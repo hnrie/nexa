@@ -12,12 +12,14 @@ import { t, translator } from "@/i18n";
 /** The styles a `<t:…>` timestamp in a message can ask for, beside the app's own. */
 export type StampStyle = "t" | "T" | "d" | "D" | "f" | "F" | "R";
 
-type Kind = "time" | "date" | "shortDate" | "longDate" | "full" | "exact" | `stamp:${Exclude<StampStyle, "R">}`;
+type Kind = "time" | "date" | "shortDate" | "dayMonth" | "weekday" | "longDate" | "full" | "exact" | `stamp:${Exclude<StampStyle, "R">}`;
 
 const OPTIONS: Record<Kind, Intl.DateTimeFormatOptions> = {
   time: { hour: "numeric", minute: "2-digit" },
   date: { month: "2-digit", day: "2-digit", year: "numeric" },
   shortDate: { month: "short", day: "numeric", year: "numeric" },
+  dayMonth: { month: "short", day: "numeric" },
+  weekday: { weekday: "short" },
   longDate: { month: "long", day: "numeric", year: "numeric" },
   full: { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" },
   exact: { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" },
@@ -80,6 +82,21 @@ export function formatExact(ms: number): string {
   return fmt("exact").format(new Date(ms));
 }
 
+/**
+ * When something was last changed, as short as a list wants it: the time
+ * today, the day of the week within the last week, the day and month this
+ * year, and the whole date before that.
+ */
+export function formatListWhen(ms: number, now = Date.now()): string {
+  if (sameDay(ms, now)) return formatTime(ms);
+  const d = new Date(ms);
+  const n = new Date(now);
+  const days = (new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime() - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / 86_400_000;
+  if (days > 0 && days < 7) return fmt("weekday").format(d);
+  if (d.getFullYear() === n.getFullYear()) return fmt("dayMonth").format(d);
+  return fmt("shortDate").format(d);
+}
+
 /** "Sep 24, 2026", a date on its own: member since, when a page was published. */
 export function formatShortDate(ms: number): string {
   return fmt("shortDate").format(new Date(ms));
@@ -108,6 +125,34 @@ export function formatBytes(n: number): string {
   if (n < 1024 * 1024) return t("time.kilobytes", { n: round(n / 1024, 1) });
   if (n < 1024 * 1024 * 1024) return t("time.megabytes", { n: round(n / (1024 * 1024), 1) });
   return t("time.gigabytes", { n: round(n / (1024 * 1024 * 1024), 2) });
+}
+
+const numbers = new Map<string, Intl.NumberFormat>();
+
+function numberFormat(kind: "compact" | "percent"): Intl.NumberFormat {
+  const locale = translator().locale;
+  const key = `${locale}:${kind}`;
+  let f = numbers.get(key);
+  if (!f) {
+    const options: Intl.NumberFormatOptions = kind === "compact" ? { notation: "compact", maximumFractionDigits: 1 } : { style: "percent", maximumFractionDigits: 0 };
+    try {
+      f = new Intl.NumberFormat(locale, options);
+    } catch {
+      f = new Intl.NumberFormat(undefined, options);
+    }
+    numbers.set(key, f);
+  }
+  return f;
+}
+
+/** A count in few characters, "1.2K" or "3.4M" as the language writes them: a post's likes, its views. */
+export function formatCompact(n: number): string {
+  return numberFormat("compact").format(n);
+}
+
+/** A share out of a hundred, "75%" as the language writes it. */
+export function formatPercent(percent: number): string {
+  return numberFormat("percent").format(percent / 100);
 }
 
 export function formatDuration(seconds: number): string {

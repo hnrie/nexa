@@ -58,10 +58,18 @@ export interface AppLockPolicy {
   blurDelayMs: number;
 }
 
+export type FontFace = "default" | "classic";
+
 export interface Settings {
   theme: Theme;
   accent: string | null;
   fontScale: number;
+  /**
+   * The app's typeface: Wix Madefor, or the classic pair it had before
+   * (Onest, with wide Mona Sans for names and titles), loaded only for
+   * whoever picks it.
+   */
+  fontFace: FontFace;
   messageDisplay: "cozy" | "compact";
   reducedMotion: boolean;
   underlineLinks: boolean;
@@ -165,6 +173,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: "dark",
   accent: null,
   fontScale: 1,
+  fontFace: "default",
   messageDisplay: "cozy",
   reducedMotion: false,
   underlineLinks: false,
@@ -252,6 +261,8 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     plugins: Array.isArray(inc.plugins) ? inc.plugins : base.plugins,
 
     whatsNewSeen: typeof inc.whatsNewSeen === "string" || inc.whatsNewSeen === null ? inc.whatsNewSeen : base.whatsNewSeen,
+
+    fontFace: inc.fontFace === "classic" || inc.fontFace === "default" ? inc.fontFace : base.fontFace,
 
     smartEmoji: typeof inc.smartEmoji === "boolean" ? inc.smartEmoji : base.smartEmoji,
     emojiUsage: "emojiUsage" in inc ? sanitizeUsage(inc.emojiUsage) : base.emojiUsage,

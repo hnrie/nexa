@@ -18,6 +18,12 @@ function follow(link: AppLink, anchor: Element, nav: NavigateFunction): void {
     else nav(`/invite/${link.code}${link.hash}`);
     return;
   }
+  if (link.kind === "note") {
+    // the same for a note's share link: a dialog in the app, its own page outside it
+    if (inApp()) ui.openModal("noteLink", { token: link.token, hash: link.hash });
+    else nav(`/note/${link.token}${link.hash}`);
+    return;
+  }
   // a link in a dialog (a profile, a topic) leads away from it
   if (anchor.closest("[data-modal-layer]")) ui.closeAllModals();
   const here = window.location.pathname + window.location.search + window.location.hash;

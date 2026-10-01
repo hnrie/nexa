@@ -94,6 +94,22 @@ describe("drawing a theme", () => {
     expect(document.documentElement.dataset["underlineLinks"]).toBe("false");
   });
 
+  it("sets the classic typeface when it is chosen, and takes it off again", () => {
+    applyTheme({ ...base, theme: "dark", fontFace: "classic" });
+    expect(document.documentElement.dataset["font"]).toBe("classic");
+    applyTheme({ ...base, theme: "dark", fontFace: "default" });
+    expect(document.documentElement.dataset["font"]).toBeUndefined();
+    applyTheme({ ...base, theme: "dark" });
+    expect(document.documentElement.dataset["font"]).toBeUndefined();
+  });
+
+  it("remembers the classic typeface for the next first frame, and nothing for the default", () => {
+    rememberAppearance({ ...base, theme: "dark", fontFace: "classic" });
+    expect(rememberedAppearance()?.fontFace).toBe("classic");
+    rememberAppearance({ ...base, theme: "dark", fontFace: "default" });
+    expect(rememberedAppearance()?.fontFace).toBeUndefined();
+  });
+
   it("draws a missing custom theme as Dark rather than as nothing", () => {
     expect(resolveLook({ ...base, theme: "custom-gone0000" }).id).toBe("dark");
     expect(resolveLook({ ...base, theme: custom.id, customThemes: [custom] }).tokens?.link).toBe("#88ccff");

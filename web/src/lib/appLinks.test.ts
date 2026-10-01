@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { appLink, inviteLinksIn, messageTarget, setPublicUrl } from "./appLinks";
+import { appLink, inviteLinksIn, isNoteLink, messageTarget, noteLinksIn, setPublicUrl } from "./appLinks";
 import { parse } from "@/markdown/parse";
 
 const here = { href: "https://chat.evilion.xyz/channels/1/2", host: "chat.evilion.xyz" };
@@ -12,6 +12,18 @@ describe("appLink", () => {
     expect(appLink("https://chat.evilion.xyz/invite/AbC-12_x", here)).toEqual({ kind: "invite", code: "AbC-12_x", hash: "" });
     expect(appLink("https://chat.evilion.xyz/invite/AbC#k=3.abcdef", here)).toEqual({ kind: "invite", code: "AbC", hash: "#k=3.abcdef" });
     expect(appLink("/invite/xyz/", here)).toEqual({ kind: "invite", code: "xyz", hash: "" });
+  });
+
+  it("opens a note's share link in the app, keeping its key in the fragment", () => {
+    const token = "dG9rZW4tZm9yLWEtbm90ZQ";
+    const key = "k".repeat(43);
+    expect(appLink(`https://chat.evilion.xyz/note/${token}#${key}`, here)).toEqual({ kind: "note", token, hash: `#${key}` });
+    expect(appLink(`/note/${token}/`, here)).toEqual({ kind: "note", token, hash: "" });
+    expect(isNoteLink(`https://chat.evilion.xyz/note/${token}#${key}`, here)).toBe(true);
+    // a token too short to be one, and another site's page of the same name, are not
+    expect(appLink("https://chat.evilion.xyz/note/short", here)).toEqual({ kind: "route", path: "/note/short" });
+    expect(isNoteLink(`https://elsewhere.example/note/${token}`, here)).toBe(false);
+    expect(isNoteLink("not a link", here)).toBe(false);
   });
 
   it("routes channels, messages, sticker packs, the download page and unknown pages", () => {
@@ -89,5 +101,31 @@ describe("inviteLinksIn", () => {
     const tree = [{ type: "table", head: [[links[0]]], rows: [[[links[1]]], [[links[2], links[3]]]] }, { type: "details", summary: [], children: [links[4]] }];
     expect(inviteLinksIn(tree, here).map((l) => l.code)).toEqual(["c0", "c1", "c2"]);
     expect(inviteLinksIn(null, here)).toEqual([]);
+  });
+});
+
+describe("noteLinksIn", () => {
+  const token = (n: number) => `dG9rZW4tZm9yLWEtbm90ZQ${n}`;
+  const key = "k".repeat(43);
+  it("finds each note link once, in order, with its key, and none in code or written as <url>", () => {
+    const text = [
+      `a note https://chat.evilion.xyz/note/${token(1)}#${key}`,
+      `[another](https://chat.evilion.xyz/note/${token(2)}#${key})`,
+      `again https://chat.evilion.xyz/note/${token(1)}#${key}`,
+      `quiet <https://chat.evilion.xyz/note/${token(3)}#${key}>`,
+      `\`https://chat.evilion.xyz/note/${token(4)}#${key}\``,
+      "and an invite https://chat.evilion.xyz/invite/abc",
+    ].join("\n");
+    expect(noteLinksIn(parse(text), here)).toEqual([
+      { token: token(1), hash: `#${key}`, url: `https://chat.evilion.xyz/note/${token(1)}#${key}` },
+      { token: token(2), hash: `#${key}`, url: `https://chat.evilion.xyz/note/${token(2)}#${key}` },
+    ]);
+    // and an invite list does not pick notes up
+    expect(inviteLinksIn(parse(text), here).map((l) => l.code)).toEqual(["abc"]);
+  });
+
+  it("stops at three", () => {
+    const text = [1, 2, 3, 4, 5].map((n) => `https://chat.evilion.xyz/note/${token(n)}#${key}`).join(" ");
+    expect(noteLinksIn(parse(text), here).map((l) => l.token)).toEqual([token(1), token(2), token(3)]);
   });
 });

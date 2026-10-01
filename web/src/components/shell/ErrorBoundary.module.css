@@ -1,6 +1,6 @@
 .wrap { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; background: var(--bg-base); }
 .card { width: 100%; max-width: 520px; padding: 28px; border-radius: var(--radius-md); background: var(--bg-raised); box-shadow: var(--shadow-high); }
-.title { margin: 0 0 8px; font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 23px; font-weight: 820; letter-spacing: -0.018em; color: var(--text-strong); }
+.title { margin: 0 0 8px; font-family: var(--font-display); font-size: 23px; font-weight: 700; letter-spacing: -0.01em; color: var(--text-strong); }
 .body { margin: 0 0 16px; font-size: 15px; color: var(--text); line-height: 1.45; }
 .detail { margin: 0 0 16px; padding: 12px; max-height: 180px; overflow: auto; border-radius: var(--radius-sm); background: var(--code-bg); border: 1px solid var(--code-border); color: var(--text-muted); font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }

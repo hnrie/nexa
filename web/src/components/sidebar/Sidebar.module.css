@@ -8,6 +8,7 @@
 .searchText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .searchKeys { flex: none; padding: 1px 6px; border-radius: 6px; background: var(--bg-surface); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--shade) 40%, transparent), 0 0 0 1px var(--border-subtle); font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
 @media (pointer: coarse) { .searchKeys { display: none; } }
+.searchKeys[data-hidden] { display: none; }
 .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 8px 0; }
 .nav { position: relative; display: flex; align-items: center; gap: 12px; height: 42px; margin-bottom: 2px; padding: 0 8px; border-radius: var(--radius-sm); color: var(--text-channel); font-size: 15.5px; font-weight: 550; width: 100%; transition: background-color var(--transition), color var(--transition), box-shadow var(--transition); }
 .nav:hover { background: var(--bg-hover); color: var(--text); }
@@ -17,6 +18,7 @@
 .nav[data-selected="true"] .navIcon { color: var(--text-brand); }
 .header { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 18px 8px 4px 10px; color: var(--text-muted); font-size: 12.5px; font-weight: 650; letter-spacing: 0.01em; }
 .header:hover { color: var(--text); }
+.headerBtns { display: inline-flex; align-items: center; gap: 6px; }
 .headerBtn { display: flex; padding: 2px; color: inherit; border-radius: var(--radius-xs); }
 .headerBtn:hover { color: var(--text-strong); }
 .item { position: relative; display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 8px; margin-bottom: 2px; border-radius: var(--radius-sm); color: var(--text-channel); width: 100%; text-align: start; transition: background-color var(--transition), color var(--transition), box-shadow var(--transition); }
@@ -94,3 +96,12 @@
 @media (hover: hover) { .item:hover .close { display: flex; } }
 /* reachable from the keyboard as well: it shows while the row has focus */
 .item:focus-within .close { display: flex; }
+
+/* picking several at once (stores/pick.ts): a picked row is lit in the accent */
+.item[data-picked] { background: color-mix(in srgb, var(--brand) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 30%, transparent); color: var(--text-strong); }
+.item[data-picked]:hover { background: color-mix(in srgb, var(--brand) 20%, transparent); }
+/* the handle a finger drags a row by while picking by tap; the list does not scroll under it */
+.dragHandle { flex: none; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-inline-end: -6px; border-radius: var(--radius-sm); color: var(--text-muted); touch-action: none; cursor: grab; }
+.dragHandle:active { color: var(--text-strong); background: var(--bg-active); cursor: grabbing; }
+/* the name of what a finger is dragging, following it */
+.ghost { position: fixed; left: 0; top: 0; z-index: var(--z-menu); pointer-events: none; display: inline-flex; align-items: center; gap: 6px; max-width: 240px; padding: 7px 12px; border-radius: var(--radius-sm); background: var(--bg-floating); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px color-mix(in srgb, var(--brand) 45%, transparent), var(--shadow-high); color: var(--text-strong); font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

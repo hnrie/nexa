@@ -34,10 +34,9 @@
   align-items: center;
   gap: 9px;
   font-family: var(--font-display);
-  font-stretch: 108%;
   font-size: 16.5px;
-  font-weight: 780;
-  letter-spacing: -0.005em;
+  font-weight: 680;
+  letter-spacing: 0;
   color: var(--text-strong);
   padding-inline-end: 14px;
   margin-inline-end: 2px;
@@ -313,10 +312,9 @@
   gap: 7px;
   min-width: 0;
   font-family: var(--font-display);
-  font-stretch: var(--display-stretch);
   font-size: 17.5px;
-  font-weight: 800;
-  letter-spacing: -0.012em;
+  font-weight: 690;
+  letter-spacing: -0.006em;
   color: var(--text-strong);
 }
 .cardNameText {
@@ -332,7 +330,6 @@
   padding: 0 7px;
   border-radius: 999px;
   font-family: var(--font);
-  font-stretch: 100%;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0;
@@ -564,9 +561,8 @@
 }
 .emptyTitle {
   font-family: var(--font-display);
-  font-stretch: var(--display-stretch);
   font-size: 17px;
-  font-weight: 780;
+  font-weight: 680;
   color: var(--text-strong);
 }
 .sentinel {
@@ -823,10 +819,9 @@
   align-items: center;
   gap: 8px;
   font-family: var(--font-display);
-  font-stretch: var(--display-stretch);
   font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.012em;
+  font-weight: 690;
+  letter-spacing: -0.006em;
   color: var(--text-strong);
   min-width: 0;
 }
@@ -986,9 +981,8 @@ td.logReason {
   gap: 8px;
   margin: 0 0 4px;
   font-family: var(--font-display);
-  font-stretch: var(--display-stretch);
   font-size: 17px;
-  font-weight: 780;
+  font-weight: 680;
   color: var(--text-strong);
 }
 .panelHint {
@@ -1088,10 +1082,9 @@ td.logReason {
 .modalTitle {
   margin: 0;
   font-family: var(--font-display);
-  font-stretch: var(--display-stretch);
   font-size: 19px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-weight: 690;
+  letter-spacing: -0.005em;
   color: var(--text-strong);
 }
 .modalTarget {

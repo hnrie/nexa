@@ -1,7 +1,7 @@
 /* The front page. It has colours of its own, which follow the visitor's light
-   or dark preference rather than the app's theme; the app's type (Onest, with
-   the wide Mona Sans for headings as the app's names and titles have it,
-   with JetBrains Mono kept for ciphertext alone); and one thing that moves by
+   or dark preference rather than the app's theme; the app's type (Wix Madefor
+   Text, with its Display cut for headings as the app's names and titles have
+   it, with JetBrains Mono kept for ciphertext alone); and one thing that moves by
    itself, the line through the conversation at the top. */
 
 /* Registered so the line can glide rather than jump when it first comes in. */
@@ -163,11 +163,10 @@
 .h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-stretch: 110%;
   font-size: clamp(38px, 3.2vw + 20px, 68px);
-  font-weight: 850;
+  font-weight: 720;
   line-height: 1.02;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.024em;
   text-wrap: balance;
 }
 .lede { margin: 0; max-width: 34em; font-size: clamp(17px, 0.4vw + 15.5px, 20px); line-height: 1.6; color: var(--ink-soft); }
@@ -266,7 +265,7 @@
 /* the rule that opens each chapter, as wide as the text rather than the screen */
 .chapter::before { content: ""; grid-column: 1 / -1; height: 1px; margin-bottom: 44px; background: var(--rule); }
 .chapterHead { min-width: 0; }
-.h2 { margin: 0; font-family: var(--font-display); font-stretch: 110%; font-size: clamp(30px, 1.5vw + 22px, 46px); font-weight: 850; line-height: 1.06; letter-spacing: -0.03em; text-wrap: balance; }
+.h2 { margin: 0; font-family: var(--font-display); font-size: clamp(30px, 1.5vw + 22px, 46px); font-weight: 720; line-height: 1.06; letter-spacing: -0.02em; text-wrap: balance; }
 .chapterLede { max-width: 34em; margin: 14px 0 0; font-size: 18px; line-height: 1.6; color: var(--ink-soft); }
 .chapterBody { display: flex; flex-direction: column; gap: 36px; min-width: 0; }
 
@@ -323,7 +322,7 @@
 
 .end { padding-top: 24px; padding-bottom: 96px; }
 .end::before { content: ""; display: block; height: 1px; margin-bottom: 72px; background: var(--rule); }
-.endTitle { margin: 0; font-family: var(--font-display); font-stretch: 110%; font-size: clamp(38px, 3.2vw + 20px, 68px); font-weight: 850; line-height: 1.03; letter-spacing: -0.035em; text-wrap: balance; }
+.endTitle { margin: 0; font-family: var(--font-display); font-size: clamp(38px, 3.2vw + 20px, 68px); font-weight: 720; line-height: 1.03; letter-spacing: -0.024em; text-wrap: balance; }
 .endBody { max-width: 34em; margin: 16px 0 0; font-size: 19px; line-height: 1.6; color: var(--ink-soft); }
 
 .foot { border-top: 1px solid var(--rule); }

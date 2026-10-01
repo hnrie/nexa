@@ -79,7 +79,7 @@ export default function DevicesPage() {
     });
   return (
     <>
-      <h2 className={s.title}>{t("settings.devices.devices")}</h2>
+      <h2 data-setting="sessions" className={s.title}>{t("settings.devices.devices")}</h2>
       <p className={s.hint}>{t("settings.devices.everyDeviceThatIsLoggedInto")}</p>
       {/* The one action that needs no device to be recognised comes first: it
           used to wait under every row, out of sight once there were a few. */}

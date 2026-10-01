@@ -1,6 +1,6 @@
 import type { AlertKind, Align, Node, RenderCtx } from "@/markdown/ast";
 import { formatColorSpec } from "@/markdown/colors";
-import { misleadingLabel, parse, RE_ALERT, RE_FOOTNOTE_DEF, RE_HEADING, RE_HR, RE_LIST, trimUrl } from "@/markdown/parse";
+import { fileLine, misleadingLabel, parse, RE_ALERT, RE_FOOTNOTE_DEF, RE_HEADING, RE_HR, RE_LIST, trimUrl } from "@/markdown/parse";
 import { shortcodeToEmoji } from "@/lib/shortcodes";
 import { formatStamp } from "@/lib/time";
 import { t } from "@/i18n";
@@ -23,9 +23,15 @@ export interface Loaded {
   simplified: boolean;
 }
 
-export function fromMarkdown(src: string, names?: AtomNames): Loaded {
+/** How a note's text is read: with its file lines as files, and as long as a note may be. */
+export interface ReadOptions {
+  files?: boolean;
+  max?: number;
+}
+
+export function fromMarkdown(src: string, names?: AtomNames, read?: ReadOptions): Loaded {
   const st: LoadState = { out: [], simplified: false, names };
-  blocksOf(parse(src), null, st);
+  blocksOf(parse(src, read?.files || read?.max ? { files: read.files === true, ...(read.max ? { max: read.max } : {}) } : undefined), null, st);
   // trailing and leading blank lines say nothing, and the parser drops them
   while (st.out.length > 1 && emptyLine(st.out[st.out.length - 1])) st.out.pop();
   return { blocks: st.out.length ? withoutSeparators(st.out) : [textBlock()], simplified: st.simplified };
@@ -126,6 +132,9 @@ function blocksOf(nodes: Node[], wrap: Wrap, st: LoadState): void {
         break;
       case "hr":
         st.out.push({ id: newId(), kind: "hr", wrap });
+        break;
+      case "file":
+        st.out.push({ id: newId(), kind: "file", file: node.id, name: node.name, wrap });
         break;
       case "table":
         st.out.push({
@@ -324,6 +333,9 @@ function flowLines(run: Block[], afterTable = false): string[] {
       }
       case "hr":
         out.push("---");
+        break;
+      case "file":
+        out.push(fileLine(block.file, block.name));
         break;
       case "table": {
         if (prevTable) out.push("");

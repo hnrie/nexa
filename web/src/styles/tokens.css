@@ -96,13 +96,12 @@
   --tooltip-text: #f5f3fa;
   --tooltip-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
   /* Twemoji first: its face only covers emoji code points (fonts.css), so every name, status, menu
-     and text box draws emoji with the same artwork the messages use, and letters keep Onest.
+     and text box draws emoji with the same artwork the messages use, and letters keep Wix Madefor.
      Keycaps start with a digit, so theirs comes after the letters' faces. */
-  --font: "Twemoji Text", "Onest Variable", "Noto Sans", "Twemoji Keycaps", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font: "Twemoji Text", "Wix Madefor Text Variable", "Noto Sans", "Twemoji Keycaps", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-with-emoji: var(--font);
-  /* names and titles: Mona Sans, wide and heavy like the wordmark; Onest where it has no letters (Cyrillic) */
-  --font-display: "Twemoji Text", "Mona Sans Variable", "Onest Variable", "Noto Sans", "Twemoji Keycaps", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --display-stretch: 115%;
+  /* names and titles: the Display cut of the same family, tighter and finer for large sizes */
+  --font-display: "Twemoji Text", "Wix Madefor Display Variable", "Wix Madefor Text Variable", "Noto Sans", "Twemoji Keycaps", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --rail-w: 72px;
   --sidebar-w: 248px;
@@ -115,6 +114,19 @@
   --avatar-lg: 40px;
   --avatar-xl: 80px;
   color-scheme: dark;
+}
+
+/*
+ * The classic typeface, for whoever picks it in Appearance (lib/theme.ts,
+ * styles/fonts-classic.css): Onest for everything people read and click, and
+ * Mona Sans for names and titles, as wide as it used to be drawn. The width
+ * is set here once and inherited; only Mona Sans has a width to change, so
+ * the text set in Onest stays as it is.
+ */
+:root[data-font="classic"] {
+  --font: "Twemoji Text", "Onest Variable", "Noto Sans", "Twemoji Keycaps", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Twemoji Text", "Mona Sans Variable", "Onest Variable", "Noto Sans", "Twemoji Keycaps", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-stretch: 115%;
 }
 
 [data-theme="light"] {

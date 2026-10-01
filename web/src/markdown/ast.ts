@@ -22,6 +22,12 @@ export type Node =
   /** A task list item's box; always the first node of its item. */
   | { type: "task"; checked: boolean }
   | { type: "hr" }
+  /**
+   * A file a note holds, on a line of its own: `![name](nexa-file:id)`. Only a
+   * note's text is parsed with these on (`files`); in a message the same
+   * characters are the words they look like.
+   */
+  | { type: "file"; id: string; name: string }
   /** `head` is the header row's cells; every row has exactly `align.length` cells. */
   | { type: "table"; align: Align[]; head: Node[][]; rows: Node[][][] }
   | { type: "alert"; kind: AlertKind; children: Node[] }
@@ -56,4 +62,6 @@ export interface RenderCtx {
    * line is already the way to the message.
    */
   inert?: boolean;
+  /** Draws a note's file where the text has it; without it the file's name stands in. */
+  renderFile?: (id: string, name: string) => import("react").ReactNode;
 }

@@ -102,7 +102,7 @@ export default function AboutPage() {
       </section>
 
       <section className={l.aboutGroup}>
-        <h3 className={l.aboutLabel}>{t("settings.about.documents")}</h3>
+        <h3 data-setting="documents" className={l.aboutLabel}>{t("settings.about.documents")}</h3>
         {/* the page around them follows the language; a translated Terms would be a different Terms */}
         {!locale.startsWith("en") ? <p className={s.hint}>{t("settings.about.englishOnly")}</p> : null}
         <div className={l.rows}>
@@ -112,7 +112,7 @@ export default function AboutPage() {
       </section>
 
       <section className={l.aboutGroup}>
-        <h3 className={l.aboutLabel}>{t("settings.about.contact")}</h3>
+        <h3 data-setting="contact" className={l.aboutLabel}>{t("settings.about.contact")}</h3>
         <div className={l.rows}>
           <div className={l.row}>
             <span className={l.rowIcon} aria-hidden="true">
@@ -150,7 +150,7 @@ export default function AboutPage() {
       </section>
 
       <section className={l.aboutGroup}>
-        <h3 className={l.aboutLabel}>{t("settings.about.version")}</h3>
+        <h3 data-setting="version" className={l.aboutLabel}>{t("settings.about.version")}</h3>
         <div className={l.rows}>
           <div className={l.row}>
             <span className={l.rowIcon} aria-hidden="true">

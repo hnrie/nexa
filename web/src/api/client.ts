@@ -32,6 +32,8 @@ export class ApiError extends Error {
   status: number;
   code: string;
   retryAfter?: number;
+  /** What the server said beside the error itself: the version a note is at, the files it would not take. */
+  details?: Record<string, unknown>;
 
   constructor(status: number, code: string, message: string, retryAfter?: number) {
     super(message);
@@ -111,7 +113,10 @@ export function errorFrom(status: number, body: string, retryAfterHeader: string
     parsed = undefined;
   }
   if (isErrorEnvelope(parsed)) {
-    return new ApiError(status, parsed.error.code, parsed.error.message, retryAfter);
+    const err = new ApiError(status, parsed.error.code, parsed.error.message, retryAfter);
+    const { error: _error, ...rest } = parsed as unknown as Record<string, unknown>;
+    if (Object.keys(rest).length > 0) err.details = rest;
+    return err;
   }
   return new ApiError(status, `http_${status}`, genericMessage(status), retryAfter);
 }

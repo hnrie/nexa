@@ -6,6 +6,7 @@ import { enterElementFullscreen, enterVideoFullscreen, exitElementFullscreen, fu
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { fitVideo } from "./fitMedia";
 import { mediaPrefs, saveMediaPrefs } from "./mediaPrefs";
+import { followVideo } from "./soundtrack";
 import s from "./VideoPlayer.module.css";
 
 import { t as tr_ } from "@/i18n";
@@ -79,11 +80,18 @@ interface Props {
   poster?: string | undefined;
   /** Hidden until the viewer chooses to reveal it. */
   spoiler?: boolean;
+  /** The video's sound, when it is a file of its own (a post from Reddit); played in step with the picture. */
+  audio?: string | undefined;
 }
 
 /** The app's own video player: themed controls, keyboard, PiP and a download. */
-export function VideoPlayer({ src, name, width, height, poster, spoiler = false }: Props) {
+export function VideoPlayer({ src, name, width, height, poster, spoiler = false, audio }: Props) {
   const video = useRef<HTMLVideoElement>(null);
+  const sound = useRef<HTMLAudioElement>(null);
+  useEffect(() => {
+    if (!audio || !video.current || !sound.current) return;
+    return followVideo(video.current, sound.current);
+  }, [audio, src]);
   const wrap = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
@@ -314,6 +322,7 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
       data-testid="video-player"
     >
       <video ref={video} className={s.video} src={src} poster={poster} playsInline preload="metadata" onClick={onSurface} onDoubleClick={toggleFull} />
+      {audio ? <audio ref={sound} src={audio} preload="metadata" hidden /> : null}
       {!revealed ? (
         <button type="button" className={s.spoiler} aria-label={tr_("render.spoilerHidden")} onClick={() => setRevealed(true)}><span>{tr_("composer.composer.spoiler")}</span></button>
       ) : null}

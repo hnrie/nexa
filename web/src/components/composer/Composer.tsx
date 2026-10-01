@@ -36,6 +36,7 @@ import { rankPeople, recentSpeakers } from "./rankPeople";
 import { servers as serversApi } from "@/api/servers";
 import { useShownName } from "@/components/chat/useShownName";
 import { createLinkPreviews } from "./linkPreviews";
+import { isPostLink } from "@/lib/postLinks";
 import { closeShortcode, typedColon } from "./shortcodeTyping";
 import { MessagePreview } from "./MessagePreview";
 import { ReplyWords, useReplyWords } from "@/components/chat/ReplyWords";
@@ -64,6 +65,13 @@ const NO_FILES: Staged[] = [];
 const TYPING_INTERVAL = 8000;
 /** How long Send waits for link previews that are still on their way. */
 const PREVIEW_WAIT = 1500;
+/**
+ * And for a link to a social post, whose card is the post itself: the server
+ * asks the post's site and then the services that fix these embeds, each in
+ * turn, for up to 4.2 s (postBudget in internal/unfurl/post.go). The message
+ * is already in the list while it waits, and goes without a card after this.
+ */
+const PREVIEW_WAIT_POST = 5000;
 
 /**
  * Saves a draft only once the account's settings are in. Before that the store
@@ -194,6 +202,8 @@ export function Composer({ channel }: { channel: Channel }) {
   const sendAsIs = useRef<string | null>(null);
   /** Files being staged, so a later pick still lands after an earlier one. */
   const staging = useRef<Promise<void>>(Promise.resolve());
+  /** Whether the box had the keyboard when Send was pressed, so the send can hand it back. */
+  const typingAtPress = useRef(false);
   // Link previews are made by the sender (so recipients never fetch the
   // address) and ride inside the encrypted payload. They are asked for when
   // the message is sent, never while it is typed: a link in a draft that is
@@ -631,7 +641,7 @@ export function Composer({ channel }: { channel: Channel }) {
     // previews still on their way are waited for alongside the uploads, so a link pasted just before Send keeps its card
     if (linkPreviews) {
       const urls = extractUrls(body);
-      if (urls.length) opts.embeds = previews.embedsFor(urls, PREVIEW_WAIT);
+      if (urls.length) opts.embeds = previews.embedsFor(urls, urls.some(isPostLink) ? PREVIEW_WAIT_POST : PREVIEW_WAIT);
     }
     // a message that cannot be sent stays in the list, marked, with Retry
     if (files.length) sendWithFiles(channelId, body, useUploads.getState().take(channelId), opts).catch(() => undefined);
@@ -970,7 +980,31 @@ export function Composer({ channel }: { channel: Channel }) {
               <button className={s.iconBtn} data-on={picker} data-picker-toggle={picker || undefined} aria-label={tr_("composer.composer.selectEmoji")} onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
             </>
           )}
-          <button className={[s.iconBtn, s.send, s.sendMobile, sendButton ? s.sendShown : ""].join(" ")} aria-label={tr_("composer.composer.sendMessage")} title={tr_("composer.composer.sendMessage")} onClick={() => void send()} disabled={remaining > 0 || (!text.trim() && files.length === 0)} data-testid="send-button"><SendHorizontal size={22} /></button>
+          <button
+            className={[s.iconBtn, s.send, s.sendMobile, sendButton ? s.sendShown : ""].join(" ")}
+            aria-label={tr_("composer.composer.sendMessage")}
+            title={tr_("composer.composer.sendMessage")}
+            // Pressing Send leaves the caret in the box: on a phone taking the
+            // focus put the keyboard away after every message, and the next
+            // one had to start with a tap on the box to bring it back.
+            onMouseDown={(e) => {
+              if (document.activeElement === taRef.current) e.preventDefault();
+            }}
+            onPointerDown={() => {
+              typingAtPress.current = document.activeElement === taRef.current;
+            }}
+            onClick={() => {
+              void send();
+              // still inside the tap, where a phone lets a box take the keyboard back
+              const ta = taRef.current;
+              if (typingAtPress.current && ta && document.activeElement !== ta) ta.focus({ preventScroll: true });
+              typingAtPress.current = false;
+            }}
+            disabled={remaining > 0 || (!text.trim() && files.length === 0)}
+            data-testid="send-button"
+          >
+            <SendHorizontal size={22} />
+          </button>
         </div>
       </div>
       <MessageCounter text={text} className={s.counter} />

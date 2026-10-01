@@ -1,0 +1,7 @@
+/*
+ * The classic look, for whoever picks it in Appearance: Onest for everything
+ * people read and click, and Mona Sans, stretched wide, for names and titles,
+ * the way the app looked before Wix Madefor. Fetched only when picked.
+ */
+@import "@fontsource-variable/onest/index.css";
+@import "@fontsource-variable/mona-sans/wdth.css";

@@ -399,6 +399,41 @@
   "chat.pins.thisChannelDoesnTHaveAny": "这里还没有置顶内容。",
   "chat.pins.unpin": "取消置顶",
   "chat.pins.unpinThisMessage": "取消置顶这条消息",
+  "chat.post.forwardedFrom": "转发自 {name}",
+  "chat.post.likes": {
+    "other": "{n} 次点赞"
+  },
+  "chat.post.note": "读者补充了背景信息",
+  "chat.post.openOn": "在 {site} 上打开",
+  "chat.post.pictureOf": "第 {index} 张，共 {count} 张",
+  "chat.post.points": {
+    "other": "{n} 分"
+  },
+  "chat.post.pollClosed": "最终结果",
+  "chat.post.pollEnds": "{date} 结束",
+  "chat.post.reactions": {
+    "other": "{n} 个回应"
+  },
+  "chat.post.replies": {
+    "other": "{n} 条回复"
+  },
+  "chat.post.replyingTo": "回复 {name}",
+  "chat.post.reposts": {
+    "other": "{n} 次转发"
+  },
+  "chat.post.sensitive": "此帖子可能包含敏感内容。",
+  "chat.post.shares": {
+    "other": "{n} 次分享"
+  },
+  "chat.post.show": "显示",
+  "chat.post.verified": "已认证",
+  "chat.post.views": {
+    "other": "{n} 次查看"
+  },
+  "chat.post.votes": {
+    "other": "{n} 票"
+  },
+  "chat.post.watchOn": "在 {site} 上观看",
   "chat.reactions.addReaction": "添加表情回应",
   "chat.reactions.andMore": {
     "other": "还有 {count} 人"
@@ -452,7 +487,6 @@
   "chat.systemMessage.pollWinner": "{answer} 以 {percent}% 胜出。",
   "chat.systemMessage.removedFromGroup": "{actor} 把 {target} 移出了群组。",
   "chat.systemMessage.someone": "某人",
-  "chat.systemMessage.startedACall": "{actor} 发起了通话。",
   "chat.systemMessage.tookOwnership": "{actor} 成为了群主。",
   "chat.systemMessage.viewPoll": "查看投票",
   "chat.typingBar.oneTyping": "{a} 正在输入…",
@@ -1890,16 +1924,192 @@
     "other": "{count} 条来自 Nexa 的未读消息"
   },
   "nexa.viewProfile": "查看资料",
+  "notes.card.empty": "还没有写任何内容。",
+  "notes.card.locked": "无法在此设备上打开。",
+  "notes.card.sharedWith": {
+    "other": "{count} 人共享此笔记"
+  },
+  "notes.editor.addPicture": "添加图片或视频",
+  "notes.editor.attachFile": "附加文件",
+  "notes.editor.body": "笔记",
+  "notes.editor.placeholder": "开始书写，或拖入图片和文件",
+  "notes.editor.title": "标题",
+  "notes.editor.titlePlaceholder": "标题",
+  "notes.editor.tooLong": "此笔记超过 {max} 个字符，因此没有保存。删去一些文字即可继续保存。",
+  "notes.errors.alreadyMember": "对方已在此笔记中。",
+  "notes.errors.bad": "此笔记的部分内容无法保存。请重试。",
+  "notes.errors.blocked": "你无法邀请此人。",
+  "notes.errors.file": "此笔记中的一个文件无法保留。请重新添加。",
+  "notes.errors.filesFull": "此笔记的文件数量已达上限。",
+  "notes.errors.full": "此笔记的共享人数已达上限。",
+  "notes.errors.gone": "此笔记已不存在。",
+  "notes.errors.noInvite": "该请求已不存在。",
+  "notes.errors.noLink": "该链接已失效。",
+  "notes.errors.owner": "你是此笔记的所有者，无法退出。可以将其删除。",
+  "notes.errors.role": "你无法在此笔记中执行此操作。",
+  "notes.errors.self": "这已经是你的笔记了。",
+  "notes.errors.tooManyLinks": "此笔记的链接已达上限。删除一个后才能新建。",
+  "notes.errors.tooManyNotes": "你的笔记数量已达账号上限。删除一些后才能新建。",
+  "notes.errors.userNotFound": "没有使用该用户名的人。",
+  "notes.file.failed": "无法上传此文件。",
+  "notes.file.full": "此笔记无法再添加文件。",
+  "notes.file.notHere": "此文件尚未到达。",
+  "notes.file.remove": "移除 {name}",
+  "notes.file.removeShort": "移除",
+  "notes.file.retry": "重新上传 {name}",
+  "notes.file.retryShort": "重试",
+  "notes.file.someLeftOut": {
+    "other": "此笔记只能再添加 {count} 个文件。"
+  },
+  "notes.file.tooBig": "{name} 超过了 {limit} 的上传上限。",
+  "notes.file.untitled": "文件",
+  "notes.file.uploading": "正在上传 {name}",
+  "notes.first.body": "笔记会保存你的文字、图片和文件，并像消息一样加密。分享笔记即可实时共同编写。",
+  "notes.first.friend": "好友",
+  "notes.first.title": "写下你的第一条笔记",
+  "notes.history.allVersions": "所有版本",
+  "notes.history.backToNote": "返回笔记",
+  "notes.history.couldNotLoad": "无法加载此笔记的历史记录。",
+  "notes.history.couldNotOpen": "无法打开此版本。",
+  "notes.history.couldNotRestore": "无法恢复此版本。",
+  "notes.history.current": "当前版本",
+  "notes.history.currentNote": "笔记的当前内容",
+  "notes.history.loading": "正在加载版本",
+  "notes.history.none": "还没有更早的版本。每次停顿后重新开始书写时都会保存一个版本。",
+  "notes.history.restore": "恢复此版本",
+  "notes.history.restored": "已恢复版本。被替换的内容也保留在历史记录中。",
+  "notes.history.savedBy": "{name} 保存于 {when}",
+  "notes.history.title": "版本历史",
+  "notes.history.unreadable": "无法在此设备上打开",
+  "notes.link.alreadyIn": "你已在此笔记中",
+  "notes.link.couldNotJoin": "无法加入此笔记。",
+  "notes.link.dialogLabel": "共享的笔记",
+  "notes.link.failedBody": "请检查网络连接后重试。",
+  "notes.link.failedTitle": "无法加载笔记",
+  "notes.link.goneBody": "该链接已被移除，或笔记已被删除。",
+  "notes.link.goneTitle": "该链接已失效",
+  "notes.link.join": "加入笔记",
+  "notes.link.joinToEdit": "加入后可编辑",
+  "notes.link.joinToView": "加入后可阅读",
+  "notes.link.label": "共享的笔记：{title}",
+  "notes.link.noKeyBody": "链接缺少 # 之后包含密钥的部分。请重新索取完整链接。",
+  "notes.link.noKeyTitle": "此链接不完整",
+  "notes.link.open": "打开笔记",
+  "notes.link.opening": "正在打开笔记",
+  "notes.link.pageTitle": "共享的笔记",
+  "notes.link.people": {
+    "other": "{count} 人"
+  },
+  "notes.link.shared": "有人与你分享了一条笔记",
+  "notes.link.sharedBy": "由 {name} 分享",
+  "notes.link.signInToOpen": "登录后即可阅读。笔记经过加密，只有笔记中的成员才能阅读。",
+  "notes.link.tryAgain": "重试",
+  "notes.list.couldNotCreate": "无法新建笔记。",
+  "notes.list.couldNotLoad": "无法加载你的笔记。",
+  "notes.list.loading": "正在加载笔记",
+  "notes.list.new": "新建笔记",
+  "notes.list.noMatch": "没有与“{query}”匹配的笔记。",
+  "notes.list.none": "还没有笔记。",
+  "notes.list.pick": "选择一条笔记，或新建一条。",
+  "notes.list.search": "搜索笔记",
+  "notes.menu.delete": "删除笔记",
+  "notes.menu.deleteBody": "“{title}”将连同历史记录一起，从所有共享者那里删除。此操作无法撤销。",
+  "notes.menu.deleteTitle": "删除笔记",
+  "notes.menu.history": "版本历史",
+  "notes.menu.leave": "退出笔记",
+  "notes.menu.leaveBody": "除非有人再次与你分享，否则你将无法再打开“{title}”。",
+  "notes.menu.leaveTitle": "退出笔记",
+  "notes.menu.open": "打开笔记",
+  "notes.menu.share": "分享",
+  "notes.menu.whoHasAccess": "谁可以访问",
+  "notes.page.backToNotes": "返回笔记",
+  "notes.page.edited": "{when}编辑",
+  "notes.page.editedBy": "最后由 {name} 编辑，{when}",
+  "notes.page.editedByYou": "最后由你编辑，{when}",
+  "notes.page.failedBody": "请检查网络连接后重试。",
+  "notes.page.failedTitle": "无法打开此笔记",
+  "notes.page.goneBody": "它已被删除，或者你已不在其中。",
+  "notes.page.goneTitle": "此笔记不在这里",
+  "notes.page.hereNow": "正在查看：{names}",
+  "notes.page.isHere": "{name} 正在查看",
+  "notes.page.more": "更多",
+  "notes.page.notSaved": "未保存",
+  "notes.page.notSavedWhy": "无法保存你最近的更改。",
+  "notes.page.offline": "离线",
+  "notes.page.offlineWhy": "你的更改会保留在这里，恢复联网后即会保存。",
+  "notes.page.opening": "正在打开笔记",
+  "notes.page.saved": "已保存",
+  "notes.page.saving": "正在保存",
+  "notes.page.tryAgain": "重试",
+  "notes.page.viewOnly": "仅可查看",
+  "notes.reader.empty": "还没有写任何内容。",
+  "notes.requests.accept": "接受",
+  "notes.requests.couldNotAccept": "无法接受该请求。",
+  "notes.requests.couldNotDecline": "无法拒绝该请求。",
+  "notes.requests.count": {
+    "other": "{count} 个笔记请求"
+  },
+  "notes.requests.decline": "拒绝",
+  "notes.requests.title": "请求",
+  "notes.requests.toEdit": "{name} 想和你一起编写笔记",
+  "notes.requests.toView": "{name} 想与你分享一条笔记",
+  "notes.share.cancelInvite": "取消请求",
+  "notes.share.canEdit": "可编辑",
+  "notes.share.canView": "可查看",
+  "notes.share.copied": "已复制",
+  "notes.share.copy": "复制",
+  "notes.share.couldNotCancel": "无法取消该请求。",
+  "notes.share.couldNotChange": "无法更改 {name} 的权限。",
+  "notes.share.couldNotInvite": "无法向 {name} 发送请求。",
+  "notes.share.couldNotLoad": "无法加载此笔记的成员。",
+  "notes.share.couldNotMakeLink": "无法创建链接。",
+  "notes.share.couldNotRemove": "无法移除 {name}。",
+  "notes.share.couldNotRemoveLink": "无法移除链接。",
+  "notes.share.createLink": "创建链接",
+  "notes.share.invite": "邀请",
+  "notes.share.inviteAs": "对方的权限",
+  "notes.share.invited": "已向 {name} 发送请求。",
+  "notes.share.invitedShort": "已发送",
+  "notes.share.inviteHint": "搜索你的好友，或按用户名搜索任何人。对方会收到一条待接受的请求。",
+  "notes.share.inviteNamed": "邀请 {name}",
+  "notes.share.invitePeople": "邀请成员",
+  "notes.share.keyChanged": "{name} 的加密密钥已更改，你尚未接受。分享前请先核对其安全码。",
+  "notes.share.keyNote": "链接和请求都带有笔记的密钥。移除某人或某个链接后，笔记会换用新密钥，之后写的内容他们将无法读取。",
+  "notes.share.linkCanEdit": "知道链接的人可编辑",
+  "notes.share.linkCanView": "知道链接的人可查看",
+  "notes.share.linkCopied": "链接已复制。",
+  "notes.share.linkRole": "链接权限",
+  "notes.share.links": "分享链接",
+  "notes.share.linksHint": "创建链接，即可在消息或其他地方分享笔记。",
+  "notes.share.linkUses": {
+    "other": "{count} 人已加入"
+  },
+  "notes.share.loading": "正在加载",
+  "notes.share.nobodyFound": "未找到该名称的用户。",
+  "notes.share.owner": "所有者",
+  "notes.share.peopleWithAccess": "可访问的人",
+  "notes.share.removeFromNote": "从笔记中移除",
+  "notes.share.removeLink": "移除链接",
+  "notes.share.roleOf": "{name} 的权限",
+  "notes.share.searchPlaceholder": "搜索好友或用户名",
+  "notes.share.title": "分享“{title}”",
+  "notes.share.waiting": "已发送请求（{role}）",
+  "notes.share.whoTitle": "“{title}”的成员",
+  "notes.share.you": "{name}（你）",
+  "notes.title": "笔记",
+  "notes.untitled": "无标题笔记",
   "notFound.body": "链接可能输错了，或者它指向的内容已经移走。",
   "notFound.home": "前往首页",
   "notFound.openNexa": "打开 Nexa",
   "notFound.title": "此页面不存在",
   "notify.friendRequest": "好友请求",
   "notify.newMessage": "新消息",
+  "notify.noteInvite": "笔记请求",
   "notify.sentASticker": "发送了一张贴纸",
   "notify.sentFile": "发送了 {name}",
   "notify.sentFiles": "发送了 {count} 个文件",
   "notify.sentYouAFriendRequest": "{name} 给你发了好友申请。",
+  "notify.sharedANote": "{name} 想与你分享一条笔记。",
   "offline.canTConnect": "无法连接",
   "offline.couldNotReachTheServer": "联系不上服务器。",
   "offline.youAreStillLoggedInCheck": "你仍处于登录状态。检查一下网络，或者服务器正在重启的话稍等片刻；本页会继续尝试。",
@@ -2071,6 +2281,126 @@
   "perms.viewAuditLog": "查看审计日志",
   "perms.viewChannels": "查看频道",
   "perms.voiceChannelPermissions": "语音频道权限",
+  "pick.accepted": {
+    "other": "已接受 {count} 个申请。"
+  },
+  "pick.acceptRequests": {
+    "other": "接受 {count} 个申请"
+  },
+  "pick.addRole": "添加身份组",
+  "pick.ban": {
+    "other": "封禁 {count} 名成员"
+  },
+  "pick.banned": {
+    "other": "已封禁 {count} 名成员。"
+  },
+  "pick.banTitle": {
+    "other": "封禁 {count} 名成员？"
+  },
+  "pick.block": {
+    "other": "屏蔽 {count} 人"
+  },
+  "pick.blockBody": "{names} 将无法再给你发消息或好友申请。",
+  "pick.blocked": {
+    "other": "已屏蔽 {count} 人。"
+  },
+  "pick.blockTitle": {
+    "other": "屏蔽 {count} 人？"
+  },
+  "pick.cancelRequests": {
+    "other": "撤回 {count} 个申请"
+  },
+  "pick.close": "关闭会话",
+  "pick.closeBody": {
+    "other": "其中 {count} 个是群聊，你将退出这些群聊。"
+  },
+  "pick.closeConfirm": "关闭并退出",
+  "pick.closeTitle": {
+    "other": "关闭 {count} 个会话？"
+  },
+  "pick.count": {
+    "other": "已选择 {count} 项"
+  },
+  "pick.dmBar": "已选会话",
+  "pick.done": "完成",
+  "pick.friendsBar": "已选用户",
+  "pick.friendsRemoved": {
+    "other": "已删除 {count} 位好友。"
+  },
+  "pick.groupChatWith": {
+    "other": "与 {count} 人创建群聊"
+  },
+  "pick.ignoreRequests": {
+    "other": "忽略 {count} 个申请"
+  },
+  "pick.kick": {
+    "other": "踢出 {count} 名成员"
+  },
+  "pick.kicked": {
+    "other": "已踢出 {count} 名成员。"
+  },
+  "pick.kickTitle": {
+    "other": "踢出 {count} 名成员？"
+  },
+  "pick.leaveServers": {
+    "other": "退出 {count} 个服务器"
+  },
+  "pick.leaveServersBody": "你将退出 {names}，需要新的邀请才能回来。",
+  "pick.leaveServersTitle": {
+    "other": "退出 {count} 个服务器？"
+  },
+  "pick.listOptions": "列表选项",
+  "pick.membersBar": "已选成员",
+  "pick.more": "更多",
+  "pick.mute": "静音",
+  "pick.newFolder": "新建文件夹",
+  "pick.ownedStay": {
+    "other": "你拥有的 {count} 个服务器会保留。"
+  },
+  "pick.pickNamed": "选择 {name}",
+  "pick.pin": "置顶",
+  "pick.removedFromGroup": {
+    "other": "已将 {count} 人移出群组。"
+  },
+  "pick.removeFriends": {
+    "other": "删除 {count} 位好友"
+  },
+  "pick.removeFriendsBody": "你将不再与 {names} 是好友。",
+  "pick.removeFriendsTitle": {
+    "other": "删除 {count} 位好友？"
+  },
+  "pick.removeFromGroup": {
+    "other": "将 {count} 人移出群组"
+  },
+  "pick.removeFromGroupBody": "{names} 将离开群组，不再收到群消息。",
+  "pick.removeFromGroupTitle": {
+    "other": "将 {count} 人移出群组？"
+  },
+  "pick.removeRole": "移除身份组",
+  "pick.requestsDropped": {
+    "other": "已移除 {count} 个申请。"
+  },
+  "pick.roleGiven": {
+    "other": "已为 {count} 名成员添加身份组。"
+  },
+  "pick.roleTaken": {
+    "other": "已为 {count} 名成员移除身份组。"
+  },
+  "pick.select": "选择",
+  "pick.selectConversations": "选择会话",
+  "pick.serverBar": "已选服务器",
+  "pick.sortedManually": "已手动排序",
+  "pick.sortManual": "手动排序",
+  "pick.sortRecent": "按最近活动排序",
+  "pick.tapToPick": "轻点以选择",
+  "pick.unblocked": {
+    "other": "已解除屏蔽 {count} 人。"
+  },
+  "pick.unblockPeople": {
+    "other": "解除屏蔽 {count} 人"
+  },
+  "pick.unmute": "取消静音",
+  "pick.unpin": "取消置顶",
   "pickers.emojiIndex.activities": "活动",
   "pickers.emojiIndex.animalsNature": "动物与自然",
   "pickers.emojiIndex.flags": "旗帜",
@@ -2200,6 +2530,7 @@
   "profile.profileCard.editProfile": "编辑资料",
   "profile.profileCard.friendNickname": "好友备注",
   "profile.profileCard.friendsSince": "成为好友于",
+  "profile.profileCard.joinedServer": "加入 {server}",
   "profile.profileCard.memberSince": "加入于",
   "profile.profileCard.message": "发消息",
   "profile.profileCard.mutualFriendCount": {
@@ -2214,11 +2545,13 @@
   "profile.profileCard.mutualServersCount": {
     "other": "共同服务器（{count}）"
   },
+  "profile.profileCard.noRoles": "还没有身份组。",
   "profile.profileCard.note": "备注",
   "profile.profileCard.onlyYouSeeIt": "只有你能看到。",
   "profile.profileCard.owner": "所有者",
   "profile.profileCard.ownerTip": "Nexa 所有者",
   "profile.profileCard.removeFriend": "删除好友",
+  "profile.profileCard.rolesIn": "在 {server} 的身份组",
   "profile.profileCard.viewFullBio": "查看完整简介",
   "profile.profileCard.viewFullProfile": "查看完整资料",
   "profile.profileCard.viewFullProfileOf": "查看 {name} 的完整资料",
@@ -2884,6 +3217,10 @@
   "settings.about.title": "关于",
   "settings.about.version": "版本",
   "settings.about.whatsNewSub": "最近更新中的变化，以及在哪里找到它们。",
+  "settings.accessibility.goToTextSize": "前往文字大小",
+  "settings.accessibility.motion": "动态效果",
+  "settings.accessibility.reading": "阅读",
+  "settings.accessibility.textSizeIsIn": "文字大小在“外观”中设置。",
   "settings.account.aRecoveryKeyIsSetGenerating": "已设置恢复密钥。生成新的会替换它。",
   "settings.account.accountRemoval": "删除账号",
   "settings.account.atLeast8Characters": "至少 8 个字符。",
@@ -2911,6 +3248,7 @@
   "settings.account.purge.leaves": "你将退出的其他服务器和群聊",
   "settings.account.purge.messages": "你发送的消息（所有地方）",
   "settings.account.purge.note": "任何人都无法恢复，包括 Nexa 的运营者。",
+  "settings.account.purge.notes": "你拥有的笔记（对所有共享者）",
   "settings.account.purge.ownedGroups": "你拥有的群聊（对所有成员）",
   "settings.account.purge.ownedServers": "你拥有的服务器（连同其中的一切，对所有人）",
   "settings.account.purge.packs": "你创建的贴纸和表情包",
@@ -3030,6 +3368,9 @@
   "settings.appearance.custom": "自定义",
   "settings.appearance.disablesAnimationsAndTransitions": "关闭动画和过渡效果。",
   "settings.appearance.editTheme": "编辑“{name}”",
+  "settings.appearance.font": "字体",
+  "settings.appearance.fontClassic": "经典",
+  "settings.appearance.fontDefault": "默认",
   "settings.appearance.fontSize": "字体大小",
   "settings.appearance.groupClassic": "经典",
   "settings.appearance.groupDark": "深色",
@@ -3068,6 +3409,13 @@
   "settings.appearance.underlinesMisspelledWordsInTheMessage": "输入时给拼错的词加下划线。拼写由浏览器检查：按住 Shift 右键点击一个词，就能看到浏览器的建议。Nexa 使用英语时，由 Nexa 自己检查。",
   "settings.appearance.waitingForTheDayWhen": "拖动滑块，直到文字看着舒服为止。",
   "settings.appearance.yourWords": "你添加的词",
+  "settings.chat.linksAndMedia": "链接与媒体",
+  "settings.chat.messageBox": "消息输入框",
+  "settings.chat.reading": "朗读",
+  "settings.chat.title": "消息与媒体",
+  "settings.data.deleteIsIn": "删除账号在“我的账号”中。",
+  "settings.data.export": "导出你的数据",
+  "settings.data.goToMyAccount": "前往我的账号",
   "settings.desktop.activityShowsHereOnlyDiscordDoes": "你的动态只显示在 Nexa 中，不会显示在 Discord 上。",
   "settings.desktop.alsoShowItOnDiscord": "同时显示在 Discord 上",
   "settings.desktop.callsNotificationsAndRichPresenceCarry": "通话、通知和 Rich Presence 会在托盘里继续运行。",
@@ -3133,6 +3481,12 @@
   "settings.devices.thisDevice": "这台设备",
   "settings.devices.unknownDevice": "未知设备",
   "settings.devices.yourDevicesCouldNotBeLoaded": "无法加载你的设备。",
+  "settings.groups.account": "账号",
+  "settings.groups.app": "应用",
+  "settings.groups.chat": "聊天",
+  "settings.groups.emojiStickers": "表情与贴纸",
+  "settings.groups.help": "帮助与法律",
+  "settings.groups.look": "外观与体验",
   "settings.licenses.desktopApp": "桌面应用",
   "settings.licenses.everything": "全部",
   "settings.licenses.fontsAndArtwork": "字体与图像",
@@ -3214,8 +3568,9 @@
   "settings.privacy.searchRebuilding": "索引已删除，正在重新建立",
   "settings.privacy.shareMyActivity": "分享我的动态",
   "settings.privacy.showEmbeddedImagesAndGifsFrom": "显示链接里的内嵌图片和 GIF",
+  "settings.privacy.title": "隐私",
   "settings.privacy.yourData": "你的数据",
-  "settings.privacy.yourDeviceAsksTheServerTo": "你的设备会请求服务器去查看你链接的页面，并把预览附加到你已加密的消息上。如果你不想让服务器看到你发送的链接，就关掉它。",
+  "settings.privacy.yourDeviceAsksTheServerTo": "你的设备会请求服务器去查看你链接的页面，并把预览附加到你已加密的消息上。如果是社交网站上的帖子，服务器还可能向公开的嵌入服务查询。如果你不想让服务器看到你发送的链接，就关掉它。",
   "settings.profile.aboutHintLeft": {
     "other": "这里支持 Markdown。还可输入 {count} 个字符。"
   },
@@ -3246,6 +3601,9 @@
   "settings.profile.secondColourHex": "第二色 HEX",
   "settings.profile.tellPeopleAboutYourself": "说说你自己",
   "settings.profile.topColourOnItsOwnIt": "顶部颜色：单独使用时会给你的横幅上色。",
+  "settings.search.none": "没有与“{query}”匹配的设置。",
+  "settings.search.placeholder": "搜索设置",
+  "settings.search.results": "搜索结果",
   "settings.security.anAuthenticatorAppAdds": "验证器应用会在每次登录时要求一个六位数字，光有密码就进不来了。无论如何你的消息都是端到端加密的；这一项保护的是账号本身。",
   "settings.security.appLock": "应用锁",
   "settings.security.appLockHint": "开启后，你登录的每台设备都会要求输入锁屏码。锁屏码永远不会离开输入它的设备，并在那里保护你的密钥，所以关闭标签页或锁定应用后，在你再次输入之前，消息都无法读取。连续输错十次，设备会忘掉你的密钥，用密码可以重新进入。",
@@ -3554,6 +3912,7 @@
   "sidebar.dMSidebar.closeDm": "关闭私信",
   "sidebar.dMSidebar.createDm": "创建私信",
   "sidebar.dMSidebar.directMessages": "私信",
+  "sidebar.dMSidebar.findAConversation": "查找对话",
   "sidebar.dMSidebar.findOrStartAConversation": "查找或开始一个对话",
   "sidebar.dMSidebar.friends": "好友",
   "sidebar.dMSidebar.leaveGroup": "退出群组",
@@ -3662,13 +4021,16 @@
   "voice.callBanner.joining": "正在加入…",
   "voice.callLine.callAgain": "再次呼叫",
   "voice.callLine.callBack": "回拨",
-  "voice.callLine.callWith": "与 {name} 通话 · {length}",
+  "voice.callLine.callWithName": "与 {name} 通话",
+  "voice.callLine.cancelled": "已取消",
+  "voice.callLine.declinedYourCall": "{name} 拒绝了你的通话",
+  "voice.callLine.lasted": "持续 {length}",
+  "voice.callLine.live": "正在进行",
   "voice.callLine.missedFrom": "{name} 的未接来电",
-  "voice.callLine.startedLasting": "{actor} 发起了通话 · {length}",
-  "voice.callLine.startedNoAnswer": "{actor} 发起了通话 · 无人接听",
-  "voice.callLine.theyDeclined": "{name} 拒绝了通话",
-  "voice.callLine.youCalledCancelled": "你呼叫了 {name} · 已取消",
-  "voice.callLine.youCalledNoAnswer": "你呼叫了 {name} · 无人接听",
+  "voice.callLine.noAnswer": "无人接听",
+  "voice.callLine.noOneJoined": "无人加入",
+  "voice.callLine.startedCall": "{actor} 发起了通话",
+  "voice.callLine.youCalledName": "你呼叫了 {name}",
   "voice.callLine.youDeclined": "你拒绝了 {name} 的通话",
   "voice.callNotice.missedCall": "未接来电",
   "voice.callNotice.missedInGroup": "{name} 里的未接来电",
@@ -3890,5 +4252,21 @@
   "whatsNew.r202609292.pinsTitle": "置顶消息完整显示",
   "whatsNew.r202609292.themesBody": "经典主题用柔和的紫色调取代了单调的灰色。浅色主题的提示框更加清晰，对话框也能清楚地浮在页面之上。",
   "whatsNew.r202609292.themesTitle": "焕新的主题",
+  "whatsNew.r202609303.fontBody": "Nexa 现在使用更圆润、更易读的 Wix Madefor。想换回旧字体，请在“设置”中的“外观”里，把“字体”选为“经典”。",
+  "whatsNew.r202609303.fontTitle": "更轻盈的字体",
+  "whatsNew.r202609303.liveBody": "笔记中的每个人都能看到文字随输入出现，每个人的光标和选区都有自己的颜色。早期版本保留在“版本历史”中，可以回看或恢复。",
+  "whatsNew.r202609303.liveTitle": "实时共同编写",
+  "whatsNew.r202609303.notesBody": "笔记可以在任意位置插入图片和文件，并像消息一样加密。它在“好友”下方，可以通过请求或链接分享。",
+  "whatsNew.r202609303.notesTitle": "笔记",
+  "whatsNew.r202609303.phoneBody": "表情选择器等面板可以拉到全屏或滑动关闭，发送后键盘保持打开，正在编辑的内容也不会被键盘挡住。",
+  "whatsNew.r202609303.phoneTitle": "手机上更流畅",
+  "whatsNew.r202609303.pickBody": "按住 Ctrl 点击会话、好友、服务器和成员即可同时操作，手机上长按即可。会话可以拖动成任意顺序。",
+  "whatsNew.r202609303.pickTitle": "一次选择多项",
+  "whatsNew.r202609303.postsBody": "X、Bluesky、TikTok、Instagram、Reddit、Telegram、Threads 和 Mastodon 的链接会直接显示帖子本身，图片和视频可在聊天中播放。",
+  "whatsNew.r202609303.postsTitle": "聊天中显示帖子",
+  "whatsNew.r202609303.rolesBody": "在服务器内打开的个人资料会显示此人在该服务器中的身份组。",
+  "whatsNew.r202609303.rolesTitle": "资料中显示身份组",
+  "whatsNew.r202609303.settingsBody": "设置被归入更清晰的页面，顶部的搜索框可以找到任意一项并直接跳转。",
+  "whatsNew.r202609303.settingsTitle": "更有条理的设置",
   "whatsNew.title": "新功能"
 }

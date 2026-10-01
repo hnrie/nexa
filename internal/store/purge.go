@@ -31,6 +31,8 @@ type PurgeCounts struct {
 	// DirectMessages is its one-to-one conversations, which go whole when
 	// someone deletes their own account.
 	DirectMessages int `json:"direct_messages"`
+	// Notes is the notes it owns, which go for everyone they are shared with.
+	Notes int `json:"notes"`
 }
 
 // PurgePreview counts what deleting the account would remove.
@@ -47,8 +49,9 @@ func (s *Store) PurgePreview(ctx context.Context, uid ids.ID) (PurgeCounts, erro
 		(SELECT count(*) FROM dm_participants p JOIN channels c ON c.id = p.channel_id WHERE p.user_id = ? AND c.type = 'group_dm'),
 		(SELECT count(*) FROM sticker_packs WHERE owner_user_id = ?),
 		(SELECT count(*) FROM reactions WHERE user_id = ?),
-		(SELECT count(*) FROM dm_participants p JOIN channels c ON c.id = p.channel_id WHERE p.user_id = ? AND c.type = 'dm')`,
-		id, id, id, id, id, id, id, id, id, id).Scan(&c.Messages, &c.Attachments, &c.AttachmentBytes, &c.OwnedServers, &c.OwnedGroups, &c.Servers, &c.Groups, &c.Packs, &c.Reactions, &c.DirectMessages)
+		(SELECT count(*) FROM dm_participants p JOIN channels c ON c.id = p.channel_id WHERE p.user_id = ? AND c.type = 'dm'),
+		(SELECT count(*) FROM notes WHERE owner_id = ?)`,
+		id, id, id, id, id, id, id, id, id, id, id).Scan(&c.Messages, &c.Attachments, &c.AttachmentBytes, &c.OwnedServers, &c.OwnedGroups, &c.Servers, &c.Groups, &c.Packs, &c.Reactions, &c.DirectMessages, &c.Notes)
 	return c, err
 }
 
@@ -103,7 +106,10 @@ func (s *Store) DeletedAccountsWithLeftovers(ctx context.Context) ([]ids.ID, err
 		EXISTS (SELECT 1 FROM sessions WHERE user_id = u.id) OR
 		EXISTS (SELECT 1 FROM relationships WHERE user_id = u.id OR target_id = u.id) OR
 		EXISTS (SELECT 1 FROM user_settings WHERE user_id = u.id) OR
-		EXISTS (SELECT 1 FROM key_grants WHERE user_id = u.id)
+		EXISTS (SELECT 1 FROM key_grants WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM notes WHERE owner_id = u.id) OR
+		EXISTS (SELECT 1 FROM note_members WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM note_invites WHERE from_id = u.id OR to_id = u.id)
 	) ORDER BY u.id`, FlagDeleted)
 }
 
@@ -278,7 +284,9 @@ func (s *Store) idList(ctx context.Context, q string, args ...any) ([]ids.ID, er
 // the invites and guest links it made, its unfinished uploads, its read
 // positions, recent stickers and installed packs, its per-server avatars
 // (whose pictures are let go), its Nexa read position, the crash reports its
-// devices sent and the bug reports it wrote (whose files are let go), server
+// devices sent and the bug reports it wrote (whose files are let go), the
+// notes it owns (with their versions and files) and its place in the ones it
+// was shared (which are marked for a new key), its note invitations, server
 // bans and channel permissions naming it, and any mute or ban still on it.
 // The moderation cases about it, the log and the usernames held for it stay:
 // they are the record of what was done, and a name taken away by a moderator
@@ -294,7 +302,17 @@ func (s *Store) PurgeUserLeftovers(ctx context.Context, uid ids.ID) error {
 		if err := deleteUserBugReportsTx(ctx, tx, id); err != nil {
 			return err
 		}
+		// the notes it owned go, with their files; the ones it was only
+		// shared stay with their owners, without it
+		if err := deleteNotesTx(ctx, tx, `owner_id = ?`, id); err != nil {
+			return err
+		}
 		for _, q := range []string{
+			// it held their keys: each gets a new one from its owner's app
+			`UPDATE notes SET needs_rekey = 1 WHERE id IN (SELECT note_id FROM note_members WHERE user_id = ?)`,
+			`DELETE FROM note_members WHERE user_id = ?`,
+			`DELETE FROM note_invites WHERE from_id = ?`,
+			`DELETE FROM note_invites WHERE to_id = ?`,
 			`UPDATE server_members SET avatar_id = NULL WHERE user_id = ?`,
 			`DELETE FROM poll_votes WHERE user_id = ?`,
 			`DELETE FROM invites WHERE inviter_id = ?`,

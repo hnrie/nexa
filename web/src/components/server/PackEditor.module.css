@@ -16,7 +16,7 @@
 .editor { min-width: 0; }
 .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .headText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.title { margin: 0; font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 21px; font-weight: 800; letter-spacing: -0.015em; color: var(--text-strong); }
+.title { margin: 0; font-family: var(--font-display); font-size: 21px; font-weight: 690; letter-spacing: -0.008em; color: var(--text-strong); }
 .sub { font-size: 14px; color: var(--text-muted); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-top: 16px; }

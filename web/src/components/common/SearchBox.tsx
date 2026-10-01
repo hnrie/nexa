@@ -1,11 +1,18 @@
 import { Search, X } from "lucide-react";
 import { forwardRef, useRef, type InputHTMLAttributes, type KeyboardEvent } from "react";
 import { t } from "@/i18n";
+import { useFittingText } from "@/lib/fitText";
 import s from "./SearchBox.module.css";
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "onChange" | "value" | "type" | "className"> & {
   value: string;
   onChange: (value: string) => void;
+  /**
+   * Shorter words for the placeholder, shortest last, for when it does not
+   * fit the box: "Search Unnamed Group" in a narrow header was cut off as
+   * "Search Unnamed Grou".
+   */
+  shorterPlaceholders?: string[];
   /** Always named: a search box's placeholder is not a label. */
   "aria-label": string;
   /** For the box around the input: a width, or a box that grows while it is used. */
@@ -23,8 +30,9 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "onChange" | "value" | 
  * on a phone is the worst thing there is to do. It is a search field to the
  * browser too, so a phone's keyboard says "Search".
  */
-export const SearchBox = forwardRef<HTMLInputElement, Props>(function SearchBox({ value, onChange, className, onClear, onEscape, onKeyDown, ...input }, ref) {
+export const SearchBox = forwardRef<HTMLInputElement, Props>(function SearchBox({ value, onChange, className, onClear, onEscape, onKeyDown, placeholder, shorterPlaceholders, ...input }, ref) {
   const own = useRef<HTMLInputElement | null>(null);
+  const shown = useFittingText(own, placeholder ? [placeholder, ...(shorterPlaceholders ?? [])] : []);
   const setRef = (el: HTMLInputElement | null) => {
     own.current = el;
     if (typeof ref === "function") ref(el);
@@ -45,7 +53,7 @@ export const SearchBox = forwardRef<HTMLInputElement, Props>(function SearchBox(
   return (
     <label className={[s.box, className ?? ""].join(" ")} data-filled={value ? "" : undefined}>
       <Search size={16} className={s.icon} aria-hidden="true" />
-      <input ref={setRef} {...input} type="search" enterKeyHint="search" autoComplete="off" spellCheck={false} className={s.input} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={keys} />
+      <input ref={setRef} {...input} placeholder={placeholder ? shown || placeholder : undefined} type="search" enterKeyHint="search" autoComplete="off" spellCheck={false} className={s.input} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={keys} />
       {value ? (
         <button
           type="button"

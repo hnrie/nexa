@@ -14,7 +14,7 @@
 /* A phone has little width to give, and 32px of padding on each side of it is
    most of what a long German label needs. */
 @media (max-width: 480px) { .card { padding: 26px 20px 22px; border-radius: var(--radius-lg); } .title { font-size: 25px; } }
-.title { margin: 0; font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 29px; font-weight: 820; letter-spacing: -0.022em; line-height: 1.1; color: var(--text-strong); text-align: center; }
+.title { margin: 0; font-family: var(--font-display); font-size: 29px; font-weight: 700; letter-spacing: -0.014em; line-height: 1.1; color: var(--text-strong); text-align: center; }
 .subtitle { margin: -10px 0 0; color: var(--text-muted); text-align: center; font-size: 15.5px; line-height: 1.45; }
 .form { display: flex; flex-direction: column; gap: 20px; }
 .row { display: flex; gap: 12px; }

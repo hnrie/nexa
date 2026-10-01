@@ -135,7 +135,8 @@ export function dmArrangeItems(id: string, moves: ContextMenuItem[] = []): Conte
     },
   ];
   if (group) items.push({ id: "remove-from-group", label: t("organize.dm.removeFromNamed", { name: groupName(group) }), onSelect: () => changeDMList((l) => removeFromGroup(l, id)) });
-  if (pinned) items.push(...moves);
+  // whoever opens the menu offers the moves where the row can make them: among the pins, or a list sorted by hand
+  items.push(...moves);
   items[items.length - 1]!.separatorAfter = true;
   return items;
 }

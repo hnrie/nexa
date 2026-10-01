@@ -8,13 +8,16 @@ import {
   dropDM,
   forgetDM,
   groupOf,
+  moveInMain,
   movePinnedDM,
   NEXA_ID,
   pinDM,
   pruneDMs,
   removeFromGroup,
   renameGroup,
+  rowId,
   sanitizeDMList,
+  setDMSort,
   setGroupCollapsed,
   unpinDM,
   type DMListLayout,
@@ -143,5 +146,44 @@ describe("arranging the DM list", () => {
     const main = dropDM(base, "30", { kind: "main" });
     expect(groupOf(main, "30")).toBeNull();
     expect(dropDM(base, "gfam", { kind: "main" }).pins).toEqual(["10"]);
+  });
+});
+
+describe("putting the main list in order by hand", () => {
+  const ids = ["1", "2", "3", "4"];
+  const known = () => true;
+  // activity: higher id is newer
+  const activity = (id: string) => id;
+  const cmp = (a: string, b: string) => Number(a) - Number(b);
+  const rest = (l: DMListLayout) => dmListView(l, ids, known, activity, cmp).rest.map(rowId);
+
+  it("goes by activity until a row is moved, then keeps the order it was moved into", () => {
+    const start: DMListLayout = { pins: [], groups: [] };
+    expect(rest(start)).toEqual(["4", "3", "2", "1"]);
+    const moved = moveInMain(start, "1", "4", "before", rest(start));
+    expect(moved.sort).toBe("custom");
+    expect(rest(moved)).toEqual(["1", "4", "3", "2"]);
+    // more activity changes nothing now
+    expect(dmListView(moved, ids, known, (id) => (id === "2" ? "99" : id), cmp).rest.map(rowId)).toEqual(["1", "4", "3", "2"]);
+  });
+
+  it("puts a conversation that is new since at the top", () => {
+    const moved = moveInMain({ pins: [], groups: [] }, "2", "3", "after", ["4", "3", "2", "1"]);
+    expect(dmListView(moved, [...ids, "5"], known, activity, cmp).rest.map(rowId)).toEqual(["5", "4", "3", "2", "1"]);
+  });
+
+  it("takes a pinned conversation out of the pins to put it in the list", () => {
+    const pinned: DMListLayout = { pins: ["3"], groups: [] };
+    const moved = dropDM(pinned, "3", { kind: "main", at: "1", where: "after", rest: ["4", "2", "1"] });
+    expect(moved.pins).toEqual([]);
+    expect(rest(moved)).toEqual(["4", "2", "1", "3"]);
+  });
+
+  it("goes back to activity, and survives being stored and read back", () => {
+    const moved = moveInMain({ pins: [], groups: [] }, "1", "4", "before", ["4", "3", "2", "1"]);
+    expect(sanitizeDMList(JSON.parse(JSON.stringify(moved)))).toEqual(moved);
+    expect(rest(setDMSort(moved, "recent", rest(moved)))).toEqual(["4", "3", "2", "1"]);
+    // forgetting a conversation takes it out of the order too
+    expect(forgetDM(moved, "1").order).toEqual(["4", "3", "2"]);
   });
 });

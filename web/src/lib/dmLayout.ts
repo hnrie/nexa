@@ -23,6 +23,15 @@ export interface DMListLayout {
   /** The pinned conversations and groups, top first. */
   pins: string[];
   groups: DMGroup[];
+  /**
+   * "custom" once the main list has been put in an order by hand (dragged
+   * about, or Sort Manually chosen): it keeps `order`, with anything not in
+   * it yet (a conversation that just started) at the top, newest first.
+   * Without it the main list goes by activity.
+   */
+  sort?: "custom";
+  /** The main list's order, top first, while it is sorted by hand: conversations and groups. */
+  order?: string[];
 }
 
 /** The Nexa conversation's id in the layout: it has no channel. */
@@ -45,7 +54,12 @@ export interface DMListView {
 export type DMDrop =
   | { kind: "pinned"; index: number }
   | { kind: "group"; groupId: string }
-  | { kind: "main" };
+  /**
+   * The main list. With `at`, beside that row of it, which puts the list in
+   * an order of its own; `rest` is the main list as it is shown, to start
+   * that order from.
+   */
+  | { kind: "main"; at?: string; where?: "before" | "after"; rest?: string[] };
 
 const CONVERSATION_ID = /^(\d{1,20}|nexa)$/;
 const GROUP_ID = /^g[a-z0-9]{1,16}$/;
@@ -85,7 +99,15 @@ export function sanitizeDMList(x: unknown): DMListLayout {
   }
   const pins: string[] = [];
   for (const id of rawPins) if ((CONVERSATION_ID.test(id) || groupIds.has(id)) && !pins.includes(id)) pins.push(id);
-  return { pins, groups };
+  const out: DMListLayout = { pins, groups };
+  if ((x as { sort?: unknown }).sort === "custom") {
+    const rawOrder = (x as { order?: unknown }).order;
+    const order: string[] = [];
+    for (const id of Array.isArray(rawOrder) ? rawOrder : []) if (typeof id === "string" && (CONVERSATION_ID.test(id) || groupIds.has(id)) && !order.includes(id)) order.push(id);
+    out.sort = "custom";
+    out.order = order;
+  }
+  return out;
 }
 
 /** The group a conversation is in, or null. */
@@ -141,12 +163,65 @@ export function dmListView(layout: DMListLayout, conversations: string[], known:
     rest.push({ row: { kind: "conversation", id }, at: activity(id) });
   }
   rest.sort((a, b) => compare(b.at, a.at));
+  if (layout.sort === "custom") {
+    // put in order by hand: that order, after whatever is new since, which comes first by activity
+    const place = new Map((layout.order ?? []).map((id, i) => [id, i]));
+    const key = (r: DMRow) => place.get(r.kind === "group" ? r.group.id : r.id) ?? -1;
+    const fresh = rest.filter((r) => key(r.row) < 0);
+    const kept = rest.filter((r) => key(r.row) >= 0).sort((a, b) => key(a.row) - key(b.row));
+    return { pinned, rest: [...fresh, ...kept].map((r) => r.row) };
+  }
   return { pinned, rest: rest.map((r) => r.row) };
+}
+
+/** A row's id: a conversation's channel (or NEXA_ID), or a group's own. */
+export function rowId(row: DMRow): string {
+  return row.kind === "group" ? row.group.id : row.id;
 }
 
 /** A copy to change. */
 function clone(layout: DMListLayout): DMListLayout {
-  return { pins: [...layout.pins], groups: layout.groups.map((g) => ({ ...g, ids: [...g.ids] })) };
+  const out: DMListLayout = { pins: [...layout.pins], groups: layout.groups.map((g) => ({ ...g, ids: [...g.ids] })) };
+  if (layout.sort === "custom") {
+    out.sort = "custom";
+    out.order = [...(layout.order ?? [])];
+  }
+  return out;
+}
+
+/**
+ * Moves a conversation or group in the main list to beside another row of it,
+ * putting the list in an order of its own if it was not already (starting
+ * from `rest`, the main list as it was shown). A pinned one comes out of the
+ * pins to go there, and a conversation out of its group.
+ */
+export function moveInMain(layout: DMListLayout, id: string, at: string, where: "before" | "after", rest: string[]): DMListLayout {
+  if (id === at) return layout;
+  const next = clone(layout);
+  next.pins = next.pins.filter((x) => x !== id);
+  if (!isGroupId(id)) for (const g of next.groups) g.ids = g.ids.filter((x) => x !== id);
+  // what is shown is the truth: anything new since is placed where it showed
+  const base = next.sort === "custom" ? [...rest, ...(next.order ?? []).filter((x) => !rest.includes(x))] : [...rest];
+  const order = base.filter((x) => x !== id);
+  const target = order.indexOf(at);
+  order.splice(target < 0 ? 0 : where === "after" ? target + 1 : target, 0, id);
+  next.sort = "custom";
+  next.order = order;
+  return next;
+}
+
+/** Sorts the main list by activity again, or by hand from the order it shows now (`rest`). */
+export function setDMSort(layout: DMListLayout, sort: "recent" | "custom", rest: string[]): DMListLayout {
+  if ((layout.sort === "custom") === (sort === "custom")) return layout;
+  const next = clone(layout);
+  if (sort === "custom") {
+    next.sort = "custom";
+    next.order = [...rest];
+  } else {
+    delete next.sort;
+    delete next.order;
+  }
+  return next;
 }
 
 /** Takes a conversation out of the pins and every group. */
@@ -249,14 +324,16 @@ export function deleteGroup(layout: DMListLayout, groupId: string): DMListLayout
   const next = clone(layout);
   next.groups = next.groups.filter((g) => g.id !== groupId);
   next.pins = next.pins.filter((x) => x !== groupId);
+  if (next.order) next.order = next.order.filter((x) => x !== groupId);
   return next;
 }
 
-/** Forgets a conversation that was closed or left: it is no longer pinned or in a group. */
+/** Forgets a conversation that was closed or left: it is no longer pinned or in a group, or anywhere in the order. */
 export function forgetDM(layout: DMListLayout, id: string): DMListLayout {
-  if (!layout.pins.includes(id) && !groupOf(layout, id)) return layout;
+  if (!layout.pins.includes(id) && !groupOf(layout, id) && !layout.order?.includes(id)) return layout;
   const next = clone(layout);
   unplace(next, id);
+  if (next.order) next.order = next.order.filter((x) => x !== id);
   return next;
 }
 
@@ -266,11 +343,13 @@ export function forgetDM(layout: DMListLayout, id: string): DMListLayout {
  * is not gone.
  */
 export function pruneDMs(layout: DMListLayout, known: (id: string) => boolean): DMListLayout {
-  const gone = (id: string) => !isGroupId(id) && !known(id);
-  if (!layout.pins.some(gone) && !layout.groups.some((g) => g.ids.some(gone))) return layout;
+  const groupIds = new Set(layout.groups.map((g) => g.id));
+  const gone = (id: string) => (isGroupId(id) ? !groupIds.has(id) : !known(id));
+  if (!layout.pins.some(gone) && !layout.groups.some((g) => g.ids.some(gone)) && !layout.order?.some(gone)) return layout;
   const next = clone(layout);
   next.pins = next.pins.filter((id) => !gone(id));
   for (const g of next.groups) g.ids = g.ids.filter((id) => !gone(id));
+  if (next.order) next.order = next.order.filter((id) => !gone(id));
   return next;
 }
 
@@ -278,6 +357,8 @@ export function pruneDMs(layout: DMListLayout, known: (id: string) => boolean): 
 export function dropDM(layout: DMListLayout, id: string, drop: DMDrop): DMListLayout {
   if (drop.kind === "pinned") return pinDM(layout, id, drop.index);
   if (drop.kind === "group") return isGroupId(id) ? layout : addToGroup(layout, id, drop.groupId);
+  // beside a row of the main list: there, and the list keeps that order
+  if (drop.at) return moveInMain(layout, id, drop.at, drop.where ?? "before", drop.rest ?? []);
   // the main list: out of the pins, and a conversation out of its group
   const next = unpinDM(layout, id);
   return isGroupId(id) ? next : removeFromGroup(next, id);

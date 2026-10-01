@@ -308,6 +308,7 @@ function characters(src: string): string {
     .blocks.map((b) => {
       if (b.kind === "code") return b.text;
       if (b.kind === "hr") return "---";
+      if (b.kind === "file") return b.name;
       if (b.kind === "table") return b.rows.map((r) => r.map((c) => c.map((x) => (x.kind === "text" ? x.text : x.raw)).join("")).join("|")).join("\n");
       return b.content.map((x) => (x.kind === "text" ? x.text : x.raw)).join("");
     })
@@ -343,5 +344,51 @@ describe("fuzz", () => {
       while (src.length < 300) src += WORDS[Math.floor(rand() * WORDS.length)] + (rand() < 0.2 ? "\n" : "");
       expect(() => toMarkdown(fromMarkdown(src).blocks)).not.toThrow();
     }
+  });
+});
+
+describe("a note's files", () => {
+  const read = { files: true, max: 200_000 };
+  const kinds = (src: string, opts?: typeof read) => fromMarkdown(src, undefined, opts).blocks.map((b) => b.kind);
+
+  it("reads a file line as a file block and writes it back as it was", () => {
+    const src = "Before\n![photo.png](nexa-file:123456789)\nAfter";
+    const { blocks } = fromMarkdown(src, undefined, read);
+    expect(blocks.map((b) => b.kind)).toEqual(["p", "file", "p"]);
+    expect(blocks[1]).toMatchObject({ kind: "file", file: "123456789", name: "photo.png" });
+    expect(toMarkdown(blocks)).toBe(src);
+  });
+
+  it("leaves the same characters as words in a message, where there are no files", () => {
+    expect(kinds("![photo.png](nexa-file:123456789)")).toEqual(["p"]);
+    expect(toMarkdown(fromMarkdown("![photo.png](nexa-file:123456789)").blocks)).toContain("nexa-file:123456789");
+  });
+
+  it("only takes a line that is a file and nothing else", () => {
+    expect(kinds("see ![a.png](nexa-file:1) here", read)).toEqual(["p"]);
+    expect(kinds("![a.png](https://example.com/a.png)", read)).toEqual(["p"]);
+    expect(kinds("![a.png](nexa-file:not an id)", read)).toEqual(["p"]);
+    expect(kinds("```\n![a.png](nexa-file:1)\n```", read)).toEqual(["code"]);
+  });
+
+  it("keeps a file inside a callout and a folded section, and several in a row", () => {
+    for (const src of ["> [!NOTE]\n> words\n> ![a.png](nexa-file:1)", "::: details Summary\n![a.png](nexa-file:1)\n:::", "![a.png](nexa-file:1)\n![b.pdf](nexa-file:2)\n\n![c.mp4](nexa-file:3)"]) {
+      const { blocks } = fromMarkdown(src, undefined, read);
+      expect(blocks.some((b) => b.kind === "file"), src).toBe(true);
+      expect(toMarkdown(blocks), src).toBe(src);
+    }
+  });
+
+  it("keeps a file's name out of the way of the syntax around it", () => {
+    const { blocks } = fromMarkdown("x", undefined, read);
+    const out = toMarkdown([...blocks, { id: 99, kind: "file", file: "7", name: "a [draft]\n(final).png", wrap: null }]);
+    expect(out).toBe("x\n![a draft (final).png](nexa-file:7)");
+    expect(fromMarkdown(out, undefined, read).blocks[1]).toMatchObject({ kind: "file", file: "7", name: "a draft (final).png" });
+  });
+
+  it("reads a note far longer than a message", () => {
+    const long = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join("\n");
+    expect(fromMarkdown(long).blocks.length).toBeLessThan(3000);
+    expect(fromMarkdown(long, undefined, read).blocks.length).toBe(3000);
   });
 });

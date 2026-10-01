@@ -1,3 +1,8 @@
+/* the green a game or a song is marked with, everywhere an activity shows */
+:root { --activity-green: #1ed760; }
+:root[data-theme="light"] { --activity-green: #117a37; }
+/* the parts of a light page that stay dark (a call's stage) keep the bright one */
+:root[data-theme="light"] [data-dark-scope] { --activity-green: #1ed760; }
 /* a Rich Presence activity: the card in a profile, and the line under a name */
 /* A tile of its own. With art, the art is laid far out of focus behind it, so
    the tile takes on the colours of what is playing. */
@@ -5,14 +10,15 @@
 .ambient { position: absolute; inset: -40%; z-index: -1; background-image: var(--art); background-size: cover; background-position: center; filter: blur(34px) saturate(1.5); opacity: 0.42; pointer-events: none; }
 [data-theme="light"] .ambient { opacity: 0.3; }
 .heading { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; font-weight: 700; letter-spacing: 0.01em; color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a game or a song is always marked in green, whichever app it comes from (--activity-green below) */
 .headingIcon { flex: none; color: var(--text-brand); }
+.headingIcon[data-kind="0"], .headingIcon[data-kind="2"] { color: var(--activity-green); }
 /* three bars rising and falling out of step, while a song plays */
 .eq { flex: none; display: inline-flex; align-items: flex-end; gap: 2px; width: 13px; height: 11px; }
-.eq i { flex: 1; height: 40%; border-radius: 1px; background: var(--text-brand); animation: eq 0.9s ease-in-out infinite; }
+.eq i { flex: 1; height: 40%; border-radius: 1px; background: var(--activity-green); animation: eq 0.9s ease-in-out infinite; }
 .eq i:nth-child(2) { height: 85%; animation-duration: 1.1s; animation-delay: -0.35s; }
 .eq i:nth-child(3) { height: 60%; animation-duration: 0.8s; animation-delay: -0.6s; }
-.eq[data-spotify] i { background: #1ed760; }
-[data-theme="light"] .eq[data-spotify] i { background: #117a37; }
+
 @keyframes eq { 0%, 100% { height: 30%; } 50% { height: 100%; } }
 /* where an activity came from, when it is not the desktop app: a quiet tag after the heading */
 .source { margin-inline-start: 2px; padding: 1px 7px; border-radius: 999px; background: var(--bg-active); font-size: 10.5px; font-weight: 650; color: var(--text-muted); }
@@ -42,9 +48,10 @@ a.title:hover, a.line:hover { text-decoration: underline; }
 .statusText { min-width: 0; flex: 1; }
 .activityName { font-weight: 600; color: var(--text-subtle); }
 .kindIcon { flex: none; opacity: 0.85; }
-/* Spotify's green, a shade darker where the page is light so the note still reads */
-.kindIcon[data-spotify] { color: #1ed760; opacity: 1; }
-[data-theme="light"] .kindIcon[data-spotify] { color: #117a37; }
+/* A game and a song are always green, from any app: the colour says "playing"
+   before the words are read. Spotify's own green, a shade darker where the
+   page is light so it still reads. */
+.kindIcon[data-kind="0"], .kindIcon[data-kind="2"], .kindIcon[data-spotify] { color: var(--activity-green); opacity: 1; }
 /* two or more things at once: the icon of the first, and how many follow */
 .kindStack { display: inline-flex; align-items: center; gap: 1px; flex: none; }
 .kindMore { font-size: 10px; font-weight: 700; line-height: 1; color: var(--text-muted); }

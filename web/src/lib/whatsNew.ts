@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { AudioLines, BadgeCheck, Bug, ClipboardCopy, CloudUpload, Eye, EyeOff, FolderPlus, Headphones, House, IdCard, Images, Keyboard, LayoutGrid, Link, MapPinOff, MessageSquareDashed, MessageSquarePlus, MousePointerClick, Music, Newspaper, Palette, PanelsTopLeft, Pin, Puzzle, RefreshCw, Reply, Search, SendHorizontal, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, Type, UserCheck, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
+import { AudioLines, BadgeCheck, Bug, ClipboardCopy, CloudUpload, Eye, EyeOff, FolderPlus, Headphones, House, IdCard, Images, Keyboard, LayoutGrid, Link, MapPinOff, MessageSquareDashed, MessageSquarePlus, MousePointerClick, Music, Newspaper, NotebookPen, Palette, PanelsTopLeft, Pin, Puzzle, RefreshCw, Reply, Search, SendHorizontal, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, Type, UserCheck, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,19 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-09-30.3",
+    items: [
+      { icon: NotebookPen, title: "whatsNew.r202609303.notesTitle", body: "whatsNew.r202609303.notesBody" },
+      { icon: UsersRound, title: "whatsNew.r202609303.liveTitle", body: "whatsNew.r202609303.liveBody" },
+      { icon: Newspaper, title: "whatsNew.r202609303.postsTitle", body: "whatsNew.r202609303.postsBody" },
+      { icon: Type, title: "whatsNew.r202609303.fontTitle", body: "whatsNew.r202609303.fontBody" },
+      { icon: Search, title: "whatsNew.r202609303.settingsTitle", body: "whatsNew.r202609303.settingsBody" },
+      { icon: MousePointerClick, title: "whatsNew.r202609303.pickTitle", body: "whatsNew.r202609303.pickBody" },
+      { icon: Smartphone, title: "whatsNew.r202609303.phoneTitle", body: "whatsNew.r202609303.phoneBody" },
+      { icon: BadgeCheck, title: "whatsNew.r202609303.rolesTitle", body: "whatsNew.r202609303.rolesBody" },
+    ],
+  },
   {
     id: "2026-09-30.2",
     items: [

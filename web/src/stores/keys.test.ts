@@ -82,9 +82,13 @@ describe("key manager", () => {
    * test saw no grants and the one after it saw a duplicate. Both passed when
    * run on their own, which is the least useful way for a test to be wrong.
    */
+  // Settled is several quiet ticks in a row: one was enough on an idle
+  // machine, but under the whole suite sealing a grant can take longer than a
+  // tick, and the test read the grants before the first one was put.
   const settled = async (): Promise<void> => {
     let seen = -1;
-    for (let i = 0; i < 200 && seen !== putGrants.length; i++) {
+    for (let i = 0, quiet = 0; i < 200 && quiet < 6; i++) {
+      quiet = seen === putGrants.length ? quiet + 1 : 0;
       seen = putGrants.length;
       await new Promise((r) => setTimeout(r, 5));
     }

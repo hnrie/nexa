@@ -2,6 +2,7 @@ import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
+import { attachSheetDrag, fadeElement, sheetsHere } from "@/lib/sheetDrag";
 import { t } from "@/i18n";
 import { useUI, type ContextMenuItem, type ContextMenuState } from "@/stores/ui";
 import s from "./ContextMenu.module.css";
@@ -321,6 +322,19 @@ export function ContextMenuHost() {
     };
   }, [menu, close, sub, closeSub, stops, moveTo]);
 
+  // On a phone the menu is a sheet across the bottom, swiped down to put away.
+  const [sheet] = useState(sheetsHere);
+  useEffect(() => {
+    const el = ref.current;
+    if (!menu || !el || !sheet) return;
+    return attachSheetDrag({
+      sheet: el,
+      onClose: close,
+      fade: fadeElement(backdrop.current),
+      expandable: () => el.scrollHeight > el.clientHeight + 1,
+    });
+  }, [menu, sheet, close]);
+
   if (!menu) return null;
 
   /**
@@ -510,7 +524,11 @@ export function ContextMenuHost() {
         onKeyDown={onKeyDown(false)}
         onPointerDownCapture={notePointer}
         onMouseDown={keepFocusDown}
+        data-sheet={sheet || undefined}
       >
+        {sheet ? <span className={s.grip} aria-hidden="true" /> : null}
+        {/* on a phone the menu says what it is for, far from the finger that opened it */}
+        {sheet && menu.label && !drilled && !menu.items.some((it) => it.note && it.label === menu.label) ? <div className={s.sheetTitle} aria-hidden="true" dir="auto">{menu.label}</div> : null}
         {drilled ? (
           <>
             <div role="none">

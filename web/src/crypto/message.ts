@@ -179,7 +179,8 @@ function sanitizePreview(x: unknown): AttachmentPreview | undefined {
   return { blob_id, key, size, type, w, h };
 }
 
-function sanitizeAttachment(x: unknown): AttachmentMeta | null {
+/** A file as something another person wrote into a message or a note: held to what a file can be. */
+export function sanitizeAttachment(x: unknown): AttachmentMeta | null {
   if (!isObj(x)) return null;
   const { blob_id, name, type, key, size, w, h, duration, spoiler } = x;
   if (typeof blob_id !== "string" || typeof name !== "string" || typeof type !== "string" || typeof key !== "string") return null;
@@ -233,6 +234,8 @@ export function sanitizeEmbed(e: Obj): Obj {
     const v = e[k];
     if (typeof v === "string" && allowed.includes(v)) out[k] = v;
   }
+  const post = sanitizePost(e["post"], false);
+  if (post) out["post"] = post;
   return out;
 }
 
@@ -240,6 +243,92 @@ export function sanitizeEmbed(e: Obj): Obj {
 function cap(v: string, n: number): string {
   const chars = Array.from(v);
   return chars.length > n ? chars.slice(0, n).join("") : v;
+}
+
+// A social post's card (internal/unfurl/post.go), held to the same rule as
+// the rest of an embed: only what is listed here is kept, the fields that are
+// addresses hold web addresses and nothing else, and everything has a length.
+// The sender's app made the card, so a sender can write anything into it.
+const POST_TEXTS: Record<string, number> = { platform: 20, site: 40, name: 256, handle: 256, community: 256, title: 300, text: 4000, reply_to: 256, note: 2048 };
+const POST_ADDRESSES = ["url", "author_url", "avatar", "community_url"];
+const POST_COUNTS = ["created", "replies", "reposts", "likes", "views"];
+const POST_MEDIA_KINDS = ["photo", "video", "gif"];
+const MAX_ADDRESS = 8192;
+const MAX_POST_MEDIA = 10;
+const MAX_POST_LINKS = 20;
+
+function address(v: unknown): string | undefined {
+  return typeof v === "string" && v.length <= MAX_ADDRESS && webLink(v) ? v : undefined;
+}
+
+function sanitizePostMedia(x: unknown): Obj | undefined {
+  if (!isObj(x) || typeof x["kind"] !== "string" || !POST_MEDIA_KINDS.includes(x["kind"])) return undefined;
+  const out: Obj = { kind: x["kind"] };
+  for (const k of ["url", "thumb", "audio"]) {
+    const v = address(x[k]);
+    if (v) out[k] = v;
+  }
+  // a picture is its file; a video may be only its poster
+  if (!out["url"] && (out["kind"] === "photo" || !out["thumb"])) return undefined;
+  for (const k of ["w", "h", "duration"]) {
+    const v = x[k];
+    if (isNum(v) && v > 0 && v <= 100000) out[k] = v;
+  }
+  if (typeof x["alt"] === "string" && x["alt"]) out["alt"] = cap(x["alt"], 1000);
+  return out;
+}
+
+function sanitizePost(x: unknown, quoted: boolean): Obj | undefined {
+  if (!isObj(x) || typeof x["platform"] !== "string" || !/^[a-z]{2,20}$/.test(x["platform"])) return undefined;
+  const out: Obj = {};
+  for (const [k, max] of Object.entries(POST_TEXTS)) {
+    const v = x[k];
+    if (typeof v === "string" && v) out[k] = cap(v, max);
+  }
+  for (const k of POST_ADDRESSES) {
+    const v = address(x[k]);
+    if (v) out[k] = v;
+  }
+  for (const k of POST_COUNTS) {
+    const v = x[k];
+    if (isNum(v) && v > 0) out[k] = v;
+  }
+  for (const k of ["verified", "sensitive"]) if (x[k] === true) out[k] = true;
+  if (Array.isArray(x["media"])) {
+    const media = x["media"].slice(0, MAX_POST_MEDIA).map(sanitizePostMedia).filter((m): m is Obj => !!m);
+    if (media.length) out["media"] = media;
+  }
+  if (Array.isArray(x["links"])) {
+    const links: Obj[] = [];
+    for (const l of x["links"].slice(0, MAX_POST_LINKS)) {
+      if (!isObj(l) || typeof l["text"] !== "string" || !l["text"] || l["text"].length > 512) continue;
+      const url = address(l["url"]);
+      if (url) links.push({ text: l["text"], url });
+    }
+    if (links.length) out["links"] = links;
+  }
+  const poll = x["poll"];
+  if (isObj(poll) && Array.isArray(poll["choices"])) {
+    const choices: Obj[] = [];
+    for (const c of poll["choices"].slice(0, 10)) {
+      if (!isObj(c) || typeof c["label"] !== "string" || !isNum(c["percent"])) continue;
+      const choice: Obj = { label: cap(c["label"], 200), percent: Math.min(100, Math.max(0, c["percent"])) };
+      if (isNum(c["votes"]) && c["votes"] >= 0) choice["votes"] = c["votes"];
+      choices.push(choice);
+    }
+    if (choices.length >= 2) {
+      const p: Obj = { choices };
+      if (isNum(poll["votes"]) && poll["votes"] >= 0) p["votes"] = poll["votes"];
+      if (isNum(poll["ends"]) && poll["ends"] > 0) p["ends"] = poll["ends"];
+      out["poll"] = p;
+    }
+  }
+  // a quote quotes nothing further
+  if (!quoted) {
+    const quote = sanitizePost(x["quote"], true);
+    if (quote) out["quote"] = quote;
+  }
+  return out;
 }
 
 function sanitizePollEmoji(x: unknown): PollEmoji | undefined {

@@ -81,7 +81,22 @@ export interface TableBlock extends Base {
   /** The header row first; every row has align.length cells. */
   rows: Inline[][][];
 }
-export type Block = TextBlock | CodeBlock | RuleBlock | TableBlock;
+/**
+ * A file a note holds, where it sits in the text: a picture, a video, or a
+ * file to download. `file` names it among the note's files. Only a note's
+ * editor makes these; a message has its attachments beside its text instead.
+ */
+export interface FileBlock extends Base {
+  kind: "file";
+  file: string;
+  name: string;
+}
+export type Block = TextBlock | CodeBlock | RuleBlock | TableBlock | FileBlock;
+
+/** A block with nothing to type in: a rule or a file. It is stepped over, and removed whole. */
+export function isVoid(b: Block | undefined): b is RuleBlock | FileBlock {
+  return !!b && (b.kind === "hr" || b.kind === "file");
+}
 
 /** A place in the document: a block, a table cell when it is in one, and an offset in characters. */
 export interface Pos {
@@ -104,7 +119,7 @@ export function newId(): number {
 }
 
 export function isText(b: Block | undefined): b is TextBlock {
-  return !!b && b.kind !== "code" && b.kind !== "hr" && b.kind !== "table";
+  return !!b && b.kind !== "code" && b.kind !== "hr" && b.kind !== "table" && b.kind !== "file";
 }
 
 export function textBlock(kind: TextKind = "p", content: Inline[] = [], wrap: Wrap = null, extra: Partial<TextBlock> = {}): TextBlock {
@@ -303,7 +318,7 @@ export function sizeAt(blocks: Block[], p: Pos): number {
     return cell ? inlineLength(cell) : 0;
   }
   if (block.kind === "code") return block.text.length;
-  if (block.kind === "hr") return 0;
+  if (isVoid(block)) return 0;
   return inlineLength(block.content);
 }
 
@@ -377,7 +392,7 @@ export function splitAt(blocks: Block[], at: Pos): Edit {
   if (!block) return { blocks, sel: caret(at.b, at.o) };
   if (block.kind === "code") return insertAt(blocks, at, [text("\n")]);
   const out = blocks.slice();
-  if (block.kind === "hr" || block.kind === "table") {
+  if (isVoid(block) || block.kind === "table") {
     // a new line after it
     out.splice(at.b + 1, 0, textBlock("p", [], block.wrap));
     return { blocks: out, sel: caret(at.b + 1, 0) };
@@ -435,7 +450,7 @@ export function joinBackward(blocks: Block[], index: number): Edit {
   }
   const prev = blocks[index - 1];
   if (!prev) return { blocks, sel: caret(index, 0) };
-  if (prev.kind === "hr") {
+  if (isVoid(prev)) {
     out.splice(index - 1, 1);
     return { blocks: out, sel: caret(index - 1, 0) };
   }
@@ -470,7 +485,7 @@ export function joinForward(blocks: Block[], index: number): Edit {
   const block = blocks[index];
   const next = blocks[index + 1];
   if (!block || !next) return { blocks, sel: caret(index, block ? sizeAt(blocks, { b: index, o: 0 }) : 0) };
-  if (next.kind === "hr") {
+  if (isVoid(next)) {
     const out = blocks.slice();
     out.splice(index + 1, 1);
     return { blocks: out, sel: caret(index, sizeAt(blocks, { b: index, o: 0 })) };

@@ -632,6 +632,201 @@ export interface ReadyPayload {
   nexa?: NexaState;
 }
 
+/** What a member of a note may do: read it, edit it, or own it. A higher role includes the ones below. */
+export type NoteRole = 1 | 2 | 3;
+export const NOTE_VIEWER = 1;
+export const NOTE_EDITOR = 2;
+export const NOTE_OWNER = 3;
+
+/**
+ * A note as the server keeps it for one of its members. `head` and `body` are
+ * sealed with the note's key, and `key_sealed` is that key sealed to this
+ * account (crypto/notes.ts); the server can read none of it.
+ */
+export interface NoteRow {
+  id: Snowflake;
+  owner_id: Snowflake;
+  head: string;
+  /** Left out of lists; fetched when the note is opened. */
+  body?: string;
+  /** Counts saves. A save names the version it was made from. */
+  version: number;
+  edited_by: Snowflake | null;
+  created_at: number;
+  updated_at: number;
+  role: NoteRole;
+  key_sealed: string;
+  /** Counts the note's keys: `key_sealed` is the key of this epoch. It gets a new one when someone is taken out. */
+  key_epoch: number;
+  /** How many people the note is shared with, its owner included. */
+  members: number;
+  /**
+   * Someone who held the note's key is no longer in it (taken out, left, an
+   * invitation or a link removed). The owner's app gives the note a new key
+   * when it sees this.
+   */
+  needs_rekey?: boolean;
+}
+
+/** An earlier state of a note, sealed with the key the note had then. */
+export interface NoteVersionRow {
+  id: Snowflake;
+  note_id: Snowflake;
+  version: number;
+  head: string;
+  /** Left out of the list of versions. */
+  body?: string;
+  key_epoch: number;
+  edited_by: Snowflake | null;
+  /** When this state was saved. */
+  saved_at: number;
+}
+
+/** One of a note's earlier keys, sealed with the key that replaced it. */
+export interface NoteKeyRow {
+  epoch: number;
+  wrapped: string;
+}
+
+/** An invitation to a note, as the person invited gets it. */
+export interface NoteInviteRow {
+  id: Snowflake;
+  note_id: Snowflake;
+  role: NoteRole;
+  key_sealed: string;
+  head: string;
+  created_at: number;
+  from: PublicUser;
+}
+
+export interface NoteLinkRow {
+  id: Snowflake;
+  note_id: Snowflake;
+  role: NoteRole;
+  key_wrapped: string;
+  /** The link itself, sealed with the note's key, for its owner to copy again. */
+  link_sealed: string;
+  created_by: Snowflake | null;
+  uses: number;
+  created_at: number;
+}
+
+/** Who a note is shared with. Invitations and links are only sent to its owner. */
+export interface NoteSharing {
+  members: { user: PublicUser; role: NoteRole; created_at: number }[];
+  invites: { id: Snowflake; role: NoteRole; created_at: number; user: PublicUser }[];
+  links: NoteLinkRow[];
+}
+
+/** What a share link leads to, for whoever holds it. */
+export interface NoteLinkView {
+  note_id: Snowflake;
+  role: NoteRole;
+  key_wrapped: string;
+  head: string;
+  updated_at: number;
+  members: number;
+  /** This account's role in the note already, or 0. */
+  member_role: number;
+  owner?: PublicUser;
+}
+
+/** What the server says when a note changes (internal/api/note_handlers.go). */
+export interface NoteUpdateEvent {
+  id: Snowflake;
+  version?: number;
+  head?: string;
+  /** The sealed note itself, sent along when it is short enough. */
+  body?: string;
+  updated_at?: number;
+  edited_by?: Snowflake;
+  /** Who it is shared with changed, or how. */
+  members?: boolean;
+  /** Someone was taken out, or a link was removed: the owner's app gives the note a new key. */
+  removed?: boolean;
+  /** The note has a new key: every member's copy changed. */
+  rekeyed?: boolean;
+}
+
+/** Someone else in a note says they have it open, or have closed it; `hello` asks those there to say so too. */
+export interface NotePresenceEvent {
+  id: Snowflake;
+  user_id: Snowflake;
+  here: boolean;
+  hello: boolean;
+}
+
+/** One picture or video of a social post. */
+export interface PostMedia {
+  /** "gif" is a silent video that loops. */
+  kind: "photo" | "video" | "gif";
+  /** The file. A video with none cannot be played here; its picture opens the post. */
+  url?: string;
+  thumb?: string;
+  /** A video's sound, where the site keeps it in a file of its own; played together with it. */
+  audio?: string;
+  w?: number;
+  h?: number;
+  /** In seconds. */
+  duration?: number;
+  alt?: string;
+}
+
+/** The address behind some words of a post's text. Found by looking for the words in order, each after the last. */
+export interface PostLink {
+  text: string;
+  url: string;
+}
+
+export interface PostPoll {
+  choices: { label: string; votes?: number; percent: number }[];
+  votes?: number;
+  /** When voting closes or closed, in Unix milliseconds. */
+  ends?: number;
+}
+
+/**
+ * A social post, read by the server from the post's own site (internal/unfurl/post.go)
+ * and drawn here as a post: who wrote it, what it says, its pictures and video.
+ */
+export interface SocialPost {
+  /** What its card keys its look on: "twitter", "bluesky", "tiktok", "instagram", "reddit", "telegram", "threads", "mastodon". */
+  platform: string;
+  /** The service's name as people say it. */
+  site?: string;
+  /** The post on its own site. */
+  url?: string;
+  name?: string;
+  /** Without the "@". */
+  handle?: string;
+  author_url?: string;
+  avatar?: string;
+  verified?: boolean;
+  /** Where it was posted: "r/pics", the channel a Telegram message was forwarded from. */
+  community?: string;
+  community_url?: string;
+  /** A post's own headline (Reddit), or a content warning (Mastodon). */
+  title?: string;
+  text?: string;
+  links?: PostLink[];
+  /** The handle it answers. */
+  reply_to?: string;
+  /** Unix milliseconds. */
+  created?: number;
+  media?: PostMedia[];
+  poll?: PostPoll;
+  quote?: SocialPost;
+  replies?: number;
+  reposts?: number;
+  /** A Reddit post's score, and the sum of a Telegram message's reactions. */
+  likes?: number;
+  views?: number;
+  /** Its media is covered until asked for. */
+  sensitive?: boolean;
+  /** A note readers added under it. */
+  note?: string;
+}
+
 export interface UnfurlResult {
   url: string;
   type: "link" | "image" | "gif" | "video" | "youtube" | "invite";
@@ -667,6 +862,8 @@ export interface UnfurlResult {
   banner?: string;
   /** How the page asks for its picture: across the card, or small beside the words. Unset leaves it to the picture's size. */
   image_layout?: "large" | "thumbnail";
+  /** Set when the link is a social post. The fields above still describe it, for an app that does not draw posts. */
+  post?: SocialPost;
 }
 
 export interface KdfParamsJson {

@@ -49,6 +49,7 @@ describe("crypto module surface", () => {
       "isEnvelope",
       "webLink",
       "sanitizeEmbed",
+      "sanitizeAttachment",
       "POLL_QUESTION_MAX",
       "POLL_ANSWER_MAX",
       "POLL_ANSWERS_MIN",

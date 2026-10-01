@@ -108,7 +108,18 @@ export function misleadingLabel(label: string, url: string): boolean {
 const RE_UNICODE_EMOJI =
   /(?:\p{RI}\p{RI}|[0-9#*]\u{FE0F}?\u{20E3}|(?:(?=\p{Extended_Pictographic})\p{Emoji_Presentation}(?:\u{FE0F}|\p{Emoji_Modifier})?|\p{Extended_Pictographic}(?:\u{FE0F}\p{Emoji_Modifier}?|\p{Emoji_Modifier}|(?=\u{200D}\p{Extended_Pictographic})))(?:\u{200D}\p{Extended_Pictographic}(?:\u{FE0F}|\p{Emoji_Modifier})?)*)/uy;
 
-const BLOCK_TYPES = new Set(["paragraph", "quote", "heading", "subtext", "list", "codeblock", "hr", "table", "alert", "details", "footnotes"]);
+const BLOCK_TYPES = new Set(["paragraph", "quote", "heading", "subtext", "list", "codeblock", "hr", "table", "alert", "details", "footnotes", "file"]);
+
+/** A note's file, alone on its line: `![name](nexa-file:id)`. The name has no brackets or line breaks in it. */
+export const RE_FILE = /^!\[([^\[\]\n]{0,200})\]\(nexa-file:([A-Za-z0-9_-]{1,64})\)[ \t]*$/;
+
+/** The line that puts a file in a note's text. */
+export function fileLine(id: string, name: string): string {
+  return `![${name.replace(/[\[\]\s]+/g, " ").trim().slice(0, 200)}](nexa-file:${id})`;
+}
+
+/** Whether file lines are being read as files: on for the length of one parse of a note. */
+let filesOn = false;
 
 const at = (s: string, i: number): string => (i >= 0 && i < s.length ? s.charAt(i) : "");
 const isWordChar = (c: string): boolean => c !== "" && RE_WORD.test(c);
@@ -129,12 +140,20 @@ function runOf(s: string, i: number, ch: string): number {
  * (headings, lists, quotes, fenced code, tables, callouts) is disabled, which
  * is what message previews want; newlines still become `br` nodes.
  */
-export function parse(src: string, opts?: { inline?: boolean }): Node[] {
-  const text = normalize(src.length > MAX_SOURCE ? src.slice(0, MAX_SOURCE) : src);
+export function parse(src: string, opts?: { inline?: boolean; files?: boolean; max?: number }): Node[] {
+  // a note is as long as a note is; a message is held to a message's length
+  const max = Math.max(MAX_SOURCE, opts?.max ?? 0);
+  const text = normalize(src.length > max ? src.slice(0, max) : src);
   if (text === "") return [];
   const notes: Notes = new Map();
-  const nodes = opts?.inline ? parseInline(text, 0) : parseBlocks(text, 0, notes);
-  return text.includes("[^") ? resolveFootnotes(nodes, notes) : nodes;
+  const was = filesOn;
+  filesOn = opts?.files === true;
+  try {
+    const nodes = opts?.inline ? parseInline(text, 0) : parseBlocks(text, 0, notes);
+    return text.includes("[^") ? resolveFootnotes(nodes, notes) : nodes;
+  } finally {
+    filesOn = was;
+  }
 }
 
 function normalize(src: string): string {
@@ -292,6 +311,14 @@ function parseBlocks(src: string, depth: number, notes: Notes): Node[] {
       if (subtext) {
         flushAll();
         out.push({ type: "subtext", children: parseInline((subtext[1] ?? "").trim(), 0) });
+        i = lineEnd + 1;
+        continue;
+      }
+      // a note's file, on a line of its own
+      const file = filesOn && line.startsWith("![") ? RE_FILE.exec(line) : null;
+      if (file) {
+        flushAll();
+        out.push({ type: "file", id: file[2] ?? "", name: file[1] ?? "" });
         i = lineEnd + 1;
         continue;
       }
@@ -535,7 +562,7 @@ function delimiterRow(line: string): Align[] | null {
 
 /** Whether a line would start a block of its own, which ends a table. */
 function startsBlock(line: string): boolean {
-  return line.startsWith("```") || line === ">" || line.startsWith("> ") || line.startsWith(">>>") || RE_HEADING.test(line) || RE_SUBTEXT.test(line) || RE_HR.test(line) || RE_LIST.test(line) || RE_DETAILS_OPEN.test(line) || RE_DETAILS_CLOSE.test(line);
+  return (filesOn && RE_FILE.test(line)) || line.startsWith("```") || line === ">" || line.startsWith("> ") || line.startsWith(">>>") || RE_HEADING.test(line) || RE_SUBTEXT.test(line) || RE_HR.test(line) || RE_LIST.test(line) || RE_DETAILS_OPEN.test(line) || RE_DETAILS_CLOSE.test(line);
 }
 
 /**
@@ -1269,6 +1296,8 @@ function nodeText(node: Node, names?: PlainTextNames): string {
       return node.checked ? "☑ " : "☐ ";
     case "hr":
       return "---";
+    case "file":
+      return node.name;
     case "table":
       return [node.head, ...node.rows].map((row) => row.map((cell) => inlineText(cell, names)).join(" | ")).join("\n");
     case "alert": {

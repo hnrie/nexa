@@ -147,7 +147,7 @@ export default function VoicePage() {
   const holdButton = noKeyToHold();
   return (
     <>
-      <h2 className={st.title}>{tr_("settings.voice.voiceVideo")}</h2>
+      <h2 data-setting="devices" className={st.title}>{tr_("settings.voice.voiceVideo")}</h2>
       <div className={st.form}>
         <div className={`${st.twoCol} ${st.twoEqual}`}>
           <Field label={tr_("settings.voice.inputDevice")}>
@@ -215,7 +215,7 @@ export default function VoicePage() {
       {/* Headings and radio cards sat in the form's 20px-gap column, so each
           heading floated 28px above what it named and the two cards stood
           28px apart; everywhere else they are 8px. */}
-      <h3 className={st.h5}>{tr_("settings.voice.inputMode")}</h3>
+      <h3 data-setting="inputMode" className={st.h5}>{tr_("settings.voice.inputMode")}</h3>
       <div role="radiogroup" aria-label={tr_("settings.voice.inputMode")}>
         <label className={st.radio} data-on={settings.mode === "vad"}>
           <input type="radio" name="voice-input-mode" checked={settings.mode === "vad"} onChange={() => set({ mode: "vad" })} />
@@ -247,7 +247,7 @@ export default function VoicePage() {
           </>
         )}
       </div>
-      <h3 className={st.h5}>{tr_("settings.voice.voiceProcessing")}</h3>
+      <h3 data-setting="voiceProcessing" className={st.h5}>{tr_("settings.voice.voiceProcessing")}</h3>
       <Toggle checked={settings.noiseSuppression} onChange={(on) => set({ noiseSuppression: on })} label={tr_("settings.voice.noiseSuppression")} description={tr_("settings.voice.filtersKeyboardClatterAndFansWith")} />
       <Toggle checked={settings.echoCancellation} onChange={(on) => set({ echoCancellation: on })} label={tr_("settings.voice.echoCancellation")} />
       <Toggle checked={settings.autoGain} onChange={(on) => set({ autoGain: on })} label={tr_("settings.voice.automaticGainControl")} />

@@ -2,7 +2,7 @@ import { NexaProfile } from "@/components/nexa/NexaProfile";
 import { isSystemAccount } from "@/lib/moderation";
 import { LoaderCircle, MessageCircle, MoreHorizontal, NotebookPen, Pencil, UserPlus, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { dmOpenError } from "@/lib/errors";
 import { channels as channelsApi } from "@/api/channels";
@@ -30,6 +30,7 @@ import { useChannels } from "@/stores/channels";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
 import { useRelationships } from "@/stores/relationships";
 import { useServers } from "@/stores/servers";
+import { servers as serversApi } from "@/api/servers";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
@@ -46,6 +47,68 @@ interface Props {
   onClose?: () => void;
   /** Settings' live preview: unsaved changes over the account's own profile, with nothing to click. */
   preview?: Partial<PublicUser>;
+  /** The server it was opened from; otherwise the server being looked at, if any. */
+  serverId?: string;
+}
+
+/** The server whose page is open, which a profile opened from it belongs to. */
+function useServerInView(explicit: string | undefined): string | null {
+  const loc = useLocation();
+  const fromPath = /^\/channels\/(\d+)(?:\/|$)/.exec(loc.pathname)?.[1] ?? null;
+  const id = explicit ?? fromPath;
+  return useServers((st) => (id && st.byId[id] ? id : null));
+}
+
+/**
+ * Someone's roles in the server their profile was opened from, highest first,
+ * each in its colour, and when they joined it. A big server's members arrive a
+ * page at a time, so one who is not loaded yet is asked for.
+ */
+function ServerRoles({ serverId, userId }: { serverId: string; userId: string }) {
+  const server = useServers((st) => st.byId[serverId]);
+  const member = server?.members[userId];
+  const upsertMember = useServers((st) => st.upsertMember);
+  const [missing, setMissing] = useState(false);
+  useEffect(() => {
+    if (member || missing) return;
+    let alive = true;
+    serversApi
+      .member(serverId, userId)
+      .then((m) => alive && upsertMember(m))
+      // not (or no longer) a member: there is nothing of theirs here to show
+      .catch(() => alive && setMissing(true));
+    return () => {
+      alive = false;
+    };
+  }, [serverId, userId, member, missing, upsertMember]);
+  if (!server || !member) return null;
+  const roles = member.role_ids
+    .map((id) => server.roles[id])
+    .filter((r): r is NonNullable<typeof r> => !!r && r.id !== serverId)
+    .sort((a, b) => b.position - a.position);
+  return (
+    <>
+      <div className={s.section} data-testid="profile-roles">
+        <h3>{t("profile.profileCard.rolesIn", { server: server.server.name })}</h3>
+        {roles.length ? (
+          <ul className={s.roles}>
+            {roles.map((r) => (
+              <li key={r.id} className={s.role}>
+                <span className={s.roleDot} style={r.color ? { background: `#${r.color.toString(16).padStart(6, "0")}` } : undefined} aria-hidden="true" />
+                <span className={s.roleName} dir="auto">{r.name}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={s.noRoles}>{t("profile.profileCard.noRoles")}</p>
+        )}
+      </div>
+      <div className={s.section}>
+        <h3>{t("profile.profileCard.joinedServer", { server: server.server.name })}</h3>
+        <p>{dateOf(member.joined_at)}</p>
+      </div>
+    </>
+  );
 }
 
 /** A round button laid over the banner, as Discord's preview has them. */
@@ -66,8 +129,9 @@ function BannerButton({ label, onClick, children, testId, busy }: { label: strin
  * profile with two theme colours is a gradient from top to bottom, with its
  * text and buttons turned to read on it.
  */
-export function ProfileCard({ userId, variant, onClose, preview }: Props) {
+export function ProfileCard({ userId, variant, onClose, preview, serverId }: Props) {
   const nav = useNavigate();
+  const inServer = useServerInView(serverId);
   const me = useAuth((a) => a.me);
   const stored = useUsers((u) => u.byId[userId]);
   const upsertUser = useUsers((u) => u.upsert);
@@ -365,6 +429,8 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
               ) : null}
             </div>
           ) : null}
+
+          {inServer && interactive ? <ServerRoles serverId={inServer} userId={userId} /> : null}
 
           {user.public_key && interactive ? (
             <div className={s.section} data-testid="profile-key">

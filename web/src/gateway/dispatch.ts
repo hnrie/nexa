@@ -9,6 +9,7 @@ import { useRelationships } from "@/stores/relationships";
 import { useServers } from "@/stores/servers";
 import { useExpressions } from "@/stores/expressions";
 import { useGroupAddNotices } from "@/stores/groupAddNotices";
+import { useNotes } from "@/stores/notes";
 import { useSettings } from "@/stores/settings";
 import { useTyping } from "@/stores/typing";
 import { useUI } from "@/stores/ui";
@@ -21,7 +22,7 @@ import { channels as channelsApi } from "@/api/channels";
 import { ApiError } from "@/api/client";
 import { expressions as expressionsApi } from "@/api/expressions";
 import { ring } from "@/lib/keyring";
-import type { Message, PublicUser, Relationship, ServerView } from "@/api/types";
+import type { Message, NoteInviteRow, PublicUser, Relationship, ServerView } from "@/api/types";
 import { nexa as nexaApi, type Announcement, type MemberCase, type NexaState } from "@/api/moderation";
 import { useNexa } from "@/stores/nexa";
 import { useDiscord } from "@/stores/discord";
@@ -66,13 +67,15 @@ export const dispatchHooks: {
   onFriendRequest: ((r: Relationship) => void)[];
   /** Nexa has something new: a notice, a staff reply, an announcement, or for staff a member's appeal. */
   onNexa: ((a: NexaAlert) => void)[];
+  /** Someone asked this account into a note. */
+  onNoteInvite: ((inv: NoteInviteRow) => void)[];
   /** A message was edited; it arrives decrypted. */
   onMessageUpdate: ((decrypted: DecryptedMessage) => void)[];
   /** Messages were deleted; `was` holds each one as it was loaded here, or undefined. */
   onMessageDelete: ((channelId: string, ids: string[], was: (DecryptedMessage | undefined)[]) => void)[];
   /** A message was edited or deleted, or conversations went away. */
   onMessageChange: ((c: MessageChange) => void)[];
-} = { onMessage: [], onUnhandled: [], onReady: [], onFriendRequest: [], onNexa: [], onMessageUpdate: [], onMessageDelete: [], onMessageChange: [] };
+} = { onMessage: [], onUnhandled: [], onReady: [], onFriendRequest: [], onNexa: [], onNoteInvite: [], onMessageUpdate: [], onMessageDelete: [], onMessageChange: [] };
 
 /** The account's standing, and for staff what is waiting on them. */
 function applyNexaState(st: NexaState | undefined): void {
@@ -285,6 +288,10 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       for (const h of dispatchHooks.onReady) h();
       void useKeys.getState().reconcile();
       void useDiscord.getState().load();
+      // The notes ride REST, like the stickers above. Asked for again on every
+      // ready rather than cleared first: a note open on the page keeps what it
+      // has while the list catches up with whatever the reconnect missed.
+      void useNotes.getState().load(true);
       for (const id of shown) void useMessages.getState().syncGap(id);
       return;
     }
@@ -482,6 +489,27 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     case "discord_link":
       useDiscord.getState().set(e.d);
+      return;
+    case "note_update":
+      useNotes.getState().updated(e.d);
+      return;
+    case "note_delete":
+      useNotes.getState().drop(e.d.id);
+      return;
+    case "note_invite": {
+      const known = useNotes.getState().invites.some((i) => i.id === e.d.id);
+      useNotes.getState().invited(e.d);
+      if (!known) for (const h of dispatchHooks.onNoteInvite) h(e.d);
+      return;
+    }
+    case "note_invite_delete":
+      useNotes.getState().dropInvite(e.d.id);
+      return;
+    case "note_presence":
+      useNotes.getState().present(e.d);
+      return;
+    case "note_cursor":
+      useNotes.getState().cursor(e.d);
       return;
     case "group_add_notice_delete":
       useGroupAddNotices.getState().remove(e.d.channel_id);

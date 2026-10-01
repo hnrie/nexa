@@ -9,12 +9,14 @@ interface Props {
   disabled?: boolean;
   /** Names a switch that has no visible label. */
   ariaLabel?: string;
+  /** Which setting this is, for Settings' search to find and point at. */
+  setting?: string;
 }
 
-export function Toggle({ checked, onChange, label, description, disabled, ariaLabel }: Props) {
+export function Toggle({ checked, onChange, label, description, disabled, ariaLabel, setting }: Props) {
   const descId = useId();
   return (
-    <label className={s.row} data-disabled={disabled}>
+    <label className={s.row} data-disabled={disabled} data-setting={setting}>
       {label !== undefined ? (
         <span className={s.text}>
           <span className={s.label}>{label}</span>

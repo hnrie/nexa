@@ -8,6 +8,8 @@ import type { Settings } from "@/stores/settings";
 
 /** What applyTheme draws the page with. */
 export type Appearance = Pick<Settings, "theme" | "accent" | "fontScale" | "reducedMotion" | "underlineLinks"> & {
+  /** The app's typeface; the default one when not said. */
+  fontFace?: Settings["fontFace"];
   /** The custom themes `theme` may name. */
   customThemes?: CustomTheme[];
   /** Which themes "Sync with system" moves between; Dark and Light when not set. */
@@ -186,9 +188,29 @@ export function applyTheme(s: Appearance, draft?: ThemeDraft | null): void {
   if (style.textContent !== text) style.textContent = text;
   root.dataset["reducedMotion"] = s.reducedMotion ? "true" : "false";
   root.dataset["underlineLinks"] = s.underlineLinks || look.underlineLinks ? "true" : "false";
+  applyFontFace(s.fontFace ?? "default");
   const meta = document.querySelector('meta[name="theme-color"]');
   const bar = look.tokens ? toHex(parseColour(look.tokens["bg-base"])?.rgb ?? [0, 0, 0]) : look.classic === "light" ? "#f4f2fb" : look.classic === "onyx" ? "#000000" : look.classic === "ash" ? "#18191d" : "#1c1825";
   if (meta) meta.setAttribute("content", bar);
+}
+
+let classicFonts: Promise<unknown> | null = null;
+
+/**
+ * Sets the app's typeface. The classic fonts are a stylesheet of their own,
+ * fetched the first time they are picked: nobody who keeps the default
+ * downloads them.
+ */
+export function applyFontFace(face: Settings["fontFace"]): void {
+  const root = document.documentElement;
+  if (face !== "classic") {
+    delete root.dataset["font"];
+    return;
+  }
+  classicFonts ??= import("@/styles/fonts-classic.css").catch(() => {
+    classicFonts = null;
+  });
+  root.dataset["font"] = "classic";
 }
 
 const REMEMBERED = "ec:appearance";
@@ -236,6 +258,7 @@ export function rememberedAppearance(): Appearance | null {
       reducedMotion: v["reducedMotion"] === true,
       underlineLinks: v["underlineLinks"] === true,
     };
+    if (v["fontFace"] === "classic") out.fontFace = "classic";
     if (customThemes.length) out.customThemes = customThemes;
     const pair = sanitizePair(v["systemThemes"]);
     if (pair) out.systemThemes = pair;
@@ -258,6 +281,7 @@ export function rememberAppearance(a: Appearance): void {
       fontScale: a.fontScale,
       reducedMotion: a.reducedMotion,
       underlineLinks: a.underlineLinks,
+      ...(a.fontFace === "classic" ? { fontFace: "classic" } : {}),
       ...(customThemes.length ? { customThemes } : {}),
       ...(a.theme === "system" && a.systemThemes ? { systemThemes: a.systemThemes } : {}),
     }),

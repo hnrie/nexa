@@ -281,6 +281,7 @@ export function ChatView({ channel }: { channel: Channel }) {
             }}
             onSelect={(e) => setSearchCaret(e.currentTarget.selectionStart ?? searchQuery.length)}
             placeholder={searchPlaceholder}
+            shorterPlaceholders={[tr_("chat.chat.search")]}
             aria-label={tr_("chat.chat.searchMessages")}
             title={tr_("chat.chat.searchThisDeviceSDecryptedMessages")}
             data-testid="search-input"

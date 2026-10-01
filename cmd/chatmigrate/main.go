@@ -232,6 +232,14 @@ var keyColumns = []struct{ table, cols string }{
 	// a linked Discord account's sealed tokens: ones that came across wrong
 	// cannot put it back in the activity server
 	{"discord_links", "user_id, discord_id, access_sealed, refresh_sealed"},
+	// a note's key, sealed to each person in it, to each one asked in and for
+	// each link, and its earlier keys: one that came across wrong is a note
+	// somebody can no longer open, or a version nobody can
+	{"notes", "id, owner_id, version, key_epoch"},
+	{"note_members", "note_id, user_id, role, key_sealed"},
+	{"note_invites", "id, note_id, to_id, key_sealed"},
+	{"note_links", "id, note_id, token_hash, key_wrapped, link_sealed"},
+	{"note_keys", "note_id, epoch, wrapped"},
 }
 
 // sameBytes checks that the values that matter are identical on both sides.

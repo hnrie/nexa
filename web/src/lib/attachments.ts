@@ -205,14 +205,26 @@ function worthAnotherTry(err: unknown): boolean {
   return err.status === 0 || err.status >= 500;
 }
 
+/** Where a file is going: a conversation, by its id, or a note, by where its files are sent. */
+export type UploadPlace = string | { path: string };
+
+function placePath(to: UploadPlace): string {
+  return typeof to === "string" ? `/channels/${to}/attachments` : to.path;
+}
+
+/** A note's files go up as a message's do, to the note. */
+export function noteUploads(noteId: string): UploadPlace {
+  return { path: `/notes/${noteId}/attachments` };
+}
+
 /**
  * Encrypts and sends a picture's small copy (lib/pictureCopy.ts): a file of
  * its own, under a key of its own, in one request.
  */
-async function sendCopy(channelId: string, copy: PictureCopy, send: PieceSender, signal?: AbortSignal): Promise<{ meta: AttachmentPreview; blob: Blob }> {
+async function sendCopy(to: UploadPlace, copy: PictureCopy, send: PieceSender, signal?: AbortSignal): Promise<{ meta: AttachmentPreview; blob: Blob }> {
   const key = newFileKey();
   const baseIv = newBaseIv();
-  const job: PieceJob = { method: "POST", path: `/channels/${channelId}/attachments`, file: copy.blob, key, baseIv, first: 0, count: chunkCount(copy.blob.size), skip: 0 };
+  const job: PieceJob = { method: "POST", path: placePath(to), file: copy.blob, key, baseIv, first: 0, count: chunkCount(copy.blob.size), skip: 0 };
   const res = (await send(job, () => undefined, signal)) as { blob_id: string; size: number };
   return { meta: { blob_id: res.blob_id, key: b64.enc(key), size: copy.blob.size, type: copy.type, w: copy.w, h: copy.h }, blob: copy.blob };
 }
@@ -229,7 +241,7 @@ async function sendCopy(channelId: string, copy: PictureCopy, send: PieceSender,
  * Meanwhile a picture is measured and, when it is big, a small copy of it is
  * made and sent beside it for the chat to show.
  */
-export async function uploadStaged(channelId: string, st: Staged, onProgress: (p: number) => void, send: PieceSender = sendInWorker, signal?: AbortSignal): Promise<{ meta: AttachmentMeta; blob_id: string; size: number }> {
+export async function uploadStaged(to: UploadPlace, st: Staged, onProgress: (p: number) => void, send: PieceSender = sendInWorker, signal?: AbortSignal): Promise<{ meta: AttachmentMeta; blob_id: string; size: number }> {
   if (!fitsUploadLimit(st.file.size)) throw new Error(t("attachments.overServerLimit", { limit: formatSize(limits.max) }));
   const total = encryptedSize(st.file.size);
   const key = newFileKey();
@@ -241,12 +253,12 @@ export async function uploadStaged(channelId: string, st: Staged, onProgress: (p
   const release = holdReload("upload");
   const look = lookAtPicture(st.file);
   // a copy that does not make it up only leaves the picture to be shown at its full size
-  const copied = look.then((found) => (found.copy ? sendCopy(channelId, found.copy, send, signal) : null)).catch(() => null);
+  const copied = look.then((found) => (found.copy ? sendCopy(to, found.copy, send, signal) : null)).catch(() => null);
   try {
     // One request up to the server's single-request limit, pieces only above it:
     // the owner chose fewer requests over resuming mid-file for files that fit in one.
     if (total <= limits.single) {
-      const job: PieceJob = { method: "POST", path: `/channels/${channelId}/attachments`, file: st.file, key, baseIv, first: 0, count: chunkCount(st.file.size), skip: 0 };
+      const job: PieceJob = { method: "POST", path: placePath(to), file: st.file, key, baseIv, first: 0, count: chunkCount(st.file.size), skip: 0 };
       const once = async () => (await send(job, (loaded) => onProgress(loaded / total), signal)) as { blob_id: string; size: number };
       try {
         res = await once();

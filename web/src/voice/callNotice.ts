@@ -10,6 +10,7 @@ import { avatarUrl } from "@/api/users";
 import { doNotDisturb } from "@/lib/dnd";
 import { channelDisplayName } from "@/lib/names";
 import { appOnScreen, closeNotifications, notificationsEnabled, showNotification } from "@/lib/notify";
+import { roundAvatar } from "@/lib/roundIcon";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useSettings } from "@/stores/settings";
@@ -32,10 +33,9 @@ function notify(channelId: string, from: string, body: string, ringing: boolean)
   const caller = useUsers.getState().byId[from];
   // A ringing call stays up until it is dealt with, as a phone's does; the
   // app plays the ring itself, so the notification makes no sound of its own.
-  void showNotification(
-    displayName(caller),
-    { body, tag: tagOf(channelId), icon: avatarUrl(caller?.avatar_id ?? null, 96) ?? "/icons/icon-192.png", requireInteraction: ringing, silent: true },
-    `/channels/@me/${channelId}`,
+  const name = displayName(caller);
+  void roundAvatar({ id: from, name, url: avatarUrl(caller?.avatar_id ?? null, 96) }, "/icons/icon-192.png").then((icon) =>
+    showNotification(name, { body, tag: tagOf(channelId), icon, requireInteraction: ringing, silent: true }, `/channels/@me/${channelId}`),
   );
 }
 

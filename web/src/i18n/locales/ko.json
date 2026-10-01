@@ -399,6 +399,41 @@
   "chat.pins.thisChannelDoesnTHaveAny": "아직 고정된 메시지가 없습니다.",
   "chat.pins.unpin": "고정 해제",
   "chat.pins.unpinThisMessage": "이 메시지 고정 해제",
+  "chat.post.forwardedFrom": "{name}에서 전달됨",
+  "chat.post.likes": {
+    "other": "좋아요 {n}개"
+  },
+  "chat.post.note": "독자가 맥락을 추가했습니다",
+  "chat.post.openOn": "{site}에서 열기",
+  "chat.post.pictureOf": "사진 {index}/{count}",
+  "chat.post.points": {
+    "other": "{n}점"
+  },
+  "chat.post.pollClosed": "최종 결과",
+  "chat.post.pollEnds": "{date}에 종료",
+  "chat.post.reactions": {
+    "other": "반응 {n}개"
+  },
+  "chat.post.replies": {
+    "other": "답글 {n}개"
+  },
+  "chat.post.replyingTo": "{name}에게 보내는 답글",
+  "chat.post.reposts": {
+    "other": "재게시 {n}회"
+  },
+  "chat.post.sensitive": "이 게시물에는 민감한 콘텐츠가 있을 수 있습니다.",
+  "chat.post.shares": {
+    "other": "공유 {n}회"
+  },
+  "chat.post.show": "보기",
+  "chat.post.verified": "인증됨",
+  "chat.post.views": {
+    "other": "조회 {n}회"
+  },
+  "chat.post.votes": {
+    "other": "{n}표"
+  },
+  "chat.post.watchOn": "{site}에서 보기",
   "chat.reactions.addReaction": "반응 추가",
   "chat.reactions.andMore": {
     "other": "외 {count}명"
@@ -452,7 +487,6 @@
   "chat.systemMessage.pollWinner": "{answer}이(가) {percent}%로 1위를 했습니다.",
   "chat.systemMessage.removedFromGroup": "{actor}님이 {target}님을 그룹에서 내보냈습니다.",
   "chat.systemMessage.someone": "누군가",
-  "chat.systemMessage.startedACall": "{actor}님이 통화를 시작했습니다.",
   "chat.systemMessage.tookOwnership": "{actor}님이 그룹 소유권을 가져왔습니다.",
   "chat.systemMessage.viewPoll": "투표 보기",
   "chat.typingBar.oneTyping": "{a} 님이 입력 중…",
@@ -1890,16 +1924,192 @@
     "other": "Nexa에서 온 읽지 않은 메시지 {count}개"
   },
   "nexa.viewProfile": "프로필 보기",
+  "notes.card.empty": "아직 작성된 내용이 없습니다.",
+  "notes.card.locked": "이 기기에서는 열 수 없습니다.",
+  "notes.card.sharedWith": {
+    "other": "{count}명이 공유 중"
+  },
+  "notes.editor.addPicture": "사진 또는 동영상 추가",
+  "notes.editor.attachFile": "파일 첨부",
+  "notes.editor.body": "노트",
+  "notes.editor.placeholder": "쓰기 시작하거나 사진과 파일을 끌어다 놓으세요",
+  "notes.editor.title": "제목",
+  "notes.editor.titlePlaceholder": "제목",
+  "notes.editor.tooLong": "이 노트는 {max}자를 넘어서 저장되지 않고 있습니다. 텍스트를 줄이면 다시 저장됩니다.",
+  "notes.errors.alreadyMember": "이미 이 노트에 참여 중인 사람입니다.",
+  "notes.errors.bad": "이 노트의 일부를 저장할 수 없었습니다. 다시 시도하세요.",
+  "notes.errors.blocked": "이 사람은 초대할 수 없습니다.",
+  "notes.errors.file": "이 노트의 파일 하나를 유지할 수 없었습니다. 다시 추가하세요.",
+  "notes.errors.filesFull": "이 노트에 넣을 수 있는 파일 수가 최대입니다.",
+  "notes.errors.full": "이 노트는 공유할 수 있는 최대 인원과 이미 공유되어 있습니다.",
+  "notes.errors.gone": "이 노트는 더 이상 없습니다.",
+  "notes.errors.noInvite": "이 요청은 더 이상 없습니다.",
+  "notes.errors.noLink": "이 링크는 더 이상 작동하지 않습니다.",
+  "notes.errors.owner": "내 노트에서는 나갈 수 없습니다. 대신 삭제하세요.",
+  "notes.errors.role": "이 노트에서는 그렇게 할 수 없습니다.",
+  "notes.errors.self": "이미 내 노트입니다.",
+  "notes.errors.tooManyLinks": "이 노트의 링크가 최대 개수입니다. 새로 만들려면 하나를 삭제하세요.",
+  "notes.errors.tooManyNotes": "계정에 저장할 수 있는 노트 수가 최대입니다. 더 만들려면 몇 개를 삭제하세요.",
+  "notes.errors.userNotFound": "해당 사용자 이름을 가진 사람이 없습니다.",
+  "notes.file.failed": "이 파일을 업로드할 수 없었습니다.",
+  "notes.file.full": "이 노트에는 더 이상 파일을 넣을 수 없습니다.",
+  "notes.file.notHere": "이 파일은 아직 없습니다.",
+  "notes.file.remove": "{name} 삭제",
+  "notes.file.removeShort": "삭제",
+  "notes.file.retry": "{name} 다시 업로드",
+  "notes.file.retryShort": "다시 시도",
+  "notes.file.someLeftOut": {
+    "other": "이 노트에는 파일을 {count}개만 더 넣을 수 있습니다."
+  },
+  "notes.file.tooBig": "{name}이(가) 업로드 한도 {limit}을(를) 넘습니다.",
+  "notes.file.untitled": "파일",
+  "notes.file.uploading": "{name} 업로드 중",
+  "notes.first.body": "노트에는 글과 사진, 파일이 메시지처럼 암호화되어 보관됩니다. 공유하면 실시간으로 함께 쓸 수 있습니다.",
+  "notes.first.friend": "친구",
+  "notes.first.title": "첫 노트를 써 보세요",
+  "notes.history.allVersions": "모든 버전",
+  "notes.history.backToNote": "노트로 돌아가기",
+  "notes.history.couldNotLoad": "이 노트의 기록을 불러올 수 없었습니다.",
+  "notes.history.couldNotOpen": "이 버전을 열 수 없었습니다.",
+  "notes.history.couldNotRestore": "이 버전을 복원할 수 없었습니다.",
+  "notes.history.current": "현재 버전",
+  "notes.history.currentNote": "지금의 노트",
+  "notes.history.loading": "버전을 불러오는 중",
+  "notes.history.none": "아직 이전 버전이 없습니다. 쉬었다가 다시 쓰기 시작할 때마다 하나씩 보관됩니다.",
+  "notes.history.restore": "이 버전 복원",
+  "notes.history.restored": "버전을 복원했습니다. 바뀌기 전 내용도 기록에 남아 있습니다.",
+  "notes.history.savedBy": "{name} 님이 저장, {when}",
+  "notes.history.title": "버전 기록",
+  "notes.history.unreadable": "이 기기에서는 열 수 없음",
+  "notes.link.alreadyIn": "이미 참여 중인 노트",
+  "notes.link.couldNotJoin": "이 노트에 참여할 수 없었습니다.",
+  "notes.link.dialogLabel": "공유된 노트",
+  "notes.link.failedBody": "연결을 확인하고 다시 시도하세요.",
+  "notes.link.failedTitle": "노트를 불러올 수 없었습니다",
+  "notes.link.goneBody": "링크가 삭제되었거나 노트가 삭제되었습니다.",
+  "notes.link.goneTitle": "이 링크는 더 이상 작동하지 않습니다",
+  "notes.link.join": "노트 참여",
+  "notes.link.joinToEdit": "참여하면 편집할 수 있습니다",
+  "notes.link.joinToView": "참여하면 읽을 수 있습니다",
+  "notes.link.label": "공유된 노트: {title}",
+  "notes.link.noKeyBody": "링크에서 키가 담긴 # 뒷부분이 빠져 있습니다. 전체 링크를 다시 받아 주세요.",
+  "notes.link.noKeyTitle": "링크가 불완전합니다",
+  "notes.link.open": "노트 열기",
+  "notes.link.opening": "노트를 여는 중",
+  "notes.link.pageTitle": "공유된 노트",
+  "notes.link.people": {
+    "other": "{count}명"
+  },
+  "notes.link.shared": "누군가 노트를 공유했습니다",
+  "notes.link.sharedBy": "{name} 님이 공유함",
+  "notes.link.signInToOpen": "로그인해서 읽어 보세요. 노트는 암호화되어 있어 참여한 사람만 읽을 수 있습니다.",
+  "notes.link.tryAgain": "다시 시도",
+  "notes.list.couldNotCreate": "새 노트를 만들 수 없었습니다.",
+  "notes.list.couldNotLoad": "노트를 불러올 수 없었습니다.",
+  "notes.list.loading": "노트를 불러오는 중",
+  "notes.list.new": "새 노트",
+  "notes.list.noMatch": "“{query}”과(와) 일치하는 노트가 없습니다.",
+  "notes.list.none": "아직 노트가 없습니다.",
+  "notes.list.pick": "노트를 고르거나 새로 시작하세요.",
+  "notes.list.search": "노트 검색",
+  "notes.menu.delete": "노트 삭제",
+  "notes.menu.deleteBody": "“{title}”이(가) 공유된 모든 사람에게서 기록과 함께 삭제됩니다. 되돌릴 수 없습니다.",
+  "notes.menu.deleteTitle": "노트 삭제",
+  "notes.menu.history": "버전 기록",
+  "notes.menu.leave": "노트 나가기",
+  "notes.menu.leaveBody": "누군가 다시 공유하지 않으면 “{title}”을(를) 열 수 없게 됩니다.",
+  "notes.menu.leaveTitle": "노트 나가기",
+  "notes.menu.open": "노트 열기",
+  "notes.menu.share": "공유",
+  "notes.menu.whoHasAccess": "접근 권한이 있는 사람",
+  "notes.page.backToNotes": "노트 목록으로",
+  "notes.page.edited": "{when} 수정됨",
+  "notes.page.editedBy": "마지막 수정: {name}, {when}",
+  "notes.page.editedByYou": "마지막 수정: 나, {when}",
+  "notes.page.failedBody": "연결을 확인하고 다시 시도하세요.",
+  "notes.page.failedTitle": "이 노트를 열 수 없었습니다",
+  "notes.page.goneBody": "삭제되었거나 더 이상 참여 중이 아닙니다.",
+  "notes.page.goneTitle": "이 노트가 없습니다",
+  "notes.page.hereNow": "지금 있는 사람: {names}",
+  "notes.page.isHere": "{name} 님이 보고 있습니다",
+  "notes.page.more": "더 보기",
+  "notes.page.notSaved": "저장되지 않음",
+  "notes.page.notSavedWhy": "최근 변경 사항을 저장할 수 없었습니다.",
+  "notes.page.offline": "오프라인",
+  "notes.page.offlineWhy": "변경 사항은 여기에 보관되었다가 다시 온라인이 되면 저장됩니다.",
+  "notes.page.opening": "노트를 여는 중",
+  "notes.page.saved": "저장됨",
+  "notes.page.saving": "저장 중",
+  "notes.page.tryAgain": "다시 시도",
+  "notes.page.viewOnly": "보기 전용",
+  "notes.reader.empty": "아직 작성된 내용이 없습니다.",
+  "notes.requests.accept": "수락",
+  "notes.requests.couldNotAccept": "요청을 수락할 수 없었습니다.",
+  "notes.requests.couldNotDecline": "요청을 거절할 수 없었습니다.",
+  "notes.requests.count": {
+    "other": "노트 요청 {count}개"
+  },
+  "notes.requests.decline": "거절",
+  "notes.requests.title": "요청",
+  "notes.requests.toEdit": "{name} 님이 함께 노트를 쓰고 싶어 합니다",
+  "notes.requests.toView": "{name} 님이 노트를 공유하고 싶어 합니다",
+  "notes.share.cancelInvite": "요청 취소",
+  "notes.share.canEdit": "편집 가능",
+  "notes.share.canView": "보기 가능",
+  "notes.share.copied": "복사됨",
+  "notes.share.copy": "복사",
+  "notes.share.couldNotCancel": "요청을 취소할 수 없었습니다.",
+  "notes.share.couldNotChange": "{name} 님의 권한을 바꿀 수 없었습니다.",
+  "notes.share.couldNotInvite": "{name} 님에게 요청을 보낼 수 없었습니다.",
+  "notes.share.couldNotLoad": "이 노트의 참여자를 불러올 수 없었습니다.",
+  "notes.share.couldNotMakeLink": "링크를 만들 수 없었습니다.",
+  "notes.share.couldNotRemove": "{name} 님을 내보낼 수 없었습니다.",
+  "notes.share.couldNotRemoveLink": "링크를 삭제할 수 없었습니다.",
+  "notes.share.createLink": "링크 만들기",
+  "notes.share.invite": "초대",
+  "notes.share.inviteAs": "권한",
+  "notes.share.invited": "{name} 님에게 요청을 보냈습니다.",
+  "notes.share.invitedShort": "보냄",
+  "notes.share.inviteHint": "친구나 사용자 이름으로 검색하세요. 상대방에게 수락할 요청이 갑니다.",
+  "notes.share.inviteNamed": "{name} 초대",
+  "notes.share.invitePeople": "사람 초대",
+  "notes.share.keyChanged": "{name} 님의 암호화 키가 바뀌었고 아직 수락하지 않았습니다. 공유하기 전에 안전 번호를 확인하세요.",
+  "notes.share.keyNote": "링크와 요청에는 노트의 키가 담겨 있습니다. 사람이나 링크를 삭제하면 노트에 새 키가 생겨, 그 뒤에 쓴 내용은 읽을 수 없습니다.",
+  "notes.share.linkCanEdit": "링크가 있는 사람은 편집 가능",
+  "notes.share.linkCanView": "링크가 있는 사람은 보기 가능",
+  "notes.share.linkCopied": "링크를 복사했습니다.",
+  "notes.share.linkRole": "링크 권한",
+  "notes.share.links": "공유 링크",
+  "notes.share.linksHint": "링크를 만들어 메시지나 다른 곳에서 노트를 공유하세요.",
+  "notes.share.linkUses": {
+    "other": "{count}명 참여"
+  },
+  "notes.share.loading": "불러오는 중",
+  "notes.share.nobodyFound": "그 이름으로 찾은 사람이 없습니다.",
+  "notes.share.owner": "소유자",
+  "notes.share.peopleWithAccess": "접근 권한이 있는 사람",
+  "notes.share.removeFromNote": "노트에서 내보내기",
+  "notes.share.removeLink": "링크 삭제",
+  "notes.share.roleOf": "{name} 님의 권한",
+  "notes.share.searchPlaceholder": "친구 또는 사용자 이름 검색",
+  "notes.share.title": "“{title}” 공유",
+  "notes.share.waiting": "요청 보냄({role})",
+  "notes.share.whoTitle": "“{title}” 참여자",
+  "notes.share.you": "{name}(나)",
+  "notes.title": "노트",
+  "notes.untitled": "제목 없는 노트",
   "notFound.body": "링크를 잘못 입력했거나 링크된 곳이 옮겨졌을 수 있습니다.",
   "notFound.home": "홈페이지로 이동",
   "notFound.openNexa": "Nexa 열기",
   "notFound.title": "존재하지 않는 페이지입니다",
   "notify.friendRequest": "친구 요청",
   "notify.newMessage": "새 메시지",
+  "notify.noteInvite": "노트 요청",
   "notify.sentASticker": "스티커를 보냈습니다",
   "notify.sentFile": "{name}을(를) 보냈습니다",
   "notify.sentFiles": "파일 {count}개를 보냈습니다",
   "notify.sentYouAFriendRequest": "{name}이(가) 친구 요청을 보냈습니다.",
+  "notify.sharedANote": "{name} 님이 노트를 공유하고 싶어 합니다.",
   "offline.canTConnect": "연결할 수 없습니다",
   "offline.couldNotReachTheServer": "서버에 연결하지 못했습니다.",
   "offline.youAreStillLoggedInCheck": "로그인은 유지되고 있습니다. 연결을 확인하거나, 서버가 재시작 중이라면 잠시 기다리세요. 이 페이지는 계속 시도합니다.",
@@ -2071,6 +2281,126 @@
   "perms.viewAuditLog": "감사 로그 보기",
   "perms.viewChannels": "채널 보기",
   "perms.voiceChannelPermissions": "음성 채널 권한",
+  "pick.accepted": {
+    "other": "요청 {count}개를 수락했어요."
+  },
+  "pick.acceptRequests": {
+    "other": "요청 {count}개 수락"
+  },
+  "pick.addRole": "역할 추가",
+  "pick.ban": {
+    "other": "멤버 {count}명 차단"
+  },
+  "pick.banned": {
+    "other": "멤버 {count}명을 차단했어요."
+  },
+  "pick.banTitle": {
+    "other": "멤버 {count}명을 차단할까요?"
+  },
+  "pick.block": {
+    "other": "{count}명 차단"
+  },
+  "pick.blockBody": "{names}님은 더 이상 메시지나 친구 요청을 보낼 수 없어요.",
+  "pick.blocked": {
+    "other": "{count}명을 차단했어요."
+  },
+  "pick.blockTitle": {
+    "other": "{count}명을 차단할까요?"
+  },
+  "pick.cancelRequests": {
+    "other": "요청 {count}개 취소"
+  },
+  "pick.close": "대화 닫기",
+  "pick.closeBody": {
+    "other": "그중 {count}개는 그룹 채팅이며, 그룹에서 나가게 돼요."
+  },
+  "pick.closeConfirm": "닫고 나가기",
+  "pick.closeTitle": {
+    "other": "대화 {count}개를 닫을까요?"
+  },
+  "pick.count": {
+    "other": "{count}개 선택됨"
+  },
+  "pick.dmBar": "선택한 대화",
+  "pick.done": "완료",
+  "pick.friendsBar": "선택한 사람",
+  "pick.friendsRemoved": {
+    "other": "친구 {count}명을 삭제했어요."
+  },
+  "pick.groupChatWith": {
+    "other": "{count}명과 그룹 채팅 만들기"
+  },
+  "pick.ignoreRequests": {
+    "other": "요청 {count}개 무시"
+  },
+  "pick.kick": {
+    "other": "멤버 {count}명 추방"
+  },
+  "pick.kicked": {
+    "other": "멤버 {count}명을 추방했어요."
+  },
+  "pick.kickTitle": {
+    "other": "멤버 {count}명을 추방할까요?"
+  },
+  "pick.leaveServers": {
+    "other": "서버 {count}개 나가기"
+  },
+  "pick.leaveServersBody": "{names}에서 나가며, 다시 들어오려면 새 초대가 필요해요.",
+  "pick.leaveServersTitle": {
+    "other": "서버 {count}개에서 나갈까요?"
+  },
+  "pick.listOptions": "목록 옵션",
+  "pick.membersBar": "선택한 멤버",
+  "pick.more": "더 보기",
+  "pick.mute": "음소거",
+  "pick.newFolder": "새 폴더",
+  "pick.ownedStay": {
+    "other": "내가 소유한 서버 {count}개는 그대로 남아요."
+  },
+  "pick.pickNamed": "{name} 선택",
+  "pick.pin": "고정",
+  "pick.removedFromGroup": {
+    "other": "그룹에서 {count}명을 내보냈어요."
+  },
+  "pick.removeFriends": {
+    "other": "친구 {count}명 삭제"
+  },
+  "pick.removeFriendsBody": "{names}님과 더 이상 친구가 아니게 돼요.",
+  "pick.removeFriendsTitle": {
+    "other": "친구 {count}명을 삭제할까요?"
+  },
+  "pick.removeFromGroup": {
+    "other": "그룹에서 {count}명 내보내기"
+  },
+  "pick.removeFromGroupBody": "{names}님이 그룹에서 나가며 더 이상 메시지를 받지 않아요.",
+  "pick.removeFromGroupTitle": {
+    "other": "그룹에서 {count}명을 내보낼까요?"
+  },
+  "pick.removeRole": "역할 제거",
+  "pick.requestsDropped": {
+    "other": "요청 {count}개를 지웠어요."
+  },
+  "pick.roleGiven": {
+    "other": "멤버 {count}명에게 역할을 줬어요."
+  },
+  "pick.roleTaken": {
+    "other": "멤버 {count}명에게서 역할을 뺐어요."
+  },
+  "pick.select": "선택",
+  "pick.selectConversations": "대화 선택",
+  "pick.serverBar": "선택한 서버",
+  "pick.sortedManually": "직접 정렬됨",
+  "pick.sortManual": "직접 정렬",
+  "pick.sortRecent": "최근 활동순으로 정렬",
+  "pick.tapToPick": "탭하여 선택",
+  "pick.unblocked": {
+    "other": "{count}명의 차단을 해제했어요."
+  },
+  "pick.unblockPeople": {
+    "other": "{count}명 차단 해제"
+  },
+  "pick.unmute": "음소거 해제",
+  "pick.unpin": "고정 해제",
   "pickers.emojiIndex.activities": "활동",
   "pickers.emojiIndex.animalsNature": "동물과 자연",
   "pickers.emojiIndex.flags": "깃발",
@@ -2200,6 +2530,7 @@
   "profile.profileCard.editProfile": "프로필 편집",
   "profile.profileCard.friendNickname": "친구 별명",
   "profile.profileCard.friendsSince": "친구가 된 날",
+  "profile.profileCard.joinedServer": "{server} 가입",
   "profile.profileCard.memberSince": "가입한 날",
   "profile.profileCard.message": "메시지",
   "profile.profileCard.mutualFriendCount": {
@@ -2214,11 +2545,13 @@
   "profile.profileCard.mutualServersCount": {
     "other": "함께 있는 서버 ({count})"
   },
+  "profile.profileCard.noRoles": "아직 역할이 없어요.",
   "profile.profileCard.note": "메모",
   "profile.profileCard.onlyYouSeeIt": "나만 볼 수 있습니다.",
   "profile.profileCard.owner": "소유자",
   "profile.profileCard.ownerTip": "Nexa 소유자",
   "profile.profileCard.removeFriend": "친구 삭제",
+  "profile.profileCard.rolesIn": "{server}의 역할",
   "profile.profileCard.viewFullBio": "소개 전체 보기",
   "profile.profileCard.viewFullProfile": "프로필 전체 보기",
   "profile.profileCard.viewFullProfileOf": "{name}의 전체 프로필 보기",
@@ -2884,6 +3217,10 @@
   "settings.about.title": "Nexa 정보",
   "settings.about.version": "버전",
   "settings.about.whatsNewSub": "최근 업데이트에서 바뀐 점과 찾는 곳.",
+  "settings.accessibility.goToTextSize": "글자 크기로 이동",
+  "settings.accessibility.motion": "움직임",
+  "settings.accessibility.reading": "읽기",
+  "settings.accessibility.textSizeIsIn": "글자 크기는 모양에서 바꿀 수 있어요.",
   "settings.account.aRecoveryKeyIsSetGenerating": "복구 키가 설정되어 있습니다. 새로 만들면 교체됩니다.",
   "settings.account.accountRemoval": "계정 삭제",
   "settings.account.atLeast8Characters": "8자 이상.",
@@ -2911,6 +3248,7 @@
   "settings.account.purge.leaves": "나가게 되는 다른 서버와 그룹 채팅",
   "settings.account.purge.messages": "보낸 메시지(모든 곳)",
   "settings.account.purge.note": "Nexa 운영자를 포함해 누구도 되돌릴 수 없습니다.",
+  "settings.account.purge.notes": "내 노트(공유한 모든 사람에게서)",
   "settings.account.purge.ownedGroups": "내가 소유한 그룹 채팅(모든 멤버에게서)",
   "settings.account.purge.ownedServers": "내가 소유한 서버(모든 내용 포함, 모든 사람에게서)",
   "settings.account.purge.packs": "만든 스티커·이모지 팩",
@@ -3030,6 +3368,9 @@
   "settings.appearance.custom": "맞춤",
   "settings.appearance.disablesAnimationsAndTransitions": "애니메이션과 전환 효과를 끕니다.",
   "settings.appearance.editTheme": "{name} 편집",
+  "settings.appearance.font": "글꼴",
+  "settings.appearance.fontClassic": "클래식",
+  "settings.appearance.fontDefault": "기본",
   "settings.appearance.fontSize": "글자 크기",
   "settings.appearance.groupClassic": "기본",
   "settings.appearance.groupDark": "어두운 색",
@@ -3068,6 +3409,13 @@
   "settings.appearance.underlinesMisspelledWordsInTheMessage": "입력하는 동안 맞춤법이 틀린 단어에 밑줄을 긋습니다. 검사는 브라우저가 해요. Shift 키를 누른 채 단어를 오른쪽 클릭하면 브라우저의 제안을 볼 수 있어요. Nexa를 영어로 쓸 때는 Nexa가 직접 검사해요.",
   "settings.appearance.waitingForTheDayWhen": "글자가 편해질 때까지 슬라이더를 움직여 보세요.",
   "settings.appearance.yourWords": "추가한 단어",
+  "settings.chat.linksAndMedia": "링크 및 미디어",
+  "settings.chat.messageBox": "메시지 입력창",
+  "settings.chat.reading": "소리 내어 읽기",
+  "settings.chat.title": "메시지 및 미디어",
+  "settings.data.deleteIsIn": "계정 삭제는 내 계정에 있어요.",
+  "settings.data.export": "내 데이터 내보내기",
+  "settings.data.goToMyAccount": "내 계정으로 이동",
   "settings.desktop.activityShowsHereOnlyDiscordDoes": "활동은 Nexa에만 표시되고 Discord에는 표시되지 않습니다.",
   "settings.desktop.alsoShowItOnDiscord": "Discord에도 표시",
   "settings.desktop.callsNotificationsAndRichPresenceCarry": "통화, 알림, 리치 프레즌스는 트레이에서도 계속됩니다.",
@@ -3133,6 +3481,12 @@
   "settings.devices.thisDevice": "이 기기",
   "settings.devices.unknownDevice": "알 수 없는 기기",
   "settings.devices.yourDevicesCouldNotBeLoaded": "기기 목록을 불러오지 못했습니다.",
+  "settings.groups.account": "계정",
+  "settings.groups.app": "앱",
+  "settings.groups.chat": "채팅",
+  "settings.groups.emojiStickers": "이모지 및 스티커",
+  "settings.groups.help": "도움말 및 법적 고지",
+  "settings.groups.look": "모양 및 사용감",
   "settings.licenses.desktopApp": "데스크톱 앱",
   "settings.licenses.everything": "전체",
   "settings.licenses.fontsAndArtwork": "글꼴과 그래픽",
@@ -3214,8 +3568,9 @@
   "settings.privacy.searchRebuilding": "색인을 지우고 다시 만드는 중이에요",
   "settings.privacy.shareMyActivity": "내 활동 공유",
   "settings.privacy.showEmbeddedImagesAndGifsFrom": "링크의 이미지와 GIF를 본문에 표시",
+  "settings.privacy.title": "개인정보",
   "settings.privacy.yourData": "내 데이터",
-  "settings.privacy.yourDeviceAsksTheServerTo": "기기가 서버에 링크한 페이지를 대신 열어 보라고 요청하고, 미리보기를 암호화된 메시지에 붙입니다. 보내는 링크를 서버가 보지 않기를 원하면 끄세요.",
+  "settings.privacy.yourDeviceAsksTheServerTo": "기기가 서버에 링크한 페이지를 대신 열어 보라고 요청하고, 미리보기를 암호화된 메시지에 붙입니다. 소셜 사이트의 게시물이면 서버가 공개 임베드 서비스에도 물어볼 수 있습니다. 보내는 링크를 서버가 보지 않기를 원하면 끄세요.",
   "settings.profile.aboutHintLeft": {
     "other": "여기서는 Markdown이 동작합니다. {count}자 남았습니다."
   },
@@ -3246,6 +3601,9 @@
   "settings.profile.secondColourHex": "두 번째 색 HEX",
   "settings.profile.tellPeopleAboutYourself": "자신에 대해 이야기해 주세요",
   "settings.profile.topColourOnItsOwnIt": "위쪽 색: 이것만 고르면 배너 색이 됩니다.",
+  "settings.search.none": "“{query}”와 일치하는 설정이 없어요.",
+  "settings.search.placeholder": "설정 검색",
+  "settings.search.results": "검색 결과",
   "settings.security.anAuthenticatorAppAdds": "인증 앱을 쓰면 로그인할 때마다 여섯 자리 코드가 필요해서 비밀번호만으로는 들어올 수 없습니다. 메시지는 어느 쪽이든 종단 간 암호화됩니다. 이건 계정 자체를 지키는 장치입니다.",
   "settings.security.appLock": "앱 잠금",
   "settings.security.appLockHint": "켜 두면 로그인하는 모든 기기가 암호를 요구합니다. 암호는 입력한 기기 밖으로 나가지 않고 그 기기에서 키를 보호하므로, 탭을 닫거나 앱을 잠그면 다시 입력할 때까지 메시지에 접근할 수 없습니다. 10번 틀리면 기기가 키를 잊지만, 비밀번호로 다시 들어올 수 있습니다.",
@@ -3554,6 +3912,7 @@
   "sidebar.dMSidebar.closeDm": "DM 닫기",
   "sidebar.dMSidebar.createDm": "DM 만들기",
   "sidebar.dMSidebar.directMessages": "다이렉트 메시지",
+  "sidebar.dMSidebar.findAConversation": "대화 찾기",
   "sidebar.dMSidebar.findOrStartAConversation": "대화 찾기 또는 시작",
   "sidebar.dMSidebar.friends": "친구",
   "sidebar.dMSidebar.leaveGroup": "그룹 나가기",
@@ -3662,13 +4021,16 @@
   "voice.callBanner.joining": "참여하는 중…",
   "voice.callLine.callAgain": "다시 걸기",
   "voice.callLine.callBack": "다시 걸기",
-  "voice.callLine.callWith": "{name}님과 통화 · {length}",
+  "voice.callLine.callWithName": "{name}님과 통화",
+  "voice.callLine.cancelled": "취소됨",
+  "voice.callLine.declinedYourCall": "{name}님이 통화를 거절했습니다",
+  "voice.callLine.lasted": "{length} 동안 통화",
+  "voice.callLine.live": "진행 중",
   "voice.callLine.missedFrom": "{name}님의 부재중 전화",
-  "voice.callLine.startedLasting": "{actor}님이 통화를 시작했습니다 · {length}",
-  "voice.callLine.startedNoAnswer": "{actor}님이 통화를 시작했습니다 · 아무도 받지 않았습니다",
-  "voice.callLine.theyDeclined": "{name}님이 통화를 거절했습니다",
-  "voice.callLine.youCalledCancelled": "{name}님에게 건 전화 · 취소됨",
-  "voice.callLine.youCalledNoAnswer": "{name}님에게 건 전화 · 응답 없음",
+  "voice.callLine.noAnswer": "응답 없음",
+  "voice.callLine.noOneJoined": "아무도 참여하지 않음",
+  "voice.callLine.startedCall": "{actor}님이 통화를 시작했습니다",
+  "voice.callLine.youCalledName": "{name}님에게 전화함",
   "voice.callLine.youDeclined": "{name}님의 전화를 거절했습니다",
   "voice.callNotice.missedCall": "부재중 전화",
   "voice.callNotice.missedInGroup": "{name}에서 온 부재중 전화",
@@ -3890,5 +4252,21 @@
   "whatsNew.r202609292.pinsTitle": "고정 메시지를 전부 보여 줘요",
   "whatsNew.r202609292.themesBody": "클래식 테마의 밋밋한 회색이 부드러운 보랏빛으로 바뀌었어요. 라이트 테마에서는 툴팁이 또렷해지고 대화 상자도 페이지 위로 확실히 떠 보여요.",
   "whatsNew.r202609292.themesTitle": "새로워진 테마",
+  "whatsNew.r202609303.fontBody": "Nexa의 글꼴이 더 둥글고 읽기 쉬운 Wix Madefor로 바뀌었습니다. 예전 글꼴로 돌아가려면 설정, 모양, 글꼴에서 클래식을 고르세요.",
+  "whatsNew.r202609303.fontTitle": "더 가벼운 글꼴",
+  "whatsNew.r202609303.liveBody": "노트에 있는 모두가 입력되는 글자를 바로 보고, 각자의 커서와 선택 영역은 자신의 색으로 표시됩니다. 이전 버전은 버전 기록에서 다시 보거나 복원할 수 있습니다.",
+  "whatsNew.r202609303.liveTitle": "실시간으로 함께 쓰기",
+  "whatsNew.r202609303.notesBody": "사진과 파일을 원하는 곳에 넣은 노트를 메시지처럼 암호화해 쓸 수 있습니다. 친구 아래에 있으며, 요청이나 링크로 공유할 수 있습니다.",
+  "whatsNew.r202609303.notesTitle": "노트",
+  "whatsNew.r202609303.phoneBody": "이모지 선택기 같은 패널을 끝까지 끌어올리거나 밀어서 닫을 수 있고, 보낸 뒤에도 키보드가 그대로 있으며, 편집하는 내용이 키보드 뒤로 가려지지 않습니다.",
+  "whatsNew.r202609303.phoneTitle": "휴대폰에서 더 부드럽게",
+  "whatsNew.r202609303.pickBody": "Ctrl 키를 누른 채 대화, 친구, 서버, 멤버를 클릭하면 한꺼번에 다룰 수 있고, 휴대폰에서는 길게 누르면 됩니다. 대화는 끌어서 원하는 순서로 놓을 수 있습니다.",
+  "whatsNew.r202609303.pickTitle": "여러 개 한 번에 선택",
+  "whatsNew.r202609303.postsBody": "X, Bluesky, TikTok, Instagram, Reddit, Telegram, Threads, Mastodon 링크가 사진과 함께 게시물 자체를 보여 주고, 동영상은 채팅 안에서 바로 재생됩니다.",
+  "whatsNew.r202609303.postsTitle": "채팅 안의 게시물",
+  "whatsNew.r202609303.rolesBody": "서버 안에서 연 프로필에는 그 사람이 그 서버에서 가진 역할이 표시됩니다.",
+  "whatsNew.r202609303.rolesTitle": "프로필에 역할 표시",
+  "whatsNew.r202609303.settingsBody": "설정이 더 명확한 페이지로 정리되었고, 위의 검색창에서 어떤 설정이든 찾아 바로 이동할 수 있습니다.",
+  "whatsNew.r202609303.settingsTitle": "정리된 설정",
   "whatsNew.title": "새로운 기능"
 }

@@ -154,7 +154,7 @@ export default function PluginsPage() {
 
   return (
     <>
-      <h2 className={s.title}>{t("look.plugins.title")}</h2>
+      <h2 data-setting="plugins" className={s.title}>{t("look.plugins.title")}</h2>
       <Caution level="danger" testId="plugins-caution">
         <p>
           <strong>{t("look.plugins.cautionLead")}</strong> {t("look.plugins.cautionBody")}

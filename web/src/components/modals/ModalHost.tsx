@@ -29,6 +29,7 @@ import { BlockDialog } from "@/components/profile/BlockDialog";
 import { FolderSettingsModal } from "@/components/rail/FolderSettingsModal";
 import type { BugFrom } from "@/components/bugs/ReportBugModal";
 import { InviteDialog } from "@/components/invite/InviteDialog";
+import { NoteLinkDialog } from "@/components/notes/NoteLinkDialog";
 
 import { t } from "@/i18n";
 const SettingsModal = lazyPage(() => import("@/components/settings/SettingsModal"));
@@ -40,6 +41,7 @@ const SubchatModal = lazyPage(() => import("./SubchatModal"));
 const VerifyKeyModal = lazyPage(() => import("./VerifyKeyModal"));
 const KeyChangeModal = lazyPage(() => import("./KeyChangeModal"));
 const ReportBugModal = lazyPage(() => import("@/components/bugs/ReportBugModal"));
+const ShareNoteModal = lazyPage(() => import("@/components/notes/ShareNoteModal").then((m) => ({ default: m.ShareNoteModal })));
 
 /** Stands in for a dialog whose code is still on its way. */
 function Loading({ onClose }: { onClose: () => void }) {
@@ -110,6 +112,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       {modal?.kind === "block" ? <BlockDialog onClose={close} userId={String(modal.props?.["userId"])} /> : null}
       {modal?.kind === "folderSettings" ? <FolderSettingsModal onClose={close} folderId={modal.props?.["folderId"] as string | undefined} serverIds={modal.props?.["serverIds"] as string[] | undefined} /> : null}
       {modal?.kind === "joinInvite" ? <InviteDialog onClose={close} code={String(modal.props?.["code"])} hash={String(modal.props?.["hash"] ?? "")} /> : null}
+      {modal?.kind === "noteLink" ? <NoteLinkDialog onClose={close} token={String(modal.props?.["token"])} hash={String(modal.props?.["hash"] ?? "")} /> : null}
       {/* The first opening of each of these waits for its code to arrive, and
           on a slow phone connection a tap that shows nothing for seconds is a
           tap people repeat: the dialog's place is taken at once instead. */}
@@ -124,6 +127,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
         {modal?.kind === "verifyKey" ? <VerifyKeyModal onClose={close} userId={String(modal.props?.["userId"])} /> : null}
         {modal?.kind === "keyChange" ? <KeyChangeModal onClose={close} /> : null}
         {modal?.kind === "reportBug" ? <ReportBugModal onClose={close} from={modal.props?.["from"] as BugFrom | undefined} /> : null}
+        {modal?.kind === "shareNote" ? <ShareNoteModal onClose={close} noteId={String(modal.props?.["noteId"])} /> : null}
       </Suspense>
     </>
   );

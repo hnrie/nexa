@@ -59,6 +59,18 @@ const (
 	// keep a flood from filling that peer's send buffer.
 	signalBytesRate  = 128 << 10
 	signalBytesBurst = 512 << 10
+	// Where someone's caret is in a note is sent as it moves, a few times a
+	// second at most; past this the extra ones are dropped, not the socket.
+	noteCursorRate  = 10
+	noteCursorBurst = 20
+	// noteCursorMax bounds one sealed cursor.
+	noteCursorMax = 2 << 10
+	// Who a note's cursors go to is looked up once in a while, not for
+	// every move of a caret: someone taken out of a note stops getting them
+	// within this long.
+	noteAudienceTTL = 5 * time.Second
+	// noteAudienceKeep is how many notes one connection remembers that for.
+	noteAudienceKeep = 16
 
 	maxStatusText  = 128
 	maxStatusEmoji = 64
@@ -133,6 +145,10 @@ type conn struct {
 	presPending json.RawMessage
 	presTimer   *time.Timer
 	signalBytes *rate.Limiter
+	// Cursors sent in notes (OpNoteCursor), and who each note's go to. Both
+	// are only touched by handle, on the read loop.
+	cursors  *rate.Limiter
+	noteSeen map[ids.ID]noteAudience
 
 	// Activities this connection reported, resolved and cleaned. Payloads that
 	// arrive while one is being resolved wait in actPending, latest only.
@@ -354,6 +370,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	c := &conn{id: ids.New(), hub: h, ws: ws, userID: user.ID, ip: ip, session: session, guest: guest, send: make(chan ServerFrame, h.sendBuffer), closed: make(chan struct{}), typing: map[ids.ID]time.Time{},
 		ops: rate.NewLimiter(opRate, opBurst), presence: rate.NewLimiter(rate.Every(presenceEvery), presenceBurst), signalBytes: rate.NewLimiter(signalBytesRate, signalBytesBurst),
+		cursors: rate.NewLimiter(noteCursorRate, noteCursorBurst), noteSeen: map[ids.ID]noteAudience{},
 		actLimit: rate.NewLimiter(rate.Every(activityEvery), activityBurst)}
 	c.user.Store(user)
 	c.beat.Store(time.Now().UnixMilli())
@@ -719,6 +736,8 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 		c.typing[d.ChannelID] = now
 		c.typMu.Unlock()
 		h.EmitUsers(others, EvTyping, map[string]any{"channel_id": d.ChannelID, "user_id": c.userID, "ts": now.UnixMilli()})
+	case OpNoteCursor:
+		c.noteCursor(ctx, f.D)
 	case OpVoiceSignal:
 		if !c.signalBytes.AllowN(time.Now(), len(f.D)) {
 			return
@@ -731,6 +750,85 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 			h.VoiceOp(ctx, &Conn{c: c}, f.Op, f.D)
 		}
 	}
+}
+
+// noteAudience is who a note's cursors go to, as last looked up.
+type noteAudience struct {
+	others []ids.ID
+	member bool
+	at     time.Time
+}
+
+type noteCursorData struct {
+	ID   ids.ID `json:"id"`
+	Data string `json:"data"`
+}
+
+// noteCursor passes on where this account's caret is in a note to the
+// others in it. The server can read none of it: it is sealed with the
+// note's key, and only checked for being the shape a sealed text has.
+func (c *conn) noteCursor(ctx context.Context, raw json.RawMessage) {
+	var d noteCursorData
+	if json.Unmarshal(raw, &d) != nil || d.ID.IsZero() || !sealedText(d.Data, noteCursorMax) {
+		return
+	}
+	if !c.cursors.Allow() {
+		return
+	}
+	others, ok := c.noteAudience(ctx, d.ID)
+	if !ok || len(others) == 0 {
+		return
+	}
+	c.hub.EmitUsers(others, EvNoteCursor, map[string]any{"id": d.ID, "user_id": c.userID, "data": d.Data})
+}
+
+// noteAudience is everyone else in a note, when this account is in it.
+func (c *conn) noteAudience(ctx context.Context, id ids.ID) ([]ids.ID, bool) {
+	now := time.Now()
+	if a, ok := c.noteSeen[id]; ok && now.Sub(a.at) < noteAudienceTTL {
+		return a.others, a.member
+	}
+	members, err := c.hub.st.NoteMemberIDs(ctx, id)
+	if err != nil {
+		return nil, false
+	}
+	a := noteAudience{at: now}
+	for _, m := range members {
+		if m == c.userID {
+			a.member = true
+		} else {
+			a.others = append(a.others, m)
+		}
+	}
+	// made-up note ids are remembered too, so they cost one lookup a while,
+	// and the map is kept small
+	if len(c.noteSeen) >= noteAudienceKeep {
+		for k, v := range c.noteSeen {
+			if now.Sub(v.at) >= noteAudienceTTL {
+				delete(c.noteSeen, k)
+			}
+		}
+		if len(c.noteSeen) >= noteAudienceKeep {
+			clear(c.noteSeen)
+		}
+	}
+	c.noteSeen[id] = a
+	return a.others, a.member
+}
+
+// sealedText reports whether v looks like something a device sealed: not
+// empty, within max bytes, and nothing in it but base64 and a version tag.
+func sealedText(v string, max int) bool {
+	if v == "" || len(v) > max {
+		return false
+	}
+	for i := 0; i < len(v); i++ {
+		ch := v[i]
+		if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '-' || ch == '_' || ch == '.') {
+			return false
+		}
+	}
+	return true
 }
 
 // muted reports whether the account is muted, when moderation is wired in.

@@ -2,12 +2,14 @@ package api
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -298,5 +300,264 @@ func TestUnfurlProxiesEverythingOnTheCard(t *testing.T) {
 		if got, ok := srv.signedTarget(v); !ok || !strings.HasPrefix(got, "http://site.test/") {
 			t.Errorf("%s points at %q", field, got)
 		}
+	}
+}
+
+// postUpstream is a pretend internet for the social post sources: each host
+// answers with its own handler, over TLS as the real ones do.
+func postUpstream(t *testing.T, hosts map[string]http.Handler) *unfurl.Service {
+	t.Helper()
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h := hosts[r.Host]; h != nil {
+			h.ServeHTTP(w, r)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(upstream.Close)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			var d net.Dialer
+			return d.DialContext(ctx, network, upstream.Listener.Addr().String())
+		},
+	}
+	t.Cleanup(tr.CloseIdleConnections)
+	return &unfurl.Service{
+		Fetcher: &unfurl.Fetcher{Timeout: 5 * time.Second, Transport: tr, Resolver: proxyResolver{[]net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}}},
+		Cache:   unfurl.NewCache(10, time.Hour),
+	}
+}
+
+// A social post's card shows more than a link's: the author's picture, every
+// photo and video, the quoted post's. All of it loads through the proxy.
+func TestUnfurlProxiesEverythingOnAPost(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	srv.Unfurl = postUpstream(t, map[string]http.Handler{
+		"api.fxtwitter.com": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"code":200,"status":{"url":"https://x.com/jack/status/20","text":"just setting up my twttr",
+ "author":{"name":"jack","screen_name":"jack","avatar_url":"https://pbs.twimg.com/profile_images/1/a.jpg","url":"https://x.com/jack"},
+ "likes":5,"created_timestamp":1142974214,
+ "media":{"all":[{"type":"photo","url":"https://pbs.twimg.com/media/p.jpg","width":100,"height":50},
+                 {"type":"video","url":"https://video.twimg.com/v.mp4","thumbnail_url":"https://pbs.twimg.com/media/t.jpg","width":100,"height":50,"duration":3,"formats":[]}]},
+ "quote":{"url":"https://x.com/biz/status/7","text":"quoted","author":{"name":"Biz","screen_name":"biz","avatar_url":"https://pbs.twimg.com/profile_images/2/b.jpg"},
+   "media":{"all":[{"type":"photo","url":"https://pbs.twimg.com/media/q.jpg","width":10,"height":10}]}}}}`)
+		}),
+	})
+	link := "https://x.com/jack/status/20"
+	res, body := do(t, ts, "GET", "/api/v1/unfurl?url="+url.QueryEscape(link), tok, nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("unfurl: %d %v", res.StatusCode, body)
+	}
+	post, _ := body["post"].(map[string]any)
+	if post == nil {
+		t.Fatalf("no post in %v", body)
+	}
+	if post["platform"] != "twitter" || post["handle"] != "jack" || post["text"] != "just setting up my twttr" || post["url"] != link {
+		t.Errorf("post: %v", post)
+	}
+	proxied := func(what string, v any, want string) {
+		t.Helper()
+		s, _ := v.(string)
+		if !strings.HasPrefix(s, "/media/proxy/") {
+			t.Errorf("%s should load through the proxy, got %q", what, s)
+			return
+		}
+		if got, ok := srv.signedTarget(s); !ok || got != want {
+			t.Errorf("%s points at %q, want %q", what, got, want)
+		}
+	}
+	proxied("the avatar", post["avatar"], "https://pbs.twimg.com/profile_images/1/a.jpg")
+	media, _ := post["media"].([]any)
+	if len(media) != 2 {
+		t.Fatalf("media: %v", post["media"])
+	}
+	proxied("the photo", media[0].(map[string]any)["url"], "https://pbs.twimg.com/media/p.jpg")
+	proxied("the video", media[1].(map[string]any)["url"], "https://video.twimg.com/v.mp4")
+	proxied("the video's poster", media[1].(map[string]any)["thumb"], "https://pbs.twimg.com/media/t.jpg")
+	quote, _ := post["quote"].(map[string]any)
+	if quote == nil {
+		t.Fatalf("no quote in %v", post)
+	}
+	proxied("the quoted avatar", quote["avatar"], "https://pbs.twimg.com/profile_images/2/b.jpg")
+	proxied("the quoted photo", quote["media"].([]any)[0].(map[string]any)["url"], "https://pbs.twimg.com/media/q.jpg")
+	// and the plain card's fields, which an older app draws
+	proxied("the card's picture", body["image"], "https://pbs.twimg.com/media/p.jpg")
+	proxied("the card's icon", body["icon"], "https://abs.twimg.com/favicons/twitter.3.ico")
+
+	// The same post again comes from the cache, and the cache's copy was not
+	// rewritten in place: proxying twice would sign a proxy path.
+	_, again := do(t, ts, "GET", "/api/v1/unfurl?url="+url.QueryEscape(link), tok, nil)
+	proxied("the avatar, asked again", again["post"].(map[string]any)["avatar"], "https://pbs.twimg.com/profile_images/1/a.jpg")
+}
+
+// TikTok signs a file's address for a few hours, so a card holds a name for
+// the file and the proxy finds where it is when asked.
+func TestMediaProxyFindsNamedFiles(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	pageReads := 0
+	video := []byte("not really an mp4, but served as one")
+	page := `<html><body><script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">{"__DEFAULT_SCOPE__":{"webapp.video-detail":{"itemInfo":{"itemStruct":{
+ "id":"6718335390845095173","desc":"Guess my name","createTime":"1564234358","author":{"uniqueId":"scout2015","nickname":"Scout","avatarMedium":"https://p16.tiktokcdn.com/avatar.jpeg"},
+ "video":{"width":576,"height":1024,"duration":10,"originCover":"https://p16.tiktokcdn.com/cover.jpeg",
+  "bitrateInfo":[{"CodecType":"h264","Bitrate":900000,"PlayAddr":{"UrlList":["https://www.tiktok.com/aweme/v1/play/?file_id=h264"]}}]}}}}}}</script></body></html>`
+	srv.Unfurl = postUpstream(t, map[string]http.Handler{
+		"www.tiktok.com": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/@scout2015/video/6718335390845095173":
+				pageReads++
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				_, _ = io.WriteString(w, page)
+			case "/aweme/v1/play/":
+				// the way TikTok does it: only for a browser that came from
+				// TikTok, and by sending it on to the file server
+				if !strings.Contains(r.UserAgent(), "Chrome/") || !strings.HasPrefix(r.Referer(), "https://www.tiktok.com") {
+					http.Error(w, "no", http.StatusForbidden)
+					return
+				}
+				http.Redirect(w, r, "https://v16.tiktokcdn.com/file.mp4", http.StatusFound)
+			default:
+				http.NotFound(w, r)
+			}
+		}),
+		"v16.tiktokcdn.com": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "video/mp4")
+			w.Header().Set("Accept-Ranges", "bytes")
+			if r.Header.Get("Range") == "bytes=0-3" {
+				w.Header().Set("Content-Range", fmt.Sprintf("bytes 0-3/%d", len(video)))
+				w.WriteHeader(http.StatusPartialContent)
+				_, _ = w.Write(video[:4])
+				return
+			}
+			_, _ = w.Write(video)
+		}),
+	})
+	link := "https://www.tiktok.com/@scout2015/video/6718335390845095173"
+	res, body := do(t, ts, "GET", "/api/v1/unfurl?url="+url.QueryEscape(link), tok, nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("unfurl: %d %v", res.StatusCode, body)
+	}
+	media := body["post"].(map[string]any)["media"].([]any)[0].(map[string]any)
+	signed, _ := media["url"].(string)
+	// the card holds the file's name under the post, signed like any address
+	if target, ok := srv.signedTarget(signed); !ok || target != link+"#nexa-asset=m0" {
+		t.Fatalf("the video is named %q", target)
+	}
+	got, err := http.Get(ts.URL + signed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := io.ReadAll(got.Body)
+	got.Body.Close()
+	if got.StatusCode != http.StatusOK || got.Header.Get("Content-Type") != "video/mp4" || string(data) != string(video) {
+		t.Fatalf("named file: %d %s %q", got.StatusCode, got.Header.Get("Content-Type"), data)
+	}
+	// a player asks for a video in pieces; each piece is the same name again
+	req, _ := http.NewRequest("GET", ts.URL+signed, nil)
+	req.Header.Set("Range", "bytes=0-3")
+	piece, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ = io.ReadAll(piece.Body)
+	piece.Body.Close()
+	if piece.StatusCode != http.StatusPartialContent || string(data) != string(video[:4]) {
+		t.Errorf("a piece: %d %q", piece.StatusCode, data)
+	}
+	if pageReads != 1 {
+		t.Errorf("the post was read %d times for a card and two fetches of its video", pageReads)
+	}
+	// a file the post does not have is not found, rather than fetched from anywhere
+	gone, err := http.Get(ts.URL + srv.ProxyURL(link+"#nexa-asset=m7"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone.Body.Close()
+	if gone.StatusCode != http.StatusBadGateway {
+		t.Errorf("a name with no file: %d", gone.StatusCode)
+	}
+	// signing a link again keeps it a name
+	_, refreshed := do(t, ts, "POST", "/api/v1/proxy/refresh", tok, map[string]any{"urls": []string{signed}})
+	again, _ := refreshed["urls"].(map[string]any)[signed].(string)
+	if target, ok := srv.signedTarget(again); !ok || target != link+"#nexa-asset=m0" {
+		t.Errorf("refreshed name: %q", target)
+	}
+}
+
+// Some file servers do not say what a file is (a Bluesky video's poster comes
+// as "application/octet-stream"). Such a file is judged by what it is, and
+// still only passed when that is a picture or a video the proxy passes anyway.
+func TestMediaProxyJudgesUntypedFilesByWhatTheyAre(t *testing.T) {
+	srv, ts := newTestServer(t)
+	// the start of an MP4: a "ftyp" box, then enough to make two pieces
+	mp4 := append([]byte{0, 0, 0, 0x18, 'f', 't', 'y', 'p', 'm', 'p', '4', '2', 0, 0, 0, 0, 'm', 'p', '4', '2', 'i', 's', 'o', 'm'}, make([]byte, 1000)...)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		switch r.URL.Path {
+		case "/poster.jpg":
+			_, _ = w.Write(pngBytes(8, 8))
+		case "/page.jpg":
+			_, _ = io.WriteString(w, "<html><script>alert(1)</script></html>")
+		case "/drawing.jpg":
+			_, _ = io.WriteString(w, `<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>`)
+		case "/clip", "/unseen":
+			var start, end int
+			if _, err := fmt.Sscanf(r.Header.Get("Range"), "bytes=%d-%d", &start, &end); err != nil || end >= len(mp4) || start > end {
+				_, _ = w.Write(mp4)
+				return
+			}
+			w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(mp4)))
+			w.WriteHeader(http.StatusPartialContent)
+			_, _ = w.Write(mp4[start : end+1])
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer upstream.Close()
+	tr := &http.Transport{DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, network, upstream.Listener.Addr().String())
+	}}
+	t.Cleanup(tr.CloseIdleConnections)
+	srv.Unfurl = &unfurl.Service{Fetcher: &unfurl.Fetcher{Timeout: 5 * time.Second, Transport: tr, Resolver: proxyResolver{[]net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}}}}
+	const host = "http://files.test"
+	get := func(path, rng string) (int, string, []byte) {
+		t.Helper()
+		req, _ := http.NewRequest("GET", ts.URL+srv.ProxyURL(host+path), nil)
+		if rng != "" {
+			req.Header.Set("Range", rng)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		data, _ := io.ReadAll(res.Body)
+		return res.StatusCode, res.Header.Get("Content-Type"), data
+	}
+	if code, ct, data := get("/poster.jpg", ""); code != http.StatusOK || ct != "image/png" || string(data) != string(pngBytes(8, 8)) {
+		t.Errorf("an untyped picture: %d %s, %d bytes", code, ct, len(data))
+	}
+	// a page or a drawing that can script, served without a type, is still refused
+	for _, path := range []string{"/page.jpg", "/drawing.jpg"} {
+		if code, ct, _ := get(path, ""); code != http.StatusUnsupportedMediaType {
+			t.Errorf("%s got through as %d %s", path, code, ct)
+		}
+	}
+	// A later piece of a file says nothing about what the file is, so one
+	// asked for before the start was ever seen is refused...
+	if code, _, _ := get("/unseen", "bytes=100-199"); code != http.StatusUnsupportedMediaType {
+		t.Errorf("a later piece of a file never seen: %d", code)
+	}
+	// ...and once the start has been seen, which is what a player asks for
+	// first, the pieces after it go by what the start was.
+	if code, ct, data := get("/clip", "bytes=0-99"); code != http.StatusPartialContent || ct != "video/mp4" || string(data) != string(mp4[:100]) {
+		t.Errorf("the first piece: %d %s, %d bytes", code, ct, len(data))
+	}
+	if code, ct, data := get("/clip", "bytes=100-199"); code != http.StatusPartialContent || ct != "video/mp4" || string(data) != string(mp4[100:200]) {
+		t.Errorf("a later piece: %d %s, %d bytes", code, ct, len(data))
 	}
 }

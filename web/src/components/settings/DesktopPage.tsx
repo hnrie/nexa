@@ -40,7 +40,7 @@ export default function DesktopPage({ onActivity }: { onActivity?: () => void })
           </div>
         </div>
 
-        <h3 className={st.h5}>{tr_("settings.desktop.startupAndWindow")}</h3>
+        <h3 data-setting="startup" className={st.h5}>{tr_("settings.desktop.startupAndWindow")}</h3>
         {app ? (
           <>
             <Toggle checked={app.launchAtLogin} onChange={(v) => setApp_({ launchAtLogin: v })} label={tr_("settings.desktop.openNexaWhenISignIn")} description={tr_("settings.desktop.startingBeforeDiscordLetsProgramsReach")} />
@@ -50,7 +50,7 @@ export default function DesktopPage({ onActivity }: { onActivity?: () => void })
           </>
         ) : null}
 
-        <h3 className={st.h5}>{tr_("settings.desktop.updates")}</h3>
+        <h3 data-setting="updates" className={st.h5}>{tr_("settings.desktop.updates")}</h3>
         <UpdateRow version={bridge.version} update={update} />
       </div>
     </>

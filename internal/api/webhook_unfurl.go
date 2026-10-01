@@ -80,14 +80,7 @@ func (s *Server) unfurlWebhookMessage(msgID, chID ids.ID, content string) {
 			if err != nil || res == nil {
 				continue
 			}
-			out := *res
-			if out.Image == "" && (out.Type == "image" || out.Type == "gif" || out.Type == "video") {
-				out.Image = out.URL
-			}
-			out.Image = s.ProxyURL(out.Image)
-			out.Icon = s.ProxyURL(out.Icon)
-			out.Media = s.ProxyURL(out.Media)
-			results = append(results, out)
+			results = append(results, *s.proxied(res))
 		}
 		if len(results) == 0 {
 			return

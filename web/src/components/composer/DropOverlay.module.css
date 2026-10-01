@@ -5,7 +5,7 @@
 .art { position: relative; display: flex; }
 .mark { color: var(--on-brand); }
 .badge { position: absolute; inset-inline-end: -10px; bottom: -6px; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: var(--on-brand); color: var(--brand); }
-.title { font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 23px; font-weight: 820; letter-spacing: -0.018em; }
+.title { font-family: var(--font-display); font-size: 23px; font-weight: 700; letter-spacing: -0.01em; }
 .where { font-size: 15px; font-weight: 600; opacity: 0.85; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @keyframes fade { from { opacity: 0; } }
 @keyframes rise { from { opacity: 0; transform: translateY(10px) scale(0.97); } }

@@ -1,15 +1,16 @@
-import { ChevronDown, Lock, MessageCircle, MoreHorizontal, Pin, Plus, Search, Shield, Users, X } from "lucide-react";
+import { ArrowDownUp, ChevronDown, GripVertical, Lock, MessageCircle, MoreHorizontal, NotebookPen, Pin, Plus, Search, Shield, Users, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/common/Avatar";
 import { menuAnchor } from "@/components/common/ContextMenu";
 import { AdminHammer, OwnerCrown } from "@/components/common/OwnerBadge";
+import { PickBar, PickMark } from "@/components/common/Pick";
 import { UserPanel } from "@/components/shell/UserPanel";
 import { VoiceStatus } from "@/components/voice/VoiceStatus";
 import { useMediaQuery } from "@/hooks/useIsMobile";
 import { useReorder } from "@/hooks/useReorder";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { compareIds, idAt } from "@/lib/ids";
-import { dmListView, dropDM, groupOf, isGroupId, movePinnedDM, NEXA_ID, pruneDMs, setGroupCollapsed, type DMDrop, type DMGroup, type DMRow } from "@/lib/dmLayout";
+import { dmListView, dropDM, groupOf, isGroupId, moveInMain, movePinnedDM, NEXA_ID, pruneDMs, rowId, setDMSort, setGroupCollapsed, type DMDrop, type DMRow } from "@/lib/dmLayout";
 import { useOwnerId } from "@/lib/owner";
 import { isInstanceAdmin } from "@/stores/servers";
 import { useAuth } from "@/stores/auth";
@@ -20,17 +21,21 @@ import { isUnread, useReadStates } from "@/stores/readStates";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { useRelationships } from "@/stores/relationships";
-import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
+import { pickClick, usePick } from "@/stores/pick";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { iconUrl } from "@/api/users";
 import { subchatMenuItems } from "@/components/chat/SubchatPanel";
 import { badgeText, conversationCount } from "@/lib/unread";
 import { useSettings } from "@/stores/settings";
 import { modKeys } from "@/lib/textMenu";
+import { textWidth } from "@/lib/fitText";
 import { closeDM, dmMenuItems } from "./dmMenu";
+import { dmBulk } from "./dmBulk";
 import { changeDMList, closeNexa, dmGroupMenuItems, groupName, nexaListed, nexaMenuItems } from "./dmArrange";
 import { menuPoint } from "./ServerSidebar";
 import { NexaAvatar, OfficialBadge } from "@/components/nexa/NexaBits";
 import { useNexa } from "@/stores/nexa";
+import { useNotes } from "@/stores/notes";
 import { useModeration } from "@/stores/moderation";
 import s from "./Sidebar.module.css";
 
@@ -38,6 +43,13 @@ import { t } from "@/i18n";
 
 /** What a dragged conversation or group is over, and what dropping it there would do. */
 type Over = { at: string; where?: "before" | "after" | "into" | "main" | "top"; drop: DMDrop };
+
+/** Where a row is drawn: among the pins, in the main list, or inside one of its groups. */
+type Place = "pinned" | "main" | "group";
+
+const NO_PICKS: string[] = [];
+/** How near the top or bottom of the list a finger dragging a row has to be for the list to scroll. */
+const EDGE = 56;
 
 export function DMSidebar() {
   const nav = useNavigate();
@@ -55,6 +67,8 @@ export function DMSidebar() {
   const rels = useRelationships((r) => r.byUser);
   const nicknames = useMemo(() => friendNicknames(rels), [rels]);
   const friendRequests = useMemo(() => Object.values(rels).filter((r) => r.type === "incoming").length, [rels]);
+  // notes people asked to share, waiting for an answer
+  const noteRequests = useNotes((n) => n.invites.length);
   const ownerId = useOwnerId();
   const nexa = useNexa((n) => n.state);
   const nexaOpen = loc.pathname.startsWith("/channels/@me/nexa");
@@ -70,7 +84,8 @@ export function DMSidebar() {
   const activeChannel = active ? channels[active] : undefined;
   const activeConvo = activeChannel?.type === "subchat" ? (activeChannel.parent_id ?? undefined) : active;
   const layout = settings.dmList;
-  // HTML5 dragging is for a mouse; on a touch screen a held row opens its menu, which makes the same moves
+  const custom = layout.sort === "custom";
+  // HTML5 dragging is for a mouse; on a touch screen rows are dragged by their handles while picking
   const canDrag = useMediaQuery("(hover: hover) and (pointer: fine)");
   const [drag, setDragShown] = useState<string | null>(null);
   const [over, setOverShown] = useState<Over | null>(null);
@@ -79,6 +94,14 @@ export function DMSidebar() {
   // a drop could land where the pointer was a moment before.
   const dragRef = useRef<string | null>(null);
   const overRef = useRef<Over | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // picking several conversations at once (stores/pick.ts)
+  const picked = usePick((p) => (p.list === "dms" ? p.ids : NO_PICKS));
+  const pickMode = usePick((p) => p.list === "dms" && p.mode);
+  const isPicking = pickMode || picked.length > 0;
+  // a finger drags a row by its handle, which the rows grow while picking by tap
+  const handles = pickMode && !canDrag;
 
   // Going to the Nexa conversation while it is closed opens it again, as
   // messaging someone brings back a conversation that was closed. It being
@@ -113,6 +136,22 @@ export function DMSidebar() {
     const activity = (id: string) => (id === NEXA_ID ? idAt(nexa?.latest ?? 0) : (byId.get(id)?.last_message_id ?? id));
     return dmListView(layout, ids, known, activity, compareIds);
   }, [dms, nexaShown, nexa?.latest, layout]);
+  /** The main list's rows as they are shown, which a drop beside one of them puts in order. */
+  const restIds = useMemo(() => view.rest.map(rowId), [view.rest]);
+  /** Every conversation as the list shows it, top to bottom, for a Shift-click to pick a run of. */
+  const shownOrder = useMemo(() => {
+    const out: string[] = [];
+    const add = (r: DMRow) => (r.kind === "group" ? out.push(...r.ids) : out.push(r.id));
+    view.pinned.forEach(add);
+    view.rest.forEach(add);
+    return out;
+  }, [view]);
+  // what was picked and has since gone (closed, left) is let go of
+  useEffect(() => {
+    if (!picked.length) return;
+    const gone = picked.filter((id) => !shownOrder.includes(id));
+    if (gone.length) usePick.getState().drop(gone);
+  }, [picked, shownOrder]);
 
   /** What waits in a conversation: its count, and whether anything is unread at all (a muted one counts only mentions). */
   const waitingIn = (id: string): { count: number; unread: boolean } => {
@@ -124,7 +163,8 @@ export function DMSidebar() {
   };
 
   // Pinned conversations and groups move up and down among themselves, with
-  // Alt and an arrow or from their menus; the rest keep to their activity.
+  // Alt and an arrow or from their menus; so does the main list once it is
+  // sorted by hand. By activity, the main list keeps to it.
   const pinnedIds = view.pinned.map((r) => (r.kind === "group" ? r.group.id : r.id));
   const reorder = useReorder({
     ids: pinnedIds,
@@ -133,6 +173,16 @@ export function DMSidebar() {
     // pins of conversations that have gone are dropped first, or a move could land beside one that is not drawn
     move: (id, delta) => changeDMList((l) => movePinnedDM(pruneDMs(l, (x) => x === NEXA_ID || !!channels[x]), id, delta)),
   });
+  const reorderMain = useReorder({
+    ids: restIds,
+    canMove: (id) => custom && restIds.includes(id),
+    name: (id) => rowName(id),
+    move: (id, delta) => {
+      const to = restIds[restIds.indexOf(id) + delta];
+      return !!to && changeDMList((l) => moveInMain(l, id, to, delta > 0 ? "after" : "before", restIds));
+    },
+  });
+  const movesFor = (id: string, place: Place) => (place === "pinned" ? reorder.menuItems(id) : place === "main" ? reorderMain.menuItems(id) : []);
 
   function rowName(id: string): string {
     if (id === NEXA_ID) return "Nexa";
@@ -144,15 +194,19 @@ export function DMSidebar() {
     return ch ? channelDisplayName(ch, users, meId, nicknames) : "";
   }
 
-  // --- dragging, with a mouse -------------------------------------------------
+  // --- dragging -------------------------------------------------------------
+  // A mouse drags with the browser's own drag and drop; a finger drags a row
+  // by its handle. Both ask overAt what is under them, from the data the rows
+  // carry, so a drop means the same thing however it was made.
 
   const setDrag = (id: string | null) => {
     dragRef.current = id;
     setDragShown(id);
   };
   const setOver = (next: Over | null) => {
+    const was = overRef.current;
     overRef.current = next;
-    setOverShown(next);
+    if (was?.at !== next?.at || was?.where !== next?.where) setOverShown(next);
   };
   const endDrag = () => {
     setDrag(null);
@@ -164,57 +218,57 @@ export function DMSidebar() {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", id);
   };
-  const hover = (e: DragEvent, next: Over) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = "move";
-    const was = overRef.current;
-    if (was?.at !== next.at || was.where !== next.where) setOver(next);
+  const half = (el: Element, y: number): "before" | "after" => {
+    const r = el.getBoundingClientRect();
+    return y < r.top + r.height / 2 ? "before" : "after";
   };
-  const half = (e: DragEvent): "before" | "after" => {
-    const r = e.currentTarget.getBoundingClientRect();
-    return e.clientY < r.top + r.height / 2 ? "before" : "after";
-  };
-  /** Nothing would change where it is now: dropping here does nothing, whatever it was over before. */
-  const nowhere = (e: DragEvent) => {
-    e.stopPropagation();
-    if (overRef.current) setOver(null);
-  };
-  /** Among the pinned ones: before or after this one. */
-  const overPinned = (e: DragEvent, id: string) => {
+
+  /** What dropping the dragged row at this point of the list would do; null where it would do nothing. */
+  const overAt = (el: Element | null, y: number): Over | null => {
     const d = dragRef.current;
-    if (!d) return;
-    if (d === id) return nowhere(e);
-    const where = half(e);
-    const at = layout.pins.indexOf(id);
-    if (at < 0) return;
-    hover(e, { at: id, where, drop: { kind: "pinned", index: at + (where === "after" ? 1 : 0) } });
+    if (!d || !el) return null;
+    if (el.closest("[data-pin-zone], [data-dm-head='pinned']")) return { at: "top", where: "top", drop: { kind: "pinned", index: 0 } };
+    const row = el.closest<HTMLElement>("[data-dm-row]");
+    if (row && row.dataset["place"] !== "group") {
+      const id = row.dataset["dmRow"]!;
+      if (id === d) return null;
+      const where = half(row, y);
+      if (row.dataset["place"] === "pinned") {
+        const at = layout.pins.indexOf(id);
+        return at < 0 ? null : { at: id, where, drop: { kind: "pinned", index: at + (where === "after" ? 1 : 0) } };
+      }
+      return { at: id, where, drop: { kind: "main", at: id, where, rest: restIds } };
+    }
+    const groupEl = el.closest<HTMLElement>("[data-group]");
+    if (groupEl) {
+      const gid = groupEl.dataset["group"]!;
+      if (gid === d || !layout.groups.some((g) => g.id === gid)) return null;
+      // a conversation goes into a group
+      if (!isGroupId(d)) return groupOf(layout, d)?.id === gid ? null : { at: gid, where: "into", drop: { kind: "group", groupId: gid } };
+      // a group goes beside another, among the pins or in the main list
+      const where = half(groupEl, y);
+      const at = layout.pins.indexOf(gid);
+      if (at >= 0) return { at: gid, where, drop: { kind: "pinned", index: at + (where === "after" ? 1 : 0) } };
+      return { at: gid, where, drop: { kind: "main", at: gid, where, rest: restIds } };
+    }
+    if (el.closest("[data-dm-head='main'], [data-dm-main]")) {
+      // back to the main list from the pins or a group; anything already in it stays where it is
+      if (!layout.pins.includes(d) && !groupOf(layout, d)) return null;
+      return { at: "main", where: "main", drop: { kind: "main" } };
+    }
+    return null;
   };
-  /** On a group: a conversation goes in; a group goes beside it among the pinned ones, or back to the list. */
-  const overGroup = (e: DragEvent, g: DMGroup, pinned: boolean) => {
-    const d = dragRef.current;
-    if (!d) return;
-    if (d === g.id) return nowhere(e);
-    if (!isGroupId(d)) {
-      if (groupOf(layout, d)?.id === g.id) return nowhere(e);
-      hover(e, { at: g.id, where: "into", drop: { kind: "group", groupId: g.id } });
-    } else if (pinned) overPinned(e, g.id);
-    else if (layout.pins.includes(d)) hover(e, { at: "main", where: "main", drop: { kind: "main" } });
-    else nowhere(e);
-  };
-  const overMain = (e: DragEvent) => {
-    const d = dragRef.current;
-    if (!d) return;
-    if (!layout.pins.includes(d) && !groupOf(layout, d)) return nowhere(e);
-    hover(e, { at: "main", where: "main", drop: { kind: "main" } });
-  };
-  const overTop = (e: DragEvent) => {
+
+  const onListDragOver = (e: DragEvent) => {
     if (!dragRef.current) return;
-    hover(e, { at: "top", where: "top", drop: { kind: "pinned", index: 0 } });
-  };
-  const onDrop = (e: DragEvent) => {
+    const next = overAt(e.target as Element, e.clientY);
+    setOver(next);
+    if (!next) return;
     e.preventDefault();
-    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+  };
+  const onListDrop = (e: DragEvent) => {
+    e.preventDefault();
     const id = dragRef.current;
     const target = overRef.current;
     if (id && target) changeDMList((l) => dropDM(l, id, target.drop));
@@ -222,31 +276,134 @@ export function DMSidebar() {
   };
   const dropAt = (id: string) => (over?.at === id ? over.where : undefined);
 
+  // a finger dragging a row by its handle: a chip with its name follows the finger
+  const [ghost, setGhost] = useState<{ x: number; y: number; name: string } | null>(null);
+  const finger = useRef<{ pointer: number; x: number; y: number; frame: number } | null>(null);
+  const aim = () => {
+    const f = finger.current;
+    if (!f) return;
+    setOver(overAt(document.elementFromPoint(f.x, f.y), f.y));
+  };
+  /** Near the top or bottom of the list, it scrolls under the finger. */
+  const creep = () => {
+    const f = finger.current;
+    const box = scrollRef.current;
+    if (!f || !box) return;
+    const r = box.getBoundingClientRect();
+    const speed = f.y < r.top + EDGE ? -(r.top + EDGE - f.y) / 4 : f.y > r.bottom - EDGE ? (f.y - (r.bottom - EDGE)) / 4 : 0;
+    if (speed) {
+      box.scrollTop += speed;
+      aim();
+    }
+    f.frame = requestAnimationFrame(creep);
+  };
+  const handleDown = (e: ReactPointerEvent<HTMLElement>, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setDrag(id);
+    finger.current = { pointer: e.pointerId, x: e.clientX, y: e.clientY, frame: 0 };
+    finger.current.frame = requestAnimationFrame(creep);
+    setGhost({ x: e.clientX, y: e.clientY, name: rowName(id) });
+    try {
+      navigator.vibrate?.(8);
+    } catch {
+      /* no haptics here */
+    }
+  };
+  const handleMove = (e: ReactPointerEvent<HTMLElement>) => {
+    const f = finger.current;
+    if (!f || f.pointer !== e.pointerId) return;
+    f.x = e.clientX;
+    f.y = e.clientY;
+    setGhost((g) => (g ? { ...g, x: f.x, y: f.y } : g));
+    aim();
+  };
+  const handleUp = (e: ReactPointerEvent<HTMLElement>, cancelled = false) => {
+    const f = finger.current;
+    if (!f || f.pointer !== e.pointerId) return;
+    cancelAnimationFrame(f.frame);
+    finger.current = null;
+    const id = dragRef.current;
+    const target = overRef.current;
+    if (!cancelled && id && target) changeDMList((l) => dropDM(l, id, target.drop));
+    endDrag();
+    setGhost(null);
+  };
+  useEffect(() => () => cancelAnimationFrame(finger.current?.frame ?? 0), []);
+
   // --- rows -------------------------------------------------------------------
 
-  const openRowMenu = (e: MouseEvent, id: string) => {
+  /** A click on a row: picking (Ctrl or ⌘, Shift, or a tap while picking), or opening it. */
+  const openRow = (e: MouseEvent, id: string, path: string) => {
+    if (pickClick(e, "dms", id, shownOrder)) {
+      e.preventDefault();
+      return;
+    }
+    go(path);
+  };
+
+  const openRowMenu = (e: MouseEvent, id: string, place: Place) => {
     e.preventDefault();
-    const items: ContextMenuItem[] = id === NEXA_ID ? nexaMenuItems(nav, { moves: reorder.menuItems(NEXA_ID) }) : dmMenuItems(id, { nav, openModal, moves: reorder.menuItems(id) });
+    const pick = usePick.getState();
+    // a right click on one of several picked acts on all of them
+    if (pick.list === "dms" && pick.ids.includes(id) && pick.ids.length > 1) {
+      openContextMenu({ ...menuPoint(e), label: t("pick.count", { count: pick.ids.length }), items: dmBulk(pick.ids, { nav, openModal }).menu() });
+      return;
+    }
+    // on one that is not picked, it is about that one, as a file manager does
+    if (pick.list === "dms" && !pick.mode && pick.ids.length) pick.clear();
+    const moves = movesFor(id, place);
+    const items: ContextMenuItem[] = id === NEXA_ID ? nexaMenuItems(nav, { moves }) : dmMenuItems(id, { nav, openModal, moves });
+    // the way into picking on a touch screen, where there is no Ctrl to hold
+    const select: ContextMenuItem = { id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start("dms", id), separatorAfter: true };
+    const at = items.findIndex((it) => it.id === "read");
+    items.splice(at >= 0 ? at + 1 : 0, 0, select);
+    if (at >= 0) items[at]!.separatorAfter = false;
     openContextMenu({ ...menuPoint(e), label: rowName(id), items });
   };
 
-  /** Props every conversation row takes for being dragged and arranged. */
-  const rowDrag = (id: string, pinned: boolean) => ({
-    draggable: canDrag,
-    "data-dragging": drag === id,
-    "data-drop": pinned ? dropAt(id) : undefined,
-    "data-reorder-id": pinned ? id : undefined,
-    onDragStart: (e: DragEvent) => onDragStart(e, id),
-    onKeyDown: pinned ? reorder.onKeyDown(id) : undefined,
-    ...(pinned ? { onDragOver: (e: DragEvent) => overPinned(e, id), onDragEnter: (e: DragEvent) => overPinned(e, id), onDrop } : {}),
-  });
+  /** Props every conversation row takes for being dragged, picked and arranged. */
+  const rowProps = (id: string, place: Place) => {
+    const keys = place === "pinned" ? reorder.onKeyDown(id) : place === "main" && custom ? reorderMain.onKeyDown(id) : undefined;
+    return {
+      draggable: canDrag,
+      "data-dm-row": id,
+      "data-place": place,
+      "data-dragging": drag === id,
+      "data-drop": place === "group" ? undefined : dropAt(id),
+      "data-reorder-id": keys ? id : undefined,
+      "data-picked": picked.includes(id) || undefined,
+      onDragStart: (e: DragEvent) => onDragStart(e, id),
+      onKeyDown: keys,
+    };
+  };
 
-  const nexaRow = (pinned: boolean) => {
+  /** The circle in front of a row while the list is picked from. */
+  const mark = (id: string) => (isPicking ? <PickMark on={picked.includes(id)} label={t("pick.pickNamed", { name: rowName(id) })} /> : null);
+  /** The handle a finger drags a row by, in place of its ✕ while picking by tap. */
+  const handle = (id: string) =>
+    handles ? (
+      <span
+        className={s.dragHandle}
+        aria-hidden="true"
+        data-testid="dm-drag-handle"
+        onPointerDown={(e) => handleDown(e, id)}
+        onPointerMove={handleMove}
+        onPointerUp={(e) => handleUp(e)}
+        onPointerCancel={(e) => handleUp(e, true)}
+      >
+        <GripVertical size={18} />
+      </span>
+    ) : null;
+
+  const nexaRow = (place: Place) => {
     if (!nexa) return null;
     const { count } = waitingIn(NEXA_ID);
     return (
-      <div key={NEXA_ID} className={s.item} data-selected={nexaOpen} data-unread={count > 0} data-testid="nexa-dm" onContextMenu={(e) => openRowMenu(e, NEXA_ID)} {...rowDrag(NEXA_ID, pinned)}>
-        <button type="button" className={s.itemMain} onClick={() => go("/channels/@me/nexa")}>
+      <div key={NEXA_ID} className={s.item} data-selected={nexaOpen} data-unread={count > 0} data-testid="nexa-dm" onContextMenu={(e) => openRowMenu(e, NEXA_ID, place)} {...rowProps(NEXA_ID, place)}>
+        <button type="button" className={s.itemMain} onClick={(e) => openRow(e, NEXA_ID, "/channels/@me/nexa")}>
+          {mark(NEXA_ID)}
           <NexaAvatar size={32} />
           <span className={s.text}>
             <span className={s.name} style={{ display: "flex", alignItems: "center", gap: 6 }}>Nexa <OfficialBadge compact /></span>
@@ -254,25 +411,27 @@ export function DMSidebar() {
           </span>
         </button>
         {count > 0 ? <span className={s.mention} data-testid="nexa-unread" aria-label={t("nexa.unreadCount", { count })}>{badgeText(count)}</span> : null}
-        <button
-          type="button"
-          className={s.close}
-          aria-label={t("sidebar.dMSidebar.closeDm")}
-          title={t("sidebar.dMSidebar.closeDm")}
-          data-testid="nexa-close"
-          onClick={(e) => {
-            e.stopPropagation();
-            closeNexa(nav);
-          }}
-        >
-          <X size={16} />
-        </button>
+        {handles ? handle(NEXA_ID) : isPicking ? null : (
+          <button
+            type="button"
+            className={s.close}
+            aria-label={t("sidebar.dMSidebar.closeDm")}
+            title={t("sidebar.dMSidebar.closeDm")}
+            data-testid="nexa-close"
+            onClick={(e) => {
+              e.stopPropagation();
+              closeNexa(nav);
+            }}
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
     );
   };
 
-  const conversationRow = (id: string, pinned: boolean) => {
-    if (id === NEXA_ID) return nexaRow(pinned);
+  const conversationRow = (id: string, place: Place) => {
+    if (id === NEXA_ID) return nexaRow(place);
     const ch = channels[id];
     if (!ch) return null;
     const name = channelDisplayName(ch, users, meId, nicknames);
@@ -295,7 +454,7 @@ export function DMSidebar() {
       const url = iconUrl(ch.icon_id, 32);
       avatar = url ? <Avatar id={ch.id} avatarId={ch.icon_id} name={name} size={32} kind="icon" /> : <span className={s.groupIcon}><Users size={18} /></span>;
     }
-    const subs = activeConvo === ch.id ? selectSubchats(channels, ch.id) : [];
+    const subs = activeConvo === ch.id && !isPicking ? selectSubchats(channels, ch.id) : [];
     return (
       <div key={ch.id}>
         {/* A row of two buttons rather than one button with a role="button"
@@ -308,10 +467,11 @@ export function DMSidebar() {
           data-parent-selected={activeConvo === ch.id && active !== ch.id}
           data-unread={unread}
           data-channel={ch.id}
-          onContextMenu={(e) => openRowMenu(e, ch.id)}
-          {...rowDrag(ch.id, pinned)}
+          onContextMenu={(e) => openRowMenu(e, ch.id, place)}
+          {...rowProps(ch.id, place)}
         >
-          <button type="button" className={s.itemMain} onClick={() => go(`/channels/@me/${ch.id}`)}>
+          <button type="button" className={s.itemMain} onClick={(e) => openRow(e, ch.id, `/channels/@me/${ch.id}`)} aria-pressed={isPicking ? picked.includes(ch.id) : undefined}>
+            {mark(ch.id)}
             {avatar}
             <span className={s.text}>
               <span className={s.nameRow}>
@@ -325,19 +485,21 @@ export function DMSidebar() {
             {count > 0 ? <span className="visually-hidden">{`, ${count > 99 ? t("rail.rail.moreThan99Unread") : t("rail.rail.unreadMessagesCount", { count })}`}</span> : null}
           </button>
           {count > 0 ? <span className={s.mention} data-testid="dm-unread" aria-hidden="true">{badgeText(count)}</span> : null}
-          <button
-            type="button"
-            className={s.close}
-            aria-label={ch.type === "group_dm" ? t("sidebar.dMSidebar.leaveGroup") : t("sidebar.dMSidebar.closeDm")}
-            title={ch.type === "group_dm" ? t("sidebar.dMSidebar.leaveGroup") : t("sidebar.dMSidebar.closeDm")}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (ch.type === "group_dm") openContextMenu({ x: e.clientX, y: e.clientY, items: dmMenuItems(ch.id, { nav, openModal }) });
-              else void closeDM(ch.id, nav);
-            }}
-          >
-            <X size={16} />
-          </button>
+          {handles ? handle(ch.id) : isPicking ? null : (
+            <button
+              type="button"
+              className={s.close}
+              aria-label={ch.type === "group_dm" ? t("sidebar.dMSidebar.leaveGroup") : t("sidebar.dMSidebar.closeDm")}
+              title={ch.type === "group_dm" ? t("sidebar.dMSidebar.leaveGroup") : t("sidebar.dMSidebar.closeDm")}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (ch.type === "group_dm") openContextMenu({ x: e.clientX, y: e.clientY, items: dmMenuItems(ch.id, { nav, openModal }) });
+                else void closeDM(ch.id, nav);
+              }}
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
         {subs.map((sc) => {
           const srs = reads[sc.id];
@@ -376,24 +538,21 @@ export function DMSidebar() {
       if (w.unread) anyUnread = true;
     }
     // collapsed, it still shows the conversation open in it, so you can see where you are
-    const shown = collapsed ? row.ids.filter((id) => id === activeConvo || (id === NEXA_ID && nexaOpen)) : row.ids;
-    const menu = (): ContextMenuItem[] => dmGroupMenuItems(g, { openModal, unread: anyUnread, moves: reorder.menuItems(g.id) });
-    const drop = dropAt(g.id);
+    const shown = collapsed ? row.ids.filter((id) => id === activeConvo || (id === NEXA_ID && nexaOpen) || picked.includes(id)) : row.ids;
+    const moves = pinned ? reorder.menuItems(g.id) : custom ? reorderMain.menuItems(g.id) : [];
+    const menu = (): ContextMenuItem[] => dmGroupMenuItems(g, { openModal, unread: anyUnread, moves });
+    const keys = pinned ? reorder.onKeyDown(g.id) : custom ? reorderMain.onKeyDown(g.id) : undefined;
     return (
       <div
         key={g.id}
         className={s.group}
         data-collapsed={collapsed}
-        data-drop={drop}
+        data-drop={dropAt(g.id)}
         data-dragging={drag === g.id}
         data-group={g.id}
         // named, so a screen reader hears which conversations are in it and where it ends
         role="group"
         aria-label={name}
-        onDragOver={(e) => overGroup(e, g, pinned)}
-        // entering counts as being over: a quick move sends only that
-        onDragEnter={(e) => overGroup(e, g, pinned)}
-        onDrop={onDrop}
       >
         <div
           className={s.groupHead}
@@ -404,8 +563,8 @@ export function DMSidebar() {
             e.preventDefault();
             openContextMenu({ ...menuPoint(e), label: name, items: menu() });
           }}
-          onKeyDown={pinned ? reorder.onKeyDown(g.id) : undefined}
-          data-reorder-id={pinned ? g.id : undefined}
+          onKeyDown={keys}
+          data-reorder-id={keys ? g.id : undefined}
         >
           <button type="button" className={s.groupToggle} aria-expanded={!collapsed} onClick={() => changeDMList((l) => setGroupCollapsed(l, g.id, !collapsed))} data-testid="dm-group-toggle">
             <ChevronDown size={14} className={s.chev} aria-hidden="true" />
@@ -413,43 +572,58 @@ export function DMSidebar() {
             {collapsed && count > 0 ? <span className="visually-hidden">{`, ${count > 99 ? t("rail.rail.moreThan99Unread") : t("rail.rail.unreadMessagesCount", { count })}`}</span> : null}
           </button>
           {collapsed && count > 0 ? <span className={s.mention} aria-hidden="true" data-testid="dm-group-unread">{badgeText(count)}</span> : null}
-          <button
-            type="button"
-            className={s.groupMore}
-            aria-label={t("organize.dm.groupOptions", { name })}
-            title={t("organize.dm.groupOptions", { name })}
-            onClick={(e) => openContextMenu({ x: 0, y: 0, anchor: menuAnchor(e.currentTarget), label: name, items: menu() })}
-            data-testid="dm-group-more"
-          >
-            <MoreHorizontal size={16} />
-          </button>
+          {handles ? handle(g.id) : (
+            <button
+              type="button"
+              className={s.groupMore}
+              aria-label={t("organize.dm.groupOptions", { name })}
+              title={t("organize.dm.groupOptions", { name })}
+              onClick={(e) => openContextMenu({ x: 0, y: 0, anchor: menuAnchor(e.currentTarget), label: name, items: menu() })}
+              data-testid="dm-group-more"
+            >
+              <MoreHorizontal size={16} />
+            </button>
+          )}
         </div>
-        {shown.map((id) => conversationRow(id, false))}
+        {shown.map((id) => conversationRow(id, "group"))}
         {!collapsed && row.ids.length === 0 ? <div className={s.groupEmpty}>{t("organize.dm.emptyGroup")}</div> : null}
       </div>
     );
   };
 
-  const renderRow = (row: DMRow, pinned: boolean) => (row.kind === "group" ? groupSection(row, pinned) : conversationRow(row.id, pinned));
+  const renderRow = (row: DMRow, pinned: boolean) => (row.kind === "group" ? groupSection(row, pinned) : conversationRow(row.id, pinned ? "pinned" : "main"));
   const nothing = view.pinned.length === 0 && view.rest.length === 0;
 
+  /** The Direct Messages heading's menu: how the list is sorted, and picking from it. */
+  const listMenu = (e: MouseEvent<HTMLButtonElement>) =>
+    openContextMenu({
+      x: 0,
+      y: 0,
+      anchor: menuAnchor(e.currentTarget),
+      label: t("sidebar.dMSidebar.directMessages"),
+      items: [
+        { id: "recent", label: t("pick.sortRecent"), checked: !custom, onSelect: () => changeDMList((l) => setDMSort(l, "recent", restIds)) },
+        { id: "custom", label: t("pick.sortManual"), checked: custom, onSelect: () => changeDMList((l) => setDMSort(l, "custom", restIds)), separatorAfter: true },
+        { id: "select", label: t("pick.selectConversations"), onSelect: () => usePick.getState().start("dms") },
+      ],
+    });
+
+  const bulk = isPicking ? dmBulk(picked, { nav, openModal }) : null;
+
   return (
-    <div className={s.sidebar} onDragEnd={endDrag}>
+    <div className={s.sidebar} onDragEnd={endDrag} data-picking={isPicking || undefined}>
       <div className={s.search}>
-        <button className={s.searchBtn} onClick={() => setQuickSwitcher(true)}>
-          <Search size={15} className={s.searchIcon} aria-hidden="true" />
-          <span className={s.searchText}>{t("sidebar.dMSidebar.findOrStartAConversation")}</span>
-          <kbd className={s.searchKeys} aria-hidden="true">{modKeys("K")}</kbd>
-        </button>
+        <SearchButton onOpen={() => setQuickSwitcher(true)} />
       </div>
-      <div className={s.scroll}>
+      <div ref={scrollRef} className={s.scroll} onDragOver={onListDragOver} onDragEnter={onListDragOver} onDrop={onListDrop}>
         {reorder.live}
+        {reorderMain.live}
         {drag && view.pinned.length === 0 ? (
           // Nothing pinned yet: while something is dragged, a place to pin it.
           // It floats over the top of the list rather than pushing the list,
           // and the row being dragged, down from under the pointer.
           <div className={s.pinZoneWrap}>
-            <div className={s.pinZone} data-drop={dropAt("top") === "top" || undefined} onDragOver={overTop} onDragEnter={overTop} onDrop={onDrop} data-testid="dm-pin-zone">
+            <div className={s.pinZone} data-pin-zone="" data-drop={dropAt("top") === "top" || undefined} data-testid="dm-pin-zone">
               <Pin size={14} aria-hidden="true" />
               {t("organize.dm.dropToPin")}
             </div>
@@ -466,6 +640,16 @@ export function DMSidebar() {
             </>
           ) : null}
         </button>
+        <button className={s.nav} data-selected={loc.pathname.startsWith("/channels/@me/notes")} onClick={() => go("/channels/@me/notes")} data-testid="nav-notes">
+          <span className={s.navIcon}><NotebookPen size={22} /></span>
+          <span className={s.navLabel}>{t("notes.title")}</span>
+          {noteRequests > 0 ? (
+            <>
+              <span className="visually-hidden">{`, ${t("notes.requests.count", { count: noteRequests })}`}</span>
+              <span className={s.mention} aria-hidden="true" data-testid="note-requests">{badgeText(noteRequests)}</span>
+            </>
+          ) : null}
+        </button>
         {isAdmin ? (
           <button className={s.nav} data-selected={loc.pathname.startsWith("/channels/@admin")} onClick={() => go("/channels/@admin")} data-testid="nav-moderation">
             <span className={s.navIcon}><Shield size={22} /></span>
@@ -475,25 +659,95 @@ export function DMSidebar() {
         ) : null}
         {view.pinned.length > 0 ? (
           <div role="group" aria-label={t("organize.pinned")} data-testid="dm-pinned">
-            <div className={s.header} data-drop={dropAt("top") === "top" || undefined} onDragOver={overTop} onDragEnter={overTop} onDrop={onDrop}>
+            <div className={s.header} data-dm-head="pinned" data-drop={dropAt("top") === "top" || undefined}>
               <span className={s.headerLabel}><Pin size={12} aria-hidden="true" />{t("organize.pinned")}</span>
             </div>
             {view.pinned.map((r) => renderRow(r, true))}
           </div>
         ) : null}
-        <div className={s.header} data-drop={dropAt("main") === "main" || undefined} onDragOver={overMain} onDragEnter={overMain} onDrop={onDrop} data-testid="dm-header">
-          <span>{t("sidebar.dMSidebar.directMessages")}</span>
-          <button className={s.headerBtn} aria-label={t("sidebar.dMSidebar.createDm")} title={t("sidebar.dMSidebar.createDm")} onClick={() => openModal("createDM")}>
-            <Plus size={16} />
-          </button>
+        <div className={s.header} data-dm-head="main" data-drop={dropAt("main") === "main" || undefined} data-testid="dm-header">
+          <span className={s.headerLabel}>
+            {t("sidebar.dMSidebar.directMessages")}
+            {custom ? <ArrowDownUp size={12} aria-label={t("pick.sortedManually")} /> : null}
+          </span>
+          <span className={s.headerBtns}>
+            <button className={s.headerBtn} aria-label={t("pick.listOptions")} title={t("pick.listOptions")} onClick={listMenu} aria-haspopup="menu" data-testid="dm-list-options">
+              <MoreHorizontal size={16} />
+            </button>
+            <button className={s.headerBtn} aria-label={t("sidebar.dMSidebar.createDm")} title={t("sidebar.dMSidebar.createDm")} onClick={() => openModal("createDM")}>
+              <Plus size={16} />
+            </button>
+          </span>
         </div>
         {nothing ? <div className={s.empty}>{t("sidebar.dMSidebar.noConversationsYetAddAFriend")}</div> : null}
-        <div onDragOver={overMain} onDragEnter={overMain} onDrop={onDrop} data-testid="dm-main">
+        <div data-dm-main="" data-testid="dm-main">
           {view.rest.map((r) => renderRow(r, false))}
         </div>
       </div>
+      {bulk ? <PickBar list="dms" count={picked.length} label={t("pick.dmBar")} actions={bulk.bar} more={bulk.menu} /> : null}
       <VoiceStatus />
       <UserPanel />
+      {ghost ? (
+        <div className={s.ghost} style={{ transform: `translate(${ghost.x + 14}px, ${ghost.y - 18}px)` }} aria-hidden="true">
+          <GripVertical size={14} />
+          <span>{ghost.name}</span>
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * The box that opens the quick switcher. Its words have to fit a sidebar the
+ * person can make narrow, in every language: the shortcut beside them goes
+ * first, then they give way to shorter ones, rather than being cut off as
+ * "Find or Start a Conv…".
+ */
+function SearchButton({ onOpen }: { onOpen: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const keys = modKeys("K");
+  const choices = [t("sidebar.dMSidebar.findOrStartAConversation"), t("sidebar.dMSidebar.findAConversation"), t("chat.chat.search")];
+  const [fit, setFit] = useState<{ label: string; keys: boolean }>({ label: choices[0]!, keys: true });
+  const key = choices.join("\u0000");
+  useLayoutEffect(() => {
+    const btn = ref.current;
+    if (!btn) return;
+    const measure = () => {
+      const text = btn.querySelector<HTMLElement>("[data-label]");
+      const icon = btn.querySelector<SVGElement>("svg");
+      if (!text) return;
+      const cs = getComputedStyle(btn);
+      const gap = parseFloat(cs.columnGap) || 8;
+      const room = btn.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0) - (icon?.getBoundingClientRect().width ?? 15) - gap;
+      if (room <= 0) return;
+      // the shortcut only where a keyboard is the way in
+      const hasKeys = !!window.matchMedia?.("(pointer: fine)").matches;
+      const kbd = btn.querySelector("kbd");
+      const keysWidth = hasKeys && kbd ? (textWidth(keys, kbd) ?? 24) + 12 + gap : 0;
+      const list = key.split("\u0000");
+      const widths = list.map((l) => textWidth(l, text));
+      if (widths.some((w) => w === null)) return;
+      for (const withKeys of hasKeys ? [true, false] : [false]) {
+        const at = widths.findIndex((w) => w! <= room - (withKeys ? keysWidth : 0) + 0.5);
+        // the full words without the shortcut beat shorter words with it
+        if (at === 0 || (at > 0 && !withKeys)) return setFit({ label: list[at]!, keys: withKeys });
+      }
+      setFit({ label: list[list.length - 1]!, keys: false });
+    };
+    measure();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    ro?.observe(btn);
+    document.fonts?.addEventListener?.("loadingdone", measure);
+    return () => {
+      ro?.disconnect();
+      document.fonts?.removeEventListener?.("loadingdone", measure);
+    };
+  }, [key, keys]);
+  return (
+    <button ref={ref} className={s.searchBtn} onClick={onOpen} aria-label={choices[0]} data-testid="dm-search">
+      <Search size={15} className={s.searchIcon} aria-hidden="true" />
+      <span className={s.searchText} data-label="">{fit.label}</span>
+      <kbd className={s.searchKeys} aria-hidden="true" data-hidden={fit.keys ? undefined : ""}>{keys}</kbd>
+    </button>
   );
 }

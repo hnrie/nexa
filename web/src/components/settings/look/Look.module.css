@@ -267,3 +267,17 @@
   .itemActions button, .sectionHead button, .addRow button, .groupActions button, .builderFoot button, .stateBody button, button.noticeAction { height: auto; min-height: 40px; }
   .touchBar button { height: auto; min-height: 44px; }
 }
+
+/* the app's typeface: each choice shows its own letters */
+.fonts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px; margin-bottom: 26px; }
+.fontChoice { position: relative; display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: var(--radius-md); text-align: start; color: var(--text); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); transition: box-shadow var(--transition), background-color var(--transition); }
+.fontChoice:hover { box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border); }
+.fontChoice[aria-checked="true"] { box-shadow: inset 0 1px 0 var(--edge-light), var(--glow-brand); }
+.fontChoice:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.fontSample { flex: none; width: 52px; font-size: 30px; line-height: 1; color: var(--text-strong); text-align: center; }
+.fontSample[data-face="default"] { font-family: "Wix Madefor Display Variable", "Wix Madefor Text Variable", sans-serif; font-weight: 720; font-stretch: 100%; }
+.fontSample[data-face="classic"] { font-family: "Mona Sans Variable", "Onest Variable", sans-serif; font-weight: 820; font-stretch: 115%; }
+.fontText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fontName { font-size: 15px; font-weight: 650; color: var(--text-strong); }
+.fontNote { font-size: 13px; color: var(--text-muted); }
+.fontCheck { flex: none; color: var(--text-brand); }

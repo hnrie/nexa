@@ -21,7 +21,7 @@ const ICON: Record<number, typeof Music> = { 0: Gamepad2, 1: Radio, 2: Music, 3:
 /** What each activity type is called, per render so it follows the language. */
 const labels = (): Record<number, string> => ({ 0: t("activity.statusLine.playingAGame"), 1: t("activity.statusLine.streaming"), 2: t("activity.statusLine.listeningToMusic"), 3: t("activity.statusLine.watching"), 5: t("activity.statusLine.competing") });
 
-/** `spotify` tints the note Spotify's green: the line shows the artists, so the colour is what says which app is playing. */
+/** A game's and a song's icon is green whatever app it comes from; `spotify` keeps Spotify's own green on its note. */
 export function ActivityIcon({ type, size = 12, more = 0, spotify = false }: { type: number; size?: number; more?: number; spotify?: boolean }) {
   const Icon = ICON[type] ?? Gamepad2;
   const label = labels()[type] ?? t("settings.privacy.activity");
@@ -30,13 +30,13 @@ export function ActivityIcon({ type, size = 12, more = 0, spotify = false }: { t
       // `aria-label` on a plain span is prohibited and is not announced; the
       // words go in a hidden one, which is read wherever text is read.
       <span className={s.kindStack} title={t("activity.statusLine.andMore", { what: label, count: more })}>
-        <Icon size={size} className={s.kindIcon} data-spotify={spotify || undefined} aria-hidden="true" />
+        <Icon size={size} className={s.kindIcon} data-kind={type} data-spotify={spotify || undefined} aria-hidden="true" />
         <span className={s.kindMore} aria-hidden="true">+{more}</span>
         <span className="visually-hidden">{t("activity.statusLine.andMore", { what: label, count: more })}</span>
       </span>
     );
   }
-  return <Icon size={size} className={s.kindIcon} data-spotify={spotify || undefined} role="img" aria-label={label} />;
+  return <Icon size={size} className={s.kindIcon} data-kind={type} data-spotify={spotify || undefined} role="img" aria-label={label} />;
 }
 
 export function StatusLine({

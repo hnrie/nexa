@@ -2,7 +2,7 @@
 .top { display: flex; align-items: center; gap: 16px; padding: 12px; border-radius: var(--radius-sm); background: var(--bg-surface); }
 .big { width: 120px; height: 120px; flex: none; object-fit: contain; }
 .info { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.stickerName { font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 19px; font-weight: 800; letter-spacing: -0.012em; color: var(--text-strong); overflow-wrap: anywhere; }
+.stickerName { font-family: var(--font-display); font-size: 19px; font-weight: 690; letter-spacing: -0.006em; color: var(--text-strong); overflow-wrap: anywhere; }
 .creator { font-size: 14px; color: var(--text-muted); }
 .creatorLink { color: var(--text); font-weight: 600; }
 .creatorLink:hover { text-decoration: underline; }

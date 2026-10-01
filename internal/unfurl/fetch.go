@@ -94,6 +94,9 @@ type Result struct {
 	// across the card or "thumbnail" beside the words, from its twitter:card.
 	// Empty leaves it to the picture's size.
 	ImageLayout string `json:"image_layout,omitempty"`
+	// Post is set when the link is a social post the app draws as one (see
+	// post.go). The fields above still describe it, for an app that does not.
+	Post *Post `json:"post,omitempty"`
 }
 
 // Fetcher fetches previews with SSRF protection.
@@ -111,6 +114,9 @@ type Fetcher struct {
 	// for a preview and then sends without it; a card with its picture's
 	// size unknown beats no card at all. Zero means defaultMeasureWithin.
 	MeasureWithin time.Duration
+	// seen is told of every post read for a card, with its files' addresses
+	// as they are today (the Service keeps them for the media proxy).
+	seen func(ref *postRef, p *Post)
 }
 
 // defaultMeasureWithin leaves room inside the moment the app waits for a
@@ -242,6 +248,12 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Result, error) {
 	started := time.Now()
 	ctx, cancel := context.WithTimeout(ctx, f.timeout())
 	defer cancel()
+
+	// A social post has a card of its own. A post no source could read is
+	// fetched like any other link, for the card its page asks for.
+	if r := f.postResult(ctx, u); r != nil {
+		return r, nil
+	}
 
 	client := &http.Client{
 		Transport: f.transport(),

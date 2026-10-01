@@ -31,6 +31,9 @@ import { useModeration } from "@/stores/moderation";
 import { NexaAvatar } from "@/components/nexa/NexaBits";
 import { FolderFace } from "./FolderFace";
 import { adoptRail, changeRail, folderMenuItems, folderName, serverArrangeItems, toggleFolder } from "./railActions";
+import { railBulk } from "./railBulk";
+import { PickBar, PickMark } from "@/components/common/Pick";
+import { pickClick, usePick } from "@/stores/pick";
 import s from "./Rail.module.css";
 
 import { t } from "@/i18n";
@@ -49,6 +52,8 @@ const MAX_WAITING = 10;
 
 /** A conversation with messages waiting, or Nexa's (no channel), and when it last spoke as an id to sort by. */
 type Waiting = { channel: Channel | null; count: number; at: string };
+
+const NO_PICKS: string[] = [];
 
 /** What is being dragged: a server, or a whole folder. */
 type Drag = { id: string; folder: boolean };
@@ -152,11 +157,29 @@ export function Rail() {
     move: (id, delta) => changeRail((l) => moveEntry(l, id, delta)),
   });
 
+  // picking several servers at once (stores/pick.ts)
+  const picked = usePick((p) => (p.list === "servers" ? p.ids : NO_PICKS));
+  const pickMode = usePick((p) => p.list === "servers" && p.mode);
+  const isPicking = pickMode || picked.length > 0;
+  const serverOrder = useMemo(() => shown.filter((id) => !!servers[id]), [shown, servers]);
+  // what was picked and has since gone (left, deleted) is let go of
+  useEffect(() => {
+    const gone = picked.filter((id) => !servers[id]);
+    if (gone.length) usePick.getState().drop(gone);
+  }, [picked, servers]);
+
   const onServerContext = (e: MouseEvent, id: string) => {
     e.preventDefault();
+    const pick = usePick.getState();
+    // a right click on one of several picked acts on all of them
+    if (pick.list === "servers" && pick.ids.includes(id) && pick.ids.length > 1) {
+      openContextMenu({ ...menuPoint(e), label: t("pick.count", { count: pick.ids.length }), items: railBulk(pick.ids, { nav, openModal }).menu() });
+      return;
+    }
+    if (pick.list === "servers" && !pick.mode && pick.ids.length) pick.clear();
     const items = serverMenuItems(id, { nav, openModal });
-    // arranging it comes straight after Mark as read, which stays first
-    items.splice(items.findIndex((i) => i.id === "read") + 1, 0, ...serverArrangeItems(id, { openModal, moves: reorder.menuItems(id) }));
+    // arranging it comes straight after Mark as read, which stays first, and then picking more
+    items.splice(items.findIndex((i) => i.id === "read") + 1, 0, ...serverArrangeItems(id, { openModal, moves: reorder.menuItems(id) }), { id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start("servers", id), separatorAfter: true });
     openContextMenu({ ...menuPoint(e), label: servers[id]?.server.name ?? "", items });
   };
   const onFolderContext = (e: MouseEvent, f: ServerFolder) => {
@@ -245,6 +268,7 @@ export function Rail() {
         onKeyDown={reorder.onKeyDown(id)}
         data-server={id}
         data-reorder-id={id}
+        data-picked={picked.includes(id) || undefined}
       >
         <span className={s.pill} />
         <Tooltip text={st.server.name} side="right">
@@ -255,12 +279,18 @@ export function Rail() {
             // itself as a loose "3".
             aria-label={u.mentions > 0 ? t("rail.rail.serverWithMentions", { name: st.server.name, count: u.mentions }) : st.server.name}
             aria-current={selected ? "page" : undefined}
-            onClick={() => openServer(id)}
+            aria-pressed={isPicking ? picked.includes(id) : undefined}
+            onClick={(e) => {
+              // Ctrl or ⌘ picks a server, Shift a run of them, a tap one while picking
+              if (pickClick(e, "servers", id, serverOrder)) return;
+              openServer(id);
+            }}
           >
             {url ? <img src={url} alt="" draggable={false} /> : <span className={s.initials}>{initials(st.server.name)}</span>}
           </button>
         </Tooltip>
         {u.mentions > 0 ? <span className={s.badge} aria-hidden="true">{u.mentions > 99 ? "99+" : u.mentions}</span> : null}
+        {isPicking ? <span className={s.pickMark}><PickMark on={picked.includes(id)} label={t("pick.pickNamed", { name: st.server.name })} /></span> : null}
       </div>
     );
   };
@@ -327,6 +357,7 @@ export function Rail() {
   };
 
   const renderEntry = (e: RailEntry) => (typeof e === "string" ? renderServer(e, null) : renderFolder(e));
+  const bulk = isPicking ? railBulk(picked, { nav, openModal }) : null;
   const lastPinned = layout.pinned.at(-1);
   const lastRest = layout.rest.at(-1);
 
@@ -432,6 +463,12 @@ export function Rail() {
           </button>
         </Tooltip>
       </div>
+      {/* the rail is too narrow for it: the bar floats over the foot of the column beside */}
+      {bulk ? (
+        <div className={s.pickBar}>
+          <PickBar list="servers" count={picked.length} label={t("pick.serverBar")} actions={bulk.bar} more={bulk.menu} />
+        </div>
+      ) : null}
     </nav>
   );
 }

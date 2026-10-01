@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { attachSheetDrag, sheetsHere } from "@/lib/sheetDrag";
 import { createPortal } from "react-dom";
 import { EmojiPicker, focusSearchOnOpen, type EmojiPick } from "./EmojiPicker";
 import s from "./Picker.module.css";
@@ -121,6 +122,14 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
       document.removeEventListener("keydown", onKey, true);
     };
   }, [onClose]);
+  // On a phone the picker is a sheet: pulled up it takes the whole screen, swiped down it goes.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || anchor || !sheetsHere()) return;
+    return attachSheetDrag({ sheet: el, onClose: () => closeRef.current(), expandable: () => true, handle: 52 });
+  }, [anchor]);
   const onTabKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
     const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (!step) return;
@@ -134,11 +143,12 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
 
   const body = (
     // a layer, so the back gesture on a phone closes the picker (through the Escape it answers) instead of leaving the page
-    <div className={s.pop} ref={ref} role="dialog" aria-modal="true" aria-label={t("pickers.expressionPicker.expressionPicker")} onKeyDown={onKeyDown} style={anchor && !mobile ? anchoredStyle(anchor) : undefined} data-anchored={!!anchor} data-modal-layer="">
+    <div className={s.pop} ref={ref} role="dialog" aria-modal="true" aria-label={t("pickers.expressionPicker.expressionPicker")} onKeyDown={onKeyDown} style={anchor && !mobile ? anchoredStyle(anchor) : undefined} data-anchored={!!anchor} data-modal-layer="" data-testid="expression-picker">
       {/* A tab with nothing behind it was rendered `disabled` forever with no
           reason given — two dead controls on the most-opened popover in the
           app, implying a feature that is not coming. Where the caller has no
           GIFs or stickers to offer, there is no tab. */}
+      {mobile && !anchor ? <span className={s.grip} aria-hidden="true" data-sheet-handle="" /> : null}
       <div className={s.tabs}>
         {/* The close button is not a tab, so the tablist is only the tabs. */}
         <div style={{ display: "flex", gap: 4 }} role="tablist" aria-label={t("pickers.expressionPicker.expressionPicker")}>

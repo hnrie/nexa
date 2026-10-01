@@ -110,13 +110,13 @@ export default function ProfilePage() {
 
   return (
     <>
-      <h2 className={s.title}>{t("settings.profile.profiles")}</h2>
+      <h2 data-setting="profile" className={s.title}>{t("settings.profile.profiles")}</h2>
       <div className={s.twoCol}>
         <div className={s.form}>
           <Field label={t("settings.account.displayName")}><TextInput value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={32} /></Field>
           <Field label={t("settings.profile.pronouns")}><TextInput value={pronouns} onChange={(e) => setPronouns(e.target.value)} maxLength={40} placeholder={t("settings.profile.addYourPronouns")} /></Field>
           <div>
-            <div className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.avatar")}</div>
+            <div data-setting="avatar" className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.avatar")}</div>
             <div className={s.uploadRow}>
               <input ref={avatarRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop({ file: f, kind: "avatar" }); e.target.value = ""; }} />
               <Button size="sm" loading={uploading === "avatar"} onClick={() => avatarRef.current?.click()}>{t("settings.profile.changeAvatar")}</Button>
@@ -125,7 +125,7 @@ export default function ProfilePage() {
             <p className={s.hint}>{t("settings.profile.pngJpegGifOrWebpUp")}</p>
           </div>
           <div>
-            <div className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.profileBanner")}</div>
+            <div data-setting="banner" className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.profileBanner")}</div>
             <input ref={bannerRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop({ file: f, kind: "banner" }); e.target.value = ""; }} />
             <div className={s.bannerPick} style={banner ? { backgroundImage: `url(${banner})` } : { background: themeCss }}>
               <Button size="sm" variant="secondary" loading={uploading === "banner"} onClick={() => bannerRef.current?.click()}>{t("settings.profile.changeBanner")}</Button>
@@ -133,7 +133,7 @@ export default function ProfilePage() {
             </div>
           </div>
           <div>
-            <div className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.profileTheme")}</div>
+            <div data-setting="profileTheme" className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.profileTheme")}</div>
             <p className={s.hint} style={{ margin: "0 0 6px" }}>{t("settings.profile.topColourOnItsOwnIt")}</p>
             <div className={s.swatches}>
               <button className={s.swatch} data-on={accent === null} aria-pressed={accent === null} style={{ background: "var(--bg-active)" }} title={t("server.roles.default")} aria-label={t("server.roles.default")} onClick={() => { setAccent(null); setAccent2(null); }} />

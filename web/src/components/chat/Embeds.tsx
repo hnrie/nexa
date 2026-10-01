@@ -8,6 +8,7 @@ import { useUI } from "@/stores/ui";
 import { fitMedia } from "./Attachments";
 import { Lightbox } from "./Lightbox";
 import { AudioPlayer } from "./AudioPlayer";
+import { PostEmbed } from "./PostEmbed";
 import { VideoPlayer } from "./VideoPlayer";
 import c from "./Chat.module.css";
 import s from "./Embeds.module.css";
@@ -312,6 +313,8 @@ export function Embeds({ list }: { list: UnfurlResult[] }) {
     <div className={s.embeds}>
       {list.slice(0, 5).map((e, i) => {
         if (!e || typeof e !== "object" || typeof e.url !== "string") return null;
+        // a social post is drawn as a post; without one of those it is a link like any other
+        if (e.post && typeof e.post === "object") return <PostEmbed key={i} e={e} />;
         if (e.type === "image" || e.type === "gif") return imagePreviews ? <ImageEmbed key={i} e={e} /> : null;
         // played through this server's proxy, so the host of the file never sees who is watching
         if (e.type === "video") return imagePreviews ? <VideoEmbed key={i} e={e} /> : null;

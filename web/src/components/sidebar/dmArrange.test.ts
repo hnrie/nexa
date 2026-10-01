@@ -83,10 +83,12 @@ describe("arranging from menus", () => {
     expect(layout()).toEqual({ pins: ["10", "20"], groups: [{ id: "gwork", name: "Work", ids: [] }] });
   });
 
-  it("adds the moves only for a pinned conversation", () => {
+  it("adds the moves the list offers for the row, pinned or in a list sorted by hand", () => {
     const moves = [{ id: "move-down", label: "Move down" }];
     expect(ids(dmArrangeItems("10", moves))).toEqual(["pin", "add-to-group", "move-down"]);
-    expect(ids(dmArrangeItems("30", moves))).toEqual(["pin", "add-to-group"]);
+    // the list offers none for a row it cannot move
+    expect(ids(dmArrangeItems("30", []))).toEqual(["pin", "add-to-group"]);
+    expect(ids(dmArrangeItems("30", moves))).toEqual(["pin", "add-to-group", "move-down"]);
     dmArrangeItems("30")[1]!.submenu![0]!.onSelect!();
     expect(layout().groups[0]!.ids).toEqual(["20", "30"]);
   });

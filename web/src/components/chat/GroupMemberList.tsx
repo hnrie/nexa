@@ -15,6 +15,9 @@ import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 import { groupMemberMenuItems } from "./groupMemberMenu";
+import { groupMemberBulk } from "@/components/server/memberBulk";
+import { PickBar, PickMark } from "@/components/common/Pick";
+import { pickClick, usePick } from "@/stores/pick";
 import { nameOrder } from "./nameOrder";
 import s from "./MemberList.module.css";
 
@@ -27,6 +30,8 @@ import { t } from "@/i18n";
  * (or long press, or the menu key) for what you may do to each: for the
  * owner, that includes handing the group on and removing people.
  */
+const NO_PICKS: string[] = [];
+
 export function GroupMemberList({ channel, drawer, open }: { channel: Channel; drawer: boolean; open: boolean }) {
   const users = useUsers((u) => u.byId);
   const presence = usePresence((p) => p.byUser);
@@ -47,6 +52,14 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
       .sort((a, b) => Number(a.offline) - Number(b.offline) || nameOrder().compare(a.name, b.name));
   }, [channel.recipient_ids, presence, users, rels, me]);
 
+  // picking several people at once (stores/pick.ts)
+  const pickList = `members:${channel.id}` as const;
+  const picked = usePick((p) => (p.list === pickList ? p.ids : NO_PICKS));
+  const pickMode = usePick((p) => p.list === pickList && p.mode);
+  const isPicking = pickMode || picked.length > 0;
+  const pickOrder = useMemo(() => rows.map((r) => r.id), [rows]);
+  const bulk = isPicking ? groupMemberBulk(channel.id, picked) : null;
+
   return (
     <aside className={s.list} data-testid="group-member-list" data-open={drawer ? open : undefined} aria-hidden={drawer && !open} {...(drawer && !open ? ({ inert: "" } as Record<string, string>) : {})}>
       <div className={s.head}>{t("chat.groupMemberList.membersCount", { count: rows.length })}</div>
@@ -59,13 +72,29 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
             className={s.row}
             data-offline={row.offline}
             data-user={row.id}
-            onClick={() => openModal("profile", { userId: row.id })}
+            onClick={(e) => {
+              // Ctrl or ⌘ picks someone, Shift a run of people, a tap one while picking
+              if (pickClick(e, pickList, row.id, pickOrder)) return;
+              openModal("profile", { userId: row.id });
+            }}
             onContextMenu={(e) => {
               e.preventDefault();
+              const pick = usePick.getState();
+              if (pick.list === pickList && pick.ids.includes(row.id) && pick.ids.length > 1) {
+                openContextMenu({ ...menuPoint(e), label: t("pick.count", { count: pick.ids.length }), items: groupMemberBulk(channel.id, pick.ids).menu() });
+                return;
+              }
+              if (pick.list === pickList && !pick.mode && pick.ids.length) pick.clear();
               // the menu key or Shift+F10 has no pointer: the menu opens by the row
-              openContextMenu({ ...menuPoint(e), label: row.name, items: groupMemberMenuItems(channel.id, row.id, { nav, openModal }) });
+              const items = groupMemberMenuItems(channel.id, row.id, { nav, openModal });
+              items[items.length - 1]!.separatorAfter = true;
+              items.push({ id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start(pickList, row.id) });
+              openContextMenu({ ...menuPoint(e), label: row.name, items });
             }}
+            data-picked={picked.includes(row.id) || undefined}
+            aria-pressed={isPicking ? picked.includes(row.id) : undefined}
           >
+            {isPicking ? <PickMark on={picked.includes(row.id)} label={t("pick.pickNamed", { name: row.name })} /> : null}
             <Avatar id={row.id} avatarId={users[row.id]?.avatar_id ?? null} name={row.name} size={32} status={statusOf(p)} />
             <span className={s.text}>
               <span className={s.name}>
@@ -83,6 +112,11 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
           </button>
         );
       })}
+      {bulk && bulk.bar.length ? (
+        <div className={s.pickBar}>
+          <PickBar list={pickList} count={picked.length} label={t("pick.membersBar")} actions={bulk.bar} more={bulk.menu} />
+        </div>
+      ) : null}
     </aside>
   );
 }

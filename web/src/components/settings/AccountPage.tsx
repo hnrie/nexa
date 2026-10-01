@@ -85,7 +85,7 @@ export default function AccountPage({ onEditProfile }: { onEditProfile: () => vo
 
   return (
     <>
-      <h2 className={s.title}>{t("settings.account.myAccount")}</h2>
+      <h2 data-setting="account" className={s.title}>{t("settings.account.myAccount")}</h2>
       <div className={s.card}>
         {/* The banner everyone else sees on the profile card: its colours, or
             without them the avatar's own colour. Here it used to fall back to
@@ -113,7 +113,7 @@ export default function AccountPage({ onEditProfile }: { onEditProfile: () => vo
       </div>
 
       <div className={s.sep} />
-      <h3 className={s.h5}>{t("settings.account.passwordAndAuthentication")}</h3>
+      <h3 data-setting="password" className={s.h5}>{t("settings.account.passwordAndAuthentication")}</h3>
       <p className={s.hint}>{t("settings.account.yourPasswordProtectsYourAccountAnd")}</p>
       <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
         <Button onClick={() => open("password")}>{t("settings.account.changePassword")}</Button>
@@ -122,7 +122,7 @@ export default function AccountPage({ onEditProfile }: { onEditProfile: () => vo
       <p className={s.hint}>{me.has_recovery ? t("settings.account.aRecoveryKeyIsSetGenerating") : t("settings.account.withoutARecoveryKeyAForgotten")}</p>
 
       <div className={s.sep} />
-      <h3 className={s.h5}>{t("settings.account.accountRemoval")}</h3>
+      <h3 data-setting="deleteAccount" className={s.h5}>{t("settings.account.accountRemoval")}</h3>
       <div className={s.dangerBox}>
         <span className={s.hint} style={{ margin: 0 }}>{t("settings.account.deletingYourAccountIsPermanentYour")}</span>
         <Button variant="danger" onClick={() => open("delete")}>{t("settings.account.deleteAccount")}</Button>

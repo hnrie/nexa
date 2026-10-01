@@ -1,4 +1,4 @@
-import { MSG_FLAG_SUPPRESS_NOTIFICATIONS, type Message, type Relationship } from "@/api/types";
+import { MSG_FLAG_SUPPRESS_NOTIFICATIONS, type Message, type NoteInviteRow, type Relationship } from "@/api/types";
 import { avatarUrl } from "@/api/users";
 import { dispatchHooks, type NexaAlert } from "@/gateway/dispatch";
 import { noticeTitle } from "@/lib/moderation";
@@ -20,6 +20,7 @@ import { mentionsMe } from "./mentionsMe";
 import { hookText } from "./webhookMessage";
 import { pollWords } from "./poll";
 import { mediaSrc } from "./mediaLinks";
+import { roundAvatar } from "./roundIcon";
 import { currentBlockRules, isQuiet, loadedAuthorOf } from "./blocked";
 import { bugAlertHooks, bugNumber, bugStatusLabel, type BugAlert } from "./bugs";
 
@@ -186,8 +187,11 @@ function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): voi
   const author = hook?.name ?? displayName(users[m.author_id]);
   const title = ch && ch.type === "group_dm" ? `${author} (${channelDisplayName(ch, users, me.id)})` : ch && ch.server_id ? `${author} (${channelLabel(ch)})` : author;
   const body = preview === "full" ? previewOf(m, decrypted) : t("notify.newMessage");
-  const icon = hook ? ((hook.avatar_proxy_url && mediaSrc(hook.avatar_proxy_url)) || avatarUrl(hook.avatar_id ?? null, 96)) : avatarUrl(users[m.author_id]?.avatar_id ?? null, 96);
-  void showNotification(title, { body, tag: `ec-${m.channel_id}`, icon: icon ?? "/icons/icon-192.png", silent: true }, path);
+  const picture = hook ? ((hook.avatar_proxy_url && mediaSrc(hook.avatar_proxy_url)) || avatarUrl(hook.avatar_id ?? null, 96)) : avatarUrl(users[m.author_id]?.avatar_id ?? null, 96);
+  // round, as the app draws it, whatever the system does with a square one
+  void roundAvatar({ id: hook ? (m.webhook_id ?? m.author_id) : m.author_id, name: author, url: picture }, "/icons/icon-192.png").then((icon) =>
+    showNotification(title, { body, tag: `ec-${m.channel_id}`, icon, silent: true }, path),
+  );
 }
 
 /** A new friend request plays its own sound, and notifies while the app is not being looked at. */
@@ -203,7 +207,10 @@ function onFriendRequest(r: Relationship): void {
     void showNotification("Nexa", { body: t("notify.friendRequest"), tag: `ec-friend-${r.user.id}`, icon: "/icons/icon-192.png", silent: true }, "/channels/@me");
     return;
   }
-  void showNotification(t("notify.friendRequest"), { body: t("notify.sentYouAFriendRequest", { name: displayName(r.user) }), tag: `ec-friend-${r.user.id}`, icon: avatarUrl(r.user.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, "/channels/@me");
+  const name = displayName(r.user);
+  void roundAvatar({ id: r.user.id, name, url: avatarUrl(r.user.avatar_id ?? null, 96) }, "/icons/icon-192.png").then((icon) =>
+    showNotification(t("notify.friendRequest"), { body: t("notify.sentYouAFriendRequest", { name }), tag: `ec-friend-${r.user.id}`, icon, silent: true }, "/channels/@me"),
+  );
 }
 
 /**
@@ -255,12 +262,31 @@ function onBugAlert(a: BugAlert): void {
   void showNotification(title, { body, tag: `ec-bug-${a.report.id}`, icon: "/icons/icon-192.png", silent: true }, path);
 }
 
+/** Someone asking to share a note sounds like a friend request, and notifies while the app is not being looked at. */
+function onNoteInvite(inv: NoteInviteRow): void {
+  const me = useAuth.getState().me;
+  if (!me || doNotDisturb()) return;
+  const settings = useSettings.getState().settings;
+  if (settings.notifications.sounds) playSound("friend");
+  if (appOnScreen() || !notificationsEnabled(settings)) return;
+  const path = "/channels/@me/notes";
+  if (settings.notifications.preview === "none") {
+    void showNotification("Nexa", { body: t("notify.noteInvite"), tag: `ec-note-${inv.id}`, icon: "/icons/icon-192.png", silent: true }, path);
+    return;
+  }
+  const name = displayName(inv.from);
+  void roundAvatar({ id: inv.from.id, name, url: avatarUrl(inv.from.avatar_id ?? null, 96) }, "/icons/icon-192.png").then((icon) =>
+    showNotification(t("notify.noteInvite"), { body: t("notify.sharedANote", { name }), tag: `ec-note-${inv.id}`, icon, silent: true }, path),
+  );
+}
+
 let installed = false;
 export function installNotifications(): void {
   if (installed) return;
   installed = true;
   dispatchHooks.onMessage.push(onMessage);
   dispatchHooks.onFriendRequest.push(onFriendRequest);
+  dispatchHooks.onNoteInvite.push(onNoteInvite);
   dispatchHooks.onNexa.push(onNexa);
   bugAlertHooks.push(onBugAlert);
   // a phone can only play sounds once a tap has let the page make noise

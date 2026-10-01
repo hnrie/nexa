@@ -52,7 +52,8 @@ import { COLOR_NAMES, colorToken, FALLBACK_SURFACE, subscribeTheme, surfaceOf, s
 import { alertTitle } from "@/markdown/parse";
 import { MessageCounter } from "../MessageCounter";
 import type { Flag, Wrap } from "./model";
-import { FormatSurface, type Command, type SurfaceState } from "./surface";
+import type { ReadOptions } from "./markdown";
+import { FormatSurface, type Command, type FileHost, type SurfaceState } from "./surface";
 import s from "./FormatEditor.module.css";
 
 import { t } from "@/i18n";
@@ -136,35 +137,73 @@ function useNarrow(): boolean {
   return narrow;
 }
 
+/** What a page gets from useFormatBench to lay out as it likes: the tools, the tray under them, and where the writing goes. */
+export interface Bench {
+  surfaceRef: React.RefObject<HTMLDivElement>;
+  /** The surface itself, once it is made. */
+  ctl: React.MutableRefObject<FormatSurface | null>;
+  state: SurfaceState | null;
+  /** The markdown as of the last change. */
+  markdown: string;
+  /** Whether what was loaded had to be shown simpler than it was written. */
+  simplified: boolean;
+  toolbar: ReactNode;
+  tray: ReactNode | null;
+  run: (cmd: Command) => void;
+  /** The markdown right now, not a frame behind. */
+  current: () => string;
+}
+
+interface BenchOptions {
+  /** What the surface holds when it is made. */
+  initial: string;
+  placeholder: string;
+  /** Ctrl/Cmd+Enter. */
+  onSubmit: () => void;
+  /** Escape, with no tray open to close first. */
+  onEscape: () => void;
+  /** Every change, once a frame at most. */
+  onMarkdown?: (markdown: string) => void;
+  /** A note's editor: files as blocks, and a note's length. */
+  read?: ReadOptions;
+  onFiles?: (shown: FileHost[]) => void;
+  onPasteFiles?: (files: File[]) => void;
+  /** The surface was drawn again. */
+  onDraw?: () => void;
+  /** Tools the page adds after the toolbar's own. */
+  tools?: ReactNode;
+  /** Tools the page puts first, where they are always in sight (a note's Add Picture). */
+  lead?: ReactNode;
+  /** Put the caret in the surface as soon as it is made. */
+  focus?: boolean;
+}
+
 /**
- * The formatting editor: a toolbar over a writing surface drawn like a
- * message, for formatting without knowing markdown. It opens with what the
- * message box holds and hands back markdown, to put in the box or to send.
- * On a phone it is a sheet as tall as the space above the keyboard, with the
- * toolbar at its foot, where the thumb is.
+ * The formatting tools and the surface they work on, for a page to place:
+ * the chat's formatting editor puts them in a sheet, a note in its page.
  */
-export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, canSend = true, title, max }: Props) {
+export function useFormatBench(o: BenchOptions): Bench {
   const ctx = useRenderCtx();
-  const narrow = useNarrow();
   const surfaceRef = useRef<HTMLDivElement>(null);
   const ctl = useRef<FormatSurface | null>(null);
   const [state, setState] = useState<SurfaceState | null>(null);
-  const [markdown, setMarkdown] = useState(initial);
+  const [markdown, setMarkdown] = useState(o.initial);
   const [tray, setTray] = useState<Tray | null>(null);
   const [simplified, setSimplified] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const titleId = useId();
   const frame = useRef(0);
 
   // the controller's callbacks read these, so they never go stale
-  const latest = useRef({ send: () => {}, close: () => {}, link: () => {}, tray: null as Tray | null });
+  const latest = useRef(o);
+  latest.current = o;
+  const trayNow = useRef(tray);
+  trayNow.current = tray;
 
   useLayoutEffect(() => {
     const el = surfaceRef.current;
     if (!el) return;
     const c = new FormatSurface(el, {
       labels: {
-        placeholder,
+        placeholder: o.placeholder,
         summary: t("composer.format.summaryPlaceholder"),
         code: t("composer.format.codeLabel"),
         alert: alertTitle,
@@ -174,46 +213,36 @@ export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, 
         if (frame.current) return;
         frame.current = requestAnimationFrame(() => {
           frame.current = 0;
-          setMarkdown(c.markdown());
+          const md = c.markdown();
+          setMarkdown(md);
+          latest.current.onMarkdown?.(md);
         });
       },
       onState: setState,
-      onSubmit: () => latest.current.send(),
-      onLinkKey: () => latest.current.link(),
-      onEscape: () => (latest.current.tray ? setTray(null) : latest.current.close()),
+      onSubmit: () => latest.current.onSubmit(),
+      onLinkKey: () => setTray("link"),
+      onEscape: () => (trayNow.current ? setTray(null) : latest.current.onEscape()),
+      ...(o.read ? { read: o.read } : {}),
+      onFiles: (shown) => latest.current.onFiles?.(shown),
+      onPasteFiles: (files) => latest.current.onPasteFiles?.(files),
+      onDraw: () => latest.current.onDraw?.(),
     });
     ctl.current = c;
-    setSimplified(c.load(initial));
+    setSimplified(c.load(o.initial));
     setMarkdown(c.markdown());
-    c.focus();
+    if (o.focus !== false) c.focus();
     return () => {
       if (frame.current) cancelAnimationFrame(frame.current);
       c.destroy();
       ctl.current = null;
     };
-    // the editor is made once, with what the box held when it opened
+    // the surface is made once, with what it was given when it opened
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const run = useCallback((cmd: Command) => ctl.current?.command(cmd), []);
   const current = () => ctl.current?.markdown() ?? markdown;
-  const dirty = () => current().trim() !== initial.trim();
-
-  const insert = () => onInsert(current());
-  const send = () => {
-    // with nothing to send to, Ctrl+Enter puts the words in the box
-    if (!onSend) return insert();
-    if (!canSend) return;
-    const md = current();
-    if (!md.trim()) return;
-    if (onSend(md)) return;
-  };
-  const requestClose = () => {
-    if (dirty()) setConfirming(true);
-    else onClose();
-  };
   const toggleTray = (next: Tray) => setTray((cur) => (cur === next ? null : next));
-  latest.current = { send, close: requestClose, link: () => setTray("link"), tray };
 
   // Nexa's own spell checker marks the surface, and its right-click menu
   // offers spellings, this editor's own undo and the marks of the toolbar
@@ -253,6 +282,12 @@ export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, 
 
   const toolbar = (
     <Toolbar label={t("composer.format.toolbar")}>
+      {o.lead ? (
+        <>
+          {o.lead}
+          <Divider />
+        </>
+      ) : null}
       <ToolButton icon={Undo2} mirror label={t("composer.format.undo")} keys={`${mod}Z`} disabled={!state?.canUndo} onPress={() => run({ t: "undo" })} />
       <ToolButton icon={Redo2} mirror label={t("composer.format.redo")} keys={`${mod}Y`} disabled={!state?.canRedo} onPress={() => run({ t: "redo" })} />
       <Divider />
@@ -278,6 +313,12 @@ export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, 
       <ToolButton icon={Ellipsis} label={t("composer.format.more")} expanded={tray === "more"} onPress={() => toggleTray("more")} />
       <Divider />
       <ToolButton icon={RemoveFormatting} label={t("composer.format.clear")} keys={`${mod}\\`} onPress={() => run({ t: "clear" })} />
+      {o.tools ? (
+        <>
+          <Divider />
+          {o.tools}
+        </>
+      ) : null}
     </Toolbar>
   );
 
@@ -338,7 +379,7 @@ export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, 
   })();
 
   // Escape in a tray closes the tray, not the editor
-  const trayOf = (body: ReactNode) => (
+  const trayNode = trayBody ? (
     <div
       className={s.tray}
       data-testid="format-tray"
@@ -349,9 +390,46 @@ export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, 
         ctl.current?.focus();
       }}
     >
-      {body}
+      {trayBody}
     </div>
-  );
+  ) : null;
+
+  return { surfaceRef, ctl, state, markdown, simplified, toolbar, tray: trayNode, run, current };
+}
+
+/**
+ * The formatting editor: a toolbar over a writing surface drawn like a
+ * message, for formatting without knowing markdown. It opens with what the
+ * message box holds and hands back markdown, to put in the box or to send.
+ * On a phone it is a sheet as tall as the space above the keyboard, with the
+ * toolbar at its foot, where the thumb is.
+ */
+export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, canSend = true, title, max }: Props) {
+  const narrow = useNarrow();
+  const [confirming, setConfirming] = useState(false);
+  const titleId = useId();
+  // the bench's callbacks read these, so they never go stale
+  const latest = useRef({ send: () => {}, close: () => {} });
+  const bench = useFormatBench({ initial, placeholder, onSubmit: () => latest.current.send(), onEscape: () => latest.current.close() });
+  const { surfaceRef, markdown, simplified, toolbar, current } = bench;
+  const trayBody = bench.tray;
+  const trayOf = (body: ReactNode) => body;
+  const dirty = () => current().trim() !== initial.trim();
+
+  const insert = () => onInsert(current());
+  const send = () => {
+    // with nothing to send to, Ctrl+Enter puts the words in the box
+    if (!onSend) return insert();
+    if (!canSend) return;
+    const md = current();
+    if (!md.trim()) return;
+    if (onSend(md)) return;
+  };
+  const requestClose = () => {
+    if (dirty()) setConfirming(true);
+    else onClose();
+  };
+  latest.current = { send, close: requestClose };
 
   const counter = <MessageCounter text={markdown} className={s.counter} max={max} />;
   const sendButton = !onSend ? null : (
@@ -367,7 +445,7 @@ export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, 
   );
 
   return (
-    <Modal open onClose={requestClose} bare ariaLabel={title ?? t("composer.format.title")} width={780} className={s.sheet} closeOnOverlay>
+    <Modal open onClose={requestClose} bare ariaLabel={title ?? t("composer.format.title")} width={780} className={s.sheet} closeOnOverlay swipe={false}>
       <div className={s.frame} data-narrow={narrow || undefined} data-testid="format-editor">
         <header className={s.head}>
           <button type="button" className={s.close} onClick={requestClose} aria-label={t("composer.format.close")} data-testid="format-close">
@@ -458,7 +536,7 @@ function Toolbar({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Divider() {
+export function Divider() {
   return <span className={s.divider} aria-hidden="true" />;
 }
 
@@ -482,7 +560,7 @@ interface ToolProps {
  * mouse or a finger, so the selection it acts on is still there, and a
  * phone's keyboard stays up.
  */
-function ToolButton({ icon: Icon, text, label, keys, pressed, expanded, disabled, wide, swatch, mirror, onPress }: ToolProps) {
+export function ToolButton({ icon: Icon, text, label, keys, pressed, expanded, disabled, wide, swatch, mirror, onPress }: ToolProps) {
   const button = (
     <button
       type="button"

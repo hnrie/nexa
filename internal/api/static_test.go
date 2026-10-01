@@ -193,3 +193,26 @@ func TestGuestCallLinkPreview(t *testing.T) {
 		t.Errorf("guest link page: %d %q", res.StatusCode, body)
 	}
 }
+
+// A note's share link unfurls as what it is, and the app's page loads behind
+// it; nothing about the note, which the server cannot read anyway.
+func TestNoteLinkPreview(t *testing.T) {
+	srv, _ := newTestServer(t)
+	dist := t.TempDir()
+	os.WriteFile(filepath.Join(dist, "index.html"), []byte("<!doctype html><html><head><title>Nexa</title></head><body><div id=\"root\"></div></body></html>"), 0o644)
+	srv.Cfg.WebDist = dist
+	ts := newHTTPTestServer(t, srv)
+	res, err := http.Get(ts.URL + "/note/dG9rZW4tb2YtYS1zaGFyZWQtbm90ZQ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	b, _ := io.ReadAll(res.Body)
+	body := string(b)
+	if res.StatusCode != 200 || !strings.Contains(body, `<meta property="og:title" content="A Shared Note">`) || !strings.Contains(body, `<div id="root">`) || !strings.Contains(res.Header.Get("Content-Security-Policy"), "frame-ancestors 'none'") {
+		t.Errorf("note link page: %d %q", res.StatusCode, body)
+	}
+	if strings.Contains(body, "\u2014") || strings.Contains(body, "—") {
+		t.Errorf("note link preview has an em dash: %q", body)
+	}
+}

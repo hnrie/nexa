@@ -63,6 +63,10 @@ const (
 	// while. An account showing as online shows as idle while every one of its
 	// connections says so; nothing about it is stored.
 	OpAway = "away"
+	// OpNoteCursor is where someone's caret and selection are in a note they
+	// have open, sealed with the note's key, for the others in it to draw.
+	// Passed on and forgotten: nothing about it is stored.
+	OpNoteCursor = "note_cursor"
 )
 
 // Server events.
@@ -139,6 +143,20 @@ const (
 	// dismissal on another of their devices. Only that person is sent either.
 	EvGroupAddNotice       = "group_add_notice"
 	EvGroupAddNoticeDelete = "group_add_notice_delete"
+	// Notes. A note's members are told when it is saved, re-shared or sealed
+	// under a new key (its new head rides along, for their lists) and when it
+	// is gone for them; someone invited to one is told of the invitation and
+	// of its withdrawal.
+	EvNoteUpdate       = "note_update"
+	EvNoteDelete       = "note_delete"
+	EvNoteInvite       = "note_invite"
+	EvNoteInviteDelete = "note_invite_delete"
+	// EvNotePresence says someone has a note open, or has closed it, to the
+	// others it is shared with.
+	EvNotePresence = "note_presence"
+	// EvNoteCursor passes on where someone's caret and selection are in a
+	// note (OpNoteCursor), sealed as they sent it.
+	EvNoteCursor = "note_cursor"
 )
 
 // Presence is a user's visible status.

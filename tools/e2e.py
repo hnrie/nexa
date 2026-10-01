@@ -564,8 +564,8 @@ def polish_flow(srv, alice, bob, server_id):
     b.click("button[aria-label='User Settings']")
     assert b.locator("[data-nav=admin]").count() == 0, "non-admins have no admin page"
     b.keyboard.press("Escape")
-    # data export downloads a zip
-    a.click("[data-nav=privacy], button:has-text('Privacy & Safety')")
+    # data export downloads a zip (Settings, Your Data)
+    a.click("[data-nav=data]")
     a.wait_for_selector("[data-testid=export-data]", timeout=15000)
     with a.expect_download(timeout=60000) as dl:
         a.click("[data-testid=export-data]")

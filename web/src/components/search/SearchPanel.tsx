@@ -244,6 +244,7 @@ export function SearchPanel({
             setOwnCaret(v.length);
           }}
           placeholder={scope.kind === "all" ? t("search.box.placeholderEverywhere") : t("search.box.placeholder", { name: isolate(scopeName(scope, byId, names)) })}
+          shorterPlaceholders={[t("chat.chat.search")]}
           aria-label={t("search.box.label")}
           autoFocus
           data-testid="search-input-mobile"

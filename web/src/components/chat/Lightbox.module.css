@@ -1,6 +1,7 @@
 /* The picture viewer is a dark room in every theme, so its chrome is white on
    black glass rather than theme colours that would vanish on a light theme. */
-.lightbox { position: fixed; inset: 0; z-index: var(--z-lightbox); background: rgba(8, 5, 14, 0.86); -webkit-backdrop-filter: blur(16px) saturate(1.1); backdrop-filter: blur(16px) saturate(1.1); display: flex; flex-direction: column; outline: none; animation: fadeIn 180ms var(--ease-out); }
+/* --lb-dim lifts the dark as a picture is pulled away with a finger */
+.lightbox { --lb-dim: 1; position: fixed; inset: 0; z-index: var(--z-lightbox); background: rgba(8, 5, 14, calc(0.86 * var(--lb-dim))); -webkit-backdrop-filter: blur(16px) saturate(1.1); backdrop-filter: blur(16px) saturate(1.1); display: flex; flex-direction: column; outline: none; animation: fadeIn 180ms var(--ease-out); }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .lightbox { animation: none; } }
 [data-reduced-motion="true"] .lightbox { animation: none; }

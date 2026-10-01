@@ -107,7 +107,7 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
 
   return (
     <>
-      <h2 className={st.title}>{tr_("settings.stickers.expressionPacks")}</h2>
+      <h2 data-setting="packs" className={st.title}>{tr_("settings.stickers.expressionPacks")}</h2>
       <p className={st.hint}>{tr_("settings.stickers.buildYourOwnEmojiAndSticker")}</p>
       {/* A tab strip, said as one: which of the three is open was only a colour. */}
       <div className={s.tabs} style={{ marginTop: 16 }} role="tablist" aria-label={tr_("settings.stickers.expressionPacks")}>

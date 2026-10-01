@@ -141,6 +141,8 @@ export function ImageCropModal({ file, aspect, round = false, title = t("common.
       onClose={onClose}
       title={title}
       width={400}
+      // a drag in it moves the picture under the frame
+      swipe={false}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button>

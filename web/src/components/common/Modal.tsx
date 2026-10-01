@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } f
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
+import { attachSheetDrag, fadeOverlay, sheetsHere } from "@/lib/sheetDrag";
 import s from "./Modal.module.css";
 
 import { t } from "@/i18n";
@@ -43,6 +44,12 @@ interface Props {
    * task, such as an update being ready.
    */
   centered?: boolean;
+  /**
+   * Whether a phone's sheet follows the finger: pulled up to the full height
+   * when it has more to show, swiped down to close (lib/sheetDrag.ts). Off
+   * for a sheet that is all writing surface, where a drag is meant for the text.
+   */
+  swipe?: boolean;
 }
 
 /** Single-line boxes, where Enter has nothing else to do. */
@@ -63,7 +70,9 @@ function shown<T extends Element>(all: T[]): T[] {
   return laidOut.length > 0 ? laidOut : all;
 }
 
-export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false, ariaLabel, closeButton = true, onSubmit, centered = false }: Props) {
+export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false, ariaLabel, closeButton = true, onSubmit, centered = false, swipe: swipeAsked }: Props) {
+  // a dialog that has to be answered is not swiped away either
+  const swipe = swipeAsked ?? closeButton;
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const portalRoot = usePortalRoot();
@@ -158,6 +167,21 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
     // the opener is read once, as the dialog is first drawn
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+  // On a phone the dialog is a sheet that follows the finger.
+  useEffect(() => {
+    const card = ref.current;
+    if (!open || centered || !swipe || !card || !sheetsHere()) return;
+    return attachSheetDrag({
+      sheet: card,
+      onClose: () => closeRef.current(),
+      fade: fadeOverlay(card.parentElement),
+      // only a sheet with more in it than it shows has anywhere to grow to
+      expandable: () => {
+        const body = card.querySelector<HTMLElement>(`:scope > .${s.body}, :scope > .${s.bareBody}`);
+        return !!body && body.scrollHeight > body.clientHeight + 1;
+      },
+    });
+  }, [open, centered, swipe, host]);
   if (!open || !host) return null;
   const onKeyDown = onSubmit
     ? (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -181,8 +205,11 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
         {...(!bare && title !== undefined ? { "aria-labelledby": titleId } : { "aria-label": ariaLabel ?? (typeof title === "string" ? title : undefined) })}
         tabIndex={-1}
         data-modal-layer=""
+        data-swipe={swipe && !centered ? "" : undefined}
         onKeyDown={onKeyDown}
       >
+        {/* the handle of a sheet with no title bar to show one (a profile, a picture of its own) */}
+        {bare && swipe && !centered ? <span className={s.grip} aria-hidden="true" /> : null}
         {!bare && title !== undefined ? (
           <div className={s.header}>
             <h2 className={s.title} id={titleId}>{title}</h2>

@@ -578,24 +578,30 @@ func (s *Server) handleAttachmentDownload(w http.ResponseWriter, r *http.Request
 		http.NotFound(w, r)
 		return
 	}
+	// A file is its uploader's until something holds it: then it is for
+	// whoever can read the conversation it was sent in, or is in the note
+	// that holds it.
+	allowed := false
 	att, err := s.Store.AttachmentByBlob(r.Context(), id)
-	if err != nil {
-		// not attached yet: only the uploader may fetch it
-		if b.OwnerID == nil || *b.OwnerID != me.ID {
-			http.NotFound(w, r)
-			return
+	if err == nil {
+		if ch, err := s.Store.ChannelByID(r.Context(), att.ChannelID); err == nil {
+			if ok, err := s.canAccess(r, me, ch, NeedHistory); err == nil && ok {
+				allowed = true
+			}
 		}
-	} else {
-		ch, err := s.Store.ChannelByID(r.Context(), att.ChannelID)
-		if err != nil {
-			http.NotFound(w, r)
-			return
+	}
+	if !allowed {
+		if ok, nerr := s.Store.NoteFileReadable(r.Context(), id, me.ID); nerr == nil && ok {
+			allowed = true
 		}
-		ok, err := s.canAccess(r, me, ch, NeedHistory)
-		if err != nil || !ok {
-			http.NotFound(w, r)
-			return
-		}
+	}
+	// held by nothing yet: only the uploader may fetch it
+	if !allowed && errors.Is(err, store.ErrNotFound) && b.OwnerID != nil && *b.OwnerID == me.ID {
+		allowed = true
+	}
+	if !allowed {
+		http.NotFound(w, r)
+		return
 	}
 	s.Media.ServeEncrypted(w, r, b)
 }

@@ -1,12 +1,15 @@
 /*
- * Onest sets everything people read and click: open, friendly letters that
- * stay clear at the small sizes a chat is made of, with Cyrillic of its own.
- * Mona Sans, stretched wide and heavy, is kept for names and titles, the way
- * the wordmark's letters are wide and heavy. Noto Sans stays behind both for
- * the scripts they do not cover, and is only fetched when one turns up.
+ * Wix Madefor, cut twice for screens. The Text cut sets everything people read
+ * and click: open, rounded letters with room between them, clear at the small
+ * sizes a chat is made of, with a true italic and Cyrillic of its own. The
+ * Display cut, tighter and finer for large sizes, sets names and titles, so a
+ * heading is the same voice as the words under it rather than a heavier,
+ * wider one. Noto Sans stays behind both for the scripts they do not cover,
+ * and is only fetched when one turns up.
  */
-@import "@fontsource-variable/onest/index.css";
-@import "@fontsource-variable/mona-sans/wdth.css";
+@import "@fontsource-variable/wix-madefor-text/wght.css";
+@import "@fontsource-variable/wix-madefor-text/wght-italic.css";
+@import "@fontsource-variable/wix-madefor-display/wght.css";
 @import "@fontsource/noto-sans/400.css";
 @import "@fontsource/noto-sans/500.css";
 @import "@fontsource/noto-sans/600.css";

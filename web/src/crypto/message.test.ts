@@ -219,6 +219,106 @@ describe("encryptMessage / decryptMessage", () => {
   });
 });
 
+describe("a social post in a link's card", () => {
+  const open = async (post: unknown) => {
+    const env = await forgeEnvelope(utf8.enc(JSON.stringify({ t: "x", embeds: [{ url: "https://x.com/a/status/1", type: "link", post }] })));
+    return ((await decryptMessage(key, env, aad)).embeds?.[0] as { post?: Record<string, unknown> }).post;
+  };
+
+  it("keeps everything a post's card draws", async () => {
+    const post = {
+      platform: "twitter",
+      site: "X",
+      url: "https://x.com/a/status/1",
+      name: "A",
+      handle: "a",
+      author_url: "https://x.com/a",
+      avatar: "/media/proxy/1-s/YXZhdGFy",
+      verified: true,
+      community: "r/pics",
+      community_url: "https://www.reddit.com/r/pics/",
+      title: "T",
+      text: "words",
+      links: [{ text: "words", url: "https://e.x/w" }],
+      reply_to: "b",
+      created: 1_790_000_000_000,
+      media: [
+        { kind: "photo", url: "/media/proxy/1-s/cA", w: 100, h: 50, alt: "a picture" },
+        { kind: "video", url: "/media/proxy/1-s/dg", thumb: "/media/proxy/1-s/dA", audio: "/media/proxy/1-s/YQ", w: 720, h: 1280, duration: 63.5 },
+        { kind: "video", thumb: "/media/proxy/1-s/cG9zdGVy" },
+      ],
+      poll: { choices: [{ label: "Yes", percent: 75, votes: 30 }, { label: "No", percent: 25 }], votes: 40, ends: 1_790_000_000_000 },
+      quote: { platform: "twitter", name: "Q", text: "quoted", media: [{ kind: "gif", url: "/media/proxy/1-s/Zw" }] },
+      replies: 1,
+      reposts: 2,
+      likes: 3,
+      views: 4,
+      sensitive: true,
+      note: "context",
+    };
+    expect(await open(post)).toEqual(post);
+  });
+
+  it("lets nothing through that is not a web address, a known word, or of a sane size", async () => {
+    const got = await open({
+      platform: "twitter",
+      name: "A",
+      url: "javascript:alert(1)",
+      author_url: "data:text/html,hi",
+      avatar: "//elsewhere.test/a.png",
+      community_url: "https://ok.test/\\evil",
+      text: "é".repeat(5000),
+      verified: "yes",
+      sensitive: 1,
+      created: "soon",
+      likes: -5,
+      views: Infinity,
+      onload: "alert(1)",
+      html: "<script>",
+      links: [{ text: "a", url: "javascript:x" }, { text: "", url: "https://e.x" }, { text: "ok", url: "https://e.x/ok" }, "nonsense", { text: "x".repeat(600), url: "https://e.x" }],
+      media: [
+        { kind: "flash", url: "/media/proxy/1-s/a" },
+        { kind: "photo", url: "file:///etc/passwd" },
+        { kind: "photo" },
+        { kind: "video" },
+        { kind: "photo", url: "/media/proxy/1-s/b", w: -1, h: "tall", duration: 1e9, alt: 7, extra: "x" },
+        null,
+      ],
+      poll: { choices: [{ label: "only one", percent: 100 }] },
+      quote: { platform: "twitter", name: "Q", text: "quoted", quote: { platform: "twitter", name: "deeper", text: "x" } },
+    });
+    expect(got).toEqual({
+      platform: "twitter",
+      name: "A",
+      text: "é".repeat(4000),
+      links: [{ text: "ok", url: "https://e.x/ok" }],
+      media: [{ kind: "photo", url: "/media/proxy/1-s/b" }],
+      quote: { platform: "twitter", name: "Q", text: "quoted" },
+    });
+  });
+
+  it("holds a post to ten pictures, twenty links and ten answers", async () => {
+    const got = await open({
+      platform: "bluesky",
+      name: "A",
+      media: Array.from({ length: 30 }, (_, i) => ({ kind: "photo", url: `/media/proxy/1-s/${i}` })),
+      links: Array.from({ length: 50 }, (_, i) => ({ text: `l${i}`, url: "https://e.x/" })),
+      poll: { choices: Array.from({ length: 25 }, (_, i) => ({ label: `c${i}`, percent: 500 })) },
+    });
+    expect((got?.["media"] as unknown[]).length).toBe(10);
+    expect((got?.["links"] as unknown[]).length).toBe(20);
+    const choices = (got?.["poll"] as { choices: { percent: number }[] }).choices;
+    expect(choices.length).toBe(10);
+    expect(choices[0]?.percent).toBe(100);
+  });
+
+  it("drops what is not a post at all, and leaves the card its other fields", async () => {
+    for (const bad of [null, "post", [], {}, { platform: "Twitter" }, { platform: "x y" }, { name: "no platform" }]) {
+      expect(await open(bad)).toBeUndefined();
+    }
+  });
+});
+
 describe("isEnvelope", () => {
   const good: Envelope = { v: 1, conv: "c", epoch: 0, iv: "AAAA", ct: "BBBB" };
 

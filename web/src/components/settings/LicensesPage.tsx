@@ -72,7 +72,7 @@ export default function LicensesPage() {
 
   return (
     <>
-      <h2 className={s.title}>{t("settings.licenses.licenses")}</h2>
+      <h2 data-setting="licenses" className={s.title}>{t("settings.licenses.licenses")}</h2>
       <p className={s.hint}>{t("settings.licenses.nexaIsBuiltOnOpenSource")}</p>
       {data.self ? (
         <>

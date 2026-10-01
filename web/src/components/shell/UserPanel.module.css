@@ -18,7 +18,7 @@
 [dir="rtl"] .pop { transform-origin: bottom right; }
 @keyframes popUp { from { opacity: 0; transform: translateY(6px) scale(0.97); } }
 .popHead { display: flex; align-items: center; gap: 12px; padding: 8px; }
-.popName { font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 17px; font-weight: 750; color: var(--text-strong); }
+.popName { font-family: var(--font-display); font-size: 17px; font-weight: 660; color: var(--text-strong); }
 .popUser { font-size: 13px; color: var(--text-muted); }
 .sep { height: 1px; background: var(--border-subtle); margin: 6px 4px; }
 .opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); color: var(--text-subtle); font-size: 14px; font-weight: 550; text-align: start; transition: background-color 90ms ease, color 90ms ease; }

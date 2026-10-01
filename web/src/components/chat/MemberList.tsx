@@ -7,6 +7,9 @@ import { AdminHammer, OwnerCrown } from "@/components/common/OwnerBadge";
 import { isOwner } from "@/lib/owner";
 import { memberName } from "@/lib/names";
 import { memberMenuItems } from "@/components/server/memberMenu";
+import { memberBulk } from "@/components/server/memberBulk";
+import { PickBar, PickMark } from "@/components/common/Pick";
+import { pickClick, usePick } from "@/stores/pick";
 import { useAuth } from "@/stores/auth";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
 import { StatusLine } from "@/components/activity/StatusLine";
@@ -31,6 +34,8 @@ const HEAD_H = 40;
 const VIRTUAL_FROM = 200;
 
 /** Members grouped by hoisted roles, then online, then offline; windowed past 200 rows. */
+const NO_PICKS: string[] = [];
+
 export function MemberList({ serverId, channelId, drawer, open }: { serverId: string; channelId: string; drawer?: boolean; open?: boolean }) {
   const st = useServers((x) => x.byId[serverId]);
   const upsertMembers = useServers((x) => x.upsertMembers);
@@ -154,6 +159,12 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
     return out;
   }, [st, sorted, users, presence, serverId]);
 
+  // picking several members at once (stores/pick.ts)
+  const pickList = `members:${serverId}` as const;
+  const picked = usePick((p) => (p.list === pickList ? p.ids : NO_PICKS));
+  const pickMode = usePick((p) => p.list === pickList && p.mode);
+  const isPicking = pickMode || picked.length > 0;
+  const pickOrder = useMemo(() => rows.flatMap((r) => (r.kind === "head" ? [] : [r.member.user_id])), [rows]);
   if (!st) return null;
   const virtual = rows.length > VIRTUAL_FROM;
   let start = 0;
@@ -173,8 +184,19 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
 
   const onContext = (e: MouseEvent, m: Member) => {
     e.preventDefault();
-    openContextMenu({ x: e.clientX, y: e.clientY, items: memberMenuItems(serverId, m.user_id, { openModal }) });
+    const pick = usePick.getState();
+    // a right click on one of several picked acts on all of them
+    if (pick.list === pickList && pick.ids.includes(m.user_id) && pick.ids.length > 1) {
+      openContextMenu({ x: e.clientX, y: e.clientY, label: t("pick.count", { count: pick.ids.length }), items: memberBulk(serverId, pick.ids).menu() });
+      return;
+    }
+    if (pick.list === pickList && !pick.mode && pick.ids.length) pick.clear();
+    const items = memberMenuItems(serverId, m.user_id, { openModal });
+    items[items.length - 1]!.separatorAfter = true;
+    items.push({ id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start(pickList, m.user_id) });
+    openContextMenu({ x: e.clientX, y: e.clientY, items });
   };
+  const bulk = isPicking ? memberBulk(serverId, picked) : null;
 
   return (
     <aside className={s.list} ref={ref} onScroll={(e) => virtual && setScrollTop(e.currentTarget.scrollTop)} data-testid="member-list" data-open={drawer ? !!open : undefined} aria-hidden={drawer && !open} {...(drawer && !open ? ({ inert: "" } as Record<string, string>) : {})}>
@@ -194,10 +216,17 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
             key={row.key}
             className={s.row}
             data-offline={row.offline}
-            onClick={() => openModal("profile", { userId: row.member.user_id })}
+            onClick={(e) => {
+              // Ctrl or ⌘ picks a member, Shift a run of them, a tap one while picking
+              if (pickClick(e, pickList, row.member.user_id, pickOrder)) return;
+              openModal("profile", { userId: row.member.user_id });
+            }}
             onContextMenu={(e) => onContext(e, row.member)}
             data-user={row.member.user_id}
+            data-picked={picked.includes(row.member.user_id) || undefined}
+            aria-pressed={isPicking ? picked.includes(row.member.user_id) : undefined}
           >
+            {isPicking ? <PickMark on={picked.includes(row.member.user_id)} label={t("pick.pickNamed", { name })} /> : null}
             <Avatar id={row.member.user_id} avatarId={row.member.avatar_id ?? row.user?.avatar_id ?? null} name={name} size={32} status={statusOf(p)} />
             <span className={s.text}>
               <span className={s.name} style={row.color ? { color: row.color } : undefined}>
@@ -217,6 +246,11 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
         );
       })}
       {padBottom ? <div style={{ height: padBottom }} /> : null}
+      {bulk ? (
+        <div className={s.pickBar}>
+          <PickBar list={pickList} count={picked.length} label={t("pick.membersBar")} actions={bulk.bar} more={bulk.menu} />
+        </div>
+      ) : null}
     </aside>
   );
 }

@@ -107,7 +107,7 @@ export default function CustomCssPage() {
 
   return (
     <>
-      <h2 className={s.title}>{t("look.css.title")}</h2>
+      <h2 data-setting="css" className={s.title}>{t("look.css.title")}</h2>
       <Caution testId="css-caution">
         <p>
           <strong>{t("look.css.cautionLead")}</strong> {t("look.css.cautionBody")}

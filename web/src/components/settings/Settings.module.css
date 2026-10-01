@@ -34,14 +34,14 @@
 .close { width: 38px; height: 38px; border-radius: 50%; color: var(--text-muted); display: flex; align-items: center; justify-content: center; background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border), var(--shadow-low); transition: color var(--transition), transform var(--dur) var(--ease-out), box-shadow var(--transition); }
 .close:hover { color: var(--text-strong); transform: rotate(90deg); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-strong), var(--shadow-medium); }
 .esc { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--text-muted); }
-.title { margin: 0 0 22px; font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 26px; font-weight: 820; letter-spacing: -0.02em; line-height: 1.15; color: var(--text-strong); }
+.title { margin: 0 0 22px; font-family: var(--font-display); font-size: 26px; font-weight: 700; letter-spacing: -0.012em; line-height: 1.15; color: var(--text-strong); }
 .h5 { display: flex; align-items: center; gap: 6px; margin: 28px 0 10px; font-size: 14.5px; font-weight: 700; letter-spacing: -0.005em; color: var(--text-strong); }
 .card { background: var(--sheen), var(--bg-surface); border-radius: var(--radius-lg); overflow: hidden; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium); }
 .cardBanner { position: relative; aspect-ratio: 5 / 2; background: var(--brand); background-size: cover; background-position: center; }
 .cardBanner::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.26)); }
 .cardHead { position: relative; display: flex; align-items: center; justify-content: space-between; padding-block: 0 16px; padding-inline: 124px 16px; min-height: 72px; }
 .cardAvatar { position: absolute; inset-inline-start: 16px; top: -42px; border: 6px solid var(--bg-surface); border-radius: 50%; background: var(--bg-surface); box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--shade) 70%, transparent); }
-.cardName { font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 22px; font-weight: 820; letter-spacing: -0.015em; color: var(--text-strong); padding-top: 16px; }
+.cardName { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.008em; color: var(--text-strong); padding-top: 16px; }
 .cardUser { font-size: 14px; color: var(--text-muted); }
 /* a long name wraps inside its column instead of pushing the buttons out of the card */
 .cardText { min-width: 0; overflow-wrap: anywhere; }
@@ -123,7 +123,7 @@
      bar sticks to the bottom of what is left, above the keys. */
   .layer { flex-direction: column; padding: env(safe-area-inset-top) env(safe-area-inset-right) var(--kb-inset, 0px) env(safe-area-inset-left); background: var(--bg-raised); }
   .topBar { display: flex; align-items: center; gap: 8px; flex: none; min-height: 52px; padding-inline: 4px; background: var(--sheen); box-shadow: 0 1px 0 var(--border-subtle); }
-  .topTitle { flex: 1; min-width: 0; margin: 0; padding-inline: 12px; font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 19px; font-weight: 800; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topTitle { flex: 1; min-width: 0; margin: 0; padding-inline: 12px; font-family: var(--font-display); font-size: 19px; font-weight: 690; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .back { display: flex; align-items: center; gap: 2px; min-width: 0; height: 44px; padding-inline: 4px 12px; margin-inline-end: auto; border-radius: var(--radius-xs); font-size: 16px; font-weight: 600; color: var(--text-strong); }
   .back:hover { background: var(--bg-hover); }
   .backLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -223,3 +223,19 @@
 .spellWordRemove:hover { color: var(--text); background: var(--bg-hover); }
 .spellWordRemove:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; }
 @media (pointer: coarse) { .spellWordRemove { width: 32px; height: 32px; } }
+
+/* Searching the settings: the box over the nav, what it found in place of the nav's groups */
+.navSearch { margin: 0 2px 10px; }
+.navEmpty { margin: 4px 10px; font-size: 13.5px; line-height: 1.4; color: var(--text-muted); }
+.foundLabel { display: block; }
+.foundPage { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); }
+/* a page's pointer to where something else now lives */
+.inlineLink { padding: 0; font: inherit; color: var(--link); }
+.inlineLink:hover { text-decoration: underline; }
+/* the setting a search went to, lit for a moment once it is in view */
+[data-setting][data-found] { border-radius: var(--radius-sm); animation: found 1.6s var(--ease-out); }
+@keyframes found {
+  0%, 30% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 55%, transparent), 0 0 24px -4px color-mix(in srgb, var(--brand) 70%, transparent); background: color-mix(in srgb, var(--brand) 12%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) { [data-setting][data-found] { animation-duration: 0.01s; outline: 2px solid var(--brand); } }

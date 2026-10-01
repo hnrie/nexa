@@ -399,6 +399,41 @@
   "chat.pins.thisChannelDoesnTHaveAny": "まだピン留めされたものはありません。",
   "chat.pins.unpin": "ピン留めを解除",
   "chat.pins.unpinThisMessage": "このメッセージのピン留めを解除",
+  "chat.post.forwardedFrom": "{name} から転送",
+  "chat.post.likes": {
+    "other": "いいね {n} 件"
+  },
+  "chat.post.note": "読者が背景情報を追加しました",
+  "chat.post.openOn": "{site} で開く",
+  "chat.post.pictureOf": "画像 {index}/{count}",
+  "chat.post.points": {
+    "other": "{n} ポイント"
+  },
+  "chat.post.pollClosed": "最終結果",
+  "chat.post.pollEnds": "{date} に終了",
+  "chat.post.reactions": {
+    "other": "リアクション {n} 件"
+  },
+  "chat.post.replies": {
+    "other": "返信 {n} 件"
+  },
+  "chat.post.replyingTo": "{name} への返信",
+  "chat.post.reposts": {
+    "other": "リポスト {n} 件"
+  },
+  "chat.post.sensitive": "この投稿にはセンシティブな内容が含まれている可能性があります。",
+  "chat.post.shares": {
+    "other": "共有 {n} 回"
+  },
+  "chat.post.show": "表示",
+  "chat.post.verified": "認証済み",
+  "chat.post.views": {
+    "other": "表示 {n} 回"
+  },
+  "chat.post.votes": {
+    "other": "{n} 票"
+  },
+  "chat.post.watchOn": "{site} で見る",
   "chat.reactions.addReaction": "リアクションを追加",
   "chat.reactions.andMore": {
     "other": "ほか {count} 人"
@@ -452,7 +487,6 @@
   "chat.systemMessage.pollWinner": "{answer} が {percent}% で最多でした。",
   "chat.systemMessage.removedFromGroup": "{actor} さんが {target} さんをグループから外しました。",
   "chat.systemMessage.someone": "誰か",
-  "chat.systemMessage.startedACall": "{actor} さんが通話を始めました。",
   "chat.systemMessage.tookOwnership": "{actor} さんがグループのオーナーになりました。",
   "chat.systemMessage.viewPoll": "投票を見る",
   "chat.typingBar.oneTyping": "{a} が入力中…",
@@ -1890,16 +1924,192 @@
     "other": "Nexa からの未読メッセージ {count} 件"
   },
   "nexa.viewProfile": "プロフィールを表示",
+  "notes.card.empty": "まだ何も書かれていません。",
+  "notes.card.locked": "このデバイスでは開けません。",
+  "notes.card.sharedWith": {
+    "other": "{count} 人で共有中"
+  },
+  "notes.editor.addPicture": "画像や動画を追加",
+  "notes.editor.attachFile": "ファイルを添付",
+  "notes.editor.body": "ノート",
+  "notes.editor.placeholder": "書き始めるか、画像やファイルをドロップ",
+  "notes.editor.title": "タイトル",
+  "notes.editor.titlePlaceholder": "タイトル",
+  "notes.editor.tooLong": "このノートは {max} 文字を超えているため保存されていません。文字を減らすと保存が再開されます。",
+  "notes.errors.alreadyMember": "その人はすでにこのノートに参加しています。",
+  "notes.errors.bad": "このノートの一部を保存できませんでした。もう一度お試しください。",
+  "notes.errors.blocked": "この人を招待することはできません。",
+  "notes.errors.file": "このノートのファイルを保持できませんでした。もう一度追加してください。",
+  "notes.errors.filesFull": "このノートのファイル数は上限に達しています。",
+  "notes.errors.full": "このノートは共有できる人数の上限に達しています。",
+  "notes.errors.gone": "このノートはもうありません。",
+  "notes.errors.noInvite": "このリクエストはもうありません。",
+  "notes.errors.noLink": "このリンクはもう使えません。",
+  "notes.errors.owner": "このノートの所有者は退出できません。代わりに削除してください。",
+  "notes.errors.role": "このノートではその操作はできません。",
+  "notes.errors.self": "このノートはすでにあなたのものです。",
+  "notes.errors.tooManyLinks": "このノートのリンクは上限に達しています。新しく作るには1つ削除してください。",
+  "notes.errors.tooManyNotes": "1つのアカウントで持てるノートの上限に達しています。新しく作るにはいくつか削除してください。",
+  "notes.errors.userNotFound": "そのユーザー名の人はいません。",
+  "notes.file.failed": "このファイルをアップロードできませんでした。",
+  "notes.file.full": "このノートにはこれ以上ファイルを追加できません。",
+  "notes.file.notHere": "このファイルはまだありません。",
+  "notes.file.remove": "{name} を削除",
+  "notes.file.removeShort": "削除",
+  "notes.file.retry": "{name} をもう一度アップロード",
+  "notes.file.retryShort": "再試行",
+  "notes.file.someLeftOut": {
+    "other": "このノートにはあと {count} 個のファイルしか追加できません。"
+  },
+  "notes.file.tooBig": "{name} はアップロード上限の {limit} を超えています。",
+  "notes.file.untitled": "ファイル",
+  "notes.file.uploading": "{name} をアップロード中",
+  "notes.first.body": "ノートには文章や画像、ファイルを、メッセージと同じように暗号化して残せます。共有すればリアルタイムで一緒に書けます。",
+  "notes.first.friend": "フレンド",
+  "notes.first.title": "最初のノートを書こう",
+  "notes.history.allVersions": "すべてのバージョン",
+  "notes.history.backToNote": "ノートに戻る",
+  "notes.history.couldNotLoad": "このノートの履歴を読み込めませんでした。",
+  "notes.history.couldNotOpen": "このバージョンを開けませんでした。",
+  "notes.history.couldNotRestore": "このバージョンを復元できませんでした。",
+  "notes.history.current": "現在のバージョン",
+  "notes.history.currentNote": "現在のノート",
+  "notes.history.loading": "バージョンを読み込み中",
+  "notes.history.none": "以前のバージョンはまだありません。間を置いて書き始めるたびに1つ保存されます。",
+  "notes.history.restore": "このバージョンを復元",
+  "notes.history.restored": "バージョンを復元しました。置き換えられた内容も履歴に残っています。",
+  "notes.history.savedBy": "{name} が保存、{when}",
+  "notes.history.title": "バージョン履歴",
+  "notes.history.unreadable": "このデバイスでは開けません",
+  "notes.link.alreadyIn": "このノートに参加済み",
+  "notes.link.couldNotJoin": "このノートに参加できませんでした。",
+  "notes.link.dialogLabel": "共有されたノート",
+  "notes.link.failedBody": "接続を確認して、もう一度お試しください。",
+  "notes.link.failedTitle": "ノートを読み込めませんでした",
+  "notes.link.goneBody": "リンクが削除されたか、ノートが削除されました。",
+  "notes.link.goneTitle": "このリンクはもう使えません",
+  "notes.link.join": "ノートに参加",
+  "notes.link.joinToEdit": "参加すると編集できます",
+  "notes.link.joinToView": "参加すると閲覧できます",
+  "notes.link.label": "共有されたノート: {title}",
+  "notes.link.noKeyBody": "リンクの # 以降(鍵が入っている部分)が欠けています。リンク全体をもう一度送ってもらってください。",
+  "notes.link.noKeyTitle": "このリンクは不完全です",
+  "notes.link.open": "ノートを開く",
+  "notes.link.opening": "ノートを開いています",
+  "notes.link.pageTitle": "共有されたノート",
+  "notes.link.people": {
+    "other": "{count} 人"
+  },
+  "notes.link.shared": "ノートが共有されました",
+  "notes.link.sharedBy": "{name} が共有",
+  "notes.link.signInToOpen": "ログインして読んでください。ノートは暗号化されているため、参加している人だけが読めます。",
+  "notes.link.tryAgain": "再試行",
+  "notes.list.couldNotCreate": "新しいノートを作成できませんでした。",
+  "notes.list.couldNotLoad": "ノートを読み込めませんでした。",
+  "notes.list.loading": "ノートを読み込み中",
+  "notes.list.new": "新しいノート",
+  "notes.list.noMatch": "「{query}」に一致するノートはありません。",
+  "notes.list.none": "まだノートはありません。",
+  "notes.list.pick": "ノートを選ぶか、新しく書き始めましょう。",
+  "notes.list.search": "ノートを検索",
+  "notes.menu.delete": "ノートを削除",
+  "notes.menu.deleteBody": "「{title}」は共有している全員から、履歴ごと削除されます。元に戻すことはできません。",
+  "notes.menu.deleteTitle": "ノートを削除",
+  "notes.menu.history": "バージョン履歴",
+  "notes.menu.leave": "ノートから退出",
+  "notes.menu.leaveBody": "誰かが再び共有しない限り、「{title}」を開けなくなります。",
+  "notes.menu.leaveTitle": "ノートから退出",
+  "notes.menu.open": "ノートを開く",
+  "notes.menu.share": "共有",
+  "notes.menu.whoHasAccess": "アクセスできる人",
+  "notes.page.backToNotes": "ノート一覧に戻る",
+  "notes.page.edited": "{when}に編集",
+  "notes.page.editedBy": "最終編集: {name}、{when}",
+  "notes.page.editedByYou": "最終編集: あなた、{when}",
+  "notes.page.failedBody": "接続を確認して、もう一度お試しください。",
+  "notes.page.failedTitle": "このノートを開けませんでした",
+  "notes.page.goneBody": "削除されたか、あなたがもう参加していません。",
+  "notes.page.goneTitle": "このノートはありません",
+  "notes.page.hereNow": "現在ここにいる人: {names}",
+  "notes.page.isHere": "{name} がいます",
+  "notes.page.more": "その他",
+  "notes.page.notSaved": "未保存",
+  "notes.page.notSavedWhy": "最新の変更を保存できませんでした。",
+  "notes.page.offline": "オフライン",
+  "notes.page.offlineWhy": "変更はここに保持され、オンラインに戻ると保存されます。",
+  "notes.page.opening": "ノートを開いています",
+  "notes.page.saved": "保存済み",
+  "notes.page.saving": "保存中",
+  "notes.page.tryAgain": "再試行",
+  "notes.page.viewOnly": "閲覧のみ",
+  "notes.reader.empty": "まだ何も書かれていません。",
+  "notes.requests.accept": "承認",
+  "notes.requests.couldNotAccept": "リクエストを承認できませんでした。",
+  "notes.requests.couldNotDecline": "リクエストを拒否できませんでした。",
+  "notes.requests.count": {
+    "other": "ノートのリクエスト {count} 件"
+  },
+  "notes.requests.decline": "拒否",
+  "notes.requests.title": "リクエスト",
+  "notes.requests.toEdit": "{name} があなたと一緒にノートを書きたがっています",
+  "notes.requests.toView": "{name} があなたとノートを共有したがっています",
+  "notes.share.cancelInvite": "リクエストを取り消す",
+  "notes.share.canEdit": "編集可",
+  "notes.share.canView": "閲覧可",
+  "notes.share.copied": "コピーしました",
+  "notes.share.copy": "コピー",
+  "notes.share.couldNotCancel": "リクエストを取り消せませんでした。",
+  "notes.share.couldNotChange": "{name} の権限を変更できませんでした。",
+  "notes.share.couldNotInvite": "{name} にリクエストを送れませんでした。",
+  "notes.share.couldNotLoad": "このノートのメンバーを読み込めませんでした。",
+  "notes.share.couldNotMakeLink": "リンクを作成できませんでした。",
+  "notes.share.couldNotRemove": "{name} を削除できませんでした。",
+  "notes.share.couldNotRemoveLink": "リンクを削除できませんでした。",
+  "notes.share.createLink": "リンクを作成",
+  "notes.share.invite": "招待",
+  "notes.share.inviteAs": "できること",
+  "notes.share.invited": "{name} にリクエストを送りました。",
+  "notes.share.invitedShort": "送信済み",
+  "notes.share.inviteHint": "フレンドやユーザー名で検索できます。相手には承認待ちのリクエストが届きます。",
+  "notes.share.inviteNamed": "{name} を招待",
+  "notes.share.invitePeople": "メンバーを招待",
+  "notes.share.keyChanged": "{name} の暗号鍵が変わり、まだ承認されていません。共有する前に安全番号を確認してください。",
+  "notes.share.keyNote": "リンクやリクエストにはノートの鍵が含まれます。人やリンクを削除するとノートに新しい鍵が付き、その後に書かれた内容は読めなくなります。",
+  "notes.share.linkCanEdit": "リンクを知っている人は編集可",
+  "notes.share.linkCanView": "リンクを知っている人は閲覧可",
+  "notes.share.linkCopied": "リンクをコピーしました。",
+  "notes.share.linkRole": "リンクの権限",
+  "notes.share.links": "共有リンク",
+  "notes.share.linksHint": "リンクを作ると、メッセージなどでノートを共有できます。",
+  "notes.share.linkUses": {
+    "other": "{count} 人が参加"
+  },
+  "notes.share.loading": "読み込み中",
+  "notes.share.nobodyFound": "その名前の人は見つかりませんでした。",
+  "notes.share.owner": "オーナー",
+  "notes.share.peopleWithAccess": "アクセスできる人",
+  "notes.share.removeFromNote": "ノートから外す",
+  "notes.share.removeLink": "リンクを削除",
+  "notes.share.roleOf": "{name} の権限",
+  "notes.share.searchPlaceholder": "フレンドやユーザー名を検索",
+  "notes.share.title": "「{title}」を共有",
+  "notes.share.waiting": "リクエスト送信済み({role})",
+  "notes.share.whoTitle": "「{title}」のメンバー",
+  "notes.share.you": "{name}(あなた)",
+  "notes.title": "ノート",
+  "notes.untitled": "無題のノート",
   "notFound.body": "リンクが間違っているか、リンク先が移動した可能性があります。",
   "notFound.home": "ホームページへ",
   "notFound.openNexa": "Nexa を開く",
   "notFound.title": "このページは存在しません",
   "notify.friendRequest": "フレンド申請",
   "notify.newMessage": "新しいメッセージ",
+  "notify.noteInvite": "ノートのリクエスト",
   "notify.sentASticker": "スタンプを送信しました",
   "notify.sentFile": "{name} を送信しました",
   "notify.sentFiles": "ファイルを {count} 件送信しました",
   "notify.sentYouAFriendRequest": "{name} からフレンド申請が届きました。",
+  "notify.sharedANote": "{name} があなたとノートを共有したがっています。",
   "offline.canTConnect": "接続できません",
   "offline.couldNotReachTheServer": "サーバーに接続できませんでした。",
   "offline.youAreStillLoggedInCheck": "ログインは維持されています。接続を確認するか、サーバーが再起動中なら少し待ってください。このページは再試行を続けます。",
@@ -2071,6 +2281,126 @@
   "perms.viewAuditLog": "監査ログの閲覧",
   "perms.viewChannels": "チャンネルの閲覧",
   "perms.voiceChannelPermissions": "ボイスチャンネルの権限",
+  "pick.accepted": {
+    "other": "{count} 件の申請を承認しました。"
+  },
+  "pick.acceptRequests": {
+    "other": "{count} 件の申請を承認"
+  },
+  "pick.addRole": "ロールを付ける",
+  "pick.ban": {
+    "other": "{count} 人を BAN"
+  },
+  "pick.banned": {
+    "other": "{count} 人を BAN しました。"
+  },
+  "pick.banTitle": {
+    "other": "{count} 人を BAN しますか？"
+  },
+  "pick.block": {
+    "other": "{count} 人をブロック"
+  },
+  "pick.blockBody": "{names} はあなたにメッセージやフレンド申請を送れなくなります。",
+  "pick.blocked": {
+    "other": "{count} 人をブロックしました。"
+  },
+  "pick.blockTitle": {
+    "other": "{count} 人をブロックしますか？"
+  },
+  "pick.cancelRequests": {
+    "other": "{count} 件の申請を取り消す"
+  },
+  "pick.close": "会話を閉じる",
+  "pick.closeBody": {
+    "other": "うち {count} 件はグループチャットで、そこから抜けます。"
+  },
+  "pick.closeConfirm": "閉じて抜ける",
+  "pick.closeTitle": {
+    "other": "{count} 件の会話を閉じますか？"
+  },
+  "pick.count": {
+    "other": "{count} 件選択中"
+  },
+  "pick.dmBar": "選択した会話",
+  "pick.done": "完了",
+  "pick.friendsBar": "選択したユーザー",
+  "pick.friendsRemoved": {
+    "other": "{count} 人のフレンドを解除しました。"
+  },
+  "pick.groupChatWith": {
+    "other": "{count} 人とグループチャットを作成"
+  },
+  "pick.ignoreRequests": {
+    "other": "{count} 件の申請を無視"
+  },
+  "pick.kick": {
+    "other": "{count} 人をキック"
+  },
+  "pick.kicked": {
+    "other": "{count} 人をキックしました。"
+  },
+  "pick.kickTitle": {
+    "other": "{count} 人をキックしますか？"
+  },
+  "pick.leaveServers": {
+    "other": "{count} 件のサーバーを抜ける"
+  },
+  "pick.leaveServersBody": "{names} から抜けます。戻るには新しい招待が必要です。",
+  "pick.leaveServersTitle": {
+    "other": "{count} 件のサーバーを抜けますか？"
+  },
+  "pick.listOptions": "リストのオプション",
+  "pick.membersBar": "選択したメンバー",
+  "pick.more": "その他",
+  "pick.mute": "ミュート",
+  "pick.newFolder": "新しいフォルダー",
+  "pick.ownedStay": {
+    "other": "あなたが所有する {count} 件のサーバーはそのまま残ります。"
+  },
+  "pick.pickNamed": "{name} を選択",
+  "pick.pin": "ピン留め",
+  "pick.removedFromGroup": {
+    "other": "{count} 人をグループから外しました。"
+  },
+  "pick.removeFriends": {
+    "other": "{count} 人のフレンドを解除"
+  },
+  "pick.removeFriendsBody": "{names} とのフレンドを解除します。",
+  "pick.removeFriendsTitle": {
+    "other": "{count} 人のフレンドを解除しますか？"
+  },
+  "pick.removeFromGroup": {
+    "other": "{count} 人をグループから外す"
+  },
+  "pick.removeFromGroupBody": "{names} はグループから外れ、メッセージを受け取らなくなります。",
+  "pick.removeFromGroupTitle": {
+    "other": "{count} 人をグループから外しますか？"
+  },
+  "pick.removeRole": "ロールを外す",
+  "pick.requestsDropped": {
+    "other": "{count} 件の申請を取り除きました。"
+  },
+  "pick.roleGiven": {
+    "other": "{count} 人にロールを付けました。"
+  },
+  "pick.roleTaken": {
+    "other": "{count} 人からロールを外しました。"
+  },
+  "pick.select": "選択",
+  "pick.selectConversations": "会話を選択",
+  "pick.serverBar": "選択したサーバー",
+  "pick.sortedManually": "手動で並べ替え済み",
+  "pick.sortManual": "手動で並べ替え",
+  "pick.sortRecent": "最近のアクティビティ順",
+  "pick.tapToPick": "タップして選択",
+  "pick.unblocked": {
+    "other": "{count} 人のブロックを解除しました。"
+  },
+  "pick.unblockPeople": {
+    "other": "{count} 人のブロックを解除"
+  },
+  "pick.unmute": "ミュートを解除",
+  "pick.unpin": "ピン留めを外す",
   "pickers.emojiIndex.activities": "アクティビティ",
   "pickers.emojiIndex.animalsNature": "動物と自然",
   "pickers.emojiIndex.flags": "旗",
@@ -2200,6 +2530,7 @@
   "profile.profileCard.editProfile": "プロフィールを編集",
   "profile.profileCard.friendNickname": "フレンドのニックネーム",
   "profile.profileCard.friendsSince": "フレンドになった日",
+  "profile.profileCard.joinedServer": "{server} に参加",
   "profile.profileCard.memberSince": "参加した日",
   "profile.profileCard.message": "メッセージ",
   "profile.profileCard.mutualFriendCount": {
@@ -2214,11 +2545,13 @@
   "profile.profileCard.mutualServersCount": {
     "other": "共通のサーバー（{count}）"
   },
+  "profile.profileCard.noRoles": "まだロールはありません。",
   "profile.profileCard.note": "メモ",
   "profile.profileCard.onlyYouSeeIt": "あなたにしか見えません。",
   "profile.profileCard.owner": "オーナー",
   "profile.profileCard.ownerTip": "Nexa のオーナー",
   "profile.profileCard.removeFriend": "フレンドを解除",
+  "profile.profileCard.rolesIn": "{server} でのロール",
   "profile.profileCard.viewFullBio": "自己紹介を全文表示",
   "profile.profileCard.viewFullProfile": "プロフィール全体を表示",
   "profile.profileCard.viewFullProfileOf": "{name} のプロフィール全体を見る",
@@ -2884,6 +3217,10 @@
   "settings.about.title": "Nexa について",
   "settings.about.version": "バージョン",
   "settings.about.whatsNewSub": "最近のアップデートで変わったことと、その場所。",
+  "settings.accessibility.goToTextSize": "文字サイズへ",
+  "settings.accessibility.motion": "動き",
+  "settings.accessibility.reading": "読みやすさ",
+  "settings.accessibility.textSizeIsIn": "文字サイズは「外観」にあります。",
   "settings.account.aRecoveryKeyIsSetGenerating": "リカバリーキーが設定されています。新しく作ると置き換わります。",
   "settings.account.accountRemoval": "アカウントの削除",
   "settings.account.atLeast8Characters": "8 文字以上。",
@@ -2911,6 +3248,7 @@
   "settings.account.purge.leaves": "退出するその他のサーバーとグループチャット",
   "settings.account.purge.messages": "送信したメッセージ（すべての場所）",
   "settings.account.purge.note": "Nexa の運営者を含め、誰にも元に戻せません。",
+  "settings.account.purge.notes": "あなたのノート（共有している全員から）",
   "settings.account.purge.ownedGroups": "所有しているグループチャット（メンバー全員分）",
   "settings.account.purge.ownedServers": "所有しているサーバー（中身ごと、全員分）",
   "settings.account.purge.packs": "作成したスタンプ・絵文字パック",
@@ -3030,6 +3368,9 @@
   "settings.appearance.custom": "カスタム",
   "settings.appearance.disablesAnimationsAndTransitions": "アニメーションとトランジションを無効にします。",
   "settings.appearance.editTheme": "{name} を編集",
+  "settings.appearance.font": "フォント",
+  "settings.appearance.fontClassic": "クラシック",
+  "settings.appearance.fontDefault": "デフォルト",
   "settings.appearance.fontSize": "文字サイズ",
   "settings.appearance.groupClassic": "クラシック",
   "settings.appearance.groupDark": "ダークカラー",
@@ -3068,6 +3409,13 @@
   "settings.appearance.underlinesMisspelledWordsInTheMessage": "入力中に綴りの誤りに下線を引きます。チェックはブラウザーが行います。単語を Shift キーを押しながら右クリックすると、ブラウザーの候補が表示されます。Nexa を英語で使っているときは Nexa 自身がチェックします。",
   "settings.appearance.waitingForTheDayWhen": "ちょうどよく感じるまでスライダーを動かしてください。",
   "settings.appearance.yourWords": "追加した単語",
+  "settings.chat.linksAndMedia": "リンクとメディア",
+  "settings.chat.messageBox": "メッセージ入力欄",
+  "settings.chat.reading": "読み上げ",
+  "settings.chat.title": "メッセージとメディア",
+  "settings.data.deleteIsIn": "アカウントの削除は「マイアカウント」にあります。",
+  "settings.data.export": "データを書き出す",
+  "settings.data.goToMyAccount": "マイアカウントへ",
   "settings.desktop.activityShowsHereOnlyDiscordDoes": "アクティビティは Nexa にだけ表示され、Discord には表示されません。",
   "settings.desktop.alsoShowItOnDiscord": "Discord にも表示する",
   "settings.desktop.callsNotificationsAndRichPresenceCarry": "通話、通知、リッチプレゼンスはトレイからも動き続けます。",
@@ -3133,6 +3481,12 @@
   "settings.devices.thisDevice": "この端末",
   "settings.devices.unknownDevice": "不明な端末",
   "settings.devices.yourDevicesCouldNotBeLoaded": "端末の一覧を読み込めませんでした。",
+  "settings.groups.account": "アカウント",
+  "settings.groups.app": "アプリ",
+  "settings.groups.chat": "チャット",
+  "settings.groups.emojiStickers": "絵文字とスタンプ",
+  "settings.groups.help": "ヘルプと法的情報",
+  "settings.groups.look": "外観と操作",
   "settings.licenses.desktopApp": "デスクトップアプリ",
   "settings.licenses.everything": "すべて",
   "settings.licenses.fontsAndArtwork": "フォントと画像",
@@ -3214,8 +3568,9 @@
   "settings.privacy.searchRebuilding": "インデックスを削除し、作り直しています",
   "settings.privacy.shareMyActivity": "自分のアクティビティを共有",
   "settings.privacy.showEmbeddedImagesAndGifsFrom": "リンクの画像や GIF を埋め込み表示する",
+  "settings.privacy.title": "プライバシー",
   "settings.privacy.yourData": "あなたのデータ",
-  "settings.privacy.yourDeviceAsksTheServerTo": "あなたの端末がサーバーにリンク先の取得を依頼し、プレビューを暗号化されたメッセージに添付します。送るリンクをサーバーに見せたくない場合はオフにしてください。",
+  "settings.privacy.yourDeviceAsksTheServerTo": "あなたの端末がサーバーにリンク先の取得を依頼し、プレビューを暗号化されたメッセージに添付します。SNS の投稿の場合、サーバーが公開の埋め込みサービスに問い合わせることもあります。送るリンクをサーバーに見せたくない場合はオフにしてください。",
   "settings.profile.aboutHintLeft": {
     "other": "ここでは Markdown が使えます。残り {count} 文字です。"
   },
@@ -3246,6 +3601,9 @@
   "settings.profile.secondColourHex": "2 色目の HEX",
   "settings.profile.tellPeopleAboutYourself": "自分について書きましょう",
   "settings.profile.topColourOnItsOwnIt": "上の色：単独ではバナーの色になります。",
+  "settings.search.none": "「{query}」に一致する設定はありません。",
+  "settings.search.placeholder": "設定を検索",
+  "settings.search.results": "検索結果",
   "settings.security.anAuthenticatorAppAdds": "認証アプリを使うと、ログインのたびに 6 桁のコードが必要になり、パスワードだけでは入れなくなります。メッセージはいずれにせよエンドツーエンドで暗号化されています。これはアカウント自体を守るものです。",
   "settings.security.appLock": "アプリロック",
   "settings.security.appLockHint": "オンにすると、サインインするすべての端末でパスコードを求められます。パスコードは入力した端末から外に出ず、その端末で鍵を守ります。タブを閉じたりアプリをロックしたりすると、もう一度入力するまでメッセージは読めません。10 回間違えると端末は鍵を忘れますが、パスワードで再び入れます。",
@@ -3554,6 +3912,7 @@
   "sidebar.dMSidebar.closeDm": "DM を閉じる",
   "sidebar.dMSidebar.createDm": "DM を作成",
   "sidebar.dMSidebar.directMessages": "ダイレクトメッセージ",
+  "sidebar.dMSidebar.findAConversation": "会話を探す",
   "sidebar.dMSidebar.findOrStartAConversation": "会話を探す・始める",
   "sidebar.dMSidebar.friends": "フレンド",
   "sidebar.dMSidebar.leaveGroup": "グループを抜ける",
@@ -3662,13 +4021,16 @@
   "voice.callBanner.joining": "参加中…",
   "voice.callLine.callAgain": "もう一度かける",
   "voice.callLine.callBack": "折り返す",
-  "voice.callLine.callWith": "{name} との通話 · {length}",
+  "voice.callLine.callWithName": "{name} との通話",
+  "voice.callLine.cancelled": "キャンセル",
+  "voice.callLine.declinedYourCall": "{name} が通話を拒否しました",
+  "voice.callLine.lasted": "通話時間 {length}",
+  "voice.callLine.live": "通話中",
   "voice.callLine.missedFrom": "{name} からの不在着信",
-  "voice.callLine.startedLasting": "{actor} さんが通話を始めました · {length}",
-  "voice.callLine.startedNoAnswer": "{actor} さんが通話を始めました · 誰も応答しませんでした",
-  "voice.callLine.theyDeclined": "{name} が通話を拒否しました",
-  "voice.callLine.youCalledCancelled": "{name} に発信 · キャンセル",
-  "voice.callLine.youCalledNoAnswer": "{name} に発信 · 応答なし",
+  "voice.callLine.noAnswer": "応答なし",
+  "voice.callLine.noOneJoined": "誰も参加しませんでした",
+  "voice.callLine.startedCall": "{actor} さんが通話を始めました",
+  "voice.callLine.youCalledName": "{name} に発信",
   "voice.callLine.youDeclined": "{name} からの通話を拒否しました",
   "voice.callNotice.missedCall": "不在着信",
   "voice.callNotice.missedInGroup": "{name} での不在着信",
@@ -3890,5 +4252,21 @@
   "whatsNew.r202609292.pinsTitle": "ピン留めでメッセージ全体を表示",
   "whatsNew.r202609292.themesBody": "クラシックテーマの平坦なグレーが、やわらかなバイオレットの色味に変わりました。ライトテーマでは、ツールチップがくっきりし、ダイアログもページからはっきり浮き上がるようになりました。",
   "whatsNew.r202609292.themesTitle": "テーマを一新",
+  "whatsNew.r202609303.fontBody": "Nexa のフォントが、丸みがあり読みやすい Wix Madefor になりました。以前の文字に戻すには、設定の外観、フォントでクラシックを選んでください。",
+  "whatsNew.r202609303.fontTitle": "軽やかなフォント",
+  "whatsNew.r202609303.liveBody": "ノートにいる全員が、入力される文字をその場で見られます。各自のカーソルと選択範囲はそれぞれの色で表示されます。以前のバージョンはバージョン履歴で見返したり復元したりできます。",
+  "whatsNew.r202609303.liveTitle": "リアルタイムで一緒に書く",
+  "whatsNew.r202609303.notesBody": "画像やファイルを好きな場所に入れたノートを、メッセージと同じように暗号化して書けます。フレンドの下にあり、リクエストやリンクで共有できます。",
+  "whatsNew.r202609303.notesTitle": "ノート",
+  "whatsNew.r202609303.phoneBody": "絵文字ピッカーなどのパネルは全画面まで引き上げたり、スワイプで閉じたりできます。送信後もキーボードが開いたままになり、編集中の内容がキーボードに隠れなくなりました。",
+  "whatsNew.r202609303.phoneTitle": "スマホでもっと快適に",
+  "whatsNew.r202609303.pickBody": "Ctrl キーを押しながら会話、フレンド、サーバー、メンバーをクリックすると、まとめて操作できます。スマホでは長押しします。会話はドラッグして好きな順に並べられます。",
+  "whatsNew.r202609303.pickTitle": "まとめて選択",
+  "whatsNew.r202609303.postsBody": "X、Bluesky、TikTok、Instagram、Reddit、Telegram、Threads、Mastodon のリンクは投稿そのものを表示し、画像や動画もチャットの中で再生できます。",
+  "whatsNew.r202609303.postsTitle": "チャットで投稿を表示",
+  "whatsNew.r202609303.rolesBody": "サーバー内で開いたプロフィールには、その人がそのサーバーで持っているロールが表示されます。",
+  "whatsNew.r202609303.rolesTitle": "プロフィールにロール",
+  "whatsNew.r202609303.settingsBody": "設定がわかりやすいページにまとまり、上の検索ボックスでどの設定も見つけて、すぐに開けます。",
+  "whatsNew.r202609303.settingsTitle": "整理された設定",
   "whatsNew.title": "新機能"
 }

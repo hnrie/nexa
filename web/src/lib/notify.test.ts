@@ -7,6 +7,9 @@ import { useUsers } from "@/stores/users";
 import { useRelationships } from "@/stores/relationships";
 import { installNotifications, messageAlert, showNotification } from "./notify";
 
+// drawn on a canvas in a browser (roundIcon.test.ts); jsdom has none
+vi.mock("./roundIcon", () => ({ roundAvatar: (p: { url: string | null }, fallback: string) => Promise.resolve(p.url ?? fallback) }));
+
 function withWorker(reg: unknown) {
   Object.defineProperty(navigator, "serviceWorker", { value: { getRegistration: () => Promise.resolve(reg) }, configurable: true });
 }

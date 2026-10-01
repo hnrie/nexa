@@ -1,0 +1,290 @@
+/*
+ * Notes.
+ *
+ * The note is the page: it is written straight onto the panel, with nothing
+ * framed round it, in one column under the bar that holds the formatting
+ * tools, who is here and whether it is saved. The list beside it is a list:
+ * titles, first words, when, and who is in each note right now.
+ *
+ * Colour means a person. Everyone else in a note has a colour of their own
+ * (lib/notes/people.ts, set here as --who) for their caret, their selection,
+ * the flag with their name and the ring round their face, wherever they show
+ * up. Brand violet is this page's own: its caret and the New Note button.
+ */
+
+/* ---- the page: the list and the note side by side, or one at a time ---- */
+.notes { position: relative; display: flex; height: 100%; min-height: 0; container-type: inline-size; }
+.desk { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.wait { display: flex; justify-content: center; padding: 28px 16px; }
+.center { display: flex; justify-content: center; padding: 28px 16px; }
+
+/* ---- the list ---- */
+.drawer { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.notes[data-split] .drawer { flex: 0 0 304px; background: color-mix(in oklab, var(--bg-base) 55%, var(--bg-raised)); box-shadow: inset -1px 0 0 var(--border-subtle); }
+.drawerHead { flex: none; height: var(--header-h); display: flex; align-items: center; gap: 8px; padding-inline: 16px 10px; }
+.drawerTitle { flex: 1 1 auto; min-width: 0; margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--text-strong); }
+.drawerSearch { flex: none; padding: 0 10px 8px; }
+.drawerScroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 2px 8px 24px; }
+.drawerSection { margin: 6px 8px 6px; font-size: 13px; font-weight: 700; color: var(--text-muted); }
+.drawerNote { margin: 14px 10px; font-size: 14px; color: var(--text-muted); }
+
+/* the one button with the accent's light on it */
+.newBtn { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding-inline: 9px 12px; border-radius: 9px; background: var(--grad-brand); color: var(--on-brand); font-size: 13.5px; font-weight: 650; white-space: nowrap; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 12px -5px color-mix(in srgb, var(--brand) 80%, transparent); transition: filter var(--transition), transform 90ms var(--ease-out); }
+.newBtn:hover { filter: brightness(1.08); }
+.newBtn:active { transform: scale(0.97); }
+.newBtn:disabled { opacity: 0.7; cursor: progress; }
+
+.rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: 10px; row-gap: 2px; width: 100%; padding: 10px 10px 11px; border-radius: var(--radius-md); text-align: start; color: inherit; transition: background-color var(--transition); }
+.row:hover { background: var(--bg-hover); }
+.row[data-selected] { background: var(--sheen), var(--bg-selected); box-shadow: inset 0 1px 0 var(--edge-light), 0 1px 2px color-mix(in srgb, var(--shade) 35%, transparent); }
+.rowTitle { min-width: 0; font-family: var(--font-display); font-size: 15px; font-weight: 660; line-height: 1.3; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rowTitle[data-untitled] { color: var(--text-muted); font-weight: 600; }
+.rowWhen { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rowWords { grid-column: 1 / -1; min-width: 0; font-size: 13.5px; line-height: 1.42; color: var(--text-muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.row[data-selected] .rowWords { color: var(--text-subtle); }
+.rowMeta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 5px; font-size: 12px; color: var(--text-muted); }
+.rowLive { display: inline-flex; align-items: center; }
+.rowLive > * + * { margin-inline-start: -3px; }
+.rowShared { display: inline-flex; align-items: center; gap: 4px; }
+
+/* requests to share a note, above the list */
+.requests { margin-bottom: 12px; }
+.request { display: flex; align-items: center; gap: 10px; margin: 0 0 4px; padding: 10px; border-radius: var(--radius-md); background: var(--sheen), var(--bg-floating); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-low); }
+.requestText { flex: 1; min-width: 0; }
+.requestTitle { margin: 0; font-family: var(--font-display); font-size: 14.5px; font-weight: 660; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.requestLead { margin: 1px 0 0; font-size: 12.5px; line-height: 1.35; color: var(--text-muted); overflow-wrap: anywhere; }
+.requestActs { flex: none; display: flex; gap: 6px; }
+.act { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--text-subtle); background: var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); transition: background var(--transition), color var(--transition), transform 90ms var(--ease-out); }
+.act:active { transform: scale(0.92); }
+.act:disabled { opacity: 0.55; cursor: default; }
+.act[data-kind="yes"]:hover { color: var(--on-positive); background: var(--grad-positive); }
+.act[data-kind="no"]:hover { color: var(--on-danger); background: var(--grad-danger); }
+
+.noMatch { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px 12px; color: var(--text-muted); text-align: center; font-size: 14px; }
+.noMatch p { margin: 0; }
+
+/* ---- the bar over a note: tools on the left, people and state on the right ---- */
+.editor.editor { flex: 1 1 auto; min-height: 0; max-height: none; display: flex; flex-direction: column; background: transparent; }
+.bar { position: relative; z-index: 3; flex: none; height: var(--header-h); display: flex; align-items: center; gap: 6px; padding-inline: 8px 10px; box-shadow: 0 1px 0 var(--border-subtle); }
+.tools { flex: 1 1 auto; min-width: 0; display: flex; }
+/* the editor's own toolbar, made part of the bar */
+.tools.tools > * { flex: 1 1 auto; min-width: 0; padding: 0; border: 0; background: transparent; }
+.barSpace { flex: 1 1 auto; min-width: 4px; }
+.barEnd { flex: none; display: flex; align-items: center; gap: 4px; padding-inline-start: 6px; }
+.barTitle { min-width: 0; margin: 0 4px; font-family: var(--font-display); font-size: 15px; font-weight: 680; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trayDock { position: relative; z-index: 2; flex: none; box-shadow: 0 1px 0 var(--border-subtle); background: var(--bg-surface); }
+.trayDock > * { max-width: 980px; margin: 0 auto; border-bottom: 0; background: transparent; }
+
+.iconBtn { flex: none; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--icon); transition: background-color var(--transition), color var(--transition); }
+.iconBtn:hover { background: var(--bg-hover); color: var(--text-strong); }
+.shareBtn { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding-inline: 10px 12px; margin-inline-start: 2px; border-radius: 9px; background: var(--grad-brand); color: var(--on-brand); font-size: 13.5px; font-weight: 650; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 12px -5px color-mix(in srgb, var(--brand) 80%, transparent); transition: filter var(--transition), transform 90ms var(--ease-out); }
+.shareBtn:hover { filter: brightness(1.08); }
+.shareBtn:active { transform: scale(0.97); }
+.back { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px 0 6px; border-radius: var(--radius-sm); color: var(--text-subtle); font-size: 14px; font-weight: 600; }
+.back:hover { background: var(--bg-hover); color: var(--text-strong); }
+.viewOnly { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 26px; margin-inline-start: 6px; padding: 0 10px; border-radius: var(--radius-pill); background: var(--bg-active); color: var(--text-subtle); font-size: 12.5px; font-weight: 650; }
+.iconBtn:focus-visible, .newBtn:focus-visible, .shareBtn:focus-visible, .back:focus-visible, .row:focus-visible, .version:focus-visible, .act:focus-visible, .rowAct:focus-visible, .stateRetry:focus-visible, .face:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* who is here: faces ringed in their colour */
+.here { flex: none; display: flex; align-items: center; padding-inline: 2px 6px; }
+.here > * + * { margin-inline-start: -6px; }
+.face { position: relative; display: flex; border-radius: 50%; box-shadow: 0 0 0 2px var(--bg-raised), 0 0 0 4px var(--who); }
+.face[data-small] { box-shadow: 0 0 0 1.5px var(--bg-raised), 0 0 0 3px var(--who); }
+.faceMore { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--bg-active); color: var(--text); font-size: 12px; font-weight: 700; box-shadow: 0 0 0 2px var(--bg-raised); }
+
+/* whether it is saved: a word, quiet while all is well */
+.state { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 0 6px; font-size: 13px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.state[data-state="saving"] { color: var(--text-subtle); }
+.state[data-state="offline"] { color: var(--text-warning); }
+.state[data-state="failed"] { color: var(--text-danger); }
+.stateWord { display: inline-flex; align-items: center; gap: 5px; outline: none; }
+.stateDot { width: 8px; height: 8px; border-radius: 50%; background: var(--positive); }
+.state[data-state="saving"] .stateDot { background: var(--text-muted); animation: breathe 1s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: 0.35; } }
+.stateRetry { height: 24px; padding: 0 9px; border-radius: var(--radius-pill); background: var(--grad-danger); color: var(--on-danger); font-size: 12px; font-weight: 700; }
+
+/* ---- the note itself ---- */
+.scroll { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; transition: box-shadow var(--transition), background-color var(--transition); }
+.editor[data-drop] .scroll { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand) 65%, transparent); background: color-mix(in srgb, var(--brand) 4%, transparent); }
+.sheet { position: relative; max-width: 740px; margin: 0 auto; padding-block: clamp(28px, 5cqi, 56px) 128px; padding-inline: clamp(18px, 5cqi, 44px); }
+.titleInput, .readTitle { display: block; width: 100%; margin: 0; padding: 0; border: 0; resize: none; overflow: hidden; background: transparent; color: var(--text-strong); font-family: var(--font-display); font-size: clamp(30px, 2.4cqi + 18px, 42px); font-weight: 740; line-height: 1.1; letter-spacing: -0.024em; outline: none; overflow-wrap: anywhere; }
+.titleInput::placeholder { color: var(--text-placeholder); opacity: 0.75; }
+.readTitle[data-untitled] { color: var(--text-muted); }
+.readTitle + .read, .readTitle + .readEmpty { margin-top: 26px; }
+.byline { min-height: 18px; margin: 12px 0 28px; font-size: 13px; line-height: 18px; color: var(--text-muted); }
+/* long-form text: a size up from a message, and more room between the lines */
+.surface.surface { min-height: 40vh; padding: 0; font-size: 17px; line-height: 1.68; }
+.surface :global([data-b="file"]) { margin-block: 10px; }
+.read { font-size: 17px; line-height: 1.68; color: var(--text); overflow-wrap: anywhere; }
+.readEmpty { margin: 0; color: var(--text-muted); }
+.over { margin: 0 0 16px; padding: 10px 12px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--text-danger); font-size: 14px; }
+.simplified { margin: 0 0 14px; font-size: 13px; color: var(--text-muted); }
+
+/* everyone else's caret and selection, drawn over the page */
+.cursors { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.theirPick { position: absolute; border-radius: 3px; background: color-mix(in srgb, var(--who) 26%, transparent); }
+.theirCaret { position: absolute; width: 2px; margin-inline-start: -1px; border-radius: 1px; background: var(--who); transition: left 90ms linear, top 90ms linear; }
+/* the square on its head that stays when the name has gone */
+.theirCaret::before { content: ""; position: absolute; top: -2px; left: -2px; width: 6px; height: 6px; border-radius: 1.5px; background: var(--who); }
+.theirName { position: absolute; bottom: calc(100% + 1px); left: -2px; padding: 1px 7px 2px; border-radius: 5px 5px 5px 1px; background: var(--who); color: #fff; font-family: var(--font); font-size: 12px; font-weight: 650; line-height: 16px; white-space: nowrap; box-shadow: 0 2px 6px -2px color-mix(in srgb, var(--shade) 70%, transparent); animation: nameAway 260ms var(--ease-out) 2.4s forwards; }
+@keyframes nameAway { to { opacity: 0; transform: translateY(3px); } }
+
+/* a file where the note has it */
+.file { position: relative; display: flex; align-items: flex-start; gap: 6px; max-width: 100%; }
+.file > :first-child { min-width: 0; max-width: 100%; }
+/* a picture keeps its shape and never runs past the column (its frame is sized for a message) */
+.file [data-spoiler], .file :global(img), .file :global(video) { max-width: 100%; }
+.file :global(img), .file :global(video) { height: auto; }
+.fileRemove { flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--text-muted); background: var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); opacity: 0; transition: opacity var(--transition), color var(--transition), background-color var(--transition); }
+.file:hover .fileRemove, .fileRemove:focus-visible { opacity: 1; }
+.fileRemove:hover { color: var(--on-danger); background: var(--grad-danger); }
+@media (hover: none) { .fileRemove { opacity: 1; } }
+.fileWait { display: flex; align-items: center; gap: 12px; width: 360px; max-width: 100%; padding: 12px 14px; border-radius: var(--radius-md); background: var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); }
+.fileWait[data-error] { box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent); }
+.fileWaitIcon { flex: none; color: var(--text-muted); }
+.fileWait[data-error] .fileWaitIcon { color: var(--text-danger); }
+.fileWaitText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.fileWaitName { font-size: 14.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fileWaitNote, .fileWaitError { font-size: 13px; color: var(--text-muted); }
+.fileWaitError { color: var(--text-danger); }
+.fileWaitBar { display: block; height: 4px; border-radius: 2px; background: var(--bg-input); overflow: hidden; }
+.fileWaitBar > span { display: block; height: 100%; border-radius: inherit; background: var(--brand); transition: width 200ms var(--ease-out); }
+.fileAct { flex: none; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--text-subtle); }
+.fileAct:hover { background: var(--bg-hover); color: var(--text-strong); }
+
+/* small pictures and file names in a share link's preview */
+.thumb { display: block; width: 100%; max-width: 220px; height: 84px; margin: 4px 0; border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-active); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumbFile { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; margin: 2px 0; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--bg-active); color: var(--text); font-size: 12.5px; }
+.thumbFile span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- calm states in place of a note: none open, opening, gone ---- */
+.calm { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 200px; padding: 32px 20px; text-align: center; }
+.calmIcon { color: var(--text-muted); }
+.calmTitle { margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--text-strong); }
+.calmBody { margin: 0; max-width: 360px; font-size: 14.5px; line-height: 1.5; color: var(--text-muted); }
+
+/* ---- no notes yet: a page being written by two people, in small ---- */
+.first { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.firstHead { flex: none; height: var(--header-h); display: flex; align-items: center; padding-inline: 12px; }
+.firstBody { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px 20px 64px; text-align: center; }
+.firstTitle { margin: 18px 0 0; font-family: var(--font-display); font-size: clamp(26px, 2cqi + 16px, 32px); font-weight: 740; letter-spacing: -0.02em; line-height: 1.12; color: var(--text-strong); }
+.firstText { margin: 0 0 10px; max-width: 420px; font-size: 15px; line-height: 1.5; color: var(--text-muted); }
+.sample { position: relative; display: flex; flex-direction: column; gap: 11px; width: min(300px, 80vw); margin: 0; padding: 24px 24px 26px; border-radius: 14px; text-align: start; background: var(--sheen), var(--bg-floating); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-high); transform: rotate(-2deg); }
+.sampleTitle { display: block; width: 58%; height: 14px; margin-bottom: 6px; border-radius: 4px; background: var(--text-strong); opacity: 0.85; }
+.sampleLine { position: relative; display: block; height: 7px; border-radius: 4px; background: var(--text-muted); opacity: 0.45; }
+.sampleLine[data-typing] { width: 64%; opacity: 1; background: color-mix(in srgb, var(--text-muted) 45%, transparent); animation: typing 2.6s var(--ease-in-out) 0.4s both; }
+.sampleLine[data-mine] { opacity: 1; background: color-mix(in srgb, var(--text-muted) 45%, transparent); }
+.sampleCaret { position: absolute; top: -5px; right: -3px; width: 2px; height: 17px; border-radius: 1px; background: var(--who); }
+.sampleCaret::before { content: ""; position: absolute; top: -2px; left: -2px; width: 6px; height: 6px; border-radius: 1.5px; background: var(--who); }
+.sampleName { position: absolute; bottom: calc(100% + 1px); left: -2px; padding: 1px 7px 2px; border-radius: 5px 5px 5px 1px; background: var(--who); color: #fff; font-size: 12px; font-weight: 650; line-height: 16px; white-space: nowrap; }
+.sampleMine { position: absolute; top: -5px; right: -4px; width: 2px; height: 17px; border-radius: 1px; background: var(--brand); animation: blink 1.1s steps(1) infinite; }
+@keyframes typing { from { width: 22%; } to { width: 64%; } }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---- history: the version picked on the page, every version along the side ---- */
+.historyBody { flex: 1 1 auto; min-height: 0; display: flex; }
+.historyBody > .scroll { flex: 1 1 auto; }
+.rail { flex: 0 0 272px; min-height: 0; overflow-y: auto; padding: 10px 8px 24px; box-shadow: inset 1px 0 0 var(--border-subtle); }
+.railDay { margin: 14px 8px 4px; font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+.railNote { margin: 12px 8px; font-size: 13.5px; line-height: 1.45; color: var(--text-muted); }
+.version { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); text-align: start; color: var(--text); transition: background-color var(--transition); }
+.version:hover { background: var(--bg-hover); }
+.version[aria-current] { background: var(--sheen), var(--bg-selected); box-shadow: inset 0 1px 0 var(--edge-light); }
+.versionWhen { font-size: 14px; font-weight: 700; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.versionWho { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-subtle); }
+.versionTitle { max-width: 100%; font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.versionNote { margin: 0 0 14px; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+
+/* ---- sharing ---- */
+.shareCard { max-width: 100%; }
+.share { display: flex; flex-direction: column; gap: 22px; }
+.shareSection { display: flex; flex-direction: column; gap: 8px; }
+.shareHeading { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--text-subtle); }
+.shareHint { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text-muted); }
+.inviteRow { display: flex; gap: 8px; align-items: stretch; }
+.inviteRow > :first-child { flex: 1; min-width: 0; }
+.roleSelect { flex: none; width: auto; min-width: 118px; }
+.roleSelectWide { flex: 1; min-width: 0; }
+.people { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.person { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 8px; margin-inline: -8px; border-radius: var(--radius-sm); }
+.person:hover { background: var(--bg-hover); }
+.personText { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.personName { font-size: 15.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.personUser { font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rowAct { flex: none; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--text-muted); }
+.rowAct:hover:not(:disabled) { color: var(--text-strong); background: var(--bg-hover); }
+.rowAct:disabled { opacity: 0.5; }
+.roleTag { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding-inline: 9px; border-radius: var(--radius-pill); background: var(--bg-active); color: var(--text-subtle); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.linkIcon { flex: none; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-active); color: var(--text-subtle); }
+.keyNote { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-muted); }
+.keyNote svg { flex: none; margin-top: 2px; color: var(--positive); }
+.shareFoot { display: flex; justify-content: flex-end; }
+
+/* ---- a share link: a slip in a message, the dialog a link opens, the page a visitor lands on ---- */
+.linkCards { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.linkView { --pad: 14px; position: relative; display: flex; flex-direction: column; gap: 8px; width: 420px; max-width: 100%; padding: var(--pad) var(--pad) calc(var(--pad) - 2px); border-radius: var(--radius-lg); background: var(--sheen), var(--embed-bg); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-medium); color: var(--text); }
+.linkView[data-variant="dialog"], .linkView[data-variant="page"] { --pad: 26px; width: auto; gap: 12px; background: var(--sheen), var(--bg-floating); border-radius: var(--radius-xl); }
+.linkView[data-variant="page"] { box-shadow: none; }
+.linkTop { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.linkGlyph { flex: none; display: flex; padding-top: 2px; color: var(--text-muted); }
+.linkGlyph[data-gone] { color: var(--text-muted); }
+.linkMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.linkLead { margin: 0; font-size: 13px; line-height: 1.35; color: var(--text-muted); overflow-wrap: anywhere; }
+.linkTitle { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; color: var(--text-strong); overflow-wrap: anywhere; }
+.linkTitle[data-untitled] { color: var(--text-muted); }
+.linkView[data-variant="dialog"] .linkTitle, .linkView[data-variant="page"] .linkTitle { font-size: 26px; font-weight: 740; letter-spacing: -0.02em; line-height: 1.15; }
+.linkCardAct { flex: none; }
+.linkPreview { max-height: 92px; overflow: hidden; font-size: 14px; line-height: 1.5; color: var(--text-subtle); -webkit-mask-image: linear-gradient(to bottom, #000 50%, transparent); mask-image: linear-gradient(to bottom, #000 50%, transparent); }
+.linkView[data-variant="dialog"] .linkPreview, .linkView[data-variant="page"] .linkPreview { max-height: 168px; font-size: 15px; }
+.linkMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 12.5px; color: var(--text-muted); }
+.linkCount { display: inline-flex; align-items: center; gap: 5px; }
+.linkActs { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.linkError { margin: 0; font-size: 14px; color: var(--text-danger); }
+.skeletonLine { display: block; width: 70%; height: 12px; border-radius: 6px; background: var(--bg-active); animation: breathe 1.4s ease-in-out infinite; }
+.skeletonLine[data-short] { width: 40%; }
+
+/* ---- one column at a time ---- */
+@container (max-width: 640px) {
+  .sheet { padding-inline: 18px; }
+  .rail { flex: 1 1 auto; box-shadow: none; }
+}
+@media (max-width: 767px) {
+  .drawerHead { padding-inline: 8px 10px; }
+  .rail { padding-inline: 10px; }
+  .inviteRow { flex-wrap: wrap; }
+  .inviteRow > :first-child { flex-basis: 100%; }
+  .roleSelect { flex: 1; }
+  .linkView[data-variant="card"] .linkTop { flex-wrap: wrap; }
+}
+@media (pointer: coarse) {
+  .iconBtn { width: 40px; height: 40px; }
+  .newBtn, .shareBtn { height: 36px; }
+  .row { padding-block: 12px; }
+  .fileRemove { width: 38px; height: 38px; }
+  .rowAct { width: 40px; height: 40px; }
+  .act { width: 38px; height: 38px; }
+  .version { padding-block: 12px; }
+}
+/* still, the names still go after a while: they just do not move as they go */
+[data-reduced-motion="true"] .sampleLine, [data-reduced-motion="true"] .sampleMine, [data-reduced-motion="true"] .skeletonLine, [data-reduced-motion="true"] .stateDot { animation: none; }
+[data-reduced-motion="true"] .theirCaret { transition: none; }
+[data-reduced-motion="true"] .theirName { animation: nameGone 1ms linear 2.4s forwards; }
+@keyframes nameGone { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .sampleLine, .sampleMine, .skeletonLine, .stateDot { animation: none; }
+  .theirCaret { transition: none; }
+  .theirName { animation: nameGone 1ms linear 2.4s forwards; }
+}
+
+/* a choice of two, as one control: what someone asked in may do */
+.roles { flex: none; display: inline-flex; gap: 2px; padding: 3px; border-radius: 11px; background: var(--bg-input); box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 45%, transparent), inset 0 0 0 1px var(--border-subtle); }
+.roles > button { height: 30px; padding: 0 11px; border-radius: 8px; color: var(--text-muted); font-size: 13.5px; font-weight: 600; white-space: nowrap; transition: background-color var(--transition), color var(--transition); }
+.roles > button:hover { color: var(--text-strong); }
+.roles > button[aria-checked="true"] { background: var(--sheen), var(--bg-surface); color: var(--text-strong); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-low); }
+.roles > button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.roleBtn { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 8px 0 11px; border-radius: var(--radius-sm); color: var(--text-subtle); font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.roleBtn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-strong); }
+.roleBtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.roleBtn:disabled { opacity: 0.6; }

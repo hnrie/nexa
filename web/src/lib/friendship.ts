@@ -25,7 +25,7 @@ import { useSettings, type Settings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 
-import { t } from "@/i18n";
+import { formatList, t } from "@/i18n";
 
 /** The people a request is on its way about, so their buttons wait rather than take a second press. */
 export const useRelationshipBusy = create<{ busy: Record<string, true> }>()(() => ({ busy: {} }));
@@ -230,4 +230,120 @@ export function relationshipMenuItems(userId: string): ContextMenuItem[] {
   if (rel?.type === "blocked") items.push({ id: "unblock", label: t("friends.unblock"), disabled: busy, onSelect: () => void unblockUser(userId) });
   else items.push({ id: "block", label: t("profile.profileCard.block"), danger: true, onSelect: () => openBlockDialog(userId) });
   return items;
+}
+
+// --- several people at once (a picked part of a list) ------------------------
+
+/** "Alice, Bob and Cara": the people a bulk action is about, as the app's language lists them. */
+export function nameList(users: PublicUser[]): string {
+  return formatList(users.map((u) => displayName(u)));
+}
+
+/**
+ * Runs a job for each person in turn, and says once how it went: how many it
+ * worked for, and what went wrong with the first that failed.
+ */
+async function eachPerson(users: PublicUser[], job: (u: PublicUser) => Promise<void>, done: (count: number) => string, failed: string): Promise<void> {
+  let ok = 0;
+  let firstError: unknown = null;
+  for (const u of users) {
+    try {
+      await job(u);
+      ok++;
+    } catch (err) {
+      firstError ??= err;
+    }
+  }
+  if (ok) toast(done(ok), "success");
+  if (firstError) toast(describeError(firstError, failed));
+}
+
+/** Stops being friends with several people, after asking once. */
+export function confirmRemoveFriends(users: PublicUser[]): void {
+  if (users.length === 1) return confirmRemoveFriend(users[0]!);
+  useUI.getState().openModal("confirm", {
+    title: t("pick.removeFriendsTitle", { count: users.length }),
+    body: t("pick.removeFriendsBody", { names: nameList(users) }),
+    confirmLabel: t("pick.removeFriends", { count: users.length }),
+    danger: true,
+    onConfirm: () =>
+      eachPerson(
+        users,
+        async (u) => {
+          await relApi.remove(u.id);
+          useRelationships.getState().remove(u.id);
+        },
+        (count) => t("pick.friendsRemoved", { count }),
+        t("friends.couldNotUpdate"),
+      ),
+  });
+}
+
+/** Blocks several people, after asking once, with the account's choices about their messages. */
+export function confirmBlockPeople(users: PublicUser[]): void {
+  if (users.length === 1) return openBlockDialog(users[0]!.id);
+  useUI.getState().openModal("confirm", {
+    title: t("pick.blockTitle", { count: users.length }),
+    body: t("pick.blockBody", { names: nameList(users) }),
+    confirmLabel: t("pick.block", { count: users.length }),
+    danger: true,
+    onConfirm: () =>
+      eachPerson(
+        users,
+        async (u) => {
+          await relApi.block(u.id);
+          setRel(u, "blocked");
+        },
+        (count) => t("pick.blocked", { count }),
+        t("friends.couldNotUpdate"),
+      ),
+  });
+}
+
+/** Unblocks several people. */
+export function unblockPeople(users: PublicUser[]): Promise<void> {
+  return eachPerson(
+    users,
+    async (u) => {
+      try {
+        await relApi.unblock(u.id);
+      } catch (err) {
+        if (!(err instanceof ApiError && err.status === 404)) throw err;
+      }
+      useRelationships.getState().remove(u.id);
+    },
+    (count) => t("pick.unblocked", { count }),
+    t("friends.couldNotUpdate"),
+  );
+}
+
+/** Says yes to several requests. */
+export function acceptRequests(users: PublicUser[]): Promise<void> {
+  return eachPerson(
+    users,
+    async (u) => {
+      const res = await relApi.accept(u.id);
+      setRel(res.user, "friend");
+      if (res.channel) useChannels.getState().upsert(res.channel);
+    },
+    (count) => t("pick.accepted", { count }),
+    t("profile.profileCard.couldNotAccept"),
+  );
+}
+
+/** Ignores several requests, or takes back several of your own. */
+export function dropRequests(users: PublicUser[]): Promise<void> {
+  return eachPerson(
+    users,
+    async (u) => {
+      try {
+        await relApi.remove(u.id);
+      } catch (err) {
+        if (!(err instanceof ApiError && err.status === 404)) throw err;
+      }
+      useRelationships.getState().remove(u.id);
+    },
+    (count) => t("pick.requestsDropped", { count }),
+    t("friends.couldNotUpdate"),
+  );
 }

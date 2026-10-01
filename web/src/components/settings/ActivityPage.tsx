@@ -35,12 +35,12 @@ export default function ActivityPage() {
   return (
     <>
       <h2 className={st.title}>{t("settings.activity.title")}</h2>
-      <h3 className={st.h5}>{t("settings.activity.status")}</h3>
+      <h3 data-setting="activityStatus" className={st.h5}>{t("settings.activity.status")}</h3>
       <div className={st.form}>
         <Toggle checked={share} onChange={(v) => patch({ shareActivity: v })} label={t("settings.privacy.shareMyActivity")} description={t("settings.activity.shareHint")} />
         <Toggle checked={autoIdle} onChange={(v) => patch({ autoIdle: v })} label={t("settings.privacy.goIdleWhenAway")} description={t("settings.privacy.goIdleWhenAwayHint")} />
       </div>
-      <h3 className={st.h5}>{t("settings.activity.discord")}</h3>
+      <h3 data-setting="discord" className={st.h5}>{t("settings.activity.discord")}</h3>
       <DiscordSection share={share} />
       {inApp ? <RichPresenceSection share={share} /> : null}
     </>
@@ -320,7 +320,7 @@ function RichPresenceSection({ share }: { share: boolean }) {
 
   return (
     <>
-      <h3 className={st.h5}>{t("settings.desktop.richPresence")}</h3>
+      <h3 data-setting="richPresence" className={st.h5}>{t("settings.desktop.richPresence")}</h3>
       <div className={st.form}>
         <Toggle checked={!!rpc?.enabled} onChange={(on) => void bridge.rpc.setEnabled(on)} label={t("settings.desktop.showWhatIMPlayingWatching")} description={t("settings.desktop.gamesMusicPlayersAndOtherPrograms")} />
         <Toggle checked={!!rpc?.relay} onChange={(on) => void bridge.rpc.setRelay(on)} disabled={!rpc?.enabled} label={t("settings.desktop.alsoShowItOnDiscord")} description={t("settings.desktop.whenDiscordIsRunningProgramsReach")} />

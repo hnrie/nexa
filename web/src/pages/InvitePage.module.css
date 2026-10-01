@@ -16,7 +16,7 @@
 .iconBox { width: 80px; height: 80px; border-radius: 24px; display: flex; align-items: center; justify-content: center; background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-medium); color: var(--text-strong); font-size: 24px; font-weight: 700; overflow: hidden; margin: 8px 0; }
 .iconBox [data-sticker-media] { width: 100%; height: 100%; object-fit: cover; }
 .iconBox[data-invalid="true"] { background: var(--danger); color: var(--on-danger); font-size: 40px; }
-.title { margin: 0; font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 26px; font-weight: 820; letter-spacing: -0.02em; line-height: 1.15; color: var(--text-strong); overflow-wrap: anywhere; }
+.title { margin: 0; font-family: var(--font-display); font-size: 26px; font-weight: 700; letter-spacing: -0.012em; line-height: 1.15; color: var(--text-strong); overflow-wrap: anywhere; }
 .sub { margin: 0; font-size: 16px; color: var(--text-muted); overflow-wrap: anywhere; }
 .link { color: var(--link); font-size: 14px; }
 /* A pack of three stickers sits in the middle like everything else on the

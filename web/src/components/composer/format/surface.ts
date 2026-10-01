@@ -1,6 +1,7 @@
 import type { AlertKind, Align } from "@/markdown/ast";
 import { FALLBACK_SURFACE, paintColor, surfaceOf, type Surface } from "@/markdown/colors";
-import { fromMarkdown, inlineFromMarkdown, toMarkdown, type AtomNames } from "./markdown";
+import { alignment } from "@/lib/align";
+import { fromMarkdown, inlineFromMarkdown, toMarkdown, type AtomNames, type ReadOptions } from "./markdown";
 import {
   caret,
   clampPos,
@@ -16,6 +17,7 @@ import {
   insertAt,
   insertBlock,
   isText,
+  isVoid,
   joinBackward,
   joinForward,
   linkAround,
@@ -70,7 +72,7 @@ import {
 export interface SurfaceState {
   /** The marks the toolbar shows as on: every character selected has them, or typing at the caret would. */
   marks: Marks;
-  kind: TextKind | "code" | "hr" | "table" | null;
+  kind: TextKind | "code" | "hr" | "table" | "file" | null;
   list: ListInfo | null;
   wrap: Wrap;
   table: { row: number; col: number; rows: number; cols: number; align: Align } | null;
@@ -103,6 +105,53 @@ export interface SurfaceOptions {
   onLinkKey?: () => void;
   /** Escape. */
   onEscape?: () => void;
+  /**
+   * A note's editor: file lines are files, shown as blocks (the chat's
+   * formatting editor has neither), and the text may be as long as `max`.
+   */
+  read?: ReadOptions;
+  /**
+   * The file blocks on show, each with the element to draw its file in. Told
+   * after every draw that changed them; the surface draws nothing there itself.
+   */
+  onFiles?: (shown: FileHost[]) => void;
+  /** Files pasted in: the editor uploads them and puts them where the caret is. */
+  onPasteFiles?: (files: File[]) => void;
+  /** The surface was drawn again: what is drawn over it (someone else's caret) is placed again. */
+  onDraw?: () => void;
+}
+
+/**
+ * A place in a note that still means the same place in someone else's copy
+ * of it, which may be a moment ahead or behind: which block (by where it is,
+ * and by a short hash of what it says, to find it again after blocks above
+ * it came or went) and how far into it.
+ */
+export interface PlaceMark {
+  b: number;
+  o: number;
+  cell?: [number, number];
+  k: string;
+}
+
+/** Where someone's selection runs from and to; the same place twice is a caret. */
+export interface CursorMark {
+  a: PlaceMark;
+  f: PlaceMark;
+}
+
+/** Someone else's selection as drawn: the caret's line, and the boxes the selection covers. */
+export interface CursorRects {
+  caret: { left: number; top: number; height: number } | null;
+  boxes: { left: number; top: number; width: number; height: number }[];
+}
+
+/** A file block on the surface: which block, which file, and where to draw it. */
+export interface FileHost {
+  key: number;
+  file: string;
+  name: string;
+  el: HTMLElement;
 }
 
 export type TableOp = { kind: "addRow"; at: number } | { kind: "addCol"; at: number } | { kind: "delRow"; at: number } | { kind: "delCol"; at: number } | { kind: "align"; col: number; align: Align } | { kind: "delete" };
@@ -121,6 +170,9 @@ export type Command =
   | { t: "table"; rows: number; cols: number }
   | { t: "tableOp"; op: TableOp }
   | { t: "hr" }
+  | { t: "file"; file: string; name: string }
+  /** Takes out one block, by its key: a file, from the button drawn on it. */
+  | { t: "removeBlock"; key: number }
   | { t: "clear" }
   | { t: "undo" }
   | { t: "redo" }
@@ -129,6 +181,75 @@ export type Command =
 interface Snapshot {
   blocks: Block[];
   sel: Sel;
+}
+
+/** What a block says, as markdown: two blocks that read the same have the same one. */
+function signature(block: Block): string {
+  return block.kind + "\u0000" + toMarkdown([block]);
+}
+
+/** A short hash of what a block says (FNV-1a), to find it again in another copy of the note. */
+function blockKey(block: Block | undefined): string {
+  if (!block) return "";
+  const text = signature(block);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
+
+/** A block's characters as the caret counts them: an atom is one. */
+function counted(block: Block | undefined): string | null {
+  if (!block) return null;
+  if (block.kind === "code") return block.text;
+  if (!isText(block)) return null;
+  return block.content.map((r) => (r.kind === "text" ? r.text : "\uFFFC")).join("");
+}
+
+/**
+ * Where a place in the old document is in the new one, when someone else's
+ * change replaced it: `map` says which old blocks are still there and where.
+ * A place in a block that stayed is the same place. In a block that changed,
+ * it stays with the words around it: before the change it does not move,
+ * after it it moves by as much as the block grew or shrank.
+ */
+function follow(before: Block[], next: Block[], map: Int32Array, p: Pos): Pos {
+  const to = map[p.b];
+  if (to === undefined) return p;
+  if (to >= 0) return { ...p, b: to };
+  // between the nearest blocks that stayed, as far in as it was
+  let above = p.b - 1;
+  while (above >= 0 && map[above]! < 0) above -= 1;
+  let below = p.b + 1;
+  while (below < before.length && map[below]! < 0) below += 1;
+  const lo = above >= 0 ? map[above]! + 1 : 0;
+  const hi = below < before.length ? map[below]! - 1 : next.length - 1;
+  if (hi < lo) {
+    // the block is gone with nothing in its place: the end of the one before
+    const b = Math.max(0, lo - 1);
+    return { b, o: lo > 0 ? sizeAt(next, { b, o: 0 }) : 0 };
+  }
+  const b = Math.min(hi, lo + (p.b - (above + 1)));
+  const was = counted(before[p.b]);
+  const now = counted(next[b]);
+  if (was === null || now === null || p.cell) return { b, o: 0, ...(next[b]?.kind === "table" ? { cell: p.cell ?? [0, 0] } : {}) };
+  let pre = 0;
+  while (pre < was.length && pre < now.length && was[pre] === now[pre]) pre += 1;
+  let suf = 0;
+  while (suf < was.length - pre && suf < now.length - pre && was[was.length - 1 - suf] === now[now.length - 1 - suf]) suf += 1;
+  if (p.o <= pre) return { b, o: p.o };
+  if (p.o >= was.length - suf) return { b, o: now.length - (was.length - p.o) };
+  return { b, o: now.length - suf };
+}
+
+/** Whether an event's target is inside one of the frames a file is drawn in. */
+function inFileHost(target: EventTarget | null, root: HTMLElement): boolean {
+  if (!(target instanceof Node)) return false;
+  const el = target instanceof Element ? target : target.parentElement;
+  const host = el?.closest("[data-file-host]");
+  return !!host && root.contains(host);
 }
 
 const ZWSP = /​/g;
@@ -155,6 +276,7 @@ export class FormatSurface {
   private elements = new Map<Block, HTMLElement>();
   private surface: Surface = FALLBACK_SURFACE;
   private stateFrame = 0;
+  private filesShown: FileHost[] = [];
   private destroyed = false;
   private readonly listeners: [EventTarget, string, EventListener][] = [];
 
@@ -165,15 +287,18 @@ export class FormatSurface {
     root.setAttribute("role", "textbox");
     root.setAttribute("aria-multiline", "true");
     root.spellcheck = true;
-    this.on(root, "beforeinput", (e) => this.onBeforeInput(e as InputEvent));
+    // What the editor draws inside a file block (its buttons, its player) is
+    // its own: a key pressed there is not typing in the note.
+    const mine = (e: Event): boolean => !inFileHost(e.target, root);
+    this.on(root, "beforeinput", (e) => mine(e) && this.onBeforeInput(e as InputEvent));
     this.on(root, "input", () => this.onInput());
     this.on(root, "compositionstart", () => this.onCompositionStart());
     this.on(root, "compositionend", () => this.onCompositionEnd());
-    this.on(root, "keydown", (e) => this.onKeyDown(e as KeyboardEvent));
-    this.on(root, "paste", (e) => this.onPaste(e as ClipboardEvent));
-    this.on(root, "copy", (e) => this.onCopy(e as ClipboardEvent, false));
-    this.on(root, "cut", (e) => this.onCopy(e as ClipboardEvent, true));
-    this.on(root, "click", (e) => this.onClick(e as MouseEvent));
+    this.on(root, "keydown", (e) => mine(e) && this.onKeyDown(e as KeyboardEvent));
+    this.on(root, "paste", (e) => mine(e) && this.onPaste(e as ClipboardEvent));
+    this.on(root, "copy", (e) => mine(e) && this.onCopy(e as ClipboardEvent, false));
+    this.on(root, "cut", (e) => mine(e) && this.onCopy(e as ClipboardEvent, true));
+    this.on(root, "click", (e) => mine(e) && this.onClick(e as MouseEvent));
     this.on(root, "dragstart", (e) => e.preventDefault());
     this.on(root, "drop", (e) => e.preventDefault());
     this.on(document, "selectionchange", () => this.onSelectionChange());
@@ -196,7 +321,7 @@ export class FormatSurface {
 
   /** Shows a message's markdown; says whether anything nested had to be shown simpler. */
   load(markdown: string): boolean {
-    const loaded = fromMarkdown(markdown, this.opts.names);
+    const loaded = fromMarkdown(markdown, this.opts.names, this.opts.read);
     this.blocks = loaded.blocks;
     const last = this.blocks.length - 1;
     this.sel = caret(last, sizeAt(this.blocks, { b: last, o: 0 }));
@@ -206,12 +331,161 @@ export class FormatSurface {
     return loaded.simplified;
   }
 
+  /**
+   * Shows other markdown in place of what is here, with the caret kept where
+   * it was as nearly as the new text allows: for a note that someone else
+   * changed while it is open. Nothing is done while a word is being composed;
+   * the caller tries again after.
+   */
+  reload(markdown: string): boolean {
+    if (this.composing) return false;
+    // the caret is here if the keyboard is, or if the page's selection is: it
+    // is put back after the swap, which would otherwise leave it on text that is gone
+    const picked = document.getSelection();
+    const had = document.activeElement === this.root || this.root.contains(document.activeElement) || (!!picked?.anchorNode && this.root.contains(picked.anchorNode) && this.syncSelection());
+    if (had) this.syncSelection();
+    const loaded = fromMarkdown(markdown, this.opts.names, this.opts.read);
+    const before = this.blocks;
+    const next = loaded.blocks.slice();
+    // A block that reads the same as before is the same block: it keeps its
+    // object, and with it its element on the page, so only what someone
+    // changed is drawn again and the rest does not so much as flicker.
+    const map = alignment(before.map(signature), next.map(signature));
+    map.forEach((j, i) => {
+      if (j >= 0) next[j] = before[i]!;
+    });
+    const moved = (p: Pos): Pos => clampPos(next, follow(before, next, map, p));
+    const sel = { anchor: moved(this.sel.anchor), focus: moved(this.sel.focus) };
+    // nothing of the page's own changed place: the selection is still right where the browser has it
+    const still = map[this.sel.anchor.b]! >= 0 && map[this.sel.focus.b]! >= 0;
+    this.blocks = next;
+    this.sel = sel;
+    this.pending = null;
+    this.past = [];
+    this.future = [];
+    this.render();
+    if (had && !still) this.placeSelection();
+    this.emitState();
+    return true;
+  }
+
+  /** Whether a word is being composed (an input method, dictation): the document should not be swapped under it. */
+  get busy(): boolean {
+    return this.composing;
+  }
+
   markdown(): string {
     return toMarkdown(this.blocks);
   }
 
   focus(): void {
     this.placeSelection();
+  }
+
+  // -------------------------------------------------------------------------
+  // where people's carets are, for a note written together
+  // -------------------------------------------------------------------------
+
+  /** Whether the keyboard is in the surface (or the page's selection is). */
+  get active(): boolean {
+    const picked = document.getSelection();
+    return this.root.contains(document.activeElement) || (!!picked?.anchorNode && this.root.contains(picked.anchorNode));
+  }
+
+  /** Where this page's caret and selection are, as places another copy of the note can find. */
+  cursor(): CursorMark {
+    if (this.active && !this.composing) this.syncSelection();
+    return { a: this.mark(this.sel.anchor), f: this.mark(this.sel.focus) };
+  }
+
+  private mark(p: Pos): PlaceMark {
+    return { b: p.b, o: p.o, ...(p.cell ? { cell: p.cell } : {}), k: blockKey(this.blocks[p.b]) };
+  }
+
+  /**
+   * A place from another copy of the note, in this one: the block that says
+   * what it said, nearest where it was, or, when none does (it is the one
+   * being written in), the block in its place.
+   */
+  locate(m: PlaceMark): Pos | null {
+    if (!m || !Number.isInteger(m.b) || !Number.isInteger(m.o) || m.b < 0 || m.o < 0) return null;
+    let b = -1;
+    if (blockKey(this.blocks[m.b]) === m.k) b = m.b;
+    else {
+      for (let d = 1; d < 64 && b < 0; d++) {
+        if (blockKey(this.blocks[m.b - d]) === m.k) b = m.b - d;
+        else if (blockKey(this.blocks[m.b + d]) === m.k) b = m.b + d;
+      }
+    }
+    if (b < 0) b = Math.min(m.b, this.blocks.length - 1);
+    const cell = Array.isArray(m.cell) && m.cell.length === 2 && m.cell.every((n) => Number.isInteger(n) && n >= 0) ? m.cell : undefined;
+    return clampPos(this.blocks, { b, o: m.o, ...(cell ? { cell } : {}) });
+  }
+
+  /**
+   * Where to draw someone else's caret and selection, in the coordinates of
+   * the page (getBoundingClientRect's): the caret as a line as tall as the
+   * line it is on, and their selection as the boxes of the lines it covers.
+   */
+  cursorRects(c: CursorMark): CursorRects {
+    const a = this.locate(c.a);
+    const f = this.locate(c.f);
+    if (!a || !f) return { caret: null, boxes: [] };
+    const caret = this.caretBox(f);
+    if (comparePos(a, f) === 0) return { caret, boxes: [] };
+    const [from, to] = comparePos(a, f) < 0 ? [a, f] : [f, a];
+    const start = this.toDom(from);
+    const end = this.toDom(to);
+    const boxes: CursorRects["boxes"] = [];
+    if (start && end) {
+      const range = document.createRange();
+      try {
+        range.setStart(start[0], start[1]);
+        range.setEnd(end[0], end[1]);
+        for (const r of Array.from(range.getClientRects())) {
+          if (r.width > 0.5 && r.height > 0) boxes.push({ left: r.left, top: r.top, width: r.width, height: r.height });
+        }
+      } catch {
+        /* a place the browser will not take: no boxes */
+      }
+    }
+    return { caret, boxes };
+  }
+
+  /** The line a caret at p stands on. */
+  private caretBox(p: Pos): CursorRects["caret"] {
+    const block = this.blocks[p.b];
+    const el = block ? this.elements.get(block) : undefined;
+    if (!block || !el) return null;
+    const lineOf = (box: DOMRect, left: number) => {
+      const cs = getComputedStyle(el);
+      const line = Number.parseFloat(cs.lineHeight);
+      const height = Number.isFinite(line) && line > 0 ? Math.min(line, box.height || line) : box.height;
+      return { left, top: box.top, height };
+    };
+    // before a picture or a divider: along its starting edge
+    if (isVoid(block)) {
+      const box = el.getBoundingClientRect();
+      return { left: box.left, top: box.top, height: box.height };
+    }
+    const at = this.toDom(p);
+    if (!at) return null;
+    const range = document.createRange();
+    try {
+      range.setStart(at[0], at[1]);
+      range.collapse(true);
+    } catch {
+      return null;
+    }
+    const rects = range.getClientRects();
+    const r = rects[rects.length - 1] ?? range.getBoundingClientRect();
+    if (r && (r.height > 0 || r.top !== 0)) return { left: r.left, top: r.top, height: r.height };
+    // an empty line has no text to measure: the start of the line itself
+    const host = (at[0] instanceof HTMLElement ? at[0] : at[0].parentElement) ?? el;
+    const box = host.getBoundingClientRect();
+    const rtl = getComputedStyle(host).direction === "rtl";
+    const pad = Number.parseFloat(getComputedStyle(host).paddingInlineStart || "0") || 0;
+    return lineOf(box, rtl ? box.right - pad : box.left + pad);
   }
 
   // -------------------------------------------------------------------------
@@ -232,8 +506,21 @@ export class FormatSurface {
       children.push(el);
     });
     this.elements = next;
-    const current = Array.from(this.root.childNodes);
-    if (current.length !== children.length || current.some((n, k) => n !== children[k])) this.root.replaceChildren(...children);
+    // Only what is out of place is moved. An element left where it is keeps
+    // the caret and the selection inside it, which swapping every child
+    // would drop.
+    let at: ChildNode | null = this.root.firstChild;
+    for (const el of children) {
+      if (el === at) at = at.nextSibling;
+      else this.root.insertBefore(el, at);
+    }
+    while (at) {
+      const gone: ChildNode = at;
+      at = at.nextSibling;
+      gone.remove();
+    }
+    this.tellFiles();
+    this.opts.onDraw?.();
   }
 
   /** The attributes that depend on a block's neighbours: list numbers, the first line of a callout, placeholders. */
@@ -268,6 +555,21 @@ export class FormatSurface {
     if (block.kind === "code") set(el, "data-lang", block.lang || labels.code);
   }
 
+  /** Tells the editor which file blocks are on show, when that changed. */
+  private tellFiles(): void {
+    if (!this.opts.onFiles) return;
+    const shown: FileHost[] = [];
+    for (const block of this.blocks) {
+      if (block.kind !== "file") continue;
+      const el = this.elements.get(block)?.firstElementChild;
+      if (el instanceof HTMLElement) shown.push({ key: block.id, file: block.file, name: block.name, el });
+    }
+    const was = this.filesShown;
+    if (was.length === shown.length && was.every((h, k) => h.key === shown[k]!.key && h.el === shown[k]!.el)) return;
+    this.filesShown = shown;
+    this.opts.onFiles(shown);
+  }
+
   private draw(block: Block): HTMLElement {
     const el = document.createElement(block.kind === "code" ? "pre" : "div");
     el.dataset["b"] = block.kind;
@@ -282,6 +584,15 @@ export class FormatSurface {
         el.contentEditable = "false";
         el.appendChild(document.createElement("hr"));
         break;
+      case "file": {
+        // an empty frame: the editor draws the file in it (onFiles)
+        el.contentEditable = "false";
+        const host = document.createElement("div");
+        host.dataset["fileHost"] = block.file;
+        host.setAttribute("aria-label", block.name);
+        el.appendChild(host);
+        break;
+      }
       case "table":
         el.contentEditable = "false";
         el.appendChild(this.drawTable(block));
@@ -402,7 +713,7 @@ export class FormatSurface {
     if (!(node instanceof HTMLElement)) return [];
     const old = byId.get(node.dataset["id"] ?? "");
     if (old) byId.delete(node.dataset["id"] ?? "");
-    if (old?.kind === "hr") return [old];
+    if (isVoid(old)) return [old];
     if (old?.kind === "table") {
       const rows = old.rows.map((row, r) =>
         row.map((cell, c) => {
@@ -453,7 +764,7 @@ export class FormatSurface {
       const [r, c] = (td.dataset["cell"] ?? "0,0").split(",").map(Number) as [number, number];
       return { b, cell: [r, c], o: offsetIn(td, node, offset) };
     }
-    if (block.kind === "hr") return { b, o: 0 };
+    if (isVoid(block)) return { b, o: 0 };
     return { b, o: Math.min(offsetIn(el as HTMLElement, node, offset), sizeAt(this.blocks, { b, o: 0 })) };
   }
 
@@ -469,7 +780,7 @@ export class FormatSurface {
     if (!block) return null;
     const el = this.elements.get(block);
     if (!el) return null;
-    if (block.kind === "hr") return [this.root, Math.max(0, Array.from(this.root.childNodes).indexOf(el))];
+    if (isVoid(block)) return [this.root, Math.max(0, Array.from(this.root.childNodes).indexOf(el))];
     let host: HTMLElement = el;
     if (block.kind === "table") {
       const td = el.querySelector<HTMLElement>(`[data-cell="${p.cell?.[0] ?? 0},${p.cell?.[1] ?? 0}"]`);
@@ -641,7 +952,7 @@ export class FormatSurface {
         // the caret, or just after a link or inline code (whose end the
         // browser would stretch over the new words), is done here; the rest
         // is the browser's own.
-        if (across || this.pending || block?.kind === "hr" || (flat && this.atEdgeOfLinkOrCode(from))) {
+        if (across || this.pending || isVoid(block) || (flat && this.atEdgeOfLinkOrCode(from))) {
           e.preventDefault();
           this.typeText(data);
         }
@@ -758,7 +1069,8 @@ export class FormatSurface {
         dirty = true;
         continue;
       }
-      if (block.kind === "hr") continue;
+      // a file's frame holds what the editor drew in it, which is not the surface's to redraw
+      if (isVoid(block)) continue;
       const fresh = this.draw(block);
       if (fresh.innerHTML !== el.innerHTML) {
         this.elements.delete(block);
@@ -1087,6 +1399,11 @@ export class FormatSurface {
     if (!data) return;
     e.preventDefault();
     this.syncSelection();
+    // a copied picture or file goes to the editor, where there is one that takes files
+    if (this.opts.onPasteFiles && data.files.length > 0) {
+      this.opts.onPasteFiles(Array.from(data.files));
+      return;
+    }
     const text = (data.getData("text/plain") || "").replace(/\r\n?/g, "\n");
     if (!text) return;
     let blocks = this.blocks;
@@ -1108,7 +1425,7 @@ export class FormatSurface {
     }
     // Read as markdown, which drops blank lines at either end and spaces at
     // the very end; a paste keeps its edges, so they are put back.
-    const pasted = fromMarkdown(text, this.opts.names).blocks;
+    const pasted = fromMarkdown(text, this.opts.names, this.opts.read).blocks;
     const lead = /^\n*/.exec(text)?.[0].length ?? 0;
     const trail = /\n*$/.exec(text)?.[0].length ?? 0;
     const spaces = /[ \t]+\n*$/.exec(text)?.[0].replace(/\n/g, "") ?? "";
@@ -1310,6 +1627,21 @@ export class FormatSurface {
       case "hr": {
         const edit = insertBlock(this.blocks, sel, { id: newId(), kind: "hr", wrap: null });
         this.apply(edit.blocks, edit.sel);
+        return;
+      }
+      case "file": {
+        const edit = insertBlock(this.blocks, sel, { id: newId(), kind: "file", file: cmd.file, name: cmd.name, wrap: null });
+        this.apply(edit.blocks, edit.sel);
+        return;
+      }
+      case "removeBlock": {
+        const at = this.blocks.findIndex((b) => b.id === cmd.key);
+        if (at < 0) return;
+        const out = this.blocks.slice();
+        out.splice(at, 1);
+        // the caret goes where the block was: the start of what took its place, or the end of the line before
+        const next = out[at] && !isVoid(out[at]) ? caret(at, 0) : at > 0 ? caret(at - 1, sizeAt(out, { b: at - 1, o: 0 })) : caret(0, 0);
+        this.apply(out, next);
         return;
       }
       case "clear":

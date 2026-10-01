@@ -87,12 +87,18 @@ type Server struct {
 	limImport  *ratelimit.Limiter
 	limCrash   *ratelimit.Limiter
 	limBug     *ratelimit.Limiter
-	limBugFile *ratelimit.Limiter
-	limHook    *ratelimit.Limiter
-	limHookCh  *ratelimit.Limiter
-	limHookMgr *ratelimit.Limiter
-	limVote    *ratelimit.Limiter
-	limDiscord *ratelimit.Limiter
+	// notes: making them, saving them, inviting people to them, opening links to them
+	limNote         *ratelimit.Limiter
+	limNoteSave     *ratelimit.Limiter
+	limNoteInvite   *ratelimit.Limiter
+	limNoteLink     *ratelimit.Limiter
+	limNotePresence *ratelimit.Limiter
+	limBugFile      *ratelimit.Limiter
+	limHook         *ratelimit.Limiter
+	limHookCh       *ratelimit.Limiter
+	limHookMgr      *ratelimit.Limiter
+	limVote         *ratelimit.Limiter
+	limDiscord      *ratelimit.Limiter
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
@@ -209,6 +215,20 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limImport: ratelimit.New(ratelimit.Every(10, time.Hour), 6, 2*time.Hour),
 		// crash reports, per account: a broken page reports a burst, not a flood
 		limCrash: ratelimit.New(ratelimit.Every(10, time.Minute), 10, 10*time.Minute),
+		// new notes, per account: a burst while importing or tidying, then a steady few
+		limNote: ratelimit.New(ratelimit.Every(60, time.Hour), 30, 2*time.Hour),
+		// saves, per account: a note saves itself a fraction of a second after
+		// each pause in typing, so that others writing in it see the words
+		// arrive; steady typing is a few saves a second at the very most
+		limNoteSave: ratelimit.New(ratelimit.Every(240, time.Minute), 120, 10*time.Minute),
+		// saying a note is open, per account: once on opening, then every
+		// twenty seconds, for each note open on each device
+		limNotePresence: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
+		// invitations to notes, per account: each one reaches another person
+		limNoteInvite: ratelimit.New(ratelimit.Every(30, time.Hour), 10, 2*time.Hour),
+		// opening share links, per account: a link's token is a secret, and this
+		// is how fast one account may try them
+		limNoteLink: ratelimit.New(ratelimit.Every(120, time.Hour), 40, 2*time.Hour),
 		// bug reports, per account: someone who hit a few bugs in one sitting
 		// can send them all, and the team is not flooded by one account
 		limBug: ratelimit.New(ratelimit.Every(4, time.Hour), 4, 2*time.Hour),
@@ -240,6 +260,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
 		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile,
 		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord,
+		"note": s.limNote, "note-save": s.limNoteSave, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,
 	}
 }
 

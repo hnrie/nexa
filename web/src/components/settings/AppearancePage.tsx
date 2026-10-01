@@ -1,15 +1,12 @@
-import { Check, Pipette, X } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { Check, Pipette } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
-import { Toggle } from "@/components/common/Toggle";
 import { useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
-import { LANGUAGES } from "@/i18n";
 import { readableOn } from "@/lib/color";
 import { newThemeId, themeTokens } from "@/lib/look/customTheme";
 import type { CustomTheme } from "@/lib/look/types";
 import { resolveLook } from "@/lib/theme";
-import { forget } from "@/lib/spell";
 import { ImportThemeDialog } from "./look/ImportThemeDialog";
 import { startingColours } from "./look/SimpleEditor";
 import { ThemeBuilder } from "./look/ThemeBuilder";
@@ -52,6 +49,10 @@ export default function AppearancePage() {
     const col = scroller(top.current);
     col?.scrollTo?.(0, 0);
   }, [editing]);
+  // the classic fonts, for the choice between them to show them as they are
+  useEffect(() => {
+    void import("@/styles/fonts-classic.css").catch(() => undefined);
+  }, []);
 
   const startNew = () => {
     const from = customs.find((c) => c.id === shown.id);
@@ -73,7 +74,7 @@ export default function AppearancePage() {
     <div ref={top}>
       <h2 className={s.title}>{tr_("settings.appearance.appearance")}</h2>
       <p className={look.lead}>{tr_("settings.appearance.lead")}</p>
-      <h3 className={s.h5}>{tr_("settings.appearance.theme")}</h3>
+      <h3 className={s.h5} data-setting="theme">{tr_("settings.appearance.theme")}</h3>
       <ThemeGallery
         onEdit={(id) => {
           const theme = customs.find((c) => c.id === id);
@@ -91,7 +92,7 @@ export default function AppearancePage() {
           }}
         />
       ) : null}
-      <h3 className={s.h5}>{tr_("settings.appearance.accentColour")}</h3>
+      <h3 className={s.h5} data-setting="accent">{tr_("settings.appearance.accentColour")}</h3>
       <p className={s.hint} style={{ margin: "0 0 10px" }}>
         {tr_("settings.appearance.accentHint")}
       </p>
@@ -110,7 +111,22 @@ export default function AppearancePage() {
           <input type="color" value={accent ?? themeAccent} aria-label={tr_("settings.appearance.custom")} onChange={(e) => patch({ accent: e.target.value })} />
         </label>
       </div>
-      <h3 className={[s.h5, look.sizeHead].join(" ")}>
+      <h3 className={s.h5} data-setting="font">{tr_("settings.appearance.font")}</h3>
+      <div className={look.fonts} role="radiogroup" aria-label={tr_("settings.appearance.font")} data-testid="font-choice">
+        {(["default", "classic"] as const).map((face) => (
+          <button key={face} type="button" role="radio" aria-checked={st.fontFace === face} className={look.fontChoice} onClick={() => patch({ fontFace: face })} data-face={face}>
+            <span className={look.fontSample} data-face={face} aria-hidden="true">
+              Aa
+            </span>
+            <span className={look.fontText}>
+              <span className={look.fontName}>{face === "default" ? tr_("settings.appearance.fontDefault") : tr_("settings.appearance.fontClassic")}</span>
+              <span className={look.fontNote}>{face === "default" ? "Wix Madefor" : "Onest, Mona Sans"}</span>
+            </span>
+            {st.fontFace === face ? <Check size={16} className={look.fontCheck} aria-hidden="true" /> : null}
+          </button>
+        ))}
+      </div>
+      <h3 className={[s.h5, look.sizeHead].join(" ")} data-setting="textSize">
         <span>{tr_("settings.appearance.textSize")}</span>
         <span className={look.sizeValue}>{tr_("settings.appearance.textSizeValue", { px })}</span>
       </h3>
@@ -124,62 +140,6 @@ export default function AppearancePage() {
           <div className={s.previewText}>{tr_("settings.appearance.waitingForTheDayWhen")}</div>
         </div>
       </div>
-      <h3 className={s.h5}>{tr_("settings.appearance.messageDisplay")}</h3>
-      {(["cozy", "compact"] as const).map((m) => (
-        <label key={m} className={s.radio} data-on={st.messageDisplay === m}>
-          <input type="radio" name="display" checked={st.messageDisplay === m} onChange={() => patch({ messageDisplay: m })} />
-          <span className={s.radioText}>
-            <span className={s.radioLabel}>{m === "cozy" ? tr_("settings.appearance.cozy") : tr_("settings.appearance.compact")}</span>
-            <span className={s.radioDesc}>{m === "cozy" ? tr_("settings.appearance.cozyDesc") : tr_("settings.appearance.compactDesc")}</span>
-          </span>
-        </label>
-      ))}
-      <h3 className={s.h5}>{tr_("settings.appearance.language")}</h3>
-      <p className={s.hint}>{tr_("settings.appearance.languageHint")}</p>
-      <div className={s.languages} style={{ marginTop: 10 }}>
-        <button className={s.language} data-on={st.locale === null} aria-pressed={st.locale === null} onClick={() => patch({ locale: null })} data-testid="language-auto">
-          {tr_("settings.appearance.matchMyBrowser")}
-        </button>
-        {LANGUAGES.map((l) => (
-          <button
-            key={l.tag}
-            className={s.language}
-            data-on={st.locale === l.tag}
-            aria-pressed={st.locale === l.tag}
-            onClick={() => patch({ locale: l.tag })}
-            data-testid={`language-${l.tag}`}
-          >
-            {/* Only the name is in its own language and direction. The whole
-                tile used to be, which set the Arabic one flush against the
-                other edge of the grid, its English gloss with it. */}
-            <span className={s.languageName} lang={l.tag} dir={l.rtl ? "rtl" : "ltr"}>{l.endonym}</span>
-            <span className={s.languageEnglish}>{l.english}</span>
-          </button>
-        ))}
-      </div>
-      <h3 className={s.h5}>{tr_("settings.appearance.accessibility")}</h3>
-      <Toggle checked={st.reducedMotion} onChange={(v) => patch({ reducedMotion: v })} label={tr_("settings.appearance.reducedMotion")} description={tr_("settings.appearance.disablesAnimationsAndTransitions")} />
-      <Toggle checked={st.underlineLinks} onChange={(v) => patch({ underlineLinks: v })} label={tr_("settings.appearance.alwaysUnderlineLinks")} description={tr_("settings.appearance.makesLinksEasierToSpotIn")} />
-      <h3 className={s.h5}>{tr_("settings.appearance.typing")}</h3>
-      <Toggle checked={st.spellcheck !== false} onChange={(v) => patch({ spellcheck: v })} label={tr_("settings.appearance.spellCheck")} description={tr_("settings.appearance.underlinesMisspelledWordsInTheMessage")} />
-      {st.spellWords.length ? (
-        // the words added from the right-click menu, each one a click away from being checked again
-        <div className={s.spellWords} role="group" aria-labelledby="spell-words-head" data-testid="spell-words">
-          <div className={s.spellWordsHead} id="spell-words-head">{tr_("settings.appearance.yourWords")}</div>
-          <div className={s.spellWordList}>
-            {st.spellWords.map((w) => (
-              <span key={w} className={s.spellWord}>
-                <span dir="auto">{w}</span>
-                <button type="button" className={s.spellWordRemove} aria-label={tr_("settings.appearance.removeWord", { word: w })} title={tr_("settings.appearance.removeWord", { word: w })} onClick={() => forget(w)}>
-                  <X size={14} aria-hidden="true" />
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      <Toggle checked={st.sendButton} onChange={(v) => patch({ sendButton: v })} label={tr_("settings.appearance.sendButton")} description={tr_("settings.appearance.sendButtonHint")} />
-      <Toggle checked={st.smartEmoji} onChange={(v) => patch({ smartEmoji: v })} label={tr_("settings.appearance.smartEmoji")} description={tr_("settings.appearance.smartEmojiHint")} />
     </div>
   );
 }

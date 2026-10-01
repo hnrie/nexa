@@ -1,4 +1,4 @@
-import { Ban, Bell, ChevronLeft, ChevronRight, Code, Gamepad2, Gavel, IdCard, Info, KeyRound, Link, Lock, Mic, Monitor, MonitorSmartphone, Palette, Puzzle, Scale, ScrollText, Settings2, Shield, ShieldCheck, SlidersHorizontal, Smile, Sticker, Tags, Trash2, UserRound, Users, Webhook, X, type LucideIcon } from "lucide-react";
+import { Accessibility, Ban, Bell, ChevronLeft, ChevronRight, Code, DatabaseZap, Gamepad2, Gavel, IdCard, Info, KeyRound, Languages, Link, Lock, MessagesSquare, Mic, Monitor, MonitorSmartphone, Palette, Puzzle, Scale, ScrollText, Settings2, Shield, ShieldCheck, SlidersHorizontal, Smile, Sticker, Tags, Trash2, UserRound, Users, Webhook, Wrench, X, type LucideIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/common/Button";
@@ -20,6 +20,11 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   security: KeyRound,
   devices: MonitorSmartphone,
   appearance: Palette,
+  accessibility: Accessibility,
+  language: Languages,
+  chat: MessagesSquare,
+  data: DatabaseZap,
+  advanced: Wrench,
   customCss: Code,
   plugins: Puzzle,
   voice: Mic,
@@ -41,6 +46,11 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   permissions: SlidersHorizontal,
   delete: Trash2,
 };
+
+/** The picture a settings page is shown with, wherever it is listed (Settings' search, say). */
+export function navIconOf(id: string): LucideIcon | undefined {
+  return NAV_ICONS[id];
+}
 
 export interface NavGroup {
   /** The group's heading; without one the group is set apart by a divider instead. */
@@ -65,6 +75,8 @@ export function SettingsLayer({
   children,
   footer,
   startOnList = false,
+  navTop,
+  navBody,
 }: {
   label: string;
   groups: NavGroup[];
@@ -76,6 +88,10 @@ export function SettingsLayer({
   footer?: ReactNode;
   /** On a phone, open on the list instead of on `page`: settings opened as a whole rather than at one page. */
   startOnList?: boolean;
+  /** Above the nav: a search through the settings. */
+  navTop?: ReactNode;
+  /** In place of the nav's groups while there is something to show instead: what the search found. */
+  navBody?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -90,6 +106,15 @@ export function SettingsLayer({
     if (!mobile) setAtList(false);
   }, [mobile]);
   const onList = mobile && atList;
+  // a page chosen from outside the nav (what Settings' search found) is opened, on a phone too
+  const firstPage = useRef(true);
+  useEffect(() => {
+    if (firstPage.current) {
+      firstPage.current = false;
+      return;
+    }
+    setAtList(false);
+  }, [page]);
   // into the layer when it opens: at the page it opened on, or its way back to the list
   useFocusTrap(ref, true, () => (mobile && !atList ? backRef.current : ref.current?.querySelector<HTMLElement>('[aria-current="page"]')));
   useEffect(() => {
@@ -138,6 +163,63 @@ export function SettingsLayer({
     if (id !== page) setPage(id);
     setAtList(false);
   };
+
+  // On a phone a page is swiped away to the list it came from, the way a
+  // phone goes back: a drag towards the reading direction's start that
+  // carries the page with it, and back it goes past a third of the way.
+  const swipe = useRef<{ x: number; y: number; t: number; on: boolean } | null>(null);
+  const flow = () => (document.documentElement.dir === "rtl" ? -1 : 1);
+  const slide = (x: number | null, ms = 0) => {
+    const el = scroller.current;
+    if (!el) return;
+    el.style.transition = ms ? `transform ${ms}ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity ${ms}ms ease` : "none";
+    el.style.transform = x === null ? "" : `translateX(${x * flow()}px)`;
+    el.style.opacity = x === null ? "" : String(Math.max(0.4, 1 - x / 600));
+  };
+  const swipeBack = {
+    onTouchStart: (e: React.TouchEvent) => {
+      const t0 = e.touches[0];
+      const target = e.target instanceof Element ? e.target : null;
+      // a slider, a field, or anything that scrolls sideways keeps its own drag
+      if (!t0 || e.touches.length !== 1 || target?.closest("input, textarea, select, [contenteditable='true'], [data-no-swipe]")) {
+        swipe.current = null;
+        return;
+      }
+      swipe.current = { x: t0.clientX, y: t0.clientY, t: e.timeStamp, on: false };
+    },
+    onTouchMove: (e: React.TouchEvent) => {
+      const sw = swipe.current;
+      const t1 = e.touches[0];
+      if (!sw || !t1) return;
+      const dx = (t1.clientX - sw.x) * flow();
+      const dy = t1.clientY - sw.y;
+      if (!sw.on) {
+        if (Math.abs(dx) < 14 && Math.abs(dy) < 14) return;
+        if (dx < 0 || Math.abs(dx) < Math.abs(dy) * 1.4) {
+          swipe.current = null;
+          return;
+        }
+        sw.on = true;
+      }
+      slide(Math.max(0, dx));
+    },
+    onTouchEnd: (e: React.TouchEvent) => {
+      const sw = swipe.current;
+      swipe.current = null;
+      if (!sw?.on) return;
+      const t1 = e.changedTouches[0];
+      const dx = t1 ? (t1.clientX - sw.x) * flow() : 0;
+      const fast = dx / Math.max(1, e.timeStamp - sw.t) > 0.5;
+      const width = scroller.current?.clientWidth ?? 360;
+      if (dx > width / 3 || (fast && dx > 40)) {
+        slide(width, 160);
+        window.setTimeout(() => {
+          slide(null);
+          unlessUnsaved(() => setAtList(true))();
+        }, 150);
+      } else slide(null, 200);
+    },
+  };
   const close = (
     <button className={s.close} aria-label={t("server.settingsLayer.closeSettings")} onClick={unlessUnsaved(onClose)}>
       <X size={mobile ? 22 : 20} />
@@ -162,7 +244,8 @@ export function SettingsLayer({
         <div className={s.navWrap}>
           {/* Selection lived only in `data-selected`, which is a CSS hook: ten identically-stated buttons, with no way to hear which page is open. */}
           <nav className={s.nav} aria-label={label}>
-            {groups.map((g, i) => (
+            {navTop}
+            {navBody ?? groups.map((g, i) => (
               <div key={g.head + i} className={s.navSection}>
                 {g.head ? <div className={s.navHead}>{g.head}</div> : <div className={s.navSep} />}
                 <div className={s.navGroup}>
@@ -187,12 +270,12 @@ export function SettingsLayer({
                 </div>
               </div>
             ))}
-            {footer}
+            {navBody ? null : footer}
           </nav>
         </div>
       ) : null}
       {onList ? null : (
-        <div ref={scroller} className={s.contentWrap}>
+        <div ref={scroller} className={s.contentWrap} {...(mobile ? swipeBack : {})}>
           <div className={s.content}>{children}</div>
           {mobile ? null : (
             <div className={s.closeCol}>

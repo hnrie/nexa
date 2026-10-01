@@ -36,6 +36,13 @@ func (s *Server) handleUnfurl(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, http.StatusOK, res)
 		return
 	}
+	// A note's share link gets no preview from here: what it leads to can
+	// only be read with the key in the part after the #, which never reaches
+	// the server, so the app draws its card itself.
+	if s.ownPath(raw, "/note/") != "" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if s.Unfurl == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -57,9 +64,16 @@ func (s *Server) handleUnfurl(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// everything the client loads from a card goes through our proxy, so
-	// opening a chat never hands the reader's address to whoever hosts the
-	// picture: the image, the site's own icon, and a file it plays inline
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	WriteJSON(w, http.StatusOK, s.proxied(res))
+}
+
+// proxied is a preview with every address the client loads from it rewritten
+// to go through our proxy, so opening a chat never hands the reader's address
+// to whoever hosts the picture: the image, the site's own icon, a file it
+// plays inline, and everything a social post shows. The preview given is the
+// cache's own and is left as it is.
+func (s *Server) proxied(res *unfurl.Result) *unfurl.Result {
 	out := *res
 	if out.Image == "" && (out.Type == "image" || out.Type == "gif" || out.Type == "video") {
 		out.Image = out.URL
@@ -67,12 +81,35 @@ func (s *Server) handleUnfurl(w http.ResponseWriter, r *http.Request) {
 	out.Image = s.ProxyURL(out.Image)
 	out.Icon = s.ProxyURL(out.Icon)
 	out.Media = s.ProxyURL(out.Media)
-	w.Header().Set("Cache-Control", "private, max-age=3600")
-	WriteJSON(w, http.StatusOK, &out)
+	out.Post = s.proxiedPost(out.Post)
+	return &out
+}
+
+func (s *Server) proxiedPost(p *unfurl.Post) *unfurl.Post {
+	if p == nil {
+		return nil
+	}
+	out := *p
+	out.Avatar = s.ProxyURL(out.Avatar)
+	if len(p.Media) > 0 {
+		out.Media = make([]unfurl.PostMedia, len(p.Media))
+		for i, m := range p.Media {
+			m.URL, m.Thumb, m.Audio = s.ProxyURL(m.URL), s.ProxyURL(m.Thumb), s.ProxyURL(m.Audio)
+			out.Media[i] = m
+		}
+	}
+	out.Quote = s.proxiedPost(p.Quote)
+	return &out
 }
 
 // inviteCodeOf returns the code when raw is an invite link to Nexa.
 func (s *Server) inviteCodeOf(raw string) string {
+	return s.ownPath(raw, "/invite/")
+}
+
+// ownPath returns what follows prefix when raw is a link to one of Nexa's
+// own pages under it ("/invite/CODE", "/note/TOKEN"), or "".
+func (s *Server) ownPath(raw, prefix string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {
 		return ""
@@ -81,11 +118,13 @@ func (s *Server) inviteCodeOf(raw string) string {
 	if err != nil || !strings.EqualFold(u.Host, base.Host) {
 		return ""
 	}
-	code, ok := strings.CutPrefix(u.Path, "/invite/")
-	if !ok || code == "" || strings.Contains(code, "/") {
+	rest, ok := strings.CutPrefix(u.Path, prefix)
+	// the app takes the page with a slash at its end too
+	rest = strings.TrimSuffix(rest, "/")
+	if !ok || rest == "" || strings.Contains(rest, "/") {
 		return ""
 	}
-	return code
+	return rest
 }
 
 // inviteUnfurl builds the preview card for one of our own invite links.

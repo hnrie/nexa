@@ -71,6 +71,7 @@ export function DeleteAccountDialog({ onClose }: { onClose: () => void }) {
     if (counts.owned_servers) rows.push({ label: t("settings.account.purge.ownedServers"), value: n(counts.owned_servers) });
     if (counts.owned_groups) rows.push({ label: t("settings.account.purge.ownedGroups"), value: n(counts.owned_groups) });
     if (counts.direct_messages) rows.push({ label: t("settings.account.purge.dms"), value: n(counts.direct_messages) });
+    if (counts.notes) rows.push({ label: t("settings.account.purge.notes"), value: n(counts.notes) });
     if (counts.reactions) rows.push({ label: t("settings.account.purge.reactions"), value: n(counts.reactions) });
     if (counts.packs) rows.push({ label: t("settings.account.purge.packs"), value: n(counts.packs) });
     if (leaving) rows.push({ label: t("settings.account.purge.leaves"), value: n(leaving) });

@@ -20,6 +20,8 @@ const LegalPage = lazyPage(() => import("@/pages/LegalPage"));
 const NexaPage = lazyPage(() => import("@/pages/NexaPage"));
 const NexaCasePage = lazyPage(() => import("@/pages/NexaCasePage"));
 const NexaBugPage = lazyPage(() => import("@/pages/NexaBugPage"));
+const NotesPage = lazyPage(() => import("@/pages/NotesPage"));
+const NoteLinkPage = lazyPage(() => import("@/pages/NoteLinkPage"));
 const NotFoundPage = lazyPage(() => import("@/pages/NotFoundPage"));
 // The app itself: its sidebars, conversations, calls and every store behind
 // them. The public pages (the front page, signing in, an invite) never load it.
@@ -51,6 +53,8 @@ export function AppRoutes() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/recover" element={<RecoverPage />} />
         <Route path="/invite/:code" element={<InvitePage />} />
+        {/* a note's share link: its key is in the part after the #, which never leaves the device */}
+        <Route path="/note/:token" element={<NoteLinkPage />} />
         <Route path="/download" element={<DownloadPage />} />
         <Route path="/terms" element={<LegalPage page="terms" />} />
         <Route path="/privacy" element={<LegalPage page="privacy" />} />
@@ -68,6 +72,9 @@ export function AppRoutes() {
                   <Route path="@me/nexa" element={<NexaPage />} />
                   <Route path="@me/nexa/cases/:caseId" element={<NexaCasePage />} />
                   <Route path="@me/nexa/bugs/:reportId" element={<NexaBugPage />} />
+                  {/* the list and the note open beside it: one page, so moving between notes keeps the list */}
+                  <Route path="@me/notes" element={<NotesPage />} />
+                  <Route path="@me/notes/:noteId" element={<NotesPage />} />
                   <Route path="@admin" element={<AdminPanelPage />}>
                     <Route index element={<Navigate to="users" replace />} />
                     <Route path="users" element={<AdminUsers />} />

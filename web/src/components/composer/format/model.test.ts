@@ -9,12 +9,16 @@ import {
   indentBy,
   insertAt,
   insertBlock,
+  isText,
+  isVoid,
   joinBackward,
   joinForward,
   mapSelection,
   marksAt,
+  newId,
   selectionHas,
   setKind,
+  sizeAt,
   splitAt,
   textBlock,
   toggleChecked,
@@ -227,5 +231,40 @@ describe("code, tables and rules", () => {
     expect(blocks[0]?.kind === "table" && blocks[0].rows.length).toBe(3);
     blocks = editTable(blocks, 0, { kind: "align", col: 0, align: "center" });
     expect(md(blocks).split("\n")[1]).toBe("|:-:|---|---|");
+  });
+});
+
+describe("a note's files", () => {
+  const file = (id: string, name = "photo.png"): Block => ({ id: newId(), kind: "file", file: id, name, wrap: null });
+
+  it("go in as a block of their own with a line after to carry on typing", () => {
+    const edit = insertBlock([p("before")], caret(0, 6), file("123"));
+    expect(edit.blocks.map((b) => b.kind)).toEqual(["p", "file", "p"]);
+    expect(edit.sel.focus).toEqual({ b: 2, o: 0 });
+    // on an empty line the file takes the line's place
+    expect(insertBlock([p("")], caret(0, 0), file("123")).blocks.map((b) => b.kind)).toEqual(["file", "p"]);
+  });
+
+  it("are removed whole, by Backspace after them and Delete before them", () => {
+    const blocks = [p("a"), file("123"), p("b")];
+    expect(joinBackward(blocks, 2).blocks.map((b) => b.kind)).toEqual(["p", "p"]);
+    expect(joinForward(blocks, 0).blocks.map((b) => b.kind)).toEqual(["p", "p"]);
+    // a selection across one takes it with the words
+    const cut = deleteRange(blocks, range(0, 1, 2, 0));
+    expect(md(cut.blocks)).toBe("ab");
+  });
+
+  it("have nothing to type in: Enter on one starts a line under it", () => {
+    const edit = splitAt([file("123")], { b: 0, o: 0 });
+    expect(edit.blocks.map((b) => b.kind)).toEqual(["file", "p"]);
+    expect(edit.sel.focus).toEqual({ b: 1, o: 0 });
+    expect(sizeAt([file("123")], { b: 0, o: 0 })).toBe(0);
+    expect(isVoid(file("1")) && !isText(file("1"))).toBe(true);
+  });
+
+  it("stay out of a quote, which holds lines of words, and go into a callout", () => {
+    const blocks = [p("a"), file("123"), p("b")];
+    expect(toggleWrap(blocks, range(0, 0, 2, 1), "quote").blocks.map((b) => b.wrap)).toEqual(["quote", null, "quote"]);
+    expect(toggleWrap(blocks, range(0, 0, 2, 1), "note").blocks.map((b) => b.wrap)).toEqual(["note", "note", "note"]);
   });
 });

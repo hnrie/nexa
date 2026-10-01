@@ -39,6 +39,8 @@ export interface PurgeCounts {
   reactions: number;
   /** One-to-one conversations, which go whole when someone deletes their own account. */
   direct_messages?: number;
+  /** The notes the account owns. */
+  notes?: number;
 }
 
 /** Exactly what a case did; which fields are there depends on the action. */

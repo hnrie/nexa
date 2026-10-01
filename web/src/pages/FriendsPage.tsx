@@ -1,5 +1,5 @@
 import { Check, Copy, MessageSquare, MessageSquarePlus, MoreVertical, Phone, Plus, Search, UserPlus, Users, X } from "lucide-react";
-import { useId, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { channels as channelsApi } from "@/api/channels";
 import { relationships as relApi } from "@/api/relationships";
@@ -30,9 +30,14 @@ import { ReportBugButton } from "@/components/bugs/ReportBugButton";
 import bugStyles from "@/components/bugs/Bugs.module.css";
 import { guarded } from "@/lib/captcha";
 import { describeError, dmOpenError } from "@/lib/errors";
+import { PickBar, PickMark } from "@/components/common/Pick";
+import { friendsBulk } from "@/components/friends/friendsBulk";
+import { pickClick, usePick } from "@/stores/pick";
 
 import { t as tr_, translator } from "@/i18n";
 type Tab = "online" | "all" | "pending" | "blocked" | "add";
+
+const NO_PICKS: string[] = [];
 
 /** Online first, then idle, then busy: who can answer soonest heads the list. */
 const PRESENCE_ORDER: Record<string, number> = { online: 0, idle: 1, dnd: 2 };
@@ -100,6 +105,23 @@ export default function FriendsPage() {
   ];
   const activeTab = tabs.find((x) => x.id === tab);
 
+  // picking several people at once (stores/pick.ts), within the tab on show
+  const picked = usePick((p) => (p.list === "friends" ? p.ids : NO_PICKS));
+  const pickMode = usePick((p) => p.list === "friends" && p.mode);
+  const isPicking = pickMode || picked.length > 0;
+  const pickOrder = useMemo(() => list.map((r) => r.user.id), [list]);
+  const openModal = useUI((u) => u.openModal);
+  // another tab is another list
+  useEffect(() => {
+    if (usePick.getState().list === "friends") usePick.getState().clear();
+  }, [tab]);
+  // whoever is picked and has gone from the list (removed, answered) is let go of
+  useEffect(() => {
+    const gone = picked.filter((id) => !pickOrder.includes(id));
+    if (gone.length) usePick.getState().drop(gone);
+  }, [picked, pickOrder]);
+  const bulk = isPicking ? friendsBulk(picked, openModal) : null;
+
   // Left/Right across the strip, as a tablist is expected to move; the buttons
   // themselves carry tabIndex -1 so Tab passes over the set rather than through it.
   const order: Tab[] = [...tabs.map((x) => x.id), "add"];
@@ -139,15 +161,21 @@ export default function FriendsPage() {
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr_("chat.chat.search")} aria-label={tr_("friends.searchFriends")} />
               <Search size={20} />
             </div>
-            <h3 className={s.section}>{activeTab?.label} (<span role="status">{list.length}</span>)</h3>
+            <div className={s.sectionRow}>
+              <h3 className={s.section}>{activeTab?.label} (<span role="status">{list.length}</span>)</h3>
+              {list.length > 0 && !isPicking ? (
+                <button type="button" className={s.selectBtn} onClick={() => usePick.getState().start("friends")} data-testid="friends-select">{tr_("pick.select")}</button>
+              ) : null}
+            </div>
             {list.length === 0 ? (
               alone && !query.trim() && (tab === "online" || tab === "all") ? <FirstRun onAdd={() => setTab("add")} /> : <Empty tab={tab} query={query} onClear={() => setQuery("")} />
             ) : (
-              list.map((r) => <FriendRow key={r.user.id} rel={r} presenceUser={users[r.user.id] ?? r.user} />)
+              list.map((r) => <FriendRow key={r.user.id} rel={r} presenceUser={users[r.user.id] ?? r.user} order={pickOrder} picking={isPicking} picked={picked.includes(r.user.id)} />)
             )}
           </>
         )}
       </div>
+      {bulk && tab !== "add" ? <PickBar list="friends" count={picked.length} label={tr_("pick.friendsBar")} actions={bulk.bar} more={bulk.menu} /> : null}
     </div>
   );
 }
@@ -209,7 +237,7 @@ function YourUsername() {
   );
 }
 
-function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Relationship["user"] }) {
+function FriendRow({ rel, presenceUser, order, picking, picked }: { rel: Relationship; presenceUser: Relationship["user"]; order: string[]; picking: boolean; picked: boolean }) {
   const nav = useNavigate();
   const p = usePresence((st) => st.byUser[rel.user.id]);
   const toast = useUI((u) => u.toast);
@@ -258,6 +286,13 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
   };
   const more = (e: React.MouseEvent) => {
     e.preventDefault();
+    const pick = usePick.getState();
+    // a right click on one of several picked acts on all of them
+    if (pick.list === "friends" && pick.ids.includes(rel.user.id) && pick.ids.length > 1) {
+      openContextMenu({ x: e.clientX, y: e.clientY, label: tr_("pick.count", { count: pick.ids.length }), items: friendsBulk(pick.ids, useUI.getState().openModal).menu() });
+      return;
+    }
+    if (pick.list === "friends" && !pick.mode && pick.ids.length) pick.clear();
     // Opened from the keyboard there is no pointer, and the click lands at
     // 0,0: the menu goes by the button instead.
     const fromKeys = e.clientX === 0 && e.clientY === 0;
@@ -274,7 +309,9 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
         ...(rel.type !== "blocked"
           ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: () => openBlockDialog(rel.user.id) }]
           : [{ id: "unblock", label: tr_("friends.unblock"), onSelect: () => void unblockUser(rel.user.id) }]),
-        { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => copyAndSay(rel.user.id, tr_("friends.userIdCopied")) },
+        { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => copyAndSay(rel.user.id, tr_("friends.userIdCopied")), separatorAfter: true },
+        // the way into picking on a touch screen, where there is no Ctrl to hold
+        { id: "select", label: tr_("pick.select"), onSelect: () => usePick.getState().start("friends", rel.user.id) },
       ],
     });
   };
@@ -293,8 +330,20 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
   // buttons included), while the buttons sit above it and keep their own
   // jobs. Siblings rather than buttons inside a button, as the DM list does.
   return (
-    <div className={s.row} data-user={rel.user.username} data-kind={rel.type} onContextMenu={more}>
-      <button type="button" className={s.rowMain} onClick={profile} aria-haspopup="dialog" data-testid="friend-row">
+    <div className={s.row} data-user={rel.user.username} data-kind={rel.type} onContextMenu={more} data-picked={picked || undefined}>
+      <button
+        type="button"
+        className={s.rowMain}
+        onClick={(e) => {
+          // Ctrl or ⌘ picks someone, Shift a run of people, a tap one while picking
+          if (pickClick(e, "friends", rel.user.id, order)) return;
+          profile();
+        }}
+        aria-haspopup={picking ? undefined : "dialog"}
+        aria-pressed={picking ? picked : undefined}
+        data-testid="friend-row"
+      >
+        {picking ? <PickMark on={picked} label={tr_("pick.pickNamed", { name })} /> : null}
         <Avatar id={rel.user.id} avatarId={presenceUser.avatar_id} name={name} size={32} status={rel.type === "friend" ? status : null} />
         <span className={s.rowText}>
           <span className={s.rowName}>

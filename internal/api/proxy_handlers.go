@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bufio"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -11,6 +12,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"evilion.xyz/chat/internal/auth"
@@ -196,6 +198,17 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "proxy unavailable", http.StatusServiceUnavailable)
 		return
 	}
+	// A social post's files move (their sites sign each address for a few
+	// hours), so a card names them instead; the name is traded here for
+	// where the file is today. See internal/unfurl/assets.go.
+	var extra map[string]string
+	if asset, named, err := s.Unfurl.Asset(r.Context(), target); named {
+		if err != nil {
+			http.Error(w, "upstream failed", http.StatusBadGateway)
+			return
+		}
+		target, extra = asset.URL, asset.Header
+	}
 	f := s.Unfurl.MediaFetcher()
 	if err := f.Validate(r.Context(), target); err != nil {
 		http.Error(w, "blocked", http.StatusForbidden)
@@ -214,6 +227,9 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Header.Set("User-Agent", f.UA())
 	req.Header.Set("Accept", "image/*,video/*,audio/*;q=0.8,*/*;q=0.1")
+	for k, v := range extra {
+		req.Header.Set(k, v)
+	}
 	// a Range request lets the browser seek inside proxied video, and a long
 	// one comes through a piece at a time instead of being refused
 	if rng := r.Header.Get("Range"); rng != "" {
@@ -230,6 +246,10 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ct := strings.ToLower(strings.TrimSpace(strings.Split(res.Header.Get("Content-Type"), ";")[0]))
+	body := io.Reader(res.Body)
+	if untypedMedia[ct] {
+		ct, body = sniffedType(target.String(), res)
+	}
 	if !proxyTypes[ct] && !unfurl.ProxyImageTypes[ct] {
 		http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
 		return
@@ -257,7 +277,44 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodHead {
 		return
 	}
-	_, _ = io.Copy(w, watch.Body(io.LimitReader(res.Body, maxProxyBytes)))
+	_, _ = io.Copy(w, watch.Body(io.LimitReader(body, maxProxyBytes)))
+}
+
+// untypedMedia are the types a file server gives when it does not say what a
+// file is: a Bluesky video's poster, a file kept exactly as it was uploaded.
+var untypedMedia = map[string]bool{"": true, "application/octet-stream": true, "binary/octet-stream": true}
+
+// sniffedTypes remembers what untyped files turned out to be, by address.
+// Only the start of a file says what it is, and a video is fetched in pieces:
+// the first piece is read for its type and the later ones go by it.
+var sniffedTypes = struct {
+	sync.Mutex
+	m map[string]string
+}{m: map[string]string{}}
+
+// sniffedType is the type of an untyped file, judged by what the file is, and
+// the body to send on with the bytes that were read to tell. The answer is
+// only used if it is a type the proxy passes anyway, so a page or a script
+// served without a type is still refused.
+func sniffedType(address string, res *http.Response) (string, io.Reader) {
+	fromStart := res.StatusCode == http.StatusOK || strings.HasPrefix(strings.TrimSpace(res.Header.Get("Content-Range")), "bytes 0-")
+	if !fromStart {
+		sniffedTypes.Lock()
+		defer sniffedTypes.Unlock()
+		return sniffedTypes.m[address], res.Body
+	}
+	head := bufio.NewReaderSize(res.Body, 512)
+	peek, _ := head.Peek(512)
+	ct := strings.ToLower(strings.TrimSpace(strings.Split(http.DetectContentType(peek), ";")[0]))
+	if proxyTypes[ct] || unfurl.ProxyImageTypes[ct] {
+		sniffedTypes.Lock()
+		if len(sniffedTypes.m) >= 2000 {
+			clear(sniffedTypes.m)
+		}
+		sniffedTypes.m[address] = ct
+		sniffedTypes.Unlock()
+	}
+	return ct, head
 }
 
 // narrowRange limits a single "bytes=start-[end]" range to at most max bytes.

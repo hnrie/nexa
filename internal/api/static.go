@@ -129,7 +129,18 @@ func (s *Server) staticHandler() http.Handler {
 			if !s.allowPublicPage(w, r) {
 				return
 			}
-			if s.serveGuestCallPage(w, r, dist) {
+			if s.servePlainPage(w, r, dist, "Join a Voice Call", "You're invited to a voice call. No account needed: pick a name and join.") {
+				return
+			}
+		}
+		// So does a note's share link. The server cannot read the note, and the
+		// link's key is in the part after the # that never reaches it, so the
+		// preview says only what the link is.
+		if token, ok := strings.CutPrefix(p, "/note/"); ok && token != "" && !strings.Contains(token, "/") {
+			if !s.allowPublicPage(w, r) {
+				return
+			}
+			if s.servePlainPage(w, r, dist, "A Shared Note", "Someone shared a note with you on Nexa. Open the link to read it.") {
 				return
 			}
 		}
@@ -315,15 +326,15 @@ func (s *Server) serveHomePage(w http.ResponseWriter, r *http.Request, dist stri
 	return true
 }
 
-// serveGuestCallPage renders index.html with preview tags for a guest link:
-// an invitation to a voice call, with no name, server or people in it, since
-// the link says nothing about where it leads to whoever does not open it.
-func (s *Server) serveGuestCallPage(w http.ResponseWriter, r *http.Request, dist string) bool {
+// servePlainPage renders index.html with preview tags that only say what
+// kind of link it is: a guest link to a voice call, with no name, server or
+// people in it, or a note's share link. Neither link says anything about
+// where it leads to whoever does not open it.
+func (s *Server) servePlainPage(w http.ResponseWriter, r *http.Request, dist, title, desc string) bool {
 	raw, err := os.ReadFile(filepath.Join(dist, "index.html"))
 	if err != nil {
 		return false
 	}
-	const title, desc = "Join a Voice Call", "You're invited to a voice call. No account needed: pick a name and join."
 	var tags strings.Builder
 	tags.WriteString("\n<title>" + escapeAttr(title) + "</title>")
 	for _, m := range [][2]string{{"og:type", "website"}, {"og:site_name", s.issuer()}, {"og:title", title}, {"og:description", desc}} {

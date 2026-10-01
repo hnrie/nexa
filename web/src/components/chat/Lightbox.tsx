@@ -84,7 +84,23 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
   const zoom = useRef<ZoomPanHandle>(null);
   const root = useRef<HTMLDivElement>(null);
   const closeBtn = useRef<HTMLButtonElement>(null);
-  const swipe = useRef<{ x: number; y: number } | null>(null);
+  const swipe = useRef<{ x: number; y: number; t: number; down: boolean } | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  /** The picture follows a finger pulling it down, and the dark behind it lifts, until it is let go. */
+  const follow = (dy: number | null, ms = 0) => {
+    const stage = stageRef.current;
+    const box = root.current;
+    if (!stage || !box) return;
+    stage.style.transition = ms ? `transform ${ms}ms cubic-bezier(0.2, 0.8, 0.2, 1)` : "none";
+    box.style.transition = ms ? `background-color ${ms}ms ease` : "none";
+    if (dy === null) {
+      stage.style.transform = "";
+      box.style.removeProperty("--lb-dim");
+      return;
+    }
+    stage.style.transform = `translateY(${dy}px) scale(${Math.max(0.82, 1 - Math.abs(dy) / 2400)})`;
+    box.style.setProperty("--lb-dim", String(Math.max(0.2, 1 - Math.abs(dy) / 500)));
+  };
   // a dialog in every sense: focus goes in, stays in, and comes back to the picture after
   useFocusTrap(root, true, () => closeBtn.current);
   const rtl = typeof document !== "undefined" && document.documentElement.dir === "rtl";
@@ -153,11 +169,21 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
         </div>
       </div>
       <div
+        ref={stageRef}
         className={s.stageWrap}
-        // a sideways swipe on a touch screen goes to the next picture, while the picture is at its own size
+        // At its own size, a picture on a touch screen goes to the next one with a
+        // sideways swipe, and is put away with one up or down, as a phone's
+        // photos are. Not over a clip, where a drag is the scrubber's.
         onPointerDown={(e) => {
-          // not over a clip, where a sideways drag is the scrubber's
-          swipe.current = e.pointerType === "touch" && scale <= 1 && count > 1 && !video ? { x: e.clientX, y: e.clientY } : null;
+          swipe.current = e.pointerType === "touch" && scale <= 1 && !video ? { x: e.clientX, y: e.clientY, t: e.timeStamp, down: false } : null;
+        }}
+        onPointerMove={(e) => {
+          const from = swipe.current;
+          if (!from) return;
+          const dx = e.clientX - from.x;
+          const dy = e.clientY - from.y;
+          if (!from.down && Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx) * 1.3) from.down = true;
+          if (from.down) follow(dy);
         }}
         onPointerUp={(e) => {
           const from = swipe.current;
@@ -165,8 +191,20 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
           if (!from) return;
           const dx = e.clientX - from.x;
           const dy = e.clientY - from.y;
-          if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+          if (from.down) {
+            const speed = Math.abs(dy) / Math.max(1, e.timeStamp - from.t);
+            if (Math.abs(dy) > 110 || speed > 0.7) {
+              follow(dy + Math.sign(dy) * 240, 160);
+              window.setTimeout(onClose, 150);
+            } else follow(null, 220);
+            return;
+          }
+          if (count < 2 || Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
           step((dx < 0) !== rtl ? 1 : -1);
+        }}
+        onPointerCancel={() => {
+          if (swipe.current?.down) follow(null, 220);
+          swipe.current = null;
         }}
       >
         {video ? (

@@ -46,7 +46,7 @@ export default function BlockedPage() {
       <h2 className={s.title}>{t("people.blockedPage.title")}</h2>
       <p className={s.hint}>{t("people.blockedPage.intro")}</p>
 
-      <h3 className={s.h5}>{t("people.blockedPage.messagesHeading")}</h3>
+      <h3 data-setting="blockedMessages" className={s.h5}>{t("people.blockedPage.messagesHeading")}</h3>
       <Toggle
         checked={blocking.hideMessages}
         onChange={(v) => patch({ blocking: { hideMessages: v, hideReplies: v && blocking.hideReplies } })}

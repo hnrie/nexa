@@ -52,8 +52,12 @@ func TestDeletingYourOwnAccountTakesEverything(t *testing.T) {
 
 	// what it would take, before asking: accepting a friend opens a DM, so
 	// there is one with carol as well as the one with bob
+	// and a note of their own
+	if res, body := do(t, ts, "POST", "/api/v1/notes", vicTok, map[string]any{"head": "v1.aGVhZA.aGVhZA", "body": "v1.Ym9keQ.Ym9keQ", "key_sealed": "a2V5LXNlYWxlZA"}); res.StatusCode != 201 {
+		t.Fatalf("note: %d %v", res.StatusCode, body)
+	}
 	_, preview := do(t, ts, "GET", "/api/v1/users/@me/delete-preview", vicTok, nil)
-	if preview["messages"].(float64) != 2 || preview["owned_servers"].(float64) != 1 || preview["direct_messages"].(float64) != 2 || preview["groups"].(float64) != 1 || preview["reactions"].(float64) != 1 {
+	if preview["messages"].(float64) != 2 || preview["owned_servers"].(float64) != 1 || preview["direct_messages"].(float64) != 2 || preview["groups"].(float64) != 1 || preview["reactions"].(float64) != 1 || preview["notes"].(float64) != 1 {
 		t.Errorf("preview: %v", preview)
 	}
 

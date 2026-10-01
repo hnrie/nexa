@@ -10,8 +10,8 @@
  * because it only redirects to https.
  */
 
-/** Where a link to this app leads. `hash` keeps an invite's key, which never leaves the device. */
-export type AppLink = { kind: "invite"; code: string; hash: string } | { kind: "route"; path: string };
+/** Where a link to this app leads. `hash` keeps an invite's or a note's key, which never leaves the device. */
+export type AppLink = { kind: "invite"; code: string; hash: string } | { kind: "note"; token: string; hash: string } | { kind: "route"; path: string };
 
 /** An invite link found in a message: its code, and the key in its fragment when it has one. */
 export interface InviteLinkRef {
@@ -41,6 +41,8 @@ const FILE_PATH = /\.[a-z0-9]{2,12}$/i;
  */
 const OWN_SESSION = /^\/call\//;
 const INVITE_PATH = /^\/invite\/([A-Za-z0-9_-]{1,64})\/?$/;
+/** A note's share link (crypto/notes.ts): its token, and its key after the #. */
+const NOTE_PATH = /^\/note\/([A-Za-z0-9_-]{16,128})\/?$/;
 const MESSAGE_PATH = /^\/channels\/(@me|\d+)\/(\d+)\/(\d+)\/?$/;
 
 interface Here {
@@ -71,7 +73,15 @@ export function appLink(href: string, here: Here = window.location): AppLink | n
   if (u.hash && path === cur.pathname && u.search === cur.search) return null;
   const invite = INVITE_PATH.exec(path);
   if (invite) return { kind: "invite", code: invite[1]!, hash: u.hash };
+  const note = NOTE_PATH.exec(path);
+  if (note) return { kind: "note", token: note[1]!, hash: u.hash };
   return { kind: "route", path: path + u.search + u.hash };
+}
+
+/** Whether a link is a note's share link to this app, which nothing is asked about but the app itself. */
+export function isNoteLink(href: string, here?: Here): boolean {
+  const at = here ?? (typeof window === "undefined" ? null : window.location);
+  return !!at && appLink(href, at)?.kind === "note";
 }
 
 /** The channel and message a message link points to. */
@@ -80,8 +90,54 @@ export function messageTarget(path: string): { channelId: string; messageId: str
   return m ? { channelId: m[2]!, messageId: m[3]! } : null;
 }
 
-/** How many invite cards one message shows at most. */
+/** How many invite cards one message shows at most, and how many note cards. */
 export const MAX_INVITE_CARDS = 3;
+export const MAX_NOTE_CARDS = 3;
+
+/** A note's share link found in a message: its token, the key in its fragment, and the link as written. */
+export interface NoteLinkRef {
+  token: string;
+  hash: string;
+  url: string;
+}
+
+/** Visits every link a message's parsed markdown has that asks for a preview: not one in code, not one written as <url>. */
+function eachLink(nodes: unknown, fn: (url: string) => boolean): void {
+  let stop = false;
+  const visit = (value: unknown, depth: number) => {
+    if (stop || depth > 64 || !value || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      for (const v of value) visit(v, depth + 1);
+      return;
+    }
+    const node = value as Record<string, unknown>;
+    if (node["type"] === "code" || node["type"] === "codeblock") return;
+    if (node["type"] === "link" && typeof node["url"] === "string" && node["noEmbed"] !== true && !fn(node["url"])) {
+      stop = true;
+      return;
+    }
+    for (const key of Object.keys(node)) {
+      const v = node[key];
+      if (v && typeof v === "object") visit(v, depth + 1);
+    }
+  };
+  visit(nodes, 0);
+}
+
+/** The note share links a message has, in order and each once. */
+export function noteLinksIn(nodes: unknown, here: Here = window.location): NoteLinkRef[] {
+  const out: NoteLinkRef[] = [];
+  const seen = new Set<string>();
+  eachLink(nodes, (url) => {
+    const link = appLink(url, here);
+    if (link?.kind === "note" && !seen.has(link.token)) {
+      seen.add(link.token);
+      out.push({ token: link.token, hash: link.hash, url });
+    }
+    return out.length < MAX_NOTE_CARDS;
+  });
+  return out;
+}
 
 /**
  * The invites to Nexa that a message links to, in order and each
@@ -91,26 +147,13 @@ export const MAX_INVITE_CARDS = 3;
 export function inviteLinksIn(nodes: unknown, here: Here = window.location): InviteLinkRef[] {
   const out: InviteLinkRef[] = [];
   const seen = new Set<string>();
-  const visit = (value: unknown, depth: number) => {
-    if (depth > 64 || out.length >= MAX_INVITE_CARDS || !value || typeof value !== "object") return;
-    if (Array.isArray(value)) {
-      for (const v of value) visit(v, depth + 1);
-      return;
+  eachLink(nodes, (url) => {
+    const link = appLink(url, here);
+    if (link?.kind === "invite" && !seen.has(link.code)) {
+      seen.add(link.code);
+      out.push({ code: link.code, hash: link.hash, url });
     }
-    const node = value as Record<string, unknown>;
-    if (node["type"] === "code" || node["type"] === "codeblock") return;
-    if (node["type"] === "link" && typeof node["url"] === "string" && node["noEmbed"] !== true) {
-      const link = appLink(node["url"], here);
-      if (link?.kind === "invite" && !seen.has(link.code)) {
-        seen.add(link.code);
-        out.push({ code: link.code, hash: link.hash, url: node["url"] });
-      }
-    }
-    for (const key of Object.keys(node)) {
-      const v = node[key];
-      if (v && typeof v === "object") visit(v, depth + 1);
-    }
-  };
-  visit(nodes, 0);
+    return out.length < MAX_INVITE_CARDS;
+  });
   return out;
 }

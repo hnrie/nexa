@@ -8,6 +8,9 @@ import type {
   KeyNeed,
   Member,
   Message,
+  NoteInviteRow,
+  NotePresenceEvent,
+  NoteUpdateEvent,
   Presence,
   PublicUser,
   ReadState,
@@ -83,6 +86,16 @@ export type GatewayEvent =
   /** Nexa's note that a friend added you to a group, and its dismissal on another of your devices. */
   | { t: "group_add_notice"; d: GroupAddNotice }
   | { t: "group_add_notice_delete"; d: { channel_id: Snowflake } }
+  /** A note changed: what it says, who it is shared with, or its key. */
+  | { t: "note_update"; d: NoteUpdateEvent }
+  /** A note is gone for this account: deleted, or this account is out of it. */
+  | { t: "note_delete"; d: { id: Snowflake } }
+  /** Someone asked this account into a note, and that asking being answered or taken back. */
+  | { t: "note_invite"; d: NoteInviteRow }
+  | { t: "note_invite_delete"; d: { id: Snowflake } }
+  | { t: "note_presence"; d: NotePresenceEvent }
+  /** Where someone else's caret is in a note, sealed with the note's key. */
+  | { t: "note_cursor"; d: { id: Snowflake; user_id: Snowflake; data: string } }
   | { t: "session_expired"; d: unknown }
   /** A guest's time in the call is over: removed, revoked, expired, left, or the call is gone. */
   | { t: "guest_ended"; d: { reason: string } }

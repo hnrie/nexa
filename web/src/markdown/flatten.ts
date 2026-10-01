@@ -65,6 +65,7 @@ export function flattenInline(nodes: Node[]): Node[] {
           gap();
           break;
         case "hr":
+        case "file":
         case "footnotes":
         case "footnoteRef":
         case "task":

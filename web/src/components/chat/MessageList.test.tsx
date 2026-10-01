@@ -67,8 +67,10 @@ function msg(id: string, author = THEM): DecryptedMessage {
 // --- a fake layout ---------------------------------------------------------
 // jsdom measures nothing: every box is zero by zero and scrollTop never moves.
 // Anchoring is entirely about measurements, so one is supplied here — a box of
-// a fixed height, rows of a fixed height each, and the same bottom pinning
-// `.inner`'s `justify-content: flex-end` gives a list shorter than its box.
+// a fixed height, rows of a fixed height each, and the list scrolled from its
+// bottom as `.scroll`'s column-reverse box scrolls it: scrollTop is 0 with the
+// newest message at the bottom of the box and goes negative above it, and a
+// list shorter than its box sits at the bottom of it.
 
 const BOX = 400;
 const ROW = 40;
@@ -85,9 +87,12 @@ const realRect = HTMLElement.prototype.getBoundingClientRect;
 const rows = (): HTMLElement[] => [...scroller.querySelectorAll<HTMLElement>("[data-id]")];
 const heightOf = (row: HTMLElement): number => heights.get(row.dataset.id!) ?? ROW;
 const content = (): number => rows().reduce((h, r) => h + heightOf(r), HEAD);
-/** A list shorter than its box sits at the bottom of it, not the top. */
-const pinned = (): number => Math.max(0, BOX - content());
 const maxScroll = (): number => Math.max(0, content() - BOX);
+/** Where the top of the list is, with the reader `-scrollTop` above its bottom. */
+const contentTop = (): number => BOX - scrollTop - content();
+
+/** How far the reader is below the top of what is loaded: how a drag up through history is felt. */
+const fromTheTop = (): number => maxScroll() + scrollTop;
 
 function rect(top: number, height: number): DOMRect {
   return { top, bottom: top + height, height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
@@ -100,14 +105,15 @@ function measure(): void {
     configurable: true,
     get: () => scrollTop,
     set: (v: number) => {
-      scrollTop = Math.max(0, Math.min(Math.round(v), maxScroll()));
+      scrollTop = Math.max(-maxScroll(), Math.min(Math.round(v), 0));
     },
   });
   HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement): DOMRect {
     if (this === scroller) return rect(0, BOX);
-    let y = pinned() + HEAD;
+    if (this === scroller.firstElementChild) return rect(contentTop(), content());
+    let y = contentTop() + HEAD;
     for (const row of rows()) {
-      if (row === this) return rect(y - scrollTop, heightOf(row));
+      if (row === this) return rect(y, heightOf(row));
       y += heightOf(row);
     }
     return rect(0, 0);
@@ -127,10 +133,10 @@ function firstVisible(): string {
   throw new Error("nothing visible");
 }
 
-/** A drag or a fling: the browser moves the list, then says so. */
+/** A drag or a fling to `top` pixels below the top of what is loaded: the browser moves the list, then says so. */
 function scrollTo(top: number): void {
   act(() => {
-    scroller.scrollTop = top;
+    scroller.scrollTop = top - maxScroll();
     fireEvent.scroll(scroller);
   });
 }
@@ -257,10 +263,11 @@ describe("MessageList keeping the reading position", () => {
 
     expect(firstVisible()).toBe(keeping);
     expect(topOf(keeping)).toBe(was);
-    // The complaint itself: with the anchor gone the list stays where it was
-    // and the ten messages that arrived above the viewport carry the reader
-    // up to the top of the chunk that just loaded.
-    expect(scroller.scrollTop).toBe(200 + 10 * ROW);
+    // The complaint itself: the ten messages that arrived above the viewport
+    // must not carry the reader up to the top of the chunk that just loaded.
+    // Counted from the bottom the list never moved at all, and the reader is
+    // the new page's height further from the top of what is loaded.
+    expect(fromTheTop()).toBe(200 + 10 * ROW);
   });
 
   it("holds through a stream of unrelated renders, as a DM full of decryptions produces", () => {
@@ -297,16 +304,15 @@ describe("MessageList keeping the reading position", () => {
     scrollTo(0);
     const keeping = firstVisible();
     const was = topOf(keeping);
-    const before = scroller.scrollTop;
+    const before = fromTheTop();
 
-    // A picture well below the viewport finally loads. The list is taller than
-    // it was, which a height comparison reads as a page of older messages and
-    // pays for by shoving the reader down by the height of the picture.
+    // A picture well below the viewport finally loads. Counted from the bottom,
+    // that would push everything on screen up by the height of the picture.
     heights.set("1050", ROW + 300);
     relayout();
     act(() => useMessages.getState().update(CHANNEL, { ...msg("1050"), payload: { t: "picture" } }));
 
-    expect(scroller.scrollTop).toBe(before);
+    expect(fromTheTop()).toBe(before);
     expect(topOf(keeping)).toBe(was);
   });
 
@@ -346,7 +352,37 @@ describe("MessageList keeping the reading position", () => {
     inFlight.land(Array.from({ length: 50 }, (_, i) => String(951 + i)));
 
     expect(topOf(keeping)).toBe(was);
-    expect(scroller.scrollTop).toBe(160 + 50 * ROW);
+    expect(fromTheTop()).toBe(160 + 50 * ROW);
+  });
+
+  it("writes no scroll position while a page of history lands above a fling", () => {
+    seed(60);
+    show();
+    scrollTo(150);
+    expect(inFlight.asked).toBe(1);
+    const keeping = firstVisible();
+    const was = topOf(keeping);
+    // iOS carries a fling on in the compositor and throws away a scroll
+    // position written from the page in the middle of one: the reader was
+    // left at the top of the page that had just loaded. Nothing may be written.
+    let writes = 0;
+    const own = Object.getOwnPropertyDescriptor(scroller, "scrollTop")!;
+    Object.defineProperty(scroller, "scrollTop", {
+      configurable: true,
+      get: own.get!,
+      set: (v: number) => {
+        writes++;
+        own.set!(v);
+      },
+    });
+    // The message that was oldest joins the one before it as the page lands,
+    // and loses the name line on top of it: it shrinks from its top.
+    heights.set(rows()[0]!.dataset.id!, ROW - 16);
+    inFlight.land(Array.from({ length: 50 }, (_, i) => String(951 + i)));
+    heights.set("955", ROW + 160);
+    relayout();
+    expect(writes).toBe(0);
+    expect(topOf(keeping)).toBe(was);
   });
 
   it("asks for one page however hard the list is flung", () => {
@@ -354,7 +390,7 @@ describe("MessageList keeping the reading position", () => {
     show();
     act(() => {
       for (const top of [900, 600, 300, 100, 40, 0]) {
-        scroller.scrollTop = top;
+        scroller.scrollTop = top - maxScroll();
         fireEvent.scroll(scroller);
       }
     });
@@ -366,11 +402,11 @@ describe("MessageList behaviours the anchoring must not cost", () => {
   it("sticks to the bottom when the reader is at the bottom", () => {
     seed(20);
     show();
-    expect(scroller.scrollTop).toBe(maxScroll());
+    expect(scroller.scrollTop).toBe(0);
     const wasMax = maxScroll();
 
     act(() => useMessages.getState().insert(CHANNEL, [msg("1021")]));
-    expect(scroller.scrollTop).toBe(maxScroll());
+    expect(scroller.scrollTop).toBe(0);
     expect(maxScroll()).toBe(wasMax + ROW);
   });
 
@@ -378,7 +414,7 @@ describe("MessageList behaviours the anchoring must not cost", () => {
     seed(60);
     show();
     scrollTo(600);
-    expect(scroller.scrollTop).toBe(600);
+    expect(fromTheTop()).toBe(600);
 
     act(() =>
       useMessages.getState().addPending({
@@ -392,7 +428,7 @@ describe("MessageList behaviours the anchoring must not cost", () => {
       }),
     );
 
-    expect(scroller.scrollTop).toBe(maxScroll());
+    expect(scroller.scrollTop).toBe(0);
   });
 
   it("offers the new-messages pill instead of moving a reader who has scrolled up", () => {
@@ -404,7 +440,7 @@ describe("MessageList behaviours the anchoring must not cost", () => {
 
     act(() => useMessages.getState().insert(CHANNEL, [msg("1061")]));
 
-    expect(scroller.scrollTop).toBe(600);
+    expect(fromTheTop()).toBe(600);
     expect(topOf(keeping)).toBe(was);
     // it counts what came in, and says since when
     expect(document.body.textContent).toMatch(/1 new message since \d{1,2}:\d{2}/);

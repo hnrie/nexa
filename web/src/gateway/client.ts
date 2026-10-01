@@ -341,7 +341,8 @@ export class GatewayClient {
       this.ws.send(frame);
       return;
     }
-    if (op === "typing") return;
+    // where a caret is, like typing, is only worth saying now
+    if (op === "typing" || op === "note_cursor") return;
     this.queue.push(frame);
     if (this.queue.length > MAX_QUEUE) this.queue.shift();
   }
@@ -363,6 +364,11 @@ export class GatewayClient {
     clear_status?: boolean;
   }): void {
     this.send("presence", p);
+  }
+
+  /** Where this device's caret is in a note, sealed with the note's key (lib/notes/cursors.ts). */
+  sendNoteCursor(noteId: string, data: string): void {
+    this.send("note_cursor", { id: noteId, data });
   }
 
   /** Whether the person has left this device alone for a while (see lib/away.ts). */

@@ -38,7 +38,7 @@
 @keyframes badgeIn { from { transform: scale(0.4); opacity: 0; } }
 .server .btn { font-size: 16px; font-weight: 700; color: var(--text-strong); }
 .server .btn.hasIcon { background: transparent; }
-.initials { padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; font-family: var(--font-display); font-stretch: 105%; letter-spacing: -0.01em; }
+.initials { padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; font-family: var(--font-display); letter-spacing: -0.005em; }
 .server[data-muted="true"] .btn { opacity: 0.6; }
 .server[data-dragging="true"], .folder[data-dragging="true"] { opacity: 0.4; }
 /* Where a dragged server or folder will land: a line before or after an entry, or a ring round the one it joins. */
@@ -78,3 +78,9 @@
 .folder[data-open="true"] .pill { inset-inline-start: -7px; }
 .folder[data-open="true"] .badge { inset-inline-end: -2px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--folder) 16%, var(--bg-canvas)); }
 .folder[data-open="true"] .item[data-drop="before"]::before, .folder[data-open="true"] .item[data-drop="after"]::after { inset-inline: 4px; }
+
+/* picking several servers (stores/pick.ts): the circle in the tile's top corner, and a picked tile ringed in the accent */
+.pickMark { position: absolute; top: -3px; inset-inline-start: calc(50% - 28px); z-index: 2; pointer-events: none; filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--shade) 60%, transparent)); }
+.item[data-picked] .btn { box-shadow: 0 0 0 2px var(--bg-canvas), 0 0 0 4px var(--brand), 0 8px 24px -6px color-mix(in srgb, var(--brand) 80%, transparent); }
+/* too narrow for the bar itself, the rail has it float over the foot of the column beside it */
+.pickBar { position: fixed; z-index: 45; bottom: calc(76px + env(safe-area-inset-bottom)); inset-inline-start: calc(var(--rail-w) + env(safe-area-inset-left)); width: min(320px, calc(100vw - var(--rail-w) - 24px)); }

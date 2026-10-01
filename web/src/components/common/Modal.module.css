@@ -1,5 +1,7 @@
 /* The page falls back behind a soft blur, and the dialog comes up out of it. */
-.overlay { position: fixed; inset: 0; z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; background: var(--bg-overlay); -webkit-backdrop-filter: blur(6px) saturate(1.1); backdrop-filter: blur(6px) saturate(1.1); animation: fadeIn 180ms var(--ease-out); padding: 16px; }
+/* --sheet-dim falls from 1 as a phone's sheet is swiped away (lib/sheetDrag.ts), taking the dim and the blur with it */
+@property --sheet-dim { syntax: "<number>"; inherits: false; initial-value: 1; }
+.overlay { --sheet-dim: 1; position: fixed; inset: 0; z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--bg-overlay) calc(var(--sheet-dim) * 100%), transparent); -webkit-backdrop-filter: blur(calc(var(--sheet-dim) * 6px)) saturate(1.1); backdrop-filter: blur(calc(var(--sheet-dim) * 6px)) saturate(1.1); animation: fadeIn 180ms var(--ease-out); padding: 16px; }
 /* A dialog floats over the app, so it is drawn in the floating colour, lit
    along its top edge, with a hairline round it for a theme whose panels are
    black already. Its footer is a shelf a step below the body. */
@@ -8,8 +10,9 @@
    ring round the whole card says nothing a keyboard user needs to know. */
 .card:focus-visible { outline: none; }
 .bare { background: transparent; box-shadow: none; }
+.grip { display: none; }
 .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 20px 0; }
-.title { margin: 0; font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 21px; font-weight: 780; letter-spacing: -0.012em; line-height: 1.2; color: var(--text-strong); }
+.title { margin: 0; font-family: var(--font-display); font-size: 21px; font-weight: 680; letter-spacing: -0.006em; line-height: 1.2; color: var(--text-strong); }
 .close { color: var(--text-muted); display: inline-flex; padding: 6px; border-radius: var(--radius-sm); transition: background-color var(--transition), color var(--transition), transform var(--transition); }
 .close:hover { color: var(--text-strong); background: var(--bg-hover); transform: rotate(90deg); }
 .body { padding: 16px 20px 20px; overflow: auto; }
@@ -23,8 +26,13 @@
   /* above the on-screen keyboard, where there is one (src/lib/keyboardInset.ts) */
   .overlay { padding: 0; padding-bottom: var(--kb-inset, 0px); align-items: flex-end; }
   .card { width: 100% !important; max-height: 92vh; max-height: min(92dvh, calc(var(--vvh, 100dvh) - 12px)); border-radius: var(--radius-lg) var(--radius-lg) 0 0; animation: sheetUp 280ms var(--ease-out); }
-  /* a handle, so a sheet looks like something that can be let go of */
+  /* a handle, so a sheet looks like something that can be let go of, or pulled up */
   .card:not(.bare)::before { content: ""; flex: none; display: block; width: 36px; height: 4px; margin: 8px auto -4px; border-radius: 2px; background: var(--border-strong); }
+  /* pulled up, a sheet with more in it takes the whole height of the screen */
+  .card[data-expanded] { height: calc(var(--vvh, 100dvh) - env(safe-area-inset-top)); max-height: none; }
+  /* the handle drawn over a sheet that has no bar of its own (a profile's banner) */
+  .grip { display: block; position: absolute; z-index: 5; top: 8px; left: 50%; translate: -50% 0; width: 38px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.78); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); pointer-events: none; }
+  .card.bare { position: relative; }
   .header { padding: 16px 16px 0; }
   .body { padding: 16px; }
   .footer { padding: 14px 16px; }

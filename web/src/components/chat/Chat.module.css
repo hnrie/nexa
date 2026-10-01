@@ -2,7 +2,7 @@
 /* the header rides on top of the conversation, with a soft shadow falling onto it */
 .header { position: relative; z-index: 2; flex: none; height: var(--header-h); display: flex; align-items: center; gap: 8px; padding-block: 0; padding-inline: 18px 10px; background: var(--sheen); box-shadow: 0 1px 0 var(--border-subtle), 0 8px 16px -14px color-mix(in srgb, var(--shade) 90%, transparent); }
 .hIcon { color: var(--text-muted); display: flex; flex: none; }
-.hName { font-family: var(--font-display); font-stretch: 108%; font-size: 16.5px; font-weight: 750; letter-spacing: -0.005em; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hName { font-family: var(--font-display); font-size: 16.5px; font-weight: 660; letter-spacing: 0; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hNameBtn { min-width: 0; }
 .hNameBtn:hover { text-decoration: underline; }
 /* The line after the name gives way first, so a narrow header still shows who
@@ -44,8 +44,11 @@
 @media (min-width: 768px) and (max-width: 899px) { .profilePanel { width: 100%; } }
 .listWrap { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; position: relative; }
 /* a pull past the top stays in the list instead of reaching the page, where Chrome on Android reloads */
-.scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; padding-bottom: 8px; }
-.inner { display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%; }
+/* Scrolled from its bottom (MessageList.tsx): the one child of a column-reverse
+   box sits at the bottom of it, and the scroll position counts up from there,
+   so history added at the top leaves what is on screen where it is. */
+.scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; display: flex; flex-direction: column-reverse; }
+.inner { flex: none; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 8px; }
 .loader { display: flex; justify-content: center; padding: 16px; color: var(--text-muted); }
 .loadError { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; padding: 16px; color: var(--text-muted); font-size: 14px; text-align: center; }
 .loadRetry { color: var(--link); font-size: 14px; font-weight: 500; padding: 4px; }
@@ -53,7 +56,7 @@
 /* the start of a conversation: who it is with, big, in the names' own face */
 .empty { padding: 24px 18px 10px; }
 .emptyAvatar { margin-bottom: 14px; display: inline-flex; border-radius: 50%; box-shadow: 0 0 0 4px var(--bg-raised), 0 0 0 5px var(--border-subtle), 0 18px 40px -16px color-mix(in srgb, var(--brand) 60%, transparent); }
-.emptyName { font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 34px; font-weight: 820; letter-spacing: -0.02em; color: var(--text-strong); margin: 0; line-height: 1.1; }
+.emptyName { font-family: var(--font-display); font-size: 34px; font-weight: 700; letter-spacing: -0.012em; color: var(--text-strong); margin: 0; line-height: 1.1; }
 .emptyUser { font-size: 18px; font-weight: 500; color: var(--text-subtle); margin: 6px 0 12px; }
 .emptyText { font-size: 15.5px; line-height: 1.5; color: var(--text-muted); margin: 0; max-width: 62ch; }
 .dateDivider { display: flex; align-items: center; margin: 24px 18px 8px; color: var(--text-muted); font-size: 12px; font-weight: 650; }
@@ -167,9 +170,11 @@
 .pillEmoji { font-size: 16px; line-height: 1; }
 .addReact { width: 30px; height: 26px; display: none; align-items: center; justify-content: center; border-radius: 999px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-muted); }
 .addReact:hover { color: var(--text-strong); border-color: var(--border-strong); }
-.system { display: flex; align-items: center; gap: 12px; padding-block: 4px; padding-inline: 64px 12px; margin-inline: 8px; border-radius: var(--radius-sm); position: relative; min-height: 26px; margin-top: 17px; color: var(--text-muted); font-size: 15.5px; line-height: 22px; }
+/* --sys-icon is where the line's icon starts, in the avatars' column */
+.system { --sys-icon: 16px; display: flex; align-items: center; gap: 12px; padding-block: 4px; padding-inline: 64px 12px; margin-inline: 8px; border-radius: var(--radius-sm); position: relative; min-height: 26px; margin-top: 17px; color: var(--text-muted); font-size: 15.5px; line-height: 22px; }
 .system:hover { background: var(--bg-message-hover); }
-.sysIcon { position: absolute; inset-inline-start: 16px; top: 4px; color: var(--text-muted); display: flex; }
+/* centred on the first line: 4px of padding and half of what the 22px line has over the 18px icon */
+.sysIcon { position: absolute; inset-inline-start: var(--sys-icon); top: 6px; color: var(--text-muted); display: flex; }
 .sysName { color: var(--text-strong); font-weight: 500; font-size: inherit; line-height: inherit; }
 button.sysName { cursor: pointer; }
 button.sysName:hover { text-decoration: underline; }
@@ -269,7 +274,7 @@ button.sysName:hover { text-decoration: underline; }
 .popClose:hover { background: var(--bg-hover); color: var(--text); }
 .pinsList { overflow-y: auto; overscroll-behavior: contain; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .pinsPop:focus { outline: none; }
-.pinsTitle { margin: 0; font-family: var(--font-display); font-stretch: 108%; font-size: 16px; font-weight: 750; color: var(--text-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pinsTitle { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 660; color: var(--text-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Each pin is the message it is, whole, on a card of its own: avatar, name and
    time, then everything it says and carries, as the conversation draws it. */
 .pinCard { position: relative; display: flex; gap: 12px; padding: 12px 14px 14px; border-radius: var(--radius-md); background: var(--bg-raised); border: 1px solid var(--border-subtle); box-shadow: inset 0 1px 0 var(--edge-light); transition: border-color var(--transition); }
@@ -302,8 +307,7 @@ button.sysName:hover { text-decoration: underline; }
 .listWrap[data-selecting="true"] .msg { padding-inline-start: 100px; }
 .listWrap[data-selecting="true"] .avatar { inset-inline-start: 44px; }
 .listWrap[data-selecting="true"] .gutterTime { display: none; }
-.listWrap[data-selecting="true"] .system { padding-inline-start: 100px; }
-.listWrap[data-selecting="true"] .sysIcon { inset-inline-start: 52px; }
+.listWrap[data-selecting="true"] .system { padding-inline-start: 100px; --sys-icon: 52px; }
 .msg[data-pickable="true"] { cursor: pointer; }
 .msg[data-picked="true"], .msg[data-picked="true"]:hover { background: var(--bg-selected); }
 .pick { position: absolute; inset-inline-start: 8px; top: 3px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid var(--border-strong); color: var(--on-brand); transition: background-color var(--transition), border-color var(--transition); }
@@ -336,8 +340,7 @@ button.sysName:hover { text-decoration: underline; }
   .header { gap: 4px; }
   .hKey { margin-inline-start: 4px; }
   .msg { padding-block: 2px; padding-inline: 64px 16px; margin-inline: 0; border-radius: 0; }
-  .system { padding-inline: 64px 16px; margin-inline: 0; border-radius: 0; }
-  .sysIcon { inset-inline-start: 24px; }
+  .system { padding-inline: 64px 16px; margin-inline: 0; border-radius: 0; --sys-icon: 24px; }
   /* the gutter time is hidden on phones, so compact rows need no gutter for it */
   .compact .msg { padding-inline-start: 16px; }
   .avatar { inset-inline-start: 12px; }
@@ -346,8 +349,7 @@ button.sysName:hover { text-decoration: underline; }
   .listWrap[data-selecting="true"] .msg { padding-inline-start: 98px; }
   .listWrap[data-selecting="true"] .avatar { inset-inline-start: 46px; }
   .listWrap[data-selecting="true"].compact .msg { padding-inline-start: 48px; }
-  .listWrap[data-selecting="true"] .system { padding-inline-start: 98px; }
-  .listWrap[data-selecting="true"] .sysIcon { inset-inline-start: 54px; }
+  .listWrap[data-selecting="true"] .system { padding-inline-start: 98px; --sys-icon: 54px; }
   .pick { inset-inline-start: 12px; }
   .empty { padding: 20px 16px 8px; }
   .emptyName { font-size: 28px; }
@@ -402,7 +404,7 @@ button.sysName:hover { text-decoration: underline; }
 .lockedWrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .lockedCard { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; padding: 28px 24px 24px; border-radius: var(--radius-lg); background: var(--sheen), var(--bg-surface); text-align: center; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); }
 .lockedIcon { align-self: center; display: flex; align-items: center; justify-content: center; width: 60px; height: 60px; border-radius: 20px; background: color-mix(in srgb, var(--brand) 18%, var(--bg-raised)); color: var(--text-brand); box-shadow: inset 0 1px 0 var(--edge-light), 0 10px 24px -12px color-mix(in srgb, var(--brand) 80%, transparent); }
-.lockedTitle { margin: 0; font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 21px; font-weight: 780; color: var(--text-strong); overflow-wrap: anywhere; }
+.lockedTitle { margin: 0; font-family: var(--font-display); font-size: 21px; font-weight: 680; color: var(--text-strong); overflow-wrap: anywhere; }
 .lockedText { margin: 0; font-size: 14px; color: var(--text-muted); }
 .lockedCard label { text-align: start; }
 

@@ -50,6 +50,14 @@ func TestMigrationTidiesSubchatMembers(t *testing.T) {
 	ALTER TABLE users DROP COLUMN group_link_only;
 	ALTER TABLE dm_participants DROP COLUMN add_notice_by;
 	DROP TABLE discord_links;
+	DROP TABLE note_keys;
+	DROP TABLE note_version_files;
+	DROP TABLE note_versions;
+	DROP TABLE note_files;
+	DROP TABLE note_links;
+	DROP TABLE note_invites;
+	DROP TABLE note_members;
+	DROP TABLE notes;
 	PRAGMA user_version = 6;`)
 	if err != nil {
 		t.Fatal(err)

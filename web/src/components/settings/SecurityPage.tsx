@@ -200,7 +200,7 @@ export default function SecurityPage() {
     <>
       <h2 className={s.title}>{t("settings.security.security")}</h2>
 
-      <h3 className={s.h5}><ShieldCheck size={16} /> {t("settings.security.twoFactorAuthentication")}</h3>
+      <h3 data-setting="twoFactor" className={s.h5}><ShieldCheck size={16} /> {t("settings.security.twoFactorAuthentication")}</h3>
       <p className={s.hint}>
         {t("settings.security.anAuthenticatorAppAdds")}
       </p>
@@ -234,7 +234,7 @@ export default function SecurityPage() {
       </div>
       {!checking && !unknown && on && left === 0 ? <div className={s.dangerBox} style={{ marginTop: 12 }}>{t("settings.security.youHaveNoBackupCodesLeft")}</div> : null}
 
-      <h3 className={s.h5} style={{ marginTop: 28 }}><Lock size={16} /> {t("settings.security.appLock")}</h3>
+      <h3 data-setting="appLock" className={s.h5} style={{ marginTop: 28 }}><Lock size={16} /> {t("settings.security.appLock")}</h3>
       <p className={s.hint}>{t("settings.security.appLockHint")}</p>
       <div className={s.device} data-testid="lock-row">
         <div>

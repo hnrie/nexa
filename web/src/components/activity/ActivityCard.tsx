@@ -56,7 +56,7 @@ export function ActivityCard({ activity: a }: { activity: Activity }) {
         {a.type === 2 && clock?.kind === "progress" && clock.fraction < 1 ? (
           <span className={s.eq} data-spotify={isSpotify(a) || undefined} aria-hidden="true"><i /><i /><i /></span>
         ) : (
-          <KindIcon size={13} className={s.headingIcon} aria-hidden="true" />
+          <KindIcon size={13} className={s.headingIcon} data-kind={a.type} aria-hidden="true" />
         )}
         {activityHeading(a)}
         {a.source === "discord" ? <span className={s.source}>{t("activity.activityCard.fromDiscord")}</span> : null}

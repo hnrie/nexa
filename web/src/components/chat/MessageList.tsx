@@ -67,15 +67,6 @@ function useReadStatesKnown(): boolean {
   return known;
 }
 
-/**
- * How long the reading position goes on being held after a page of older
- * messages has landed. The page is in the list before the pictures and embeds
- * in it know how tall they are, so it keeps growing above the reader for a few
- * frames more, and `.scroll` turns `overflow-anchor` off, so nothing else
- * takes that growth back off again.
- */
-const HOLD_AFTER_LOAD_MS = 1500;
-
 /** How soon after a click or a key leaving a conversation counts as having read it. */
 const LEAVE_MS = 3000;
 
@@ -84,12 +75,8 @@ type Anchor = { id: string; top: number };
 
 /**
  * Notes where the reader is, as the first row still showing and where it sits.
- *
- * A height measured before a change and compared with the height after cannot
- * tell fifty older messages arriving from one message finishing its decryption
- * and growing a line, and it is spent by whichever render happens to come
- * first. A row that is still on screen afterwards is the reading position
- * itself, and putting it back is the same answer however much else moved.
+ * For a change made right after it is taken (picking messages rewraps every
+ * row), so it is put back from the same place before anything has scrolled.
  */
 function readAnchor(el: HTMLElement): Anchor | null {
   const box = el.getBoundingClientRect();
@@ -106,6 +93,74 @@ function restoreAnchor(el: HTMLElement, a: Anchor): boolean {
   if (!row) return false;
   const now = row.getBoundingClientRect().top - el.getBoundingClientRect().top;
   if (now !== a.top) el.scrollTop += now - a.top;
+  return true;
+}
+
+/*
+ * The list scrolls from its bottom: `.scroll` is a column-reverse flex box
+ * around `.inner`, so a scroll position is a distance from the newest
+ * message (0 at the bottom, negative above it). History loaded above the
+ * reader then moves nothing on screen and needs no correcting. It used to:
+ * a page of older messages pushed everything down and the list wrote the
+ * scroll position back, and on iOS a fling in progress threw that write
+ * away, so a fast swipe up landed at the top of the page that had just
+ * loaded, far above where it had been going.
+ */
+
+/** How far the reader is above the newest message. */
+export function fromBottom(el: HTMLElement): number {
+  return Math.max(0, -el.scrollTop);
+}
+
+/** How far the reader is below the oldest message loaded. */
+export function fromTop(el: HTMLElement): number {
+  return Math.max(0, el.scrollHeight - el.clientHeight + el.scrollTop);
+}
+
+/** To the newest message: counted from the bottom, anything past 0 is 0. */
+function toBottom(el: HTMLElement): void {
+  el.scrollTop = el.scrollHeight;
+}
+
+/**
+ * The row at the foot of the view and how far its bottom sits above the end
+ * of the list. Scrolling does not change that distance, and nothing above
+ * the row does either: older history landing, a message there losing its
+ * name as it joins the one before it, a picture loading. Only something
+ * below the row growing or shrinking does, and counted from the bottom that
+ * is what would move the reader: a message arriving, a newer page, a picture
+ * loading further down.
+ */
+type Reading = { id: string; below: number };
+
+/** The last row still showing at the foot of the box, found by halves: a long conversation has thousands. */
+function readReading(el: HTMLElement): Reading | null {
+  const inner = el.firstElementChild;
+  if (!inner) return null;
+  const rows = el.querySelectorAll<HTMLElement>("[data-id]");
+  if (rows.length === 0) return null;
+  const bottom = el.getBoundingClientRect().bottom;
+  let lo = 0;
+  let hi = rows.length - 1;
+  let at = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (rows[mid]!.getBoundingClientRect().top < bottom) {
+      at = mid;
+      lo = mid + 1;
+    } else hi = mid - 1;
+  }
+  const row = rows[at]!;
+  return { id: row.dataset.id!, below: inner.getBoundingClientRect().bottom - row.getBoundingClientRect().bottom };
+}
+
+/** Takes back whatever grew or shrank below the row being read. False when that row has gone. */
+function keepReading(el: HTMLElement, a: Reading): boolean {
+  const inner = el.firstElementChild;
+  const row = el.querySelector<HTMLElement>(`[data-id="${cssValue(a.id)}"]`);
+  if (!inner || !row) return false;
+  const moved = inner.getBoundingClientRect().bottom - row.getBoundingClientRect().bottom - a.below;
+  if (Math.abs(moved) >= 0.5) el.scrollTop -= moved;
   return true;
 }
 
@@ -167,14 +222,10 @@ export function MessageList({ channel }: { channel: Channel }) {
   const pickAnchor = useRef<{ id: string; top: number } | null>(null);
   const atBottom = useRef(true);
   /**
-   * The reading position while a page of older messages is on its way. Held
-   * rather than spent: it has to outlive every unrelated render in between —
-   * a message finishing its decryption, a reaction, someone going idle — or
-   * there is nothing left to hold on to by the time the page itself lands and
-   * the reader is thrown up to the top of it.
+   * Where the reader is, while they are anywhere but the bottom: noted as
+   * they scroll and after every change, and put back after every change.
    */
-  const hold = useRef<Anchor | null>(null);
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reading = useRef<Reading | null>(null);
   /** A page of older messages is on its way. Set here, not read from the last render, which lags a frame behind. */
   const olderBusy = useRef(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -315,22 +366,18 @@ export function MessageList({ channel }: { channel: Channel }) {
   const prevPending = useRef(0);
   const prevHasNewer = useRef(false);
 
-  /** Lets the reading position go, along with any wait for it to settle. */
-  const dropHold = useCallback(() => {
-    hold.current = null;
-    if (holdTimer.current) {
-      clearTimeout(holdTimer.current);
-      holdTimer.current = null;
-    }
+  /** Lets the reading position go: the bottom, or a jump, is where the list puts itself. */
+  const dropReading = useCallback(() => {
+    reading.current = null;
   }, []);
 
-  /** Takes back whatever the list grew or shrank above the held row. */
-  const keepHold = useCallback((el: HTMLElement) => {
-    const a = hold.current;
-    if (!a) return;
-    // The held row can be deleted, or swept away by a jump that reloaded the
-    // list around somewhere else; then the row in its place is what to hold.
-    if (!restoreAnchor(el, a)) hold.current = readAnchor(el);
+  /** Keeps the row being read where it is on screen, and notes it again for the next change. */
+  const holdReading = useCallback((el: HTMLElement) => {
+    const a = reading.current;
+    // The row can be deleted, or swept away by a jump that reloaded the list
+    // around somewhere else; then the row in its place is what to hold.
+    if (a) keepReading(el, a);
+    reading.current = readReading(el);
   }, []);
 
   /**
@@ -369,21 +416,20 @@ export function MessageList({ channel }: { channel: Channel }) {
     if (pending.length > prevPending.current) {
       atBottom.current = true;
       setShowJump(false);
-      // Going to the bottom outranks whatever a page of older messages was holding.
-      dropHold();
+      // Going to the bottom outranks wherever the reader was.
+      dropReading();
       if (hasNewer) returnToPresent(channel.id);
     }
     prevPending.current = pending.length;
     if (atBottom.current) {
-      el.scrollTop = el.scrollHeight;
+      toBottom(el);
       clearNewBelow();
     } else {
-      // Older messages are inserted above the viewport, so everything being
-      // read is pushed down the list by however tall they turned out to be.
-      // Putting the held row back takes exactly that off again — and nothing
-      // more, so a render that only made a message a line taller, or that
-      // changed nothing at all, costs the reader nothing.
-      keepHold(el);
+      // Older messages land above the reader and move nothing. What lands
+      // below (a message arriving, a newer page) would push them up the
+      // screen; holding the row being read takes exactly that off again, and
+      // nothing more, so a render that changed nothing costs the reader nothing.
+      holdReading(el);
       if (newest && prevNewest.current && compareIds(newest, prevNewest.current) > 0 && !prevHasNewer.current && byId[newest]?.author_id !== me?.id && !quiet(byId[newest])) {
         // A list that stopped short of the present only grows downwards by
         // loading pages the reader scrolled to, which are not news.
@@ -393,21 +439,20 @@ export function MessageList({ channel }: { channel: Channel }) {
     }
     prevNewest.current = newest;
     prevHasNewer.current = hasNewer;
-  }, [rows, newest, byId, me?.id, pending.length, hasNewer, returnToPresent, channel.id, dropHold, keepHold, announce, quiet]);
+  }, [rows, newest, byId, me?.id, pending.length, hasNewer, returnToPresent, channel.id, dropReading, holdReading, announce, quiet]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(() => {
       if (atBottom.current) {
-        el.scrollTop = el.scrollHeight;
+        toBottom(el);
         return;
       }
-      // A picture or an embed in a page of older messages has no height of its
-      // own until it loads, so the list goes on growing above the reader for a
-      // while after the page landed. Nothing in a render says that happened,
-      // which is why the hold is kept until it has settled.
-      keepHold(el);
+      // A picture or an embed has no height of its own until it loads, and
+      // nothing in a render says when it does. One below the reader would
+      // push them up the screen, so the row being read is held here too.
+      holdReading(el);
     });
     // Watch the list itself as well as its contents: the composer growing a
     // line shrinks this box without changing what is in it, and the newest
@@ -415,7 +460,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     if (el.firstElementChild) ro.observe(el.firstElementChild);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [channel.id, keepHold]);
+  }, [channel.id, holdReading]);
 
   // Picking moves every row over for its check, which rewraps long messages
   // and would slide what is being read out of view. The row at the top is
@@ -466,7 +511,7 @@ export function MessageList({ channel }: { channel: Channel }) {
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const dist = fromBottom(el);
     // The end of a list that stops short of the present is not the bottom:
     // nothing should stick to it or be marked read from it.
     const wasAtBottom = atBottom.current;
@@ -478,42 +523,24 @@ export function MessageList({ channel }: { channel: Channel }) {
     if (atBottom.current) {
       clearNewBelow();
       // Nothing to hold: the bottom is where this list puts itself anyway.
-      hold.current = null;
-    } else if (hold.current || olderBusy.current) {
-      // A fling carries on while the page loads, so what is worth holding is
-      // the row in front of the reader now, not the one they had left behind
-      // when the page was asked for. `olderBusy` is asked as well as the hold
-      // itself, so a reader who reached the bottom and came back up before the
-      // page landed gets a new row taken rather than nothing at all.
-      hold.current = readAnchor(el) ?? hold.current;
+      reading.current = null;
+    } else {
+      // the row in front of the reader now, which a fling keeps changing
+      reading.current = readReading(el) ?? reading.current;
     }
-    if (el.scrollTop < 400 && hasOlder && !olderBusy.current && !loading && loaded && ids.length > 0) {
+    if (fromTop(el) < 400 && hasOlder && !olderBusy.current && !loading && loaded && ids.length > 0) {
       // A second scroll event in the same frame still sees `loading` false —
       // the store sets it synchronously, React has not re-rendered — so the
       // guard is a ref of this list's own, set before the call rather than
       // read back out of the last render.
       olderBusy.current = true;
-      if (holdTimer.current) {
-        clearTimeout(holdTimer.current);
-        holdTimer.current = null;
-      }
-      hold.current = readAnchor(el);
       void loadOlder(channel.id)
         .catch(() => {})
         .finally(() => {
           olderBusy.current = false;
-          // The page is in the list; the pictures in it are not yet as tall as
-          // they are going to be. Hold on a little longer so what they add
-          // above the reader comes off again too, and so a second page asked
-          // for in the meantime replaces the hold rather than racing it.
-          if (holdTimer.current) clearTimeout(holdTimer.current);
-          holdTimer.current = setTimeout(() => {
-            holdTimer.current = null;
-            hold.current = null;
-          }, HOLD_AFTER_LOAD_MS);
         });
     } else if (dist < 400 && hasNewer && !loading && loaded) {
-      // Pages added below the reader leave the scroll position where it is.
+      // Pages added below the reader are taken back off by the row being read.
       setNewerBusy(true);
       void loadNewer(channel.id)
         .catch(() => {})
@@ -591,7 +618,7 @@ export function MessageList({ channel }: { channel: Channel }) {
       setShowJump(true);
       // Going somewhere on purpose beats holding where you were: the row that
       // was being held is very likely not even in the list any more.
-      dropHold();
+      dropReading();
       el.scrollIntoView({ block: "center" });
       setHighlight(jumpTo.messageId);
       // a second jump within the two seconds would otherwise have its highlight
@@ -614,7 +641,7 @@ export function MessageList({ channel }: { channel: Channel }) {
       triedAround.current = jumpTo.messageId;
       void useMessages.getState().loadAround(channel.id, jumpTo.messageId).catch(() => {});
     }
-  }, [jumpTo, channel.id, rows, loading, setJumpTo, dropHold, byId, blockRules]);
+  }, [jumpTo, channel.id, rows, loading, setJumpTo, dropReading, byId, blockRules]);
 
   // "3 new messages since 4:32 PM": what came in below the reader since the news began
   const newSince = (): string => {
@@ -629,10 +656,10 @@ export function MessageList({ channel }: { channel: Channel }) {
     atBottom.current = true;
     setShowJump(false);
     clearNewBelow();
-    dropHold();
+    dropReading();
     // The newest messages are not loaded after a jump far back, so they are fetched again.
     if (hasNewer) returnToPresent(channel.id);
-    else el.scrollTop = el.scrollHeight;
+    else toBottom(el);
   };
 
   const intro = useMemo(() => {
@@ -706,7 +733,6 @@ export function MessageList({ channel }: { channel: Channel }) {
   useEffect(
     () => () => {
       if (highlightTimer.current) clearTimeout(highlightTimer.current);
-      if (holdTimer.current) clearTimeout(holdTimer.current);
     },
     [],
   );

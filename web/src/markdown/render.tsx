@@ -21,12 +21,12 @@ import { t } from "@/i18n";
 // ---------------------------------------------------------------------------
 
 /** Renders a raw message. `parse` is memoised on the source and the mode. */
-export function Markdown(props: { source: string; ctx: RenderCtx; inline?: boolean; jumbo?: boolean }): JSX.Element {
-  const { source, ctx, inline, jumbo } = props;
+export function Markdown(props: { source: string; ctx: RenderCtx; inline?: boolean; jumbo?: boolean; files?: boolean; max?: number }): JSX.Element {
+  const { source, ctx, inline, jumbo, files, max } = props;
   // `:shortcode:` names need a table that arrives on demand; once it does,
   // everything already on screen parses again and the names turn into emoji.
   const codes = useShortcodes(source);
-  const nodes = useMemo(() => parse(source, { inline: inline === true }), [source, inline, codes]);
+  const nodes = useMemo(() => parse(source, { inline: inline === true, files: files === true, ...(max ? { max } : {}) }), [source, inline, files, max, codes]);
   // footnote links point within this message, whatever else is on the page
   const scope = useId();
   return (
@@ -75,6 +75,8 @@ function signature(node: Node, max: number): string {
     case "br":
     case "hr":
       return "";
+    case "file":
+      return node.id;
     case "task":
       return node.checked ? "x" : "-";
     case "footnoteRef":
@@ -238,6 +240,8 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
       return <input type="checkbox" className="md-task" checked={node.checked} disabled readOnly aria-label={node.checked ? t("render.taskDone") : t("render.taskOpen")} />;
     case "hr":
       return <hr className="md-hr" />;
+    case "file":
+      return ctx.renderFile ? <>{ctx.renderFile(node.id, node.name)}</> : <div className="md-paragraph" dir="auto">{node.name}</div>;
     case "table":
       return <Table node={node} ctx={ctx} />;
     case "alert":
