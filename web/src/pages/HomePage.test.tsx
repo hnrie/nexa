@@ -38,7 +38,7 @@ describe("HomePage", () => {
   it("says what Nexa is in chapters, and compares it to nothing", async () => {
     motion(false);
     await open();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("All the Fun of Group Chat. None of the Snooping.");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Private Chat with All the Fun Left In");
     const chapters = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(chapters).toEqual(["Why Nexa", "Servers for Your People", "Voice and Video", "Write Together", "Make It Yours", "Private by Design", "Quick on Every Device", "What You Can Count On", "Start Chatting"]);
     expect(document.querySelector("table")).toBeNull();

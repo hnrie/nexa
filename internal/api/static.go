@@ -314,7 +314,7 @@ func (s *Server) serveHomePage(w http.ResponseWriter, r *http.Request, dist stri
 	if err != nil {
 		return false
 	}
-	const title = "Nexa: all the fun of group chat, none of the snooping"
+	const title = "Nexa: private chat with all the fun left in"
 	const desc = "A free chat app with servers, voice and video calls, and custom emoji and stickers. Messages, files and calls are encrypted on your device, and signing up needs no email or phone number."
 	var tags strings.Builder
 	// The front page is drawn on the app's darker canvas; until the page's
