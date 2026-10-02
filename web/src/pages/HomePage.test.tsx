@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { admin } from "@/api/admin";
+import type { InstanceInfo } from "@/api/types";
 import HomePage from "./HomePage";
 
 /** A browser that asks for less movement, or not. */
@@ -36,14 +38,31 @@ describe("HomePage", () => {
   it("says what Nexa is in chapters, and compares it to nothing", async () => {
     motion(false);
     await open();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Private Chat with All the Fun Left In");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("All the Fun of Group Chat. None of the Snooping.");
     const chapters = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(chapters).toEqual(["Servers for Your People", "Voice and Video", "Emoji, Themes and Plugins", "Private by Design", "Quick on Every Device", "What You Can Count On", "Start Chatting"]);
+    expect(chapters).toEqual(["Why Nexa", "Servers for Your People", "Voice and Video", "Write Together", "Make It Yours", "Private by Design", "Quick on Every Device", "What You Can Count On", "Start Chatting"]);
     expect(document.querySelector("table")).toBeNull();
     expect(document.body.textContent).not.toMatch(/discord/i);
     expect(document.body.textContent).not.toContain("—");
     // the load size it names is the one tools/app_size.py holds the build to
     expect(document.body.textContent).toContain("under 300 kB");
+  });
+
+  it("makes four promises before the tour, naming the server's own upload limit", async () => {
+    motion(false);
+    vi.spyOn(admin, "instance").mockResolvedValue({ max_upload_bytes: 15 * 1024 ** 3 } as InstanceInfo);
+    await open();
+    const promises = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(promises.slice(0, 4)).toEqual(["Nobody Reading Along", "Nothing to Hand Over", "Nothing to Pay For", "Nothing Left Out"]);
+    expect(screen.getByRole("heading", { level: 4, name: "Files up to 15 GB" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 4, name: "Notes You Write Together" })).toBeTruthy();
+  });
+
+  it("says only that files can be big when the server cannot be asked", async () => {
+    motion(false);
+    vi.spyOn(admin, "instance").mockRejectedValue(new Error("offline"));
+    await open();
+    expect(screen.getByRole("heading", { level: 4, name: "Big Files" })).toBeTruthy();
   });
 
   it("moves the line through the conversation with its slider, and says how far", async () => {
@@ -65,9 +84,16 @@ describe("HomePage", () => {
     motion(false);
     await open();
     const videos = document.querySelectorAll("video");
-    expect(videos).toHaveLength(2);
-    // the speed loop starts on the frame its still was taken from
-    expect(videos[1]!.querySelector("source")!.getAttribute("src")).toBe("/home/speed.webm#t=2");
+    expect(videos).toHaveLength(4);
+    expect([...videos].map((v) => v.getAttribute("aria-label"))).toEqual([
+      "Two people in a Nexa voice call, speaking",
+      "Two people writing in the same Nexa note at once, each with their own cursor",
+      "A Nexa server shown in one colour theme after another",
+      "Moving through six channels in a Nexa server, one after another",
+    ]);
+    // the speed and notes loops start on the frame their stills were taken from
+    expect(videos[1]!.querySelector("source")!.getAttribute("src")).toBe("/home/notes.webm#t=3");
+    expect(videos[3]!.querySelector("source")!.getAttribute("src")).toBe("/home/speed.webm#t=2");
     const pause = screen.getAllByRole("button", { name: "Pause" })[0]!;
     fireEvent.click(pause);
     expect(screen.getAllByRole("button", { name: "Play" })).toHaveLength(1);
@@ -78,7 +104,7 @@ describe("HomePage", () => {
     await open();
     expect(document.querySelectorAll("video")).toHaveLength(0);
     const stills = [...document.querySelectorAll("img")].map((i) => i.getAttribute("src"));
-    expect(stills).toEqual(expect.arrayContaining(["/home/call-loop.png", "/home/speed.png"]));
+    expect(stills).toEqual(expect.arrayContaining(["/home/call-loop.png", "/home/notes.png", "/home/themes.png", "/home/speed.png"]));
     expect(screen.getByRole("slider").getAttribute("value")).not.toBe("96");
   });
 

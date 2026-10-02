@@ -90,6 +90,8 @@ export interface FileBlock extends Base {
   kind: "file";
   file: string;
   name: string;
+  /** How much of the line a picture takes, in percent; the whole line when left out. */
+  width?: number;
 }
 export type Block = TextBlock | CodeBlock | RuleBlock | TableBlock | FileBlock;
 

@@ -88,6 +88,27 @@ describe("the formatting editor reads markdown and writes it back", () => {
     }
   });
 
+  it("keeps a space typed at the end of any line, which a word is about to follow", () => {
+    // A note written together reads its text back into the editor each time
+    // someone else types; a space dropped there was dropped for everyone.
+    for (const src of [
+      "things:\n- sunscreen\n- board ",
+      "- a \n  - nested \n- b",
+      "- [x] done \n- [ ] two ",
+      "1. one\n2. two ",
+      "# Weekend \nplans",
+      "-# small print ",
+      "| a | b |\n|---|---|\n| c  | d |",
+      "::: details Packing \nbring a jacket \n:::",
+      "> [!NOTE]\n> the train ",
+      "para \n\nnext",
+    ]) {
+      expect(toMarkdown(fromMarkdown(src).blocks), src).toBe(src);
+    }
+    // a message shown in the chat still trims them
+    expect(parse("- board ")).toEqual(parse("- board"));
+  });
+
   it("writes plain text plainly", () => {
     expect(roundTrip("just words, with punctuation! (and brackets) 50% off? yes: 10:30")).toBe("just words, with punctuation! (and brackets) 50% off? yes: 10:30");
     expect(roundTrip("snake_case_word")).toBe("snake_case_word");

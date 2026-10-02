@@ -23,7 +23,7 @@ const KEY_LEN = 32;
 const VERSION = "v1";
 
 /** What a sealed part is bound to, so that one cannot be passed off as another. */
-export type NotePart = "head" | "body" | "link" | "link-key" | "prev-key" | "cursor";
+export type NotePart = "head" | "body" | "link" | "link-key" | "prev-key" | "cursor" | "update";
 
 const aad = (part: NotePart): Uint8Array => utf8.enc(`nexa-note/v1/${part}`);
 
@@ -77,6 +77,18 @@ export async function openNote(key: Uint8Array, part: "head" | "body", sealed: s
   } catch {
     throw new DecryptError("the note could not be read");
   }
+}
+
+/**
+ * One change to a note, as its CRDT says it (lib/notes/ydoc.ts): bytes,
+ * sealed like the note, since what changed is what is written.
+ */
+export async function sealNoteUpdate(key: Uint8Array, update: Uint8Array): Promise<string> {
+  return sealBytes(key, "update", update);
+}
+
+export async function openNoteUpdate(key: Uint8Array, sealed: string): Promise<Uint8Array> {
+  return openBytes(key, "update", sealed);
 }
 
 /**

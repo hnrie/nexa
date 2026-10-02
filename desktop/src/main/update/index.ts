@@ -37,7 +37,7 @@ export class Updater extends EventEmitter {
   private nextAt = 0;
 
   constructor(
-    /** Where releases are published, e.g. https://chat.evilion.xyz/desktop/ */
+    /** Where releases are published, e.g. https://nexa.fish/desktop/ */
     private readonly feed: string,
     /** The download page, for builds that cannot update themselves. */
     private readonly downloadPage: string,

@@ -1,7 +1,30 @@
 import { AudioKeeper, isHomeScreenApp } from "./audioKeeper";
+import { DEFAULT_SOUNDS, SOUND_NAMES, sourceOf, type BuiltinPack, type SoundFile, type SoundSettings, type SoundSource } from "./soundPacks";
 
 import { t as tr_ } from "@/i18n";
 export type SoundName = "message" | "mention" | "friend" | "ring" | "outgoing" | "join" | "leave" | "mute" | "unmute";
+
+/** The account's sound packs, volume and the sounds switched off (lib/soundPacks.ts), as set by configureSounds. */
+let config: SoundSettings = DEFAULT_SOUNDS;
+/** How a custom pack's sealed recordings are fetched and opened; set with the settings, so this module needs no network of its own. */
+let openFile: ((file: SoundFile) => Promise<ArrayBuffer>) | null = null;
+
+/**
+ * Takes the account's sound settings: which pack plays, how loud, and which
+ * sounds are off. Called whenever they change, on every device the account
+ * is signed in on.
+ */
+export function configureSounds(next: SoundSettings, open?: (file: SoundFile) => Promise<ArrayBuffer>): void {
+  config = next;
+  if (open) openFile = open;
+  // a ring already going carries on as it is; the next sound plays from the new pack
+  if (preloadWanted && keeper) decodeActive();
+}
+
+/** How loud sounds play, from the volume setting. */
+function level(): number {
+  return Math.max(0, Math.min(1, config.volume / 100));
+}
 
 /** A sound that cannot start within this long is dropped rather than played late. */
 const STALE_MS = 1500;
@@ -44,7 +67,7 @@ function audio(): AudioKeeper | null {
     else armUnlock();
   });
   watchVisibility();
-  if (preloadWanted) decodeAll();
+  if (preloadWanted) decodeActive();
   return k;
 }
 
@@ -135,7 +158,7 @@ function tone(ac: AudioContext, freq: number, start: number, dur: number, type: 
   o.type = type;
   o.frequency.setValueAtTime(freq, ac.currentTime + start);
   g.gain.setValueAtTime(0, ac.currentTime + start);
-  g.gain.linearRampToValueAtTime(gain, ac.currentTime + start + 0.01);
+  g.gain.linearRampToValueAtTime(Math.max(0.0002, gain * level()), ac.currentTime + start + 0.01);
   g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + start + dur);
   o.connect(g).connect(ac.destination);
   o.start(ac.currentTime + start);
@@ -161,36 +184,53 @@ const FILES: Partial<Record<SoundName, string>> = {
 /** How loud the recordings play; they are mastered near full scale. */
 const FILE_GAIN = 0.7;
 
-const fetched = new Map<SoundName, Promise<ArrayBuffer | null>>();
-const buffers = new Map<SoundName, AudioBuffer>();
-const loading = new Map<SoundName, Promise<AudioBuffer | null>>();
+/**
+ * Recordings by what they are: "nexa:<sound>" for the ones served with the
+ * app, "file:<blob>" for a custom pack's. Bytes are fetched once and decoded
+ * once a context is there to decode them.
+ */
+const fetched = new Map<string, Promise<ArrayBuffer | null>>();
+const buffers = new Map<string, AudioBuffer>();
+const loading = new Map<string, Promise<AudioBuffer | null>>();
 let preloadWanted = false;
 
-function fetchBytes(name: SoundName): Promise<ArrayBuffer | null> {
-  const url = FILES[name];
-  if (!url) return Promise.resolve(null);
-  let p = fetched.get(name);
+/** Where a recording comes from, and its key in the maps above; null for a sound that is synthesised. */
+function recordingOf(name: SoundName, src: SoundSource): { key: string; get: () => Promise<ArrayBuffer> } | null {
+  if (src.kind === "file") {
+    const file = src.file;
+    return {
+      key: `file:${file.blob}`,
+      get: () => (openFile ? openFile(file) : Promise.reject(new Error("custom sounds are not set up yet"))),
+    };
+  }
+  const url = src.pack === "nexa" ? FILES[name] : undefined;
+  if (!url) return null;
+  return {
+    key: `nexa:${name}`,
+    get: () => fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status))))),
+  };
+}
+
+function fetchBytes(rec: { key: string; get: () => Promise<ArrayBuffer> }): Promise<ArrayBuffer | null> {
+  let p = fetched.get(rec.key);
   if (!p) {
-    p = fetch(url)
-      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
-      .catch(() => {
-        // not remembered: a later sound tries again
-        fetched.delete(name);
-        return null;
-      });
-    fetched.set(name, p);
+    p = rec.get().catch(() => {
+      // not remembered: a later sound tries again
+      fetched.delete(rec.key);
+      return null;
+    });
+    fetched.set(rec.key, p);
   }
   return p;
 }
 
 /** A recording, decoded; null when it cannot be had or there is no context to decode it with yet. */
-function loadBuffer(name: SoundName): Promise<AudioBuffer | null> {
-  if (!FILES[name]) return Promise.resolve(null);
-  const have = buffers.get(name);
+function decodeRecording(rec: { key: string; get: () => Promise<ArrayBuffer> }): Promise<AudioBuffer | null> {
+  const have = buffers.get(rec.key);
   if (have) return Promise.resolve(have);
-  let p = loading.get(name);
+  let p = loading.get(rec.key);
   if (!p) {
-    p = fetchBytes(name)
+    p = fetchBytes(rec)
       .then((data) => {
         const ac = keeper?.ac;
         if (!data || !ac) return Promise.reject(new Error("nothing to decode"));
@@ -198,21 +238,44 @@ function loadBuffer(name: SoundName): Promise<AudioBuffer | null> {
         return ac.decodeAudioData(data.slice(0));
       })
       .then((buf) => {
-        buffers.set(name, buf);
-        fetched.delete(name);
+        buffers.set(rec.key, buf);
+        fetched.delete(rec.key);
         return buf;
       })
       .catch(() => {
-        loading.delete(name);
+        loading.delete(rec.key);
         return null;
       });
-    loading.set(name, p);
+    loading.set(rec.key, p);
   }
   return p;
 }
 
-function decodeAll(): void {
-  for (const name of Object.keys(FILES) as SoundName[]) void loadBuffer(name);
+/**
+ * What a sound plays as in a pack: a decoded recording, or null to synthesise
+ * it in the voice given. A custom recording that cannot be had plays as its
+ * pack's base would, so a sound never goes missing.
+ */
+async function loadSound(name: SoundName, packId?: string): Promise<{ buf: AudioBuffer | null; voice: Voice }> {
+  const src = sourceOf(config, name, packId);
+  const rec = recordingOf(name, src);
+  if (rec) {
+    const buf = await decodeRecording(rec);
+    if (buf) return { buf, voice: voiceOf(src) };
+    if (src.kind === "file") {
+      const base = recordingOf(name, { kind: "builtin", pack: src.fallback });
+      return { buf: base ? await decodeRecording(base) : null, voice: VOICE[src.fallback] };
+    }
+  }
+  return { buf: null, voice: voiceOf(src) };
+}
+
+/** The recordings of the pack in use. */
+function decodeActive(): void {
+  for (const name of SOUND_NAMES) {
+    const rec = recordingOf(name, sourceOf(config, name));
+    if (rec) void decodeRecording(rec);
+  }
 }
 
 /**
@@ -222,8 +285,11 @@ function decodeAll(): void {
  */
 export function preloadSounds(): void {
   preloadWanted = true;
-  for (const name of Object.keys(FILES) as SoundName[]) void fetchBytes(name);
-  if (keeper) decodeAll();
+  for (const name of SOUND_NAMES) {
+    const rec = recordingOf(name, sourceOf(config, name));
+    if (rec) void fetchBytes(rec);
+  }
+  if (keeper) decodeActive();
   else if (!isHomeScreenApp()) void audio()?.want();
 }
 
@@ -232,14 +298,21 @@ function playBuffer(ac: AudioContext, buf: AudioBuffer, loop = false): AudioBuff
   src.buffer = buf;
   src.loop = loop;
   const g = ac.createGain();
-  g.gain.value = FILE_GAIN;
+  g.gain.value = FILE_GAIN * level();
   src.connect(g).connect(ac.destination);
   src.start();
   return src;
 }
 
+/** How a pack's synthesised sounds are voiced. Nexa's own, where it has no recording, are the chimes. */
+type Voice = "chime" | "retro" | "soft";
+const VOICE: Record<BuiltinPack, Voice> = { nexa: "chime", chime: "chime", retro: "retro", soft: "soft" };
+const voiceOf = (src: SoundSource): Voice => VOICE[src.kind === "file" ? src.fallback : src.pack];
+
 /** Plays a synthesised sound; returns its length in seconds. */
-function synth(ac: AudioContext, name: SoundName): number {
+function synth(ac: AudioContext, name: SoundName, voice: Voice = "chime"): number {
+  if (voice === "retro") return retro(ac, name);
+  if (voice === "soft") return soft(ac, name);
   switch (name) {
     case "message":
       tone(ac, 880, 0, 0.09);
@@ -272,12 +345,96 @@ function synth(ac: AudioContext, name: SoundName): number {
   }
 }
 
-/** Plays a sound. Resolves with whether it could start, which the settings page's test buttons report. */
+/** Little square-wave blips, like an old games console. */
+function retro(ac: AudioContext, name: SoundName): number {
+  const sq = (freq: number, start: number, dur: number) => tone(ac, freq, start, dur, "square", 0.07);
+  switch (name) {
+    case "message":
+      sq(1046.5, 0, 0.05);
+      return sq(1568, 0.06, 0.07);
+    case "mention":
+      sq(784, 0, 0.05);
+      sq(1046.5, 0.06, 0.05);
+      sq(1318.5, 0.12, 0.05);
+      return sq(2093, 0.18, 0.09);
+    case "friend":
+      sq(523.3, 0, 0.06);
+      sq(659.3, 0.07, 0.06);
+      sq(784, 0.14, 0.06);
+      return sq(1046.5, 0.21, 0.12);
+    case "join":
+      sq(392, 0, 0.05);
+      return sq(784, 0.06, 0.08);
+    case "leave":
+      sq(784, 0, 0.05);
+      return sq(392, 0.06, 0.08);
+    case "mute":
+      return sq(220, 0, 0.07);
+    case "unmute":
+      return sq(440, 0, 0.07);
+    case "ring":
+      sq(880, 0, 0.08);
+      sq(1174.7, 0.1, 0.08);
+      sq(880, 0.2, 0.08);
+      return sq(1174.7, 0.3, 0.08);
+    case "outgoing":
+      sq(587.3, 0, 0.12);
+      return sq(587.3, 0.4, 0.12);
+  }
+}
+
+/** Low, round taps, like a wooden marimba: quieter than the rest. */
+function soft(ac: AudioContext, name: SoundName): number {
+  const tap = (freq: number, start: number, dur = 0.22) => {
+    // a quiet fifth above gives the tap its wooden ring
+    tone(ac, freq * 1.5, start, dur * 0.5, "sine", 0.03);
+    return tone(ac, freq, start, dur, "triangle", 0.16);
+  };
+  switch (name) {
+    case "message":
+      tap(523.3, 0);
+      return tap(659.3, 0.11);
+    case "mention":
+      tap(523.3, 0);
+      tap(659.3, 0.1);
+      return tap(784, 0.2, 0.3);
+    case "friend":
+      tap(392, 0);
+      tap(523.3, 0.12);
+      return tap(659.3, 0.24, 0.32);
+    case "join":
+      return tap(587.3, 0, 0.18);
+    case "leave":
+      return tap(392, 0, 0.18);
+    case "mute":
+      return tap(294, 0, 0.12);
+    case "unmute":
+      return tap(392, 0, 0.12);
+    case "ring":
+      tap(659.3, 0);
+      tap(523.3, 0.18);
+      return tap(659.3, 0.36, 0.3);
+    case "outgoing":
+      return tap(440, 0, 0.35);
+  }
+}
+
+/** Plays a sound, unless it is switched off. Resolves with whether it could start. */
 export function playSound(name: SoundName): Promise<boolean> {
+  if (config.off.includes(name)) return Promise.resolve(false);
   return play(name).catch(() => false);
 }
 
-async function play(name: SoundName): Promise<boolean> {
+/**
+ * Plays a sound to hear it, from the pack named or the one in use, even if it
+ * is switched off: what the settings' play buttons do. Resolves with whether
+ * it could start, which those buttons report.
+ */
+export function previewSound(name: SoundName, packId?: string): Promise<boolean> {
+  return play(name, packId).catch(() => false);
+}
+
+async function play(name: SoundName, packId?: string): Promise<boolean> {
   // a home-screen app in the background stays quiet rather than start audio there
   if (hiddenHomeScreenApp()) return false;
   const k = audio();
@@ -285,7 +442,7 @@ async function play(name: SoundName): Promise<boolean> {
   const asked = Date.now();
   starting++;
   try {
-    const [running, buf] = await Promise.all([k.started(STALE_MS), loadBuffer(name)]);
+    const [running, { buf, voice }] = await Promise.all([k.started(STALE_MS), loadSound(name, packId)]);
     if (!running || keeper !== k || k.released || Date.now() - asked > STALE_MS) {
       trouble = { state: k.ac.state, problem: k.problem };
       // the next tap may start what this could not
@@ -297,7 +454,7 @@ async function play(name: SoundName): Promise<boolean> {
     if (buf) {
       playBuffer(k.ac, buf);
       seconds = buf.duration;
-    } else seconds = synth(k.ac, name);
+    } else seconds = synth(k.ac, name, voice);
     quietFrom = Math.max(quietFrom, Date.now() + seconds * 1000);
     return true;
   } finally {
@@ -335,16 +492,16 @@ function startLoops(): void {
 
 function beginLoop(l: Loop, ac: AudioContext): void {
   l.ac = ac;
-  void loadBuffer(l.name).then((buf) => {
+  void loadSound(l.name).then(({ buf, voice }) => {
     if (!loops.has(l) || l.ac !== ac || ac.state === "closed") return;
     if (buf) {
       l.source = playBuffer(ac, buf, true);
       return;
     }
-    synth(ac, l.name);
+    synth(ac, l.name, voice);
     l.timer = setInterval(() => {
       // tones asked for while it is stopped would all come out at once when it starts
-      if (ac.state === "running") synth(ac, l.name);
+      if (ac.state === "running") synth(ac, l.name, voice);
     }, 1500);
   });
 }
@@ -373,9 +530,10 @@ function loop(name: SoundName): () => void {
 let stopIncoming: (() => void) | null = null;
 let stopOutgoing: (() => void) | null = null;
 
-/** Someone is calling: rings until stopRinging. */
+/** Someone is calling: rings until stopRinging, unless the ring is switched off. */
 export function startRinging(): void {
   stopRinging();
+  if (config.off.includes("ring")) return;
   stopIncoming = loop("ring");
 }
 
@@ -387,6 +545,7 @@ export function stopRinging(): void {
 /** Calling someone who has not picked up yet: the outgoing tone, until stopCalling. */
 export function startCalling(): void {
   stopCalling();
+  if (config.off.includes("outgoing")) return;
   stopOutgoing = loop("outgoing");
 }
 

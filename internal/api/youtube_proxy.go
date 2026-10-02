@@ -138,8 +138,13 @@ func (s *Server) ytClient() *http.Client {
 	}
 }
 
-// ytOrigin is where this server is reached, as the frame's policy names it.
+// ytOrigin is where this server is reached, as the frame's policy names it:
+// the address the page holding the player is at, when that is one of Nexa's
+// own, and its main address for anything else.
 func (s *Server) ytOrigin(r *http.Request) string {
+	if addr, kind := s.requestAddress(r); kind != notOurs {
+		return addr
+	}
 	if s.Cfg.PublicURL != "" {
 		if u, err := url.Parse(s.Cfg.PublicURL); err == nil && u.Host != "" {
 			return u.Scheme + "://" + u.Host

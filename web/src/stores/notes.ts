@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { ApiError } from "@/api/client";
 import { notes as notesApi } from "@/api/notes";
-import { NOTE_OWNER, type NoteInviteRow, type NotePresenceEvent, type NoteRole, type NoteRow, type NoteUpdateEvent, type PublicUser } from "@/api/types";
+import { NOTE_OWNER, type NoteCrdtEvent, type NoteInviteRow, type NotePresenceEvent, type NoteRole, type NoteRow, type NoteUpdateEvent, type PublicUser } from "@/api/types";
 import { openNote, openNoteKey } from "@/crypto/notes";
 import { forgetNoteKey, forgetNoteKeys, heldNoteKey, keepNoteKeys, noteKeyOf } from "@/lib/notes/keys";
 import { readHead, type NoteHead } from "@/lib/notes/model";
@@ -66,6 +66,10 @@ interface NotesState {
   present: (d: NotePresenceEvent) => void;
   /** Where someone's caret is in a note: passed to the page that has it open, and kept nowhere. */
   cursor: (d: NoteCursorEvent) => void;
+  /** A change someone made to a note: passed to the page that has it open, and kept nowhere. */
+  crdt: (d: NoteCrdtEvent) => void;
+  /** What a note being written on this page says now, for the list, ahead of its next save. */
+  shown: (id: string, head: NoteHead, by: string | null) => void;
 }
 
 /** Someone's caret in a note, as the gateway passes it on (sealed). */
@@ -81,6 +85,7 @@ export interface NoteListener {
   update?: (d: NoteUpdateEvent) => void;
   presence?: (d: NotePresenceEvent) => void;
   cursor?: (d: NoteCursorEvent) => void;
+  crdt?: (d: NoteCrdtEvent) => void;
   /** The note is gone for this account: deleted, or this account is out of it. */
   gone?: () => void;
 }
@@ -281,6 +286,23 @@ export const useNotes = create<NotesState>()((set, get) => ({
 
   cursor: (d) => {
     for (const l of [...(listeners.get(d.id) ?? [])]) l.cursor?.(d);
+  },
+
+  shown: (id, head, by) => {
+    set((s) => {
+      const known = s.notes[id];
+      if (!known) return s;
+      return { notes: { ...s.notes, [id]: { ...known, head, updatedAt: Math.max(known.updatedAt, Date.now()), editedBy: by ?? known.editedBy } } };
+    });
+  },
+
+  crdt: (d) => {
+    for (const l of [...(listeners.get(d.id) ?? [])]) l.crdt?.(d);
+    // the list shows when it was last written in, and by whom
+    set((s) => {
+      const known = s.notes[d.id];
+      return known && d.at > known.updatedAt ? { notes: { ...s.notes, [d.id]: { ...known, updatedAt: d.at, editedBy: d.user_id } } } : s;
+    });
   },
 
   present: (d) => {

@@ -511,6 +511,9 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "note_cursor":
       useNotes.getState().cursor(e.d);
       return;
+    case "note_crdt":
+      useNotes.getState().crdt(e.d);
+      return;
     case "group_add_notice_delete":
       useGroupAddNotices.getState().remove(e.d.channel_id);
       return;

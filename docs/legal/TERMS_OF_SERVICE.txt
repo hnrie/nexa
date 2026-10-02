@@ -1,5 +1,5 @@
 NEXA - TERMS OF SERVICE
-Site: chat.evilion.xyz
+Site: nexa.fish (also at mathtest.lol, and formerly chat.evilion.xyz)
 Contact the owner (nora) here: evilionx3@proton.me
 Effective: 2026-10-01
 
@@ -195,6 +195,6 @@ They are answered with exactly what is held, as listed in the Privacy
 Policy. Anything not on that list does not exist to hand over.
 
 The full Terms and Privacy Policy are always available at
-chat.evilion.xyz/terms and chat.evilion.xyz/privacy.
+nexa.fish/terms and nexa.fish/privacy.
 
 END OF TERMS

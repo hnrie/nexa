@@ -5,7 +5,10 @@ server keeps what it needs to deliver them and can read none of it. Servers with
 voice channels, direct messages and group chats, calls with screen sharing, and emoji and
 sticker packs anyone can make and share. Every account gets animated avatars and banners,
 a long "about me", display names with plain unique usernames, and big uploads. It is served
-at `https://chat.evilion.xyz` through the Cloudflare tunnel that already fronts this box.
+at `https://nexa.fish` (and `https://mathtest.lol`) through the Cloudflare tunnel that already
+fronts this box. `https://chat.evilion.xyz`, its address before, still answers: the desktop
+apps installed from there and old webhooks keep working, and a browser that opens it is
+moved on to nexa.fish, still signed in (`ALT_URLS`, `MOVED_FROM` in `chatd.env.example`).
 
 ```
 chat/

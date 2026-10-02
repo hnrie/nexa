@@ -123,7 +123,8 @@ describe("the writing surface", () => {
     const paste = new Event("paste", { bubbles: true, cancelable: true });
     Object.defineProperty(paste, "clipboardData", { value: { getData: (type: string) => (type === "text/plain" ? "**bold**\n- item\nlast " : "") } });
     root.dispatchEvent(paste);
-    expect(surface.markdown()).toBe("start **bold**\n- item\nlast end");
+    // the space the pasted text ends with is kept, as it was copied
+    expect(surface.markdown()).toBe("start **bold**\n- item\nlast  end");
   });
 
   it("gives a link to the selected words, with https:// kept as given", () => {

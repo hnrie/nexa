@@ -142,8 +142,8 @@ type AppLookup interface {
 	Lookup(ctx context.Context, id string) (*rpcapps.App, error)
 }
 
-// New creates a hub.
-func New(st *store.Store, authn *auth.Authenticator, log *slog.Logger, publicURL string) *Hub {
+// New creates a hub. Pages at any of `origins` may open a connection.
+func New(st *store.Store, authn *auth.Authenticator, log *slog.Logger, origins []string) *Hub {
 	h := &Hub{st: st, auth: authn, log: log, conns: map[ids.ID]map[*conn]struct{}{},
 		byIP: map[string]int{}, waiting: map[string]int{},
 		linked: map[ids.ID][]Activity{}, linkedTimer: map[ids.ID]*time.Timer{}, linkedAt: map[ids.ID]time.Time{},
@@ -154,8 +154,10 @@ func New(st *store.Store, authn *auth.Authenticator, log *slog.Logger, publicURL
 		connectRate: ratelimit.New(ratelimit.Every(240, time.Minute), 120, 10*time.Minute),
 		// five in ten seconds, across every channel
 		typingRate: ratelimit.New(ratelimit.Every(30, time.Minute), 5, 10*time.Minute)}
-	if u, err := url.Parse(publicURL); err == nil && u.Host != "" {
-		h.originPatterns = append(h.originPatterns, u.Host)
+	for _, o := range origins {
+		if u, err := url.Parse(o); err == nil && u.Host != "" {
+			h.originPatterns = append(h.originPatterns, u.Host)
+		}
 	}
 	h.originPatterns = append(h.originPatterns, "localhost:*", "127.0.0.1:*")
 	return h

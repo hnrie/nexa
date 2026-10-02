@@ -89,12 +89,24 @@ func (s *Store) UnreferencedBlobs(ctx context.Context, olderThan int64) ([]*Blob
 // blob listed as unreferenced can be picked up again (public images are shared
 // by content) before the sweep gets to it. It reports whether a row went.
 func (s *Store) DeleteBlob(ctx context.Context, id ids.ID) (bool, error) {
-	res, err := s.db.W.ExecContext(ctx, `DELETE FROM blobs WHERE id = ? AND ref_count <= 0`, int64(id))
-	if err != nil {
-		return false, err
-	}
-	n, err := res.RowsAffected()
-	return n > 0, err
+	gone := false
+	err := s.Tx(ctx, func(tx *db.Tx) error {
+		res, err := tx.ExecContext(ctx, `DELETE FROM blobs WHERE id = ? AND ref_count <= 0`, int64(id))
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil || n == 0 {
+			return err
+		}
+		gone = true
+		// an upload for a note that no save ever named (see AddNoteUpload);
+		// spelled out rather than left to the foreign key, which a database
+		// opened without them enforced would skip
+		_, err = tx.ExecContext(ctx, `DELETE FROM note_uploads WHERE blob_id = ?`, int64(id))
+		return err
+	})
+	return gone && err == nil, err
 }
 
 // imageColumns are the only places SwapImage writes, so its SQL is never

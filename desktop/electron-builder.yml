@@ -21,12 +21,16 @@ compression: maximum
 artifactName: "nexa-${version}-${os}-${arch}.${ext}"
 publish:
   provider: generic
-  url: https://chat.evilion.xyz/desktop/
+  url: https://nexa.fish/desktop/
   channel: latest
 mac:
   category: public.app-category.social-networking
   icon: resources/icon.png
-  identity: "-"
+  # Not signed, not even ad-hoc: the Apple identity is long gone, and updates
+  # are checked against the release's checksum instead (src/main/update/mac.ts).
+  # Electron's own executables keep the signatures they were built with, which
+  # is what Apple silicon needs to run them.
+  identity: null
   hardenedRuntime: false
   gatekeeperAssess: false
   target:

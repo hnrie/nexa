@@ -8,6 +8,7 @@ import { sanitizeRail, type RailLayout } from "@/lib/railLayout";
 import { EMPTY_DM_LIST, sanitizeDMList, type DMListLayout } from "@/lib/dmLayout";
 import type { CustomCss, CustomTheme, PluginEntry } from "@/lib/look/types";
 import { sanitizeUsage, type EmojiUsage } from "@/lib/emojiUsage";
+import { DEFAULT_SOUNDS, sanitizeSounds, type SoundSettings } from "@/lib/soundPacks";
 
 /** A classic theme, "system", or the id of a gallery preset or a custom theme (lib/look). */
 export type Theme = "dark" | "light" | "ash" | "onyx" | "system" | (string & {});
@@ -110,6 +111,11 @@ export interface Settings {
    * app: notifications in the desktop app, on unless turned off.
    */
   notifications: { desktop: boolean; app: boolean; sounds: boolean; perChannel: Record<string, NotificationLevel>; muted: string[]; preview: NotificationPreview };
+  /**
+   * Which sound pack plays, how loud, which sounds are off, and the account's
+   * own packs: their names, and the sealed recordings each plays (lib/soundPacks.ts).
+   */
+  sounds: SoundSettings;
   drafts: Record<string, string>;
   voice: VoiceSettings;
   serverPositions: string[];
@@ -196,6 +202,7 @@ export const DEFAULT_SETTINGS: Settings = {
   favoriteGifs: [],
   skinTone: 0,
   notifications: { desktop: false, app: true, sounds: true, perChannel: {}, muted: [], preview: "full" },
+  sounds: DEFAULT_SOUNDS,
   drafts: {},
   voice: {
     inputDeviceId: null,
@@ -247,6 +254,7 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     ...inc,
     notifications: { ...base.notifications, ...(inc.notifications ?? {}) },
     voice: mergeVoice(base.voice, inc.voice),
+    sounds: "sounds" in inc ? sanitizeSounds(inc.sounds) : base.sounds,
 
     // read defensively, as every version of the app may have written them
     rail: "rail" in inc ? sanitizeRail(inc.rail) : base.rail,

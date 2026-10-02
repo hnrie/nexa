@@ -50,6 +50,8 @@ type Config struct {
 	// GuildID is the activity server. Empty: the bot's only server.
 	GuildID   string
 	PublicURL string
+	// RedirectURL is the callback listed with Discord. Empty: the one under PublicURL.
+	RedirectURL string
 	// API is Discord's REST API (DefaultAPI); tests point it at a fake.
 	API  string
 	HTTP *http.Client
@@ -92,6 +94,8 @@ type watch struct {
 type oauthState struct {
 	uid     ids.ID
 	expires time.Time
+	// back is the address the person started from, to return them to
+	back string
 }
 
 type pending struct {
@@ -134,6 +138,9 @@ func New(cfg Config, st *store.Store, hub Hub, seal func(string) ([]byte, error)
 // Redirect is the address Discord sends people back to, which has to be
 // listed under OAuth2, Redirects in the Developer Portal.
 func (s *Service) Redirect() string {
+	if s.cfg.RedirectURL != "" {
+		return s.cfg.RedirectURL
+	}
 	return strings.TrimRight(s.cfg.PublicURL, "/") + "/api/v1/connections/discord/callback"
 }
 
@@ -485,8 +492,9 @@ func (s *Service) publish(uid ids.ID, raw []json.RawMessage) {
 // --- linking ---------------------------------------------------------------
 
 // AuthorizeURL is Discord's page for linking, for this account. The state in
-// it is single use and lasts ten minutes.
-func (s *Service) AuthorizeURL(uid ids.ID) string {
+// it is single use and lasts ten minutes; `back` is the address of Nexa the
+// person started from, which Callback hands back.
+func (s *Service) AuthorizeURL(uid ids.ID, back string) string {
 	state := randomString(32)
 	s.mu.Lock()
 	for k, v := range s.states {
@@ -494,7 +502,7 @@ func (s *Service) AuthorizeURL(uid ids.ID) string {
 			delete(s.states, k)
 		}
 	}
-	s.states[state] = oauthState{uid: uid, expires: time.Now().Add(stateTTL)}
+	s.states[state] = oauthState{uid: uid, expires: time.Now().Add(stateTTL), back: back}
 	s.mu.Unlock()
 	q := url.Values{
 		"response_type": {"code"},
@@ -505,6 +513,13 @@ func (s *Service) AuthorizeURL(uid ids.ID) string {
 		"prompt":        {"consent"},
 	}
 	return "https://discord.com/oauth2/authorize?" + q.Encode()
+}
+
+// Back is the address the link with this state was started from, or "".
+func (s *Service) Back(state string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.states[state].back
 }
 
 // Callback finishes a link Discord sent the person back from. It says how it

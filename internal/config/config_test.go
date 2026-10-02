@@ -15,7 +15,7 @@ func TestLoadDefaults(t *testing.T) {
 	if c.Listen != "127.0.0.1:8090" {
 		t.Errorf("Listen = %q", c.Listen)
 	}
-	if c.PublicURL != "https://chat.evilion.xyz" {
+	if c.PublicURL != "https://nexa.fish" {
 		t.Errorf("PublicURL = %q", c.PublicURL)
 	}
 	if c.MaxUploadBytes != 104857600 {
@@ -105,5 +105,37 @@ func TestLoadEnvFile(t *testing.T) {
 	}
 	if _, err := LoadEnvFile(filepath.Join(t.TempDir(), "missing")); err == nil {
 		t.Error("missing file should error")
+	}
+}
+
+func TestNexaAtSeveralAddresses(t *testing.T) {
+	env := map[string]string{
+		"PUBLIC_URL":           "https://nexa.fish/",
+		"ALT_URLS":             " https://mathtest.lol/ ,",
+		"MOVED_FROM":           "https://chat.evilion.xyz",
+		"DISCORD_REDIRECT_URL": "https://chat.evilion.xyz/api/v1/connections/discord/callback",
+	}
+	c, err := Load(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.Origins(); len(got) != 3 || got[0] != "https://nexa.fish" || got[1] != "https://mathtest.lol" || got[2] != "https://chat.evilion.xyz" {
+		t.Errorf("origins %v", got)
+	}
+	if c.DiscordRedirectURL != env["DISCORD_REDIRECT_URL"] {
+		t.Errorf("discord redirect %q", c.DiscordRedirectURL)
+	}
+	for _, bad := range []map[string]string{
+		{"ALT_URLS": "mathtest.lol"},
+		{"MOVED_FROM": "ftp://old.example"},
+		{"ALT_URLS": "https://mathtest.lol/app"},
+		// one address cannot be both Nexa's own and one it moved from
+		{"PUBLIC_URL": "https://nexa.fish", "MOVED_FROM": "https://NEXA.fish"},
+		{"ALT_URLS": "https://a.example", "MOVED_FROM": "https://a.example"},
+		{"DISCORD_REDIRECT_URL": "chat.evilion.xyz/callback"},
+	} {
+		if _, err := Load(func(k string) string { return bad[k] }); err == nil {
+			t.Errorf("accepted %v", bad)
+		}
 	}
 }

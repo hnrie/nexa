@@ -666,6 +666,30 @@ export interface NoteRow {
    * when it sees this.
    */
   needs_rekey?: boolean;
+  /** The number the newest change to the note was given. */
+  crdt_seq?: number;
+  /** The newest change the saved note (`body`) already holds: the ones after it are fetched. */
+  crdt_upto?: number;
+}
+
+/** One change to a note, sealed on the device that made it (lib/notes/ydoc.ts). */
+export interface NoteUpdateRow {
+  seq: number;
+  update: string;
+  user_id: Snowflake | null;
+  created_at: number;
+}
+
+/** Someone changed a note: the change itself, sealed, passed on as it is made. */
+export interface NoteCrdtEvent {
+  id: Snowflake;
+  seq: number;
+  /** Left out when it is large; whoever has the note open fetches it. */
+  update?: string;
+  user_id: Snowflake;
+  /** Which open copy of the note made it. */
+  cid: string;
+  at: number;
 }
 
 /** An earlier state of a note, sealed with the key the note had then. */
@@ -746,6 +770,10 @@ export interface NoteUpdateEvent {
   removed?: boolean;
   /** The note has a new key: every member's copy changed. */
   rekeyed?: boolean;
+  /** The newest change the saved note holds. */
+  upto?: number;
+  /** Saved whole by an app that keeps no changes: the note is what this body says. */
+  reset?: boolean;
 }
 
 /** Someone else in a note says they have it open, or have closed it; `hello` asks those there to say so too. */

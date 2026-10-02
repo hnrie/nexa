@@ -4,8 +4,6 @@ import { Avatar } from "@/components/common/Avatar";
 import { menuAnchor } from "@/components/common/ContextMenu";
 import { AdminHammer, OwnerCrown } from "@/components/common/OwnerBadge";
 import { PickBar, PickMark } from "@/components/common/Pick";
-import { UserPanel } from "@/components/shell/UserPanel";
-import { VoiceStatus } from "@/components/voice/VoiceStatus";
 import { useMediaQuery } from "@/hooks/useIsMobile";
 import { useReorder } from "@/hooks/useReorder";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
@@ -685,8 +683,6 @@ export function DMSidebar() {
         </div>
       </div>
       {bulk ? <PickBar list="dms" count={picked.length} label={t("pick.dmBar")} actions={bulk.bar} more={bulk.menu} /> : null}
-      <VoiceStatus />
-      <UserPanel />
       {ghost ? (
         <div className={s.ghost} style={{ transform: `translate(${ghost.x + 14}px, ${ghost.y - 18}px)` }} aria-hidden="true">
           <GripVertical size={14} />

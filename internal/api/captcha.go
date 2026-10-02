@@ -78,9 +78,13 @@ func (s *Server) requireCaptcha(w http.ResponseWriter, r *http.Request, action s
 	return true
 }
 
-// captchaSite reports whether Cloudflare saw the captcha solved on this
-// Nexa's own hostname, the one in PUBLIC_URL.
+// captchaSite reports whether Cloudflare saw the captcha solved on one of
+// this Nexa's own hostnames (PUBLIC_URL, ALT_URLS and MOVED_FROM).
 func (s *Server) captchaSite(hostname string) bool {
-	u, err := url.Parse(s.Cfg.PublicURL)
-	return err == nil && u.Hostname() != "" && strings.EqualFold(hostname, u.Hostname())
+	for _, h := range s.ourHostnames() {
+		if strings.EqualFold(hostname, h) {
+			return true
+		}
+	}
+	return false
 }

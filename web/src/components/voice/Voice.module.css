@@ -140,7 +140,7 @@
 
 /* voice status block above the user panel */
 /* its own card over the user panel's, lit a little green while the call holds */
-.status { flex: none; margin: 0 8px 6px; padding: 8px 8px 8px 10px; border-radius: var(--radius-md); background: linear-gradient(180deg, color-mix(in srgb, var(--status-online) 10%, transparent), transparent 70%), var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium); display: flex; flex-direction: column; gap: 6px; animation: statusIn 260ms var(--ease-out); }
+.status { flex: none; margin: 0; padding: 8px 8px 8px 10px; border-radius: var(--radius-md); background: linear-gradient(180deg, color-mix(in srgb, var(--status-online) 10%, transparent), transparent 70%), var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium); display: flex; flex-direction: column; gap: 6px; animation: statusIn 260ms var(--ease-out); }
 @keyframes statusIn { from { opacity: 0; transform: translateY(6px); } }
 .statusRow { display: flex; align-items: center; gap: 8px; }
 .statusText { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.2; }

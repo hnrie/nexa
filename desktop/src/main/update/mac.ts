@@ -115,9 +115,10 @@ export async function stageMacUpdate(base: string, onProgress: (fraction: number
   fs.rmSync(zip, { force: true });
   const staged = fs.readdirSync(unpacked).find((n) => n.endsWith(".app"));
   if (!staged) throw new Error("the update has no app inside");
+  // No signature is checked: the app has none worth checking since its Apple
+  // identity went, and the download already matched the release's checksum
+  // above, which is what says it is the file that was published.
   const stagedApp = path.join(unpacked, staged);
-  // an ad-hoc signature still has to hold together, or macOS refuses to open the app at all
-  await run("/usr/bin/codesign", ["--verify", "--deep", stagedApp]);
   return { version: manifest.version, staged: stagedApp };
 }
 

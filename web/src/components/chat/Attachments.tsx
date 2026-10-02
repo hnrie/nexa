@@ -196,7 +196,7 @@ export function mosaicLayout(n: number): Tile[] {
   return [...top, ...Array.from({ length: n - over }, () => square)];
 }
 
-function ImageAttachment({ att, onOpen, tile }: { att: AttachmentMeta; onOpen: () => void; tile?: Tile }) {
+function ImageAttachment({ att, onOpen, tile, fill }: { att: AttachmentMeta; onOpen: () => void; tile?: Tile; fill?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   // A big picture shows the small copy its sender made (lib/pictureCopy.ts),
   // which comes down in a moment whatever the picture's own size. A copy that
@@ -215,9 +215,12 @@ function ImageAttachment({ att, onOpen, tile }: { att: AttachmentMeta; onOpen: (
     if (url) onOpen();
   };
   // in a grid the tile gives the shape, and the picture is cut to fill it
+  // a note's picture is as wide as the note gives it, in its own shape
   const box = tile
     ? { gridColumn: `span ${tile.col}`, gridRow: `span ${tile.row}`, ...(tile.ratio ? { aspectRatio: tile.ratio } : {}) }
-    : { width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` };
+    : fill
+      ? { width: "100%", aspectRatio: att.w && att.h ? `${att.w} / ${att.h}` : "4 / 3" }
+      : { width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` };
   return (
     <div ref={ref} className={s.imgWrap} data-tile={tile ? "" : undefined} data-spoiler={!revealed} style={box} onClick={() => (revealed ? open() : setRevealed(true))}>
       {att.type === "image/gif" && revealed ? <FavoriteButton url={`attach:${att.blob_id}`} w={att.w} h={att.h} att={att} className={s.favStar} /> : null}
@@ -284,7 +287,7 @@ function ImageAttachment({ att, onOpen, tile }: { att: AttachmentMeta; onOpen: (
   );
 }
 
-function VideoAttachment({ att }: { att: AttachmentMeta }) {
+function VideoAttachment({ att, fill }: { att: AttachmentMeta; fill?: boolean }) {
   // the whole file has to come down and be decrypted before it can play at all
   const ref = useRef<HTMLDivElement>(null);
   const auto = att.size <= AUTO_LOAD_MAX;
@@ -297,9 +300,9 @@ function VideoAttachment({ att }: { att: AttachmentMeta }) {
   return (
     <div ref={ref} className={s.mediaSlot}>
       {url ? (
-        <VideoPlayer src={url} name={att.name} width={att.w} height={att.h} spoiler={att.spoiler ?? false} />
+        <VideoPlayer src={url} name={att.name} width={att.w} height={att.h} spoiler={att.spoiler ?? false} fill={fill} />
       ) : (
-        <div className={s.videoPending} style={{ width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }}>
+        <div className={s.videoPending} style={fill ? { width: "100%", aspectRatio: att.w && att.h ? `${att.w} / ${att.h}` : "16 / 9" } : { width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }}>
           {error ? (
             <LoadFailed error={error} what="video" onRetry={retry} />
           ) : wanted || auto ? (
@@ -366,7 +369,11 @@ function FileAttachment({ att }: { att: AttachmentMeta }) {
   );
 }
 
-export function Attachments({ list, from }: { list: AttachmentMeta[]; from?: string }) {
+/**
+ * A message's files, or one of a note's (`fill`: as wide as the note gives
+ * it, a picture in its own shape, rather than fitted into a message's frame).
+ */
+export function Attachments({ list, from, fill }: { list: AttachmentMeta[]; from?: string; fill?: boolean }) {
   // The message's pictures are one set in the viewer, a step apart. A spoiler
   // is left out unless it is the one opened: stepping onto it would give it away.
   const [viewing, setViewing] = useState<string | null>(null);
@@ -390,8 +397,8 @@ export function Attachments({ list, from }: { list: AttachmentMeta[]; from?: str
         const t = att.type || "";
         // showing or playing a file means holding all of it, so past a point it is only offered as a download
         const inline = att.size <= INLINE_MAX;
-        if (inline && t.startsWith("image/")) return tiles ? null : <ImageAttachment key={att.blob_id} att={att} onOpen={() => setViewing(att.blob_id)} />;
-        if (inline && t.startsWith("video/")) return <VideoAttachment key={att.blob_id} att={att} />;
+        if (inline && t.startsWith("image/")) return tiles ? null : <ImageAttachment key={att.blob_id} att={att} onOpen={() => setViewing(att.blob_id)} fill={fill} />;
+        if (inline && t.startsWith("video/")) return <VideoAttachment key={att.blob_id} att={att} fill={fill} />;
         if (inline && t.startsWith("audio/")) return <AudioAttachment key={att.blob_id} att={att} />;
         return <FileAttachment key={att.blob_id} att={att} />;
       })}

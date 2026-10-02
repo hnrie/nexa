@@ -5,6 +5,7 @@ package config
 import (
 	"bufio"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,8 +17,18 @@ import (
 
 // Config is the complete runtime configuration of chatd.
 type Config struct {
-	Listen    string
+	Listen string
+	// PublicURL is Nexa's own address: what its links, previews and the
+	// desktop app's updates name.
 	PublicURL string
+	// AltURLs are other addresses the same Nexa is reached at, every one of
+	// them working in full (ALT_URLS, comma-separated).
+	AltURLs []string
+	// MovedFrom are addresses Nexa used to be at (MOVED_FROM). They keep
+	// working for whatever still calls them, the installed desktop apps and
+	// webhooks among them, while a browser that opens one is moved on to
+	// PublicURL, still signed in (api/handoff.go).
+	MovedFrom []string
 	DataDir   string
 	WebDist   string
 	// DatabaseURL points at a Postgres database (postgres://…). Empty keeps
@@ -66,6 +77,11 @@ type Config struct {
 	DiscordGuildID      string
 	// DiscordAPIURL is Discord's REST API; only end-to-end tests point it at a fake.
 	DiscordAPIURL string
+	// DiscordRedirectURL is where Discord sends people back to after linking,
+	// as listed under OAuth2, Redirects in the Developer Portal. Empty, it is
+	// the callback under PublicURL; set it to keep using an address already
+	// listed there when PublicURL changes.
+	DiscordRedirectURL string
 	// TurnstileSiteKey and TurnstileSecretKey turn on Cloudflare Turnstile
 	// captchas for the actions bots abuse. Both are free to get; without them
 	// nothing asks for a captcha.
@@ -109,7 +125,7 @@ type Config struct {
 func Load(getenv func(string) string) (Config, error) {
 	c := Config{
 		Listen:            "127.0.0.1:8090",
-		PublicURL:         "https://chat.evilion.xyz",
+		PublicURL:         "https://nexa.fish",
 		DataDir:           "./data",
 		WebDist:           "./web/dist",
 		MaxUploadBytes:    104857600,
@@ -152,6 +168,7 @@ func Load(getenv func(string) string) (Config, error) {
 	str("DISCORD_BOT_TOKEN", &c.DiscordBotToken)
 	str("DISCORD_ACTIVITY_GUILD_ID", &c.DiscordGuildID)
 	str("DISCORD_API_URL", &c.DiscordAPIURL)
+	str("DISCORD_REDIRECT_URL", &c.DiscordRedirectURL)
 	str("TURNSTILE_SITE_KEY", &c.TurnstileSiteKey)
 	str("TURNSTILE_SECRET_KEY", &c.TurnstileSecretKey)
 	str("REALTIME_APP_ID", &c.RealtimeAppID)
@@ -233,6 +250,20 @@ func Load(getenv func(string) string) (Config, error) {
 			}
 		}
 	}
+	for _, list := range []struct {
+		key string
+		dst *[]string
+	}{{"ALT_URLS", &c.AltURLs}, {"MOVED_FROM", &c.MovedFrom}} {
+		for _, u := range strings.Split(getenv(list.key), ",") {
+			if u = strings.TrimRight(strings.TrimSpace(u), "/"); u == "" {
+				continue
+			}
+			if o, err := url.Parse(u); err != nil || (o.Scheme != "http" && o.Scheme != "https") || o.Host == "" || (o.Path != "" && o.Path != "/") {
+				return c, fmt.Errorf("%s: each address is a scheme and a host, like https://example.com, got %q", list.key, u)
+			}
+			*list.dst = append(*list.dst, u)
+		}
+	}
 	switch c.Registration {
 	case "open", "invite", "closed":
 	default:
@@ -255,7 +286,40 @@ func Load(getenv func(string) string) (Config, error) {
 	if !strings.HasPrefix(c.PublicURL, "http://") && !strings.HasPrefix(c.PublicURL, "https://") {
 		return c, fmt.Errorf("PUBLIC_URL: must start with http:// or https://, got %q", c.PublicURL)
 	}
+	if c.DiscordRedirectURL != "" && !strings.HasPrefix(c.DiscordRedirectURL, "https://") && !strings.HasPrefix(c.DiscordRedirectURL, "http://") {
+		return c, fmt.Errorf("DISCORD_REDIRECT_URL: must start with http:// or https://, got %q", c.DiscordRedirectURL)
+	}
+	// an address in two lists would be both moved and not
+	seen := map[string]string{}
+	for _, l := range []struct {
+		key  string
+		urls []string
+	}{{"PUBLIC_URL", []string{c.PublicURL}}, {"ALT_URLS", c.AltURLs}, {"MOVED_FROM", c.MovedFrom}} {
+		for _, u := range l.urls {
+			h := strings.ToLower(hostOf(u))
+			if prev, dup := seen[h]; dup {
+				return c, fmt.Errorf("%s: %s is already in %s", l.key, h, prev)
+			}
+			seen[h] = l.key
+		}
+	}
 	return c, nil
+}
+
+func hostOf(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return u.Host
+}
+
+// Origins are every address this Nexa answers at as itself: PublicURL first,
+// then AltURLs, then MovedFrom.
+func (c Config) Origins() []string {
+	out := []string{c.PublicURL}
+	out = append(out, c.AltURLs...)
+	return append(out, c.MovedFrom...)
 }
 
 // LoadEnvFile parses KEY=VALUE lines. Blank lines and # comments are skipped,

@@ -1,9 +1,10 @@
+import { AudioLines, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Toggle } from "@/components/common/Toggle";
 import { desktopBridge } from "@/lib/desktopBridge";
 import { showNotification } from "@/lib/notify";
-import { playSound, soundTrouble, type SoundName } from "@/lib/sounds";
+import { previewSound, soundTrouble, type SoundName } from "@/lib/sounds";
 import { useSettings, type NotificationPreview } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
@@ -18,7 +19,7 @@ function previewChoices(): { value: NotificationPreview; label: string; desc: st
   ];
 }
 
-export default function NotificationsPage() {
+export default function NotificationsPage({ onSounds }: { onSounds?: () => void }) {
   const st = useSettings((x) => x.settings);
   const patch = useSettings((x) => x.patch);
   const toast = useUI((x) => x.toast);
@@ -36,7 +37,7 @@ export default function NotificationsPage() {
   };
   // a sound that will not start says why, since a silent button tells nobody anything
   const testSound = async (name: SoundName) => {
-    setSoundHint((await playSound(name)) ? null : soundTrouble());
+    setSoundHint((await previewSound(name)) ? null : soundTrouble());
   };
   const testNotification = async () => {
     if (typeof Notification === "undefined" || Notification.permission !== "granted") {
@@ -54,6 +55,16 @@ export default function NotificationsPage() {
         <Toggle setting="desktopNotifications" checked={st.notifications.desktop && perm === "granted"} disabled={perm === "unsupported" || perm === "denied"} onChange={(v) => void enable(v)} label={t("settings.notifications.enableDesktopNotifications")} description={perm === "denied" ? t("settings.notifications.notificationsAreBlocked") : perm === "unsupported" ? t("settings.notifications.thisBrowserDoesNotSupport") : t("settings.notifications.getANotificationWhileThisTabIsOpen")} />
       )}
       <Toggle setting="sounds" checked={st.notifications.sounds} onChange={(v) => patch({ notifications: { ...st.notifications, sounds: v } })} label={t("settings.notifications.sounds")} description={t("settings.notifications.playASoundForNewMessages")} />
+      {onSounds ? (
+        <button className={s.panelLink} style={{ width: "100%", marginTop: 16, textAlign: "start" }} onClick={onSounds} data-testid="open-sounds">
+          <span className={s.panelLinkIcon} aria-hidden="true"><AudioLines size={22} /></span>
+          <span className={s.panelLinkText}>
+            <span className={s.panelLinkTitle}>{t("settings.sounds.title")}</span>
+            <span className={s.hint} style={{ margin: 0 }}>{t("settings.sounds.linkHint")}</span>
+          </span>
+          <ChevronRight size={18} aria-hidden="true" />
+        </button>
+      ) : null}
       <h3 className={s.h5} data-setting="notificationPreview">{t("settings.notifications.previewHeading")}</h3>
       <p className={s.hint}>{t("settings.notifications.previewIntro")}</p>
       {previewChoices().map((o) => (

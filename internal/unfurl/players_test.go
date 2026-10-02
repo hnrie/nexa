@@ -71,3 +71,17 @@ func TestTwitchNeedsAParent(t *testing.T) {
 		t.Errorf("unexpected player %+v", p)
 	}
 }
+
+// Nexa at several addresses names each of them, so the player opens at any.
+func TestTwitchIsToldEveryAddress(t *testing.T) {
+	p := PlayerFor(mustURL(t, "https://www.twitch.tv/videos/1234567"), "nexa.fish", "", "mathtest.lol", "chat.evilion.xyz")
+	if p == nil {
+		t.Fatal("no player")
+	}
+	if !strings.HasSuffix(p.URL, "&parent=nexa.fish&parent=mathtest.lol&parent=chat.evilion.xyz") {
+		t.Errorf("parents in %s", p.URL)
+	}
+	if p := PlayerFor(mustURL(t, "https://www.twitch.tv/videos/1234567")); p != nil {
+		t.Errorf("a player with no parent at all: %+v", p)
+	}
+}

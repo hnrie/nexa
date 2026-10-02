@@ -109,7 +109,8 @@ func (s *Store) DeletedAccountsWithLeftovers(ctx context.Context) ([]ids.ID, err
 		EXISTS (SELECT 1 FROM key_grants WHERE user_id = u.id) OR
 		EXISTS (SELECT 1 FROM notes WHERE owner_id = u.id) OR
 		EXISTS (SELECT 1 FROM note_members WHERE user_id = u.id) OR
-		EXISTS (SELECT 1 FROM note_invites WHERE from_id = u.id OR to_id = u.id)
+		EXISTS (SELECT 1 FROM note_invites WHERE from_id = u.id OR to_id = u.id) OR
+		EXISTS (SELECT 1 FROM user_sounds WHERE user_id = u.id)
 	) ORDER BY u.id`, FlagDeleted)
 }
 
@@ -285,6 +286,7 @@ func (s *Store) idList(ctx context.Context, q string, args ...any) ([]ids.ID, er
 // positions, recent stickers and installed packs, its per-server avatars
 // (whose pictures are let go), its Nexa read position, the crash reports its
 // devices sent and the bug reports it wrote (whose files are let go), the
+// files of its sound packs, the
 // notes it owns (with their versions and files) and its place in the ones it
 // was shared (which are marked for a new key), its note invitations, server
 // bans and channel permissions naming it, and any mute or ban still on it.
@@ -300,6 +302,10 @@ func (s *Store) PurgeUserLeftovers(ctx context.Context, uid ids.ID) error {
 			return err
 		}
 		if err := deleteUserBugReportsTx(ctx, tx, id); err != nil {
+			return err
+		}
+		// the files of its sound packs, which nobody else ever plays
+		if err := deleteUserSoundsTx(ctx, tx, id); err != nil {
 			return err
 		}
 		// the notes it owned go, with their files; the ones it was only

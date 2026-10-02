@@ -60,7 +60,7 @@ func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 	srv.limMsg = ratelimit.New(rate.Inf, 1000, time.Hour)
 	srv.limUpload = ratelimit.New(rate.Inf, 1000, time.Hour)
 	srv.limGuest = ratelimit.New(rate.Inf, 1000, time.Hour)
-	hub := gateway.New(st, srv.Auth, srv.Log, cfg.PublicURL)
+	hub := gateway.New(st, srv.Auth, srv.Log, cfg.Origins())
 	srv.Bcast = hub
 	srv.WireServers(hub)
 	srv.WireVoice(hub)

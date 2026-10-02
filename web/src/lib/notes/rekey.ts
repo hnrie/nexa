@@ -1,10 +1,12 @@
 import { ApiError } from "@/api/client";
 import { notes as notesApi } from "@/api/notes";
 import { NOTE_OWNER } from "@/api/types";
-import { newNoteKey, openNote, openNoteLink, sealNote, sealNoteKey, sealNoteLink, wrapNoteKeyForLink, wrapPreviousKey } from "@/crypto/notes";
+import { newNoteKey, openNote, openNoteLink, openNoteUpdate, sealNote, sealNoteKey, sealNoteLink, wrapNoteKeyForLink, wrapPreviousKey } from "@/crypto/notes";
 import { useAuth } from "@/stores/auth";
 import { sealingKeyOf, useKeys } from "@/stores/keys";
 import { noteKeyOf } from "./keys";
+import { pruned, readHead } from "./model";
+import { bodyOf, docFromBody, readDoc, Y } from "./ydoc";
 
 /**
  * Giving a note a new key.
@@ -89,9 +91,29 @@ async function run(id: string): Promise<RekeyResult> {
     }
 
     const [head, body] = await Promise.all([openNote(oldKey, "head", row.head), openNote(oldKey, "body", row.body ?? "")]);
-    const [newHead, newBody, prevKey] = await Promise.all([sealNote(newKey, "head", head), sealNote(newKey, "body", body), wrapPreviousKey(newKey, oldKey)]);
+    // The changes kept since the note was last saved whole are sealed with
+    // the old key, and go when it does: the new body carries every one of them.
+    const doc = docFromBody(id, row.version, readHead(head).title, body);
+    let upto = row.crdt_upto ?? 0;
+    for (let more = true; more; ) {
+      const page = await notesApi.updates(id, upto);
+      for (const u of page.updates) {
+        try {
+          Y.applyUpdate(doc, await openNoteUpdate(oldKey, u.update));
+        } catch {
+          // one that will not open with the key it should have been sealed with holds nothing anyone can read
+        }
+        upto = Math.max(upto, u.seq);
+      }
+      upto = Math.max(upto, page.crdt_upto);
+      more = page.more;
+    }
+    const now = readDoc(doc);
+    const whole = bodyOf(doc, pruned(now));
+    doc.destroy();
+    const [newHead, newBody, prevKey] = await Promise.all([sealNote(newKey, "head", head), sealNote(newKey, "body", whole), wrapPreviousKey(newKey, oldKey)]);
     try {
-      await notesApi.rekey(id, { head: newHead, body: newBody, base_version: row.version, prev_key: prevKey, members, invites, links });
+      await notesApi.rekey(id, { head: newHead, body: newBody, base_version: row.version, prev_key: prevKey, members, invites, links, upto });
       return "done";
     } catch (err) {
       if (err instanceof ApiError && (err.code === "note_stale" || err.code === "note_members_changed")) continue;

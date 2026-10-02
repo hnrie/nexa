@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"evilion.xyz/chat/internal/auth"
@@ -23,17 +24,23 @@ import (
 // or declines, or by a link, whose key is in the part of it the server never
 // sees.
 //
-// Writing together is live: a note saves itself a moment after each pause,
-// and every save is sent on, sealed, to everyone else the note is shared
-// with, whose app puts it into the note they have open. Who has a note open
-// is said by the apps themselves and only passed along. Earlier states of a
-// note are set aside as it is written, to look back through and restore.
+// Writing together is live. Each app keeps a note as a CRDT and sends every
+// change the moment it is made, sealed (POST .../updates): the server numbers
+// it, keeps it, and passes it on to everyone else the note is shared with,
+// whose app puts it into the note they have open; the CRDT puts everyone's
+// changes together the same way everywhere, so nothing is lost or doubled.
+// Every few seconds of writing an app also saves the note whole, saying which
+// changes that holds, and those are let go. Who has a note open is said by
+// the apps themselves and only passed along. Earlier states of a note are set
+// aside as it is saved, to look back through and restore.
 
 func (s *Server) noteRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/notes", s.authed(s.handleNotes))
 	mux.Handle("POST /api/v1/notes", s.authed(s.handleNoteCreate))
 	mux.Handle("GET /api/v1/notes/{id}", s.authed(s.handleNoteGet))
 	mux.Handle("PUT /api/v1/notes/{id}", s.authed(s.handleNoteSave))
+	mux.Handle("POST /api/v1/notes/{id}/updates", s.authed(s.handleNoteUpdatePost))
+	mux.Handle("GET /api/v1/notes/{id}/updates", s.authed(s.handleNoteUpdates))
 	mux.Handle("DELETE /api/v1/notes/{id}", s.authed(s.handleNoteDelete))
 	mux.Handle("POST /api/v1/notes/{id}/rekey", s.authed(s.handleNoteRekey))
 	mux.Handle("GET /api/v1/notes/{id}/versions", s.authed(s.handleNoteVersions))
@@ -204,6 +211,9 @@ func (s *Server) handleNoteSave(w http.ResponseWriter, r *http.Request) {
 		// Keep sets the state being replaced aside as a version whatever the
 		// clock says: sent when an old version is being put back.
 		Keep bool `json:"keep"`
+		// Upto is the newest change the body holds. An app from before notes
+		// were written change by change sends none.
+		Upto *int64 `json:"upto"`
 	}
 	if err := ReadJSON(w, r, &req, store.MaxNoteBodyBytes+store.MaxNoteHeadBytes+64<<10); err != nil {
 		WriteError(w, err)
@@ -213,9 +223,21 @@ func (s *Server) handleNoteSave(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, errNoteContent)
 		return
 	}
-	version, updated, err := s.Store.SaveNote(r.Context(), id, me.ID, req.Base, req.Head, req.Body, req.Files, req.Keep)
+	upto := int64(-1)
+	if req.Upto != nil {
+		if *req.Upto < 0 {
+			WriteError(w, errNoteContent)
+			return
+		}
+		upto = *req.Upto
+	}
+	version, updated, err := s.Store.SaveNote(r.Context(), id, me.ID, req.Base, req.Head, req.Body, req.Files, req.Keep, upto)
 	var files *store.NoteFilesError
 	switch {
+	case errors.Is(err, store.ErrConflict):
+		// it says it holds changes that were never made
+		WriteError(w, errNoteContent)
+		return
 	case errors.Is(err, store.ErrStale):
 		// not an error to the app: it fetches the newer note, puts its own
 		// changes into it, and saves again
@@ -239,9 +261,93 @@ func (s *Server) handleNoteSave(w http.ResponseWriter, r *http.Request) {
 	if len(req.Body) <= noteLiveBytes {
 		ev["body"] = req.Body
 	}
+	if upto >= 0 {
+		ev["upto"] = upto
+	} else {
+		// saved whole by an app that knows nothing of changes: the note is what it says
+		ev["reset"] = true
+	}
 	s.emitNote(r, id, ev)
 	WriteJSON(w, http.StatusOK, map[string]any{"version": version, "updated_at": updated})
 }
+
+// handleNoteUpdatePost keeps one change to a note and passes it on, sealed,
+// to everyone the note is shared with; the app that made it knows it by `cid`
+// when it comes back. A change sealed with a key the note no longer has, or
+// to a note that has gone too long without being saved whole, is refused
+// with a code that says what the app should do first.
+func (s *Server) handleNoteUpdatePost(w http.ResponseWriter, r *http.Request) {
+	me, id, _ := s.note(w, r, store.NoteEditor)
+	if me == nil {
+		return
+	}
+	if ok, retry := s.limNoteUpdate.Allow("note-update:" + me.ID.String()); !ok {
+		w.Header().Set("Retry-After", retryAfter(retry))
+		WriteError(w, ErrRateLimited)
+		return
+	}
+	var req struct {
+		Update string `json:"update"`
+		Epoch  int    `json:"epoch"`
+		// which open copy of the note sent it, so that copy can tell its own change when it comes back
+		CID string `json:"cid"`
+	}
+	if err := ReadJSON(w, r, &req, store.MaxNoteUpdateBytes+4<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	if !sealed(req.Update, store.MaxNoteUpdateBytes) || len(req.CID) > 32 || !sealedOrEmpty(req.CID) {
+		WriteError(w, errNoteContent)
+		return
+	}
+	seq, at, err := s.Store.AppendNoteUpdate(r.Context(), id, me.ID, req.Epoch, req.Update)
+	switch {
+	case errors.Is(err, store.ErrRekeyed):
+		WriteError(w, E(http.StatusConflict, "note_rekeyed", "This note has a new key. Open it again."))
+		return
+	case errors.Is(err, store.ErrSaveFirst):
+		WriteError(w, E(http.StatusConflict, "note_save_first", "Save this note before changing it further."))
+		return
+	case err != nil:
+		WriteError(w, err)
+		return
+	}
+	ev := map[string]any{"id": id, "seq": seq, "user_id": me.ID, "cid": req.CID, "at": at}
+	// a big change goes by its number alone, and whoever has the note open fetches it
+	if len(req.Update) <= noteLiveBytes {
+		ev["update"] = req.Update
+	}
+	if members, err := s.Store.NoteMemberIDs(r.Context(), id); err == nil && len(members) > 0 {
+		s.Bcast.EmitUsers(members, "note_crdt", ev)
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"seq": seq, "at": at})
+}
+
+// sealedOrEmpty is sealed() for a value that may be left out.
+func sealedOrEmpty(v string) bool { return v == "" || sealed(v, len(v)) }
+
+// handleNoteUpdates lists a note's changes after ?after=, for an app catching
+// up: on opening the note (the changes since it was last saved whole), or
+// after missing some while its connection was down.
+func (s *Server) handleNoteUpdates(w http.ResponseWriter, r *http.Request) {
+	me, id, _ := s.note(w, r, store.NoteViewer)
+	if me == nil {
+		return
+	}
+	after, _ := strconv.ParseInt(r.URL.Query().Get("after"), 10, 64)
+	if after < 0 {
+		after = 0
+	}
+	list, seq, upto, err := s.Store.NoteUpdates(r.Context(), id, me.ID, after, noteUpdatesPage)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"updates": list, "crdt_seq": seq, "crdt_upto": upto, "more": len(list) == noteUpdatesPage})
+}
+
+// noteUpdatesPage is how many changes one fetch brings back.
+const noteUpdatesPage = 500
 
 // noteLiveBytes is the longest sealed note sent along with the news that it
 // changed. Past it only the news goes, and the note is fetched by those who
@@ -346,9 +452,10 @@ func (s *Server) handleNoteDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleNoteUpload takes a file for a note: the same sealed bytes a message's
-// attachment is, from someone who may edit the note. The file belongs to the
-// note once a save names it; one never named is swept away like any upload
-// nothing refers to.
+// attachment is, from someone who may edit the note. The note's people may
+// read it straight away (note_uploads), as everyone writing in the note sees
+// it the moment it is added; it belongs to the note once a save names it, and
+// one never named is swept away like any upload nothing refers to.
 func (s *Server) handleNoteUpload(w http.ResponseWriter, r *http.Request) {
 	me, id, _ := s.note(w, r, store.NoteEditor)
 	if me == nil {
@@ -374,6 +481,11 @@ func (s *Server) handleNoteUpload(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, limit+1)
 	b, err := s.Media.PutEncrypted(r.Context(), r.Body, limit, me.ID)
 	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	// the others writing in the note see it at once, so they may fetch it at once
+	if err := s.Store.AddNoteUpload(r.Context(), id, b.ID); err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -806,6 +918,8 @@ func (s *Server) handleNoteRekey(w http.ResponseWriter, r *http.Request) {
 			KeyWrapped string `json:"key_wrapped"`
 			LinkSealed string `json:"link_sealed"`
 		} `json:"links"`
+		// the newest change the body holds, which has to be the newest there is
+		Upto *int64 `json:"upto"`
 	}
 	if err := ReadJSON(w, r, &req, store.MaxNoteBodyBytes+store.MaxNoteHeadBytes+256<<10); err != nil {
 		WriteError(w, err)
@@ -815,7 +929,10 @@ func (s *Server) handleNoteRekey(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, errNoteContent)
 		return
 	}
-	rekey := store.NoteRekey{Head: req.Head, Body: req.Body, PrevKey: req.PrevKey, Members: map[ids.ID]string{}, Invites: map[ids.ID]string{}, Links: map[ids.ID][2]string{}}
+	rekey := store.NoteRekey{Head: req.Head, Body: req.Body, PrevKey: req.PrevKey, Members: map[ids.ID]string{}, Invites: map[ids.ID]string{}, Links: map[ids.ID][2]string{}, Upto: -1}
+	if req.Upto != nil && *req.Upto >= 0 {
+		rekey.Upto = *req.Upto
+	}
 	for _, m := range req.Members {
 		if !sealed(m.KeySealed, store.MaxNoteKeyBytes) {
 			WriteError(w, errNoteContent)

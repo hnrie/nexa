@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -434,9 +435,16 @@ func TestNoteFiles(t *testing.T) {
 	if code, _ := upload(dave, picture); code != http.StatusNotFound {
 		t.Errorf("a stranger's upload: %d", code)
 	}
-	// until a save names it, the file is its uploader's alone
-	if code, _ := get(bob, blob); code != http.StatusNotFound {
-		t.Errorf("a file no save has named, read by another member: %d", code)
+	// Before any save names it, the note's people can already read it: in a
+	// note written together it shows up for them the moment it is added.
+	// Nobody else can.
+	for name, tok := range map[string]string{"editor": bob, "viewer": carol} {
+		if code, data := get(tok, blob); code != http.StatusOK || !bytes.Equal(data, picture) {
+			t.Errorf("the %s reading a file just added to the note: %d", name, code)
+		}
+	}
+	if code, _ := get(dave, blob); code != http.StatusNotFound {
+		t.Errorf("a stranger reading a file just added to the note: %d", code)
 	}
 	if res, body := do(t, ts, "PUT", "/api/v1/notes/"+id, alice, map[string]any{"head": sealedHead, "body": sealedBody, "base_version": 1, "files": []string{blob}}); res.StatusCode != http.StatusOK {
 		t.Fatalf("save with a file: %d %v", res.StatusCode, body)
@@ -459,42 +467,88 @@ func TestNoteFiles(t *testing.T) {
 		t.Errorf("held %d times after a second save", refs(blob))
 	}
 
-	// A note cannot be made to hold a file its saver did not upload: bob
-	// names a file of alice's that the note does not have.
-	_, loose := upload(alice, []byte("alice's other file"))
-	if res, body := do(t, ts, "PUT", "/api/v1/notes/"+id, bob, map[string]any{"head": sealedHead, "body": sealedBody, "base_version": 3, "files": []string{blob, loose}}); res.StatusCode != http.StatusBadRequest || errCode(body) != "note_file" {
+	// Whoever saves a note written together saves the pictures the others
+	// have just added with it: bob saves with a file alice uploaded for it.
+	_, hers := upload(alice, []byte("alice's picture, added while bob was writing"))
+	if res, body := do(t, ts, "PUT", "/api/v1/notes/"+id, bob, map[string]any{"head": sealedHead, "body": sealedBody, "base_version": 3, "files": []string{blob, hers}}); res.StatusCode != http.StatusOK {
+		t.Fatalf("saving with a file another editor added: %d %v", res.StatusCode, body)
+	}
+	if refs(hers) != 1 {
+		t.Errorf("the note holds the other editor's file %d times", refs(hers))
+	}
+	if res, _ := do(t, ts, "PUT", "/api/v1/notes/"+id, bob, map[string]any{"head": sealedHead, "body": sealedBody, "base_version": 4, "files": []string{blob}}); res.StatusCode != http.StatusOK {
+		t.Fatalf("save without it again: %d", res.StatusCode)
+	}
+
+	// But a note cannot be made to hold a file its saver did not upload for
+	// it: bob names a file alice uploaded for another note of hers.
+	other := newNote(t, ts, alice)
+	loose := func() string {
+		req, _ := http.NewRequest("POST", ts.URL+"/api/v1/notes/"+other+"/attachments", bytes.NewReader([]byte("alice's other file")))
+		req.Header.Set("Authorization", "Bearer "+alice)
+		req.Header.Set("Content-Type", "application/octet-stream")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(res.Body).Decode(&out)
+		return out["blob_id"].(string)
+	}()
+	if code, _ := get(bob, loose); code != http.StatusNotFound {
+		t.Errorf("a file added to a note bob is not in, read by bob: %d", code)
+	}
+	if res, body := do(t, ts, "PUT", "/api/v1/notes/"+id, bob, map[string]any{"head": sealedHead, "body": sealedBody, "base_version": 5, "files": []string{blob, loose}}); res.StatusCode != http.StatusBadRequest || errCode(body) != "note_file" {
 		t.Errorf("claiming someone else's upload: %d %v", res.StatusCode, body)
 	} else if named, _ := body["files"].([]any); len(named) != 1 || named[0] != loose {
 		// the app is told which, so it can take that file out and save the rest
 		t.Errorf("the refusal names %v, wanted only %s", body["files"], loose)
 	}
-	if res, body := do(t, ts, "PUT", "/api/v1/notes/"+id, bob, map[string]any{"head": sealedHead, "body": sealedBody, "base_version": 3, "files": []string{blob, "424242"}}); res.StatusCode != http.StatusBadRequest || errCode(body) != "note_file" {
+	if res, body := do(t, ts, "PUT", "/api/v1/notes/"+id, bob, map[string]any{"head": sealedHead, "body": sealedBody, "base_version": 5, "files": []string{blob, "424242"}}); res.StatusCode != http.StatusBadRequest || errCode(body) != "note_file" {
 		t.Errorf("naming a file that is not there: %d %v", res.StatusCode, body)
 	}
 	// ...and the refused saves changed nothing
-	if _, got := do(t, ts, "GET", "/api/v1/notes/"+id, alice, nil); got["version"].(float64) != 3 {
+	if _, got := do(t, ts, "GET", "/api/v1/notes/"+id, alice, nil); got["version"].(float64) != 5 {
 		t.Errorf("version after refused saves: %v", got["version"])
 	}
 
-	// let go of: the reference is given back, and it is its uploader's alone again
-	if res, _ := do(t, ts, "PUT", "/api/v1/notes/"+id, bob, map[string]any{"head": sealedHead, "body": sealedBody, "base_version": 3, "files": []string{}}); res.StatusCode != http.StatusOK {
+	// let go of: the reference is given back. Until the sweep takes it the
+	// note's people can still read it, as they could a file one of its
+	// earlier states holds; once swept, nobody can.
+	if res, _ := do(t, ts, "PUT", "/api/v1/notes/"+id, bob, map[string]any{"head": sealedHead, "body": sealedBody, "base_version": 5, "files": []string{}}); res.StatusCode != http.StatusOK {
 		t.Fatalf("save without the file: %d", res.StatusCode)
 	}
-	if refs(blob) != 0 {
-		t.Errorf("held %d times after the note let it go", refs(blob))
+	if refs(hers) != 0 {
+		t.Errorf("held %d times after the note let it go", refs(hers))
 	}
-	if code, _ := get(carol, blob); code != http.StatusNotFound {
-		t.Errorf("a file the note let go, read by a member: %d", code)
+	if code, _ := get(dave, hers); code != http.StatusNotFound {
+		t.Errorf("a file the note let go, read by a stranger: %d", code)
+	}
+	hersID, _ := ids.Parse(hers)
+	if gone, err := srv.Store.DeleteBlob(context.Background(), hersID); err != nil || !gone {
+		t.Fatalf("sweeping the file nothing holds: %v %v", gone, err)
+	}
+	if code, _ := get(carol, hers); code != http.StatusNotFound {
+		t.Errorf("a swept file, read by a member: %d", code)
+	}
+	var left int
+	if err := srv.Store.DB().R.QueryRow(`SELECT count(*) FROM note_uploads WHERE blob_id = ?`, int64(hersID)).Scan(&left); err != nil || left != 0 {
+		t.Errorf("a swept file's upload row stayed: %d %v", left, err)
 	}
 
-	// deleting the note gives back whatever it still held
-	do(t, ts, "PUT", "/api/v1/notes/"+id, alice, map[string]any{"head": sealedHead, "body": sealedBody, "base_version": 4, "files": []string{blob, loose}})
-	if refs(blob) != 1 || refs(loose) != 1 {
-		t.Fatalf("held %d and %d times", refs(blob), refs(loose))
+	// deleting the note gives back whatever it still held, and forgets its uploads
+	do(t, ts, "PUT", "/api/v1/notes/"+id, alice, map[string]any{"head": sealedHead, "body": sealedBody, "base_version": 6, "files": []string{blob}})
+	if refs(blob) != 1 {
+		t.Fatalf("held %d times", refs(blob))
 	}
 	do(t, ts, "DELETE", "/api/v1/notes/"+id, alice, nil)
-	if refs(blob) != 0 || refs(loose) != 0 {
-		t.Errorf("held %d and %d times after the note was deleted", refs(blob), refs(loose))
+	if refs(blob) != 0 {
+		t.Errorf("held %d times after the note was deleted", refs(blob))
+	}
+	nid, _ := ids.Parse(id)
+	if err := srv.Store.DB().R.QueryRow(`SELECT count(*) FROM note_uploads WHERE note_id = ?`, int64(nid)).Scan(&left); err != nil || left != 0 {
+		t.Errorf("a deleted note's uploads stayed: %d %v", left, err)
 	}
 }
 
@@ -980,5 +1034,145 @@ func TestNoteVersionHistory(t *testing.T) {
 	}
 	if refs() != 0 {
 		t.Errorf("the picture is still held %d times after the note went", refs())
+	}
+}
+
+// Writing together, change by change: each change is numbered, kept and
+// passed on to the note's other members; a save of the whole note says which
+// changes it holds and those are let go; a change sealed with an old key, and
+// one made by someone who may only read, are refused.
+func TestNoteUpdates(t *testing.T) {
+	_, ts := newTestServer(t)
+	alice, _ := register(t, ts, "alice")
+	bob, bobID := register(t, ts, "bob")
+	carol, carolID := register(t, ts, "carol")
+	id := newNote(t, ts, alice)
+	share := func(tok, uid string, role int) {
+		t.Helper()
+		_, inv := do(t, ts, "POST", "/api/v1/notes/"+id+"/invites", alice, map[string]any{"user_id": uid, "role": role, "key_sealed": sealedKey})
+		if res, _ := do(t, ts, "POST", "/api/v1/note-invites/"+inv["id"].(string)+"/accept", tok, nil); res.StatusCode != http.StatusOK {
+			t.Fatalf("share: %d", res.StatusCode)
+		}
+	}
+	share(bob, bobID, store.NoteEditor)
+	share(carol, carolID, store.NoteViewer)
+	gwB := connectGW(t, ts, bob)
+	gwC := connectGW(t, ts, carol)
+	send := func(tok, update string, epoch int) (*http.Response, map[string]any) {
+		return do(t, ts, "POST", "/api/v1/notes/"+id+"/updates", tok, map[string]any{"update": update, "epoch": epoch, "cid": "dGFi"})
+	}
+
+	// numbered in the order they arrive, whoever made them
+	for i, who := range []string{alice, bob, alice} {
+		res, got := send(who, fmt.Sprintf("v1.dXA.%d", i), 0)
+		if res.StatusCode != http.StatusOK || got["seq"].(float64) != float64(i+1) {
+			t.Fatalf("change %d: %d %v", i, res.StatusCode, got)
+		}
+	}
+	// passed on, sealed, to everyone in the note, readers too
+	for _, g := range []*gw{gwB, gwC} {
+		ev := g.nextWhere("note_crdt", 2*time.Second, func(e map[string]any) bool { return e["seq"].(float64) == 3 })
+		if ev == nil || ev["id"] != id || ev["update"] != "v1.dXA.2" || ev["cid"] != "dGFi" {
+			t.Errorf("note_crdt: %v", ev)
+		}
+	}
+	// someone who may only read cannot change it
+	if res, _ := send(carol, "v1.dXA.eA", 0); res.StatusCode != http.StatusForbidden {
+		t.Errorf("a reader's change: %d", res.StatusCode)
+	}
+	// catching up: everything after a number, and where the saved note stands
+	_, list := do(t, ts, "GET", "/api/v1/notes/"+id+"/updates?after=1", carol, nil)
+	if ups := list["updates"].([]any); len(ups) != 2 || ups[0].(map[string]any)["update"] != "v1.dXA.1" || list["crdt_seq"].(float64) != 3 || list["crdt_upto"].(float64) != 0 {
+		t.Fatalf("updates after 1: %v", list)
+	}
+	// the note itself says the same
+	if _, row := do(t, ts, "GET", "/api/v1/notes/"+id, bob, nil); row["crdt_seq"].(float64) != 3 || row["crdt_upto"].(float64) != 0 {
+		t.Errorf("row: %v", row)
+	}
+
+	save := func(tok string, base int, upto any) (*http.Response, map[string]any) {
+		body := map[string]any{"head": sealedHead, "body": sealedBody, "base_version": base, "files": []string{}}
+		if upto != nil {
+			body["upto"] = upto
+		}
+		return do(t, ts, "PUT", "/api/v1/notes/"+id, tok, body)
+	}
+	// a save cannot hold changes that were never made
+	if res, _ := save(bob, 1, 9); res.StatusCode != http.StatusBadRequest {
+		t.Errorf("a save past the newest change: %d", res.StatusCode)
+	}
+	// saved whole with the first two: those go, the third stays
+	if res, got := save(bob, 1, 2); res.StatusCode != http.StatusOK || got["version"].(float64) != 2 {
+		t.Fatalf("save upto 2: %d %v", res.StatusCode, got)
+	}
+	if ev := gwC.nextWhere("note_update", 2*time.Second, func(e map[string]any) bool { return e["version"] != nil }); ev == nil || ev["upto"].(float64) != 2 || ev["reset"] != nil {
+		t.Errorf("note_update on save: %v", ev)
+	}
+	_, list = do(t, ts, "GET", "/api/v1/notes/"+id+"/updates?after=0", alice, nil)
+	if ups := list["updates"].([]any); len(ups) != 1 || ups[0].(map[string]any)["seq"].(float64) != 3 || list["crdt_upto"].(float64) != 2 {
+		t.Fatalf("after the save: %v", list)
+	}
+	// a save that holds less than the note already does is stale, as is one from an old version
+	if res, got := save(alice, 2, 1); res.StatusCode != http.StatusConflict || errCode(got) != "note_stale" {
+		t.Errorf("a save holding fewer changes: %d %v", res.StatusCode, got)
+	}
+	if res, got := save(alice, 1, 3); res.StatusCode != http.StatusConflict || errCode(got) != "note_stale" {
+		t.Errorf("a save from an old version: %d %v", res.StatusCode, got)
+	}
+	// numbers keep going up after changes are let go, so none is ever given twice
+	if res, got := send(alice, "v1.dXA.4", 0); res.StatusCode != http.StatusOK || got["seq"].(float64) != 4 {
+		t.Fatalf("change after the save: %d %v", res.StatusCode, got)
+	}
+	// an app from before changes were kept saves the note whole: every change goes
+	if res, got := save(alice, 2, nil); res.StatusCode != http.StatusOK || got["version"].(float64) != 3 {
+		t.Fatalf("an old app's save: %d %v", res.StatusCode, got)
+	}
+	if ev := gwB.nextWhere("note_update", 2*time.Second, func(e map[string]any) bool { return e["version"] != nil && e["version"].(float64) == 3 }); ev == nil || ev["reset"] != true {
+		t.Errorf("note_update on an old app's save: %v", ev)
+	}
+	_, list = do(t, ts, "GET", "/api/v1/notes/"+id+"/updates?after=0", alice, nil)
+	if len(list["updates"].([]any)) != 0 || list["crdt_upto"].(float64) != 4 {
+		t.Fatalf("after an old app's save: %v", list)
+	}
+
+	// a change sealed with a key the note no longer has is refused
+	if res, got := send(alice, "v1.dXA.5", 0); res.StatusCode != http.StatusOK || got["seq"].(float64) != 5 {
+		t.Fatalf("change 5: %d %v", res.StatusCode, got)
+	}
+	rekey := func(base int, upto any) (*http.Response, map[string]any) {
+		_, sharing := do(t, ts, "GET", "/api/v1/notes/"+id+"/sharing", alice, nil)
+		var members []map[string]any
+		for _, m := range sharing["members"].([]any) {
+			members = append(members, map[string]any{"user_id": m.(map[string]any)["user"].(map[string]any)["id"], "key_sealed": "bmV3"})
+		}
+		body := map[string]any{"head": sealedHead, "body": sealedBody, "base_version": base, "members": members, "prev_key": "b2xk", "invites": []any{}, "links": []any{}}
+		if upto != nil {
+			body["upto"] = upto
+		}
+		return do(t, ts, "POST", "/api/v1/notes/"+id+"/rekey", alice, body)
+	}
+	// not holding the newest change, it would lose it with the old key
+	if res, got := rekey(3, 4); res.StatusCode != http.StatusConflict || errCode(got) != "note_stale" {
+		t.Fatalf("a rekey missing a change: %d %v", res.StatusCode, got)
+	}
+	if res, got := rekey(3, 5); res.StatusCode != http.StatusOK || got["version"].(float64) != 4 {
+		t.Fatalf("rekey: %d %v", res.StatusCode, got)
+	}
+	if res, got := send(bob, "v1.dXA.b2xk", 0); res.StatusCode != http.StatusConflict || errCode(got) != "note_rekeyed" {
+		t.Errorf("a change sealed with the old key: %d %v", res.StatusCode, got)
+	}
+	if res, got := send(bob, "v1.dXA.bmV3", 1); res.StatusCode != http.StatusOK || got["seq"].(float64) != 6 {
+		t.Errorf("a change sealed with the new key: %d %v", res.StatusCode, got)
+	}
+	_, list = do(t, ts, "GET", "/api/v1/notes/"+id+"/updates?after=0", carol, nil)
+	if ups := list["updates"].([]any); len(ups) != 1 || ups[0].(map[string]any)["seq"].(float64) != 6 || list["crdt_upto"].(float64) != 5 {
+		t.Fatalf("after the rekey: %v", list)
+	}
+	// changes go with the note
+	if res, _ := do(t, ts, "DELETE", "/api/v1/notes/"+id, alice, nil); res.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete: %d", res.StatusCode)
+	}
+	if res, _ := do(t, ts, "GET", "/api/v1/notes/"+id+"/updates?after=0", alice, nil); res.StatusCode != http.StatusNotFound {
+		t.Errorf("updates of a deleted note: %d", res.StatusCode)
 	}
 }

@@ -1,6 +1,9 @@
 /* container-type lets the controls fit the player's own width: a portrait video, or any video on a phone, is narrow */
 .player { position: relative; width: 550px; max-width: 100%; border-radius: var(--radius-sm); overflow: hidden; background: #000; outline: none; margin-top: 4px; container-type: inline-size; }
 .player:focus-visible { box-shadow: 0 0 0 2px var(--brand); }
+/* in a note: as wide as the line gives it, in the video's own shape */
+.player[data-fill]:not([data-full="true"]) { width: 100%; margin-top: 0; }
+.player[data-fill]:not([data-full="true"]) .video { max-height: none; width: 100%; height: 100%; }
 .player[data-full="true"] { max-width: none; width: 100vw; height: 100vh; border-radius: 0; display: flex; align-items: center; justify-content: center; }
 .video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; cursor: pointer; -webkit-touch-callout: none; }
 /* with no recorded size there is no frame, so the video sets the height itself */

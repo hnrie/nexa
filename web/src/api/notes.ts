@@ -1,5 +1,5 @@
 import { api, captchaOptions } from "./client";
-import type { NoteKeyRow, NoteLinkRow, NoteLinkView, NoteInviteRow, NoteRole, NoteRow, NoteSharing, NoteVersionRow, PublicUser, Snowflake } from "./types";
+import type { NoteKeyRow, NoteLinkRow, NoteLinkView, NoteInviteRow, NoteRole, NoteRow, NoteSharing, NoteUpdateRow, NoteVersionRow, PublicUser, Snowflake } from "./types";
 
 /**
  * Notes. Everything sent and returned here is sealed on the device
@@ -16,10 +16,21 @@ export const notes = {
   get(id: Snowflake): Promise<NoteRow> {
     return api.request("GET", `/notes/${id}`);
   },
-  /** Saves over the version `base`. Refused with `note_stale` when the note has moved on since. */
-  save(id: Snowflake, head: string, body: string, base: number, files: string[], opts?: { keep?: boolean; keepalive?: boolean }): Promise<{ version: number; updated_at: number }> {
+  /**
+   * Saves the whole note over the version `base`, holding every change up to
+   * `upto`. Refused with `note_stale` when the note has moved on since.
+   */
+  save(id: Snowflake, head: string, body: string, base: number, files: string[], upto: number, opts?: { keep?: boolean; keepalive?: boolean }): Promise<{ version: number; updated_at: number }> {
     // keep: the state being replaced is set aside as a version, whatever the clock says
-    return api.request("PUT", `/notes/${id}`, { head, body, base_version: base, files, ...(opts?.keep ? { keep: true } : {}) }, opts?.keepalive ? { keepalive: true } : undefined);
+    return api.request("PUT", `/notes/${id}`, { head, body, base_version: base, files, upto, ...(opts?.keep ? { keep: true } : {}) }, opts?.keepalive ? { keepalive: true } : undefined);
+  },
+  /** Sends one change, sealed with the key of `epoch`; `cid` is which open copy made it. */
+  postUpdate(id: Snowflake, update: string, epoch: number, cid: string, opts?: { keepalive?: boolean }): Promise<{ seq: number; at: number }> {
+    return api.request("POST", `/notes/${id}/updates`, { update, epoch, cid }, opts?.keepalive ? { keepalive: true } : undefined);
+  },
+  /** The changes after `after`, and where the note stands. */
+  updates(id: Snowflake, after: number): Promise<{ updates: NoteUpdateRow[]; crdt_seq: number; crdt_upto: number; more: boolean }> {
+    return api.request("GET", `/notes/${id}/updates`, undefined, { query: { after } });
   },
   /** The note's earlier states, newest first, and its earlier keys. */
   versions(id: Snowflake): Promise<{ versions: NoteVersionRow[]; keys: NoteKeyRow[] }> {
@@ -81,6 +92,8 @@ export const notes = {
       members: { user_id: Snowflake; key_sealed: string }[];
       invites: { id: Snowflake; key_sealed: string }[];
       links: { id: Snowflake; key_wrapped: string; link_sealed: string }[];
+      /** The newest change the body holds, which has to be the newest there is. */
+      upto: number;
     },
   ): Promise<{ version: number; updated_at: number }> {
     return api.request("POST", `/notes/${id}/rekey`, body);

@@ -120,9 +120,12 @@ func main() {
 	srv.Secret = secret
 	srv.Media = mediaStore
 	srv.Unfurl = unfurl.NewService()
-	// Twitch's player refuses to open unless it is told which page holds it.
-	if u, err := url.Parse(cfg.PublicURL); err == nil {
-		srv.Unfurl.Fetcher.ParentHost = u.Hostname()
+	// Twitch's player refuses to open unless it is told which pages may hold
+	// it: every address this Nexa is at.
+	for _, o := range cfg.Origins() {
+		if u, err := url.Parse(o); err == nil && u.Hostname() != "" {
+			srv.Unfurl.Fetcher.ParentHosts = append(srv.Unfurl.Fetcher.ParentHosts, u.Hostname())
+		}
 	}
 	// What a person can make this server fetch goes out through the proxy.
 	out, warp := setupEgress(cfg, log)
@@ -133,7 +136,7 @@ func main() {
 		srv.Apps = rpcapps.New()
 		srv.Apps.Client.Transport = out.Transport()
 	}
-	hub := gateway.New(st, srv.Auth, log, cfg.PublicURL)
+	hub := gateway.New(st, srv.Auth, log, cfg.Origins())
 	srv.Bcast = hub
 	srv.WireServers(hub)
 	srv.WireVoice(hub)

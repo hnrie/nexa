@@ -16,6 +16,7 @@ import { useUsers, displayName } from "@/stores/users";
 import { desktopBridge } from "./desktopBridge";
 import { doNotDisturb } from "./dnd";
 import { installAudioUnlock, playSound, preloadSounds } from "./sounds";
+import { installSoundSettings } from "./soundSync";
 import { mentionsMe } from "./mentionsMe";
 import { hookText } from "./webhookMessage";
 import { pollWords } from "./poll";
@@ -289,6 +290,8 @@ export function installNotifications(): void {
   dispatchHooks.onNoteInvite.push(onNoteInvite);
   dispatchHooks.onNexa.push(onNexa);
   bugAlertHooks.push(onBugAlert);
+  // the pack, volume and sounds switched off follow the account's settings
+  installSoundSettings();
   // a phone can only play sounds once a tap has let the page make noise
   installAudioUnlock();
   // the recorded sounds come down once the app has settled, so the first message is not late

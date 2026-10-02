@@ -1,10 +1,10 @@
 {
   "name": "nexa-desktop",
   "productName": "Nexa",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Nexa for your computer, with Rich Presence that works alongside Discord.",
   "author": "Evilion <evilionx3@proton.me>",
-  "homepage": "https://chat.evilion.xyz",
+  "homepage": "https://nexa.fish",
   "license": "UNLICENSED",
   "private": true,
   "main": "dist-app/main.js",

@@ -32,7 +32,8 @@ let pendingMfa: { username: string; encKey: Uint8Array; ticket: string } | null 
  */
 let pendingPolicy: AppLockPolicy | null = null;
 
-const TOKEN_KEY = "ec.token";
+/** Where this device keeps its session (lib/move.ts carries it to a new address). */
+export const TOKEN_KEY = "ec.token";
 
 /**
  * Whether this browser holds a session, without opening it: the public pages

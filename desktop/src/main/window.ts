@@ -5,7 +5,7 @@
  */
 import { app, BrowserWindow, Menu, clipboard, screen, shell, type ContextMenuParams, type WebContents } from "electron";
 import path from "node:path";
-import { BASE, ORIGIN, START_URL, isAppUrl, isFrameableUrl } from "./config";
+import { BASE, MOVE_URL, ORIGIN, START_URL, isAppUrl, isFrameableUrl, isMovedUrl } from "./config";
 import { windowAudioSupported } from "./appAudio";
 import { shareAudioMode } from "./permissions";
 import { nativeStrings } from "./strings";
@@ -122,6 +122,25 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
   wc.on("did-fail-load", (_e, code, _desc, url, isMainFrame) => {
     // -3 is a navigation this app cancelled itself
     if (isMainFrame && code !== -3 && isAppUrl(url)) void wc.loadURL(offlinePage());
+    // the old address did not answer: nothing to carry over, so on to the new one
+    if (isMainFrame && code !== -3 && isMovedUrl(url)) {
+      settings.set({ addressMoved: true }, { now: true });
+      void wc.loadURL(START_URL);
+    }
+  });
+  // once the new address is open the move is done, with a sign-in or without
+  wc.on("did-navigate", (_e, url) => {
+    if (isAppUrl(url) && !settings.get("addressMoved")) settings.set({ addressMoved: true }, { now: true });
+  });
+  // and a page at the old address that never moves on (a server from before
+  // the move) is left for the new address after a while, for good
+  wc.on("did-finish-load", () => {
+    if (!isMovedUrl(wc.getURL())) return;
+    setTimeout(() => {
+      if (win.isDestroyed() || !isMovedUrl(wc.getURL())) return;
+      settings.set({ addressMoved: true }, { now: true });
+      void wc.loadURL(START_URL);
+    }, 15_000);
   });
   wc.on("context-menu", (_e, params) => textMenu(wc, params));
 
@@ -139,8 +158,11 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
   win.on("maximize", remember);
   win.on("unmaximize", remember);
 
-  // the splash is a data URL, so it paints immediately; the site replaces it
-  void win.loadURL(splashPage()).then(() => win.loadURL(START_URL));
+  // The splash is a data URL, so it paints immediately; the site replaces it.
+  // The first time, the site is the old address, for the moment it takes to
+  // move its sign-in over (config.ts, MOVED_FROM).
+  const first = MOVE_URL && !settings.get("addressMoved") ? MOVE_URL : START_URL;
+  void win.loadURL(splashPage()).then(() => win.loadURL(first));
   return win;
 }
 

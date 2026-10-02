@@ -92,6 +92,7 @@ type Server struct {
 	// notes: making them, saving them, inviting people to them, opening links to them
 	limNote         *ratelimit.Limiter
 	limNoteSave     *ratelimit.Limiter
+	limNoteUpdate   *ratelimit.Limiter
 	limNoteInvite   *ratelimit.Limiter
 	limNoteLink     *ratelimit.Limiter
 	limNotePresence *ratelimit.Limiter
@@ -101,6 +102,9 @@ type Server struct {
 	limHookMgr      *ratelimit.Limiter
 	limVote         *ratelimit.Limiter
 	limDiscord      *ratelimit.Limiter
+
+	// handoffs are sealed sign-ins on their way from a moved address to Nexa's own (handoff.go)
+	handoffs handoffStore
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
@@ -230,6 +234,9 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		// each pause in typing, so that others writing in it see the words
 		// arrive; steady typing is a few saves a second at the very most
 		limNoteSave: ratelimit.New(ratelimit.Every(240, time.Minute), 120, 10*time.Minute),
+		// a change goes up a moment after each burst of typing: several a
+		// second from someone writing fast, sustained, in every note they have open
+		limNoteUpdate: ratelimit.New(ratelimit.Every(1200, time.Minute), 400, 10*time.Minute),
 		// saying a note is open, per account: once on opening, then every
 		// twenty seconds, for each note open on each device
 		limNotePresence: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
@@ -269,7 +276,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
 		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile,
 		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord,
-		"note": s.limNote, "note-save": s.limNoteSave, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,
+		"note": s.limNote, "note-save": s.limNoteSave, "note-update": s.limNoteUpdate, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,
 	}
 }
 

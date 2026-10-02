@@ -1,5 +1,5 @@
 /* a card of its own at the foot of the sidebar, lifted off the panel */
-.panel { flex: none; margin: 0 8px 8px; padding-block: 0; padding-inline: 6px 8px; height: var(--panel-h); display: flex; align-items: center; gap: 6px; background: var(--sheen), var(--bg-surface); border-radius: var(--radius-md); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium); position: relative; }
+.panel { flex: none; margin: 0; padding-block: 0; padding-inline: 6px 8px; height: var(--panel-h); display: flex; align-items: center; gap: 6px; background: var(--sheen), var(--bg-surface); border-radius: var(--radius-md); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium); position: relative; }
 .me { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1; height: 44px; padding: 0 6px 0 4px; border-radius: var(--radius-sm); text-align: start; transition: background-color var(--transition); }
 .me:hover, .me[aria-expanded="true"] { background: var(--bg-hover); }
 /* the speaking ring, drawn as the call's is: on quickly, fading out gently between words */
@@ -44,6 +44,10 @@
    their own under the name. */
 @media (pointer: coarse) {
   .icon { width: 40px; height: 40px; }
+}
+/* Under the rail and the list together the card is wide enough for the name
+   and three finger-sized buttons in one row; only a narrow one stacks them. */
+@container dock (max-width: 300px) {
   .panel { flex-wrap: wrap; height: auto; padding: 4px; gap: 0; }
   .me { flex: 1 0 100%; }
   .btns { flex: 1 0 100%; justify-content: space-evenly; }

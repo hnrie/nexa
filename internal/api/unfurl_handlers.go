@@ -108,14 +108,14 @@ func (s *Server) inviteCodeOf(raw string) string {
 }
 
 // ownPath returns what follows prefix when raw is a link to one of Nexa's
-// own pages under it ("/invite/CODE", "/note/TOKEN"), or "".
+// own pages under it ("/invite/CODE", "/note/TOKEN"), at any of its
+// addresses, or "".
 func (s *Server) ownPath(raw, prefix string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {
 		return ""
 	}
-	base, err := url.Parse(s.Cfg.PublicURL)
-	if err != nil || !strings.EqualFold(u.Host, base.Host) {
+	if _, kind := s.addressOf(u.Host); kind == notOurs {
 		return ""
 	}
 	rest, ok := strings.CutPrefix(u.Path, prefix)

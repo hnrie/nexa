@@ -1,5 +1,5 @@
 NEXA - PRIVACY POLICY
-Site: chat.evilion.xyz
+Site: nexa.fish (also at mathtest.lol, and formerly chat.evilion.xyz)
 Contact the owner (nora) here: evilionx3@proton.me
 Effective: 2026-10-01
 
@@ -162,8 +162,8 @@ decrypted.
   from your device reaches them. A YouTube video plays in YouTube's
   own player, loaded through the server the same way, in a frame that
   cannot reach anything else in the app: YouTube is told the video is
-  shown on chat.evilion.xyz, as any site that shows one says, but not
-  who is watching, and it gets no cookies. Nothing ties a fetch to who
+  shown on the Nexa address you are using, as any site that shows one
+  says, but not who is watching, and it gets no cookies. Nothing ties a fetch to who
   asked for it, and a preview is kept in memory for at most an hour so
   the same link is not fetched twice.
 - No third parties, no advertisers, and no analytics companies.

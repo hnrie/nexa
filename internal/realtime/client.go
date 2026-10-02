@@ -20,7 +20,7 @@ import (
 const DefaultBase = "https://rtc.live.cloudflare.com/v1"
 
 // userAgent is sent on every call: the API turns some default agents away.
-const userAgent = "evilion-chat/1 (+https://chat.evilion.xyz)"
+const userAgent = "evilion-chat/1 (+https://nexa.fish)"
 
 // SessionDescription is an SDP offer or answer.
 type SessionDescription struct {

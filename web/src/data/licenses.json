@@ -67,6 +67,21 @@
   },
   {
    "part": "web",
+   "name": "@fontsource-variable/wix-madefor-display",
+   "version": "5.3.0",
+   "license": "OFL-1.1",
+   "url": "https://fontsource.org/fonts/wix-madefor-display",
+   "copyright": "Copyright 2021 The Wix Madefor Project Authors (https://github.com/wix/wixmadefor/)"
+  },
+  {
+   "part": "web",
+   "name": "@fontsource-variable/wix-madefor-text",
+   "version": "5.3.0",
+   "license": "OFL-1.1",
+   "url": "https://fontsource.org/fonts/wix-madefor-text"
+  },
+  {
+   "part": "web",
    "name": "@fontsource/jetbrains-mono",
    "version": "5.3.0",
    "license": "OFL-1.1",
@@ -169,11 +184,27 @@
   },
   {
    "part": "web",
+   "name": "isomorphic.js",
+   "version": "0.2.5",
+   "license": "MIT",
+   "url": "https://github.com/dmonad/isomorphic.js#readme",
+   "copyright": "Copyright (c) 2020 Kevin Jahns <kevin.jahns@protonmail.com>."
+  },
+  {
+   "part": "web",
    "name": "js-tokens",
    "version": "4.0.0",
    "license": "MIT",
    "url": "https://www.npmjs.com/package/js-tokens",
    "copyright": "Copyright (c) 2014, 2015, 2016, 2017, 2018 Simon Lydell"
+  },
+  {
+   "part": "web",
+   "name": "lib0",
+   "version": "0.2.119",
+   "license": "MIT",
+   "url": "https://github.com/dmonad/lib0#readme",
+   "copyright": "Copyright (c) 2019 Kevin Jahns <kevin.jahns@protonmail.com>."
   },
   {
    "part": "web",
@@ -256,6 +287,14 @@
   },
   {
    "part": "web",
+   "name": "yjs",
+   "version": "13.6.33",
+   "license": "MIT",
+   "url": "https://docs.yjs.dev",
+   "copyright": "Copyright (c) 2023"
+  },
+  {
+   "part": "web",
    "name": "zustand",
    "version": "5.0.15",
    "license": "MIT",
@@ -303,7 +342,7 @@
    "name": "@koromix/koffi-darwin-x64",
    "version": "3.2.1",
    "license": "MIT",
-   "url": "https://koffi.dev/"
+   "url": "https://www.npmjs.com/package/@koromix/koffi-darwin-x64"
   },
   {
    "part": "desktop",
@@ -366,7 +405,7 @@
    "name": "@koromix/koffi-linux-x64",
    "version": "3.2.1",
    "license": "MIT",
-   "url": "https://www.npmjs.com/package/@koromix/koffi-linux-x64"
+   "url": "https://koffi.dev/"
   },
   {
    "part": "desktop",
@@ -663,22 +702,6 @@
    "license": "MIT",
    "url": "https://pkg.go.dev/github.com/jackc/puddle/v2",
    "copyright": "Copyright (c) 2018 Jack Christensen"
-  },
-  {
-   "part": "server",
-   "name": "github.com/mattn/go-isatty",
-   "version": "v0.0.24",
-   "license": "MIT",
-   "url": "https://pkg.go.dev/github.com/mattn/go-isatty",
-   "copyright": "Copyright (c) Yasuhiro MATSUMOTO <mattn.jp@gmail.com>"
-  },
-  {
-   "part": "server",
-   "name": "github.com/ncruces/go-strftime",
-   "version": "v1.0.0",
-   "license": "MIT",
-   "url": "https://pkg.go.dev/github.com/ncruces/go-strftime",
-   "copyright": "Copyright (c) 2022 Nuno Cruces"
   },
   {
    "part": "server",

@@ -110,16 +110,43 @@ const RE_UNICODE_EMOJI =
 
 const BLOCK_TYPES = new Set(["paragraph", "quote", "heading", "subtext", "list", "codeblock", "hr", "table", "alert", "details", "footnotes", "file"]);
 
-/** A note's file, alone on its line: `![name](nexa-file:id)`. The name has no brackets or line breaks in it. */
-export const RE_FILE = /^!\[([^\[\]\n]{0,200})\]\(nexa-file:([A-Za-z0-9_-]{1,64})\)[ \t]*$/;
+/**
+ * A note's file, alone on its line: `![name](nexa-file:id)`, or with how wide
+ * a picture is drawn, in percent of the line, `![name](nexa-file:id?w=60)`.
+ * The name has no brackets or line breaks in it.
+ */
+export const RE_FILE = /^!\[([^\[\]\n]{0,200})\]\(nexa-file:([A-Za-z0-9_-]{1,64})(?:\?w=(\d{1,3}))?\)[ \t]*$/;
+
+/** The narrowest a picture in a note may be drawn, in percent of the line. */
+export const FILE_MIN_WIDTH = 15;
+
+/** A picture's width as a note may hold it: a whole percentage, the full line left unsaid. */
+export function fileWidth(w: number | undefined | null): number | undefined {
+  if (w === undefined || w === null || !Number.isFinite(w)) return undefined;
+  const n = Math.round(w);
+  return n >= 100 ? undefined : Math.max(FILE_MIN_WIDTH, n);
+}
 
 /** The line that puts a file in a note's text. */
-export function fileLine(id: string, name: string): string {
-  return `![${name.replace(/[\[\]\s]+/g, " ").trim().slice(0, 200)}](nexa-file:${id})`;
+export function fileLine(id: string, name: string, width?: number): string {
+  const w = fileWidth(width);
+  return `![${name.replace(/[\[\]\s]+/g, " ").trim().slice(0, 200)}](nexa-file:${id}${w ? `?w=${w}` : ""})`;
 }
 
 /** Whether file lines are being read as files: on for the length of one parse of a note. */
 let filesOn = false;
+/**
+ * Whether spaces at the ends of lines are kept everywhere, for the editor:
+ * on for the length of one parse that reads text back into it. A space just
+ * typed at the end of a list item, a heading or a table cell is about to have
+ * a word after it, and in a note written together, the editor reads the text
+ * back each time someone else types. Dropping the space there dropped it for
+ * everyone ("board games" arrived as "boardgames"). Shown messages trim them,
+ * as they always have.
+ */
+let exactOn = false;
+/** Trims what the editor gives back exactly: only the spaces at the start. */
+const trimRead = (s: string): string => (exactOn ? s.replace(/^[ \t]+/, "") : s.trim());
 
 const at = (s: string, i: number): string => (i >= 0 && i < s.length ? s.charAt(i) : "");
 const isWordChar = (c: string): boolean => c !== "" && RE_WORD.test(c);
@@ -140,25 +167,39 @@ function runOf(s: string, i: number, ch: string): number {
  * (headings, lists, quotes, fenced code, tables, callouts) is disabled, which
  * is what message previews want; newlines still become `br` nodes.
  */
-export function parse(src: string, opts?: { inline?: boolean; files?: boolean; max?: number }): Node[] {
+export function parse(src: string, opts?: { inline?: boolean; files?: boolean; max?: number; exact?: boolean }): Node[] {
   // a note is as long as a note is; a message is held to a message's length
   const max = Math.max(MAX_SOURCE, opts?.max ?? 0);
   const text = normalize(src.length > max ? src.slice(0, max) : src);
   if (text === "") return [];
   const notes: Notes = new Map();
   const was = filesOn;
+  const wasExact = exactOn;
   filesOn = opts?.files === true;
+  exactOn = opts?.exact === true;
   try {
     const nodes = opts?.inline ? parseInline(text, 0) : parseBlocks(text, 0, notes);
     return text.includes("[^") ? resolveFootnotes(nodes, notes) : nodes;
   } finally {
     filesOn = was;
+    exactOn = wasExact;
   }
 }
 
 function normalize(src: string): string {
-  // trimEnd, because /\s+$/ retries from every space of a long run that is not at the end
-  return src.replace(/\r\n?/g, "\n").trimEnd().replace(/^\n+/, "");
+  const s = src.replace(/\r\n?/g, "\n");
+  // Blank lines at the end say nothing and go. Spaces at the end of the last
+  // line with words on it stay: in a note being written together, that is
+  // the space someone just typed before their next word, and taking it away
+  // took it away from everyone. Walked back by hand, because /\s+$/ retries
+  // from every space of a long run that is not at the end.
+  let end = s.length;
+  for (let i = s.length - 1; i >= 0; i--) {
+    const c = s.charCodeAt(i);
+    if (c === 10) end = i;
+    else if (c !== 32 && c !== 9) break;
+  }
+  return s.slice(0, end).replace(/^\n+/, "");
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +249,7 @@ function columns(indent: string): number {
 function itemContent(raw: string): Node[] {
   const task = RE_TASK.exec(raw);
   if (!task) return parseInline(raw, 0);
-  return [{ type: "task", checked: task[1] !== " " }, ...parseInline((task[2] ?? "").trim(), 0)];
+  return [{ type: "task", checked: task[1] !== " " }, ...parseInline(trimRead(task[2] ?? ""), 0)];
 }
 
 function parseBlocks(src: string, depth: number, notes: Notes): Node[] {
@@ -302,7 +343,7 @@ function parseBlocks(src: string, depth: number, notes: Notes): Node[] {
       if (heading) {
         flushAll();
         const level = (heading[1]?.length ?? 1) as 1 | 2 | 3 | 4 | 5 | 6;
-        const words = (heading[2] ?? "").trim().replace(RE_HEADING_CLOSE, "");
+        const words = trimRead(heading[2] ?? "").replace(RE_HEADING_CLOSE, "");
         out.push({ type: "heading", level, children: parseInline(words, 0) });
         i = lineEnd + 1;
         continue;
@@ -310,7 +351,7 @@ function parseBlocks(src: string, depth: number, notes: Notes): Node[] {
       const subtext = RE_SUBTEXT.exec(line);
       if (subtext) {
         flushAll();
-        out.push({ type: "subtext", children: parseInline((subtext[1] ?? "").trim(), 0) });
+        out.push({ type: "subtext", children: parseInline(trimRead(subtext[1] ?? ""), 0) });
         i = lineEnd + 1;
         continue;
       }
@@ -318,7 +359,8 @@ function parseBlocks(src: string, depth: number, notes: Notes): Node[] {
       const file = filesOn && line.startsWith("![") ? RE_FILE.exec(line) : null;
       if (file) {
         flushAll();
-        out.push({ type: "file", id: file[2] ?? "", name: file[1] ?? "" });
+        const width = fileWidth(file[3] ? Number(file[3]) : undefined);
+        out.push({ type: "file", id: file[2] ?? "", name: file[1] ?? "", ...(width ? { width } : {}) });
         i = lineEnd + 1;
         continue;
       }
@@ -334,7 +376,7 @@ function parseBlocks(src: string, depth: number, notes: Notes): Node[] {
         const indent = columns(item[1] ?? "");
         const ordered = item[3] !== undefined;
         const start = ordered ? Number.parseInt(item[3] ?? "1", 10) : 1;
-        const content = itemContent((item[5] ?? "").trim());
+        const content = itemContent(trimRead(item[5] ?? ""));
         flushPara();
         flushQuote();
         const stack: ListFrame[] | null = lists;
@@ -370,7 +412,7 @@ function parseBlocks(src: string, depth: number, notes: Notes): Node[] {
         const body = detailsBody(src, lineEnd);
         out.push({
           type: "details",
-          summary: parseInline((details[1] ?? "").trim(), 0),
+          summary: parseInline(trimRead(details[1] ?? ""), 0),
           children: parseBlocks(trimBlankLines(body.content), depth + 1, notes),
         });
         i = body.end;
@@ -415,7 +457,9 @@ function parseBlocks(src: string, depth: number, notes: Notes): Node[] {
 
 /** The inside of a callout or collapsible section, without the blank lines around it. */
 function trimBlankLines(src: string): string {
-  return src.trimEnd().replace(/^(?:[ \t]*\n)+/, "");
+  // the editor keeps the spaces at the end of the last line, as everywhere else
+  const end = exactOn && src.trim() !== "" ? src.replace(/(?:\n[ \t]*)+$/, "") : src.trimEnd();
+  return end.replace(/^(?:[ \t]*\n)+/, "");
 }
 
 /** Where a fenced code block starting at `start` ends, as readFence sees it. */
@@ -535,15 +579,28 @@ function splitRow(line: string): string[] {
           continue;
         }
       }
-      cells.push(s.slice(cur, j).trim());
+      cells.push(cellText(s.slice(cur, j)));
       cur = j + 1;
       j += 1;
       continue;
     }
     j += 1;
   }
-  if (cells.length <= MAX_TABLE_COLS) cells.push(s.slice(cur).trim());
+  if (cells.length <= MAX_TABLE_COLS) cells.push(cellText(s.slice(cur)));
   return cells;
+}
+
+/**
+ * A cell's words. The editor writes a cell with one space of padding on each
+ * side (`| words |`) and reads exactly that back off, so a space typed at the
+ * end of a cell stays; shown messages trim cells.
+ */
+function cellText(raw: string): string {
+  if (!exactOn || raw.trim() === "") return raw.trim();
+  let s = raw;
+  if (s.startsWith(" ")) s = s.slice(1);
+  if (s.endsWith(" ")) s = s.slice(0, -1);
+  return s;
 }
 
 /** The alignment row under a table's header, or null when the line is not one. */

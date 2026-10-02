@@ -179,6 +179,65 @@ describe("sounds", () => {
   });
 });
 
+describe("sound packs", () => {
+  const pack = (files: Record<string, { blob: string }>) => ({
+    pack: "pmine1234",
+    volume: 100,
+    off: [] as never[],
+    packs: [{ id: "pmine1234", name: "Mine", base: "retro" as const, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { ...f, key: "k".repeat(44), name: "x.wav", ms: 500, size: 10 }])) }],
+  });
+
+  it("play a custom recording, opened with the account's key, and the pack's base for the rest", async () => {
+    const s = await load();
+    const open = vi.fn(() => Promise.resolve(new ArrayBuffer(16)));
+    s.configureSounds(pack({ message: { blob: "77" } }), open);
+    expect(await s.playSound("message")).toBe(true);
+    const ac = made();
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(ac.sources).toBe(1);
+    expect(ac.decoded).toBe(1);
+    // retro voices the rest, with no recording fetched for them
+    expect(await s.playSound("mention")).toBe(true);
+    expect(ac.tones).toBe(4);
+    expect(fetch).not.toHaveBeenCalled();
+    // played again, it is not fetched again
+    expect(await s.playSound("message")).toBe(true);
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it("fall back to the base pack when a recording cannot be had", async () => {
+    const s = await load();
+    s.configureSounds(pack({ join: { blob: "88" } }), () => Promise.reject(new Error("gone")));
+    expect(await s.playSound("join")).toBe(true);
+    expect(made().tones).toBe(2);
+  });
+
+  it("keep a switched-off sound quiet, but let the settings play it to hear it", async () => {
+    const s = await load();
+    s.configureSounds({ pack: "chime", volume: 100, off: ["message", "ring"], packs: [] });
+    expect(await s.playSound("message")).toBe(false);
+    expect(FakeAudioContext.made).toHaveLength(0);
+    expect(await s.previewSound("message")).toBe(true);
+    expect(made().tones).toBe(2);
+    // and a switched-off ring does not ring
+    s.startRinging();
+    await settle();
+    expect(made().loops).toBe(0);
+    expect(made().tones).toBe(2);
+  });
+
+  it("preview a pack that is not the one in use", async () => {
+    const s = await load();
+    s.configureSounds({ pack: "nexa", volume: 100, off: [], packs: [] });
+    expect(await s.previewSound("message", "soft")).toBe(true);
+    const ac = made();
+    // soft is synthesised: two taps, each with its overtone
+    expect(ac.tones).toBe(4);
+    expect(ac.sources).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
 describe("sounds in an iPhone home-screen app", () => {
   beforeEach(() => useFakeAudio(true));
 

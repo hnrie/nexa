@@ -15,6 +15,8 @@ import { DesktopEffects } from "@/components/desktop/DesktopEffects";
 import { EmojiDetails } from "@/components/chat/EmojiDetails";
 import { Shortcuts } from "@/components/shell/Shortcuts";
 import { TAB_PANEL_ID, Tabs } from "@/components/shell/Tabs";
+import { UserPanel } from "@/components/shell/UserPanel";
+import { VoiceStatus } from "@/components/voice/VoiceStatus";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { activeTab, tabAddress, useTabs } from "@/stores/tabs";
 import { useUI } from "@/stores/ui";
@@ -216,6 +218,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const dragging = dragX !== null;
   const drawerStyle = dragging ? { transform: `translateX(${(dragX - drawerWidth()) * flow()}px)`, transition: "none" } : undefined;
   const backdropStyle = dragging ? { opacity: dragX / drawerWidth(), pointerEvents: "none" as const, transition: "none" } : undefined;
+  // You: the call you are in and your own card, under the server rail and the
+  // list beside it together. Inside the list alone the name got a few letters.
+  const dock = (
+    <div className={s.dock}>
+      <VoiceStatus />
+      <UserPanel />
+    </div>
+  );
 
   return (
     <div className={s.app} data-keyboard-fit="" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
@@ -225,12 +235,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className={s.drawer} data-open={leftOpen} style={drawerStyle}>
             <div className={s.rail}><Rail /></div>
             <div className={s.sidebar}>{sidebar}</div>
+            {dock}
           </div>
         </>
       ) : (
         <>
           <div className={s.rail}><Rail /></div>
           <div className={s.sidebar}>{sidebar}</div>
+          {dock}
         </>
       )}
       <div className={s.main}>

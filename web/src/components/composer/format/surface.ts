@@ -1,7 +1,8 @@
 import type { AlertKind, Align } from "@/markdown/ast";
 import { FALLBACK_SURFACE, paintColor, surfaceOf, type Surface } from "@/markdown/colors";
+import { fileWidth } from "@/markdown/parse";
 import { alignment } from "@/lib/align";
-import { fromMarkdown, inlineFromMarkdown, toMarkdown, type AtomNames, type ReadOptions } from "./markdown";
+import { fromMarkdown, inlineFromMarkdown, inlineMarkdown, toMarkdown, type AtomNames, type ReadOptions } from "./markdown";
 import {
   caret,
   clampPos,
@@ -44,6 +45,7 @@ import {
   withLink,
   withMark,
   type Block,
+  type FileBlock,
   type Flag,
   type Inline,
   type ListInfo,
@@ -151,6 +153,8 @@ export interface FileHost {
   key: number;
   file: string;
   name: string;
+  /** How much of the line a picture takes, in percent (100 when the text says nothing). */
+  width: number;
   el: HTMLElement;
 }
 
@@ -173,6 +177,8 @@ export type Command =
   | { t: "file"; file: string; name: string }
   /** Takes out one block, by its key: a file, from the button drawn on it. */
   | { t: "removeBlock"; key: number }
+  /** How wide a picture is drawn, in percent of the line: from the handles drawn on it. */
+  | { t: "fileWidth"; key: number; width: number }
   | { t: "clear" }
   | { t: "undo" }
   | { t: "redo" }
@@ -242,6 +248,26 @@ function follow(before: Block[], next: Block[], map: Int32Array, p: Pos): Pos {
   if (p.o <= pre) return { b, o: p.o };
   if (p.o >= was.length - suf) return { b, o: now.length - (was.length - p.o) };
   return { b, o: now.length - suf };
+}
+
+/** Where each line of a text starts. */
+function lineStarts(text: string): number[] {
+  const out = [0];
+  for (let i = text.indexOf("\n"); i >= 0; i = text.indexOf("\n", i + 1)) out.push(i + 1);
+  return out;
+}
+
+/**
+ * Where a block's words start on its line of markdown, past what makes the
+ * line a heading, an item, a quote: the line ends with the words, written as
+ * they are, unless a backslash had to be put before something at their start.
+ */
+function contentStart(line: string, block: Block): number {
+  if (!isText(block)) return -1;
+  const words = inlineMarkdown(block.content);
+  if (line.endsWith(words)) return line.length - words.length;
+  if (words && line.endsWith(words.slice(1))) return Math.max(0, line.length - words.length - 1);
+  return -1;
 }
 
 /** Whether an event's target is inside one of the frames a file is drawn in. */
@@ -332,12 +358,89 @@ export class FormatSurface {
   }
 
   /**
+   * Where the caret is, as an offset into the markdown this surface writes
+   * (markdown()), when it can be said exactly: a caret, not a selection, in
+   * the text of a block, with no emoji or mention before it on its line.
+   * Null otherwise, and while the keyboard is elsewhere.
+   */
+  caretMarkdown(): number | null {
+    if (this.composing || !this.active) return null;
+    this.syncSelection();
+    const { anchor, focus } = this.sel;
+    if (comparePos(anchor, focus) !== 0 || focus.cell) return null;
+    const block = this.blocks[focus.b];
+    const visible = counted(block);
+    if (!block || visible === null) return null;
+    const lines = new Map<Block, number>();
+    const md = toMarkdown(this.blocks, lines);
+    const line = lines.get(block);
+    if (line === undefined) return null;
+    const starts = lineStarts(md);
+    if (block.kind === "code") {
+      // the code starts on the line after its fence, written as it is
+      const at = starts[line + 1];
+      return at === undefined ? null : at + Math.min(focus.o, block.text.length);
+    }
+    const prefix = visible.slice(0, focus.o);
+    if (prefix.includes("\uFFFC")) return null;
+    const from = starts[line]!;
+    const text = md.slice(from, (starts[line + 1] ?? md.length + 1) - 1);
+    let i = contentStart(text, block);
+    if (i < 0) return null;
+    for (let j = 0; j < prefix.length; j++) {
+      while (i < text.length && text.charCodeAt(i) !== prefix.charCodeAt(j)) i += 1;
+      if (i >= text.length) return null;
+      i += 1;
+    }
+    return from + i;
+  }
+
+  /** The place an offset into `markdown` names, when that markdown is what these blocks write. */
+  private placeOf(markdown: string, at: number): Pos | null {
+    const lines = new Map<Block, number>();
+    if (toMarkdown(this.blocks, lines) !== markdown) return null;
+    const starts = lineStarts(markdown);
+    // the line the offset is on
+    let lo = 0;
+    let hi = starts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (starts[mid]! <= at) lo = mid;
+      else hi = mid - 1;
+    }
+    for (let b = 0; b < this.blocks.length; b++) {
+      const block = this.blocks[b]!;
+      const line = lines.get(block);
+      if (line === undefined) continue;
+      if (block.kind === "code") {
+        const first = starts[line + 1];
+        const count = block.text.split("\n").length;
+        if (first !== undefined && lo >= line + 1 && lo < line + 1 + count) return { b, o: Math.max(0, Math.min(block.text.length, at - first)) };
+        continue;
+      }
+      if (line !== lo || !isText(block)) continue;
+      const visible = counted(block) ?? "";
+      const from = starts[line]!;
+      const text = markdown.slice(from, (starts[line + 1] ?? markdown.length + 1) - 1);
+      const start = contentStart(text, block);
+      if (start < 0) return null;
+      let j = 0;
+      for (let i = start; i < at - from && j < visible.length; i++) {
+        if (text.charCodeAt(i) === visible.charCodeAt(j)) j += 1;
+      }
+      return { b, o: j };
+    }
+    return null;
+  }
+
+  /**
    * Shows other markdown in place of what is here, with the caret kept where
    * it was as nearly as the new text allows: for a note that someone else
-   * changed while it is open. Nothing is done while a word is being composed;
-   * the caller tries again after.
+   * changed while it is open. `caretAt`, when the caller knows it, is exactly
+   * where the caret is to go, as an offset into the new markdown. Nothing is
+   * done while a word is being composed; the caller tries again after.
    */
-  reload(markdown: string): boolean {
+  reload(markdown: string, caretAt?: number | null): boolean {
     if (this.composing) return false;
     // the caret is here if the keyboard is, or if the page's selection is: it
     // is put back after the swap, which would otherwise leave it on text that is gone
@@ -364,7 +467,14 @@ export class FormatSurface {
     this.past = [];
     this.future = [];
     this.render();
-    if (had && !still) this.placeSelection();
+    // Where the caller says the caret goes, it goes. Without that, someone
+    // else's words put in right where the caret was could land on either
+    // side of it, and the next letter typed would end up among theirs.
+    const exact = had && caretAt !== undefined && caretAt !== null ? this.placeOf(markdown, caretAt) : null;
+    if (exact) {
+      this.sel = caret(exact.b, exact.o);
+      this.placeSelection();
+    } else if (had && !still) this.placeSelection();
     this.emitState();
     return true;
   }
@@ -498,8 +608,19 @@ export class FormatSurface {
     const next = new Map<Block, HTMLElement>();
     const children: HTMLElement[] = [];
     const counters: number[] = [];
+    // A file whose block changed (made wider, or the note reloaded around it)
+    // keeps its element, and with it the picture or player already drawn in it.
+    const fileEls = new Map<string, HTMLElement>();
+    for (const [block, el] of this.elements) {
+      if (block.kind === "file" && !this.blocks.includes(block)) fileEls.set(block.file, el);
+    }
     this.blocks.forEach((block, k) => {
       let el = this.elements.get(block);
+      if (!el && block.kind === "file") {
+        el = fileEls.get(block.file);
+        fileEls.delete(block.file);
+        if (el) el.dataset["id"] = String(block.id);
+      }
       if (!el) el = this.draw(block);
       next.set(block, el);
       this.decorate(el, block, k, counters);
@@ -553,6 +674,11 @@ export class FormatSurface {
       set(el, "data-task", list.task ? (list.checked ? "done" : "open") : null);
     } else counters.length = 0;
     if (block.kind === "code") set(el, "data-lang", block.lang || labels.code);
+    if (block.kind === "file") {
+      if (block.width) el.style.setProperty("--file-w", `${block.width}%`);
+      else el.style.removeProperty("--file-w");
+      set(el, "data-width", block.width ? String(block.width) : null);
+    }
   }
 
   /** Tells the editor which file blocks are on show, when that changed. */
@@ -562,10 +688,10 @@ export class FormatSurface {
     for (const block of this.blocks) {
       if (block.kind !== "file") continue;
       const el = this.elements.get(block)?.firstElementChild;
-      if (el instanceof HTMLElement) shown.push({ key: block.id, file: block.file, name: block.name, el });
+      if (el instanceof HTMLElement) shown.push({ key: block.id, file: block.file, name: block.name, width: block.width ?? 100, el });
     }
     const was = this.filesShown;
-    if (was.length === shown.length && was.every((h, k) => h.key === shown[k]!.key && h.el === shown[k]!.el)) return;
+    if (was.length === shown.length && was.every((h, k) => h.key === shown[k]!.key && h.el === shown[k]!.el && h.width === shown[k]!.width)) return;
     this.filesShown = shown;
     this.opts.onFiles(shown);
   }
@@ -1632,6 +1758,20 @@ export class FormatSurface {
       case "file": {
         const edit = insertBlock(this.blocks, sel, { id: newId(), kind: "file", file: cmd.file, name: cmd.name, wrap: null });
         this.apply(edit.blocks, edit.sel);
+        return;
+      }
+      case "fileWidth": {
+        const at = this.blocks.findIndex((b) => b.id === cmd.key);
+        const block = this.blocks[at];
+        if (!block || block.kind !== "file") return;
+        const width = fileWidth(cmd.width);
+        if (width === block.width) return;
+        const out = this.blocks.slice();
+        const next: FileBlock = { ...block };
+        if (width) next.width = width;
+        else delete next.width;
+        out[at] = next;
+        this.apply(out, this.sel);
         return;
       }
       case "removeBlock": {

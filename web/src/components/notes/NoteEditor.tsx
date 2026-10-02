@@ -10,27 +10,58 @@ import f from "@/components/composer/format/FormatEditor.module.css";
 import { useMediaQuery } from "@/hooks/useIsMobile";
 import { fitsUploadLimit, noteUploads, stage, uploadLimit, uploadStaged } from "@/lib/attachments";
 import { describeError } from "@/lib/errors";
-import { NOTE_MAX_CHARS, NOTE_MAX_FILES, NOTE_TITLE_MAX, fileIds, type NoteDoc } from "@/lib/notes/model";
+import { NOTE_MAX_CHARS, NOTE_MAX_FILES, NOTE_TITLE_MAX, fileIds, headOf, type NoteDoc } from "@/lib/notes/model";
 import type { OpenNote } from "@/lib/notes/open";
+import type { Carets } from "@/lib/notes/session";
 import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
+import { useAuth } from "@/stores/auth";
+import { useNotes } from "@/stores/notes";
+import { unfurl } from "@/api/unfurl";
 import { t } from "@/i18n";
 import { useLiveCursors } from "./LiveCursors";
 import { NoteFile, type PendingUpload } from "./NoteFile";
+import { noteName } from "./NoteParts";
 import s from "./Notes.module.css";
 
 /** How the page reaches whichever view of the note is showing: the editor, or the note as read. */
 export interface NoteBridge {
-  /** Someone else's changes, put together with this page's: shown in place of what is here. False when that cannot be done just now. */
-  onRemote: (doc: NoteDoc) => boolean;
+  /**
+   * Someone else's changes, taken in with this page's: shown in place of what
+   * is here, with the carets put where `at` says. False when that cannot be
+   * done just now.
+   */
+  onRemote: (doc: NoteDoc, at?: Carets) => boolean;
+  /** Where the carets are, as offsets into the note's text and its title. */
+  caret?: () => Carets;
   /** What the page holds this instant. */
   read?: () => Partial<NoteDoc>;
+  /** Whether the page can take someone else's change just now: not while a word is being composed. */
+  canShow?: () => boolean;
 }
 
 export const IDLE_BRIDGE: NoteBridge = { onRemote: () => false };
 
 /** How many files go up at once. */
 const UPLOADS_AT_ONCE = 3;
+
+/** The address of what was dragged in from another page: a link, or the picture in what was dragged. */
+function droppedLink(dt: DataTransfer): string | null {
+  const html = dt.getData("text/html");
+  // a picture dragged from a page carries its own address in its markup, which is the picture rather than a page it links to
+  const img = html ? /<img[^>]+src="([^"]+)"/i.exec(html)?.[1] : undefined;
+  const list = dt.getData("text/uri-list").split(/\r?\n/).find((l) => l && !l.startsWith("#"));
+  for (const candidate of [img, list]) {
+    if (!candidate) continue;
+    try {
+      const u = new URL(candidate.replace(/&amp;/g, "&"));
+      if (u.protocol === "https:" || u.protocol === "http:") return u.toString();
+    } catch {
+      /* not an address */
+    }
+  }
+  return null;
+}
 
 /** A new file's id in the note's text: random, and nothing else. */
 function newFileId(): string {
@@ -87,6 +118,23 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
   );
   /** Places the others' carets again; set once the cursors are made, below. */
   const redrawRef = useRef<() => void>(() => undefined);
+  // The list beside the note shows what it says as it is written, ahead of
+  // the next whole save, which is what tells everyone else's lists.
+  const headTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const meId = useAuth((a) => a.me?.id ?? null);
+  const showHead = (): void => {
+    if (headTimer.current) return;
+    headTimer.current = setTimeout(() => {
+      headTimer.current = null;
+      if (!gone.current) useNotes.getState().shown(noteId, headOf(session.doc), meId);
+    }, 300);
+  };
+  useEffect(
+    () => () => {
+      if (headTimer.current) clearTimeout(headTimer.current);
+    },
+    [],
+  );
 
   // ---- files going up ---------------------------------------------------------
   const queue = useRef<{ id: string; file: File }[]>([]);
@@ -204,7 +252,10 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
       // past the longest a note can be it is not saved, and says so, until it is short enough again
       const tooLong = md.length > NOTE_MAX_CHARS;
       setOver(tooLong);
-      if (!tooLong) session.edit({ md });
+      if (!tooLong) {
+        session.edit({ md });
+        showHead();
+      }
     },
     read: { files: true, max: NOTE_MAX_CHARS },
     onFiles: setHosts,
@@ -237,6 +288,7 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
     setTitle(clean);
     onTitle(clean);
     session.edit({ title: clean });
+    showHead();
   };
   const titleKey = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
     // a title is one line: Enter goes on to the note itself
@@ -265,20 +317,26 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
   // ---- someone else's changes ---------------------------------------------------
   useLayoutEffect(() => {
     bridge.current = {
-      onRemote: (doc) => {
+      onRemote: (doc, at) => {
         const ctl = bench.ctl.current;
         if (!ctl) return false;
-        if (doc.md !== ctl.markdown() && !ctl.reload(doc.md)) return false;
+        if (doc.md !== ctl.markdown() && !ctl.reload(doc.md, at?.md)) return false;
+        showHead();
         filesRef.current = doc.files;
         setFiles(doc.files);
         if (doc.title !== titleRef.current) {
           const el = titleEl.current;
-          if (el && document.activeElement === el) titleSel.current = [el.selectionStart, el.selectionEnd];
+          if (el && document.activeElement === el) titleSel.current = at?.title ?? [el.selectionStart, el.selectionEnd];
           titleRef.current = doc.title;
           setTitle(doc.title);
           onTitle(doc.title);
         }
         return true;
+      },
+      canShow: () => !bench.ctl.current?.busy,
+      caret: () => {
+        const el = titleEl.current;
+        return { md: bench.ctl.current?.caretMarkdown() ?? null, title: el && document.activeElement === el ? [el.selectionStart, el.selectionEnd] : null };
       },
       read: () => {
         const md = bench.ctl.current?.markdown();
@@ -291,8 +349,39 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
     };
   });
 
+  // ---- pictures and videos from other pages -------------------------------------
+  /**
+   * A picture or video dragged in from another page goes into the note as one
+   * of its files: fetched through Nexa (the link preview's fetcher and media
+   * proxy), so the site it comes from never learns who looked, then sealed and
+   * uploaded like any picture. A link to anything else goes in as a link.
+   */
+  const addFromLink = async (url: string): Promise<void> => {
+    const res = await unfurl.fetch(url).catch(() => null);
+    const src = res && (res.type === "image" || res.type === "gif") ? res.image : res?.media_kind === "video" ? res.media : undefined;
+    if (!src) {
+      bench.ctl.current?.focus();
+      bench.run({ t: "text", text: url });
+      return;
+    }
+    try {
+      const got = await fetch(src);
+      if (!got.ok) throw new Error(String(got.status));
+      const blob = await got.blob();
+      const tail = decodeURIComponent(new URL(url).pathname.split("/").pop() ?? "").replace(/[^\p{L}\p{N}._ -]+/gu, " ").trim();
+      const ext = blob.type.split("/")[1]?.replace("jpeg", "jpg").replace(/[^a-z0-9]/g, "") ?? "";
+      const name = tail && /\.[a-z0-9]{2,5}$/i.test(tail) ? tail : `${tail || t("notes.file.picture")}${ext ? `.${ext}` : ""}`;
+      addFiles([new File([blob], name.slice(0, 120), { type: blob.type || res?.mime || "application/octet-stream" })]);
+    } catch {
+      toast(t("notes.file.linkFailed"), "error");
+    }
+  };
+
   // ---- dropping files on the note ----------------------------------------------
-  const carriesFiles = (e: DragEvent): boolean => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+  const carriesFiles = (e: DragEvent): boolean => {
+    const types = Array.from(e.dataTransfer?.types ?? []);
+    return types.includes("Files") || types.includes("text/uri-list");
+  };
   const onDragOver = (e: DragEvent<HTMLDivElement>): void => {
     if (!carriesFiles(e)) return;
     e.preventDefault();
@@ -304,21 +393,44 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
   };
   const onDrop = (e: DragEvent<HTMLDivElement>): void => {
     setDropping(false);
-    if (!e.dataTransfer?.files.length) return;
+    const dt = e.dataTransfer;
+    if (!dt) return;
+    if (dt.files.length) {
+      e.preventDefault();
+      addFiles(Array.from(dt.files));
+      return;
+    }
+    const url = droppedLink(dt);
+    if (!url) return;
     e.preventDefault();
-    addFiles(Array.from(e.dataTransfer.files));
+    void addFromLink(url);
   };
 
-  // each file drawn into the frame the surface keeps for it
-  const portals = hosts.map((h) => createPortal(<NoteFile meta={files[h.file]} name={h.name} pending={pending[h.file]} onRemove={() => removeFile(h)} onRetry={() => retry(h.file)} />, h.el, String(h.key)));
+  // Each file drawn into the frame the surface keeps for it. Keyed by the
+  // file, which stays the same when its block is made again (a new width,
+  // someone else's change around it), so the picture is not drawn anew.
+  const seen = new Map<string, number>();
+  const portals = hosts.map((h) => {
+    const n = seen.get(h.file) ?? 0;
+    seen.set(h.file, n + 1);
+    return createPortal(
+      <NoteFile meta={files[h.file]} name={h.name} pending={pending[h.file]} width={h.width} onResize={(width) => bench.run({ t: "fileWidth", key: h.key, width })} onRemove={() => removeFile(h)} onRetry={() => retry(h.file)} />,
+      h.el,
+      n ? `${h.file}:${n}` : h.file,
+    );
+  });
 
   return (
     <div className={`${f.frame} ${s.editor}`} data-narrow={narrow || undefined} data-drop={dropping || undefined} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} data-testid="note-editor">
       <div className={s.bar}>
         {barStart}
-        {narrow ? <span className={s.barSpace} /> : <div className={s.tools}>{bench.toolbar}</div>}
+        <span className={s.barTitle} data-untitled={title.trim() ? undefined : ""} dir="auto">
+          {noteName(title)}
+        </span>
+        <span className={s.barSpace} />
         <div className={s.barEnd}>{barEnd}</div>
       </div>
+      {narrow ? null : <div className={s.format}>{bench.toolbar}</div>}
       {!narrow && bench.tray ? <div className={s.trayDock}>{bench.tray}</div> : null}
       <div className={s.scroll} data-scroller="">
         <div className={s.sheet} ref={sheet}>

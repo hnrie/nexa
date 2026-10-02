@@ -35,7 +35,7 @@ func newEnv(t *testing.T) *testEnv {
 		t.Fatal(err)
 	}
 	st := store.New(d)
-	hub := New(st, &auth.Authenticator{Store: st, TTL: time.Hour}, slog.New(slog.NewTextHandler(io.Discard, nil)), "http://localhost")
+	hub := New(st, &auth.Authenticator{Store: st, TTL: time.Hour}, slog.New(slog.NewTextHandler(io.Discard, nil)), []string{"http://localhost"})
 	ts := httptest.NewServer(hub)
 	t.Cleanup(func() { hub.CloseAll(websocket.StatusGoingAway, "test over"); ts.Close(); d.Close() })
 	return &testEnv{st: st, hub: hub, ts: ts}

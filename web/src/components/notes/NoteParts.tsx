@@ -15,7 +15,7 @@ import { peopleHere, useNotes } from "@/stores/notes";
 import { displayName, fetchMissingUsers, useUsers } from "@/stores/users";
 import { t } from "@/i18n";
 import type { NoteBridge } from "./NoteEditor";
-import { NoteFile, NoteFileThumb } from "./NoteFile";
+import { NoteFile, NoteFileLine, NoteFileThumb } from "./NoteFile";
 import s from "./Notes.module.css";
 
 /** A note's title as it is shown: what it is called, or that it is not called anything yet. */
@@ -44,9 +44,16 @@ export function Byline({ noteId }: { noteId: string }) {
   }, [item?.editedBy, meId]);
   if (!item) return <p className={s.byline} />;
   const when = formatRelative(item.updatedAt, now);
+  const me = useAuth.getState().me;
+  const face = item.editedBy === meId ? me : who;
   return (
     <p className={s.byline} data-testid="note-byline">
-      {!item.editedBy ? t("notes.page.edited", { when }) : item.editedBy === meId ? t("notes.page.editedByYou", { when }) : t("notes.page.editedBy", { name: displayName(who), when })}
+      {item.editedBy && face ? (
+        <span className={s.bylineFaces} aria-hidden="true">
+          <Avatar id={face.id} avatarId={face.avatar_id ?? null} name={displayName(face)} size={20} />
+        </span>
+      ) : null}
+      <span>{!item.editedBy ? t("notes.page.edited", { when }) : item.editedBy === meId ? t("notes.page.editedByYou", { when }) : t("notes.page.editedBy", { name: displayName(who), when })}</span>
     </p>
   );
 }
@@ -58,7 +65,7 @@ export function Byline({ noteId }: { noteId: string }) {
 export function NoteReader({ initial, bridge, onTitle, barStart, barEnd, byline }: { initial: NoteDoc; bridge: React.MutableRefObject<NoteBridge>; onTitle: (title: string) => void; barStart?: ReactNode; barEnd: ReactNode; byline: ReactNode }) {
   const [doc, setDoc] = useState(initial);
   const base = useRenderCtx();
-  const ctx = useMemo<RenderCtx>(() => ({ ...base, renderFile: (id, name) => <NoteFile meta={doc.files[id]} name={name} /> }), [base, doc.files]);
+  const ctx = useMemo<RenderCtx>(() => ({ ...base, renderFile: (id, name, width) => <NoteFileLine width={width}><NoteFile meta={doc.files[id]} name={name} width={width} /></NoteFileLine> }), [base, doc.files]);
   useLayoutEffect(() => {
     bridge.current = {
       onRemote: (next) => {

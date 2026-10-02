@@ -157,6 +157,10 @@ const (
 	// EvNoteCursor passes on where someone's caret and selection are in a
 	// note (OpNoteCursor), sealed as they sent it.
 	EvNoteCursor = "note_cursor"
+	// EvNoteCRDT is one change to a note written together, numbered by the
+	// server and sealed as its writer sent it; a big one goes by its number
+	// alone, for the others to fetch.
+	EvNoteCRDT = "note_crdt"
 )
 
 // Presence is a user's visible status.

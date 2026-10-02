@@ -51,7 +51,7 @@ export function LegalHighlights() {
 
 /** What changed since the version before this one, for anyone who agreed to that. */
 export function LegalChanges() {
-  const changes = [t("legal.new1"), t("legal.new2"), t("legal.new3"), t("legal.new4")];
+  const changes = [t("legal.new5"), t("legal.new1"), t("legal.new2"), t("legal.new3"), t("legal.new4")];
   return (
     <div className={s.news} data-testid="legal-changes" dir="auto">
       <p className={s.newsTitle}>

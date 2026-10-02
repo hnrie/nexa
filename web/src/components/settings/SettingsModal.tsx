@@ -28,6 +28,7 @@ const LanguagePage = lazyPage(() => import("./LanguagePage"));
 const CustomCssPage = lazyPage(() => import("./CustomCssPage"));
 const PluginsPage = lazyPage(() => import("./PluginsPage"));
 const NotificationsPage = lazyPage(() => import("./NotificationsPage"));
+const SoundsPage = lazyPage(() => import("./SoundsPage"));
 const StickersPage = lazyPage(() => import("./StickersPage"));
 const VoicePage = lazyPage(() => import("./VoicePage"));
 const AdvancedPage = lazyPage(() => import("./AdvancedPage"));
@@ -66,6 +67,7 @@ function navGroups(opts: { inApp: boolean; admin: boolean }): NavGroup[] {
       items: [
         { id: "chat", label: t("settings.chat.title") },
         { id: "notifications", label: t("settings.notifications.notifications") },
+        { id: "sounds", label: t("settings.sounds.title") },
         { id: "stickers", label: t("settings.groups.emojiStickers") },
       ],
     },
@@ -159,7 +161,8 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
     page === "language" ? <LanguagePage /> :
     page === "customCss" ? <CustomCssPage /> :
     page === "plugins" ? <PluginsPage /> :
-    page === "notifications" ? <NotificationsPage /> :
+    page === "notifications" ? <NotificationsPage onSounds={() => setPage("sounds")} /> :
+    page === "sounds" ? <SoundsPage /> :
     page === "stickers" ? <StickersPage initialPackId={packId} /> :
     page === "voice" ? <VoicePage /> :
     page === "advanced" ? <AdvancedPage /> :

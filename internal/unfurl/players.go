@@ -39,8 +39,9 @@ func host(u *url.URL) string {
 }
 
 // PlayerFor returns the frame for a link to a video, or nil for anything else.
-// `parentHost` is the host the page runs on, which Twitch insists on knowing.
-func PlayerFor(u *url.URL, parentHost string) *Player {
+// `parents` are the hosts the page runs on, which Twitch insists on knowing:
+// its player opens only on a page at one of them.
+func PlayerFor(u *url.URL, parents ...string) *Player {
 	if u == nil {
 		return nil
 	}
@@ -59,11 +60,17 @@ func PlayerFor(u *url.URL, parentHost string) *Player {
 			return &Player{Site: "Vimeo", URL: src}
 		}
 	case h == "twitch.tv" || h == "clips.twitch.tv" || h == "player.twitch.tv":
-		if parentHost == "" {
+		parentQuery := ""
+		for _, p := range parents {
+			if p != "" {
+				parentQuery += "&parent=" + url.QueryEscape(p)
+			}
+		}
+		if parentQuery == "" {
 			return nil
 		}
 		if m := twitchVodRe.FindStringSubmatch(path); m != nil {
-			return &Player{Site: "Twitch", URL: "https://player.twitch.tv/?video=" + m[1] + "&autoplay=true&parent=" + url.QueryEscape(parentHost)}
+			return &Player{Site: "Twitch", URL: "https://player.twitch.tv/?video=" + m[1] + "&autoplay=true" + parentQuery}
 		}
 		slug := ""
 		if h == "clips.twitch.tv" {
@@ -72,7 +79,7 @@ func PlayerFor(u *url.URL, parentHost string) *Player {
 			slug = path[i+len("/clip/"):]
 		}
 		if slug != "" && twitchClipRe.MatchString(slug) {
-			return &Player{Site: "Twitch", URL: "https://clips.twitch.tv/embed?clip=" + url.QueryEscape(slug) + "&autoplay=true&parent=" + url.QueryEscape(parentHost)}
+			return &Player{Site: "Twitch", URL: "https://clips.twitch.tv/embed?clip=" + url.QueryEscape(slug) + "&autoplay=true" + parentQuery}
 		}
 	case h == "dailymotion.com" || h == "dai.ly":
 		id := strings.TrimPrefix(strings.TrimPrefix(path, "/video/"), "/")

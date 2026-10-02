@@ -58,8 +58,10 @@ export function NoteView({ noteId, narrow, onBack, fresh }: Props) {
     setHistory(false);
     openNoteSession(noteId, {
       onState: (state, error) => setSave({ state, error }),
-      onRemote: (doc) => bridge.current.onRemote(doc),
+      onRemote: (doc, at) => bridge.current.onRemote(doc, at),
       read: () => bridge.current.read?.() ?? {},
+      canShow: () => bridge.current.canShow?.() ?? true,
+      caret: () => bridge.current.caret?.() ?? { md: null, title: null },
       onGone: () => setOpening({ kind: "gone" }),
     }).then(
       (h) => {

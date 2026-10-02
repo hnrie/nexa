@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"io"
 	"mime"
 	"net/http"
 	"os"
@@ -85,9 +86,11 @@ func (s *Server) staticHandler() http.Handler {
 			WriteError(w, ErrNotFound)
 			return
 		}
+		moved := s.movedTag(r)
 		if p != "/" {
 			fp := filepath.Join(dist, filepath.FromSlash(p))
-			if strings.HasPrefix(fp, dist+string(filepath.Separator)) {
+			// at an address Nexa moved from, every page carries the way on (below)
+			if strings.HasPrefix(fp, dist+string(filepath.Separator)) && (moved == "" || filepath.Ext(fp) != ".html") {
 				if st, err := os.Stat(fp); err == nil && !st.IsDir() {
 					serveStaticFile(w, r, fp, p, st.ModTime())
 					return
@@ -167,12 +170,41 @@ func (s *Server) staticHandler() http.Handler {
 		h.Set("Cache-Control", "no-cache, must-revalidate")
 		h.Set("CDN-Cache-Control", "no-store")
 		h.Set("Content-Security-Policy", CSP)
+		if moved != "" {
+			raw, err := io.ReadAll(f)
+			if err != nil {
+				WriteError(w, err)
+				return
+			}
+			body := string(raw)
+			if i := strings.Index(body, "</head>"); i >= 0 {
+				body = body[:i] + moved + "\n" + body[i:]
+			}
+			if r.Method == http.MethodHead {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			_, _ = w.Write([]byte(body))
+			return
+		}
 		var mod time.Time
 		if st != nil {
 			mod = st.ModTime()
 		}
 		http.ServeContent(w, r, "index.html", mod, f)
 	})
+}
+
+// movedTag is what a page carries at an address Nexa moved away from: where
+// Nexa is now. The app moves the browser on, still signed in, before it draws
+// anything (web/src/lib/move.ts), except inside a desktop app from before the
+// move, which goes on working at the old address until it updates. Elsewhere
+// it is nothing.
+func (s *Server) movedTag(r *http.Request) string {
+	if _, kind := s.requestAddress(r); kind != ourMoved {
+		return ""
+	}
+	return "\n<meta name=\"nexa-moved-to\" content=\"" + escapeAttr(strings.TrimRight(s.Cfg.PublicURL, "/")) + "\">"
 }
 
 func serveStaticFile(w http.ResponseWriter, r *http.Request, fp, urlPath string, mod time.Time) {
@@ -254,6 +286,7 @@ func (s *Server) serveInvitePage(w http.ResponseWriter, r *http.Request, dist, c
 	}
 	tags.WriteString("\n<meta name=\"description\" content=\"" + escapeAttr(desc) + "\">")
 	tags.WriteString("\n<meta name=\"twitter:card\" content=\"" + card + "\">")
+	tags.WriteString(s.movedTag(r))
 
 	body := string(raw)
 	if i := strings.Index(body, "</head>"); i >= 0 {
@@ -281,15 +314,14 @@ func (s *Server) serveHomePage(w http.ResponseWriter, r *http.Request, dist stri
 	if err != nil {
 		return false
 	}
-	const title = "Nexa: private chat with all the fun left in"
-	const desc = "Servers, voice and video calls, custom emoji and sticker packs. Messages, files and calls are encrypted on your device, and signing up needs no email or phone number."
+	const title = "Nexa: all the fun of group chat, none of the snooping"
+	const desc = "A free chat app with servers, voice and video calls, and custom emoji and stickers. Messages, files and calls are encrypted on your device, and signing up needs no email or phone number."
 	var tags strings.Builder
-	// The front page has colours of its own, light or dark as the visitor's
-	// system prefers, while the app starts dark; until the page's code has
-	// arrived the loading screen would show the app's grey instead. This paints
-	// the page's background from the first frame, and the page removes it
-	// once it is drawn (HomePage.tsx, useFrontDocument).
-	tags.WriteString("\n<style id=\"front-paint\">@media (prefers-color-scheme: light){:root{--bg-base:#faf8fc;background:#faf8fc;color-scheme:light}}@media (prefers-color-scheme: dark){:root{--bg-base:#141018;background:#141018}}</style>")
+	// The front page is drawn on the app's darker canvas; until the page's
+	// code has arrived the loading screen would show the app's grey instead.
+	// This paints the page's background from the first frame, and the page
+	// removes it once it is drawn (HomePage.tsx, useFrontDocument).
+	tags.WriteString("\n<style id=\"front-paint\">:root{--bg-base:#120f18;background:#120f18;color-scheme:dark}</style>")
 	meta := func(prop, content string) {
 		tags.WriteString("\n<meta property=\"" + prop + "\" content=\"" + escapeAttr(content) + "\">")
 	}
@@ -306,9 +338,12 @@ func (s *Server) serveHomePage(w http.ResponseWriter, r *http.Request, dist stri
 		meta("og:image:height", "900")
 		meta("og:image:alt", "The Nexa app: a server's channels, a conversation and who is online")
 		tags.WriteString("\n<meta name=\"twitter:card\" content=\"summary_large_image\">")
+		// the same page at every address: search engines are told which one is Nexa's own
+		tags.WriteString("\n<link rel=\"canonical\" href=\"" + escapeAttr(base+"/") + "\">")
 	} else {
 		tags.WriteString("\n<meta name=\"twitter:card\" content=\"summary\">")
 	}
+	tags.WriteString(s.movedTag(r))
 	body := string(raw)
 	if i := strings.Index(body, "</head>"); i >= 0 {
 		body = body[:i] + tags.String() + "\n" + body[i:]
@@ -342,6 +377,7 @@ func (s *Server) servePlainPage(w http.ResponseWriter, r *http.Request, dist, ti
 	}
 	tags.WriteString("\n<meta name=\"description\" content=\"" + escapeAttr(desc) + "\">")
 	tags.WriteString("\n<meta name=\"twitter:card\" content=\"summary\">")
+	tags.WriteString(s.movedTag(r))
 	body := string(raw)
 	if i := strings.Index(body, "</head>"); i >= 0 {
 		body = body[:i] + tags.String() + "\n" + body[i:]

@@ -32,7 +32,7 @@ func (s *Server) WireDiscord(hub *gateway.Hub) {
 	}
 	s.Discord = discordsync.New(discordsync.Config{
 		ClientID: c.DiscordClientID, ClientSecret: c.DiscordClientSecret, BotToken: c.DiscordBotToken,
-		GuildID: c.DiscordGuildID, PublicURL: c.PublicURL, API: cmp.Or(s.discordAPI, c.DiscordAPIURL),
+		GuildID: c.DiscordGuildID, PublicURL: c.PublicURL, RedirectURL: c.DiscordRedirectURL, API: cmp.Or(s.discordAPI, c.DiscordAPIURL),
 	}, s.Store, hub, s.sealDiscordToken, s.openDiscordToken, s.ProxyURL, s.Log)
 }
 
@@ -103,18 +103,30 @@ func (s *Server) handleDiscordAuthorize(w http.ResponseWriter, r *http.Request) 
 	if s.discordLimited(w, me.ID) {
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]string{"url": s.Discord.AuthorizeURL(me.ID)})
+	// back to the address this was started from, which is not always where Discord returns to
+	back := ""
+	if addr, kind := s.originAddress(r.Header.Get("Origin")); kind != notOurs {
+		back = addr
+	}
+	WriteJSON(w, http.StatusOK, map[string]string{"url": s.Discord.AuthorizeURL(me.ID, back)})
 }
 
 // handleDiscordCallback is where Discord sends the person back. It finishes
 // the link and goes on to the Activity settings, saying how it went.
 func (s *Server) handleDiscordCallback(w http.ResponseWriter, r *http.Request) {
 	result := "failed"
+	back := ""
 	if s.Discord != nil {
 		q := r.URL.Query()
+		back = s.Discord.Back(q.Get("state"))
 		_, result = s.Discord.Callback(r.Context(), q.Get("code"), q.Get("state"), q.Get("error"))
 	}
-	dest := strings.TrimRight(s.Cfg.PublicURL, "/") + "/channels/@me?" + url.Values{"settings": {"activity"}, "discord": {result}}.Encode()
+	// where the link was started, when that is one of Nexa's addresses; a
+	// moved one sends its browser on to the new address by itself
+	if _, kind := s.originAddress(back); kind == notOurs {
+		back = strings.TrimRight(s.Cfg.PublicURL, "/")
+	}
+	dest := back + "/channels/@me?" + url.Values{"settings": {"activity"}, "discord": {result}}.Encode()
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	http.Redirect(w, r, dest, http.StatusSeeOther)

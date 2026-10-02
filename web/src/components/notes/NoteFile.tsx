@@ -1,9 +1,10 @@
-import { AlertCircle, FileIcon, RotateCw, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AlertCircle, FileIcon, RotateCw, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { AttachmentMeta } from "@/crypto/message";
 import { Attachments } from "@/components/chat/Attachments";
 import { acquire, attachmentObjectURL, cachedURL, PRIORITY, release } from "@/lib/mediaCache";
 import { copyOf } from "@/lib/pictureCopy";
+import { FILE_MIN_WIDTH } from "@/markdown/parse";
 import { t } from "@/i18n";
 import s from "./Notes.module.css";
 
@@ -24,19 +25,92 @@ interface Props {
   /** In a note being written: takes the file out of it. */
   onRemove?: (() => void) | undefined;
   onRetry?: (() => void) | undefined;
+  /** How much of the line a picture or video takes, in percent. */
+  width?: number | undefined;
+  /** In a note being written: makes a picture or video that wide. */
+  onResize?: ((width: number) => void) | undefined;
 }
+
+/** The sizes offered at a click, in percent of the line. */
+const SIZES: { width: number; label: () => string }[] = [
+  { width: 33, label: () => t("notes.file.small") },
+  { width: 50, label: () => t("notes.file.medium") },
+  { width: 75, label: () => t("notes.file.large") },
+  { width: 100, label: () => t("notes.file.fullWidth") },
+];
 
 /**
  * A file where a note's text has it. Once it is up it is drawn the way a
- * message draws its files: a picture to open, a video or a sound to play, a
- * file to download. While it goes up from this device it shows how far it
- * has got. One the note names but nobody has the file for (someone else's
- * still on its way, or one that never made it up) says so.
+ * message draws its files, a picture or a video as wide as the note says
+ * (dragged wider or narrower by its edges, or set at a click from its
+ * toolbar), a sound to play, a file to download. While it goes up from this
+ * device it shows how far it has got. One the note names but nobody has the
+ * file for (someone else's still on its way, or one that never made it up)
+ * says so.
  */
-export function NoteFile({ meta, name, pending, onRemove, onRetry }: Props) {
+export function NoteFile({ meta, name, pending, onRemove, onRetry, width = 100, onResize }: Props) {
+  const root = useRef<HTMLDivElement>(null);
+  const [live, setLive] = useState<number | null>(null);
+  const visual = !!meta && (meta.type.startsWith("image/") || meta.type.startsWith("video/"));
+  const resizable = visual && !!onResize;
+  const shown = live ?? width;
+
+  /** The line the file sits on: its width is what a percentage is of. */
+  const line = (): HTMLElement | null => root.current?.closest<HTMLElement>("[data-b='file'], [data-note-file-line]") ?? null;
+  const show = (w: number | null): void => {
+    const el = line();
+    if (!el) return;
+    if (w === null || w >= 100) el.style.removeProperty("--file-w");
+    else el.style.setProperty("--file-w", `${w}%`);
+  };
+
+  const grab = (side: "start" | "end") => (e: React.PointerEvent<HTMLSpanElement>) => {
+    if (e.button !== 0 || !onResize) return;
+    const el = line();
+    const box = root.current?.getBoundingClientRect();
+    if (!el || !box) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rtl = getComputedStyle(el).direction === "rtl";
+    // the picture is centred, so it grows by as much on the other side too
+    const sign = (side === "end") !== rtl ? 2 : -2;
+    const from = e.clientX;
+    const start = box.width;
+    const full = el.clientWidth || 1;
+    let now = shown;
+    const move = (ev: PointerEvent): void => {
+      const px = start + sign * (ev.clientX - from);
+      now = Math.round(Math.max(FILE_MIN_WIDTH, Math.min(100, (px / full) * 100)));
+      setLive(now);
+      show(now);
+    };
+    const up = (): void => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      setLive(null);
+      if (now !== width) onResize(now);
+      else show(width);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  };
+  // the arrow keys move a handle too, five percent at a time
+  const key = (side: "start" | "end") => (e: React.KeyboardEvent<HTMLSpanElement>) => {
+    if (!onResize) return;
+    const rtl = line() ? getComputedStyle(line()!).direction === "rtl" : false;
+    const out = side === "end" ? (rtl ? "ArrowLeft" : "ArrowRight") : rtl ? "ArrowRight" : "ArrowLeft";
+    const step = e.key === out ? 5 : e.key === "ArrowLeft" || e.key === "ArrowRight" ? -5 : e.key === "Home" ? -100 : e.key === "End" ? 100 : 0;
+    if (!step) return;
+    e.preventDefault();
+    onResize(Math.max(FILE_MIN_WIDTH, Math.min(100, width + step)));
+  };
+
   let body;
   if (meta) {
-    body = <Attachments list={[meta]} />;
+    body = <Attachments list={[meta]} fill={visual} />;
   } else if (pending) {
     const percent = Math.round(pending.progress * 100);
     body = (
@@ -71,22 +145,55 @@ export function NoteFile({ meta, name, pending, onRemove, onRetry }: Props) {
     );
   }
   return (
-    <div className={s.file} data-testid="note-file" data-state={meta ? "ready" : pending ? (pending.error ? "failed" : "uploading") : "missing"}>
+    <div ref={root} className={s.file} data-testid="note-file" data-visual={visual || undefined} data-resizing={live !== null || undefined} data-state={meta ? "ready" : pending ? (pending.error ? "failed" : "uploading") : "missing"}>
       {body}
-      {onRemove ? (
-        <button
-          type="button"
-          className={s.fileRemove}
-          // the caret stays where it was in the note
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={onRemove}
-          aria-label={t("notes.file.remove", { name })}
-          title={t("notes.file.removeShort")}
-          data-testid="note-file-remove"
-        >
-          <X size={16} aria-hidden="true" />
-        </button>
+      {resizable
+        ? (["start", "end"] as const).map((side) => (
+            <span
+              key={side}
+              className={s.grip}
+              data-side={side}
+              role="slider"
+              tabIndex={0}
+              aria-label={t("notes.file.width", { name })}
+              aria-valuemin={FILE_MIN_WIDTH}
+              aria-valuemax={100}
+              aria-valuenow={shown}
+              aria-valuetext={`${shown}%`}
+              onPointerDown={grab(side)}
+              onKeyDown={key(side)}
+              data-testid={`note-file-grip-${side}`}
+            />
+          ))
+        : null}
+      {live !== null ? <span className={s.fileSize} aria-hidden="true">{live}%</span> : null}
+      {resizable || onRemove ? (
+        <div className={s.fileBar} role="toolbar" aria-label={t("notes.file.tools", { name })} onMouseDown={(e) => e.preventDefault()}>
+          {resizable
+            ? SIZES.map((size) => (
+                <button key={size.width} type="button" className={s.fileBarSize} aria-pressed={shown === size.width} aria-label={size.label()} onClick={() => onResize?.(size.width)} data-testid={`note-file-size-${size.width}`}>
+                  {/* on a narrow picture the sizes say how wide, which needs no words */}
+                  <span className={s.sizeWord} aria-hidden="true">{size.label()}</span>
+                  <span className={s.sizeShort} aria-hidden="true">{size.width}%</span>
+                </button>
+              ))
+            : null}
+          {onRemove ? (
+            <button type="button" className={s.fileBarRemove} onClick={onRemove} aria-label={t("notes.file.remove", { name })} title={t("notes.file.removeShort")} data-testid="note-file-remove">
+              <Trash2 size={15} aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
       ) : null}
+    </div>
+  );
+}
+
+/** The line a file sits on in a note that is only read: as wide as the note says for a picture, centred. */
+export function NoteFileLine({ width, children }: { width?: number | undefined; children: React.ReactNode }) {
+  return (
+    <div className={s.fileLine} data-note-file-line="" style={width && width < 100 ? ({ "--file-w": `${width}%` } as React.CSSProperties) : undefined}>
+      {children}
     </div>
   );
 }

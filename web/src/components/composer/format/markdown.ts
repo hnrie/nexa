@@ -31,7 +31,8 @@ export interface ReadOptions {
 
 export function fromMarkdown(src: string, names?: AtomNames, read?: ReadOptions): Loaded {
   const st: LoadState = { out: [], simplified: false, names };
-  blocksOf(parse(src, read?.files || read?.max ? { files: read.files === true, ...(read.max ? { max: read.max } : {}) } : undefined), null, st);
+  // exact: the spaces at the ends of lines are the writer's, and stay (see parse.ts, exactOn)
+  blocksOf(parse(src, { exact: true, files: read?.files === true, ...(read?.max ? { max: read.max } : {}) }), null, st);
   // trailing and leading blank lines say nothing, and the parser drops them
   while (st.out.length > 1 && emptyLine(st.out[st.out.length - 1])) st.out.pop();
   return { blocks: st.out.length ? withoutSeparators(st.out) : [textBlock()], simplified: st.simplified };
@@ -134,7 +135,7 @@ function blocksOf(nodes: Node[], wrap: Wrap, st: LoadState): void {
         st.out.push({ id: newId(), kind: "hr", wrap });
         break;
       case "file":
-        st.out.push({ id: newId(), kind: "file", file: node.id, name: node.name, wrap });
+        st.out.push({ id: newId(), kind: "file", file: node.id, name: node.name, wrap, ...(node.width ? { width: node.width } : {}) });
         break;
       case "table":
         st.out.push({
@@ -263,7 +264,12 @@ function inline(nodes: Node[], marks: Marks, out: Inline[], st: LoadState): void
 /** Callouts and plain quotes are written with `>`, so two of them in a row would read as one. */
 const ANGLED = new Set<Wrap>(["quote", "note", "tip", "important", "warning", "caution"]);
 
-export function toMarkdown(blocks: Block[]): string {
+/**
+ * The editor's blocks as markdown. With `lines`, each block that writes a
+ * line of its own is given the index of that line (a code block, its opening
+ * fence), so a place in a block can be found in the markdown and back again.
+ */
+export function toMarkdown(blocks: Block[], lines?: Map<Block, number>): string {
   let start = 0;
   let end = blocks.length;
   // the parser drops blank lines at either end, so they are not written
@@ -280,10 +286,18 @@ export function toMarkdown(blocks: Block[]): string {
     const run = blocks.slice(i, j);
     if (wrap && ANGLED.has(wrap) && prevWrap && ANGLED.has(prevWrap)) out.push("");
     if (prevTable && run[0]?.kind === "table") out.push("");
-    if (wrap === "quote") out.push(...quoteLines(run));
-    else if (wrap === "details") out.push(...detailsLines(run));
-    else if (wrap) out.push(`> [!${wrap.toUpperCase()}]`, ...withoutTrailingBlanks(flowLines(run)).map((l) => (l === "" ? ">" : "> " + l)));
-    else out.push(...flowLines(run, prevTable));
+    const base = out.length;
+    const at = lines ? new Map<Block, number>() : undefined;
+    if (wrap === "quote") {
+      out.push(...quoteLines(run));
+      run.forEach((b, k) => at?.set(b, k));
+    } else if (wrap === "details") out.push(...detailsLines(run, at));
+    else if (wrap) {
+      out.push(`> [!${wrap.toUpperCase()}]`, ...withoutTrailingBlanks(flowLines(run, false, at)).map((l) => (l === "" ? ">" : "> " + l)));
+      // under the callout's own line
+      if (at) for (const [b, k] of at) at.set(b, k + 1);
+    } else out.push(...flowLines(run, prevTable, at));
+    if (lines && at) for (const [b, k] of at) if (base + k < out.length) lines.set(b, base + k);
     prevWrap = wrap;
     prevTable = !wrap && run[run.length - 1]?.kind === "table";
     i = j;
@@ -300,11 +314,17 @@ function quoteLines(run: Block[]): string[] {
   });
 }
 
-function detailsLines(run: Block[]): string[] {
+function detailsLines(run: Block[], at?: Map<Block, number>): string[] {
   const head = run[0];
   const summary = isText(head) ? inlineMarkdown(head.content) : "";
   const body = isText(head) ? run.slice(1) : run;
-  return [summary ? `::: details ${summary}` : "::: details", ...withoutTrailingBlanks(flowLines(body)), ":::"];
+  const inner = at ? new Map<Block, number>() : undefined;
+  const lines = [summary ? `::: details ${summary}` : "::: details", ...withoutTrailingBlanks(flowLines(body, false, inner)), ":::"];
+  if (at) {
+    if (isText(head)) at.set(head, 0);
+    for (const [b, k] of inner ?? []) at.set(b, k + 1);
+  }
+  return lines;
 }
 
 /** A callout or section ends at its last line with words; the parser drops the blank ones after it anyway. */
@@ -315,13 +335,15 @@ function withoutTrailingBlanks(lines: string[]): string[] {
 }
 
 /** Blocks with no wrap of their own, or the inside of a callout or section. */
-function flowLines(run: Block[], afterTable = false): string[] {
+function flowLines(run: Block[], afterTable = false, at?: Map<Block, number>): string[] {
   const out: string[] = [];
   // per list level: the column items start at, their marker's width, the next number
   const levels: { col: number; width: number; next: number; ordered: boolean }[] = [];
   let prevTable = afterTable;
   for (const block of run) {
     if (!(isText(block) && block.kind === "li")) levels.length = 0;
+    // a table after a table gets a blank line first; every other block starts where the lines stand
+    at?.set(block, out.length + (prevTable && block.kind === "table" ? 1 : 0));
     switch (block.kind) {
       case "code": {
         let fence = "```";
@@ -335,7 +357,7 @@ function flowLines(run: Block[], afterTable = false): string[] {
         out.push("---");
         break;
       case "file":
-        out.push(fileLine(block.file, block.name));
+        out.push(fileLine(block.file, block.name, block.width));
         break;
       case "table": {
         if (prevTable) out.push("");

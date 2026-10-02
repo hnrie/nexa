@@ -67,14 +67,16 @@
 /* ---- the bar over a note: tools on the left, people and state on the right ---- */
 .editor.editor { flex: 1 1 auto; min-height: 0; max-height: none; display: flex; flex-direction: column; background: transparent; }
 .bar { position: relative; z-index: 3; flex: none; height: var(--header-h); display: flex; align-items: center; gap: 6px; padding-inline: 8px 10px; box-shadow: 0 1px 0 var(--border-subtle); }
-.tools { flex: 1 1 auto; min-width: 0; display: flex; }
-/* the editor's own toolbar, made part of the bar */
-.tools.tools > * { flex: 1 1 auto; min-width: 0; padding: 0; border: 0; background: transparent; }
 .barSpace { flex: 1 1 auto; min-width: 4px; }
 .barEnd { flex: none; display: flex; align-items: center; gap: 4px; padding-inline-start: 6px; }
-.barTitle { min-width: 0; margin: 0 4px; font-family: var(--font-display); font-size: 15px; font-weight: 680; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.trayDock { position: relative; z-index: 2; flex: none; box-shadow: 0 1px 0 var(--border-subtle); background: var(--bg-surface); }
-.trayDock > * { max-width: 980px; margin: 0 auto; border-bottom: 0; background: transparent; }
+.barTitle { min-width: 0; flex: 0 1 auto; margin: 0 6px; font-family: var(--font-display); font-size: 15px; font-weight: 680; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barTitle[data-untitled] { color: var(--text-muted); }
+/* The formatting tools: a lit strip of their own under the bar, as wide as
+   the page is written in, so they never crowd what the note is doing. */
+.format { position: relative; z-index: 2; flex: none; padding: 8px 12px 0; }
+.format > * { width: fit-content; max-width: 100%; margin: 0 auto; padding: 4px 6px; border: 0; border-radius: 12px; background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-low); }
+.trayDock { position: relative; z-index: 2; flex: none; padding: 6px 12px 0; }
+.trayDock > * { max-width: 760px; margin: 0 auto; border: 0; border-radius: 12px; background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge); }
 
 .iconBtn { flex: none; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--icon); transition: background-color var(--transition), color var(--transition); }
 .iconBtn:hover { background: var(--bg-hover); color: var(--text-strong); }
@@ -107,16 +109,31 @@
 /* ---- the note itself ---- */
 .scroll { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; transition: box-shadow var(--transition), background-color var(--transition); }
 .editor[data-drop] .scroll { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand) 65%, transparent); background: color-mix(in srgb, var(--brand) 4%, transparent); }
-.sheet { position: relative; max-width: 740px; margin: 0 auto; padding-block: clamp(28px, 5cqi, 56px) 128px; padding-inline: clamp(18px, 5cqi, 44px); }
-.titleInput, .readTitle { display: block; width: 100%; margin: 0; padding: 0; border: 0; resize: none; overflow: hidden; background: transparent; color: var(--text-strong); font-family: var(--font-display); font-size: clamp(30px, 2.4cqi + 18px, 42px); font-weight: 740; line-height: 1.1; letter-spacing: -0.024em; outline: none; overflow-wrap: anywhere; }
-.titleInput::placeholder { color: var(--text-placeholder); opacity: 0.75; }
+/* the page the note is written on: one easy column, a little under 70 characters wide */
+.sheet { position: relative; max-width: 720px; margin: 0 auto; padding-block: clamp(22px, 3.4cqi, 40px) 128px; padding-inline: clamp(18px, 5cqi, 40px); }
+/* the title: the biggest thing on the page, but a heading, not a poster */
+.titleInput, .readTitle { display: block; width: 100%; margin: 0; padding: 0; border: 0; resize: none; overflow: hidden; background: transparent; color: var(--text-strong); font-family: var(--font-display); font-size: clamp(24px, 1.1cqi + 19px, 31px); font-weight: 720; line-height: 1.2; letter-spacing: -0.018em; outline: none; overflow-wrap: anywhere; }
+.titleInput::placeholder { color: var(--text-placeholder); opacity: 0.8; }
 .readTitle[data-untitled] { color: var(--text-muted); }
-.readTitle + .read, .readTitle + .readEmpty { margin-top: 26px; }
-.byline { min-height: 18px; margin: 12px 0 28px; font-size: 13px; line-height: 18px; color: var(--text-muted); }
-/* long-form text: a size up from a message, and more room between the lines */
-.surface.surface { min-height: 40vh; padding: 0; font-size: 17px; line-height: 1.68; }
-.surface :global([data-b="file"]) { margin-block: 10px; }
-.read { font-size: 17px; line-height: 1.68; color: var(--text); overflow-wrap: anywhere; }
+.readTitle + .read, .readTitle + .readEmpty { margin-top: 22px; }
+.byline { display: flex; align-items: center; gap: 8px; min-height: 22px; margin: 10px 0 22px; padding-bottom: 18px; font-size: 13px; line-height: 18px; color: var(--text-muted); box-shadow: 0 1px 0 var(--border-subtle); }
+.bylineFaces { display: inline-flex; align-items: center; }
+.bylineFaces > * + * { margin-inline-start: -5px; }
+.bylineFaces > * { border-radius: 50%; box-shadow: 0 0 0 2px var(--bg-raised); }
+/* long-form text: a little more than a message, more air between the lines, and a breath between blocks */
+.surface.surface { min-height: 40vh; padding: 0; font-size: 16.5px; line-height: 1.7; }
+.surface.surface > :global(*) + :global(*) { margin-top: 0.4em; }
+.surface.surface > :global([data-b="li"]) + :global([data-b="li"]) { margin-top: 0.12em; }
+.surface.surface > :global([data-b="h1"]) { font-size: 1.55em; margin-block: 1.1em 0.35em; letter-spacing: -0.012em; }
+.surface.surface > :global([data-b="h2"]) { font-size: 1.3em; margin-block: 1em 0.3em; }
+.surface.surface > :global([data-b="h3"]) { font-size: 1.1em; margin-block: 0.9em 0.25em; }
+.surface.surface > :global([data-b^="h"]:first-child) { margin-top: 0; }
+.surface.surface > :global([data-list="task"])::after { top: calc((1.7em - 15px) / 2); }
+.surface.surface > :global([data-b="file"]) { margin-block: 1em; }
+.surface.surface > :global([data-b="file"]) > :global([data-file-host]) { width: var(--file-w, 100%); margin-inline: auto; }
+.read { font-size: 16.5px; line-height: 1.7; color: var(--text); overflow-wrap: anywhere; }
+.read > * + * { margin-top: 0.4em; }
+.fileLine { width: var(--file-w, 100%); margin: 1em auto; }
 .readEmpty { margin: 0; color: var(--text-muted); }
 .over { margin: 0 0 16px; padding: 10px 12px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--text-danger); font-size: 14px; }
 .simplified { margin: 0 0 14px; font-size: 13px; color: var(--text-muted); }
@@ -133,13 +150,43 @@
 /* a file where the note has it */
 .file { position: relative; display: flex; align-items: flex-start; gap: 6px; max-width: 100%; }
 .file > :first-child { min-width: 0; max-width: 100%; }
-/* a picture keeps its shape and never runs past the column (its frame is sized for a message) */
+/* a picture or a video takes the whole width its line gives it, in its own shape */
+.file[data-visual] { display: block; width: 100%; container: notefile / inline-size; }
+.sizeShort { display: none; }
+@container notefile (max-width: 380px) {
+  .sizeWord { display: none; }
+  .sizeShort { display: inline; }
+  .fileBarSize { padding: 0 7px; font-size: 12px; }
+}
+.file[data-visual] > :first-child { width: 100%; margin-top: 0; }
+.file[data-visual] :global(img), .file[data-visual] :global(video) { width: 100%; height: auto; }
 .file [data-spoiler], .file :global(img), .file :global(video) { max-width: 100%; }
 .file :global(img), .file :global(video) { height: auto; }
-.fileRemove { flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--text-muted); background: var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); opacity: 0; transition: opacity var(--transition), color var(--transition), background-color var(--transition); }
-.file:hover .fileRemove, .fileRemove:focus-visible { opacity: 1; }
-.fileRemove:hover { color: var(--on-danger); background: var(--grad-danger); }
-@media (hover: none) { .fileRemove { opacity: 1; } }
+.file[data-resizing] { cursor: ew-resize; user-select: none; }
+.file[data-resizing] :global(img) { pointer-events: none; }
+/* its handles: a pill on each side, to drag it wider or narrower */
+.grip { position: absolute; top: 50%; z-index: 2; width: 8px; height: 46px; margin-top: -23px; border-radius: 5px; background: rgba(255, 255, 255, 0.92); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.45); cursor: ew-resize; opacity: 0; touch-action: none; transition: opacity var(--transition), transform var(--transition); }
+.grip[data-side="start"] { inset-inline-start: 8px; }
+.grip[data-side="end"] { inset-inline-end: 8px; }
+.grip:hover, .file[data-resizing] .grip { transform: scaleY(1.12); }
+.file:hover .grip, .file:focus-within .grip, .file[data-resizing] .grip { opacity: 1; }
+.grip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.fileSize { position: absolute; bottom: 12px; left: 50%; z-index: 2; translate: -50% 0; padding: 3px 9px; border-radius: var(--radius-pill); background: rgba(14, 11, 20, 0.82); color: #fff; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; pointer-events: none; }
+/* what can be done to it, along its top edge while the pointer is over it */
+.fileBar { position: absolute; top: 8px; inset-inline-end: 8px; z-index: 2; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(14, 11, 20, 0.78); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 4px 14px rgba(0, 0, 0, 0.4); opacity: 0; transition: opacity var(--transition); }
+.file:not([data-visual]) .fileBar { position: static; opacity: 1; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; }
+.file:hover .fileBar, .file:focus-within .fileBar, .file[data-resizing] .fileBar { opacity: 1; }
+.fileBarSize { height: 26px; padding: 0 9px; border-radius: 7px; color: rgba(255, 255, 255, 0.82); font-size: 12.5px; font-weight: 650; white-space: nowrap; transition: background-color var(--transition), color var(--transition); }
+.fileBarSize:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.fileBarSize[aria-pressed="true"] { background: var(--brand); color: var(--on-brand); }
+.fileBarRemove { width: 28px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border-radius: 7px; color: rgba(255, 255, 255, 0.82); transition: background-color var(--transition), color var(--transition); }
+.file:not([data-visual]) .fileBarRemove { width: 30px; height: 30px; color: var(--text-muted); background: var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); }
+.fileBarRemove:hover, .file:not([data-visual]) .fileBarRemove:hover { color: var(--on-danger); background: var(--grad-danger); }
+.fileBarSize:focus-visible, .fileBarRemove:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+@media (hover: none) {
+  .fileBar { opacity: 1; }
+  .grip { opacity: 0.9; }
+}
 .fileWait { display: flex; align-items: center; gap: 12px; width: 360px; max-width: 100%; padding: 12px 14px; border-radius: var(--radius-md); background: var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); }
 .fileWait[data-error] { box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent); }
 .fileWaitIcon { flex: none; color: var(--text-muted); }
@@ -262,7 +309,9 @@
   .iconBtn { width: 40px; height: 40px; }
   .newBtn, .shareBtn { height: 36px; }
   .row { padding-block: 12px; }
-  .fileRemove { width: 38px; height: 38px; }
+  .fileBarSize { height: 32px; }
+  .fileBarRemove { width: 34px; height: 32px; }
+  .grip { width: 12px; height: 56px; margin-top: -28px; }
   .rowAct { width: 40px; height: 40px; }
   .act { width: 38px; height: 38px; }
   .version { padding-block: 12px; }

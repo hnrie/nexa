@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Takes the pictures the front page shows, from the app actually running.
+"""Takes the picture the front page shows of the app, from the app actually running.
 
 Boots a throwaway chatd on the built web dist, sets up a small server with two
-people in it, and photographs the parts the page talks about: the server
-(app.png, also the front page's link preview) and the colour themes
-(themes.png). Nothing here is mocked up: what the page shows is what the app
-draws. The two loops are tools/home_gifs.py's.
+people in it, and photographs it: app.png, which is also the front page's link
+preview. Nothing here is mocked up: what the page shows is what the app draws.
+The loops, and the posters they start from, are tools/home_gifs.py's.
 
   PLAYWRIGHT_VENV=tools/.venv tools/.venv/bin/python tools/home_shots.py
 
@@ -22,13 +21,16 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 OUT = ROOT / "web/public/home"
 SHOT = (1440, 900)
 
+# the first picture of Nexa many people see (it is the link preview too), so
+# friends making plans rather than anything that needs explaining
+CHANNELS = ["plans", "games", "music", "photos"]
 CHAT = [
-    ("alice", "morning! pushed the new build, calls are noticeably smoother now"),
-    ("bob", "nice. the screen share audio worked first try on my machine"),
-    ("alice", "that was the per-window capture. no more hearing yourself"),
-    ("bob", "does it still hold up on a bad connection?"),
-    ("alice", "yeah, tested it on a throttled link. it drops video before it drops you"),
-    ("bob", "perfect. shipping it"),
+    ("alice", "game night on friday? 🎲"),
+    ("bob", "yes!! i'll bring the new expansion"),
+    ("alice", "nice. sam can't make it, so we'll call him from the voice channel"),
+    ("bob", "can i share my screen at some point? i drew a map for the campaign"),
+    ("alice", "go for it, i want to see it"),
+    ("bob", "ok see you friday!"),
 ]
 
 
@@ -65,6 +67,14 @@ def main() -> int:
             a.wait_for_url("**/channels/*/*", timeout=20000)
             a.wait_for_selector("textarea[aria-label='Message #general']", timeout=15000)
             server_id = a.url.split("/channels/")[1].split("/")[0]
+            for n in CHANNELS:
+                a.click("button[aria-label='Create Channel']")
+                a.fill("[data-testid=channel-name]", n)
+                a.click("button:has-text('Create Channel') >> nth=-1")
+                a.wait_for_selector(f"[data-channel]:has(span:text-is('{n}'))", timeout=15000)
+                time.sleep(0.2)
+            a.locator("[data-channel]:has(span:text-is('general')) button").first.click()
+            a.wait_for_selector("textarea[aria-label='Message #general']", timeout=15000)
             a.click("button[aria-label='Invite People']")
             box = a.locator("[data-testid=invite-link]")
             box.wait_for(timeout=15000)
@@ -82,7 +92,7 @@ def main() -> int:
             for who, line in CHAT:
                 (alice if who == "alice" else bob).send(line)
                 time.sleep(0.25)
-            a.wait_for_selector("[data-id]:has-text('shipping it')", timeout=20000)
+            a.wait_for_selector("[data-id]:has-text('see you friday')", timeout=20000)
             b.bring_to_front()
             time.sleep(0.8)
             a.bring_to_front()
@@ -97,31 +107,6 @@ def main() -> int:
             a.screenshot(path=str(OUT / "app.png"))
             print("wrote app.png")
 
-            # The colour themes, as the gallery in Settings shows them: its
-            # dark and light rows, cut out of the dialog on a window tall
-            # enough to hold both at once.
-            a.set_viewport_size({"width": SHOT[0], "height": 1400})
-            a.click("[data-testid=user-settings]")
-            a.click("[data-nav=appearance]")
-            a.wait_for_selector("[data-theme-id]", timeout=15000)
-            a.mouse.move(10, 10)
-            time.sleep(1.5)
-            rows = a.locator("[role=group]:has([data-theme-id])")
-            dark, light = rows.nth(1).bounding_box(), rows.nth(2).bounding_box()
-            # the groups above and below sit close, so the cut stays tight
-            # top and bottom rather than take half a line of either
-            pad, tight = 28, 6
-            left = min(dark["x"], light["x"]) - pad
-            top = dark["y"] - tight
-            a.screenshot(path=str(OUT / "themes.png"), clip={
-                "x": left,
-                "y": top,
-                "width": max(dark["x"] + dark["width"], light["x"] + light["width"]) + pad - left,
-                "height": light["y"] + light["height"] + tight - top,
-            })
-            a.keyboard.press("Escape")
-            a.set_viewport_size({"width": SHOT[0], "height": SHOT[1]})
-            print("wrote themes.png")
             browser.close()
             other.close()
     finally:

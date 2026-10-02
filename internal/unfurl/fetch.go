@@ -33,7 +33,7 @@ const (
 	// nothing. "Mozilla/5.0 (compatible; …)" is the form those sites read a
 	// crawler's name from. Inside the brackets, "like Twitterbot" sent YouTube
 	// to its phone site, whose tags are not in its head.
-	defaultUserAgent = "Mozilla/5.0 (compatible; Nexa-Unfurl/1.0; +https://chat.evilion.xyz) like Twitterbot"
+	defaultUserAgent = "Mozilla/5.0 (compatible; Nexa-Unfurl/1.0; +https://nexa.fish) like Twitterbot"
 	defaultTimeout   = 6 * time.Second
 	defaultMaxBytes  = 2 << 20
 	mediaHeadBytes   = 64 << 10
@@ -113,9 +113,9 @@ type Fetcher struct {
 	// server's address). It is given the address already checked to be public.
 	Dial      func(ctx context.Context, network, addr string) (net.Conn, error)
 	Transport http.RoundTripper
-	// ParentHost is the host this app is served from. Twitch's player refuses
-	// to open without it; nothing else uses it.
-	ParentHost string
+	// ParentHosts are the hosts this app is served from. Twitch's player
+	// refuses to open on any other; nothing else uses them.
+	ParentHosts []string
 	// MeasureWithin is how long after the start of a fetch a picture of
 	// unknown size may still be measured. The sender's app waits a moment
 	// for a preview and then sends without it; a card with its picture's
@@ -410,7 +410,7 @@ func (f *Fetcher) htmlResult(ctx context.Context, started time.Time, body io.Rea
 		}
 	}
 	// The one place a preview runs another site's code, and only for a video.
-	if p := PlayerFor(final, f.ParentHost); p != nil {
+	if p := PlayerFor(final, f.ParentHosts...); p != nil {
 		r.Player, r.PlayerSite = p.URL, p.Site
 		if r.SiteName == "" || r.SiteName == host {
 			r.SiteName = p.Site

@@ -1,6 +1,7 @@
 # Nexa: working notes
 
-Nexa is the end-to-end encrypted chat app served at https://chat.evilion.xyz: a Go server
+Nexa is the end-to-end encrypted chat app served at https://nexa.fish (also https://mathtest.lol;
+https://chat.evilion.xyz is its old address, which moves browsers on): a Go server
 (`cmd/`, `internal/`) and a React + TypeScript web app (`web/src`) that the desktop app also runs.
 README.md has the architecture.
 

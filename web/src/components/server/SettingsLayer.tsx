@@ -1,4 +1,4 @@
-import { Accessibility, Ban, Bell, ChevronLeft, ChevronRight, Code, DatabaseZap, Gamepad2, Gavel, IdCard, Info, KeyRound, Languages, Link, Lock, MessagesSquare, Mic, Monitor, MonitorSmartphone, Palette, Puzzle, Scale, ScrollText, Settings2, Shield, ShieldCheck, SlidersHorizontal, Smile, Sticker, Tags, Trash2, UserRound, Users, Webhook, Wrench, X, type LucideIcon } from "lucide-react";
+import { Accessibility, AudioLines, Ban, Bell, ChevronLeft, ChevronRight, Code, DatabaseZap, Gamepad2, Gavel, IdCard, Info, KeyRound, Languages, Link, Lock, MessagesSquare, Mic, Monitor, MonitorSmartphone, Palette, Puzzle, Scale, ScrollText, Settings2, Shield, ShieldCheck, SlidersHorizontal, Smile, Sticker, Tags, Trash2, UserRound, Users, Webhook, Wrench, X, type LucideIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/common/Button";
@@ -29,6 +29,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   plugins: Puzzle,
   voice: Mic,
   notifications: Bell,
+  sounds: AudioLines,
   stickers: Sticker,
   desktop: Monitor,
   licenses: Scale,

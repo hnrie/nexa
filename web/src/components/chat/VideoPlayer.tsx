@@ -82,10 +82,12 @@ interface Props {
   spoiler?: boolean;
   /** The video's sound, when it is a file of its own (a post from Reddit); played in step with the picture. */
   audio?: string | undefined;
+  /** As wide as where it is put, a note's line, rather than a message's frame. */
+  fill?: boolean | undefined;
 }
 
 /** The app's own video player: themed controls, keyboard, PiP and a download. */
-export function VideoPlayer({ src, name, width, height, poster, spoiler = false, audio }: Props) {
+export function VideoPlayer({ src, name, width, height, poster, spoiler = false, audio, fill = false }: Props) {
   const video = useRef<HTMLVideoElement>(null);
   const sound = useRef<HTMLAudioElement>(null);
   useEffect(() => {
@@ -311,8 +313,9 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
     <div
       ref={wrap}
       className={s.player}
-      style={size}
+      style={fill ? (size ? { aspectRatio: size.aspectRatio } : undefined) : size}
       data-full={full}
+      data-fill={fill || undefined}
       data-sized={!!size}
       data-spoiler={!revealed}
       data-ui={ui}

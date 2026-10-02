@@ -5,10 +5,8 @@ import type { Channel } from "@/api/types";
 import { ApiError } from "@/api/client";
 import { servers as serversApi, type ChannelPositionPatch } from "@/api/servers";
 import { bannerUrl } from "@/api/users";
-import { UserPanel } from "@/components/shell/UserPanel";
 import { ChannelGlyph } from "@/components/common/ChannelGlyph";
 import { VoiceParticipants } from "@/components/voice/VoiceParticipants";
-import { VoiceStatus } from "@/components/voice/VoiceStatus";
 import { joinVoice } from "@/voice/session";
 import { useVoice } from "@/stores/voice";
 import { Tooltip } from "@/components/common/Tooltip";
@@ -298,8 +296,6 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
         })}
         {tree.loose.length === 0 && tree.categories.length === 0 ? <div className={s.empty}>{t("sidebar.serverSidebar.noChannelsYouCanSeeYet")}</div> : null}
       </div>
-      <VoiceStatus />
-      <UserPanel />
     </div>
   );
 }

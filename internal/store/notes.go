@@ -33,6 +33,13 @@ const (
 	// MaxNoteVersions is how many earlier states of a note are kept; past
 	// that the oldest go.
 	MaxNoteVersions = 100
+	// MaxNoteUpdateBytes is the most one sealed change to a note may weigh:
+	// a whole note pasted in at once fits.
+	MaxNoteUpdateBytes = 1 << 20
+	// MaxNoteUpdates is how many changes a note keeps since it was last saved
+	// whole. Apps save it every few seconds of writing, so this is only ever
+	// reached by one that stopped doing so; it is then told to save first.
+	MaxNoteUpdates = 5000
 )
 
 // When an earlier state of a note is set aside (see SaveNote). Variables so
@@ -49,6 +56,13 @@ var (
 // ErrStale is a save made from a version of the note that is no longer the
 // newest: someone else saved in between, and the two have to be put together.
 var ErrStale = errors.New("stale version")
+
+// ErrRekeyed is a change sealed with a key the note no longer has.
+var ErrRekeyed = errors.New("sealed with an old key")
+
+// ErrSaveFirst is a change to a note that has had too many since it was
+// last saved whole: the note is to be saved first.
+var ErrSaveFirst = errors.New("save the note first")
 
 // Note is a note as one of its members sees it: the sealed head and body, and
 // that member's own role and copy of the key.
@@ -72,6 +86,19 @@ type Note struct {
 	// member taken out, a link removed, an invitation taken back): the owner's
 	// app gives the note a new key the next time it sees this.
 	NeedsRekey bool `json:"needs_rekey,omitempty"`
+	// CrdtSeq is the number the newest change to the note was given, and
+	// CrdtUpto the newest one the saved note (Body) already holds: the
+	// changes after it are fetched to bring the note up to date.
+	CrdtSeq  int64 `json:"crdt_seq"`
+	CrdtUpto int64 `json:"crdt_upto"`
+}
+
+// NoteUpdate is one change to a note, sealed on the device that made it.
+type NoteUpdate struct {
+	Seq       int64   `json:"seq"`
+	Sealed    string  `json:"update"`
+	UserID    *ids.ID `json:"user_id"`
+	CreatedAt int64   `json:"created_at"`
 }
 
 // NoteVersion is an earlier state of a note, sealed as it was.
@@ -130,13 +157,13 @@ type NoteLink struct {
 
 // noteCols reads a note for the member the query is joined to (m).
 const noteCols = `n.id, n.owner_id, n.head, n.version, n.edited_by, n.created_at, n.updated_at, m.role, m.key_sealed, n.key_epoch,
-	(SELECT count(*) FROM note_members c WHERE c.note_id = n.id), n.needs_rekey`
+	(SELECT count(*) FROM note_members c WHERE c.note_id = n.id), n.needs_rekey, n.crdt_seq, n.crdt_upto`
 
 func scanNote(r rowScanner, body *string) (*Note, error) {
 	var n Note
 	var edited sql.NullInt64
 	var rekey int
-	dest := []any{&n.ID, &n.OwnerID, &n.Head, &n.Version, &edited, &n.CreatedAt, &n.UpdatedAt, &n.Role, &n.KeySealed, &n.KeyEpoch, &n.Members, &rekey}
+	dest := []any{&n.ID, &n.OwnerID, &n.Head, &n.Version, &edited, &n.CreatedAt, &n.UpdatedAt, &n.Role, &n.KeySealed, &n.KeyEpoch, &n.Members, &rekey, &n.CrdtSeq, &n.CrdtUpto}
 	if body != nil {
 		dest = append(dest, body)
 	}
@@ -267,30 +294,43 @@ func (s *Store) NoteMembers(ctx context.Context, id ids.ID) ([]NoteMember, error
 // again after a pause (NoteQuiet), every so often while it goes on
 // (NoteSnapshotEvery), and whenever `keep` asks for it, which the app does
 // before putting an old version back.
-func (s *Store) SaveNote(ctx context.Context, id, uid ids.ID, base int64, head, body string, files []ids.ID, keep bool) (version, updatedAt int64, err error) {
+//
+// upto is the newest change (AppendNoteUpdate) the body holds: the changes up
+// to it are let go, since the note itself now has them. A save that holds
+// fewer than the note already did is stale. An app from before notes were
+// written change by change sends no upto (a negative one): its body is the
+// note as it says it is, so every change kept so far goes.
+func (s *Store) SaveNote(ctx context.Context, id, uid ids.ID, base int64, head, body string, files []ids.ID, keep bool, upto int64) (version, updatedAt int64, err error) {
 	err = s.Tx(ctx, func(tx *db.Tx) error {
 		if err := tx.Serialise(ctx, "note", int64(id)); err != nil {
 			return err
 		}
 		var was struct {
 			version, updated, created, lastKept int64
+			crdtSeq, crdtUpto                   int64
 			epoch, role                         int
 			head, body                          string
 			editedBy                            sql.NullInt64
 		}
 		err := tx.QueryRowContext(ctx, `SELECT n.version, m.role, n.head, n.body, n.key_epoch, n.edited_by, n.updated_at, n.created_at,
-			(SELECT coalesce(max(v.created_at), 0) FROM note_versions v WHERE v.note_id = n.id)
+			(SELECT coalesce(max(v.created_at), 0) FROM note_versions v WHERE v.note_id = n.id), n.crdt_seq, n.crdt_upto
 			FROM notes n JOIN note_members m ON m.note_id = n.id AND m.user_id = ? WHERE n.id = ?`, int64(uid), int64(id)).
-			Scan(&was.version, &was.role, &was.head, &was.body, &was.epoch, &was.editedBy, &was.updated, &was.created, &was.lastKept)
+			Scan(&was.version, &was.role, &was.head, &was.body, &was.epoch, &was.editedBy, &was.updated, &was.created, &was.lastKept, &was.crdtSeq, &was.crdtUpto)
 		if errors.Is(err, sql.ErrNoRows) || (err == nil && was.role < NoteEditor) {
 			return ErrNotFound
 		}
 		if err != nil {
 			return err
 		}
-		if was.version != base {
+		if was.version != base || (upto >= 0 && upto < was.crdtUpto) {
 			version = was.version
 			return ErrStale
+		}
+		if upto > was.crdtSeq {
+			return ErrConflict
+		}
+		if upto < 0 {
+			upto = was.crdtSeq
 		}
 		now := nowMs()
 		since := was.lastKept
@@ -306,10 +346,76 @@ func (s *Store) SaveNote(ctx context.Context, id, uid ids.ID, base int64, head, 
 			return err
 		}
 		version, updatedAt = was.version+1, now
-		_, err = tx.ExecContext(ctx, `UPDATE notes SET head = ?, body = ?, version = ?, edited_by = ?, updated_at = ? WHERE id = ?`, head, body, version, int64(uid), updatedAt, int64(id))
+		if _, err := tx.ExecContext(ctx, `DELETE FROM note_updates WHERE note_id = ? AND seq <= ?`, int64(id), upto); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE notes SET head = ?, body = ?, version = ?, edited_by = ?, updated_at = ?, crdt_upto = ? WHERE id = ?`, head, body, version, int64(uid), updatedAt, upto, int64(id))
 		return err
 	})
 	return version, updatedAt, err
+}
+
+// AppendNoteUpdate keeps one change to a note, made by uid, who may edit it,
+// and gives it its number. epoch is the key it was sealed with, which has to
+// be the note's key now: one sealed with an old key could not be opened by
+// whoever joined since.
+func (s *Store) AppendNoteUpdate(ctx context.Context, id, uid ids.ID, epoch int, sealed string) (seq, at int64, err error) {
+	err = s.Tx(ctx, func(tx *db.Tx) error {
+		if err := tx.Serialise(ctx, "note", int64(id)); err != nil {
+			return err
+		}
+		var role, keyEpoch int
+		var crdtSeq, crdtUpto int64
+		err := tx.QueryRowContext(ctx, `SELECT m.role, n.key_epoch, n.crdt_seq, n.crdt_upto FROM notes n JOIN note_members m ON m.note_id = n.id AND m.user_id = ? WHERE n.id = ?`, int64(uid), int64(id)).
+			Scan(&role, &keyEpoch, &crdtSeq, &crdtUpto)
+		if errors.Is(err, sql.ErrNoRows) || (err == nil && role < NoteEditor) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if epoch != keyEpoch {
+			return ErrRekeyed
+		}
+		if crdtSeq-crdtUpto >= MaxNoteUpdates {
+			return ErrSaveFirst
+		}
+		seq, at = crdtSeq+1, nowMs()
+		if _, err := tx.ExecContext(ctx, `INSERT INTO note_updates (note_id, seq, sealed, user_id, created_at) VALUES (?,?,?,?,?)`, int64(id), seq, sealed, int64(uid), at); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE notes SET crdt_seq = ?, edited_by = ?, updated_at = ? WHERE id = ?`, seq, int64(uid), at, int64(id))
+		return err
+	})
+	return seq, at, err
+}
+
+// NoteUpdates lists a note's changes after `after`, oldest first, at most
+// limit of them, with the numbers of the newest change and of the newest the
+// saved note holds. uid must be in the note.
+func (s *Store) NoteUpdates(ctx context.Context, id, uid ids.ID, after int64, limit int) (list []NoteUpdate, crdtSeq, crdtUpto int64, err error) {
+	if err = s.db.R.QueryRowContext(ctx, `SELECT n.crdt_seq, n.crdt_upto FROM notes n JOIN note_members m ON m.note_id = n.id AND m.user_id = ? WHERE n.id = ?`, int64(uid), int64(id)).Scan(&crdtSeq, &crdtUpto); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			err = ErrNotFound
+		}
+		return nil, 0, 0, err
+	}
+	rows, err := s.db.R.QueryContext(ctx, `SELECT seq, sealed, user_id, created_at FROM note_updates WHERE note_id = ? AND seq > ? ORDER BY seq LIMIT ?`, int64(id), after, limit)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer rows.Close()
+	list = []NoteUpdate{}
+	for rows.Next() {
+		var u NoteUpdate
+		var who sql.NullInt64
+		if err := rows.Scan(&u.Seq, &u.Sealed, &who, &u.CreatedAt); err != nil {
+			return nil, 0, 0, err
+		}
+		u.UserID = idPtr(who)
+		list = append(list, u)
+	}
+	return list, crdtSeq, crdtUpto, rows.Err()
 }
 
 // keepNoteVersionTx sets a state of a note aside, with a reference on each
@@ -447,13 +553,17 @@ func syncNoteFiles(ctx context.Context, tx *db.Tx, id, uid ids.ID, files []ids.I
 		// Only a file this person uploaded, and only an attachment: a note
 		// cannot be made to hold on to somebody else's file or a profile
 		// picture. A file one of the note's earlier states holds is the note's
-		// already, which is what lets anyone who may edit put that state back.
+		// already, which is what lets anyone who may edit put that state back,
+		// and so is a file uploaded for this note by anyone who could edit it:
+		// a note written together is saved by whoever is writing, with the
+		// pictures the others have just added in it.
 		var owner sql.NullInt64
 		var kind string
 		var held int
 		err := tx.QueryRowContext(ctx, `SELECT owner_id, kind,
 			(SELECT count(*) FROM note_version_files f JOIN note_versions v ON v.id = f.version_id WHERE f.blob_id = blobs.id AND v.note_id = ?)
-			FROM blobs WHERE id = ?`, int64(id), b).Scan(&owner, &kind, &held)
+			+ (SELECT count(*) FROM note_uploads u WHERE u.blob_id = blobs.id AND u.note_id = ?)
+			FROM blobs WHERE id = ?`, int64(id), int64(id), b).Scan(&owner, &kind, &held)
 		if errors.Is(err, sql.ErrNoRows) || (err == nil && (kind != "attachment" || (held == 0 && (!owner.Valid || owner.Int64 != int64(uid))))) {
 			missing = append(missing, ids.ID(b))
 			continue
@@ -528,7 +638,7 @@ func deleteNotesTx(ctx context.Context, tx *db.Tx, where string, args ...any) er
 	}
 	// spelled out rather than left to the foreign keys, which a database
 	// opened without them enforced would skip
-	for _, table := range []string{"note_versions", "note_keys", "note_files", "note_links", "note_invites", "note_members"} {
+	for _, table := range []string{"note_versions", "note_keys", "note_files", "note_links", "note_invites", "note_members", "note_updates", "note_uploads"} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE note_id IN (SELECT id FROM notes WHERE `+where+`)`, args...); err != nil {
 			return err
 		}
@@ -844,6 +954,11 @@ type NoteRekey struct {
 	Members map[ids.ID]string
 	Invites map[ids.ID]string
 	Links   map[ids.ID][2]string // key_wrapped, link_sealed
+	// Upto is the newest change the new body holds, which has to be the
+	// newest there is: the changes kept so far are sealed with the old key,
+	// and go. Negative, from an app before changes were kept, lets them go
+	// all the same.
+	Upto int64
 }
 
 // RekeyNote swaps a note over to a new key, by its owner, from the version
@@ -854,16 +969,17 @@ func (s *Store) RekeyNote(ctx context.Context, id, uid ids.ID, base int64, r Not
 		if err := tx.Serialise(ctx, "note", int64(id)); err != nil {
 			return err
 		}
-		var current int64
+		var current, crdtSeq int64
 		var role, epoch int
-		err := tx.QueryRowContext(ctx, `SELECT n.version, m.role, n.key_epoch FROM notes n JOIN note_members m ON m.note_id = n.id AND m.user_id = ? WHERE n.id = ?`, int64(uid), int64(id)).Scan(&current, &role, &epoch)
+		err := tx.QueryRowContext(ctx, `SELECT n.version, m.role, n.key_epoch, n.crdt_seq FROM notes n JOIN note_members m ON m.note_id = n.id AND m.user_id = ? WHERE n.id = ?`, int64(uid), int64(id)).Scan(&current, &role, &epoch, &crdtSeq)
 		if errors.Is(err, sql.ErrNoRows) || (err == nil && role != NoteOwner) {
 			return ErrNotFound
 		}
 		if err != nil {
 			return err
 		}
-		if current != base {
+		// a change kept since the body was put together would be lost with the old key
+		if current != base || (r.Upto >= 0 && r.Upto != crdtSeq) {
 			version = current
 			return ErrStale
 		}
@@ -915,7 +1031,10 @@ func (s *Store) RekeyNote(ctx context.Context, id, uid ids.ID, base int64, r Not
 			}
 		}
 		version, updatedAt = current+1, nowMs()
-		_, err = tx.ExecContext(ctx, `UPDATE notes SET head = ?, body = ?, version = ?, key_epoch = ?, needs_rekey = 0, edited_by = ?, updated_at = ? WHERE id = ?`, r.Head, r.Body, version, epoch+1, int64(uid), updatedAt, int64(id))
+		if _, err := tx.ExecContext(ctx, `DELETE FROM note_updates WHERE note_id = ?`, int64(id)); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE notes SET head = ?, body = ?, version = ?, key_epoch = ?, needs_rekey = 0, edited_by = ?, updated_at = ?, crdt_upto = crdt_seq WHERE id = ?`, r.Head, r.Body, version, epoch+1, int64(uid), updatedAt, int64(id))
 		return err
 	})
 	return version, updatedAt, err
@@ -941,13 +1060,22 @@ func txIDs(ctx context.Context, tx *db.Tx, q string, args ...any) ([]ids.ID, err
 // NoteFileReadable reports whether a blob is a file of a note that uid is a
 // member of: what lets them download it.
 func (s *Store) NoteFileReadable(ctx context.Context, blobID, uid ids.ID) (bool, error) {
-	var now, before int
-	// in the note as it is, or in one of its earlier states
+	var now, before, added int
+	// in the note as it is, in one of its earlier states, or just added to it
+	// by someone writing in it and not saved yet (note_uploads)
 	err := s.db.R.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM note_files f JOIN note_members m ON m.note_id = f.note_id WHERE f.blob_id = ? AND m.user_id = ?),
-		(SELECT count(*) FROM note_version_files f JOIN note_versions v ON v.id = f.version_id JOIN note_members m ON m.note_id = v.note_id WHERE f.blob_id = ? AND m.user_id = ?)`,
-		int64(blobID), int64(uid), int64(blobID), int64(uid)).Scan(&now, &before)
-	return now+before > 0, err
+		(SELECT count(*) FROM note_version_files f JOIN note_versions v ON v.id = f.version_id JOIN note_members m ON m.note_id = v.note_id WHERE f.blob_id = ? AND m.user_id = ?),
+		(SELECT count(*) FROM note_uploads u JOIN note_members m ON m.note_id = u.note_id WHERE u.blob_id = ? AND m.user_id = ?)`,
+		int64(blobID), int64(uid), int64(blobID), int64(uid), int64(blobID), int64(uid)).Scan(&now, &before, &added)
+	return now+before+added > 0, err
+}
+
+// AddNoteUpload records that a file was uploaded for a note, by someone who
+// may edit it: its people may read it from now on, before any save names it.
+func (s *Store) AddNoteUpload(ctx context.Context, noteID, blobID ids.ID) error {
+	_, err := s.db.W.ExecContext(ctx, `INSERT INTO note_uploads (blob_id, note_id, created_at) VALUES (?,?,?) ON CONFLICT (blob_id) DO NOTHING`, int64(blobID), int64(noteID), nowMs())
+	return err
 }
 
 // NoteFileIDs lists the blobs a note holds.

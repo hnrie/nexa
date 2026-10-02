@@ -11,10 +11,12 @@ import { applyRememberedAppearance } from "./lib/theme";
 import { initSafeMode } from "./lib/look/safeMode";
 import { applyRememberedSheets } from "./lib/look/styles";
 import { ensureTwemojiIndex } from "./lib/twemoji";
+import { movedTo, moveTo, stayForOldDesktop, takeHandoff } from "./lib/move";
 import "./styles/base.css";
 
-if (import.meta.env.PROD && "serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
+function registerWorkers(): void {
+  if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
+  const register = () => {
     // A page holds its own copy of the app until it reloads, so a deploy would
     // otherwise sit unused until someone happened to refresh. A new worker
     // taking over an already-controlled page means a deploy, most likely:
@@ -33,32 +35,50 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
         })
         .catch(() => undefined);
     }
-  });
+  };
+  // the page may already have loaded, when it first took a sign-in moved from the old address
+  if (document.readyState === "complete") register();
+  else window.addEventListener("load", register);
 }
 
-installCrashReporting();
-installLongPress();
-// a text box's right-click menu on a computer: spellings, the clipboard, formatting
-installTextMenu();
-// whether the actions bots abuse need a captcha here, known before anyone signs in
-void loadCaptchaConfig();
-installKeyboardInset();
-// the first emoji on screen should not have to wait for the list of pictures
-ensureTwemojiIndex();
+function start(): void {
+  registerWorkers();
 
-// The look this device last had, on before anything is drawn: the account's
-// own settings only arrive with the gateway's ready (see ThemeEffect). Safe
-// mode is decided first, since it keeps the person's own CSS off.
-initSafeMode();
-applyRememberedAppearance();
-applyRememberedSheets();
+  installCrashReporting();
+  installLongPress();
+  // a text box's right-click menu on a computer: spellings, the clipboard, formatting
+  installTextMenu();
+  // whether the actions bots abuse need a captcha here, known before anyone signs in
+  void loadCaptchaConfig();
+  installKeyboardInset();
+  // the first emoji on screen should not have to wait for the list of pictures
+  ensureTwemojiIndex();
 
-const rootEl = document.getElementById("root");
-if (!rootEl) throw new Error("missing #root");
-createRoot(rootEl).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>,
-);
+  // The look this device last had, on before anything is drawn: the account's
+  // own settings only arrive with the gateway's ready (see ThemeEffect). Safe
+  // mode is decided first, since it keeps the person's own CSS off.
+  initSafeMode();
+  applyRememberedAppearance();
+  applyRememberedSheets();
+
+  const rootEl = document.getElementById("root");
+  if (!rootEl) throw new Error("missing #root");
+  createRoot(rootEl).render(
+    <React.StrictMode>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </React.StrictMode>,
+  );
+}
+
+// At an address Nexa moved away from, the app moves the browser on to the
+// new one, signed in, and draws nothing here (lib/move.ts). A desktop app from
+// before the move stays: it can open no other address until it updates.
+const moving = movedTo();
+if (moving && !stayForOldDesktop()) {
+  void moveTo(moving);
+} else {
+  // a page opened from the old address may carry its sign-in
+  void takeHandoff().finally(start);
+}

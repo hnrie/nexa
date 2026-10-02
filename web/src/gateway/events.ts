@@ -8,6 +8,7 @@ import type {
   KeyNeed,
   Member,
   Message,
+  NoteCrdtEvent,
   NoteInviteRow,
   NotePresenceEvent,
   NoteUpdateEvent,
@@ -96,6 +97,8 @@ export type GatewayEvent =
   | { t: "note_presence"; d: NotePresenceEvent }
   /** Where someone else's caret is in a note, sealed with the note's key. */
   | { t: "note_cursor"; d: { id: Snowflake; user_id: Snowflake; data: string } }
+  /** A change to a note, sealed, as it is made. */
+  | { t: "note_crdt"; d: NoteCrdtEvent }
   | { t: "session_expired"; d: unknown }
   /** A guest's time in the call is over: removed, revoked, expired, left, or the call is gone. */
   | { t: "guest_ended"; d: { reason: string } }

@@ -1,8 +1,13 @@
-/* The front page. It has colours of its own, which follow the visitor's light
-   or dark preference rather than the app's theme; the app's type (Wix Madefor
-   Text, with its Display cut for headings as the app's names and titles have
-   it, with JetBrains Mono kept for ciphertext alone); and one thing that moves by
-   itself, the line through the conversation at the top. */
+/* The front page, drawn the way the app is: its dark canvas with the accent's
+   glow in the corner, a rail of lit tiles down the side, and panels that
+   catch the light along their top edge and throw a soft shadow. Words sit on
+   the canvas; panels hold only what is really the app. The type is the app's
+   (Wix Madefor, its Display cut for headings), with JetBrains Mono kept for
+   ciphertext alone.
+
+   One thing moves by itself, once, as the page opens: the conversation's
+   window lifts in and the line sweeps across it. Anyone who asked for less
+   movement gets the page at rest. */
 
 /* Registered so the line can glide rather than jump when it first comes in. */
 @property --seam {
@@ -13,36 +18,36 @@
 
 .page,
 :global(html[data-home]) {
-  --paper: #faf8fc;
-  --panel: #ffffff;
+  --canvas: #120f18;
+  --panel: #1c1825;
+  --raised: #221d2b;
+  --surface: #2b2636;
   /* the server's side of the conversation, and anything else it cannot read */
-  --sealed: #f2ecfb;
-  --ink: #1b1523;
-  --ink-soft: #5d5669;
-  --rule: #e5e0ec;
-  --rule-strong: #cfc7da;
+  --sealed: #1a1226;
+  --ink: #f0edf7;
+  --ink-strong: #ffffff;
+  --ink-soft: #b0a8bf;
+  --ink-faint: #8d85a0;
+  --rule: rgba(166, 156, 196, 0.13);
+  --rule-strong: rgba(166, 156, 196, 0.3);
   --violet: #8000ff;
   --violet-hover: #6c00d8;
-  --violet-text: #6a00d6;
+  --violet-text: #c6a4ff;
+  --violet-glow: rgba(128, 0, 255, 0.55);
   --on-violet: #ffffff;
+  --online: #46b56e;
+  /* the depth the app's panels have (tokens.css): a lit top edge, a hairline, a shadow */
+  --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 60%);
+  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --lift: 0 1px 3px rgba(4, 2, 10, 0.5), 0 18px 48px -14px rgba(4, 2, 10, 0.75);
+  --grad-violet: linear-gradient(180deg, #9433ff 0%, #8000ff 55%, #7400e8 100%);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
   /* the app's own dark grey, behind its pictures until they arrive */
-  --shot: #2c2d32;
+  --shot: #1c1825;
   --wrap: 1200px;
   --gutter: 16px;
-}
-@media (prefers-color-scheme: dark) {
-  .page,
-  :global(html[data-home]) {
-    --paper: #141018;
-    --panel: #1c1722;
-    --sealed: #221a2d;
-    --ink: #f1edf6;
-    --ink-soft: #aaa2b6;
-    --rule: #2d2636;
-    --rule-strong: #463d52;
-    --violet-hover: #8f2bff;
-    --violet-text: #bb91ff;
-  }
+  --top-h: 64px;
+  --rail: 72px;
 }
 @media (min-width: 600px) {
   .page { --gutter: 24px; }
@@ -58,14 +63,11 @@
 /* While this page is open the document scrolls, not a frame inside it. */
 :global(html[data-home]) {
   height: auto;
-  color-scheme: light;
-  background: var(--paper);
+  color-scheme: dark;
+  background: var(--canvas);
   scrollbar-color: var(--rule-strong) transparent;
 }
-@media (prefers-color-scheme: dark) {
-  :global(html[data-home]) { color-scheme: dark; }
-}
-:global(html[data-home] body) { height: auto; overflow: visible; background: var(--paper); }
+:global(html[data-home] body) { height: auto; overflow: visible; background: var(--canvas); }
 :global(html[data-home] #root) { height: auto; }
 /* the app keeps long presses for its own menus; this page has none, and its text may be copied */
 @media (pointer: coarse) {
@@ -75,23 +77,90 @@
 .page {
   /* the wordmark's sparkles keep the brand colour whatever accent the app has */
   --brand: var(--violet);
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
-  background: var(--paper);
+  background: var(--canvas);
   color: var(--ink);
   font-family: var(--font);
   font-size: 18px;
   line-height: 1.6;
 }
-.page :focus-visible { outline: 2px solid var(--violet-text); outline-offset: 3px; border-radius: 6px; }
+/* The canvas's glow, as the app has it: up from the top corner, and a fainter
+   one from the far side. Fixed, as the app's window is, so it stays where it
+   is while the page goes past. */
+.page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 680px at -6% -14%, rgba(128, 0, 255, 0.2), transparent 64%),
+    radial-gradient(900px 760px at 108% 112%, rgba(128, 0, 255, 0.1), transparent 62%);
+}
+:global([dir="rtl"]) .page::before {
+  background:
+    radial-gradient(1100px 680px at 106% -14%, rgba(128, 0, 255, 0.2), transparent 64%),
+    radial-gradient(900px 760px at -8% 112%, rgba(128, 0, 255, 0.1), transparent 62%);
+}
+.page :focus-visible { outline: 2px solid #b77aff; outline-offset: 3px; border-radius: 8px; }
 /* no word left alone on the last line of a paragraph */
 .page p,
 .page dd,
 .page figcaption { text-wrap: pretty; }
-.page ::selection { background: color-mix(in srgb, var(--violet) 30%, transparent); }
+.page ::selection { background: rgba(128, 0, 255, 0.45); color: var(--ink-strong); }
+.page a { color: inherit; }
 
-/* Every band is the same width, so their edges line up down the page. */
-.topInner,
+/* ---- the header -------------------------------------------------------- */
+
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--canvas) 72%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 1px 0 transparent;
+  transition: box-shadow 200ms var(--ease), background-color 200ms var(--ease);
+}
+.top[data-scrolled] { background: color-mix(in srgb, var(--canvas) 86%, transparent); box-shadow: 0 1px 0 var(--rule), 0 12px 30px -18px rgba(4, 2, 10, 0.9); }
+.topInner {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--top-h);
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
+}
+.logo { display: flex; padding-block: 8px; color: var(--ink-strong); }
+.nav { display: flex; align-items: center; gap: 4px; }
+.navLink,
+.navCta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding-inline: 14px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+.navLink { color: var(--ink-soft); }
+.navLink:hover { color: var(--ink-strong); background: rgba(166, 156, 196, 0.1); }
+.navCta { margin-inline-start: 6px; padding-inline: 16px; background: var(--grad-violet); color: var(--on-violet); font-weight: 700; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 6px 18px -8px var(--violet-glow); }
+.navCta:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26), 0 8px 26px -6px var(--violet-glow); }
+
+/* ---- the page beside its rail ------------------------------------------- */
+
+.body { position: relative; }
+.main { min-width: 0; }
 .hero,
+.why,
 .chapter,
 .end,
 .footInner {
@@ -103,28 +172,71 @@
   padding-right: max(var(--gutter), env(safe-area-inset-right));
 }
 
-/* ---- the header -------------------------------------------------------- */
-
-.top { position: sticky; top: 0; z-index: 10; background: var(--paper); border-bottom: 1px solid var(--rule); }
-.topInner { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; }
-.logo { display: flex; padding-block: 8px; color: var(--ink); }
-.nav { display: flex; align-items: center; gap: 4px; }
-.navLink,
-.navCta {
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  padding-inline: 14px;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 600;
-  white-space: nowrap;
-  transition: background-color 120ms ease, color 120ms ease;
+/* The rail: a column of tiles standing on the canvas, as the app's server
+   rail does, with the light at its edge beside the part being read. */
+.rail { display: none; }
+@media (min-width: 1080px) {
+  .body { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); }
+  .rail {
+    position: sticky;
+    top: var(--top-h);
+    z-index: 10;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    /* as tall as its tiles, so it stays put until the very end of the page */
+    max-height: calc(100vh - var(--top-h));
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding-block: 14px;
+    box-sizing: border-box;
+  }
 }
-.navLink { color: var(--ink-soft); }
-.navLink:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); text-decoration: none; }
-.navCta { margin-inline-start: 6px; padding-inline: 16px; background: var(--violet); color: var(--on-violet); font-weight: 700; }
-.navCta:hover { background: var(--violet-hover); text-decoration: none; }
+.railItem { position: relative; display: flex; justify-content: center; width: 100%; text-decoration: none; }
+.railPill { position: absolute; inset-inline-start: 0; top: 50%; width: 4px; height: 8px; margin-top: -4px; border-start-end-radius: 4px; border-end-end-radius: 4px; background: var(--ink-strong); opacity: 0; transition: height 220ms var(--ease), margin-top 220ms var(--ease), opacity 220ms var(--ease); }
+.railItem:hover .railPill { opacity: 1; height: 20px; margin-top: -10px; }
+.railItem[data-on] .railPill { opacity: 1; height: 36px; margin-top: -18px; box-shadow: 0 0 12px var(--violet-glow); }
+.railBtn,
+.railHome {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  transition: transform 200ms var(--ease), border-radius 200ms var(--ease), background 200ms var(--ease), color 200ms var(--ease), box-shadow 200ms var(--ease);
+}
+.railBtn { background: var(--sheen), var(--surface); color: var(--ink-soft); box-shadow: var(--edge), 0 1px 2px rgba(4, 2, 10, 0.5); }
+.railItem:hover .railBtn { transform: translateY(-1px); border-radius: 14px; color: var(--ink-strong); background: var(--sheen), color-mix(in oklab, var(--violet) 26%, var(--surface)); }
+.railItem[data-on] .railBtn { border-radius: 14px; background: var(--grad-violet); color: var(--on-violet); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 0 0 1px rgba(128, 0, 255, 0.55), 0 6px 22px -6px var(--violet-glow); }
+.railHome { overflow: hidden; box-shadow: 0 1px 2px rgba(4, 2, 10, 0.5); }
+.railItem[data-on] .railHome { border-radius: 14px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 6px 22px -6px var(--violet-glow); }
+.railItem:active .railBtn,
+.railItem:active .railHome { transform: scale(0.95); transition-duration: 80ms; }
+.railSep { width: 28px; height: 2px; border-radius: 1px; background: var(--rule-strong); flex: none; }
+/* its name, beside it, as the app's tooltips are */
+.railTip {
+  position: absolute;
+  inset-inline-start: calc(100% - 4px);
+  top: 50%;
+  translate: -4px -50%;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: #0e0b14;
+  color: var(--ink-strong);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, translate 140ms var(--ease);
+}
+:global([dir="rtl"]) .railTip { translate: 4px -50%; }
+.railItem:hover .railTip,
+.railItem:focus-visible .railTip { opacity: 1; translate: 0 -50%; }
 
 /* ---- buttons ----------------------------------------------------------- */
 
@@ -134,18 +246,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 52px;
-  padding-inline: 26px;
-  border-radius: 12px;
+  min-height: 54px;
+  padding-inline: 28px;
+  border-radius: 14px;
   font-size: 17px;
   font-weight: 700;
   text-align: center;
-  transition: background-color 120ms ease;
+  text-decoration: none;
+  transition: box-shadow 160ms ease, background-color 160ms ease, transform 90ms var(--ease);
 }
-.primary { background: var(--violet); color: var(--on-violet); }
-.primary:hover { background: var(--violet-hover); text-decoration: none; }
-.secondary { color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--rule-strong); }
-.secondary:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); text-decoration: none; }
+.primary { background: var(--grad-violet); color: var(--on-violet); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 -1px 0 rgba(0, 0, 0, 0.16), 0 10px 30px -10px var(--violet-glow); }
+.primary:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(0, 0, 0, 0.16), 0 14px 40px -10px rgba(128, 0, 255, 0.8); }
+.secondary { background: var(--sheen), var(--surface); color: var(--ink-strong); box-shadow: var(--edge), 0 1px 2px rgba(4, 2, 10, 0.4); }
+.secondary:hover { background: var(--sheen), color-mix(in oklab, var(--surface), #fff 6%); }
+.primary:active,
+.secondary:active { transform: translateY(1px) scale(0.99); }
 
 /* ---- the opening ------------------------------------------------------- */
 
@@ -154,8 +269,8 @@
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "title" "duo" "text";
   row-gap: 32px;
-  padding-top: 36px;
-  padding-bottom: 72px;
+  padding-top: 32px;
+  padding-bottom: 88px;
 }
 .h1 { grid-area: title; }
 .duo { grid-area: duo; }
@@ -163,61 +278,80 @@
 .h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(38px, 3.2vw + 20px, 68px);
-  font-weight: 720;
-  line-height: 1.02;
-  letter-spacing: -0.024em;
+  font-size: clamp(42px, 4.1vw + 18px, 84px);
+  font-weight: 780;
+  line-height: 0.98;
+  letter-spacing: -0.034em;
+  color: var(--ink-strong);
   text-wrap: balance;
 }
-.lede { margin: 0; max-width: 34em; font-size: clamp(17px, 0.4vw + 15.5px, 20px); line-height: 1.6; color: var(--ink-soft); }
-.fine { margin: 16px 0 0; font-size: 15px; line-height: 1.5; color: var(--ink-soft); }
+.lede { margin: 0; max-width: 33em; font-size: clamp(17px, 0.45vw + 15.5px, 21px); line-height: 1.6; color: var(--ink-soft); }
+.fine { margin: 18px 0 0; font-size: 15px; line-height: 1.5; color: var(--ink-faint); }
 
 /* ---- the two sides of one conversation ---------------------------------- */
 
-.duo { margin: 0; min-width: 0; }
-.duoLegend { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 10px; font-size: 14px; font-weight: 700; line-height: 1.4; color: var(--ink); }
-.duoLegendServer { color: var(--violet-text); text-align: end; }
+.duo { position: relative; margin: 0; min-width: 0; }
+/* behind the window, the light it gives off onto the canvas */
+.duo::before {
+  content: "";
+  position: absolute;
+  inset: 10% 6% -6%;
+  z-index: -1;
+  border-radius: 40px;
+  background: radial-gradient(closest-side, rgba(128, 0, 255, 0.34), transparent);
+  filter: blur(28px);
+  pointer-events: none;
+}
+.duoLegend { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px; font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+.duoLegendYou,
+.duoLegendServer { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; }
+.duoLegendYou { background: rgba(166, 156, 196, 0.1); color: var(--ink); }
+.duoLegendServer { background: rgba(128, 0, 255, 0.18); color: var(--violet-text); box-shadow: inset 0 0 0 1px rgba(128, 0, 255, 0.35); text-align: end; }
 .stage {
   --seam: 100%;
   --lh: 23px;
   position: relative;
   display: grid;
-  border: 1px solid var(--rule);
-  border-radius: 18px;
+  border-radius: 20px;
   overflow: hidden;
-  background: var(--panel);
+  background: var(--sheen), var(--panel);
+  box-shadow: var(--edge), var(--lift);
   isolation: isolate;
   cursor: col-resize;
   -webkit-user-select: none;
   user-select: none;
-  transition: --seam 1500ms cubic-bezier(0.2, 0.75, 0.25, 1) 300ms;
+  transition: --seam 1500ms cubic-bezier(0.2, 0.75, 0.25, 1) 650ms;
 }
 .stage[data-dragging],
 .stage[data-still] { transition: none; }
 .convo,
 .serverSide { grid-area: 1 / 1; min-width: 0; }
-.serverSide { z-index: 1; background: var(--sealed); clip-path: inset(0 0 0 var(--seam)); }
+.serverSide {
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(128, 0, 255, 0.08), transparent 40%), var(--sealed);
+  clip-path: inset(0 0 0 var(--seam));
+}
 :global([dir="rtl"]) .serverSide { clip-path: inset(0 var(--seam) 0 0); }
 
 .convo { display: flex; flex-direction: column; }
-.convoTop { display: flex; align-items: center; gap: 6px; min-height: 52px; padding-inline: 20px; border-bottom: 1px solid var(--rule); font-size: 16px; font-weight: 700; line-height: 1.3; }
-.convoTop svg { flex: none; color: var(--ink-soft); }
+.convoTop { display: flex; align-items: center; gap: 6px; min-height: 54px; padding-inline: 20px; box-shadow: 0 1px 0 var(--rule); font-size: 16px; font-weight: 700; line-height: 1.3; color: var(--ink-strong); }
+.convoTop svg { flex: none; color: var(--ink-faint); }
 .convoLines { display: flex; flex-direction: column; gap: 18px; margin: 0; padding: 20px 20px 24px; list-style: none; }
 .line { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.lineRow { display: grid; grid-template-columns: 38px minmax(0, 1fr); column-gap: 12px; }
-.avatar { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; font-size: 15px; font-weight: 700; line-height: 1; }
+.lineRow { display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 12px; }
+.avatar { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; font-size: 15px; font-weight: 700; line-height: 1; }
 .lineMain { min-width: 0; }
 .lineHead { display: flex; align-items: baseline; gap: 8px; line-height: 1.3; }
-.name { font-size: 15.5px; font-weight: 700; }
-.time { font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; }
-.text { display: block; margin-top: 2px; font-size: 15.5px; line-height: var(--lh); overflow-wrap: anywhere; }
-.replyTo { display: flex; align-items: center; gap: 6px; min-width: 0; margin-inline-start: 50px; font-size: 13px; line-height: 18px; color: var(--ink-soft); }
+.name { font-size: 15.5px; font-weight: 700; color: var(--ink-strong); }
+.time { font-size: 12.5px; color: var(--ink-faint); white-space: nowrap; }
+.text { display: block; margin-top: 2px; font-size: 15.5px; line-height: var(--lh); color: var(--ink); overflow-wrap: anywhere; }
+.replyTo { display: flex; align-items: center; gap: 6px; min-width: 0; margin-inline-start: 52px; font-size: 13px; line-height: 18px; color: var(--ink-soft); }
 .replyTo svg { flex: none; }
 :global([dir="rtl"]) .replyTo svg { transform: scaleX(-1); }
 .replyName { flex: none; font-weight: 700; color: var(--ink); }
 .replyText { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.event { display: flex; align-items: center; gap: 8px; margin-inline-start: 50px; font-size: 14px; line-height: 1.4; color: var(--ink-soft); }
-.event svg { flex: none; color: #1f8a63; }
+.event { display: flex; align-items: center; gap: 8px; margin-inline-start: 52px; font-size: 14px; line-height: 1.4; color: var(--ink-soft); }
+.event svg { flex: none; color: var(--online); }
 
 /* On the server's side the words keep their space unseen, and the ciphertext
    sits over them in the same box: same lines, same height, different text. */
@@ -227,15 +361,28 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 13.5px;
-  color: var(--violet-text);
+  color: #b48cff;
   text-align: left;
   word-break: break-all;
 }
 .replyText .cipher { white-space: nowrap; }
 
-.seam { position: absolute; z-index: 2; inset-block: 0; inset-inline-start: var(--seam); width: 2px; margin-inline-start: -1px; background: var(--violet); pointer-events: none; }
+/* The line: lit while it sweeps across, then calmer once it rests. */
+.seam {
+  position: absolute;
+  z-index: 2;
+  inset-block: 0;
+  inset-inline-start: var(--seam);
+  width: 2px;
+  margin-inline-start: -1px;
+  background: linear-gradient(180deg, rgba(200, 160, 255, 0.4), #a259ff 18%, #a259ff 82%, rgba(200, 160, 255, 0.4));
+  box-shadow: 0 0 22px 6px rgba(140, 40, 255, 0.55);
+  pointer-events: none;
+  transition: box-shadow 900ms var(--ease);
+}
+.stage[data-settled] .seam { box-shadow: 0 0 12px 1px rgba(140, 40, 255, 0.45); }
 .knob {
   position: absolute;
   top: 50%;
@@ -246,30 +393,63 @@
   height: 44px;
   margin: -22px 0 0 -22px;
   border-radius: 50%;
-  background: var(--violet);
+  background: var(--grad-violet);
   color: var(--on-violet);
-  box-shadow: 0 0 0 4px var(--panel);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 0 4px var(--panel), 0 8px 24px -4px rgba(128, 0, 255, 0.7);
   cursor: grab;
   pointer-events: auto;
   touch-action: none;
+  transition: transform 160ms var(--ease);
 }
-.stage[data-dragging] .knob { cursor: grabbing; }
+.knob:hover { transform: scale(1.06); }
+/* when the sweep ends, the handle catches the light once */
+.knob::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(198, 164, 255, 0.9);
+  opacity: 0;
+  pointer-events: none;
+}
+.stage[data-settled]:not([data-still]) .knob::after { animation: ping 1100ms var(--ease) 1; }
+@keyframes ping {
+  0% { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+.stage[data-dragging] .knob { cursor: grabbing; transform: scale(1.04); }
 /* the slider is what the keyboard and a screen reader use; the knob shows where it is */
 .seamInput { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; pointer-events: none; }
-.seamInput:focus-visible ~ .seam .knob { outline: 3px solid var(--violet-text); outline-offset: 3px; }
-.duoCaption { max-width: 52ch; margin-top: 14px; font-size: 15px; line-height: 1.55; color: var(--ink-soft); }
+.seamInput:focus-visible ~ .seam .knob { outline: 3px solid #b77aff; outline-offset: 3px; }
+.duoCaption { max-width: 52ch; margin-top: 16px; font-size: 15px; line-height: 1.55; color: var(--ink-faint); }
+
+/* ---- the promises -------------------------------------------------------- */
+
+/* Four promises set as type: each one large, with what keeps it beside it.
+   Nothing frames them; the page's panels are kept for what is really the app. */
+.why { display: grid; gap: 64px; padding-top: 8px; padding-bottom: 112px; scroll-margin-top: calc(var(--top-h) + 8px); }
+.promise { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.promiseHead { min-width: 0; }
+/* "pretty" rather than "balance": a promise that wraps keeps its first words together ("Nothing to / Pay For") */
+.promiseTitle { margin: 0; font-family: var(--font-display); font-size: clamp(34px, 1.9vw + 24px, 54px); font-weight: 780; line-height: 1; letter-spacing: -0.03em; color: var(--ink-strong); text-wrap: pretty; }
+.promiseLede { max-width: 24em; margin: 14px 0 0; font-size: 17.5px; line-height: 1.55; color: var(--ink-soft); }
+.promiseItems { display: grid; grid-template-columns: minmax(0, 1fr); gap: 26px 44px; margin: 0; padding: 0; list-style: none; }
+.promiseItem { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 14px; min-width: 0; }
+.promiseIcon { margin-top: 3px; color: var(--violet-text); }
+.promiseItemTitle { margin: 0 0 4px; font-size: 17px; font-weight: 700; line-height: 1.4; color: var(--ink-strong); }
+.promiseItemBody { margin: 0; font-size: 16px; line-height: 1.6; color: var(--ink-soft); }
 
 /* ---- chapters ---------------------------------------------------------- */
 
-.chapter { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; padding-top: 0; padding-bottom: 72px; }
-/* the rule that opens each chapter, as wide as the text rather than the screen */
-.chapter::before { content: ""; grid-column: 1 / -1; height: 1px; margin-bottom: 44px; background: var(--rule); }
+.chapter { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; padding-top: 24px; padding-bottom: 96px; scroll-margin-top: calc(var(--top-h) + 8px); }
 .chapterHead { min-width: 0; }
-.h2 { margin: 0; font-family: var(--font-display); font-size: clamp(30px, 1.5vw + 22px, 46px); font-weight: 720; line-height: 1.06; letter-spacing: -0.02em; text-wrap: balance; }
-.chapterLede { max-width: 34em; margin: 14px 0 0; font-size: 18px; line-height: 1.6; color: var(--ink-soft); }
-.chapterBody { display: flex; flex-direction: column; gap: 36px; min-width: 0; }
+/* the same tile as the rail's, so the two can be matched at a glance */
+.chapterTile { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 18px; border-radius: 16px; background: var(--sheen), color-mix(in oklab, var(--violet) 22%, var(--surface)); color: var(--violet-text); box-shadow: var(--edge), 0 6px 18px -8px var(--violet-glow); }
+.h2 { margin: 0; font-family: var(--font-display); font-size: clamp(32px, 1.9vw + 22px, 54px); font-weight: 760; line-height: 1.02; letter-spacing: -0.028em; color: var(--ink-strong); text-wrap: balance; }
+.chapterLede { max-width: 32em; margin: 16px 0 0; font-size: 18px; line-height: 1.6; color: var(--ink-soft); }
+.chapterBody { display: flex; flex-direction: column; gap: 40px; min-width: 0; }
 
-.frame { position: relative; margin: 0; overflow: hidden; border: 1px solid var(--rule); border-radius: 14px; background: var(--shot); }
+.frame { position: relative; margin: 0; overflow: hidden; border-radius: 18px; background: var(--shot); box-shadow: var(--edge), var(--lift); }
 .frame img,
 .frame video { display: block; width: 100%; height: auto; }
 .pause {
@@ -281,24 +461,47 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(20, 16, 24, 0.72);
+  background: rgba(14, 11, 20, 0.78);
   color: #fff;
   opacity: 0.85;
-  transition: opacity 120ms ease;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+  transition: opacity 120ms ease, background-color 120ms ease;
 }
-.pause:hover { opacity: 1; }
+.pause:hover { opacity: 1; background: var(--violet); }
 
-.facts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px 40px; margin: 0; }
-.fact dt { margin: 0 0 4px; font-size: 17px; font-weight: 700; line-height: 1.4; }
+.facts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 26px 44px; margin: 0; }
+.fact { min-width: 0; padding-inline-start: 16px; box-shadow: inset 2px 0 0 rgba(128, 0, 255, 0.5); }
+:global([dir="rtl"]) .fact { box-shadow: inset -2px 0 0 rgba(128, 0, 255, 0.5); }
+.fact dt { margin: 0 0 4px; font-size: 17px; font-weight: 700; line-height: 1.4; color: var(--ink-strong); }
 .fact dd { margin: 0; font-size: 16px; line-height: 1.6; color: var(--ink-soft); }
 
+/* what the server can and cannot read, side by side */
 .ledger { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-.ledgerSide { padding: 22px 24px 24px; border: 1px solid var(--rule); border-radius: 14px; }
-.ledgerSide[data-sealed] { border-color: transparent; background: var(--sealed); }
-.h3 { margin: 0 0 14px; font-size: 18px; font-weight: 700; line-height: 1.35; }
-.ledgerSide ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.ledgerSide li { display: flex; gap: 10px; font-size: 16px; line-height: 1.5; }
-.ledgerSide li svg { flex: none; margin-top: 3px; color: var(--ink-soft); }
+.ledgerSide { position: relative; overflow: hidden; padding: 24px 26px 26px; border-radius: 18px; background: var(--sheen), var(--panel); box-shadow: var(--edge), var(--lift); }
+.ledgerSide[data-sealed] { background: linear-gradient(180deg, rgba(128, 0, 255, 0.12), transparent 60%), var(--sealed); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 0 1px rgba(128, 0, 255, 0.35), var(--lift); }
+/* the list as the server holds it: real ciphertext, faint, behind the words */
+.sealedGround {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  padding: 14px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(180, 140, 255, 0.15);
+  word-break: break-all;
+  /* strongest in the far corner, away from the heading and the list */
+  -webkit-mask-image: linear-gradient(330deg, #000 0%, rgba(0, 0, 0, 0.35) 45%, transparent 80%);
+  mask-image: linear-gradient(330deg, #000 0%, rgba(0, 0, 0, 0.35) 45%, transparent 80%);
+  pointer-events: none;
+  user-select: none;
+}
+.ledgerSide > :not(.sealedGround) { position: relative; z-index: 1; }
+.h3 { margin: 0 0 16px; font-family: var(--font-display); font-size: 20px; font-weight: 750; line-height: 1.3; color: var(--ink-strong); }
+.ledgerSide ul { display: grid; gap: 11px; margin: 0; padding: 0; list-style: none; }
+.ledgerSide li { display: flex; gap: 10px; font-size: 16px; line-height: 1.5; color: var(--ink); }
+.ledgerSide li svg { flex: none; margin-top: 3px; color: var(--ink-faint); }
 .ledgerSide[data-sealed] li svg { color: var(--violet-text); }
 
 .aboutLinks { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; }
@@ -306,38 +509,75 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: 46px;
   padding-inline: 18px;
   border-radius: 12px;
-  box-shadow: inset 0 0 0 1.5px var(--rule-strong);
-  color: var(--ink);
+  background: var(--sheen), var(--surface);
+  box-shadow: var(--edge);
+  color: var(--ink-strong);
   font-size: 16px;
   font-weight: 700;
+  text-decoration: none;
   overflow-wrap: anywhere;
-  transition: background-color 120ms ease;
+  transition: background-color 140ms ease;
 }
-.small:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); text-decoration: none; }
+.small:hover { background: var(--sheen), color-mix(in oklab, var(--surface), #fff 6%); }
 
 /* ---- the close --------------------------------------------------------- */
 
-.end { padding-top: 24px; padding-bottom: 96px; }
-.end::before { content: ""; display: block; height: 1px; margin-bottom: 72px; background: var(--rule); }
-.endTitle { margin: 0; font-family: var(--font-display); font-size: clamp(38px, 3.2vw + 20px, 68px); font-weight: 720; line-height: 1.03; letter-spacing: -0.024em; text-wrap: balance; }
-.endBody { max-width: 34em; margin: 16px 0 0; font-size: 19px; line-height: 1.6; color: var(--ink-soft); }
+.end { padding-top: 8px; padding-bottom: 96px; }
+.endPanel {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  padding: 36px 28px;
+  border-radius: 28px;
+  background:
+    radial-gradient(120% 160% at 50% 130%, rgba(128, 0, 255, 0.42), transparent 58%),
+    var(--sheen),
+    var(--panel);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(128, 0, 255, 0.28), var(--lift);
+}
+.endTile { border-radius: 19px; box-shadow: 0 10px 30px -8px var(--violet-glow); }
+.endText { min-width: 0; }
+.endTitle { margin: 0; font-family: var(--font-display); font-size: clamp(36px, 2.6vw + 22px, 64px); font-weight: 780; line-height: 1; letter-spacing: -0.032em; color: var(--ink-strong); text-wrap: balance; }
+.endBody { max-width: 30em; margin: 12px 0 0; font-size: 19px; line-height: 1.55; color: var(--ink-soft); }
+.endActions { margin-top: 0; }
 
-.foot { border-top: 1px solid var(--rule); }
+.foot { box-shadow: 0 -1px 0 var(--rule); background: color-mix(in srgb, var(--canvas) 80%, #000); }
 .footInner { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; padding-top: 28px; padding-bottom: max(28px, env(safe-area-inset-bottom)); }
-.footMark { flex: none; color: var(--ink); }
-.footTag { flex: 1 1 16em; margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+.footMark { flex: none; color: var(--ink-strong); }
+.footTag { flex: 1 1 16em; margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-faint); }
 .footLinks { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0; padding: 0; list-style: none; font-size: 14px; }
-.footLinks a { color: var(--ink-soft); }
-.footLinks a:hover { color: var(--ink); }
+.footLinks a { color: var(--ink-soft); text-decoration: none; }
+.footLinks a:hover { color: var(--ink-strong); }
+
+/* ---- the opening, once ------------------------------------------------- */
+
+/* As the page opens: the headline and its words rise into place, the
+   window lifts after them, and then the line sweeps across it. */
+.page:not([data-still]) .h1 { animation: rise 760ms var(--ease) 60ms both; }
+.page:not([data-still]) .lede { animation: rise 760ms var(--ease) 180ms both; }
+.page:not([data-still]) .actions { animation: rise 760ms var(--ease) 260ms both; }
+.page:not([data-still]) .fine { animation: rise 760ms var(--ease) 320ms both; }
+.page:not([data-still]) .hero .duo { animation: lift 900ms var(--ease) 140ms both; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+}
+@keyframes lift {
+  from { opacity: 0; transform: translateY(30px) scale(0.985); }
+}
 
 /* ---- wider screens ----------------------------------------------------- */
 
 @media (min-width: 700px) {
   .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .promiseItems { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ledger { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .endPanel { grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 28px; padding: 44px 44px; }
+  .endActions { grid-column: 2; }
 }
 @media (min-width: 1080px) {
   /* side by side: the headline and its paragraph stay together, level with
@@ -348,17 +588,23 @@
     align-content: center;
     column-gap: 64px;
     row-gap: 0;
-    padding-top: 72px;
-    padding-bottom: 112px;
+    min-height: min(860px, calc(100vh - var(--top-h)));
+    padding-top: 48px;
+    padding-bottom: 120px;
   }
   .h1 { align-self: end; }
   .heroText { align-self: start; }
   .duo { align-self: center; }
-  .lede { margin-top: 22px; }
-  .chapter { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); column-gap: 64px; padding-bottom: 112px; }
-  .chapter::before { margin-bottom: 72px; }
+  .lede { margin-top: 26px; }
+  .chapter { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); column-gap: 64px; padding-bottom: 128px; }
+  /* the promises keep the chapters' columns, so the page reads down one line */
+  .why { gap: 88px; padding-bottom: 152px; }
+  .promise { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); column-gap: 64px; }
+  .promiseItems { padding-top: 6px; }
   /* the chapter's name stays in view beside everything in it */
-  .chapterHead { position: sticky; top: 112px; align-self: start; }
+  .chapterHead { position: sticky; top: calc(var(--top-h) + 40px); align-self: start; }
+  .endPanel { grid-template-columns: auto minmax(0, 1fr) auto; padding: 52px 56px; }
+  .endActions { grid-column: auto; flex-wrap: nowrap; }
 }
 
 /* ---- phones ------------------------------------------------------------- */
@@ -367,12 +613,15 @@
    goes is Download: it is offered twice more further down the page, while the
    only way back in for someone who already has an account is Log In. */
 @media (max-width: 480px) {
-  .topInner { min-height: 56px; }
+  .page { --top-h: 56px; }
   .navDownload { display: none; }
   .navLink { padding-inline: 10px; }
   .navCta { padding-inline: 12px; }
   .actions > * { flex: 1 1 100%; }
-  .stage { --lh: 21px; border-radius: 14px; }
+  .stage { --lh: 21px; border-radius: 16px; }
+  .duoLegend { font-size: 12.5px; }
+  .duoLegendYou,
+  .duoLegendServer { padding: 5px 10px; }
   .convoTop { min-height: 46px; padding-inline: 14px; font-size: 15px; }
   .convoLines { gap: 14px; padding: 16px 14px 18px; }
   .lineRow { grid-template-columns: 32px minmax(0, 1fr); column-gap: 10px; }
@@ -383,6 +632,8 @@
   .replyTo,
   .event { margin-inline-start: 42px; }
   .event { font-size: 13px; }
+  .ledgerSide { padding: 20px 18px 22px; }
+  .endPanel { padding: 30px 20px; border-radius: 22px; }
 }
 
 /* finger-sized targets on a touch screen */
@@ -396,5 +647,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .stage { transition: none; }
+  .page .h1,
+  .page .lede,
+  .page .actions,
+  .page .fine,
+  .page .hero .duo,
+  .stage .knob::after { animation: none !important; }
 }
 :global(html[data-reduced-motion="true"]) .stage { transition: none; }
