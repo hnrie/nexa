@@ -23,13 +23,17 @@ publish:
   provider: generic
   url: https://nexa.fish/desktop/
   channel: latest
+# signs the Mac app ad hoc as it is packed, on Linux too (sign-mac.cjs)
+afterPack: ./sign-mac.cjs
 mac:
   category: public.app-category.social-networking
   icon: resources/icon.png
-  # Not signed, not even ad-hoc: the Apple identity is long gone, and updates
-  # are checked against the release's checksum instead (src/main/update/mac.ts).
-  # Electron's own executables keep the signatures they were built with, which
-  # is what Apple silicon needs to run them.
+  # No Apple identity: the one there was is long gone, so electron-builder
+  # signs nothing itself and sign-mac.cjs signs ad hoc instead. Without that
+  # macOS calls the downloaded app damaged, since Electron's binaries carry only
+  # the linker's stub signatures. Updates are checked against the release's
+  # checksum (src/main/update/mac.ts). On Linux, tools/mac_package.py checks the
+  # signatures and makes the zips and disk images.
   identity: null
   hardenedRuntime: false
   gatekeeperAssess: false
