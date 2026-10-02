@@ -9,12 +9,14 @@
  */
 import { api, type UploadOptions } from "./client";
 import type { BugCounts, BugMessage, MemberBug } from "./bugs";
-import type { Activity, PublicUser, Snowflake } from "./types";
+import type { Activity, Emoji, PublicUser, Snowflake, StickerPack } from "./types";
 
-export type ModAction = "avatar_remove" | "field_reset" | "mute" | "ban" | "delete" | "server_reset";
+export type ModAction = "avatar_remove" | "field_reset" | "mute" | "ban" | "delete" | "server_reset" | "expression_takedown";
 export type ResetField = "username" | "display_name" | "about_me" | "pronouns" | "status" | "nicknames";
 /** What a server_reset can take back of what a server shows everyone. */
 export type ServerField = "icon" | "banner" | "name" | "description";
+/** What an expression_takedown can take back of a pack: its name, its description, its public listing. */
+export type PackField = "name" | "description" | "public";
 
 /** As much of an account as the moderation views draw: a name, an avatar, a way to the profile. */
 export interface Person {
@@ -49,17 +51,35 @@ export interface PurgeCounts {
 export interface CaseDetails {
   avatar?: boolean;
   banner?: boolean;
-  /** A field_reset's profile fields, or a server_reset's parts of the server. */
-  fields?: (ResetField | ServerField)[];
-  old?: Partial<Record<ResetField | ServerField, string>>;
-  new?: Partial<Record<ResetField | ServerField, string>>;
-  /** A server_reset's server, and what it was called when it happened. */
+  /** A field_reset's profile fields, a server_reset's parts of the server, or an expression_takedown's parts of a pack. */
+  fields?: (ResetField | ServerField | PackField)[];
+  old?: Partial<Record<ResetField | ServerField | PackField, string>>;
+  new?: Partial<Record<ResetField | ServerField | PackField, string>>;
+  /** A server_reset's server, and what it was called when it happened; an expression_takedown's, for a server's emoji or pack. */
   server_id?: Snowflake;
   server_name?: string;
+  /** An expression_takedown's pack, as it was called then. */
+  pack_id?: Snowflake;
+  pack_name?: string;
+  pack_kind?: "sticker" | "emoji";
+  /** The stickers or emoji it took down, by name (their pictures may be blocked now). */
+  stickers?: TakenDown[];
+  emojis?: TakenDown[];
+  /** It took the whole pack. */
+  deleted?: boolean;
+  /** Its pictures were blocked: served to nobody, and refused if uploaded again. */
+  blocked?: boolean;
   duration_ms?: number;
   permanent?: boolean;
   counts?: PurgeCounts;
   complete?: boolean;
+}
+
+/** A sticker or emoji an expression_takedown took down. */
+export interface TakenDown {
+  id: Snowflake;
+  name: string;
+  blob_id: Snowflake;
 }
 
 /** A case as the member it is about sees it. */
@@ -230,6 +250,45 @@ export interface ModServer {
 
 export type ServerSort = "newest" | "oldest" | "members" | "name";
 
+/** A sticker or emoji pack as the panel shows it: its first stickers in lists, all of them on its page. */
+export interface ModPack extends StickerPack {
+  sticker_count: number;
+  installs: number;
+  /** The staff made it private, and it stays private until they let it back. */
+  discover_blocked: boolean;
+  /** Who answers for it: its owner, or its server's owner. */
+  owner_id: Snowflake;
+  /** Why the viewer cannot act on it ("" when they can). */
+  blocked: BlockReason;
+}
+
+/** A server a pack or an emoji belongs to. */
+export interface ModServerRef {
+  id: Snowflake;
+  name: string;
+  icon_id: Snowflake | null;
+  owner_id: Snowflake;
+}
+
+export type PackScope = "all" | "discover" | "personal" | "server" | "hidden";
+export type PackSort = "newest" | "oldest" | "installs" | "name";
+
+/** One sticker or emoji among the newest uploads on Nexa. */
+export interface ModUpload {
+  kind: "sticker" | "emoji";
+  id: Snowflake;
+  name: string;
+  blob_id: Snowflake;
+  animated: boolean;
+  format?: string;
+  pack_id?: Snowflake;
+  pack_name?: string;
+  server_id?: Snowflake;
+  owner_id?: Snowflake;
+  creator_id: Snowflake;
+  created_at: number;
+}
+
 export interface ModLogEntry {
   id: Snowflake;
   action: string;
@@ -310,14 +369,34 @@ export const moderation = {
   users(p: { q?: string; show?: GridShow; sort?: GridSort; cursor?: string; limit?: number }): Promise<{ users: ModUser[]; next_cursor: string }> {
     return api.request("GET", "/moderation/users", undefined, { query: { q: p.q || undefined, show: p.show, sort: p.sort, cursor: p.cursor || undefined, limit: p.limit } });
   },
-  user(id: Snowflake): Promise<{ user: ModUser; cases: StaffCase[]; people: People; servers?: ModMembership[] }> {
+  user(id: Snowflake): Promise<{ user: ModUser; cases: StaffCase[]; people: People; servers?: ModMembership[]; packs?: ModPack[] }> {
     return api.request("GET", `/moderation/users/${id}`);
   },
   servers(p: { q?: string; sort?: ServerSort; offset?: number; limit?: number }): Promise<{ servers: ModServer[]; people: People; total: number; has_more: boolean }> {
     return api.request("GET", "/moderation/servers", undefined, { query: { q: p.q?.trim() || undefined, sort: p.sort, offset: p.offset || undefined, limit: p.limit } });
   },
-  server(id: Snowflake): Promise<{ server: ModServer; cases: StaffCase[]; people: People }> {
+  server(id: Snowflake): Promise<{ server: ModServer; cases: StaffCase[]; people: People; emojis?: Emoji[]; packs?: ModPack[] }> {
     return api.request("GET", `/moderation/servers/${id}`);
+  },
+  packs(p: { q?: string; scope?: PackScope; sort?: PackSort; offset?: number; limit?: number }): Promise<{ packs: ModPack[]; people: People; servers: Record<string, ModServerRef>; has_more: boolean }> {
+    return api.request("GET", "/moderation/packs", undefined, { query: { q: p.q?.trim() || undefined, scope: p.scope, sort: p.sort, offset: p.offset || undefined, limit: p.limit } });
+  },
+  pack(id: Snowflake): Promise<{ pack: ModPack; cases: StaffCase[]; people: People; servers: Record<string, ModServerRef> }> {
+    return api.request("GET", `/moderation/packs/${id}`);
+  },
+  /** Takes down stickers in a pack, its name, description or public listing, or the whole pack. */
+  actOnPack(id: Snowflake, body: { stickers?: Snowflake[]; fields?: PackField[]; delete?: boolean; block?: boolean; reason: string }): Promise<{ case: StaffCase; people: People }> {
+    return api.request("POST", `/moderation/packs/${id}/actions`, body);
+  },
+  /** Lets a pack the staff made private be made public again by its owner. */
+  relistPack(id: Snowflake, reason: string): Promise<void> {
+    return api.request("POST", `/moderation/packs/${id}/relist`, { reason });
+  },
+  actOnEmojis(serverId: Snowflake, body: { emojis: Snowflake[]; block: boolean; reason: string }): Promise<{ case: StaffCase; people: People }> {
+    return api.request("POST", `/moderation/servers/${serverId}/emojis/actions`, body);
+  },
+  uploads(p: { before?: number; before_id?: Snowflake; limit?: number }): Promise<{ uploads: ModUpload[]; people: People; servers: Record<string, ModServerRef>; has_more: boolean }> {
+    return api.request("GET", "/moderation/uploads", undefined, { query: { before: p.before, before_id: p.before_id, limit: p.limit } });
   },
   actOnServer(id: Snowflake, body: { fields: ServerField[]; reason: string }): Promise<{ case: StaffCase; people: People }> {
     return api.request("POST", `/moderation/servers/${id}/actions`, body);

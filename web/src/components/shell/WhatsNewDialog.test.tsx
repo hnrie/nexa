@@ -98,10 +98,10 @@ describe("What's New", () => {
   });
 
   it("shows an account that saw the first release of a day only what came after it", () => {
-    signIn(OLD, { seen: "2026-09-29" });
+    signIn(OLD, { seen: "2026-10-01" });
     render(<WhatsNew />);
-    expect(screen.getByText("Calls Without the Lag")).toBeTruthy();
-    expect(screen.queryByText("Discord Activity")).toBeNull();
+    expect(screen.getByText("Nexa Is Now at nexa.fish")).toBeTruthy();
+    expect(screen.queryByText("Richer YouTube Videos")).toBeNull();
   });
 
   it("puts the releases of one day under one date", () => {

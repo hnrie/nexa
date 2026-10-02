@@ -12,6 +12,7 @@ import { displayName, useUsers } from "@/stores/users";
 import { relationshipMenuItems } from "@/lib/friendship";
 
 import { t } from "@/i18n";
+import { profileLinkItem } from "@/lib/profileLinks";
 export interface GroupMemberMenuCtx {
   nav: (path: string) => void;
   openModal: (kind: string, props?: Record<string, unknown>) => void;
@@ -50,6 +51,7 @@ export function groupMemberMenuItems(channelId: string, userId: string, ctx: Gro
 
   const items: ContextMenuItem[] = [
     { id: "profile", label: t("profile.profile.profile"), onSelect: () => ctx.openModal("profile", { userId }) },
+    ...[profileLinkItem(userId)].filter((x): x is ContextMenuItem => !!x),
     {
       id: "mention",
       label: t("settings.notifications.mention"),

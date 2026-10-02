@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate, type NavigateFunction } from "react-router-dom";
 import { appLink, messageTarget, type AppLink } from "@/lib/appLinks";
+import { openProfileLink } from "@/lib/profileLinks";
 import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
 
@@ -22,6 +23,12 @@ function follow(link: AppLink, anchor: Element, nav: NavigateFunction): void {
     // the same for a note's share link: a dialog in the app, its own page outside it
     if (inApp()) ui.openModal("noteLink", { token: link.token, hash: link.hash });
     else nav(`/note/${link.token}${link.hash}`);
+    return;
+  }
+  if (link.kind === "profile") {
+    // and a profile link: the profile over the app, or the profile's own page outside it
+    if (inApp()) void openProfileLink(link.username);
+    else nav(`/@${link.username}`);
     return;
   }
   // a link in a dialog (a profile, a topic) leads away from it

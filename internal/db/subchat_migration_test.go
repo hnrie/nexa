@@ -58,6 +58,9 @@ func TestMigrationTidiesSubchatMembers(t *testing.T) {
 	DROP TABLE note_invites;
 	DROP TABLE note_members;
 	DROP TABLE notes;
+	ALTER TABLE blobs DROP COLUMN blocked;
+	ALTER TABLE sticker_packs DROP COLUMN discover_blocked;
+	DROP TABLE blocked_images;
 	PRAGMA user_version = 6;`)
 	if err != nil {
 		t.Fatal(err)

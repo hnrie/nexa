@@ -58,6 +58,8 @@ func WriteError(w http.ResponseWriter, err error) {
 		apiErr = E(http.StatusBadRequest, "unsupported_type", "That file type is not supported; use PNG, JPEG, GIF or WebP.")
 	case errors.Is(err, media.ErrBadDimensions):
 		apiErr = E(http.StatusBadRequest, "bad_dimensions", "The image dimensions are out of range.")
+	case errors.Is(err, media.ErrBlocked):
+		apiErr = E(http.StatusBadRequest, "image_blocked", "That picture was taken down by Nexa and can't be uploaded.")
 	default:
 		slog.Error("internal error", "err", err)
 		apiErr = E(http.StatusInternalServerError, "internal", "Something went wrong on the server.")

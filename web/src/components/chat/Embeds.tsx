@@ -339,8 +339,8 @@ function embedFor(e: UnfurlResult, imagePreviews: boolean): ReactNode {
   // played through this server's proxy, so the host of the file never sees who is watching
   if (e.type === "video") return imagePreviews ? <VideoEmbed e={e} /> : null;
   if (e.type === "youtube") return <LinkEmbed e={e} />;
-  // drawn by InviteCards, which also covers invite links that came without a card
-  if (e.type === "invite") return null;
+  // drawn by InviteCards and ProfileCards, which also cover links that came without a card
+  if (e.type === "invite" || e.type === "profile") return null;
   if (e.title || e.description || e.player || e.media) return <LinkEmbed e={e} />;
   return null;
 }
@@ -351,7 +351,7 @@ function embedFor(e: UnfurlResult, imagePreviews: boolean): ReactNode {
  */
 export function Embeds({ list, onRemove }: { list: UnfurlResult[]; onRemove?: ((ev: MouseEvent) => void) | undefined }) {
   const imagePreviews = useSettings((st) => st.settings.imagePreviews);
-  if (list.every((e) => e?.type === "invite")) return null;
+  if (list.every((e) => e?.type === "invite" || e?.type === "profile")) return null;
   return (
     <div className={s.embeds}>
       {list.slice(0, 5).map((e, i) => {

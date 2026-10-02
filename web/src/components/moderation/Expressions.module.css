@@ -1,0 +1,224 @@
+/*
+ * Stickers and emoji in the moderation panel (ExpressionsTab, PackPage). What
+ * is being judged is pictures, so pictures come first: a pack's card is
+ * crowned with its own first stickers where a person's has their banner, its
+ * page lays every sticker out as the pack shows it, and New Uploads is a wall
+ * of the newest ones. The cards, panels and modals are the panel's own
+ * (Moderation.module.css, Sheet.module.css).
+ */
+
+/* the strip of views above the tab's own toolbar: Packs, New Uploads */
+.views { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+
+/* --- a pack's card: its first stickers stand in for a banner -------------------- */
+
+.mosaic {
+  position: relative;
+  height: 96px;
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  background: color-mix(in oklab, var(--bg-input) 70%, var(--bg-base));
+}
+.mosaic[data-tall] { height: 132px; }
+.mosaic[data-tall] .mosaicCell img,
+.mosaic[data-tall] .mosaicCell video,
+.mosaic[data-tall] .mosaicCell canvas,
+.mosaic[data-tall] .mosaicCell svg { max-height: 112px; }
+.mosaic[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
+.mosaic[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mosaic[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mosaicCell {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(var(--radius-lg) - 6px);
+  background: color-mix(in oklab, var(--bg-surface) 60%, transparent);
+  overflow: hidden;
+}
+.mosaicCell img,
+.mosaicCell video,
+.mosaicCell canvas,
+.mosaicCell svg {
+  max-width: 82%;
+  max-height: 82px;
+  object-fit: contain;
+}
+/* an emoji pack's pictures are small things, and look it */
+.mosaic[data-kind="emoji"] .mosaicCell img { max-height: 44px; }
+.mosaicEmpty { display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+/* the card's corner tags sit over the stickers, as a person's flags sit over their banner */
+.packFlags { position: absolute; top: 8px; inset-inline-end: 8px; display: flex; gap: 4px; }
+
+/* a pack's card has no picture standing out of its banner to make room for (doubled to outrank .cardBody's own) */
+.packBody.packBody { padding-top: 14px; }
+/* the face of a pack's page opens on its stickers, not on an avatar */
+.faceBody.faceBody { padding-top: 16px; }
+
+/* whose it is: a person, or a server */
+.whose { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; align-self: flex-start; padding: 3px 9px 3px 4px; border-radius: 999px; background: var(--bg-active); color: var(--text-subtle); font-size: 12.5px; font-weight: 600; transition: background var(--transition), color var(--transition); }
+.whose:hover { background: color-mix(in srgb, var(--bg-active), var(--text) 10%); color: var(--text-strong); }
+.whose span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- a pack's stickers, and a server's emoji, to tick and take down ------------- */
+
+.pickGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+}
+.pickGrid[data-kind="emoji"] { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+/* an emoji's tile is small: its tick sits above the picture rather than on it */
+.pickGrid[data-kind="emoji"] .tile { padding-top: 26px; }
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 8px 8px;
+  border-radius: var(--radius-md);
+  background: var(--sheen), color-mix(in oklab, var(--bg-surface) 60%, var(--bg-raised));
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle);
+  cursor: pointer;
+  transition: box-shadow var(--transition), background var(--transition), transform 90ms var(--ease-out);
+}
+.tile:hover { box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-strong); }
+.tile:active { transform: scale(0.98); }
+.tile[data-picked="true"] {
+  background: var(--sheen), color-mix(in srgb, var(--danger) 12%, var(--bg-surface));
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 2px color-mix(in srgb, var(--danger) 80%, transparent);
+}
+.tile[data-disabled="true"] { cursor: default; opacity: 0.6; }
+.tile input { position: absolute; top: 7px; inset-inline-start: 7px; width: 17px; height: 17px; margin: 0; accent-color: var(--danger); }
+.tilePic { width: 88px; height: 88px; display: flex; align-items: center; justify-content: center; }
+.pickGrid[data-kind="emoji"] .tilePic { width: 40px; height: 40px; }
+.tilePic img,
+.tilePic video,
+.tilePic canvas,
+.tilePic svg { max-width: 100%; max-height: 100%; object-fit: contain; }
+.tileName { max-width: 100%; font-size: 12.5px; font-weight: 600; color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pickGrid[data-kind="emoji"] .tileName { font-size: 11.5px; }
+/* what is ticked, and the one thing to do with it, held in view at the foot of the list */
+.pickBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--sheen), var(--bg-floating);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium);
+}
+.pickBar[hidden] { display: none; }
+.pickCount { font-size: 13.5px; font-weight: 650; color: var(--text-strong); }
+.grow { flex: 1; }
+
+/* --- New Uploads: a wall of the newest stickers and emoji ----------------------- */
+
+.wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.upload {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: var(--radius-md);
+  background: var(--sheen), color-mix(in oklab, var(--bg-surface) 55%, var(--bg-raised));
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-low);
+  overflow: hidden;
+  transition: box-shadow var(--transition), transform var(--dur) var(--ease-out);
+}
+.upload:hover,
+.upload:focus-within { box-shadow: inset 0 1px 0 var(--edge-light-strong), 0 0 0 1px var(--border), var(--shadow-medium); }
+.uploadPic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 132px;
+  padding: 10px;
+  background: color-mix(in oklab, var(--bg-input) 70%, var(--bg-base));
+  cursor: pointer;
+}
+.uploadPic[data-kind="emoji"] { padding: 40px; }
+.uploadPic img,
+.uploadPic video,
+.uploadPic canvas,
+.uploadPic svg { max-width: 100%; max-height: 112px; object-fit: contain; }
+.uploadInfo { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 8px 10px 10px; }
+.uploadName { font-size: 13.5px; font-weight: 650; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uploadWhere { display: flex; align-items: center; gap: 5px; min-width: 0; padding: 0; font-size: 12px; color: var(--text-muted); text-align: start; }
+.uploadWhere span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.uploadWhere:hover { color: var(--text-strong); }
+.uploadWhen { font-size: 11.5px; color: var(--text-muted); }
+/* take it down from here: over the picture's corner, shown on hover and focus, always on a touch screen */
+.uploadTake {
+  position: absolute;
+  top: 8px;
+  inset-inline-end: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 6, 20, 0.6);
+  color: #fff;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 2px 8px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transition: opacity var(--transition), background var(--transition);
+}
+.uploadTake:hover { background: var(--danger); }
+.upload:hover .uploadTake,
+.upload:focus-within .uploadTake,
+.uploadTake:focus-visible { opacity: 1; }
+@media (hover: none) { .uploadTake { opacity: 1; } }
+.kindTag { position: absolute; top: 8px; inset-inline-start: 8px; }
+
+/* --- the pack's page ----------------------------------------------------------------- */
+
+.cover { flex: none; width: 48px; height: 48px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; background: var(--bg-active); overflow: hidden; }
+.cover img,
+.cover video,
+.cover canvas,
+.cover svg { max-width: 100%; max-height: 100%; object-fit: contain; }
+.faceGrid { margin-top: 4px; }
+.faceDesc { white-space: pre-wrap; }
+
+/* a pack in a list of them, on a person's or a server's page (the row is Sheet.module.css's serverRow) */
+.packCover { flex: none; width: 36px; height: 36px; border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; background: var(--bg-active); overflow: hidden; }
+.packCover img,
+.packCover video,
+.packCover canvas,
+.packCover svg { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+/* the stickers or emoji a takedown names, in its modal */
+.thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
+.thumb { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); background: var(--bg-input); overflow: hidden; }
+.thumb img,
+.thumb video,
+.thumb canvas,
+.thumb svg { max-width: 100%; max-height: 100%; object-fit: contain; }
+.thumbMore { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); background: var(--bg-active); color: var(--text-subtle); font-size: 12.5px; font-weight: 700; }
+
+@media (max-width: 600px) {
+  .wall { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
+  .uploadPic { height: 112px; }
+  .pickGrid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  .tilePic { width: 72px; height: 72px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile, .upload, .uploadTake { transition: none; }
+}

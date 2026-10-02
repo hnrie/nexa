@@ -8,6 +8,17 @@
 /** How long it stays lit after the last loud reading. */
 export const SPEAKING_HOLD_MS = 600;
 
+/**
+ * The level (LevelMeter's, 0–1) above which sound can be heard, and so lights
+ * a ring. The ring says sound is coming through: everyone's, worked out from
+ * what arrives (playback.ts), and this device's own, from what it sends while
+ * its microphone is open (engine.ts). It sits below the lowest level that can
+ * open a microphone (sensitivityToThreshold's 0.005), so anything let through
+ * lights the ring. It was 0.02 for other people, above where many people set
+ * their sensitivity, and quiet sound came through with no ring.
+ */
+export const AUDIBLE_LEVEL = 0.004;
+
 export class SpeakingGate {
   private until = 0;
 

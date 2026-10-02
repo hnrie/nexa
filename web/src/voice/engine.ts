@@ -26,7 +26,8 @@ import { MeshTransport, type SignalPayload } from "./mesh";
 import { asGuest, iceConfig, me, sendState } from "./session";
 import { SfuTransport } from "./sfu";
 import { shareBitrate } from "./shareQuality";
-import { SpeakingGate } from "./speaking";
+import { makeDenoiser, prepareDenoiser, releaseDenoiser } from "./denoise";
+import { AUDIBLE_LEVEL, SpeakingGate } from "./speaking";
 import type { TransportEvents, VoiceTransport } from "./transport";
 import { VoiceSend } from "./voiceSend";
 
@@ -42,6 +43,14 @@ interface Session {
   send: VoiceSend;
   inputGain: GainNode | null;
   inputSource: MediaStreamAudioSourceNode | null;
+  /** RNNoise between the microphone and the input slider, while Enhanced noise suppression runs here (denoise.ts). */
+  denoiser: AudioNode | null;
+  /** Whether this call's noise is taken out here by RNNoise, rather than by the browser or not at all. */
+  rnnoise: boolean;
+  /** Said once a call that Enhanced cannot run here and Standard is used instead. */
+  noiseNoticed: boolean;
+  /** Counts input graphs being built, so one overtaken by another is let go. */
+  inputGen: number;
   meter: LevelMeter | null;
   meterTimer: ReturnType<typeof setInterval> | null;
   camera: MediaStream | null;
@@ -214,25 +223,51 @@ export function applyInputGain(): void {
   if (!s?.micRaw) return;
   const volume = useSettings.getState().settings.voice.inputVolume;
   if (s.inputGain) {
-    // moving back to 100% takes the extra stage out of the way again
-    if (volume === 100) rebuildInput(s);
+    // moving back to 100% takes the extra stage out of the way again, unless RNNoise needs the graph anyway
+    if (volume === 100 && !s.denoiser) void rebuildInput(s);
     else s.inputGain.gain.value = volume / 100;
     return;
   }
-  if (volume !== 100) rebuildInput(s);
+  if (volume !== 100) void rebuildInput(s);
 }
 
 /** Rebuilds the path from the microphone to the peers after a volume change. */
-function rebuildInput(s: Session): void {
-  if (!s.micRaw) return;
+async function rebuildInput(s: Session): Promise<void> {
+  const raw = s.micRaw;
+  if (!raw) return;
+  const gen = ++s.inputGen;
+  const denoiser = s.rnnoise ? await makeDenoiser(audioContext()) : null;
+  // overtaken while RNNoise was being made: a newer graph, a new microphone, or the call ended
+  if (gen !== s.inputGen || session !== s || s.micRaw !== raw) {
+    releaseDenoiser(denoiser);
+    return;
+  }
   // the meter listens to the sent stream, which is about to be replaced
   stopMeter(s);
   disconnectInput(s);
   if (s.mic && s.mic !== s.micRaw) s.mic.getTracks().forEach((t) => t.stop());
-  s.mic = withInputGain(s, s.micRaw);
+  s.mic = buildInput(s, raw, denoiser);
   s.transport.setLocalAudio(s.send.track(s.mic.getAudioTracks()[0] ?? null));
   startMeter(s);
   applyTransmit();
+}
+
+/**
+ * How this call takes noise out of the microphone: by RNNoise here, by the
+ * browser, or not at all. Enhanced that cannot run here (no AudioWorklet or
+ * WebAssembly, or an audio engine that would not run at 48 kHz) falls back to
+ * the browser's own, and says so once.
+ */
+async function noisePlan(s: Session): Promise<{ rnnoise: boolean; browserNoise: boolean }> {
+  const mode = useSettings.getState().settings.voice.noiseMode;
+  if (mode === "off") return { rnnoise: false, browserNoise: false };
+  if (mode === "standard") return { rnnoise: false, browserNoise: true };
+  if (await prepareDenoiser(audioContext())) return { rnnoise: true, browserNoise: false };
+  if (!s.noiseNoticed && session === s) {
+    s.noiseNoticed = true;
+    useUI.getState().toast(tr_("voice.noise.fallback"), "info");
+  }
+  return { rnnoise: false, browserNoise: true };
 }
 
 /**
@@ -296,14 +331,18 @@ export async function join(channelId: string, ice: { servers: RTCIceServer[]; sf
     },
   };
   const transport: VoiceTransport = ice.sfu ? new SfuTransport(myId, channelId, ice.servers, events) : new MeshTransport(myId, ice.servers, events);
-  s = { channelId, transport, mic: null, micRaw: null, send: new VoiceSend(), inputGain: null, inputSource: null, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, micRetrying: false, noiseFloor: 0.01, pttHeld: false, vadOpen: false, vadHoldUntil: 0, speaking: new SpeakingGate(), announced: false, iceTimer: null, cleanups: [] };
+  s = { channelId, transport, mic: null, micRaw: null, send: new VoiceSend(), inputGain: null, inputSource: null, denoiser: null, rnnoise: false, noiseNoticed: false, inputGen: 0, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, micRetrying: false, noiseFloor: 0.01, pttHeld: false, vadOpen: false, vadHoldUntil: 0, speaking: new SpeakingGate(), announced: false, iceTimer: null, cleanups: [] };
   session = s;
   useVoice.getState().setConnection("connecting");
   releaseCall ??= holdReload("call");
   releaseAudio ??= holdAudio();
   let mic: MediaStream | null = null;
+  let denoiser: AudioNode | null = null;
   try {
-    mic = await getMic(useSettings.getState().settings.voice);
+    const plan = await noisePlan(s);
+    s.rnnoise = plan.rnnoise;
+    mic = await getMic(useSettings.getState().settings.voice, { browserNoise: plan.browserNoise });
+    if (plan.rnnoise) denoiser = await makeDenoiser(audioContext());
     useVoice.getState().setMicBlocked(false);
   } catch (err) {
     // The toast is gone in five seconds and the call then looked entirely
@@ -317,11 +356,12 @@ export async function join(channelId: string, ice: { servers: RTCIceServer[]; sf
     // left while asking for the mic: leaving already closed the transport, but
     // this capture came too late for it to stop
     mic?.getTracks().forEach((t) => t.stop());
+    releaseDenoiser(denoiser);
     return false;
   }
   if (mic) {
     s.micRaw = mic;
-    s.mic = withInputGain(s, mic);
+    s.mic = buildInput(s, mic, denoiser);
     watchMic(s);
     if (lastInputChoice() === "missing") {
       // Better to say so than to carry a microphone nobody is talking into.
@@ -443,14 +483,18 @@ export function stats(): Promise<{ rtt: number; loss: number }> | null {
 }
 
 /**
- * Routes the capture through a gain node so the input slider does something.
- * At 100% the microphone's own track is sent instead: a graph that produces
- * silence on some devices is not worth inserting for no change in level.
+ * Routes the capture through RNNoise, when it is given one, and a gain node
+ * so the input slider does something. At 100% with no RNNoise the
+ * microphone's own track is sent instead: a graph that produces silence on
+ * some devices is not worth inserting for no change in level.
  */
-function withInputGain(s: Session, raw: MediaStream): MediaStream {
-  const { stream, gain, source } = sentStream(audioContext(), raw, useSettings.getState().settings.voice.inputVolume);
+function buildInput(s: Session, raw: MediaStream, denoiser: AudioNode | null): MediaStream {
+  const { stream, gain, source } = sentStream(audioContext(), raw, useSettings.getState().settings.voice.inputVolume, denoiser);
+  // a graph that could not be built sends the microphone as it is
+  if (denoiser && !source) releaseDenoiser(denoiser);
   s.inputGain = gain;
   s.inputSource = source;
+  s.denoiser = source ? denoiser : null;
   return stream;
 }
 
@@ -478,8 +522,10 @@ function disconnectInput(s: Session): void {
   } catch {
     /* already gone */
   }
+  releaseDenoiser(s.denoiser);
   s.inputSource = null;
   s.inputGain = null;
+  s.denoiser = null;
 }
 
 function startMeter(s: Session): void {
@@ -506,10 +552,14 @@ function startMeter(s: Session): void {
       s.vadOpen = open;
       applyTransmit();
     }
-    // the ring holds through the gaps between words, but a muted mic is out at once
-    const loud = s.speaking.update(level > threshold, now);
-    const speaking = shouldTransmit() && gateOpen() && loud;
-    useVoice.getState().setSpeaking(myId, speaking);
+    // The ring says this device's sound is going out: the microphone let
+    // through (unmuted, and voice activity or push to talk open) with
+    // something in it to hear. Everyone else's ring for it goes by the same
+    // level of what arrives (playback.ts). It holds through the gaps between
+    // words, and a microphone shut or muted puts it out at once.
+    const sending = shouldTransmit() && gateOpen();
+    const loud = s.speaking.update(sending && level > AUDIBLE_LEVEL, now);
+    useVoice.getState().setSpeaking(myId, sending && loud);
   }, VAD_EVERY_MS);
 }
 
@@ -529,11 +579,17 @@ function stopMeter(s: Session): void {
  */
 async function swapMic(s: Session, failure: string | null): Promise<void> {
   try {
-    const next = await getMic(useSettings.getState().settings.voice);
+    const plan = await noisePlan(s);
+    const next = await getMic(useSettings.getState().settings.voice, { browserNoise: plan.browserNoise });
+    const denoiser = plan.rnnoise ? await makeDenoiser(audioContext()) : null;
     if (session !== s) {
       next.getTracks().forEach((t) => t.stop());
+      releaseDenoiser(denoiser);
       return;
     }
+    // a volume change still building its graph is overtaken by this one
+    s.inputGen++;
+    s.rnnoise = plan.rnnoise;
     stopMeter(s);
     disconnectInput(s);
     s.mic?.getTracks().forEach((t) => t.stop());
@@ -542,7 +598,7 @@ async function swapMic(s: Session, failure: string | null): Promise<void> {
       t.stop();
     });
     s.micRaw = next;
-    s.mic = withInputGain(s, next);
+    s.mic = buildInput(s, next, denoiser);
     watchMic(s);
     s.transport.setLocalAudio(s.send.track(s.mic.getAudioTracks()[0] ?? null));
     startMeter(s);

@@ -17,7 +17,6 @@ import {
   renameGroup,
   rowId,
   sanitizeDMList,
-  setDMSort,
   setGroupCollapsed,
   unpinDM,
   type DMListLayout,
@@ -149,41 +148,70 @@ describe("arranging the DM list", () => {
   });
 });
 
-describe("putting the main list in order by hand", () => {
+describe("moving rows of the main list by hand", () => {
   const ids = ["1", "2", "3", "4"];
   const known = () => true;
-  // activity: higher id is newer
-  const activity = (id: string) => id;
-  const cmp = (a: string, b: string) => Number(a) - Number(b);
-  const rest = (l: DMListLayout) => dmListView(l, ids, known, activity, cmp).rest.map(rowId);
+  // activity: a higher id is newer, a second apart as snowflakes would be
+  let activity: Record<string, string> = {};
+  const reset = () => (activity = Object.fromEntries(ids.map((id) => [id, String(Number(id) * 4_194_304_000)])));
+  const view = (l: DMListLayout) => dmListView(l, ids, known, (id) => activity[id] ?? "0", compareIds);
+  const rest = (l: DMListLayout) => view(l).rest.map(rowId);
+  const move = (l: DMListLayout, id: string, at: string, where: "before" | "after") => {
+    const v = view(l);
+    return moveInMain(l, id, at, where, v.rest.map(rowId), v.keys, v.now);
+  };
 
-  it("goes by activity until a row is moved, then keeps the order it was moved into", () => {
+  it("goes by activity, and a moved row stands where it was put", () => {
+    reset();
     const start: DMListLayout = { pins: [], groups: [] };
     expect(rest(start)).toEqual(["4", "3", "2", "1"]);
-    const moved = moveInMain(start, "1", "4", "before", rest(start));
-    expect(moved.sort).toBe("custom");
-    expect(rest(moved)).toEqual(["1", "4", "3", "2"]);
-    // more activity changes nothing now
-    expect(dmListView(moved, ids, known, (id) => (id === "2" ? "99" : id), cmp).rest.map(rowId)).toEqual(["1", "4", "3", "2"]);
+    const up = move(start, "1", "4", "before");
+    expect(rest(up)).toEqual(["1", "4", "3", "2"]);
+    const down = move(start, "4", "2", "after");
+    expect(rest(down)).toEqual(["3", "2", "4", "1"]);
+    const between = move(start, "1", "3", "after");
+    expect(rest(between)).toEqual(["4", "3", "1", "2"]);
   });
 
-  it("puts a conversation that is new since at the top", () => {
-    const moved = moveInMain({ pins: [], groups: [] }, "2", "3", "after", ["4", "3", "2", "1"]);
-    expect(dmListView(moved, [...ids, "5"], known, activity, cmp).rest.map(rowId)).toEqual(["5", "4", "3", "2", "1"]);
+  it("is not held in place: something new still goes to the top, the moved row included", () => {
+    reset();
+    const up = move({ pins: [], groups: [] }, "1", "4", "before");
+    // a message in another conversation brings it above the moved one
+    activity["2"] = String(99 * 4_194_304_000);
+    expect(rest(up)).toEqual(["2", "1", "4", "3"]);
+    // and a message in the moved one goes by its own time again
+    reset();
+    const down = move({ pins: [], groups: [] }, "4", "1", "after");
+    expect(rest(down)).toEqual(["3", "2", "1", "4"]);
+    activity["4"] = String(50 * 4_194_304_000);
+    expect(rest(down)).toEqual(["4", "3", "2", "1"]);
+  });
+
+  it("lets go of moves that something new has overtaken when the next is made", () => {
+    reset();
+    const first = move({ pins: [], groups: [] }, "1", "4", "before");
+    activity["1"] = String(60 * 4_194_304_000);
+    const second = move(first, "2", "4", "before");
+    expect(Object.keys(second.moved ?? {})).toEqual(["2"]);
   });
 
   it("takes a pinned conversation out of the pins to put it in the list", () => {
+    reset();
     const pinned: DMListLayout = { pins: ["3"], groups: [] };
-    const moved = dropDM(pinned, "3", { kind: "main", at: "1", where: "after", rest: ["4", "2", "1"] });
+    const v = view(pinned);
+    const moved = dropDM(pinned, "3", { kind: "main", at: "1", where: "after", rest: v.rest.map(rowId), keys: v.keys, now: v.now });
     expect(moved.pins).toEqual([]);
     expect(rest(moved)).toEqual(["4", "2", "1", "3"]);
   });
 
-  it("goes back to activity, and survives being stored and read back", () => {
-    const moved = moveInMain({ pins: [], groups: [] }, "1", "4", "before", ["4", "3", "2", "1"]);
+  it("survives being stored and read back, and lets an old order kept for good go", () => {
+    reset();
+    const moved = move({ pins: [], groups: [] }, "1", "4", "before");
     expect(sanitizeDMList(JSON.parse(JSON.stringify(moved)))).toEqual(moved);
-    expect(rest(setDMSort(moved, "recent", rest(moved)))).toEqual(["4", "3", "2", "1"]);
-    // forgetting a conversation takes it out of the order too
-    expect(forgetDM(moved, "1").order).toEqual(["4", "3", "2"]);
+    // forgetting a conversation forgets where it was moved
+    expect(forgetDM(moved, "1").moved).toBeUndefined();
+    // from before: the list sorted by hand for good
+    expect(sanitizeDMList({ pins: [], groups: [], sort: "custom", order: ["1", "2"] })).toEqual({ pins: [], groups: [] });
+    expect(sanitizeDMList({ pins: [], groups: [], moved: { "1": { at: "x", since: "1" }, nope: { at: "1", since: "1" } } })).toEqual({ pins: [], groups: [] });
   });
 });

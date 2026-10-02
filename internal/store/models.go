@@ -162,6 +162,9 @@ type Blob struct {
 	Height    *int    `json:"height,omitempty"`
 	Animated  bool    `json:"animated"`
 	CreatedAt int64   `json:"created_at"`
+	// Blocked says the staff took this picture down: it is served to nobody
+	// (internal/media), and nobody can upload it again (blocked_images).
+	Blocked bool `json:"-"`
 }
 
 // Relationship links two users from user_id's point of view. Note is the note

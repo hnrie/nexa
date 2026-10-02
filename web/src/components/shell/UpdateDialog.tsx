@@ -114,7 +114,7 @@ export function UpdatePrompt() {
   return open ? <UpdateDialog offer={offer} onGo={go} onLater={() => snoozeUpdate(offer.key)} /> : <UpdateReminder offer={offer} onGo={go} />;
 }
 
-function Progress({ value }: { value: number }) {
+export function Progress({ value }: { value: number }) {
   const locale = useLocale();
   const v = Math.max(0, Math.min(1, value));
   return (

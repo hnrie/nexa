@@ -861,7 +861,7 @@ export interface SocialPost {
 
 export interface UnfurlResult {
   url: string;
-  type: "link" | "image" | "gif" | "video" | "youtube" | "invite";
+  type: "link" | "image" | "gif" | "video" | "youtube" | "invite" | "profile";
   title?: string;
   description?: string;
   site_name?: string;
@@ -892,8 +892,10 @@ export interface UnfurlResult {
   invite_code?: string;
   member_count?: number;
   online_count?: number;
-  /** An invite's server banner. */
+  /** An invite's server banner, or a linked profile's. */
   banner?: string;
+  /** Whose profile a profile link is (type "profile"), drawn by ProfileCards. */
+  username?: string;
   /** How the page asks for its picture: across the card, or small beside the words. Unset leaves it to the picture's size. */
   image_layout?: "large" | "thumbnail";
   /** Set when the link is a social post. The fields above still describe it, for an app that does not draw posts. */

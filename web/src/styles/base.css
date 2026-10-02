@@ -34,8 +34,9 @@ a:hover { text-decoration: underline; }
 img, video { max-width: 100%; display: block; }
 code, pre, kbd { font-family: var(--font-mono); }
 :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--radius-xs); }
-/* the accent of whichever theme is on, so a selection never comes out purple on a green theme */
-::selection { background: color-mix(in srgb, var(--brand) 42%, transparent); }
+/* whichever theme is on, so a selection never comes out purple on a green theme, and
+   its words at full strength, which dimmer text needs to read on it (tokens.css) */
+::selection { background: var(--selection); color: var(--text-strong); }
 
 /* Thin overlay scrollbars everywhere, Discord-style. */
 * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) var(--scroll-track); }

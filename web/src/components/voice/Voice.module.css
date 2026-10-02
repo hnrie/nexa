@@ -153,6 +153,10 @@
 .statusBtn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--text-muted); }
 .statusBtn:hover { background: var(--bg-hover); color: var(--text); }
 .statusBtn[data-on="true"] { background: var(--bg-active); color: var(--text-strong); }
+/* noise suppression: lit in the accent when RNNoise runs, struck through when off */
+.statusBtn[data-noise="enhanced"] { color: var(--text-brand); }
+.statusBtn[data-noise="off"] { position: relative; }
+.statusBtn[data-noise="off"]::after { content: ""; position: absolute; width: 22px; height: 2px; border-radius: 1px; background: currentColor; transform: rotate(-45deg); box-shadow: 0 0 0 2px var(--bg-surface); }
 .statusBtns { display: flex; gap: 4px; }
 .statusWide { flex: 1; height: 32px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text); background: var(--bg-raised); }
 .statusWide:hover { background: var(--bg-hover); }
@@ -237,7 +241,27 @@
 .meterFill[data-sent="true"] { background: var(--positive); }
 /* the microphone diagnostics in Voice & Video settings: wraps inside the column on a phone */
 .diag { margin: 8px 0 0; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; user-select: all; }
-.meterMark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--warning); }
+/* Input sensitivity: the slider's groove is the meter it is set against. The
+   voice runs along it amber while it stays under the knob and green past it,
+   which is when a call sends it; the faint green past the knob is where that
+   happens. The groove and knob are a switch's (Toggle.module.css). The groove
+   stops half a knob from each end, so its percentages meet the knob's centre. */
+.sensWrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.sens { --knob: 20px; position: relative; flex: 1 1 220px; min-width: 0; height: 28px; }
+.sensTrack { position: absolute; top: 9px; height: 10px; inset-inline: calc(var(--knob) / 2); border-radius: 5px; overflow: hidden; background: linear-gradient(90deg, transparent var(--at), color-mix(in srgb, var(--positive) 22%, transparent) var(--at)), color-mix(in srgb, var(--status-offline) 30%, var(--bg-input)); box-shadow: inset 0 1px 3px color-mix(in srgb, var(--shade) 55%, transparent), inset 0 0 0 1px var(--border-subtle); }
+.sensFill { position: absolute; inset: 0; background: linear-gradient(90deg, var(--warning) var(--at), var(--positive) var(--at)); clip-path: inset(0 calc(100% - var(--level)) 0 0); transition: clip-path 60ms linear; }
+[dir="rtl"] .sensTrack { background: linear-gradient(270deg, transparent var(--at), color-mix(in srgb, var(--positive) 22%, transparent) var(--at)), color-mix(in srgb, var(--status-offline) 30%, var(--bg-input)); }
+[dir="rtl"] .sensFill { background: linear-gradient(270deg, var(--warning) var(--at), var(--positive) var(--at)); clip-path: inset(0 0 0 calc(100% - var(--level))); }
+.sensInput { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; background: transparent; appearance: none; -webkit-appearance: none; cursor: pointer; }
+.sensInput:focus-visible { outline: none; }
+.sensInput::-webkit-slider-runnable-track { height: 28px; background: transparent; }
+.sensInput::-moz-range-track { height: 28px; background: transparent; }
+.sensInput::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: var(--knob); height: var(--knob); margin-top: 4px; border-radius: 50%; background: linear-gradient(180deg, #ffffff, #eeeaf4); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 0.5px rgba(0, 0, 0, 0.08); }
+.sensInput::-moz-range-thumb { width: var(--knob); height: var(--knob); border: 0; border-radius: 50%; background: linear-gradient(180deg, #ffffff, #eeeaf4); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 0.5px rgba(0, 0, 0, 0.08); }
+/* the knob shows where keyboard focus is, as a switch does */
+.sensInput:focus-visible::-webkit-slider-thumb { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--focus-ring); }
+.sensInput:focus-visible::-moz-range-thumb { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--focus-ring); }
+@media (prefers-reduced-motion: reduce) { .sensFill { transition: none; } }
 .keyCapture { height: 40px; padding: 0 12px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text); font-family: var(--font-mono); display: flex; align-items: center; justify-content: space-between; cursor: pointer; border: 1px solid transparent; }
 .keyCapture[data-capturing="true"] { border-color: var(--brand); }
 

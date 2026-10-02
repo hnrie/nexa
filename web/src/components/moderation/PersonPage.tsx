@@ -1,7 +1,7 @@
 import { ChevronLeft, FolderOpen, Gavel, IdCard, UserRound } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { moderation as modApi, type ModAction, type ModMembership, type ModUser, type People, type StaffCase } from "@/api/moderation";
+import { moderation as modApi, type ModAction, type ModMembership, type ModUser, type People, type StaffCase, type ModPack } from "@/api/moderation";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
@@ -36,6 +36,7 @@ export function PersonPage() {
   const [user, setUser] = useState<ModUser | null>(null);
   const [cases, setCases] = useState<StaffCase[] | null>(null);
   const [servers, setServers] = useState<ModMembership[]>([]);
+  const [packs, setPacks] = useState<ModPack[]>([]);
   const [people, setPeople] = useState<People>({});
   const [failed, setFailed] = useState(false);
   const [moderating, setModerating] = useState<ModerateIntent | null>(null);
@@ -62,6 +63,7 @@ export function PersonPage() {
       setUser(r.user);
       setCases(r.cases);
       setServers(r.servers ?? []);
+      setPacks(r.packs ?? []);
       setPeople(r.people);
       mergePeople(r.people);
     } catch {
@@ -158,7 +160,7 @@ export function PersonPage() {
       </nav>
 
       {!onCases ? (
-        <ProfileSheet user={user} servers={servers} owner={user.id === ownerId} onModerate={(intent) => setModerating(intent)} onOpenServer={(id) => nav(`/channels/@admin/servers/${id}`)} />
+        <ProfileSheet user={user} servers={servers} owner={user.id === ownerId} onModerate={(intent) => setModerating(intent)} onOpenServer={(id) => nav(`/channels/@admin/servers/${id}`)} packs={packs} onOpenPack={(id) => nav(`/channels/@admin/expressions/packs/${id}`)} />
       ) : cases.length === 0 ? (
         <div className={m.empty}>
           <FolderOpen size={40} aria-hidden="true" />

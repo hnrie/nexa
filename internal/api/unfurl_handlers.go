@@ -36,6 +36,11 @@ func (s *Server) handleUnfurl(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, http.StatusOK, res)
 		return
 	}
+	// So is a profile link: the reader's app draws it as the person's card.
+	if res := s.profileUnfurl(r.Context(), raw); res != nil {
+		WriteJSON(w, http.StatusOK, res)
+		return
+	}
 	// A note's share link gets no preview from here: what it leads to can
 	// only be read with the key in the part after the #, which never reaches
 	// the server, so the app draws its card itself.
@@ -108,8 +113,8 @@ func (s *Server) inviteCodeOf(raw string) string {
 }
 
 // ownPath returns what follows prefix when raw is a link to one of Nexa's
-// own pages under it ("/invite/CODE", "/note/TOKEN"), at any of its
-// addresses, or "".
+// own pages under it ("/invite/CODE", "/note/TOKEN", "/@NAME"), at any of
+// its addresses, or "".
 func (s *Server) ownPath(raw, prefix string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {

@@ -32,6 +32,7 @@ import { InviteDialog } from "@/components/invite/InviteDialog";
 import { NoteLinkDialog } from "@/components/notes/NoteLinkDialog";
 
 import { t } from "@/i18n";
+import { PasteUpdateDialog } from "@/components/desktop/PasteUpdateDialog";
 const SettingsModal = lazyPage(() => import("@/components/settings/SettingsModal"));
 const ProfileModal = lazyPage(() => import("@/components/profile/ProfileModal"));
 const ServerSettingsModal = lazyPage(() => import("@/components/server/ServerSettingsModal"));
@@ -85,6 +86,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
         />
       ) : null}
       {modal?.kind === "customStatus" ? <CustomStatusModal onClose={close} /> : null}
+      {modal?.kind === "pasteUpdate" ? <PasteUpdateDialog onClose={close} /> : null}
       {modal?.kind === "shortcuts" ? <ShortcutsHelp onClose={close} /> : null}
       {modal?.kind === "createServer" ? <CreateServerModal onClose={close} /> : null}
       {modal?.kind === "invite" ? <InviteModal onClose={close} serverId={String(modal.props?.["serverId"])} channelId={modal.props?.["channelId"] as string | undefined} /> : null}
@@ -117,7 +119,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
           on a slow phone connection a tap that shows nothing for seconds is a
           tap people repeat: the dialog's place is taken at once instead. */}
       <Suspense fallback={<Loading onClose={close} />}>
-        {modal?.kind === "settings" ? <SettingsModal onClose={close} page={(modal.props?.["page"] as string | undefined) ?? "account"} packId={modal.props?.["packId"] as string | undefined} /> : null}
+        {modal?.kind === "settings" ? <SettingsModal onClose={close} page={(modal.props?.["page"] as string | undefined) ?? "account"} packId={modal.props?.["packId"] as string | undefined} modalId={modal.id} resume={modal.props?.["resume"] as string | undefined} /> : null}
         {modal?.kind === "profile" ? <ProfileModal onClose={close} userId={modal.props?.["userId"] as string} /> : null}
         {modal?.kind === "screenPermission" ? <ScreenPermission stale={Boolean(modal.props?.["stale"])} onClose={close} /> : null}
         {modal?.kind === "subchat" ? <SubchatModal onClose={close} channel={modal.props?.["channel"] as never} parentId={modal.props?.["parentId"] as string | undefined} /> : null}

@@ -1,0 +1,12 @@
+/* A profile link in a message (ProfileCards.tsx), in the invite card's frame
+   (components/invite/Invite.module.css) with what is a person's own: a round
+   picture set into the band, their username and pronouns, and the start of
+   their about me. */
+.cards { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 4px; max-width: 100%; }
+.cards > * { max-width: 100%; }
+/* the picture's ring is drawn in the card's own colour, as the invite icon's is */
+.ring { flex: none; display: flex; padding: var(--ring); border-radius: 50%; background: var(--surface); box-shadow: 0 10px 22px -12px rgba(0, 0, 0, 0.6); }
+button.ring { cursor: pointer; }
+.blank { display: block; width: var(--icon); height: var(--icon); border-radius: 50%; background: var(--bg-active); }
+.handle { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; min-width: 0; font-size: 13px; line-height: 18px; color: var(--text-muted); overflow-wrap: anywhere; }
+.about { grid-column: 1 / -1; margin-top: 6px; font-size: 14px; line-height: 1.4; color: var(--text); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }

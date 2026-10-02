@@ -23,3 +23,6 @@ __pycache__/
 
 # audit round 2 screenshots (large, regenerable)
 /audit/r2/shots/
+
+# trailer footage (tools/trailer.py), large and made again at will
+/examplevideos/

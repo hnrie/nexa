@@ -5,6 +5,10 @@
  * and Select All, the formatting a box that takes markdown understands, and
  * what a box adds of its own, such as the message box's Send button.
  *
+ * Words picked out on the page and links where nothing else has a menu get a
+ * small one of the app's own too (pageItems), so a right click shows the same
+ * menu in a browser and in the desktop app.
+ *
  * Shift with the right click still opens the browser's menu. A touch screen
  * keeps the system's, with its selection handles; so do password boxes, for
  * the password manager in it.
@@ -13,7 +17,7 @@ import { useEffect, useRef, type RefObject } from "react";
 import { applyWrap, type WrapMarker } from "@/components/composer/wrapShortcut";
 import { t } from "@/i18n";
 import { copyText } from "@/lib/copyText";
-import { desktopBridge, legacyTextMenu } from "@/lib/desktopBridge";
+import { desktopBridge, pasteNeedsUpdate } from "@/lib/desktopBridge";
 import { learn, misspelled, spellActive, suggestions, wordAt, type Word } from "@/lib/spell";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 
@@ -397,7 +401,9 @@ function textMenuItems(s: Snap, spelling: Spelling | null): ContextMenuItem[] {
     );
   }
   items.push({ id: "copy", label: t("textMenu.copy"), keys: modKeys("C"), disabled: !selected, onSelect: () => void copy(s) });
-  if (writable) items.push({ id: "paste", label: t("textMenu.paste"), keys: modKeys("V"), onSelect: () => void paste(s) });
+  // an app too old to paste for the page says so, and offers the update
+  if (writable && pasteNeedsUpdate()) items.push({ id: "paste", label: t("textMenu.paste"), warn: t("textMenu.pasteNeedsUpdate"), onSelect: () => useUI.getState().openModal("pasteUpdate") });
+  else if (writable) items.push({ id: "paste", label: t("textMenu.paste"), keys: modKeys("V"), onSelect: () => void paste(s) });
   items.push({ id: "selectAll", label: t("textMenu.selectAll"), keys: modKeys("A"), disabled: s.empty, onSelect: () => selectAll(s) });
   const formats = writable && (hooks?.format || (s.el instanceof HTMLTextAreaElement && s.el.hasAttribute("data-markdown")));
   if (formats) {
@@ -429,6 +435,57 @@ export async function openTextMenu(el: HTMLElement, x: number, y: number, byMous
   useUI.getState().openContextMenu({ x, y, items: textMenuItems(s, spelling), label: t("textMenu.label"), keepFocus: byMouse });
 }
 
+/**
+ * Words picked out on the page, or a link, where nothing has a menu of its
+ * own (a message's, a person's, a server's): a small menu of the app's own,
+ * so it is the same in a browser and in the desktop app, where each would
+ * otherwise show a different one of its own. Empty when there is neither.
+ */
+export function pageItems(target: EventTarget | null): ContextMenuItem[] {
+  if (!(target instanceof Element) || target.closest("[data-native-menu]")) return [];
+  const items: ContextMenuItem[] = [];
+  const sel = typeof window.getSelection === "function" ? window.getSelection() : null;
+  const words = sel && !sel.isCollapsed ? sel.toString() : "";
+  // only when the click is on the words picked out, as a browser's menu goes
+  let onWords = false;
+  try {
+    onWords = !!words.trim() && !!sel && sel.rangeCount > 0 && sel.getRangeAt(0).intersectsNode(target);
+  } catch {
+    onWords = false;
+  }
+  if (onWords) {
+    items.push({
+      id: "copy",
+      label: t("textMenu.copy"),
+      keys: modKeys("C"),
+      onSelect: () => {
+        // with what formatting the page has, as Ctrl+C would; just the words where that is refused
+        if (exec("copy")) return;
+        void copyText(words).then((ok) => !ok && useUI.getState().toast(t("common.copyFailed"), "error"));
+      },
+    });
+  }
+  const link = target.closest<HTMLAnchorElement>("a[href]");
+  const href = link?.getAttribute("href") ?? "";
+  if (link && href && !href.startsWith("#") && !/^javascript:/i.test(href)) {
+    let address = href;
+    try {
+      address = new URL(href, window.location.href).toString();
+    } catch {
+      /* kept as written */
+    }
+    if (items.length) items[items.length - 1]!.separatorAfter = true;
+    // opened the way a click opens it: inside the app when it is the app's (shell/AppLinks), in a new tab otherwise
+    items.push({ id: "open-link", label: t("textMenu.openLink"), onSelect: () => link.click() });
+    items.push({
+      id: "copy-link",
+      label: t("textMenu.copyLink"),
+      onSelect: () => void copyText(address).then((ok) => useUI.getState().toast(ok ? t("chat.messageMenu.linkCopied") : t("common.copyFailed"), ok ? "success" : "error")),
+    });
+  }
+  return items;
+}
+
 /** A pointer that right-clicks: a mouse, a trackpad or a pen, not a finger. */
 function fromMouse(e: MouseEvent): boolean {
   if ((e as PointerEvent).pointerType === "touch") return false;
@@ -445,10 +502,23 @@ export function installTextMenu(doc: Document = document): () => void {
     // Shift with a right click: the browser's own menu, with Inspect and the rest
     if (e.shiftKey && e.button === 2) return;
     if (!fromMouse(e)) return;
-    // an older desktop app keeps its own menu, which can paste
-    if (legacyTextMenu()) return;
     const el = textBoxOf(e.target);
-    if (!el) return;
+    if (!el) {
+      const items = pageItems(e.target);
+      if (!items.length) return;
+      e.preventDefault();
+      let { clientX: x, clientY: y } = e;
+      // the menu key on a focused link has no pointer: the menu opens at the link
+      if (e.button !== 2 && e.target instanceof Element) {
+        const r = e.target.getBoundingClientRect();
+        if (x < r.left || x > r.right || y < r.top || y > r.bottom) {
+          x = r.left + 8;
+          y = r.bottom;
+        }
+      }
+      useUI.getState().openContextMenu({ x, y, items, label: t("textMenu.label"), keepFocus: e.button === 2 });
+      return;
+    }
     e.preventDefault();
     // the menu key or Shift+F10 has no pointer: the menu opens at the box
     let { clientX: x, clientY: y } = e;

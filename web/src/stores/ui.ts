@@ -24,6 +24,12 @@ export interface ContextMenuItem {
   keys?: string;
   /** Drawn in bold, as a spelling offered for a misspelled word is. */
   strong?: boolean;
+  /**
+   * Something stands in the way of the item doing what it says (an app too
+   * old to paste from this menu): a warning sign at its end, with these words
+   * for its tooltip and a screen reader. Choosing it explains instead.
+   */
+  warn?: string;
   /** A small title over the items that follow it; not an item itself. */
   heading?: boolean;
   /** A line of information, such as when a message was sent: read, never chosen. */
@@ -102,6 +108,8 @@ interface UIState {
   openModal: (kind: string, props?: Record<string, unknown>) => void;
   /** Closes the modal with that id, or the topmost one. */
   closeModal: (id?: number) => void;
+  /** Adds to an open modal's props, for what it has to find again if it is drawn anew (the language changed under it). */
+  setModalProps: (id: number, props: Record<string, unknown>) => void;
   closeAllModals: () => void;
   openContextMenu: (m: ContextMenuState) => void;
   closeContextMenu: () => void;
@@ -163,6 +171,12 @@ export const useUI = create<UIState>()((set, get) => ({
     set((s) => {
       if (s.modals.length === 0) return s;
       const modals = id === undefined ? s.modals.slice(0, -1) : s.modals.filter((m) => m.id !== id);
+      return { modals, modal: modals[modals.length - 1] ?? null };
+    }),
+  setModalProps: (id, props) =>
+    set((s) => {
+      if (!s.modals.some((m) => m.id === id)) return s;
+      const modals = s.modals.map((m) => (m.id === id ? { ...m, props: { ...m.props, ...props } } : m));
       return { modals, modal: modals[modals.length - 1] ?? null };
     }),
   closeAllModals: () => set({ modals: [], modal: null }),

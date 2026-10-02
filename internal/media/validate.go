@@ -25,6 +25,9 @@ var (
 	// ErrNotFound means the upload being finished has no bytes on disk.
 	ErrNotFound      = errors.New("upload not found")
 	ErrBadDimensions = errors.New("image dimensions out of range")
+	// ErrBlocked means the picture is one the staff took down
+	// (store.ImageBlocked): it cannot be uploaded again, as anything.
+	ErrBlocked = errors.New("image taken down")
 )
 
 // MimeTGS is a Telegram animated sticker: gzip-compressed Lottie JSON. MimeWebM

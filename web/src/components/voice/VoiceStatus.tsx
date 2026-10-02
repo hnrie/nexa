@@ -1,14 +1,18 @@
-import { MonitorUp, PhoneOutgoing, Signal, Video } from "lucide-react";
+import { AudioLines, AudioWaveform, MonitorUp, PhoneOutgoing, Signal, Video } from "lucide-react";
+import type { MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { menuAnchor } from "@/components/common/ContextMenu";
 import { Tooltip } from "@/components/common/Tooltip";
 import { channelDisplayName } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";
+import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 import { useVoice } from "@/stores/voice";
 import { canShareScreen } from "@/voice/media";
+import { noiseMenuItems, noiseModeLabel } from "@/voice/noiseMode";
 import { leaveVoice, toggleCamera, toggleScreen } from "@/voice/session";
 import { HangUp } from "./HangUp";
 import s from "./Voice.module.css";
@@ -65,6 +69,7 @@ export function VoiceStatus() {
           </span>
           <span className={s.statusSub} onClick={go} title={where}>{where}</span>
         </div>
+        <NoiseButton />
         <Tooltip text={t("voice.voiceStatus.disconnect")} side="top">
           <button className={s.statusBtn} aria-label={t("voice.voiceStatus.disconnect")} onClick={() => void leaveVoice()} data-testid="voice-status-leave"><HangUp size={18} /></button>
         </Tooltip>
@@ -88,5 +93,25 @@ export function VoiceStatus() {
         {canShareScreen ? <button className={s.statusWide} data-on={!!localScreen} onClick={() => (localScreen ? void toggleScreen() : openModal("shareScreen"))} disabled={!mine}><MonitorUp size={16} /> {localScreen ? t("voice.voiceStatus.sharing") : t("desktop.displayPicker.share")}</button> : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * Noise suppression, beside hanging up: which of Enhanced (RNNoise), Standard
+ * and Off the call uses, chosen from a menu and switched at once.
+ */
+function NoiseButton() {
+  const mode = useSettings((x) => x.settings.voice.noiseMode);
+  const label = t("voice.noise.button", { mode: noiseModeLabel(mode) });
+  const open = (e: MouseEvent<HTMLButtonElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    useUI.getState().openContextMenu({ x: r.left, y: r.top, above: true, anchor: menuAnchor(e.currentTarget), label: t("voice.noise.title"), items: noiseMenuItems() });
+  };
+  return (
+    <Tooltip text={label} side="top">
+      <button className={s.statusBtn} data-noise={mode} aria-label={label} aria-haspopup="menu" onClick={open} data-testid="noise-mode">
+        {mode === "standard" ? <AudioLines size={18} /> : <AudioWaveform size={18} />}
+      </button>
+    </Tooltip>
   );
 }

@@ -24,6 +24,7 @@ const NotesPage = lazyPage(() => import("@/pages/NotesPage"));
 const NoteLinkPage = lazyPage(() => import("@/pages/NoteLinkPage"));
 const DiscordConnectedPage = lazyPage(() => import("@/pages/DiscordConnectedPage"));
 const NotFoundPage = lazyPage(() => import("@/pages/NotFoundPage"));
+const ProfilePage = lazyPage(() => import("@/pages/ProfilePage"));
 // The app itself: its sidebars, conversations, calls and every store behind
 // them. The public pages (the front page, signing in, an invite) never load it.
 const loadAppShell = () => import("@/components/shell/AppShell");
@@ -42,6 +43,8 @@ const AdminUsers = lazyPage(() => adminPanel().then((m) => ({ default: m.UserGri
 const AdminUser = lazyPage(() => adminPanel().then((m) => ({ default: m.PersonPage })));
 const AdminServers = lazyPage(() => adminPanel().then((m) => ({ default: m.ServersTab })));
 const AdminServer = lazyPage(() => adminPanel().then((m) => ({ default: m.ServerPage })));
+const AdminExpressions = lazyPage(() => adminPanel().then((m) => ({ default: m.ExpressionsTab })));
+const AdminPack = lazyPage(() => adminPanel().then((m) => ({ default: m.PackPage })));
 const AdminCases = lazyPage(() => adminPanel().then((m) => ({ default: m.CasesTab })));
 const AdminLogs = lazyPage(() => adminPanel().then((m) => ({ default: m.LogsTab })));
 const AdminAnnouncements = lazyPage(() => adminPanel().then((m) => ({ default: m.AnnouncementsTab })));
@@ -88,6 +91,9 @@ export function AppRoutes() {
                     <Route path="users/:userId/cases/:caseId" element={<AdminUser />} />
                     <Route path="servers" element={<AdminServers />} />
                     <Route path="servers/:serverId" element={<AdminServer />} />
+                    <Route path="expressions" element={<AdminExpressions />} />
+                    <Route path="expressions/uploads" element={<AdminExpressions />} />
+                    <Route path="expressions/packs/:packId" element={<AdminPack />} />
                     <Route path="cases" element={<AdminCases />} />
                     <Route path="cases/:caseId" element={<AdminCases />} />
                     <Route path="logs" element={<AdminLogs />} />
@@ -108,6 +114,8 @@ export function AppRoutes() {
             </RequireAuth>
           }
         />
+        {/* a profile link, /@username; any other one-part address is not found there too */}
+        <Route path="/:handle" element={<ProfilePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>

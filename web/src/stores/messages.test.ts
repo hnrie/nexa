@@ -153,6 +153,18 @@ describe("messages store loading", () => {
     expect(ids()).toEqual(idsOf(251, 300));
   });
 
+  it("forgets failed first loads when asked, so a subchat just unlocked loads at once", async () => {
+    list.mockRejectedValueOnce(new Error("locked"));
+    await useMessages.getState().loadInitial("c1");
+    expect(chan().failed).toBe(1);
+    useMessages.getState().forgetFailures("c1");
+    expect(chan()).toMatchObject({ loaded: false, loading: false, failed: 0 });
+    // and a channel with nothing to forget is left as it was
+    const before = useMessages.getState().channels;
+    useMessages.getState().forgetFailures("c1");
+    expect(useMessages.getState().channels).toBe(before);
+  });
+
   it("keeps the reactions already shown when an edited copy arrives", () => {
     const s = useMessages.getState();
     s.insert("c1", [{ ...msg("1"), reactions: [{ emoji: "👍", count: 2, me: true }] }]);

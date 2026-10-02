@@ -50,6 +50,16 @@ type Row =
 const GROUP_MS = 7 * 60 * 1000;
 
 /**
+ * Chrome and the browsers built on it, where a page landing above a touch
+ * scroll moves this list under it (see `touching` in MessageList). Browsers
+ * on iPhones and iPads are WebKit whatever they call themselves, and say
+ * CriOS rather than Chrome; touch scrolling there is left as it was.
+ */
+function movesUnderTouch(): boolean {
+  return typeof navigator !== "undefined" && ("userAgentData" in navigator || /\bChrome\/\d/.test(navigator.userAgent));
+}
+
+/**
  * Whether this session's read positions are in. A conversation opened straight
  * from the address bar can load its messages before ready arrives, while
  * nothing is known yet about how far it was read: the "new" line was placed
@@ -228,6 +238,22 @@ export function MessageList({ channel }: { channel: Channel }) {
   const reading = useRef<Reading | null>(null);
   /** A page of older messages is on its way. Set here, not read from the last render, which lags a frame behind. */
   const olderBusy = useRef(false);
+  /**
+   * A finger on the list or the list still moving from one (the fling after
+   * it), and the rows it was showing when the finger went down. Chrome, while
+   * a touch scroll or its fling is under way, holds the scroll position as a
+   * distance from the top of the list rather than this list's own from the
+   * bottom. A page of history landing above threw the reader to the top of
+   * it, close enough to ask for the next page, which did the same, until the
+   * start of the conversation; and the correction for a message arriving
+   * below, written while the finger was down, made the drag lurch hundreds of
+   * pixels. So nothing changes the list's shape under a moving touch: rows
+   * that arrive wait, and so does keeping the reader's place, and both land
+   * once the list is still (scrollend). A fling up through history stops at
+   * the top of what is loaded and the next page lands there.
+   */
+  const touching = useRef(false);
+  const [held, setHeld] = useState<{ first: string; last: string } | null>(null);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [newBelow, setNewBelow] = useState(false);
   // The newest message there was when news started arriving below the reader:
@@ -266,7 +292,19 @@ export function MessageList({ channel }: { channel: Channel }) {
     });
   }, []);
 
-  const ids = state?.ids ?? [];
+  const allIds = state?.ids ?? [];
+  // under a moving touch, only the rows that were there when the finger went down (see `touching`)
+  const ids = useMemo(() => {
+    if (!held) return allIds;
+    const from = allIds.indexOf(held.first);
+    const to = allIds.lastIndexOf(held.last);
+    // the list was replaced under the finger (a jump): nothing to hold on to;
+    // and nothing new is the same list, so a touch alone builds no rows again
+    if (from < 0 || to < from || (from === 0 && to === allIds.length - 1)) return allIds;
+    return allIds.slice(from, to + 1);
+  }, [allIds, held]);
+  // a page of history is in and waits for the list to stop: the loader at the top says more is coming
+  const heldAbove = ids.length > 0 && ids[0] !== allIds[0];
   const byId = state?.byId ?? {};
   const pending = state?.pending ?? [];
   const hasOlder = state?.hasOlder ?? true;
@@ -421,7 +459,10 @@ export function MessageList({ channel }: { channel: Channel }) {
       if (hasNewer) returnToPresent(channel.id);
     }
     prevPending.current = pending.length;
-    if (atBottom.current) {
+    if (touching.current) {
+      // the touch goes on from wherever it is; the place is held again once the list stops
+      reading.current = readReading(el) ?? reading.current;
+    } else if (atBottom.current) {
       toBottom(el);
       clearNewBelow();
     } else {
@@ -445,6 +486,11 @@ export function MessageList({ channel }: { channel: Channel }) {
     const el = scrollRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(() => {
+      // a picture landing under a finger moves it, rather than the list moving under it
+      if (touching.current) {
+        reading.current = readReading(el) ?? reading.current;
+        return;
+      }
       if (atBottom.current) {
         toBottom(el);
         return;
@@ -528,7 +574,7 @@ export function MessageList({ channel }: { channel: Channel }) {
       // the row in front of the reader now, which a fling keeps changing
       reading.current = readReading(el) ?? reading.current;
     }
-    if (fromTop(el) < 400 && hasOlder && !olderBusy.current && !loading && loaded && ids.length > 0) {
+    if (fromTop(el) < 400 && hasOlder && !olderBusy.current && !loading && loaded && ids.length > 0 && !heldAbove) {
       // A second scroll event in the same frame still sees `loading` false —
       // the store sets it synchronously, React has not re-rendered — so the
       // guard is a ref of this list's own, set before the call rather than
@@ -546,7 +592,71 @@ export function MessageList({ channel }: { channel: Channel }) {
         .catch(() => {})
         .finally(() => setNewerBusy(false));
     }
-  }, [channel.id, hasOlder, hasNewer, loading, loaded, ids.length, loadOlder, loadNewer]);
+  }, [channel.id, hasOlder, hasNewer, loading, loaded, ids.length, heldAbove, loadOlder, loadNewer]);
+
+  // A finger down holds the rows that are there (see `touching`); they go once
+  // the last finger is up and the list has stopped: at once if it never
+  // moved, else at its scrollend, or when no scroll has come for a while where
+  // that never fires. A finger that catches a fling keeps what is held.
+  // Passive listeners: none of this may slow the scroll down.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !movesUnderTouch()) return;
+    let fingers = false;
+    let moving = false;
+    let rest: ReturnType<typeof setTimeout> | null = null;
+    const quietFor = "onscrollend" in window ? 1500 : 250;
+    const wait = () => {
+      if (rest) clearTimeout(rest);
+      rest = null;
+    };
+    const release = () => {
+      wait();
+      touching.current = false;
+      setHeld(null);
+    };
+    const settle = () => {
+      wait();
+      rest = setTimeout(release, quietFor);
+    };
+    const down = () => {
+      fingers = true;
+      wait();
+      if (touching.current) return;
+      touching.current = true;
+      const now = useMessages.getState().channels[channel.id]?.ids ?? [];
+      setHeld(now.length ? { first: now[0]!, last: now[now.length - 1]! } : null);
+    };
+    const up = (e: TouchEvent) => {
+      if ((e.touches?.length ?? 0) > 0 || !fingers) return;
+      fingers = false;
+      if (moving) settle();
+      else release();
+    };
+    const scrolled = () => {
+      moving = true;
+      if (rest) settle();
+    };
+    const ended = () => {
+      moving = false;
+      if (touching.current && !fingers) release();
+    };
+    el.addEventListener("touchstart", down, { passive: true });
+    el.addEventListener("touchend", up, { passive: true });
+    el.addEventListener("touchcancel", up, { passive: true });
+    el.addEventListener("scroll", scrolled, { passive: true });
+    el.addEventListener("scrollend", ended);
+    return () => {
+      el.removeEventListener("touchstart", down);
+      el.removeEventListener("touchend", up);
+      el.removeEventListener("touchcancel", up);
+      el.removeEventListener("scroll", scrolled);
+      el.removeEventListener("scrollend", ended);
+      wait();
+      touching.current = false;
+      setHeld(null);
+    };
+  }, [channel.id]);
 
   // What the checks below need from the latest render, for the ones that run outside of one.
   const live = useRef({ loaded, readKnown, hasNewer, newest, readState });
@@ -779,10 +889,11 @@ export function MessageList({ channel }: { channel: Channel }) {
               <span>{t("chat.messageList.messagesCouldNotBeLoaded")}</span>
               <button className={s.loadRetry} onClick={() => void loadInitial(channel.id)}>{t("chat.messageList.tryAgain")}</button>
             </div>
-          ) : (loading && !newerBusy) || !loaded ? (
-            <div className={s.loader}><Spinner size={24} /></div>
           ) : (
-            <div style={{ height: 24 }} />
+            // one height, spinning or not: a page asked for moves nothing before it lands
+            <div className={s.loader} data-busy={(loading && !newerBusy) || !loaded || heldAbove || undefined}>
+              {(loading && !newerBusy) || !loaded || heldAbove ? <Spinner size={24} /> : null}
+            </div>
           )}
           <RenderCtxProvider value={renderCtx}>
             <ActiveRowsProvider value={activeRows}>

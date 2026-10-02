@@ -122,6 +122,12 @@ interface MessagesState {
   loadNewer: (channelId: string) => Promise<void>;
   /** Drops a list that stops short of the newest message so the newest page loads again. Unsent messages stay. */
   returnToPresent: (channelId: string) => void;
+  /**
+   * Forgets the first-page loads that failed, so the list asks again at once
+   * instead of after its pause: the server refused them for a reason that has
+   * just gone away (a subchat's password was typed).
+   */
+  forgetFailures: (channelId: string) => void;
   redecrypt: (predicate: (m: DecryptedMessage) => boolean) => Promise<void>;
 }
 
@@ -379,6 +385,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
     nextGeneration(channelId);
     set((s) => withChannel(s, channelId, (c) => ({ ...emptyChannel(), pending: c.pending })));
   },
+  forgetFailures: (channelId) => set((s) => (s.channels[channelId]?.failed ? withChannel(s, channelId, (c) => ({ ...c, failed: 0 })) : {})),
   loadInitial: async (channelId) => {
     const cur = get().channels[channelId];
     if (cur?.loaded || cur?.loading) return;

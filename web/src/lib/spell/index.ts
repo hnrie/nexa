@@ -10,7 +10,6 @@
  * would mark every word of another language wrong.
  */
 import { translator } from "@/i18n";
-import { legacyTextMenu } from "@/lib/desktopBridge";
 import { useSettings } from "@/stores/settings";
 
 /** How people chat, which no dictionary spells. */
@@ -70,8 +69,6 @@ export function spellActive(): boolean {
   if (typeof window === "undefined" || typeof Worker === "undefined") return false;
   if (useSettings.getState().settings.spellcheck === false) return false;
   if (!translator().locale.startsWith("en")) return false;
-  // an older desktop app offers spellings from its own checker, in its own menu
-  if (legacyTextMenu()) return false;
   return !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
 }
 

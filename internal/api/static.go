@@ -147,6 +147,17 @@ func (s *Server) staticHandler() http.Handler {
 				return
 			}
 		}
+		// A profile link shows whose profile it is when pasted elsewhere
+		// (profile_links.go). Like an invite's page it reads the database per
+		// hit, so it is metered the same way.
+		if name, ok := strings.CutPrefix(p, profilePath); ok && name != "" && !strings.Contains(name, "/") {
+			if !s.allowPublicPage(w, r) {
+				return
+			}
+			if s.serveProfilePage(w, r, dist, name) {
+				return
+			}
+		}
 		// The front page is what gets shared when someone recommends Nexa, and
 		// it was the one public page that unfurled as a bare address.
 		if p == "/" && s.serveHomePage(w, r, dist) {

@@ -241,6 +241,7 @@
   --scroll-thumb-hover: rgba(166, 156, 196, 0.42);
   --shade-alpha: 1;
   --edge-light: rgba(255, 255, 255, 0.06);
+  --selection: color-mix(in srgb, var(--focus-ring) 55%, transparent);
   color-scheme: dark;
 }
 
@@ -331,6 +332,11 @@
   /* the accent as a glow, round a pressed button or a chosen tile */
   --glow-brand: 0 0 0 1px color-mix(in srgb, var(--brand) 55%, transparent), 0 6px 22px -6px color-mix(in srgb, var(--brand) 75%, transparent);
   --ring-glow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 28%, transparent);
+  /* Selected text: the hue of the theme's focus ring, at a lightness that
+     stands out from every dark panel by 2:1 or more, with the words in it at
+     full strength (base.css). The accent as it was came out nearly black on
+     Onyx. Browsers without relative colours get the ring mixed in instead. */
+  --selection: color-mix(in srgb, var(--focus-ring) 55%, transparent);
   /* a fill with the light on it: a touch brighter at the top than the bottom */
   --grad-brand: linear-gradient(180deg, color-mix(in oklab, var(--brand), #fff 16%) 0%, var(--brand) 55%, color-mix(in oklab, var(--brand), #000 8%) 100%);
   --grad-danger: linear-gradient(180deg, color-mix(in oklab, var(--danger), #fff 12%) 0%, var(--danger) 60%);
@@ -345,6 +351,12 @@
   --dur-slow: 300ms;
   --transition: 160ms var(--ease-out);
   --radius-pill: 999px;
+}
+@supports (color: oklch(from red l c h)) {
+  :root,
+  [data-theme="light"] [data-dark-scope] {
+    --selection: oklch(from var(--focus-ring) 0.5 c h);
+  }
 }
 /* Shadows are worked out where they are declared, so the call stage's dark
    scope (above) works its own out from its own colours. */
@@ -361,6 +373,8 @@
 }
 [data-theme="light"] {
   --rail-shade: 93%;
+  /* on white the ring is the full accent, and a lighter wash of it is plenty */
+  --selection: color-mix(in srgb, var(--focus-ring) 28%, transparent);
   --canvas-glow: color-mix(in srgb, var(--brand) 9%, transparent);
   --panel-edge: color-mix(in srgb, var(--text-strong) 7%, transparent);
   --edge-light: rgba(255, 255, 255, 0.85);

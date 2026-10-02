@@ -5,7 +5,11 @@
   --post-tint: var(--brand);
   position: relative;
   box-sizing: border-box;
-  width: min(516px, 100%);
+  /* a plain 516px, not min(516px, 100%): a percentage is ignored while the
+     preview's row works out how wide to be, so a long post stretched the row
+     across the chat and its remove x went with it (Embeds.module.css) */
+  width: 516px;
+  max-width: 100%;
   min-width: 0;
   padding: 12px 14px;
   border-radius: var(--radius-md);

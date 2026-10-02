@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
@@ -485,7 +485,14 @@ export function ContextMenuHost() {
                 }}
               >
                 <span className={s.itemLabel}>{item.label}</span>
-                {item.keys ? <span className={s.keys} aria-hidden="true">{item.keys}</span> : null}
+                {item.warn ? (
+                  <span className={s.warn} title={item.warn} data-testid="menu-item-warn">
+                    <TriangleAlert size={15} aria-hidden="true" />
+                    <span className="visually-hidden">{item.warn}</span>
+                  </span>
+                ) : item.keys ? (
+                  <span className={s.keys} aria-hidden="true">{item.keys}</span>
+                ) : null}
                 {item.checked === undefined ? null : item.toggle ? (
                   <span className={s.tick} data-on={item.checked} aria-hidden="true">{item.checked ? <Check size={12} strokeWidth={3.5} /> : null}</span>
                 ) : (

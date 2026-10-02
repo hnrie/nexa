@@ -73,7 +73,7 @@ func TestModerationIsStaffOnly(t *testing.T) {
 	_, ts := newTestServer(t)
 	register(t, ts, "owner")
 	tok, _ := register(t, ts, "member")
-	for _, p := range []string{"/api/v1/moderation/summary", "/api/v1/moderation/users", "/api/v1/moderation/cases", "/api/v1/moderation/log", "/api/v1/moderation/announcements"} {
+	for _, p := range []string{"/api/v1/moderation/summary", "/api/v1/moderation/users", "/api/v1/moderation/cases", "/api/v1/moderation/log", "/api/v1/moderation/announcements", "/api/v1/moderation/packs", "/api/v1/moderation/uploads"} {
 		if res, body := do(t, ts, "GET", p, tok, nil); res.StatusCode != 403 || errCode(body) != "admin_only" {
 			t.Errorf("%s as a member: %d %v", p, res.StatusCode, body)
 		}

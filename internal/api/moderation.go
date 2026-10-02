@@ -292,7 +292,13 @@ func (s *Server) handleModUser(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"user": view, "cases": views, "people": s.people(ctx, who...), "servers": servers})
+	// and the sticker and emoji packs they made
+	packs, err := s.personPacks(r, u.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"user": view, "cases": views, "people": s.people(ctx, who...), "servers": servers, "packs": packs})
 }
 
 func (s *Server) handleModPurgePreview(w http.ResponseWriter, r *http.Request) {

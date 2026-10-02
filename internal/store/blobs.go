@@ -16,17 +16,21 @@ func refFloor(d db.Dialect, expr string) string { return d.Greatest("0", expr) }
 
 const blobCols = `id, sha256, size, mime, kind, encrypted, ref_count, owner_id, width, height, animated, created_at`
 
+// blobReadCols are the columns a blob is read with: what it is written with,
+// and whether the staff took its picture down (moderation_expressions.go).
+const blobReadCols = blobCols + `, blocked`
+
 func scanBlob(r rowScanner) (*Blob, error) {
 	var b Blob
-	var enc, anim int64
+	var enc, anim, blocked int64
 	var owner, w, h sql.NullInt64
-	if err := r.Scan(&b.ID, &b.SHA256, &b.Size, &b.Mime, &b.Kind, &enc, &b.RefCount, &owner, &w, &h, &anim, &b.CreatedAt); err != nil {
+	if err := r.Scan(&b.ID, &b.SHA256, &b.Size, &b.Mime, &b.Kind, &enc, &b.RefCount, &owner, &w, &h, &anim, &b.CreatedAt, &blocked); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
-	b.Encrypted, b.Animated = enc == 1, anim == 1
+	b.Encrypted, b.Animated, b.Blocked = enc == 1, anim == 1, blocked == 1
 	b.OwnerID, b.Width, b.Height = idPtr(owner), intPtr(w), intPtr(h)
 	return &b, nil
 }
@@ -46,12 +50,12 @@ func (s *Store) InsertBlob(ctx context.Context, b *Blob) error {
 
 // BlobBySHA finds a blob with the same content and kind.
 func (s *Store) BlobBySHA(ctx context.Context, sha, kind string) (*Blob, error) {
-	return scanBlob(s.db.R.QueryRowContext(ctx, `SELECT `+blobCols+` FROM blobs WHERE sha256 = ? AND kind = ?`, sha, kind))
+	return scanBlob(s.db.R.QueryRowContext(ctx, `SELECT `+blobReadCols+` FROM blobs WHERE sha256 = ? AND kind = ?`, sha, kind))
 }
 
 // BlobByID loads a blob.
 func (s *Store) BlobByID(ctx context.Context, id ids.ID) (*Blob, error) {
-	return scanBlob(s.db.R.QueryRowContext(ctx, `SELECT `+blobCols+` FROM blobs WHERE id = ?`, int64(id)))
+	return scanBlob(s.db.R.QueryRowContext(ctx, `SELECT `+blobReadCols+` FROM blobs WHERE id = ?`, int64(id)))
 }
 
 // AddBlobRef changes the reference count by delta (never below zero).
@@ -69,7 +73,7 @@ func (s *Store) AddBlobRef(ctx context.Context, id ids.ID, delta int) error {
 
 // UnreferencedBlobs lists blobs with no references created before olderThan.
 func (s *Store) UnreferencedBlobs(ctx context.Context, olderThan int64) ([]*Blob, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+blobCols+` FROM blobs WHERE ref_count <= 0 AND created_at < ? ORDER BY id LIMIT 500`, olderThan)
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+blobReadCols+` FROM blobs WHERE ref_count <= 0 AND created_at < ? ORDER BY id LIMIT 500`, olderThan)
 	if err != nil {
 		return nil, err
 	}

@@ -56,7 +56,7 @@ var ProxyImageTypes = map[string]bool{
 // Result is a link preview.
 type Result struct {
 	URL         string `json:"url"`
-	Type        string `json:"type"` // link | image | gif | video | youtube
+	Type        string `json:"type"` // link | image | gif | video | youtube | invite | profile
 	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
 	SiteName    string `json:"site_name,omitempty"`
@@ -91,8 +91,12 @@ type Result struct {
 	InviteCode  string `json:"invite_code,omitempty"`
 	MemberCount int    `json:"member_count,omitempty"`
 	OnlineCount int    `json:"online_count,omitempty"`
-	// Banner is the invited server's banner, for the top of its card.
+	// Banner is the invited server's banner, for the top of its card, or a
+	// linked profile's.
 	Banner string `json:"banner,omitempty"`
+	// Username is set when the link is to a Nexa profile (Type "profile"),
+	// so the client can draw that person's card.
+	Username string `json:"username,omitempty"`
 	// ImageLayout is how the page asks for its picture to be shown: "large"
 	// across the card or "thumbnail" beside the words, from its twitter:card.
 	// Empty leaves it to the picture's size.

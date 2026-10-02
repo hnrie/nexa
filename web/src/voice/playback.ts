@@ -5,7 +5,7 @@
  * watched. Shared by both call transports.
  */
 import { LevelMeter, audioContext } from "./media";
-import { SpeakingGate } from "./speaking";
+import { AUDIBLE_LEVEL, SpeakingGate } from "./speaking";
 
 interface VoiceOut {
   source: MediaStreamAudioSourceNode;
@@ -99,7 +99,8 @@ export class Playback {
     const gate = new SpeakingGate();
     const out: VoiceOut = { source, gain, el, meter, timer: null, speaking: false };
     out.timer = setInterval(() => {
-      const loud = gate.update(meter.level() > 0.02, Date.now());
+      // lit whenever their sound can be heard: a microphone that is shut sends silence
+      const loud = gate.update(meter.level() > AUDIBLE_LEVEL, Date.now());
       // someone muted just here shows no ring, straight away, and neither does sound not yet known to be theirs
       const on = loud && !this.localMutes.has(userId) && !this.held.has(`voice:${userId}`);
       if (on !== out.speaking) {

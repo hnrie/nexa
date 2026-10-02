@@ -1,6 +1,6 @@
 import { NexaProfile } from "@/components/nexa/NexaProfile";
 import { isSystemAccount } from "@/lib/moderation";
-import { LoaderCircle, MessageCircle, MoreHorizontal, NotebookPen, Pencil, UserPlus, X } from "lucide-react";
+import { Link2, LoaderCircle, MessageCircle, MoreHorizontal, NotebookPen, Pencil, UserPlus, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -21,6 +21,7 @@ import { KeyStatusChip } from "./KeyVerify";
 import { RelationshipBar, relationshipLine } from "./RelationshipBar";
 import { profileTheme, profileThemeOf } from "@/lib/avatarColor";
 import { copyText } from "@/lib/clipboard";
+import { copyProfileLink } from "@/lib/profileLinks";
 import { useDominantColor } from "@/lib/dominantColor";
 import { formatShortDate } from "@/lib/time";
 import { useRenderCtx } from "@/lib/markdownCtx";
@@ -49,6 +50,13 @@ interface Props {
   preview?: Partial<PublicUser>;
   /** The server it was opened from; otherwise the server being looked at, if any. */
   serverId?: string;
+  /**
+   * A profile opened from its link by someone who may have no account
+   * (pages/ProfilePage): the card as the app draws it, from the profile the
+   * link shows, with the visitor's own way in where the person's buttons go,
+   * and nothing that needs an account (status, notes, mutuals, the key).
+   */
+  visitor?: { user: PublicUser; actions: ReactNode };
 }
 
 /** The server whose page is open, which a profile opened from it belongs to. */
@@ -129,7 +137,7 @@ function BannerButton({ label, onClick, children, testId, busy }: { label: strin
  * profile with two theme colours is a gradient from top to bottom, with its
  * text and buttons turned to read on it.
  */
-export function ProfileCard({ userId, variant, onClose, preview, serverId }: Props) {
+export function ProfileCard({ userId, variant, onClose, preview, serverId, visitor }: Props) {
   const nav = useNavigate();
   const inServer = useServerInView(serverId);
   const me = useAuth((a) => a.me);
@@ -156,13 +164,13 @@ export function ProfileCard({ userId, variant, onClose, preview, serverId }: Pro
   const [bioClamped, setBioClamped] = useState(false);
   const bioRef = useRef<HTMLDivElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
-  const isMe = me?.id === userId;
-  const base: PublicUser | undefined = isMe && me ? me : stored;
+  const isMe = !visitor && me?.id === userId;
+  const base: PublicUser | undefined = visitor ? visitor.user : isMe && me ? me : stored;
   const user: PublicUser | undefined = base ? { ...base, ...preview } : undefined;
   const panel = variant === "panel";
 
   useEffect(() => {
-    if (preview) return;
+    if (preview || visitor) return;
     let alive = true;
     // The panel beside a DM is one card that changes person rather than a new
     // one, so without this it goes on showing the last person's mutual friends
@@ -181,7 +189,7 @@ export function ProfileCard({ userId, variant, onClose, preview, serverId }: Pro
     return () => {
       alive = false;
     };
-  }, [userId, upsertUser, preview]);
+  }, [userId, upsertUser, preview, visitor]);
 
   // the preview shows the start of a long bio and offers the rest
   const about = user?.about_me ?? "";
@@ -209,13 +217,14 @@ export function ProfileCard({ userId, variant, onClose, preview, serverId }: Pro
   if (!user) return null;
   // the system account is not a person, and says so
   if (isSystemAccount(user.flags)) return <NexaProfile variant={variant} onClose={onClose} />;
-  const st = preview ? "online" : statusOf(presence);
-  const cs = preview ? (user.status_text || user.status_emoji ? { text: user.status_text, emoji: user.status_emoji } : null) : customStatus(presence);
-  const activities = preview ? [] : activitiesOf(presence);
+  // a visitor sees nothing of where someone is right now
+  const st = visitor ? null : preview ? "online" : statusOf(presence);
+  const cs = visitor ? null : preview ? (user.status_text || user.status_emoji ? { text: user.status_text, emoji: user.status_emoji } : null) : customStatus(presence);
+  const activities = preview || visitor ? [] : activitiesOf(presence);
   const theme = profileThemeOf(user.accent_color, user.accent_color_2);
   const banner = bannerUrl(user.banner_id, panel ? 340 : 600);
-  const friend = rel?.type === "friend";
-  const interactive = !preview;
+  const friend = !visitor && rel?.type === "friend";
+  const interactive = !preview && !visitor;
   const avatarSize = panel ? 80 : 120;
 
   const colours: Record<string, string> = theme ? { "--profile-top": theme.top, "--profile-bottom": theme.bottom } : tint ? { "--profile-tint": tint } : {};
@@ -273,6 +282,7 @@ export function ProfileCard({ userId, variant, onClose, preview, serverId }: Pro
   const mutualCount = mutual.friends.length + mutualServers.length;
   const viewFull = () => openModal("profile", { userId });
   const buttons = interactive && !panel;
+  const copyLink = () => copyProfileLink(user.username);
 
   // the full profile leads with one clear action; the preview keeps its buttons on the banner
   // (a request either way, or a block, is said by the bar under the names, with its own buttons)
@@ -293,7 +303,10 @@ export function ProfileCard({ userId, variant, onClose, preview, serverId }: Pro
         <div className={s.bannerBtns}>
           {!interactive ? null : panel ? (
             isMe ? (
-              <BannerButton label={t("profile.profileCard.editProfile")} onClick={() => openModal("settings", { page: "profiles" })}><Pencil size={16} /></BannerButton>
+              <>
+                <BannerButton label={t("profile.profileCard.editProfile")} onClick={() => openModal("settings", { page: "profiles" })}><Pencil size={16} /></BannerButton>
+                <BannerButton label={t("profileLink.copy")} onClick={copyLink} testId="profile-copy-link"><Link2 size={18} /></BannerButton>
+              </>
             ) : (
               <>
                 {!rel ? (
@@ -301,6 +314,7 @@ export function ProfileCard({ userId, variant, onClose, preview, serverId }: Pro
                     {busy ? <LoaderCircle size={18} className={s.spin} /> : <UserPlus size={18} />}
                   </BannerButton>
                 ) : null}
+                <BannerButton label={t("profileLink.copy")} onClick={copyLink} testId="profile-copy-link"><Link2 size={18} /></BannerButton>
                 <BannerButton label={t("chat.chat.more")} onClick={more} testId="profile-more"><MoreHorizontal size={18} /></BannerButton>
               </>
             )
@@ -369,7 +383,8 @@ export function ProfileCard({ userId, variant, onClose, preview, serverId }: Pro
         {/* read out when it changes: the button pressed has gone, and this is what took its place */}
         {interactive && !isMe ? <span className="visually-hidden" aria-live="polite">{relationshipLine(rel)}</span> : null}
 
-        {buttons && (primary || !isMe) ? (
+        {visitor ? <div className={s.actions} data-testid="profile-visitor-actions">{visitor.actions}</div> : null}
+        {buttons ? (
           <div className={s.actions}>
             {primary}
             {!isMe && !rel ? (
@@ -377,6 +392,9 @@ export function ProfileCard({ userId, variant, onClose, preview, serverId }: Pro
                 <button className={s.square} aria-label={t("profile.profileCard.message")} onClick={() => void message()}><MessageCircle size={18} /></button>
               </Tooltip>
             ) : null}
+            <Tooltip text={t("profileLink.copy")} side="top">
+              <button className={s.square} aria-label={t("profileLink.copy")} onClick={copyLink} data-testid="profile-copy-link"><Link2 size={18} /></button>
+            </Tooltip>
             {!isMe ? (
               <Tooltip text={t("chat.chat.more")} side="top">
                 <button className={s.square} aria-label={t("chat.chat.more")} onClick={more} data-testid="profile-more"><MoreHorizontal size={18} /></button>

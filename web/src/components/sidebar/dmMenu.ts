@@ -17,6 +17,7 @@ import { openMenuItems } from "./openMenu";
 import { dmArrangeItems, forgetConversation } from "./dmArrange";
 
 import { t } from "@/i18n";
+import { profileLinkItem } from "@/lib/profileLinks";
 function nameOf(ch: Channel): string {
   return channelDisplayName(ch, useUsers.getState().byId, useAuth.getState().me?.id, friendNicknames(useRelationships.getState().byUser));
 }
@@ -108,6 +109,9 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
     items.push({ id: "add", label: t("sidebar.dmMenu.addFriends"), onSelect: () => ctx.openModal("createDM", { groupId: channelId }) });
   } else {
     items.push({ id: "profile", label: t("profile.profile.profile"), onSelect: () => { const other = ch.recipient_ids.find((id) => id !== me?.id); if (other) ctx.openModal("profile", { userId: other }); } });
+    const other = ch.recipient_ids.find((id) => id !== me?.id);
+    const link = other ? profileLinkItem(other) : null;
+    if (link) items.push(link);
     items.push({
       id: "call",
       label: t("sidebar.dmMenu.startCall"),

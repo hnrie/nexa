@@ -5,6 +5,7 @@ import { Spinner } from "@/components/common/Spinner";
 import { lazyPage } from "@/lib/lazyChunk";
 import { NavIcon, SettingsLayer, navIconOf, type NavGroup } from "@/components/server/SettingsLayer";
 import { useAuth } from "@/stores/auth";
+import { useUI } from "@/stores/ui";
 import { desktopBridge } from "@/lib/desktopBridge";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { searchSettings, settingsIndex, type SettingEntry } from "./settingsIndex";
@@ -128,9 +129,15 @@ function useFindSetting(page: string, anchor: string | null, done: () => void): 
   }, [page, anchor, done]);
 }
 
-export default function SettingsModal({ onClose, page: initial, packId }: { onClose: () => void; page: string; packId?: string | undefined }) {
+export default function SettingsModal({ onClose, page: initial, packId, modalId, resume }: { onClose: () => void; page: string; packId?: string | undefined; modalId?: number; resume?: string | undefined }) {
   // pages that were folded into others open where they went
-  const [page, setPage] = useState(initial === "privacy-data" ? "data" : initial);
+  // The whole app is drawn again when the language changes, this with it: it
+  // comes back on the page it was showing (kept with the modal), not the one
+  // it was opened at.
+  const [page, setPage] = useState(resume ?? (initial === "privacy-data" ? "data" : initial));
+  useEffect(() => {
+    if (modalId !== undefined) useUI.getState().setModalProps(modalId, { resume: page });
+  }, [page, modalId]);
   const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
   const inApp = !!desktopBridge();
   const mobile = useIsMobile();
@@ -240,7 +247,7 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
 
   return (
     // Opened at My Account is opened as a whole, from the user panel: a phone starts on the list.
-    <SettingsLayer label={t("settings.settings.userSettings")} groups={groups} page={page} setPage={(id) => { setAnchor(null); setPage(id); }} onClose={onClose} footer={footer} startOnList={initial === "account"} navTop={search} navBody={found}>
+    <SettingsLayer label={t("settings.settings.userSettings")} groups={groups} page={page} setPage={(id) => { setAnchor(null); setPage(id); }} onClose={onClose} footer={footer} startOnList={initial === "account" && !resume} navTop={search} navBody={found}>
       {/* A blank content column on a slow link is indistinguishable from a crash. */}
       <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner label={t("chat.pins.loading")} /></div>}>{body}</Suspense>
     </SettingsLayer>

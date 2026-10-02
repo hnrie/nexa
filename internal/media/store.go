@@ -217,6 +217,12 @@ func (m *Store) PutPublic(ctx context.Context, kind string, r io.Reader, lim Lim
 		}
 		width, height = &w, &h
 	}
+	// a picture the staff took down stays down, whatever it is uploaded as
+	if blocked, err := m.st.ImageBlocked(ctx, sha); err != nil {
+		return nil, err
+	} else if blocked {
+		return nil, ErrBlocked
+	}
 	unlock := m.lockContent(sha)
 	defer unlock()
 	if existing, err := m.st.BlobBySHA(ctx, sha, kind); err == nil {

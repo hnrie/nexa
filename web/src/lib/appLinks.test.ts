@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { appLink, inviteLinksIn, isNoteLink, messageTarget, noteLinksIn, setPublicUrl } from "./appLinks";
+import { appLink, inviteLinksIn, isNoteLink, messageTarget, noteLinksIn, profileLinksIn, setPublicUrl, shareOrigin } from "./appLinks";
 import { parse } from "@/markdown/parse";
 
 const here = { href: "https://chat.evilion.xyz/channels/1/2", host: "chat.evilion.xyz" };
@@ -33,6 +33,21 @@ describe("appLink", () => {
     expect(appLink("https://chat.evilion.xyz/download", here)).toEqual({ kind: "route", path: "/download" });
     expect(appLink("https://chat.evilion.xyz/somewhere/new?x=1#y", here)).toEqual({ kind: "route", path: "/somewhere/new?x=1#y" });
     expect(appLink("https://chat.evilion.xyz", here)).toEqual({ kind: "route", path: "/" });
+  });
+
+  it("opens a profile link as the profile, whatever case it was typed in, dots and all", () => {
+    expect(appLink("https://chat.evilion.xyz/@maya", here)).toEqual({ kind: "profile", username: "maya" });
+    expect(appLink("https://chat.evilion.xyz/@Maya.Dev/", here)).toEqual({ kind: "profile", username: "maya.dev" });
+    expect(appLink("/@night_owl", here)).toEqual({ kind: "profile", username: "night_owl" });
+    // too short to be a username, more than one part, and another site's are not
+    expect(appLink("https://chat.evilion.xyz/@m", here)).toEqual({ kind: "route", path: "/@m" });
+    expect(appLink("https://chat.evilion.xyz/@maya/posts", here)).toEqual({ kind: "route", path: "/@maya/posts" });
+    expect(appLink("https://mastodon.example/@maya", here)).toBeNull();
+  });
+
+  it("makes links to share at Nexa's public address once it is known", () => {
+    setPublicUrl("https://nexa.example/");
+    expect(shareOrigin()).toBe("https://nexa.example");
   });
 
   it("counts plain http and any letter case as the same site", () => {
@@ -127,5 +142,17 @@ describe("noteLinksIn", () => {
   it("stops at three", () => {
     const text = [1, 2, 3, 4, 5].map((n) => `https://chat.evilion.xyz/note/${token(n)}#${key}`).join(" ");
     expect(noteLinksIn(parse(text), here).map((l) => l.token)).toEqual([token(1), token(2), token(3)]);
+  });
+});
+
+describe("profileLinksIn", () => {
+  it("finds each profile link once, in order, and none in code or written as <url>", () => {
+    const nodes = parse("meet https://chat.evilion.xyz/@maya and https://chat.evilion.xyz/@MAYA, `https://chat.evilion.xyz/@kai` <https://chat.evilion.xyz/@rin> https://chat.evilion.xyz/@theo");
+    expect(profileLinksIn(nodes, here).map((l) => l.username)).toEqual(["maya", "theo"]);
+  });
+
+  it("stops at three", () => {
+    const nodes = parse(["a1", "b2", "c3", "d4"].map((n) => `https://chat.evilion.xyz/@user${n}`).join(" "));
+    expect(profileLinksIn(nodes, here)).toHaveLength(3);
   });
 });

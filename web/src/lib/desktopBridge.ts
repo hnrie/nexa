@@ -203,12 +203,13 @@ export function desktopBridge(): EvilionDesktop | null {
 }
 
 /**
- * The desktop app from before it could paste for the page (1.0.5 and older).
- * There a text box keeps the app's own right-click menu, whose Paste works,
- * and the spell checking that menu offers spellings from (lib/textMenu,
- * lib/spell), until the app is updated.
+ * The desktop app from before it could paste for the page (1.0.5 and older),
+ * whose page may not read the clipboard either. It has the same right-click
+ * menu as everywhere else (lib/textMenu), but its Paste cannot paste: it
+ * carries a warning and offers the update (components/desktop/
+ * PasteUpdateDialog). The keyboard pastes there as always.
  */
-export function legacyTextMenu(): boolean {
+export function pasteNeedsUpdate(): boolean {
   const bridge = desktopBridge();
   return !!bridge && typeof bridge.paste !== "function";
 }

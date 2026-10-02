@@ -6,6 +6,7 @@ import type { ContextMenuItem } from "@/stores/ui";
 import { copyAndSay } from "@/lib/copyText";
 import { useUsers } from "@/stores/users";
 import { relationshipMenuItems } from "@/lib/friendship";
+import { profileLinkItem } from "@/lib/profileLinks";
 
 import { t } from "@/i18n";
 /** Whether the current user outranks a member (or is that member). */
@@ -29,6 +30,7 @@ export function memberMenuItems(serverId: string, userId: string, ctx: { openMod
   const username = useUsers.getState().byId[userId]?.username;
   const items: ContextMenuItem[] = [
     { id: "profile", label: t("profile.profile.profile"), onSelect: () => ctx.openModal("profile", { userId }) },
+    ...[profileLinkItem(userId)].filter((x): x is ContextMenuItem => !!x),
     {
       id: "mention",
       label: t("settings.notifications.mention"),

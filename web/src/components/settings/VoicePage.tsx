@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Button } from "@/components/common/Button";
 import { Select } from "@/components/common/Select";
 import { Field } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
 import { describeError } from "@/lib/errors";
-import { useSettings, type VoiceSettings } from "@/stores/settings";
+import { NOISE_MODES, useSettings, type VoiceSettings } from "@/stores/settings";
 import { useVoice } from "@/stores/voice";
-import { LevelMeter, audioContext, defaultDeviceLabel, describeInput, getMic, holdAudio, lastInputChoice, listDevices, realDevices, sensitivityToThreshold, sentStream, type Devices } from "@/voice/media";
+import { LevelMeter, audioContext, defaultDeviceLabel, describeInput, getMic, holdAudio, lastInputChoice, listDevices, realDevices, sentStream, type Devices } from "@/voice/media";
+import { makeDenoiser, prepareDenoiser, releaseDenoiser } from "@/voice/denoise";
+import { noiseModeHint, noiseModeLabel, noiseModePatch } from "@/voice/noiseMode";
 import { canChooseOutput } from "@/voice/output";
-import { inVoice, noKeyToHold } from "@/voice/session";
+import { noKeyToHold } from "@/voice/session";
 import st from "./Settings.module.css";
 import v from "@/components/voice/Voice.module.css";
 
@@ -18,6 +20,7 @@ export default function VoicePage() {
   const settings = useSettings((s) => s.settings.voice);
   const patch = useSettings((s) => s.patch);
   const liveLevel = useVoice((x) => x.level);
+  const inCall = useVoice((x) => !!x.mine);
   const [devices, setDevices] = useState<Devices | null>(null);
   const [testing, setTesting] = useState(false);
   const [testLevel, setTestLevel] = useState(0);
@@ -34,7 +37,7 @@ export default function VoicePage() {
   const [starting, setStarting] = useState(false);
   const startingRef = useRef(false);
   const aliveRef = useRef(true);
-  const testRef = useRef<{ stream: MediaStream; meter: LevelMeter; timer: ReturnType<typeof setInterval>; sent?: MediaStream; sentMeter?: LevelMeter; gain?: GainNode | null; release: () => void } | null>(null);
+  const testRef = useRef<{ stream: MediaStream; meter: LevelMeter; timer: ReturnType<typeof setInterval>; sent?: MediaStream; sentMeter?: LevelMeter; gain?: GainNode | null; denoiser?: AudioNode | null; release: () => void } | null>(null);
   const set = (partial: Partial<VoiceSettings>) => patch({ voice: { ...settings, ...partial } });
 
   useEffect(() => {
@@ -50,6 +53,7 @@ export default function VoicePage() {
     clearInterval(t.timer);
     t.meter.close();
     t.sentMeter?.close();
+    releaseDenoiser(t.denoiser ?? null);
     t.sent?.getTracks().forEach((x) => x.stop());
     t.stream.getTracks().forEach((x) => x.stop());
     t.release();
@@ -73,33 +77,44 @@ export default function VoicePage() {
     setStarting(true);
     setMicError(null);
     let stream: MediaStream | null = null;
+    let denoiser: AudioNode | null = null;
     try {
-      stream = await getMic(settings);
       const ctx = audioContext();
+      // opened the way a call opens it, noise suppression and all
+      const rnnoise = settings.noiseMode === "enhanced" && (await prepareDenoiser(ctx));
+      stream = await getMic(settings, { browserNoise: settings.noiseMode === "standard" || (settings.noiseMode === "enhanced" && !rnnoise) });
+      if (rnnoise) denoiser = await makeDenoiser(ctx);
       if (ctx.state === "suspended") await ctx.resume();
       // Settings closed while the prompt was up: let the microphone go rather than holding it with nothing to show
       if (!aliveRef.current) {
         stream.getTracks().forEach((x) => x.stop());
+        releaseDenoiser(denoiser);
         return;
       }
       const meter = new LevelMeter(ctx, stream);
       // The second meter listens to exactly what a call would send: the same
-      // stream after the input slider. If this one stays flat while the first
-      // moves, the trouble is here rather than with the microphone.
-      const sent = sentStream(ctx, stream, settings.inputVolume);
+      // stream after noise suppression and the input slider. If this one stays
+      // flat while the first moves, the trouble is here rather than with the
+      // microphone.
+      const sent = sentStream(ctx, stream, settings.inputVolume, denoiser);
+      if (denoiser && !sent.source) {
+        releaseDenoiser(denoiser);
+        denoiser = null;
+      }
       const sentMeter = new LevelMeter(ctx, sent.stream);
       const timer = setInterval(() => {
         setTestLevel(meter.level());
         setSentLevel(sentMeter.level());
       }, 60);
-      testRef.current = { stream, meter, timer, sent: sent.stream, sentMeter, gain: sent.gain, release: holdAudio() };
+      testRef.current = { stream, meter, timer, sent: sent.stream, sentMeter, gain: sent.gain, denoiser, release: holdAudio() };
       setTesting(true);
-      setDiag(describeInput(ctx, stream, sent.stream, settings.inputVolume));
+      setDiag(describeInput(ctx, stream, sent.stream, settings.inputVolume, !!denoiser));
       setWrongDevice(lastInputChoice() === "missing");
       // permission granted: device labels are now readable
       listDevices().then(setDevices).catch(() => {});
     } catch (err) {
       if (stream && testRef.current?.stream !== stream) stream.getTracks().forEach((x) => x.stop());
+      if (testRef.current?.denoiser !== denoiser) releaseDenoiser(denoiser);
       // The commonest failure here is the reader declining the browser's own
       // prompt, and `NotAllowedError: Permission denied` at 11px in a monospace
       // block is a stack trace, not an answer. `.diag` keeps the device dump
@@ -111,6 +126,38 @@ export default function VoicePage() {
       setStarting(false);
     }
   };
+
+  // a test that is running starts again with the noise suppression just chosen, or it would show the old one
+  const modeRef = useRef(settings.noiseMode);
+  useEffect(() => {
+    if (modeRef.current === settings.noiseMode) return;
+    modeRef.current = settings.noiseMode;
+    if (!testRef.current) return;
+    stopTest();
+    void startTest();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.noiseMode]);
+
+  // The sensitivity bar is set against the voice, so it listens as soon as it
+  // is on screen where the microphone was allowed before (a call's own level
+  // does that job in a call). Elsewhere it offers to, rather than prompting
+  // for the microphone on opening the page. Once a visit: a test stopped by
+  // hand stays stopped.
+  const sensShown = settings.mode !== "ptt" && !settings.autoSensitivity;
+  const listenedRef = useRef(false);
+  useEffect(() => {
+    if (!sensShown || inCall || listenedRef.current) return;
+    let gone = false;
+    void micAllowed().then((ok) => {
+      if (gone || !ok || listenedRef.current || !aliveRef.current) return;
+      listenedRef.current = true;
+      void startTest();
+    });
+    return () => {
+      gone = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sensShown, inCall]);
 
   useEffect(() => {
     if (!capturing) return;
@@ -137,8 +184,9 @@ export default function VoicePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [capturing]);
 
-  const level = testing ? testLevel : inVoice() ? liveLevel : 0;
-  const threshold = settings.autoSensitivity ? null : sensitivityToThreshold(settings.sensitivity);
+  const level = testing ? testLevel : inCall ? liveLevel : 0;
+  // voice activity is judged on what a call sends: after noise suppression and the input volume
+  const sendLevel = testing ? sentLevel : inCall ? liveLevel : 0;
   // a browser keeps device names to itself until a device of the kind was allowed once
   const label = (d: MediaDeviceInfo, i: number, kind: "microphoneN" | "speakersN" | "cameraN") => d.label || tr_(`voice.devices.${kind}`, { n: i + 1 });
   // Safari plays calls on the system's output and cannot be told another
@@ -192,7 +240,6 @@ export default function VoicePage() {
             <Button size="sm" variant={testing ? "danger" : "secondary"} onClick={() => (testing ? stopTest() : void startTest())} disabled={starting} data-testid="mic-test">{testing ? tr_("settings.voice.stopTest") : tr_("settings.voice.letSCheck")}</Button>
             <div className={v.meter} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level * 100)} aria-label={tr_("settings.voice.inputLevel")} data-testid="mic-level">
               <div className={v.meterFill} style={{ width: `${Math.round(level * 100)}%` }} />
-              {threshold !== null ? <div className={v.meterMark} style={{ insetInlineStart: `${Math.round(threshold * 100)}%` }} /> : null}
             </div>
             {testing ? (
               <>
@@ -240,15 +287,23 @@ export default function VoicePage() {
           <>
             <Toggle checked={settings.autoSensitivity} onChange={(on) => set({ autoSensitivity: on })} label={tr_("settings.voice.automaticallyDetermineInputSensitivity")} description={tr_("settings.voice.learnsYourBackgroundNoiseAndOnly")} />
             {!settings.autoSensitivity ? (
-              <Field label={tr_("settings.voice.inputSensitivityValue", { db: settings.sensitivity })}>
-                <input type="range" className={st.slider} min={-100} max={0} value={settings.sensitivity} onChange={(e) => set({ sensitivity: Number(e.target.value) })} />
+              <Field as="div" label={tr_("settings.voice.inputSensitivityValue", { db: Math.max(SENS_MIN, settings.sensitivity) })} hint={tr_("settings.voice.sensitivityHint")}>
+                <SensitivityBar value={settings.sensitivity} onChange={(db) => set({ sensitivity: db })} level={sendLevel} live={testing || inCall} onListen={() => void startTest()} listening={starting} />
               </Field>
             ) : null}
           </>
         )}
       </div>
+      <h3 data-setting="noiseSuppression" className={st.h5}>{tr_("voice.noise.title")}</h3>
+      <div role="radiogroup" aria-label={tr_("voice.noise.title")}>
+        {NOISE_MODES.map((m) => (
+          <label key={m} className={st.radio} data-on={settings.noiseMode === m}>
+            <input type="radio" name="voice-noise-mode" checked={settings.noiseMode === m} onChange={() => set(noiseModePatch(m))} data-testid={`noise-${m}`} />
+            <span className={st.radioText}><span className={st.radioLabel}>{noiseModeLabel(m)}</span><span className={st.radioDesc}>{noiseModeHint(m)}</span></span>
+          </label>
+        ))}
+      </div>
       <h3 data-setting="voiceProcessing" className={st.h5}>{tr_("settings.voice.voiceProcessing")}</h3>
-      <Toggle checked={settings.noiseSuppression} onChange={(on) => set({ noiseSuppression: on })} label={tr_("settings.voice.noiseSuppression")} description={tr_("settings.voice.filtersKeyboardClatterAndFansWith")} />
       <Toggle checked={settings.echoCancellation} onChange={(on) => set({ echoCancellation: on })} label={tr_("settings.voice.echoCancellation")} />
       <Toggle checked={settings.autoGain} onChange={(on) => set({ autoGain: on })} label={tr_("settings.voice.automaticGainControl")} />
       <div className={st.form} style={{ marginTop: 24 }}>
@@ -269,5 +324,64 @@ export default function VoicePage() {
         </Field>
       </div>
     </>
+  );
+}
+
+/** The sensitivity slider's range: below -60 dB nothing is loud enough to hear (speaking.ts, AUDIBLE_LEVEL). */
+const SENS_MIN = -60;
+
+/** Whether the microphone can be opened without a prompt. False where the browser will not say (Firefox). */
+async function micAllowed(): Promise<boolean> {
+  try {
+    const p = await navigator.permissions?.query({ name: "microphone" as PermissionName });
+    return p?.state === "granted";
+  } catch {
+    return false;
+  }
+}
+
+/** A level from LevelMeter (0–1) as where it falls on the slider, 0–100. */
+function levelAt(level: number): number {
+  if (level <= 0) return 0;
+  // the inverse of sensitivityToThreshold: the meter reads four times the RMS
+  const db = 20 * Math.log10(level / 4);
+  return Math.max(0, Math.min(100, ((db - SENS_MIN) / -SENS_MIN) * 100));
+}
+
+/**
+ * Input sensitivity, drawn as the meter it is set against: the microphone's
+ * level runs along the slider's own track as it is heard, amber up to the
+ * handle and green past it, so where to put the handle can be seen while
+ * talking. Sound past the handle is sent. It shows a call's own level, or the
+ * microphone test's, or offers to start one.
+ */
+function SensitivityBar({ value, onChange, level, live, onListen, listening }: { value: number; onChange: (db: number) => void; level: number; live: boolean; onListen: () => void; listening: boolean }) {
+  const db = Math.max(SENS_MIN, Math.min(0, value));
+  const at = ((db - SENS_MIN) / -SENS_MIN) * 100;
+  const style = { "--at": `${at}%`, "--level": `${live ? levelAt(level) : 0}%` } as CSSProperties;
+  return (
+    <div className={v.sensWrap}>
+      <div className={v.sens} style={style} data-live={live || undefined} data-sending={live && levelAt(level) > at ? "" : undefined} data-testid="sensitivity-bar">
+        <div className={v.sensTrack} aria-hidden="true">
+          <div className={v.sensFill} />
+        </div>
+        <input
+          type="range"
+          className={v.sensInput}
+          min={SENS_MIN}
+          max={0}
+          value={db}
+          onChange={(e) => onChange(Number(e.target.value))}
+          aria-label={tr_("settings.voice.inputSensitivityValue", { db })}
+          aria-valuetext={`${db} dB`}
+          data-testid="sensitivity"
+        />
+      </div>
+      {live ? null : (
+        <Button size="sm" variant="secondary" onClick={onListen} loading={listening} data-testid="sensitivity-listen">
+          {tr_("settings.voice.showMyLevel")}
+        </Button>
+      )}
+    </div>
   );
 }

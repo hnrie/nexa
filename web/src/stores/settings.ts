@@ -17,6 +17,14 @@ export type NotificationLevel = "all" | "mentions" | "none";
 export type NotificationPreview = "full" | "name" | "none";
 export type ShareResolution = "720p" | "1080p" | "1440p" | "source";
 export type ShareFps = 15 | 30 | 60;
+/**
+ * How a call takes the noise out of the microphone: "enhanced" runs RNNoise
+ * on this device (voice/denoise.ts), "standard" asks the browser for its own,
+ * "off" sends the microphone as it is.
+ */
+export type NoiseMode = "enhanced" | "standard" | "off";
+export const NOISE_MODES: readonly NoiseMode[] = ["enhanced", "standard", "off"];
+export const isNoiseMode = (v: unknown): v is NoiseMode => v === "enhanced" || v === "standard" || v === "off";
 
 export interface VoiceSettings {
   inputDeviceId: string | null;
@@ -33,6 +41,11 @@ export interface VoiceSettings {
   pttKey: string;
   sensitivity: number;
   autoSensitivity: boolean;
+  noiseMode: NoiseMode;
+  /**
+   * Whether noise suppression is on at all, kept in step with noiseMode for
+   * the copies of the app from before it, which only had this switch.
+   */
   noiseSuppression: boolean;
   echoCancellation: boolean;
   autoGain: boolean;
@@ -217,6 +230,7 @@ export const DEFAULT_SETTINGS: Settings = {
     pttKey: "`",
     sensitivity: -50,
     autoSensitivity: true,
+    noiseMode: "enhanced",
     noiseSuppression: true,
     echoCancellation: true,
     autoGain: true,
@@ -366,6 +380,15 @@ function mergeVoice(base: VoiceSettings, incoming: Partial<VoiceSettings> | unde
   if (isAlias(voice.inputDeviceId)) Object.assign(voice, { inputDeviceId: null, inputDeviceLabel: null });
   if (isAlias(voice.outputDeviceId)) Object.assign(voice, { outputDeviceId: null, outputDeviceLabel: null });
   if (isAlias(voice.cameraDeviceId)) Object.assign(voice, { cameraDeviceId: null, cameraDeviceLabel: null });
+  // Noise suppression was one switch, and a copy of the app from before the
+  // modes still only knows that one. Whether it is on goes by the switch, and
+  // which kind by the mode: on with no mode yet (or turned on again from an old
+  // copy) is the default, RNNoise.
+  if (!isNoiseMode(voice.noiseMode)) voice.noiseMode = isNoiseMode(base.noiseMode) ? base.noiseMode : "enhanced";
+  if (!isNoiseMode(rest.noiseMode) && typeof rest.noiseSuppression === "boolean") voice.noiseMode = rest.noiseSuppression ? "enhanced" : "off";
+  if (voice.noiseSuppression === false) voice.noiseMode = "off";
+  else if (voice.noiseSuppression === true && voice.noiseMode === "off") voice.noiseMode = "enhanced";
+  voice.noiseSuppression = voice.noiseMode !== "off";
   return voice;
 }
 

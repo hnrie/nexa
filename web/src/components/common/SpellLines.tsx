@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useLocale } from "@/i18n";
-import { legacyTextMenu } from "@/lib/desktopBridge";
 import { knownWrong, misspelled, onLearn, wordsOf, type Word } from "@/lib/spell";
 import { useSettings } from "@/stores/settings";
 import s from "./SpellLines.module.css";
@@ -24,8 +23,7 @@ export function useSpellActive(): boolean {
     mq.addEventListener?.("change", change);
     return () => mq.removeEventListener?.("change", change);
   }, []);
-  // an older desktop app offers spellings from its own checker, in its own menu
-  return on && english && fine && typeof Worker !== "undefined" && !legacyTextMenu();
+  return on && english && fine && typeof Worker !== "undefined";
 }
 
 /** What shapes a textarea's text, copied to the layer over it so its words land in the same places. */

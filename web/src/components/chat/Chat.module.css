@@ -49,7 +49,7 @@
    so history added at the top leaves what is on screen where it is. */
 .scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; display: flex; flex-direction: column-reverse; }
 .inner { flex: none; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 8px; }
-.loader { display: flex; justify-content: center; padding: 16px; color: var(--text-muted); }
+.loader { display: flex; justify-content: center; align-items: center; box-sizing: border-box; min-height: 56px; padding: 16px; color: var(--text-muted); }
 .loadError { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; padding: 16px; color: var(--text-muted); font-size: 14px; text-align: center; }
 .loadRetry { color: var(--link); font-size: 14px; font-weight: 500; padding: 4px; }
 .loadRetry:hover { text-decoration: underline; }

@@ -109,7 +109,8 @@
 .page p,
 .page dd,
 .page figcaption { text-wrap: pretty; }
-.page ::selection { background: rgba(128, 0, 255, 0.45); color: var(--ink-strong); }
+/* the accent's light rather than the accent, which came out nearly black on this canvas */
+.page ::selection { background: rgba(183, 122, 255, 0.5); color: var(--ink-strong); }
 .page a { color: inherit; }
 
 /* ---- the header -------------------------------------------------------- */

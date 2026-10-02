@@ -144,6 +144,36 @@ describe("screen share settings", () => {
   });
 });
 
+describe("noise suppression", () => {
+  const modeAfter = async (voice: Record<string, unknown>) => {
+    await loadFrom({ doc: { voice }, version: 1 });
+    const v = useSettings.getState().settings.voice;
+    // the switch older copies of the app read always says whether it is on
+    expect(v.noiseSuppression).toBe(v.noiseMode !== "off");
+    return v.noiseMode;
+  };
+
+  it("is RNNoise unless it was turned off, for settings from before the modes", async () => {
+    expect(await modeAfter({})).toBe("enhanced");
+    expect(await modeAfter({ noiseSuppression: true })).toBe("enhanced");
+    expect(await modeAfter({ noiseSuppression: false })).toBe("off");
+  });
+
+  it("keeps the mode chosen", async () => {
+    expect(await modeAfter({ noiseMode: "standard", noiseSuppression: true })).toBe("standard");
+    expect(await modeAfter({ noiseMode: "off", noiseSuppression: false })).toBe("off");
+  });
+
+  it("follows a copy of the app from before the modes turning it off or on", async () => {
+    expect(await modeAfter({ noiseMode: "standard", noiseSuppression: false })).toBe("off");
+    expect(await modeAfter({ noiseMode: "off", noiseSuppression: true })).toBe("enhanced");
+  });
+
+  it("puts back a mode it does not know", async () => {
+    expect(await modeAfter({ noiseMode: "loud", noiseSuppression: true })).toBe("enhanced");
+  });
+});
+
 describe("how the rail and the DM list are arranged", () => {
   it("keeps the defaults when a copy saved before them has none", async () => {
     await loadFrom({ doc: { theme: "light", serverPositions: ["2", "1"] }, version: 1 });

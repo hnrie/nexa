@@ -21,6 +21,11 @@ const (
 	// ActionServerReset takes back what a server shows everyone (its icon,
 	// banner, name or description). Its case is its owner's.
 	ActionServerReset = "server_reset"
+	// ActionExpressionTakedown takes down stickers, emoji or a whole pack, or
+	// a pack's name, description or place in Discover
+	// (moderation_expressions.go). Its case is the pack's owner's, or the
+	// server's owner's for a server's.
+	ActionExpressionTakedown = "expression_takedown"
 )
 
 // What else staff do that the log records, without a case of its own.
@@ -33,6 +38,8 @@ const (
 	LogAdminRevoke        = "admin_revoke"
 	LogAccountDisable     = "account_disable"
 	LogAccountEnable      = "account_enable"
+	// LogExpressionRelist lets a pack taken out of Discover be listed again.
+	LogExpressionRelist = "expression_relist"
 )
 
 // The restrictions a case can put in force.

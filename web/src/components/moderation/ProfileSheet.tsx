@@ -1,6 +1,6 @@
 import { CalendarDays, ChevronRight, Clock, Copy, Crown, Eraser, ImageOff, ShieldCheck, UserRoundX } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import type { ModMembership, ModUser, ResetField } from "@/api/moderation";
+import type { ModMembership, ModPack, ModUser, ResetField } from "@/api/moderation";
 import { bannerUrl } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
@@ -16,6 +16,7 @@ import { t } from "@/i18n";
 import { modStatus } from "./ModStatus";
 import type { ModerateIntent } from "./PersonPage";
 import p from "./Sheet.module.css";
+import { PackRows } from "./ExpressionsTab";
 
 /** The parts of a profile the preview can point at while a field is looked at. */
 type Part = "avatar" | "banner" | "display_name" | "username" | "pronouns" | "about_me" | "status" | null;
@@ -27,6 +28,9 @@ interface Props {
   owner: boolean;
   onModerate: (intent: ModerateIntent) => void;
   onOpenServer: (id: string) => void;
+  /** The sticker and emoji packs they made. */
+  packs?: ModPack[];
+  onOpenPack?: (id: string) => void;
 }
 
 function blockedText(b: ModUser["blocked"]): string {
@@ -48,7 +52,7 @@ function blockedText(b: ModUser["blocked"]): string {
  * down. Looking at a part lights it up on the profile, so what an action
  * touches is never in doubt.
  */
-export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer }: Props) {
+export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, packs = [], onOpenPack }: Props) {
   const [hl, setHl] = useState<Part>(null);
   const deleted = (user.admin_flags & FLAG_DELETED) !== 0;
   const blocked = deleted ? t("moderation.user.deleted") : blockedText(user.blocked);
@@ -183,6 +187,15 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer }:
                   </li>
                 ))}
               </ul>
+            </section>
+          ) : null}
+
+          {packs.length && onOpenPack ? (
+            <section className={p.panel} aria-labelledby="sheet-packs">
+              <header className={p.panelHead}>
+                <h3 id="sheet-packs" className={p.panelTitle}>{t("moderation.packs.theirPacksTitle", { count: packs.length })}</h3>
+              </header>
+              <PackRows packs={packs} onOpen={onOpenPack} />
             </section>
           ) : null}
 

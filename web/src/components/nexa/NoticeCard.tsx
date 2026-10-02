@@ -1,9 +1,9 @@
-import { Clock, MessagesSquare, Server } from "lucide-react";
+import { Clock, MessagesSquare, Server, Sticker } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
-import type { CaseDetails, MemberCase, People, ResetField, ServerField, StaffCase } from "@/api/moderation";
+import type { CaseDetails, MemberCase, PackField, People, ResetField, ServerField, StaffCase } from "@/api/moderation";
 import { Button } from "@/components/common/Button";
 import { useRenderCtx } from "@/lib/markdownCtx";
-import { actionIcon, caseStanding, fieldLabel, formatSpan, fullDate, noticeExplainer, noticeTitle, relativeTo, severity } from "@/lib/moderation";
+import { actionIcon, caseStanding, fieldLabel, formatSpan, fullDate, noticeExplainer, noticeTitle, packFieldLabel, relativeTo, severity } from "@/lib/moderation";
 import { formatBytes, formatTimestamp } from "@/lib/time";
 import { Markdown } from "@/markdown";
 import { t } from "@/i18n";
@@ -25,14 +25,16 @@ function isStaffCase(c: MemberCase | StaffCase): c is StaffCase {
   return "user_id" in c;
 }
 
+type AnyField = ResetField | ServerField | PackField;
+
 /** Fields whose words are formatted where people read them, so they are shown formatted here too. */
-const RICH = new Set<ResetField | ServerField>(["about_me", "description"]);
+const RICH = new Set<AnyField>(["about_me", "description"]);
 
 /**
  * What a field said before a reset took it, for the staff: in full, as
  * people saw it, folding after a few lines until asked for the rest.
  */
-function WasValue({ field, value }: { field: ResetField | ServerField; value: string }) {
+function WasValue({ field, value }: { field: AnyField; value: string }) {
   const ctx = useRenderCtx();
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -58,8 +60,10 @@ function WasValue({ field, value }: { field: ResetField | ServerField; value: st
 }
 
 /** What a field reads now: the stand-in a reset wrote, or that it was removed or cleared. */
-function nowValue(f: ResetField | ServerField, d: CaseDetails): string {
+function nowValue(f: AnyField, d: CaseDetails): string {
   switch (f) {
+    case "public":
+      return t("nexa.notice.madePrivate");
     case "status":
     case "nicknames":
     case "description":
@@ -75,15 +79,15 @@ function nowValue(f: ResetField | ServerField, d: CaseDetails): string {
 }
 
 /** The fields a reset took, each with what it says now, and, for the staff, what it said before. */
-function ChangedFields({ d, staff, label }: { d: CaseDetails; staff: boolean; label: string }) {
+function ChangedFields({ d, staff, label, labelOf = (f) => fieldLabel(f as ResetField | ServerField) }: { d: CaseDetails; staff: boolean; label: string; labelOf?: (f: AnyField) => string }) {
   if (!d.fields?.length) return null;
   return (
     <div className={s.fields} role="table" aria-label={label}>
       {d.fields.map((f) => (
         <div className={s.fieldRow} role="row" key={f}>
-          <span className={s.fieldName} role="cell">{fieldLabel(f)}</span>
+          <span className={s.fieldName} role="cell">{labelOf(f)}</span>
           <span className={s.fieldValue} role="cell">
-            <span className={s.newValue} data-word={f === "status" || f === "nicknames" || f === "description" || f === "icon" || f === "banner" || undefined}>{nowValue(f, d)}</span>
+            <span className={s.newValue} data-word={f === "status" || f === "nicknames" || f === "description" || f === "icon" || f === "banner" || f === "public" || undefined}>{nowValue(f, d)}</span>
             {staff && d.old?.[f] ? <WasValue field={f} value={d.old[f]!} /> : null}
           </span>
         </div>
@@ -147,6 +151,8 @@ export function NoticeCard({ c, people, perspective, onOpenThread, bare = false 
         </>
       ) : null}
 
+      {c.action === "expression_takedown" ? <TakenDownParts d={d} staff={staff} /> : null}
+
       {c.action === "field_reset" && d.fields?.includes("username") && d.new?.username ? (
         <p className={s.callout}>
           {staff
@@ -204,5 +210,38 @@ export function NoticeCard({ c, people, perspective, onOpenThread, bare = false 
         </div>
       ) : null}
     </article>
+  );
+}
+
+/**
+ * What an expression_takedown took: which pack or server, the stickers or
+ * emoji by name (their pictures may be blocked, so names are what is left),
+ * the pack's parts it reset, and whether the pictures can come back.
+ */
+function TakenDownParts({ d, staff }: { d: CaseDetails; staff: boolean }) {
+  const items = d.emojis?.length ? d.emojis.map((e) => `:${e.name}:`) : (d.stickers ?? []).map((x) => x.name);
+  const emoji = !!d.emojis?.length || d.pack_kind === "emoji";
+  return (
+    <>
+      {d.pack_name || d.server_name ? (
+        <p className={s.detailLine}>
+          {d.pack_name ? <Sticker size={14} aria-hidden="true" /> : <Server size={14} aria-hidden="true" />}
+          <span>{d.pack_name ? t("nexa.notice.packNamed", { name: d.pack_name }) : t("nexa.notice.serverNamed", { name: d.server_name ?? "" })}</span>
+        </p>
+      ) : null}
+      {items.length ? (
+        <div className={s.fields} role="table" aria-label={t("nexa.notice.takenDownItems")}>
+          <div className={s.fieldRow} role="row">
+            <span className={s.fieldName} role="cell">{emoji ? t("nexa.notice.emojiCount", { count: items.length }) : t("nexa.notice.stickerCount", { count: items.length })}</span>
+            <span className={s.fieldValue} role="cell">
+              {/* names people gave them, read as words rather than as a value a reset wrote */}
+              <span className={s.newValue} data-word="true" dir="auto">{items.join(", ")}</span>
+            </span>
+          </div>
+        </div>
+      ) : null}
+      {!d.deleted ? <ChangedFields d={d} staff={staff} label={t("nexa.notice.packFields")} labelOf={(f) => packFieldLabel(f as PackField)} /> : null}
+      {d.blocked ? <p className={s.callout}>{t("nexa.notice.picturesBlocked")}</p> : null}
+    </>
   );
 }

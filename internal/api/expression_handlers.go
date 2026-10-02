@@ -507,6 +507,18 @@ func (s *Server) handlePackPatch(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, E(http.StatusBadRequest, "invalid_value", "public must be true or false."))
 			return
 		}
+		// a pack the staff took out of Discover stays out until they let it back
+		if pub && !p.Public {
+			blocked, err := s.Store.PackDiscoverBlocked(r.Context(), p.ID)
+			if err != nil {
+				WriteError(w, err)
+				return
+			}
+			if blocked {
+				WriteError(w, E(http.StatusForbidden, "discover_blocked", "Nexa took this pack out of Discover, so it can't be made public. It still works for you and everyone who installed it."))
+				return
+			}
+		}
 		patch.Public = &pub
 	}
 	if v, ok := raw["cover_sticker_id"]; ok {

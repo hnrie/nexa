@@ -1,4 +1,4 @@
-import { Bug, FolderOpen, LayoutGrid, Megaphone, ScrollText, Server, Shield } from "lucide-react";
+import { Bug, FolderOpen, LayoutGrid, Megaphone, ScrollText, Server, Shield, Sticker } from "lucide-react";
 import { Suspense, useEffect, type KeyboardEvent } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { moderation as modApi } from "@/api/moderation";
@@ -14,19 +14,21 @@ import m from "@/components/moderation/Moderation.module.css";
 export { AnnouncementsTab } from "@/components/moderation/AnnouncementsTab";
 export { BugsTab } from "@/components/moderation/BugsTab";
 export { CasesTab } from "@/components/moderation/CaseWorkspace";
+export { ExpressionsTab } from "@/components/moderation/ExpressionsTab";
 export { LogsTab } from "@/components/moderation/LogsTab";
+export { PackPage } from "@/components/moderation/PackPage";
 export { PersonPage } from "@/components/moderation/PersonPage";
 export { ServerPage } from "@/components/moderation/ServerPage";
 export { ServersTab } from "@/components/moderation/ServersTab";
 export { UserGrid } from "@/components/moderation/UserGrid";
 
-type Tab = "users" | "servers" | "cases" | "bugs" | "logs" | "announcements";
+type Tab = "users" | "servers" | "expressions" | "cases" | "bugs" | "logs" | "announcements";
 
 const BASE = "/channels/@admin";
 
 function tabOf(path: string): Tab {
   const seg = path.slice(BASE.length + 1).split("/")[0];
-  return seg === "servers" || seg === "cases" || seg === "bugs" || seg === "logs" || seg === "announcements" ? seg : "users";
+  return seg === "servers" || seg === "expressions" || seg === "cases" || seg === "bugs" || seg === "logs" || seg === "announcements" ? seg : "users";
 }
 
 /**
@@ -73,6 +75,7 @@ export default function AdminPanelPage() {
   const tabs: { id: Tab; label: string; icon: JSX.Element; badge?: number; badgeLabel?: string }[] = [
     { id: "users", label: t("moderation.tabs.users"), icon: <LayoutGrid size={17} /> },
     { id: "servers", label: t("moderation.tabs.servers"), icon: <Server size={17} /> },
+    { id: "expressions", label: t("moderation.tabs.expressions"), icon: <Sticker size={17} /> },
     { id: "cases", label: t("moderation.tabs.cases"), icon: <FolderOpen size={17} />, badge: counts?.needs_reply || undefined },
     { id: "bugs", label: t("moderation.tabs.bugs"), icon: <Bug size={17} />, badge: bugCounts?.waiting || undefined, badgeLabel: bugCounts?.waiting ? t("bugs.staff.waitingCount", { count: bugCounts.waiting }) : undefined },
     { id: "logs", label: t("moderation.tabs.logs"), icon: <ScrollText size={17} /> },

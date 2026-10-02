@@ -48,6 +48,15 @@ export const users = {
   profile(id: Snowflake): Promise<{ user: PublicUser; mutual_friends: Snowflake[]; mutual_servers: Snowflake[] }> {
     return api.request("GET", `/users/${id}/profile`);
   },
+  /**
+   * The profile a profile link shows (lib/profileLinks), which anyone may ask
+   * for, signed in or not: what every account sees of them, without their
+   * status or encryption key. Never put it in the users store, where it would
+   * stand in for the full record.
+   */
+  shared(username: string): Promise<PublicUser> {
+    return api.request("GET", `/profiles/${encodeURIComponent(username)}`);
+  },
   search(q: string): Promise<PublicUser[]> {
     return api.request<PublicUser[]>("GET", "/users/search", undefined, { query: { q } });
   },

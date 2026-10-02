@@ -5,6 +5,7 @@
  */
 import { AudioKeeper, isHomeScreenApp } from "@/lib/audioKeeper";
 import type { ShareFps, ShareResolution, VoiceSettings } from "@/stores/settings";
+import { DENOISE_RATE } from "./denoise";
 import { shareQuality, shareVideoConstraints } from "./shareQuality";
 import { VIDEO_CAP } from "./videoCap";
 
@@ -19,10 +20,15 @@ export function lastInputChoice(): InputChoice {
   return lastChoice;
 }
 
-function micConstraints(v: VoiceSettings): MediaTrackConstraints {
+/**
+ * What the microphone is opened with. The browser's own noise suppression is
+ * on for the Standard mode only (or when RNNoise cannot run): Enhanced does
+ * it in the page instead, and two of them in a row only blur a voice.
+ */
+function micConstraints(v: VoiceSettings, browserNoise: boolean): MediaTrackConstraints {
   return {
     echoCancellation: v.echoCancellation,
-    noiseSuppression: v.noiseSuppression,
+    noiseSuppression: browserNoise,
     autoGainControl: v.autoGain,
     channelCount: 1,
   };
@@ -37,8 +43,8 @@ function micConstraints(v: VoiceSettings): MediaTrackConstraints {
  * stale the device is looked up again by name, which also covers the same
  * microphone on another computer, where ids never match.
  */
-export async function getMic(v: VoiceSettings): Promise<MediaStream> {
-  const audio = micConstraints(v);
+export async function getMic(v: VoiceSettings, opts: { browserNoise?: boolean } = {}): Promise<MediaStream> {
+  const audio = micConstraints(v, opts.browserNoise ?? v.noiseMode === "standard");
   if (!v.inputDeviceId && !v.inputDeviceLabel) {
     lastChoice = "default";
     return navigator.mediaDevices.getUserMedia({ audio, video: false });
@@ -214,6 +220,19 @@ export function sensitivityToThreshold(db: number): number {
   return Math.min(1, Math.max(0.005, Math.pow(10, db / 20) * 4));
 }
 
+/**
+ * The shared audio engine, at 48 kHz where the browser will: what calls carry,
+ * so their audio is not resampled on the way in and out, and the rate RNNoise
+ * works at (denoise.ts).
+ */
+function newContext(): AudioContext {
+  try {
+    return new AudioContext({ sampleRate: DENOISE_RATE, latencyHint: "interactive" });
+  } catch {
+    return new AudioContext();
+  }
+}
+
 let sharedKeeper: AudioKeeper | null = null;
 /** Calls and microphone tests using the shared context. */
 let audioHolds = 0;
@@ -231,7 +250,7 @@ const IDLE_MS = 2000;
  */
 export function audioContext(): AudioContext {
   if (!sharedKeeper) {
-    const k = new AudioKeeper(new AudioContext());
+    const k = new AudioKeeper(newContext());
     sharedKeeper = k;
     if (typeof document !== "undefined") {
       const away = () => {
@@ -273,18 +292,19 @@ export function resumeAudio(): void {
 }
 
 /**
- * The stream a call would send: the microphone through the input slider. At
- * 100% there is nothing to apply, so the microphone's own track goes out
- * untouched rather than through a graph that could go wrong.
+ * The stream a call would send: the microphone through RNNoise when it is
+ * given one (denoise.ts) and the input slider. At 100% with no denoiser there
+ * is nothing to apply, so the microphone's own track goes out untouched
+ * rather than through a graph that could go wrong.
  */
-export function sentStream(ctx: AudioContext, mic: MediaStream, inputVolume: number): { stream: MediaStream; gain: GainNode | null; source: MediaStreamAudioSourceNode | null } {
-  if (inputVolume === 100) return { stream: mic, gain: null, source: null };
+export function sentStream(ctx: AudioContext, mic: MediaStream, inputVolume: number, denoiser: AudioNode | null = null): { stream: MediaStream; gain: GainNode | null; source: MediaStreamAudioSourceNode | null } {
+  if (inputVolume === 100 && !denoiser) return { stream: mic, gain: null, source: null };
   try {
     const src = ctx.createMediaStreamSource(mic);
     const gain = ctx.createGain();
     gain.gain.value = Math.max(0, inputVolume) / 100;
     const dest = ctx.createMediaStreamDestination();
-    src.connect(gain).connect(dest);
+    (denoiser ? src.connect(denoiser) : src).connect(gain).connect(dest);
     if (dest.stream.getAudioTracks().length === 0) {
       src.disconnect();
       return { stream: mic, gain: null, source: null };
@@ -309,7 +329,7 @@ function choiceWords(c: InputChoice): string {
 }
 
 /** What the microphone and the call are actually doing, in words. */
-export function describeInput(ctx: AudioContext, mic: MediaStream, sent: MediaStream, inputVolume: number): string {
+export function describeInput(ctx: AudioContext, mic: MediaStream, sent: MediaStream, inputVolume: number, rnnoise = false): string {
   const track = mic.getAudioTracks()[0];
   const st = track?.getSettings() ?? {};
   const out = sent.getAudioTracks()[0];
@@ -317,7 +337,7 @@ export function describeInput(ctx: AudioContext, mic: MediaStream, sent: MediaSt
     `device: ${track?.label || "unnamed"}`,
     `track: ${track?.readyState ?? "none"}, muted=${String(track?.muted ?? "?")}, enabled=${String(track?.enabled ?? "?")}`,
     `format: ${st.sampleRate ?? "?"} Hz, ${st.channelCount ?? "?"} channel(s)`,
-    `processing: echo=${String(st.echoCancellation ?? "?")} noise=${String(st.noiseSuppression ?? "?")} gain=${String(st.autoGainControl ?? "?")}`,
+    `processing: echo=${String(st.echoCancellation ?? "?")} noise=${String(st.noiseSuppression ?? "?")} gain=${String(st.autoGainControl ?? "?")} rnnoise=${String(rnnoise)}`,
     `audio engine: ${ctx.state}, ${Math.round(ctx.sampleRate)} Hz`,
     `input volume: ${inputVolume}% (${sent === mic ? t("media.sentStraightThrough") : t("media.throughTheSlider")})`,
     `chosen device: ${choiceWords(lastChoice)}`,

@@ -103,7 +103,13 @@ func (s *Server) handleModServer(w http.ResponseWriter, r *http.Request) {
 	for _, c := range cases {
 		who = append(who, c.ModeratorID)
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"server": s.modServerView(r, m), "cases": cases, "people": s.people(ctx, who...)})
+	// its emoji and sticker packs, which the staff can take down from here too
+	emojis, packs, err := s.serverExpressions(r, m.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"server": s.modServerView(r, m), "cases": cases, "people": s.people(ctx, who...), "emojis": emojis, "packs": packs})
 }
 
 // serverCases are the cases its owner has had about this server. A server's
@@ -118,7 +124,8 @@ func (s *Server) serverCases(r *http.Request, serverID, owner ids.ID) ([]staffCa
 	cs := s.caseStateFor(ctx, owner)
 	out := []staffCase{}
 	for _, c := range all {
-		if c.Action != store.ActionServerReset || serverIDOf(c) != serverID {
+		// its own parts taken back, and its emoji and packs taken down
+		if (c.Action != store.ActionServerReset && c.Action != store.ActionExpressionTakedown) || serverIDOf(c) != serverID {
 			continue
 		}
 		out = append(out, toStaffCase(c, cs, nil))
@@ -126,7 +133,8 @@ func (s *Server) serverCases(r *http.Request, serverID, owner ids.ID) ([]staffCa
 	return out, nil
 }
 
-// serverIDOf is the server a server_reset case was about.
+// serverIDOf is the server a server_reset case was about, or an
+// expression_takedown about a server's emoji or pack.
 func serverIDOf(c *store.ModCase) ids.ID {
 	var d struct {
 		ServerID ids.ID `json:"server_id"`

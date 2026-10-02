@@ -1,22 +1,26 @@
-import { CalendarDays, ChevronLeft, ChevronRight, Copy, Eraser, FolderOpen, Gavel, Hash, ImageOff, Users } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Copy, Eraser, FolderOpen, Gavel, Hash, ImageOff, Smile, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { moderation as modApi, type ModServer, type People, type ServerField, type StaffCase } from "@/api/moderation";
+import { moderation as modApi, type ModPack, type ModServer, type People, type ServerField, type StaffCase } from "@/api/moderation";
+import type { Emoji } from "@/api/types";
 import { bannerUrl } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { profileTheme } from "@/lib/avatarColor";
 import { copyAndSay } from "@/lib/copyText";
-import { actionIcon, actionLabel, fieldLabel, fullDate, personName, previewText, severity } from "@/lib/moderation";
+import { actionIcon, actionLabel, expressionSummary, fieldLabel, fullDate, personName, previewText, severity } from "@/lib/moderation";
 import { formatRelative, formatShortDate } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { t } from "@/i18n";
+import { ExpressionPic, PackRows } from "./ExpressionsTab";
+import { ModerateEmojiModal } from "./ModerateEmojiModal";
 import { ModerateServerModal } from "./ModerateServerModal";
 import { ServerIcon } from "./ProfileSheet";
 import { serverBlockedText } from "./ServersTab";
 import m from "./Moderation.module.css";
 import p from "./Sheet.module.css";
+import x from "./Expressions.module.css";
 
 /**
  * One server, for the staff: what it shows everyone from outside, with a way
@@ -33,6 +37,10 @@ export function ServerPage() {
   const [failed, setFailed] = useState(false);
   const [moderating, setModerating] = useState<ServerField[] | null>(null);
   const [hl, setHl] = useState<ServerField | null>(null);
+  const [emojis, setEmojis] = useState<Emoji[]>([]);
+  const [packs, setPacks] = useState<ModPack[]>([]);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [takingEmoji, setTakingEmoji] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -40,6 +48,9 @@ export function ServerPage() {
       setServer(r.server);
       setCases(r.cases);
       setPeople(r.people);
+      setEmojis(r.emojis ?? []);
+      setPacks(r.packs ?? []);
+      setPicked((cur) => cur.filter((id) => (r.emojis ?? []).some((e) => e.id === id)));
       mergePeople(r.people);
     } catch {
       setFailed(true);
@@ -53,7 +64,7 @@ export function ServerPage() {
   }, [load]);
 
   useModEvents((e) => {
-    if (e.type === "case" && e.case.action === "server_reset" && e.case.details.server_id === serverId) void load();
+    if (e.type === "case" && (e.case.action === "server_reset" || e.case.action === "expression_takedown") && e.case.details.server_id === serverId) void load();
   });
 
   if (failed) {
@@ -178,6 +189,51 @@ export function ServerPage() {
               </button>
             </section>
 
+            <section className={p.panel} aria-labelledby="server-emoji">
+              <header className={p.panelHead}>
+                <h3 id="server-emoji" className={p.panelTitle}>{t("moderation.packs.serverEmojiTitle", { count: emojis.length })}</h3>
+                {emojis.length ? <p className={p.panelHint}>{blocked || t("moderation.packs.serverEmojiHint")}</p> : null}
+              </header>
+              {emojis.length ? (
+                <>
+                  <div className={x.pickGrid} data-kind="emoji" role="group" aria-label={t("moderation.packs.pickHint")}>
+                    {emojis.map((e) => (
+                      <label key={e.id} className={x.tile} data-picked={picked.includes(e.id)} data-disabled={!!blocked || undefined} data-testid="server-emoji">
+                        <input type="checkbox" checked={picked.includes(e.id)} disabled={!!blocked} onChange={() => setPicked((cur) => (cur.includes(e.id) ? cur.filter((y) => y !== e.id) : [...cur, e.id]))} aria-label={`:${e.name}:`} />
+                        <span className={x.tilePic}>
+                          <ExpressionPic kind="emoji" blobId={e.blob_id} name={e.name} size={48} />
+                        </span>
+                        <span className={x.tileName} dir="auto">:{e.name}:</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className={x.pickBar} hidden={!picked.length} data-testid="emoji-pick-bar">
+                    <span className={x.pickCount}>{t("moderation.packs.pickedCount", { count: picked.length })}</span>
+                    <Button size="sm" variant="ghost" onClick={() => setPicked([])}>
+                      {t("moderation.packs.clearPicked")}
+                    </Button>
+                    <span className={x.grow} />
+                    <Button size="sm" variant="danger" onClick={() => setTakingEmoji(true)} data-testid="emoji-take-picked">
+                      <Gavel size={15} aria-hidden="true" /> {t("moderation.packs.takeDownPicked")}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className={p.panelEmpty}>
+                  <Smile size={16} aria-hidden="true" /> {t("moderation.packs.noServerEmoji")}
+                </p>
+              )}
+            </section>
+
+            {packs.length ? (
+              <section className={p.panel} aria-labelledby="server-packs">
+                <header className={p.panelHead}>
+                  <h3 id="server-packs" className={p.panelTitle}>{t("moderation.packs.serverPacksTitle", { count: packs.length })}</h3>
+                </header>
+                <PackRows packs={packs} onOpen={(id) => nav(`/channels/@admin/expressions/packs/${id}`)} />
+              </section>
+            ) : null}
+
             <section className={p.panel} aria-labelledby="server-cases">
               <header className={p.panelHead}>
                 <h3 id="server-cases" className={p.panelTitle}>{t("moderation.servers.casesTitle")}</h3>
@@ -194,7 +250,7 @@ export function ServerPage() {
                           </span>
                           <span className={p.serverText}>
                             <span className={p.serverName}>{t("moderation.case.titled", { number: c.number, action: actionLabel(c.action) })}</span>
-                            <span className={p.serverMeta}>{previewText(c.reason)}</span>
+                            <span className={p.serverMeta}>{c.action === "expression_takedown" ? expressionSummary(c.details) : previewText(c.reason)}</span>
                           </span>
                           <span className={p.serverMeta} title={fullDate(c.created_at)}>{formatRelative(c.created_at)}</span>
                         </button>
@@ -241,6 +297,18 @@ export function ServerPage() {
         </div>
       </div>
       {moderating ? <ModerateServerModal server={server} owner={owner} preset={moderating} onClose={() => setModerating(null)} onDone={() => void load()} /> : null}
+      {takingEmoji ? (
+        <ModerateEmojiModal
+          server={{ id: server.id, name: server.name, icon_id: server.icon_id, owner_id: server.owner_id }}
+          owner={owner}
+          emojis={emojis.filter((e) => picked.includes(e.id))}
+          onClose={() => setTakingEmoji(false)}
+          onDone={() => {
+            setPicked([]);
+            void load();
+          }}
+        />
+      ) : null}
     </>
   );
 }

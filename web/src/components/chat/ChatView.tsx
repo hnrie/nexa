@@ -30,6 +30,7 @@ import sc from "@/components/search/Search.module.css";
 import { VoiceView } from "@/components/voice/VoiceView";
 import { useVoice } from "@/stores/voice";
 import { useSelection } from "@/stores/selection";
+import { useMessages } from "@/stores/messages";
 import { joinVoice, toggleCamera } from "@/voice/session";
 import { MessageList } from "./MessageList";
 import { SubchatPanel } from "./SubchatPanel";
@@ -363,7 +364,18 @@ export function ChatView({ channel }: { channel: Channel }) {
           {!isServer ? <CallBanner channelId={convo.id} /> : null}
           {!isServer && inThisCall ? <VoiceView channel={convo} embedded /> : null}
           {locked ? (
-            <LockedChannel channel={channel} onUnlocked={() => setUnlocked(true)} checkFailed={lockFailed} onRecheck={() => setRecheck((n) => n + 1)} />
+            <LockedChannel
+              channel={channel}
+              onUnlocked={() => {
+                // A message that came in while it was locked made the list try to
+                // load it, and the server said no; it said "could not be loaded"
+                // for a second after the password before trying again.
+                useMessages.getState().forgetFailures(channel.id);
+                setUnlocked(true);
+              }}
+              checkFailed={lockFailed}
+              onRecheck={() => setRecheck((n) => n + 1)}
+            />
           ) : (
             <>
               <MessageList key={channel.id} channel={channel} />

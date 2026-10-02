@@ -168,9 +168,36 @@ describe("the text box menu", () => {
     expect(ids(await opened())[0]).toBe("undo");
   });
 
-  it("leaves an older desktop app its own menu, which can paste", () => {
+  it("gives an older desktop app the same menu, whose Paste offers the update it needs", async () => {
     (window as { evilionDesktop?: unknown }).evilionDesktop = { version: "1.0.5" };
-    expect(rightClick(box("hello")).defaultPrevented).toBe(false);
+    const ta = box("hello");
+    expect(rightClick(ta).defaultPrevented).toBe(true);
+    const items = await opened();
+    expect(ids(items)).toEqual(["undo", "redo", "cut", "copy", "paste", "selectAll"]);
+    const paste = items.find((i) => i.id === "paste")!;
+    expect(paste.warn).toBeTruthy();
+    expect(paste.keys).toBeUndefined();
+    paste.onSelect!();
+    expect(useUI.getState().modals.at(-1)?.kind).toBe("pasteUpdate");
+  });
+
+  it("gives words picked out on the page, and links, a menu of the app's own", async () => {
+    document.body.innerHTML = `<p id="p">some words <a id="a" href="https://example.com/x">a link</a></p>`;
+    const words = document.getElementById("p")!.firstChild!;
+    const range = document.createRange();
+    range.setStart(words, 0);
+    range.setEnd(words, 4);
+    getSelection()!.removeAllRanges();
+    getSelection()!.addRange(range);
+    expect(rightClick(document.getElementById("p")!).defaultPrevented).toBe(true);
+    expect(ids(await opened())).toEqual(["copy"]);
+    useUI.setState({ contextMenu: null });
+    getSelection()!.removeAllRanges();
+    rightClick(document.getElementById("a")!);
+    expect(ids(await opened())).toEqual(["open-link", "copy-link"]);
+    useUI.setState({ contextMenu: null });
+    // anywhere else, the browser's own
+    expect(rightClick(document.body).defaultPrevented).toBe(false);
     expect(useUI.getState().contextMenu).toBeNull();
   });
 

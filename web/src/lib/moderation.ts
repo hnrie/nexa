@@ -3,8 +3,8 @@
  * the ban screen and the staff's panel all describe the same action the same
  * way — in the reader's language.
  */
-import { Ban, Eraser, ImageOff, KeyRound, Lock, LockOpen, Megaphone, MessageSquareOff, ServerCog, ShieldMinus, ShieldPlus, UserX, type LucideIcon } from "lucide-react";
-import type { CaseDetails, CaseMessage, MemberCase, ModAction, ModLogEntry, People, Person, ResetField, ServerField } from "@/api/moderation";
+import { Ban, Eraser, ImageOff, KeyRound, Lock, LockOpen, Megaphone, MessageSquareOff, ServerCog, ShieldMinus, ShieldPlus, Sticker, UserX, type LucideIcon } from "lucide-react";
+import type { CaseDetails, CaseMessage, MemberCase, ModAction, ModLogEntry, PackField, People, Person, ResetField, ServerField } from "@/api/moderation";
 import type { BugStatus } from "@/api/bugs";
 import { bugStatusLabel } from "@/lib/bugs";
 import { formatStamp } from "@/lib/time";
@@ -34,6 +34,7 @@ export function severity(action: string): Severity {
     case "field_reset":
     case "avatar_remove":
     case "server_reset":
+    case "expression_takedown":
     case "admin_revoke":
       return "warn";
     default:
@@ -49,6 +50,8 @@ export function actionIcon(action: string): LucideIcon {
       return Eraser;
     case "server_reset":
       return ServerCog;
+    case "expression_takedown":
+      return Sticker;
     case "mute":
       return MessageSquareOff;
     case "ban":
@@ -58,6 +61,7 @@ export function actionIcon(action: string): LucideIcon {
       return UserX;
     case "unmute":
     case "unban":
+    case "expression_relist":
       return LockOpen;
     case "announcement":
     case "announcement_delete":
@@ -82,6 +86,10 @@ export function actionLabel(action: string): string {
       return t("moderation.action.fieldReset");
     case "server_reset":
       return t("moderation.action.serverReset");
+    case "expression_takedown":
+      return t("moderation.action.expressionTakedown");
+    case "expression_relist":
+      return t("moderation.action.expressionRelist");
     case "mute":
       return t("moderation.action.mute");
     case "ban":
@@ -108,6 +116,18 @@ export function actionLabel(action: string): string {
       return t("moderation.action.accountDeleteProfile");
     default:
       return action;
+  }
+}
+
+/** A pack's parts, as a takedown names them. */
+export function packFieldLabel(f: PackField): string {
+  switch (f) {
+    case "name":
+      return t("moderation.field.packName");
+    case "description":
+      return t("moderation.field.packDescription");
+    default:
+      return t("moderation.field.packPublic");
   }
 }
 
@@ -178,6 +198,11 @@ export function noticeTitle(action: ModAction, d: CaseDetails): string {
       return t("nexa.notice.titleFieldReset");
     case "server_reset":
       return t("nexa.notice.titleServerReset");
+    case "expression_takedown":
+      if (d.deleted) return d.pack_kind === "emoji" ? t("nexa.notice.titleEmojiPackRemoved") : t("nexa.notice.titleStickerPackRemoved");
+      if (d.emojis?.length) return t("nexa.notice.titleServerEmoji");
+      if (d.stickers?.length && !d.fields?.length) return d.pack_kind === "emoji" ? t("nexa.notice.titlePackEmoji") : t("nexa.notice.titlePackStickers");
+      return t("nexa.notice.titlePack");
     case "mute":
       return t("nexa.notice.titleMute");
     case "ban":
@@ -196,6 +221,13 @@ export function noticeExplainer(c: Pick<MemberCase, "action" | "details" | "expi
       return c.details.fields?.includes("username") ? t("nexa.notice.explainUsername") : t("nexa.notice.explainFields");
     case "server_reset":
       return t("nexa.notice.explainServer", { name: c.details.server_name ?? "" });
+    case "expression_takedown": {
+      const d = c.details;
+      if (d.deleted) return t("nexa.notice.explainPackRemoved", { name: d.pack_name ?? "" });
+      if (d.emojis?.length) return t("nexa.notice.explainServerEmoji", { name: d.server_name ?? "" });
+      if (d.fields?.length) return t("nexa.notice.explainPackParts", { name: d.pack_name ?? "" });
+      return d.pack_kind === "emoji" ? t("nexa.notice.explainPackEmoji", { name: d.pack_name ?? "" }) : t("nexa.notice.explainPackItems", { name: d.pack_name ?? "" });
+    }
     case "mute":
       return t("nexa.notice.explainMute");
     case "ban":
@@ -284,11 +316,17 @@ export function logDetail(e: ModLogEntry): string {
       if (d.permanent) return t("moderation.log.permanent");
       return d.duration_ms ? t("moderation.log.forSpan", { span: formatSpan(d.duration_ms) }) : "";
     case "field_reset":
-      return (d.fields ?? []).map((f) => fieldLabel(f)).join(", ");
+      return (d.fields ?? []).map((f) => fieldLabel(f as ResetField)).join(", ");
     case "server_reset":
-      return d.server_name ? t("moderation.log.serverFields", { name: d.server_name, fields: (d.fields ?? []).map((f) => fieldLabel(f)).join(", ") }) : "";
+      return d.server_name ? t("moderation.log.serverFields", { name: d.server_name, fields: (d.fields ?? []).map((f) => fieldLabel(f as ServerField)).join(", ") }) : "";
     case "avatar_remove":
       return [d.avatar ? t("moderation.field.avatar") : "", d.banner ? t("moderation.field.banner") : ""].filter(Boolean).join(", ");
+    case "expression_takedown":
+      return expressionSummary(d);
+    case "expression_relist": {
+      const name = (e.details as { pack_name?: string }).pack_name;
+      return name ? `“${name}”` : "";
+    }
     case "delete":
       return d.counts ? t("moderation.log.deleteCounts", { messages: d.counts.messages, servers: d.counts.owned_servers }) : "";
     case "announcement":
@@ -301,10 +339,21 @@ export function logDetail(e: ModLogEntry): string {
   }
 }
 
+/** What an expression_takedown took, in a line: "2 stickers from Cats", "Cats, deleted", "3 emoji in Night Owls". */
+export function expressionSummary(d: CaseDetails): string {
+  if (d.deleted) return t("moderation.log.packDeleted", { name: d.pack_name ?? "" });
+  const parts: string[] = [];
+  if (d.stickers?.length) parts.push(t("moderation.log.stickersFrom", { count: d.stickers.length, name: d.pack_name ?? "" }));
+  if (d.emojis?.length) parts.push(t("moderation.log.emojiIn", { count: d.emojis.length, name: d.server_name ?? "" }));
+  const fields = (d.fields ?? []).filter((f): f is PackField => f === "name" || f === "description" || f === "public");
+  if (fields.length) parts.push(t("moderation.log.packFields", { fields: fields.map((f) => packFieldLabel(f)).join(", "), name: d.pack_name ?? "" }));
+  return parts.join("; ");
+}
+
 /** Log filters as the panel groups them. */
 export const LOG_GROUPS: Record<string, string[]> = {
-  punishments: ["avatar_remove", "field_reset", "server_reset", "mute", "ban", "delete", "account_delete_profile"],
-  lifts: ["unmute", "unban"],
+  punishments: ["avatar_remove", "field_reset", "server_reset", "expression_takedown", "mute", "ban", "delete", "account_delete_profile"],
+  lifts: ["unmute", "unban", "expression_relist"],
   announcements: ["announcement", "announcement_delete"],
   access: ["admin_grant", "admin_revoke", "account_disable", "account_enable"],
 };

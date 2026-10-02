@@ -148,6 +148,10 @@
 .square { width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--profile-chip); color: var(--text-strong); box-shadow: inset 0 1px 0 var(--edge-light); transition: background var(--transition), transform 90ms var(--ease-out); }
 .square:hover { background: var(--profile-chip-hover); }
 .square:active { transform: scale(0.94); }
+/* a second action in words, beside .primary: the chip's colour at the primary's size (a visitor's Create an Account) */
+.pill { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 18px; border-radius: 999px; background: var(--profile-chip); color: var(--text-strong); font-size: 15px; font-weight: 650; box-shadow: inset 0 1px 0 var(--edge-light); transition: background var(--transition), transform 90ms var(--ease-out); }
+.pill:hover { background: var(--profile-chip-hover); text-decoration: none; }
+.pill:active { transform: translateY(1px) scale(0.98); }
 
 .mutualRow { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; max-width: 100%; font-size: 14px; line-height: 20px; color: var(--text-subtle); text-align: start; }
 .mutualRow:hover > span:last-child { text-decoration: underline; }

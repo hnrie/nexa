@@ -122,6 +122,14 @@
   },
   {
    "part": "web",
+   "name": "@sapphi-red/web-noise-suppressor",
+   "version": "0.4.1",
+   "license": "MIT",
+   "url": "https://github.com/sapphi-red/web-noise-suppressor#readme",
+   "copyright": "Copyright (c) 2022 翠 / green"
+  },
+  {
+   "part": "web",
    "name": "@tanstack/react-virtual",
    "version": "3.14.12",
    "license": "MIT",
@@ -705,6 +713,22 @@
   },
   {
    "part": "server",
+   "name": "github.com/mattn/go-isatty",
+   "version": "v0.0.24",
+   "license": "MIT",
+   "url": "https://pkg.go.dev/github.com/mattn/go-isatty",
+   "copyright": "Copyright (c) Yasuhiro MATSUMOTO <mattn.jp@gmail.com>"
+  },
+  {
+   "part": "server",
+   "name": "github.com/ncruces/go-strftime",
+   "version": "v1.0.0",
+   "license": "MIT",
+   "url": "https://pkg.go.dev/github.com/ncruces/go-strftime",
+   "copyright": "Copyright (c) 2022 Nuno Cruces"
+  },
+  {
+   "part": "server",
    "name": "github.com/redis/go-redis/v9",
    "version": "v9.22.0",
    "license": "BSD-2-Clause",
@@ -814,6 +838,22 @@
    "license": "BSD-3-Clause",
    "url": "https://pkg.go.dev/modernc.org/sqlite",
    "copyright": "Copyright (c) 2017 The Sqlite Authors. All rights reserved."
+  },
+  {
+   "part": "assets",
+   "name": "RNNoise",
+   "version": "2022.1.0",
+   "license": "BSD-3-Clause",
+   "url": "https://github.com/shiguredo/rnnoise",
+   "copyright": "Copyright (c) 2021, Shiguredo Inc.; Copyright (c) 2017, Mozilla; Copyright (c) 2007-2017, Jean-Marc Valin; Copyright (c) 2005-2017, Xiph.Org Foundation; Copyright (c) 2003-2004, Mark Borgerding"
+  },
+  {
+   "part": "assets",
+   "name": "rnnoise-wasm",
+   "version": "2022.2.0",
+   "license": "Apache-2.0",
+   "url": "https://github.com/shiguredo/rnnoise-wasm",
+   "copyright": "Copyright 2021-2021, Takeru Ohta (Original Author); Copyright 2021-2021, Shiguredo Inc."
   },
   {
    "part": "assets",

@@ -1,0 +1,19 @@
+/* A profile link's page (ProfilePage.tsx). The frame is the invite page's
+   (InvitePage.module.css): the wordmark over the canvas and its glow, the
+   card in the middle when it fits. What is the person's own is the card,
+   which is their profile as the app draws it, and the glow, which takes
+   their colour once it is known, eased in from Nexa's. */
+@property --profile-glow { syntax: "<color>"; inherits: true; initial-value: #8000ff; }
+
+.page { --profile-glow: var(--brand); height: 100%; display: flex; flex-direction: column; align-items: center; gap: 28px; padding: 24px 16px; padding-bottom: max(24px, env(safe-area-inset-bottom)); background: radial-gradient(70% 55% at 50% -8%, color-mix(in srgb, var(--profile-glow) 32%, transparent), transparent 72%), radial-gradient(45% 40% at 88% 108%, color-mix(in srgb, var(--profile-glow) 16%, transparent), transparent 70%), var(--bg-canvas); overflow-y: auto; overscroll-behavior: contain; transition: --profile-glow 700ms var(--ease-out); }
+.brand { margin-top: auto; flex-shrink: 0; display: flex; color: var(--text-strong); border-radius: var(--radius-xs); filter: drop-shadow(0 6px 24px color-mix(in srgb, var(--profile-glow) 55%, transparent)); animation: rise 520ms var(--ease-out) both; }
+.brand:hover { text-decoration: none; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+.main { margin-bottom: auto; flex-shrink: 0; width: 100%; display: flex; justify-content: center; }
+/* the card brings its own edges and shadow; this adds the light it throws in their colour */
+.profile { width: 100%; max-width: 600px; border-radius: var(--radius-lg); box-shadow: 0 40px 100px -40px color-mix(in srgb, var(--profile-glow) 60%, transparent); animation: rise 520ms var(--ease-out) 60ms both; }
+/* a dead link or a failed load is the invite page's own card */
+.main > [data-gone] { max-width: 440px; border-radius: var(--radius-xl); box-shadow: inset 0 1px 0 var(--edge-light-strong), 0 0 0 1px var(--panel-edge), var(--shadow-high), 0 40px 100px -40px color-mix(in srgb, var(--brand) 55%, transparent); animation: rise 520ms var(--ease-out) 60ms both; }
+.waiting { display: flex; justify-content: center; padding: 48px 0; }
+@media (max-width: 480px) { .main > [data-gone] { border-radius: var(--radius-lg); } }
+@media (prefers-reduced-motion: reduce) { .page { transition: none; } .brand, .profile, .main > [data-gone] { animation: none; } }

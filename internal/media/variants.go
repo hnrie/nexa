@@ -74,7 +74,7 @@ func (m *Store) removeVariants(sha string) {
 // since Lottie and video cannot be drawn here.
 func (m *Store) ServePublicSized(w http.ResponseWriter, r *http.Request, kind string, id ids.ID, size int, still bool) bool {
 	b, err := m.st.BlobByID(r.Context(), id)
-	if err != nil || b.Kind != kind || b.Encrypted || !PublicKinds[kind] {
+	if err != nil || b.Kind != kind || b.Encrypted || b.Blocked || !PublicKinds[kind] {
 		return false
 	}
 	width, height := 0, 0

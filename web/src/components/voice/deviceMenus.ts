@@ -1,6 +1,7 @@
 import { useSettings } from "@/stores/settings";
 import type { ContextMenuItem } from "@/stores/ui";
 import { defaultDeviceLabel, listDevices, realDevices as real } from "@/voice/media";
+import { noiseMenuItems } from "@/voice/noiseMode";
 import { canChooseOutput } from "@/voice/output";
 
 import { t } from "@/i18n";
@@ -15,8 +16,9 @@ function nameOf(d: MediaDeviceInfo, i: number, kind: "microphone" | "speakers" |
 
 /**
  * The menu under the mute button: which microphone the call uses and, where
- * the browser can route it, which speakers it plays through. A choice takes
- * effect at once, in a call too, and is the same one the voice settings show.
+ * the browser can route it, which speakers it plays through, and how noise is
+ * taken out of the microphone. A choice takes effect at once, in a call too,
+ * and is the same one the voice settings show.
  */
 export async function micMenuItems(openModal: OpenModal, opts: { settings?: boolean } = {}): Promise<ContextMenuItem[]> {
   const devices = await listDevices().catch(() => ({ inputs: [], outputs: [], cameras: [] }));
@@ -37,6 +39,8 @@ export async function micMenuItems(openModal: OpenModal, opts: { settings?: bool
       items.push({ id: `output-${d.deviceId}`, label: nameOf(d, i, "speakers"), checked: v.outputDeviceId === d.deviceId, onSelect: () => set({ outputDeviceId: d.deviceId, outputDeviceLabel: d.label || null }) });
     });
   }
+  items[items.length - 1]!.separatorAfter = true;
+  items.push(...noiseMenuItems());
   if (opts.settings === false) return items;
   items[items.length - 1]!.separatorAfter = true;
   items.push({ id: "voice-settings", label: t("voice.deviceMenus.voiceSettings"), onSelect: () => openModal("settings", { page: "voice" }) });

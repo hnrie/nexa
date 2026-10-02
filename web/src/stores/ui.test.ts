@@ -54,3 +54,28 @@ describe("setActiveChannel", () => {
     expect(useUI.getState().editing).toBeNull();
   });
 });
+
+describe("setModalProps", () => {
+  beforeEach(() => useUI.getState().closeAllModals());
+
+  it("adds to an open modal's props, for it to find again when it is drawn anew", () => {
+    useUI.getState().openModal("settings", { page: "account" });
+    useUI.getState().openModal("confirm", { title: "Sure?" });
+    const settings = useUI.getState().modals[0]!;
+    useUI.getState().setModalProps(settings.id!, { resume: "language" });
+    const [a, b] = useUI.getState().modals;
+    expect(a!.props).toEqual({ page: "account", resume: "language" });
+    // the one above it, and which is on top, are left as they were
+    expect(b!.props).toEqual({ title: "Sure?" });
+    expect(useUI.getState().modal?.kind).toBe("confirm");
+  });
+
+  it("does nothing for a modal that has closed", () => {
+    useUI.getState().openModal("settings", { page: "account" });
+    const id = useUI.getState().modals[0]!.id!;
+    useUI.getState().closeModal(id);
+    const before = useUI.getState();
+    useUI.getState().setModalProps(id, { resume: "language" });
+    expect(useUI.getState().modals).toBe(before.modals);
+  });
+});

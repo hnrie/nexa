@@ -24,6 +24,7 @@ import { Attachments } from "./Attachments";
 import { UploadCard } from "./UploadCard";
 import { Embeds } from "./Embeds";
 import { InviteCards } from "./InviteCards";
+import { ProfileCards } from "./ProfileCards";
 import { NoteCards } from "@/components/notes/NoteCards";
 import { MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
 import type { UnfurlResult } from "@/api/types";
@@ -334,6 +335,7 @@ export function MessageBody({ msg, name, id, pending, upload }: { msg: Decrypted
       {embeds ? <Embeds list={embeds} onRemove={!pending && canRemoveEmbeds(msg) ? (ev) => confirmRemoveEmbeds(msg, ev.shiftKey) : undefined} /> : null}
       {hook ? <HookBody msg={msg} from={name} /> : null}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <InviteCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
+      {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <ProfileCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <NoteCards nodes={nodes} />}
       {pending === "failed" ? (
         <div className={s.failedRow}>

@@ -11,7 +11,7 @@
  */
 
 /** Where a link to this app leads. `hash` keeps an invite's or a note's key, which never leaves the device. */
-export type AppLink = { kind: "invite"; code: string; hash: string } | { kind: "note"; token: string; hash: string } | { kind: "route"; path: string };
+export type AppLink = { kind: "invite"; code: string; hash: string } | { kind: "note"; token: string; hash: string } | { kind: "profile"; username: string } | { kind: "route"; path: string };
 
 /** An invite link found in a message: its code, and the key in its fragment when it has one. */
 export interface InviteLinkRef {
@@ -21,14 +21,27 @@ export interface InviteLinkRef {
 }
 
 let publicHost: string | null = null;
+let publicOrigin: string | null = null;
 
 /** Remembers Nexa's public address, as GET /instance reports it. */
 export function setPublicUrl(url: string | null | undefined): void {
   try {
-    publicHost = url ? new URL(url).host.toLowerCase() : null;
+    const u = url ? new URL(url) : null;
+    publicHost = u ? u.host.toLowerCase() : null;
+    publicOrigin = u ? u.origin : null;
   } catch {
     publicHost = null;
+    publicOrigin = null;
   }
+}
+
+/**
+ * The address a link made to be shared starts with: Nexa's public one, so a
+ * link copied at another of its addresses, or in the desktop app, still reads
+ * as Nexa's own. The page's own address until the server has said.
+ */
+export function shareOrigin(): string {
+  return publicOrigin ?? (typeof window === "undefined" ? "" : window.location.origin);
 }
 
 /** Paths the server answers itself (files, media, the API), which the router knows nothing of. */
@@ -44,6 +57,8 @@ const INVITE_PATH = /^\/invite\/([A-Za-z0-9_-]{1,64})\/?$/;
 /** A note's share link (crypto/notes.ts): its token, and its key after the #. */
 const NOTE_PATH = /^\/note\/([A-Za-z0-9_-]{16,128})\/?$/;
 const MESSAGE_PATH = /^\/channels\/(@me|\d+)\/(\d+)\/(\d+)\/?$/;
+/** A profile link (lib/profileLinks): an @ and a username, which may have dots in it like a file's name. */
+const PROFILE_PATH = /^\/@([A-Za-z0-9_.]{2,32})\/?$/;
 
 interface Here {
   href: string;
@@ -68,6 +83,9 @@ export function appLink(href: string, here: Here = window.location): AppLink | n
   const host = u.host.toLowerCase();
   if (host !== here.host.toLowerCase() && host !== publicHost) return null;
   const path = u.pathname;
+  // before the file test: "@maya.dev" is a username, not a file
+  const profile = PROFILE_PATH.exec(path);
+  if (profile) return { kind: "profile", username: profile[1]!.toLowerCase() };
   if (SERVER_PATH.test(path) || FILE_PATH.test(path) || OWN_SESSION.test(path)) return null;
   // a footnote or a table of contents on the page being read
   if (u.hash && path === cur.pathname && u.search === cur.search) return null;
@@ -90,9 +108,10 @@ export function messageTarget(path: string): { channelId: string; messageId: str
   return m ? { channelId: m[2]!, messageId: m[3]! } : null;
 }
 
-/** How many invite cards one message shows at most, and how many note cards. */
+/** How many invite cards one message shows at most, how many note cards, and how many profile cards. */
 export const MAX_INVITE_CARDS = 3;
 export const MAX_NOTE_CARDS = 3;
+export const MAX_PROFILE_CARDS = 3;
 
 /** A note's share link found in a message: its token, the key in its fragment, and the link as written. */
 export interface NoteLinkRef {
@@ -154,6 +173,27 @@ export function inviteLinksIn(nodes: unknown, here: Here = window.location): Inv
       out.push({ code: link.code, hash: link.hash, url });
     }
     return out.length < MAX_INVITE_CARDS;
+  });
+  return out;
+}
+
+/** A profile link found in a message: whose, and the link as written. */
+export interface ProfileLinkRef {
+  username: string;
+  url: string;
+}
+
+/** The profiles a message links to, in order and each once. */
+export function profileLinksIn(nodes: unknown, here: Here = window.location): ProfileLinkRef[] {
+  const out: ProfileLinkRef[] = [];
+  const seen = new Set<string>();
+  eachLink(nodes, (url) => {
+    const link = appLink(url, here);
+    if (link?.kind === "profile" && !seen.has(link.username)) {
+      seen.add(link.username);
+      out.push({ username: link.username, url });
+    }
+    return out.length < MAX_PROFILE_CARDS;
   });
   return out;
 }

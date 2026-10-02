@@ -1,4 +1,4 @@
-import { ArrowDownUp, ChevronDown, GripVertical, Lock, MessageCircle, MoreHorizontal, NotebookPen, Pin, Plus, Search, Shield, Users, X } from "lucide-react";
+import { ChevronDown, GripVertical, Lock, MessageCircle, MoreHorizontal, NotebookPen, Pin, Plus, Search, Shield, Users, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/common/Avatar";
 import { menuAnchor } from "@/components/common/ContextMenu";
@@ -8,7 +8,7 @@ import { useMediaQuery } from "@/hooks/useIsMobile";
 import { useReorder } from "@/hooks/useReorder";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { compareIds, idAt } from "@/lib/ids";
-import { dmListView, dropDM, groupOf, isGroupId, moveInMain, movePinnedDM, NEXA_ID, pruneDMs, rowId, setDMSort, setGroupCollapsed, type DMDrop, type DMRow } from "@/lib/dmLayout";
+import { dmListView, dropDM, groupOf, isGroupId, moveInMain, movePinnedDM, NEXA_ID, pruneDMs, rowId, setGroupCollapsed, type DMDrop, type DMRow } from "@/lib/dmLayout";
 import { useOwnerId } from "@/lib/owner";
 import { isInstanceAdmin } from "@/stores/servers";
 import { useAuth } from "@/stores/auth";
@@ -82,7 +82,6 @@ export function DMSidebar() {
   const activeChannel = active ? channels[active] : undefined;
   const activeConvo = activeChannel?.type === "subchat" ? (activeChannel.parent_id ?? undefined) : active;
   const layout = settings.dmList;
-  const custom = layout.sort === "custom";
   // HTML5 dragging is for a mouse; on a touch screen rows are dragged by their handles while picking
   const canDrag = useMediaQuery("(hover: hover) and (pointer: fine)");
   const [drag, setDragShown] = useState<string | null>(null);
@@ -161,8 +160,8 @@ export function DMSidebar() {
   };
 
   // Pinned conversations and groups move up and down among themselves, with
-  // Alt and an arrow or from their menus; so does the main list once it is
-  // sorted by hand. By activity, the main list keeps to it.
+  // Alt and an arrow or from their menus, and so do the main list's rows,
+  // which then stay put until something new happens in them.
   const pinnedIds = view.pinned.map((r) => (r.kind === "group" ? r.group.id : r.id));
   const reorder = useReorder({
     ids: pinnedIds,
@@ -173,11 +172,11 @@ export function DMSidebar() {
   });
   const reorderMain = useReorder({
     ids: restIds,
-    canMove: (id) => custom && restIds.includes(id),
+    canMove: (id) => restIds.includes(id),
     name: (id) => rowName(id),
     move: (id, delta) => {
       const to = restIds[restIds.indexOf(id) + delta];
-      return !!to && changeDMList((l) => moveInMain(l, id, to, delta > 0 ? "after" : "before", restIds));
+      return !!to && changeDMList((l) => moveInMain(l, id, to, delta > 0 ? "after" : "before", restIds, view.keys, view.now));
     },
   });
   const movesFor = (id: string, place: Place) => (place === "pinned" ? reorder.menuItems(id) : place === "main" ? reorderMain.menuItems(id) : []);
@@ -235,7 +234,7 @@ export function DMSidebar() {
         const at = layout.pins.indexOf(id);
         return at < 0 ? null : { at: id, where, drop: { kind: "pinned", index: at + (where === "after" ? 1 : 0) } };
       }
-      return { at: id, where, drop: { kind: "main", at: id, where, rest: restIds } };
+      return { at: id, where, drop: { kind: "main", at: id, where, rest: restIds, keys: view.keys, now: view.now } };
     }
     const groupEl = el.closest<HTMLElement>("[data-group]");
     if (groupEl) {
@@ -247,7 +246,7 @@ export function DMSidebar() {
       const where = half(groupEl, y);
       const at = layout.pins.indexOf(gid);
       if (at >= 0) return { at: gid, where, drop: { kind: "pinned", index: at + (where === "after" ? 1 : 0) } };
-      return { at: gid, where, drop: { kind: "main", at: gid, where, rest: restIds } };
+      return { at: gid, where, drop: { kind: "main", at: gid, where, rest: restIds, keys: view.keys, now: view.now } };
     }
     if (el.closest("[data-dm-head='main'], [data-dm-main]")) {
       // back to the main list from the pins or a group; anything already in it stays where it is
@@ -363,7 +362,7 @@ export function DMSidebar() {
 
   /** Props every conversation row takes for being dragged, picked and arranged. */
   const rowProps = (id: string, place: Place) => {
-    const keys = place === "pinned" ? reorder.onKeyDown(id) : place === "main" && custom ? reorderMain.onKeyDown(id) : undefined;
+    const keys = place === "pinned" ? reorder.onKeyDown(id) : place === "main" ? reorderMain.onKeyDown(id) : undefined;
     return {
       draggable: canDrag,
       "data-dm-row": id,
@@ -537,9 +536,9 @@ export function DMSidebar() {
     }
     // collapsed, it still shows the conversation open in it, so you can see where you are
     const shown = collapsed ? row.ids.filter((id) => id === activeConvo || (id === NEXA_ID && nexaOpen) || picked.includes(id)) : row.ids;
-    const moves = pinned ? reorder.menuItems(g.id) : custom ? reorderMain.menuItems(g.id) : [];
+    const moves = pinned ? reorder.menuItems(g.id) : reorderMain.menuItems(g.id);
     const menu = (): ContextMenuItem[] => dmGroupMenuItems(g, { openModal, unread: anyUnread, moves });
-    const keys = pinned ? reorder.onKeyDown(g.id) : custom ? reorderMain.onKeyDown(g.id) : undefined;
+    const keys = pinned ? reorder.onKeyDown(g.id) : reorderMain.onKeyDown(g.id);
     return (
       <div
         key={g.id}
@@ -562,7 +561,7 @@ export function DMSidebar() {
             openContextMenu({ ...menuPoint(e), label: name, items: menu() });
           }}
           onKeyDown={keys}
-          data-reorder-id={keys ? g.id : undefined}
+          data-reorder-id={g.id}
         >
           <button type="button" className={s.groupToggle} aria-expanded={!collapsed} onClick={() => changeDMList((l) => setGroupCollapsed(l, g.id, !collapsed))} data-testid="dm-group-toggle">
             <ChevronDown size={14} className={s.chev} aria-hidden="true" />
@@ -592,18 +591,18 @@ export function DMSidebar() {
   const renderRow = (row: DMRow, pinned: boolean) => (row.kind === "group" ? groupSection(row, pinned) : conversationRow(row.id, pinned ? "pinned" : "main"));
   const nothing = view.pinned.length === 0 && view.rest.length === 0;
 
-  /** The Direct Messages heading's menu: how the list is sorted, and picking from it. */
+  /**
+   * The Direct Messages heading's menu: picking from the list. There is no
+   * sorting to choose: the list goes by activity, and a conversation moved by
+   * hand stays where it was put until something new happens in it.
+   */
   const listMenu = (e: MouseEvent<HTMLButtonElement>) =>
     openContextMenu({
       x: 0,
       y: 0,
       anchor: menuAnchor(e.currentTarget),
       label: t("sidebar.dMSidebar.directMessages"),
-      items: [
-        { id: "recent", label: t("pick.sortRecent"), checked: !custom, onSelect: () => changeDMList((l) => setDMSort(l, "recent", restIds)) },
-        { id: "custom", label: t("pick.sortManual"), checked: custom, onSelect: () => changeDMList((l) => setDMSort(l, "custom", restIds)), separatorAfter: true },
-        { id: "select", label: t("pick.selectConversations"), onSelect: () => usePick.getState().start("dms") },
-      ],
+      items: [{ id: "select", label: t("pick.selectConversations"), onSelect: () => usePick.getState().start("dms") }],
     });
 
   const bulk = isPicking ? dmBulk(picked, { nav, openModal }) : null;
@@ -664,10 +663,7 @@ export function DMSidebar() {
           </div>
         ) : null}
         <div className={s.header} data-dm-head="main" data-drop={dropAt("main") === "main" || undefined} data-testid="dm-header">
-          <span className={s.headerLabel}>
-            {t("sidebar.dMSidebar.directMessages")}
-            {custom ? <ArrowDownUp size={12} aria-label={t("pick.sortedManually")} /> : null}
-          </span>
+          <span className={s.headerLabel}>{t("sidebar.dMSidebar.directMessages")}</span>
           <span className={s.headerBtns}>
             <button className={s.headerBtn} aria-label={t("pick.listOptions")} title={t("pick.listOptions")} onClick={listMenu} aria-haspopup="menu" data-testid="dm-list-options">
               <MoreHorizontal size={16} />

@@ -35,6 +35,7 @@ import { friendsBulk } from "@/components/friends/friendsBulk";
 import { pickClick, usePick } from "@/stores/pick";
 
 import { t as tr_, translator } from "@/i18n";
+import { copyProfileLink } from "@/lib/profileLinks";
 type Tab = "online" | "all" | "pending" | "blocked" | "add";
 
 const NO_PICKS: string[] = [];
@@ -309,6 +310,7 @@ function FriendRow({ rel, presenceUser, order, picking, picked }: { rel: Relatio
         ...(rel.type !== "blocked"
           ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: () => openBlockDialog(rel.user.id) }]
           : [{ id: "unblock", label: tr_("friends.unblock"), onSelect: () => void unblockUser(rel.user.id) }]),
+        { id: "copy-profile-link", label: tr_("profileLink.copy"), onSelect: () => copyProfileLink(rel.user.username) },
         { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => copyAndSay(rel.user.id, tr_("friends.userIdCopied")), separatorAfter: true },
         // the way into picking on a touch screen, where there is no Ctrl to hold
         { id: "select", label: tr_("pick.select"), onSelect: () => usePick.getState().start("friends", rel.user.id) },

@@ -16,7 +16,8 @@ var PublicKinds = map[string]bool{"avatar": true, "banner": true, "icon": true, 
 // URL must match the stored kind so an attachment can never be fetched here.
 func (m *Store) ServePublic(w http.ResponseWriter, r *http.Request, kind string, id ids.ID) bool {
 	f, b, err := m.Open(r.Context(), id)
-	if err != nil || b.Kind != kind || b.Encrypted || !PublicKinds[kind] {
+	// a picture the staff took down is served to nobody, wherever it is still named
+	if err != nil || b.Kind != kind || b.Encrypted || b.Blocked || !PublicKinds[kind] {
 		if f != nil {
 			f.Close()
 		}

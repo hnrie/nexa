@@ -141,6 +141,18 @@ function scrollTo(top: number): void {
   });
 }
 
+/** The browser says the scroll is over: the finger is up and any fling has run out. */
+function scrollEnded(): void {
+  act(() => {
+    fireEvent(scroller, new Event("scrollend"));
+  });
+}
+
+/** Chrome or a browser built on it, the engine that moves the list under a touch scroll. */
+function asChrome(): void {
+  Object.defineProperty(navigator, "userAgentData", { configurable: true, value: { mobile: true, brands: [] } });
+}
+
 // --- a controllable page of older messages ---------------------------------
 
 const realLoadOlder = useMessages.getState().loadOlder;
@@ -240,6 +252,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  delete (navigator as { userAgentData?: unknown }).userAgentData;
   HTMLElement.prototype.getBoundingClientRect = realRect;
   useMessages.setState({ loadOlder: realLoadOlder, channels: {} });
 });
@@ -383,6 +396,107 @@ describe("MessageList keeping the reading position", () => {
     relayout();
     expect(writes).toBe(0);
     expect(topOf(keeping)).toBe(was);
+  });
+
+  it("holds the list's shape under a moving touch in Chrome, and lands what came once the list stops", () => {
+    // Chrome, while a touch scroll or its fling is under way, keeps the scroll
+    // position from the top: a page landing above threw the reader to the top
+    // of it, and a position written for a message below made the drag lurch.
+    asChrome();
+    seed(60);
+    show();
+    scrollTo(150);
+    scrollEnded();
+    expect(inFlight.asked).toBe(1);
+    const keeping = firstVisible();
+    const was = topOf(keeping);
+    let writes = 0;
+    const own = Object.getOwnPropertyDescriptor(scroller, "scrollTop")!;
+    Object.defineProperty(scroller, "scrollTop", {
+      configurable: true,
+      get: own.get!,
+      set: (v: number) => {
+        writes++;
+        own.set!(v);
+      },
+    });
+    fireEvent.touchStart(scroller);
+    inFlight.land(Array.from({ length: 50 }, (_, i) => String(951 + i)));
+    act(() => useMessages.getState().insert(CHANNEL, [msg("1061")]));
+    heights.set(keeping, ROW + 30);
+    relayout();
+    // nothing new is drawn, and nothing is written, while the finger is down
+    expect(rows()).toHaveLength(60);
+    expect(writes).toBe(0);
+    // more history is not asked for while a page waits for the finger
+    scrollTo(10);
+    expect(inFlight.asked).toBe(1);
+    expect(topOf(keeping)).not.toBe(was);
+    // the finger lifts and the list flings on to the top of what is loaded:
+    // still nothing lands, and the loader says more is coming
+    act(() => {
+      fireEvent.touchEnd(scroller);
+    });
+    scrollTo(0);
+    expect(rows()).toHaveLength(60);
+    expect(inFlight.asked).toBe(1);
+    expect(scroller.querySelector("[data-busy]")).not.toBeNull();
+    const stopped = firstVisible();
+    const stoppedAt = topOf(stopped);
+    scrollEnded();
+    expect(rows()).toHaveLength(111);
+    // the page lands above, and the message below is taken back off: the reader
+    // stays exactly where the fling left them, not at the top of the new page
+    expect(topOf(stopped)).toBe(stoppedAt);
+    expect(firstVisible()).not.toBe("951");
+  });
+
+  it("lands a page that came under a touch that never moved the list as the finger lifts", () => {
+    asChrome();
+    seed(60);
+    show();
+    scrollTo(150);
+    scrollEnded();
+    fireEvent.touchStart(scroller);
+    inFlight.land(Array.from({ length: 50 }, (_, i) => String(951 + i)));
+    expect(rows()).toHaveLength(60);
+    act(() => {
+      fireEvent.touchEnd(scroller);
+    });
+    expect(rows()).toHaveLength(110);
+  });
+
+  it("lands a held page after a quiet spell where the browser never says the scroll ended", () => {
+    vi.useFakeTimers();
+    try {
+      asChrome();
+      seed(60);
+      show();
+      scrollTo(150);
+      fireEvent.touchStart(scroller);
+      inFlight.land(Array.from({ length: 50 }, (_, i) => String(951 + i)));
+      scrollTo(10);
+      act(() => {
+        fireEvent.touchEnd(scroller);
+      });
+      expect(rows()).toHaveLength(60);
+      act(() => {
+        vi.advanceTimersByTime(1600);
+      });
+      expect(rows()).toHaveLength(110);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("leaves touch scrolling outside Chrome as it was", () => {
+    // Safari on an iPhone or iPad: nothing waits for the finger
+    seed(60);
+    show();
+    scrollTo(150);
+    fireEvent.touchStart(scroller);
+    inFlight.land(Array.from({ length: 50 }, (_, i) => String(951 + i)));
+    expect(rows()).toHaveLength(110);
   });
 
   it("asks for one page however hard the list is flung", () => {

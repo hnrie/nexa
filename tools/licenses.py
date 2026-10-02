@@ -336,19 +336,36 @@ def assets_part(collector: Collector) -> int:
     rather than the app importing them, and Twitter's artwork is Creative Commons
     whatever the wrapper's own package.json says.
     """
+    count = 0
     twemoji = ROOT / "web/node_modules/@twemoji/svg/package.json"
     if not twemoji.is_file():
         print("licenses: @twemoji/svg is not installed; the emoji notice is skipped", file=sys.stderr)
-        return 0
-    canonical = CANONICAL / "CC-BY-4.0.txt"
-    collector.add(
-        part="assets", name="Twemoji", version=json.loads(read_text(twemoji)).get("version", ""),
-        license_="CC-BY-4.0", url="https://github.com/jdecked/twemoji",
-        text=read_text(canonical) if canonical.is_file() else None,
-        # The notice Twemoji asks for, which is nowhere in the package that redraws it.
-        notice="Copyright 2019 Twitter, Inc and other contributors",
-    )
-    return 1
+    else:
+        canonical = CANONICAL / "CC-BY-4.0.txt"
+        collector.add(
+            part="assets", name="Twemoji", version=json.loads(read_text(twemoji)).get("version", ""),
+            license_="CC-BY-4.0", url="https://github.com/jdecked/twemoji",
+            text=read_text(canonical) if canonical.is_file() else None,
+            # The notice Twemoji asks for, which is nowhere in the package that redraws it.
+            notice="Copyright 2019 Twitter, Inc and other contributors",
+        )
+        count += 1
+    # RNNoise is compiled into the WebAssembly that @sapphi-red/web-noise-suppressor
+    # ships, by @shiguredo/rnnoise-wasm (2022.2.0 for its 0.4.1), from Shiguredo's
+    # fork of RNNoise at 2022.1.0 (its build-rnnoise.sh). Neither is in a lockfile,
+    # and the wrapper's MIT licence covers only its own code. The notices are the
+    # ones those versions carry; both licence texts are already on the page.
+    if (ROOT / "web/node_modules/@sapphi-red/web-noise-suppressor/package.json").is_file():
+        collector.add(
+            part="assets", name="RNNoise", version="2022.1.0", license_="BSD-3-Clause", url="https://github.com/shiguredo/rnnoise", text=None,
+            notice="Copyright (c) 2021, Shiguredo Inc.; Copyright (c) 2017, Mozilla; Copyright (c) 2007-2017, Jean-Marc Valin; Copyright (c) 2005-2017, Xiph.Org Foundation; Copyright (c) 2003-2004, Mark Borgerding",
+        )
+        collector.add(
+            part="assets", name="rnnoise-wasm", version="2022.2.0", license_="Apache-2.0", url="https://github.com/shiguredo/rnnoise-wasm", text=None,
+            notice="Copyright 2021-2021, Takeru Ohta (Original Author); Copyright 2021-2021, Shiguredo Inc.",
+        )
+        count += 2
+    return count
 
 
 # --------------------------------------------------------------------------- main

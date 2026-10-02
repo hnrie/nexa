@@ -28,7 +28,7 @@ def free_port():
 
 
 class Server:
-    def __init__(self, keep=False, port=None):
+    def __init__(self, keep=False, port=None, public_url=None):
         self.dir = Path(tempfile.mkdtemp(prefix="chat-e2e-"))
         # a run that has to name the server's address before it starts picks the port itself
         self.port = port or free_port()
@@ -41,7 +41,7 @@ class Server:
         web_dist = os.environ.get("E2E_WEB_DIST") or str(ROOT / "web/dist")
         chatd = os.environ.get("E2E_CHATD") or str(ROOT / "bin/chatd")
         # GUEST_LINKS_P2P: calls here go peer to peer, where guest links are off unless asked for
-        env = dict(os.environ, LISTEN=f"127.0.0.1:{self.port}", DATA_DIR=str(self.dir / "data"), WEB_DIST=web_dist, PUBLIC_URL=self.base, LOG_LEVEL="warn", STUN_URLS=os.environ.get("STUN_URLS", "none"), MAX_UPLOAD_BYTES=str(1 << 30), GUEST_LINKS_P2P="1", EGRESS_PROXY=os.environ.get("EGRESS_PROXY", "off"))
+        env = dict(os.environ, LISTEN=f"127.0.0.1:{self.port}", DATA_DIR=str(self.dir / "data"), WEB_DIST=web_dist, PUBLIC_URL=public_url or self.base, LOG_LEVEL="warn", STUN_URLS=os.environ.get("STUN_URLS", "none"), MAX_UPLOAD_BYTES=str(1 << 30), GUEST_LINKS_P2P="1", EGRESS_PROXY=os.environ.get("EGRESS_PROXY", "off"))
         self.log = open(self.dir / "chatd.log", "w")
         self.proc = subprocess.Popen([chatd], env=env, stdout=self.log, stderr=subprocess.STDOUT, cwd=str(self.dir))
         for _ in range(50):

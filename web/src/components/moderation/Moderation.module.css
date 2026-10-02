@@ -1305,6 +1305,14 @@ td.logReason {
   opacity: 0.5;
   cursor: not-allowed;
 }
+/* a choice that takes everything (a whole pack) is ticked in the colour of danger */
+.pick[data-tone="danger"] input {
+  accent-color: var(--danger);
+}
+.pick[data-tone="danger"][data-checked="true"] {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-raised));
+}
 .pick input {
   accent-color: var(--brand);
   width: 16px;
