@@ -1,5 +1,5 @@
 import { AudioKeeper, isHomeScreenApp } from "./audioKeeper";
-import { DEFAULT_SOUNDS, SOUND_NAMES, sourceOf, type BuiltinPack, type SoundFile, type SoundSettings, type SoundSource } from "./soundPacks";
+import { DEFAULT_SOUNDS, SOUND_NAMES, sourceOf, type SoundFile, type SoundSettings, type SoundSource } from "./soundPacks";
 
 import { t as tr_ } from "@/i18n";
 export type SoundName = "message" | "mention" | "friend" | "ring" | "outgoing" | "join" | "leave" | "mute" | "unmute";
@@ -203,7 +203,7 @@ function recordingOf(name: SoundName, src: SoundSource): { key: string; get: () 
       get: () => (openFile ? openFile(file) : Promise.reject(new Error("custom sounds are not set up yet"))),
     };
   }
-  const url = src.pack === "nexa" ? FILES[name] : undefined;
+  const url = FILES[name];
   if (!url) return null;
   return {
     key: `nexa:${name}`,
@@ -253,21 +253,17 @@ function decodeRecording(rec: { key: string; get: () => Promise<ArrayBuffer> }):
 
 /**
  * What a sound plays as in a pack: a decoded recording, or null to synthesise
- * it in the voice given. A custom recording that cannot be had plays as its
- * pack's base would, so a sound never goes missing.
+ * it. A custom recording that cannot be had plays as Nexa's own would, so a
+ * sound never goes missing.
  */
-async function loadSound(name: SoundName, packId?: string): Promise<{ buf: AudioBuffer | null; voice: Voice }> {
+async function loadSound(name: SoundName, packId?: string): Promise<AudioBuffer | null> {
   const src = sourceOf(config, name, packId);
   const rec = recordingOf(name, src);
-  if (rec) {
-    const buf = await decodeRecording(rec);
-    if (buf) return { buf, voice: voiceOf(src) };
-    if (src.kind === "file") {
-      const base = recordingOf(name, { kind: "builtin", pack: src.fallback });
-      return { buf: base ? await decodeRecording(base) : null, voice: VOICE[src.fallback] };
-    }
-  }
-  return { buf: null, voice: voiceOf(src) };
+  if (!rec) return null;
+  const buf = await decodeRecording(rec);
+  if (buf || src.kind === "nexa") return buf;
+  const own = recordingOf(name, { kind: "nexa" });
+  return own ? decodeRecording(own) : null;
 }
 
 /** The recordings of the pack in use. */
@@ -304,15 +300,8 @@ function playBuffer(ac: AudioContext, buf: AudioBuffer, loop = false): AudioBuff
   return src;
 }
 
-/** How a pack's synthesised sounds are voiced. Nexa's own, where it has no recording, are the chimes. */
-type Voice = "chime" | "retro" | "soft";
-const VOICE: Record<BuiltinPack, Voice> = { nexa: "chime", chime: "chime", retro: "retro", soft: "soft" };
-const voiceOf = (src: SoundSource): Voice => VOICE[src.kind === "file" ? src.fallback : src.pack];
-
 /** Plays a synthesised sound; returns its length in seconds. */
-function synth(ac: AudioContext, name: SoundName, voice: Voice = "chime"): number {
-  if (voice === "retro") return retro(ac, name);
-  if (voice === "soft") return soft(ac, name);
+function synth(ac: AudioContext, name: SoundName): number {
   switch (name) {
     case "message":
       tone(ac, 880, 0, 0.09);
@@ -345,80 +334,6 @@ function synth(ac: AudioContext, name: SoundName, voice: Voice = "chime"): numbe
   }
 }
 
-/** Little square-wave blips, like an old games console. */
-function retro(ac: AudioContext, name: SoundName): number {
-  const sq = (freq: number, start: number, dur: number) => tone(ac, freq, start, dur, "square", 0.07);
-  switch (name) {
-    case "message":
-      sq(1046.5, 0, 0.05);
-      return sq(1568, 0.06, 0.07);
-    case "mention":
-      sq(784, 0, 0.05);
-      sq(1046.5, 0.06, 0.05);
-      sq(1318.5, 0.12, 0.05);
-      return sq(2093, 0.18, 0.09);
-    case "friend":
-      sq(523.3, 0, 0.06);
-      sq(659.3, 0.07, 0.06);
-      sq(784, 0.14, 0.06);
-      return sq(1046.5, 0.21, 0.12);
-    case "join":
-      sq(392, 0, 0.05);
-      return sq(784, 0.06, 0.08);
-    case "leave":
-      sq(784, 0, 0.05);
-      return sq(392, 0.06, 0.08);
-    case "mute":
-      return sq(220, 0, 0.07);
-    case "unmute":
-      return sq(440, 0, 0.07);
-    case "ring":
-      sq(880, 0, 0.08);
-      sq(1174.7, 0.1, 0.08);
-      sq(880, 0.2, 0.08);
-      return sq(1174.7, 0.3, 0.08);
-    case "outgoing":
-      sq(587.3, 0, 0.12);
-      return sq(587.3, 0.4, 0.12);
-  }
-}
-
-/** Low, round taps, like a wooden marimba: quieter than the rest. */
-function soft(ac: AudioContext, name: SoundName): number {
-  const tap = (freq: number, start: number, dur = 0.22) => {
-    // a quiet fifth above gives the tap its wooden ring
-    tone(ac, freq * 1.5, start, dur * 0.5, "sine", 0.03);
-    return tone(ac, freq, start, dur, "triangle", 0.16);
-  };
-  switch (name) {
-    case "message":
-      tap(523.3, 0);
-      return tap(659.3, 0.11);
-    case "mention":
-      tap(523.3, 0);
-      tap(659.3, 0.1);
-      return tap(784, 0.2, 0.3);
-    case "friend":
-      tap(392, 0);
-      tap(523.3, 0.12);
-      return tap(659.3, 0.24, 0.32);
-    case "join":
-      return tap(587.3, 0, 0.18);
-    case "leave":
-      return tap(392, 0, 0.18);
-    case "mute":
-      return tap(294, 0, 0.12);
-    case "unmute":
-      return tap(392, 0, 0.12);
-    case "ring":
-      tap(659.3, 0);
-      tap(523.3, 0.18);
-      return tap(659.3, 0.36, 0.3);
-    case "outgoing":
-      return tap(440, 0, 0.35);
-  }
-}
-
 /** Plays a sound, unless it is switched off. Resolves with whether it could start. */
 export function playSound(name: SoundName): Promise<boolean> {
   if (config.off.includes(name)) return Promise.resolve(false);
@@ -442,7 +357,7 @@ async function play(name: SoundName, packId?: string): Promise<boolean> {
   const asked = Date.now();
   starting++;
   try {
-    const [running, { buf, voice }] = await Promise.all([k.started(STALE_MS), loadSound(name, packId)]);
+    const [running, buf] = await Promise.all([k.started(STALE_MS), loadSound(name, packId)]);
     if (!running || keeper !== k || k.released || Date.now() - asked > STALE_MS) {
       trouble = { state: k.ac.state, problem: k.problem };
       // the next tap may start what this could not
@@ -454,7 +369,7 @@ async function play(name: SoundName, packId?: string): Promise<boolean> {
     if (buf) {
       playBuffer(k.ac, buf);
       seconds = buf.duration;
-    } else seconds = synth(k.ac, name, voice);
+    } else seconds = synth(k.ac, name);
     quietFrom = Math.max(quietFrom, Date.now() + seconds * 1000);
     return true;
   } finally {
@@ -492,16 +407,16 @@ function startLoops(): void {
 
 function beginLoop(l: Loop, ac: AudioContext): void {
   l.ac = ac;
-  void loadSound(l.name).then(({ buf, voice }) => {
+  void loadSound(l.name).then((buf) => {
     if (!loops.has(l) || l.ac !== ac || ac.state === "closed") return;
     if (buf) {
       l.source = playBuffer(ac, buf, true);
       return;
     }
-    synth(ac, l.name, voice);
+    synth(ac, l.name);
     l.timer = setInterval(() => {
       // tones asked for while it is stopped would all come out at once when it starts
-      if (ac.state === "running") synth(ac, l.name, voice);
+      if (ac.state === "running") synth(ac, l.name);
     }, 1500);
   });
 }

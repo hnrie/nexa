@@ -180,14 +180,14 @@ describe("sounds", () => {
 });
 
 describe("sound packs", () => {
-  const pack = (files: Record<string, { blob: string }>) => ({
-    pack: "pmine1234",
+  const pack = (files: Record<string, { blob: string }>, use = "pmine1234") => ({
+    pack: use,
     volume: 100,
     off: [] as never[],
-    packs: [{ id: "pmine1234", name: "Mine", base: "retro" as const, files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { ...f, key: "k".repeat(44), name: "x.wav", ms: 500, size: 10 }])) }],
+    packs: [{ id: "pmine1234", name: "Mine", files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, { ...f, key: "k".repeat(44), name: "x.wav", ms: 500, size: 10 }])) }],
   });
 
-  it("play a custom recording, opened with the account's key, and the pack's base for the rest", async () => {
+  it("play a custom recording, opened with the account's key, and Nexa's own for the rest", async () => {
     const s = await load();
     const open = vi.fn(() => Promise.resolve(new ArrayBuffer(16)));
     s.configureSounds(pack({ message: { blob: "77" } }), open);
@@ -196,28 +196,34 @@ describe("sound packs", () => {
     expect(open).toHaveBeenCalledTimes(1);
     expect(ac.sources).toBe(1);
     expect(ac.decoded).toBe(1);
-    // retro voices the rest, with no recording fetched for them
-    expect(await s.playSound("mention")).toBe(true);
-    expect(ac.tones).toBe(4);
     expect(fetch).not.toHaveBeenCalled();
+    // Nexa's recording plays for a mention, and its chimes for a friend request
+    expect(await s.playSound("mention")).toBe(true);
+    expect(fetch).toHaveBeenCalledWith("/sounds/mention.m4a");
+    expect(ac.sources).toBe(2);
+    expect(await s.playSound("friend")).toBe(true);
+    expect(ac.tones).toBe(3);
     // played again, it is not fetched again
     expect(await s.playSound("message")).toBe(true);
     expect(open).toHaveBeenCalledTimes(1);
   });
 
-  it("fall back to the base pack when a recording cannot be had", async () => {
+  it("fall back to Nexa's own when a recording cannot be had", async () => {
     const s = await load();
-    s.configureSounds(pack({ join: { blob: "88" } }), () => Promise.reject(new Error("gone")));
+    s.configureSounds(pack({ join: { blob: "88" }, message: { blob: "89" } }), () => Promise.reject(new Error("gone")));
     expect(await s.playSound("join")).toBe(true);
     expect(made().tones).toBe(2);
+    expect(await s.playSound("message")).toBe(true);
+    expect(fetch).toHaveBeenCalledWith("/sounds/message.m4a");
+    expect(made().sources).toBe(1);
   });
 
   it("keep a switched-off sound quiet, but let the settings play it to hear it", async () => {
     const s = await load();
-    s.configureSounds({ pack: "chime", volume: 100, off: ["message", "ring"], packs: [] });
-    expect(await s.playSound("message")).toBe(false);
+    s.configureSounds({ pack: "nexa", volume: 100, off: ["join", "ring"], packs: [] });
+    expect(await s.playSound("join")).toBe(false);
     expect(FakeAudioContext.made).toHaveLength(0);
-    expect(await s.previewSound("message")).toBe(true);
+    expect(await s.previewSound("join")).toBe(true);
     expect(made().tones).toBe(2);
     // and a switched-off ring does not ring
     s.startRinging();
@@ -228,13 +234,15 @@ describe("sound packs", () => {
 
   it("preview a pack that is not the one in use", async () => {
     const s = await load();
-    s.configureSounds({ pack: "nexa", volume: 100, off: [], packs: [] });
-    expect(await s.previewSound("message", "soft")).toBe(true);
-    const ac = made();
-    // soft is synthesised: two taps, each with its overtone
-    expect(ac.tones).toBe(4);
-    expect(ac.sources).toBe(0);
+    const open = vi.fn(() => Promise.resolve(new ArrayBuffer(16)));
+    s.configureSounds(pack({ message: { blob: "77" } }, "nexa"), open);
+    expect(await s.previewSound("message", "pmine1234")).toBe(true);
+    expect(open).toHaveBeenCalledTimes(1);
     expect(fetch).not.toHaveBeenCalled();
+    // and Nexa's own, the one in use
+    expect(await s.previewSound("message")).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(made().sources).toBe(2);
   });
 });
 

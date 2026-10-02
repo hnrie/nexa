@@ -1,10 +1,10 @@
-import { AtSign, Bell, Check, Gamepad2, LogIn, LogOut, MessageSquare, Mic, MicOff, PhoneIncoming, PhoneOutgoing, Play, Plus, RotateCcw, Sparkles, Trash2, Upload, UserPlus, Waves, type LucideIcon } from "lucide-react";
+import { AtSign, Check, LogIn, LogOut, MessageSquare, Mic, MicOff, PhoneIncoming, PhoneOutgoing, Play, Plus, RotateCcw, Sparkles, Trash2, Upload, UserPlus, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Toggle } from "@/components/common/Toggle";
 import { promptText } from "@/components/modals/PromptModal";
 import { describeError } from "@/lib/errors";
-import { BUILTIN_PACKS, MAX_PACKS, PACK_NAME_MAX, SOUND_NAMES, SoundFileError, isBuiltin, newPackId, type BuiltinPack, type SoundPack, type SoundSettings } from "@/lib/soundPacks";
+import { MAX_PACKS, NEXA_PACK, PACK_NAME_MAX, SOUND_NAMES, SoundFileError, newPackId, type SoundPack, type SoundSettings } from "@/lib/soundPacks";
 import { previewSound, soundTrouble, type SoundName } from "@/lib/sounds";
 import { addSoundFile, dropSoundFile, tidySoundFiles } from "@/lib/soundSync";
 import { useSettings } from "@/stores/settings";
@@ -14,15 +14,8 @@ import st from "./Settings.module.css";
 
 import { t } from "@/i18n";
 
-const PACK_ICON: Record<BuiltinPack, LucideIcon> = { nexa: Sparkles, chime: Bell, retro: Gamepad2, soft: Waves };
 const SOUND_ICON: Record<SoundName, LucideIcon> = { message: MessageSquare, mention: AtSign, friend: UserPlus, ring: PhoneIncoming, outgoing: PhoneOutgoing, join: LogIn, leave: LogOut, mute: MicOff, unmute: Mic };
 
-function packName(id: BuiltinPack): string {
-  return { nexa: t("settings.sounds.packNexa"), chime: t("settings.sounds.packChime"), retro: t("settings.sounds.packRetro"), soft: t("settings.sounds.packSoft") }[id];
-}
-function packDesc(id: BuiltinPack): string {
-  return { nexa: t("settings.sounds.packNexaDesc"), chime: t("settings.sounds.packChimeDesc"), retro: t("settings.sounds.packRetroDesc"), soft: t("settings.sounds.packSoftDesc") }[id];
-}
 function soundLabel(name: SoundName): string {
   return {
     message: t("settings.sounds.soundMessage"),
@@ -80,7 +73,8 @@ export default function SoundsPage() {
 
   const set = (next: Partial<SoundSettings>) => patch({ sounds: { ...useSettings.getState().settings.sounds, ...next } });
   const custom = sounds.packs.find((p) => p.id === sounds.pack) ?? null;
-  const base: BuiltinPack = custom ? custom.base : isBuiltin(sounds.pack) ? sounds.pack : "nexa";
+  // Nexa's own pack, which plays wherever a pack of your own has no recording
+  const nexa = t("settings.sounds.packNexa");
 
   const play = async (name: SoundName, packId?: string) => {
     setHint((await previewSound(name, packId)) ? null : soundTrouble());
@@ -97,7 +91,7 @@ export default function SoundsPage() {
     }
     const name = await promptText(t("settings.sounds.createPack"), { label: t("settings.sounds.packNameLabel"), placeholder: t("settings.sounds.packNamePlaceholder"), maxLength: PACK_NAME_MAX }, t("settings.sounds.create"));
     if (!name?.trim()) return;
-    const pack: SoundPack = { id: newPackId(), name: name.trim().slice(0, PACK_NAME_MAX), base, files: {} };
+    const pack: SoundPack = { id: newPackId(), name: name.trim().slice(0, PACK_NAME_MAX), files: {} };
     const now = useSettings.getState().settings.sounds;
     set({ packs: [...now.packs, pack], pack: pack.id });
   };
@@ -116,7 +110,7 @@ export default function SoundsPage() {
       danger: true,
       onConfirm: async () => {
         const now = useSettings.getState().settings.sounds;
-        set({ packs: now.packs.filter((p) => p.id !== pack.id), pack: now.pack === pack.id ? pack.base : now.pack });
+        set({ packs: now.packs.filter((p) => p.id !== pack.id), pack: now.pack === pack.id ? NEXA_PACK : now.pack });
         // the files go once the settings without them are saved, so no device is left naming a file that is gone
         await useSettings.getState().flush();
         for (const f of Object.values(pack.files)) if (f) await dropSoundFile(f.blob);
@@ -199,10 +193,10 @@ export default function SoundsPage() {
       <h3 className={st.h5} data-setting="soundPack">{t("settings.sounds.packHeading")}</h3>
       <p className={st.hint}>{t("settings.sounds.packIntro")}</p>
       <div className={s.packs} role="radiogroup" aria-label={t("settings.sounds.packHeading")}>
-        {BUILTIN_PACKS.map((id) => packCard(id, packName(id), packDesc(id), PACK_ICON[id]))}
+        {packCard(NEXA_PACK, nexa, t("settings.sounds.packNexaDesc"), Sparkles)}
         {sounds.packs.map((p) => {
           const replaced = Object.keys(p.files).length;
-          return packCard(p.id, p.name || t("settings.sounds.untitledPack"), t("settings.sounds.customPackDesc", { base: packName(p.base) }), Upload, t("settings.sounds.replacedCount", { count: replaced }));
+          return packCard(p.id, p.name || t("settings.sounds.untitledPack"), t("settings.sounds.customPackDesc", { base: nexa }), Upload, t("settings.sounds.replacedCount", { count: replaced }));
         })}
         {sounds.packs.length < MAX_PACKS ? (
           <button className={s.newPack} onClick={() => void createPack()} data-testid="sound-pack-create">
@@ -222,7 +216,7 @@ export default function SoundsPage() {
         <div className={s.customHead}>
           <div className={s.customTitle}>
             <span className={s.customName}>{custom.name || t("settings.sounds.untitledPack")}</span>
-            <span className={st.hint}>{t("settings.sounds.customIntro", { base: packName(custom.base) })}</span>
+            <span className={st.hint}>{t("settings.sounds.customIntro", { base: nexa })}</span>
           </div>
           <div className={s.customBtns}>
             <Button size="sm" variant="secondary" onClick={() => void renamePack(custom)}>{t("settings.sounds.rename")}</Button>
@@ -247,7 +241,7 @@ export default function SoundsPage() {
               <span className={s.soundText}>
                 <span className={s.soundName}>{soundLabel(name)}</span>
                 <span className={s.soundSub}>
-                  {file ? t("settings.sounds.fileLine", { name: file.name || t("settings.sounds.yourRecording"), seconds: seconds(file.ms) }) : custom ? t("settings.sounds.fromPack", { name: packName(custom.base) }) : soundWhen(name)}
+                  {file ? t("settings.sounds.fileLine", { name: file.name || t("settings.sounds.yourRecording"), seconds: seconds(file.ms) }) : custom ? t("settings.sounds.fromPack", { name: nexa }) : soundWhen(name)}
                 </span>
               </span>
               {custom ? (

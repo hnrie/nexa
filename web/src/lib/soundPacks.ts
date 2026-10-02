@@ -2,13 +2,13 @@
  * Sound packs: which sound plays for a new message, a mention, a call and the
  * rest.
  *
- * Four packs come with the app. Anyone can also make packs of their own from
- * recordings they pick: each file is turned into a short mono recording here,
- * sealed like an attachment and kept on the server (api/sounds.ts), while the
- * packs themselves (names, which file plays for what, and the keys that open
- * the files) live in the account's encrypted settings, so they follow the
- * account to every device. A sound a custom pack leaves out plays from the
- * pack it was made from.
+ * Nexa's own sounds come with the app. Anyone can also make packs of their
+ * own from recordings they pick: each file is turned into a short mono
+ * recording here, sealed like an attachment and kept on the server
+ * (api/sounds.ts), while the packs themselves (names, which file plays for
+ * what, and the keys that open the files) live in the account's encrypted
+ * settings, so they follow the account to every device. A sound a custom pack
+ * leaves out plays as Nexa's own.
  *
  * Everything here is read as another device may have written it.
  */
@@ -17,9 +17,8 @@ import type { SoundName } from "./sounds";
 
 export const SOUND_NAMES: readonly SoundName[] = ["message", "mention", "friend", "ring", "outgoing", "join", "leave", "mute", "unmute"];
 
-/** The packs that come with the app. */
-export const BUILTIN_PACKS = ["nexa", "chime", "retro", "soft"] as const;
-export type BuiltinPack = (typeof BUILTIN_PACKS)[number];
+/** Nexa's own sounds: the pack that comes with the app. */
+export const NEXA_PACK = "nexa";
 
 /** One recording of a custom pack. */
 export interface SoundFile {
@@ -38,13 +37,11 @@ export interface SoundFile {
 export interface SoundPack {
   id: string;
   name: string;
-  /** The pack whose sounds play where this one has none of its own. */
-  base: BuiltinPack;
   files: Partial<Record<SoundName, SoundFile>>;
 }
 
 export interface SoundSettings {
-  /** A built-in pack, or a custom pack's id. */
+  /** Nexa's own pack, or a custom pack's id. */
   pack: string;
   /** 0 to 100. */
   volume: number;
@@ -53,7 +50,7 @@ export interface SoundSettings {
   packs: SoundPack[];
 }
 
-export const DEFAULT_SOUNDS: SoundSettings = { pack: "nexa", volume: 100, off: [], packs: [] };
+export const DEFAULT_SOUNDS: SoundSettings = { pack: NEXA_PACK, volume: 100, off: [], packs: [] };
 
 export const MAX_PACKS = 8;
 export const PACK_NAME_MAX = 40;
@@ -64,7 +61,6 @@ export const MAX_LOOP_MS = 20_000;
 export const MAX_SOURCE_BYTES = 30 * 1024 * 1024;
 
 export const isLoop = (name: SoundName): boolean => name === "ring" || name === "outgoing";
-export const isBuiltin = (id: string): id is BuiltinPack => (BUILTIN_PACKS as readonly string[]).includes(id);
 const isSoundName = (x: unknown): x is SoundName => typeof x === "string" && (SOUND_NAMES as readonly string[]).includes(x);
 
 type Obj = Record<string, unknown>;
@@ -86,12 +82,11 @@ function readFile(x: unknown): SoundFile | null {
 
 function readPack(x: unknown): SoundPack | null {
   if (!isObj(x)) return null;
-  const { id, name, base, files } = x;
-  if (typeof id !== "string" || !/^[A-Za-z0-9_-]{4,40}$/.test(id) || isBuiltin(id)) return null;
+  const { id, name, files } = x;
+  if (typeof id !== "string" || !/^[A-Za-z0-9_-]{4,40}$/.test(id) || id === NEXA_PACK) return null;
   const out: SoundPack = {
     id,
     name: typeof name === "string" && name.trim() ? name.replace(/\s+/g, " ").trim().slice(0, PACK_NAME_MAX) : "",
-    base: typeof base === "string" && isBuiltin(base) ? base : "nexa",
     files: {},
   };
   if (isObj(files)) {
@@ -117,21 +112,18 @@ export function sanitizeSounds(x: unknown): SoundSettings {
       if (packs.length >= MAX_PACKS) break;
     }
   }
-  const pack = typeof x["pack"] === "string" && (isBuiltin(x["pack"]) || seen.has(x["pack"])) ? x["pack"] : DEFAULT_SOUNDS.pack;
+  const pack = typeof x["pack"] === "string" && (x["pack"] === NEXA_PACK || seen.has(x["pack"])) ? x["pack"] : DEFAULT_SOUNDS.pack;
   const volume = typeof x["volume"] === "number" && Number.isFinite(x["volume"]) ? Math.max(0, Math.min(100, Math.round(x["volume"]))) : DEFAULT_SOUNDS.volume;
   const off = Array.isArray(x["off"]) ? [...new Set(x["off"].filter(isSoundName))] : [];
   return { pack, volume, off, packs };
 }
 
-/** What plays for a sound in a pack: one of its own files, or the built-in pack's sound. */
-export type SoundSource = { kind: "file"; file: SoundFile; fallback: BuiltinPack } | { kind: "builtin"; pack: BuiltinPack };
+/** What plays for a sound in a pack: one of its own files, or Nexa's own sound. */
+export type SoundSource = { kind: "file"; file: SoundFile } | { kind: "nexa" };
 
 export function sourceOf(settings: SoundSettings, name: SoundName, packId: string = settings.pack): SoundSource {
-  if (isBuiltin(packId)) return { kind: "builtin", pack: packId };
-  const pack = settings.packs.find((p) => p.id === packId);
-  if (!pack) return { kind: "builtin", pack: "nexa" };
-  const file = pack.files[name];
-  return file ? { kind: "file", file, fallback: pack.base } : { kind: "builtin", pack: pack.base };
+  const file = settings.packs.find((p) => p.id === packId)?.files[name];
+  return file ? { kind: "file", file } : { kind: "nexa" };
 }
 
 /** Every sealed file the packs name, each once. */

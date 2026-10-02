@@ -10,43 +10,42 @@ describe("sound packs", () => {
       volume: 250,
       off: ["ring", "ring", "bogus", 4],
       packs: [
+        // saved when the app had packs of its own to base one on, which is left behind
         { id: "pmine1234", name: "  My   sounds  ", base: "retro", files: { message: file("123"), mention: { blob: "x", key: "short" }, nonsense: file("9") } },
-        // a built-in's name is not a custom pack's id, and nor is a duplicate
-        { id: "nexa", name: "Sneaky", base: "nexa", files: {} },
-        { id: "pmine1234", name: "Again", base: "soft", files: {} },
-        { id: "pother567", name: "x".repeat(200), base: "made-up", files: [] },
+        // Nexa's own pack is not a custom pack's id, and nor is a duplicate
+        { id: "nexa", name: "Sneaky", files: {} },
+        { id: "pmine1234", name: "Again", files: {} },
+        { id: "pother567", name: "x".repeat(200), files: [] },
       ],
     });
     expect(got.pack).toBe("pmine1234");
     expect(got.volume).toBe(100);
     expect(got.off).toEqual(["ring"]);
     expect(got.packs.map((p) => p.id)).toEqual(["pmine1234", "pother567"]);
-    expect(got.packs[0]!.name).toBe("My sounds");
-    expect(got.packs[0]!.base).toBe("retro");
-    expect(Object.keys(got.packs[0]!.files)).toEqual(["message"]);
+    expect(got.packs[0]).toEqual({ id: "pmine1234", name: "My sounds", files: { message: file("123") } });
     expect(got.packs[1]!.name).toHaveLength(40);
-    expect(got.packs[1]!.base).toBe("nexa");
   });
 
-  it("fall back to Nexa's pack when the one chosen is gone", () => {
+  it("go back to Nexa's own sounds when the pack chosen is gone", () => {
     expect(sanitizeSounds({ pack: "pgone12345", packs: [] }).pack).toBe("nexa");
-    expect(sanitizeSounds({ pack: "retro" }).pack).toBe("retro");
+    // the Chime, Retro and Soft packs the app once had are gone too
+    expect(sanitizeSounds({ pack: "retro" }).pack).toBe("nexa");
   });
 
-  it("play a custom pack's own recording, and its base for the rest", () => {
-    const st: SoundSettings = { pack: "pmine1234", volume: 80, off: [], packs: [{ id: "pmine1234", name: "Mine", base: "soft", files: { message: file("55") } }] };
-    expect(sourceOf(st, "message")).toEqual({ kind: "file", file: file("55"), fallback: "soft" });
-    expect(sourceOf(st, "mention")).toEqual({ kind: "builtin", pack: "soft" });
+  it("play a custom pack's own recording, and Nexa's for the rest", () => {
+    const st: SoundSettings = { pack: "pmine1234", volume: 80, off: [], packs: [{ id: "pmine1234", name: "Mine", files: { message: file("55") } }] };
+    expect(sourceOf(st, "message")).toEqual({ kind: "file", file: file("55") });
+    expect(sourceOf(st, "mention")).toEqual({ kind: "nexa" });
     // a pack named to preview, not the one in use
-    expect(sourceOf(st, "message", "retro")).toEqual({ kind: "builtin", pack: "retro" });
-    expect(sourceOf(st, "message", "pnothere1")).toEqual({ kind: "builtin", pack: "nexa" });
+    expect(sourceOf(st, "message", "nexa")).toEqual({ kind: "nexa" });
+    expect(sourceOf(st, "message", "pnothere1")).toEqual({ kind: "nexa" });
     expect([...filesInUse(st)]).toEqual(["55"]);
   });
 
-  it("make pack ids that cannot be mistaken for a built-in", () => {
+  it("make pack ids that cannot be mistaken for Nexa's own", () => {
     const ids = new Set(Array.from({ length: 50 }, () => newPackId()));
     expect(ids.size).toBe(50);
-    for (const id of ids) expect(sanitizeSounds({ pack: id, packs: [{ id, name: "x", base: "nexa", files: {} }] }).pack).toBe(id);
+    for (const id of ids) expect(sanitizeSounds({ pack: id, packs: [{ id, name: "x", files: {} }] }).pack).toBe(id);
   });
 
   it("write a WAV any browser can play", async () => {
