@@ -61,9 +61,14 @@ function openSystemPlayer(el: HTMLVideoElement, onFail: (err: unknown) => void):
   });
 }
 
-/** A play() cut short by pause() rejects too, and says nothing about whether the file plays. */
+/**
+ * A play() cut short by pause() rejects too, and so does one the browser
+ * holds back until a tap; neither says anything about whether the file plays.
+ * Told apart by name: a video in a frame rejects with its frame's DOMException.
+ */
 function playFailed(err: unknown): boolean {
-  return !(err instanceof DOMException && err.name === "AbortError");
+  const name = (err as { name?: unknown } | null)?.name;
+  return name !== "AbortError" && name !== "NotAllowedError";
 }
 
 /** Touch screens have no hover, so the controls need a tap to appear. */
@@ -72,7 +77,13 @@ function coarsePointer(): boolean {
 }
 
 interface Props {
-  src: string;
+  /** The video's address; left out for a `frame`. */
+  src?: string | undefined;
+  /**
+   * A page holding the video instead, which the player works from outside:
+   * an encrypted video playing while it downloads (lib/videoStream.ts).
+   */
+  frame?: string | undefined;
   name: string;
   /** Natural size, when the sender recorded it. */
   width?: number | undefined;
@@ -84,16 +95,33 @@ interface Props {
   audio?: string | undefined;
   /** As wide as where it is put, a note's line, rather than a message's frame. */
   fill?: boolean | undefined;
+  /** How the download control saves it, when what plays is not the file itself (a stream). */
+  onDownload?: (() => void) | undefined;
+  /** Shown where the time goes until the video's length is known: a big one loads nothing before it is played. */
+  sizeHint?: string | undefined;
+  /**
+   * Told when the video cannot play. True (or a promise of it) means the
+   * caller has another way to play it and has taken over; false, that the
+   * player should say it cannot.
+   */
+  onFail?: (() => boolean | Promise<boolean>) | undefined;
 }
 
 /** The app's own video player: themed controls, keyboard, PiP and a download. */
-export function VideoPlayer({ src, name, width, height, poster, spoiler = false, audio, fill = false }: Props) {
-  const video = useRef<HTMLVideoElement>(null);
+export function VideoPlayer({ src, frame, name, width, height, poster, spoiler = false, audio, fill = false, onDownload, onFail, sizeHint }: Props) {
+  const video = useRef<HTMLVideoElement | null>(null);
+  /** The video element in use, once there is one: the player's own, or the one in its frame. */
+  const [media, setMedia] = useState<HTMLVideoElement | null>(null);
+  const holder = useRef<HTMLIFrameElement>(null);
+  const ownVideo = useCallback((el: HTMLVideoElement | null) => {
+    video.current = el;
+    setMedia(el);
+  }, []);
   const sound = useRef<HTMLAudioElement>(null);
   useEffect(() => {
-    if (!audio || !video.current || !sound.current) return;
-    return followVideo(video.current, sound.current);
-  }, [audio, src]);
+    if (!audio || !media || !sound.current) return;
+    return followVideo(media, sound.current);
+  }, [audio, media]);
   const wrap = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
@@ -117,6 +145,17 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
   }, []);
   const [full, setFull] = useState(false);
   const [failed, setFailed] = useState(false);
+  const fail = useCallback(() => {
+    if (!onFail) {
+      setFailed(true);
+      return;
+    }
+    void Promise.resolve(onFail()).then((handled) => {
+      if (!handled) setFailed(true);
+    });
+  }, [onFail]);
+  /** The video's own size, for a frame sent without one: a frame has none of its own to fall back on. */
+  const [natural, setNatural] = useState<[number, number] | null>(null);
   const [revealed, setRevealed] = useState(!spoiler);
   const [fullOk] = useState(canFullscreen);
   const [pipOk] = useState(canPip);
@@ -144,9 +183,9 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
   const toggle = useCallback(() => {
     const el = video.current;
     if (!el) return;
-    if (el.paused) void el.play().catch((err: unknown) => playFailed(err) && setFailed(true));
+    if (el.paused) void el.play().catch((err: unknown) => playFailed(err) && fail());
     else el.pause();
-  }, []);
+  }, [fail]);
 
   /** A first tap on a touch screen brings the controls up rather than pausing. */
   const onSurface = useCallback(() => {
@@ -161,15 +200,27 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
     toggle();
   }, [revealed, ui, reveal, toggle]);
 
+  /** The frame's page is in: its video is the one to work. */
+  const onFrame = useCallback(() => {
+    const el = holder.current?.contentDocument?.querySelector("video") ?? null;
+    video.current = el;
+    setMedia(el);
+    // what loaded is not the worker's page (it was stopped meanwhile)
+    if (!el) fail();
+  }, [fail]);
+
   useEffect(() => {
-    const el = video.current;
+    const el = media;
     if (!el) return;
     const onTime = () => {
       setTime(el.currentTime);
       const b = el.buffered;
       setBuffered(b.length ? b.end(b.length - 1) : 0);
     };
-    const onMeta = () => setDuration(el.duration);
+    const onMeta = () => {
+      setDuration(el.duration);
+      if (el.videoWidth && el.videoHeight) setNatural([el.videoWidth, el.videoHeight]);
+    };
     const onPlay = () => {
       setPlaying(true);
       armHide(true);
@@ -179,7 +230,7 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
       setUi(true);
       armHide(false);
     };
-    const onError = () => setFailed(true);
+    const onError = () => fail();
     el.addEventListener("timeupdate", onTime);
     el.addEventListener("progress", onTime);
     el.addEventListener("loadedmetadata", onMeta);
@@ -187,6 +238,10 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
     el.addEventListener("play", onPlay);
     el.addEventListener("pause", onPause);
     el.addEventListener("error", onError);
+    // a video in a frame may have read its length, or failed, before the frame said it had loaded
+    if (el.readyState >= HTMLMediaElement.HAVE_METADATA) onMeta();
+    onTime();
+    if (el.error) onError();
     return () => {
       el.removeEventListener("timeupdate", onTime);
       el.removeEventListener("progress", onTime);
@@ -196,7 +251,7 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
       el.removeEventListener("pause", onPause);
       el.removeEventListener("error", onError);
     };
-  }, [src, armHide]);
+  }, [media, armHide, fail]);
 
   useEffect(() => onFullscreenChange(() => setFull(!!wrap.current && fullscreenElement() === wrap.current)), []);
 
@@ -251,7 +306,7 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
       void exitElementFullscreen().catch(() => {});
       return;
     }
-    const failed = (err: unknown) => playFailed(err) && setFailed(true);
+    const failed = (err: unknown) => playFailed(err) && fail();
     if (streamFullscreenWay() === "element" && wrap.current) {
       // a phone turns sideways for a wide video, where the browser allows it (not iOS)
       void enterElementFullscreen(wrap.current)
@@ -264,8 +319,10 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
   const pip = () => {
     const el = video.current as (HTMLVideoElement & { webkitSetPresentationMode?: (mode: string) => void }) | null;
     if (!el) return;
-    if (document.pictureInPictureElement) {
-      void document.exitPictureInPicture().catch(() => {});
+    // a video in a frame is in picture in picture in its frame's document
+    const doc = el.ownerDocument;
+    if (doc.pictureInPictureElement) {
+      void doc.exitPictureInPicture().catch(() => {});
       return;
     }
     // inside the tap: Safari opens nothing from a promise that resolves later
@@ -273,6 +330,11 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
     else el.webkitSetPresentationMode?.("picture-in-picture");
   };
   const download = () => {
+    if (onDownload) {
+      onDownload();
+      return;
+    }
+    if (!src) return;
     const a = document.createElement("a");
     a.href = src;
     a.download = name;
@@ -291,19 +353,20 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
   };
 
   useEffect(() => {
-    const el = video.current;
+    const el = media;
     if (el) {
       el.volume = volume;
       el.muted = muted;
       el.playbackRate = speed;
     }
-  }, [volume, muted, speed]);
+  }, [media, volume, muted, speed]);
 
   const pct = duration > 0 ? (time / duration) * 100 : 0;
   const bufPct = duration > 0 ? (buffered / duration) * 100 : 0;
-  // full screen sizes the player itself, so the frame is only set inline
-  const frame = width && height && !full ? fitVideo(width, height) : null;
-  const size = frame ? { width: frame.width, aspectRatio: `${frame.width} / ${frame.height}` } : undefined;
+  // full screen sizes the player itself, so the box is only set inline
+  const shape: [number, number] | null = width && height ? [width, height] : frame ? (natural ?? [16, 9]) : null;
+  const box = shape && !full ? fitVideo(shape[0], shape[1]) : null;
+  const size = box ? { width: box.width, aspectRatio: `${box.width} / ${box.height}` } : undefined;
   /** Seeks to where a pointer is along the track; a drag keeps seeking while it moves. */
   const scrub = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -324,7 +387,15 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
       onPointerMove={(e) => e.pointerType === "mouse" && reveal()}
       data-testid="video-player"
     >
-      <video ref={video} className={s.video} src={src} poster={poster} playsInline preload="metadata" onClick={onSurface} onDoubleClick={toggleFull} />
+      {frame ? (
+        <>
+          <iframe ref={holder} className={s.video} src={frame} title={name} tabIndex={-1} onLoad={onFrame} data-testid="video-frame" />
+          {/* the frame takes no clicks of its own: they land here, as they would on the video */}
+          <div className={s.surface} onClick={onSurface} onDoubleClick={toggleFull} />
+        </>
+      ) : (
+        <video ref={ownVideo} className={s.video} src={src} poster={poster} playsInline preload="metadata" onClick={onSurface} onDoubleClick={toggleFull} />
+      )}
       {audio ? <audio ref={sound} src={audio} preload="metadata" hidden /> : null}
       {!revealed ? (
         <button type="button" className={s.spoiler} aria-label={tr_("render.spoilerHidden")} onClick={() => setRevealed(true)}><span>{tr_("composer.composer.spoiler")}</span></button>
@@ -332,7 +403,11 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
       {failed ? (
         <div className={s.failed}>
           <span>{tr_("chat.videoPlayer.thisBrowserCannotPlayThisVideo")}</span>
-          <a className={s.failedDownload} href={src} download={name}>{tr_("chat.videoPlayer.downloadIt")}</a>
+          {onDownload ? (
+            <button type="button" className={s.failedDownload} onClick={onDownload}>{tr_("chat.videoPlayer.downloadIt")}</button>
+          ) : (
+            <a className={s.failedDownload} href={src} download={name}>{tr_("chat.videoPlayer.downloadIt")}</a>
+          )}
         </div>
       ) : null}
       {!playing && revealed && !failed ? (
@@ -364,7 +439,11 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
         </div>
         <div className={s.controls}>
           <button className={s.ctl} aria-label={playing ? tr_("chat.media.pause") : tr_("chat.videoPlayer.play")} onClick={toggle}>{playing ? <Pause size={18} /> : <Play size={18} />}</button>
-          <span className={s.time}>{clock(time)}<span className={s.total}> / {clock(duration)}</span></span>
+          {sizeHint && !(duration > 0) ? (
+            <span className={s.time}>{sizeHint}</span>
+          ) : (
+            <span className={s.time}>{clock(time)}<span className={s.total}> / {clock(duration)}</span></span>
+          )}
           <span className={s.spacer} />
           <div className={s.volumeWrap}>
             <button className={s.ctl} aria-label={muted ? tr_("chat.media.unmute") : tr_("chat.media.mute")} aria-pressed={muted} onClick={() => setMuted((v) => !v)}>{muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
@@ -377,7 +456,11 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false,
             </Tooltip>
           ) : null}
           <Tooltip text={tr_("chat.attachments.download")} side="top">
-            <a className={[s.ctl, s.wideOnly].join(" ")} href={src} download={name} aria-label={tr_("chat.videoPlayer.downloadVideo")} onClick={(e) => e.stopPropagation()}><Download size={18} /></a>
+            {onDownload ? (
+              <button type="button" className={[s.ctl, s.wideOnly].join(" ")} aria-label={tr_("chat.videoPlayer.downloadVideo")} onClick={(e) => { e.stopPropagation(); onDownload(); }}><Download size={18} /></button>
+            ) : (
+              <a className={[s.ctl, s.wideOnly].join(" ")} href={src} download={name} aria-label={tr_("chat.videoPlayer.downloadVideo")} onClick={(e) => e.stopPropagation()}><Download size={18} /></a>
+            )}
           </Tooltip>
           <button className={[s.ctl, s.narrowOnly].join(" ")} aria-label={tr_("chat.chat.more")} onClick={more} data-testid="video-more"><MoreVertical size={18} /></button>
           {fullOk ? (

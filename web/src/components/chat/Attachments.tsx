@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { DecryptError } from "@/crypto/keys";
 import type { AttachmentMeta } from "@/crypto/message";
 import { saveAttachment } from "@/lib/download";
+import { canStream, openVideoStream, type VideoStream } from "@/lib/videoStream";
 import { setFullSource } from "@/lib/imageActions";
 import { INLINE_MAX, PRIORITY, acquire, attachmentObjectURL, cachedURL, prioritize, release } from "@/lib/mediaCache";
 import { copyOf } from "@/lib/pictureCopy";
@@ -287,7 +288,110 @@ function ImageAttachment({ att, onOpen, tile, fill }: { att: AttachmentMeta; onO
   );
 }
 
+/** The box a video waits in, the same shape as the player that takes its place, so nothing jumps. */
+function videoBox(att: AttachmentMeta, fill?: boolean): React.CSSProperties {
+  if (fill) return { width: "100%", aspectRatio: att.w && att.h ? `${att.w} / ${att.h}` : "16 / 9" };
+  const dims = fitVideo(att.w ?? 640, att.h ?? 360);
+  return { width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` };
+}
+
+/**
+ * A video, played while it downloads where the download worker can stream it
+ * (lib/videoStream.ts), and downloaded whole first where it cannot.
+ */
 function VideoAttachment({ att, fill }: { att: AttachmentMeta; fill?: boolean }) {
+  const [whole, setWhole] = useState(() => !canStream());
+  const fallBack = useCallback(() => setWhole(true), []);
+  if (!whole) return <StreamedVideo att={att} fill={fill} onFallBack={fallBack} />;
+  // too big to hold in memory, which playing it whole means
+  if (att.size > INLINE_MAX) return <FileAttachment att={att} />;
+  return <WholeVideo att={att} fill={fill} />;
+}
+
+/**
+ * A video that plays while it downloads, a chunk at a time, however big it
+ * is. It is set up as it nears the screen and let go again once it is far off
+ * and not playing. A small one shows its first frame and length straight
+ * away, as it did when it loaded by itself; a big one loads nothing until it
+ * is played.
+ */
+function StreamedVideo({ att, fill, onFallBack }: { att: AttachmentMeta; fill?: boolean; onFallBack: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [near, setNear] = useState(false);
+  const [stream, setStream] = useState<VideoStream | null>(null);
+  const toast = useUI((u) => u.toast);
+  // a render that only rebuilt the attachment's object must not start the stream again
+  const latest = useRef({ att, onFallBack });
+  latest.current = { att, onFallBack };
+  const id = att.blob_id;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    return watchPlace(el, el.closest("[data-scroller]"), (where) => {
+      if (where !== "far") setNear(true);
+    });
+  }, []);
+  // far from the screen and not playing: let go of it, frame and all
+  useEffect(() => {
+    const el = ref.current;
+    if (!stream || !el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) return;
+      const media = el.querySelector("iframe")?.contentDocument?.querySelector("video");
+      if (media && !media.paused) return;
+      setNear(false);
+    }, { root: el.closest("[data-scroller]"), rootMargin: FAR });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [stream]);
+  useEffect(() => {
+    if (!near) return;
+    let gone = false;
+    let opened: VideoStream | null = null;
+    const { att: a } = latest.current;
+    void openVideoStream(a, a.size <= AUTO_LOAD_MAX ? "metadata" : "none").then((s) => {
+      if (gone) {
+        s?.close();
+        return;
+      }
+      if (!s) {
+        latest.current.onFallBack();
+        return;
+      }
+      opened = s;
+      setStream(s);
+    });
+    return () => {
+      gone = true;
+      opened?.close();
+      setStream(null);
+    };
+  }, [near, id]);
+  const save = () =>
+    void saveAttachment(latest.current.att).catch((err: unknown) => toast(err instanceof Error && err.message ? err.message : tr_("chat.attachments.couldNotDownloadThatFile"), "error"));
+  // The stream failing (the file not coming, or not decrypting) is worth the
+  // whole download; a browser that cannot play what it was given is not, and
+  // the player says so with a way to save the file.
+  const failed = useCallback(async () => {
+    // the worker's word on the stream can land a moment after the player's error
+    await new Promise((r) => setTimeout(r, 400));
+    if (!stream?.failed()) return false;
+    latest.current.onFallBack();
+    return true;
+  }, [stream]);
+  return (
+    <div ref={ref} className={s.mediaSlot}>
+      {stream ? (
+        <VideoPlayer frame={stream.frame} name={att.name} width={att.w} height={att.h} spoiler={att.spoiler ?? false} fill={fill} onDownload={save} onFail={failed} sizeHint={formatBytes(att.size)} />
+      ) : (
+        <div className={s.videoPending} style={videoBox(att, fill)} />
+      )}
+    </div>
+  );
+}
+
+/** A video downloaded and decrypted whole before it plays: where nothing can stream it. */
+function WholeVideo({ att, fill }: { att: AttachmentMeta; fill?: boolean }) {
   // the whole file has to come down and be decrypted before it can play at all
   const ref = useRef<HTMLDivElement>(null);
   const auto = att.size <= AUTO_LOAD_MAX;
@@ -295,14 +399,12 @@ function VideoAttachment({ att, fill }: { att: AttachmentMeta; fill?: boolean })
   // downloaded and decrypted every clip in the loaded history at once, each of
   // them held in memory from that moment on.
   const { url, error, wanted, load, retry } = useDecrypted(att, ref, auto);
-  // the same frame the player will have, so nothing jumps when it arrives
-  const dims = fitVideo(att.w ?? 640, att.h ?? 360);
   return (
     <div ref={ref} className={s.mediaSlot}>
       {url ? (
         <VideoPlayer src={url} name={att.name} width={att.w} height={att.h} spoiler={att.spoiler ?? false} fill={fill} />
       ) : (
-        <div className={s.videoPending} style={fill ? { width: "100%", aspectRatio: att.w && att.h ? `${att.w} / ${att.h}` : "16 / 9" } : { width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }}>
+        <div className={s.videoPending} style={videoBox(att, fill)}>
           {error ? (
             <LoadFailed error={error} what="video" onRetry={retry} />
           ) : wanted || auto ? (
@@ -395,10 +497,11 @@ export function Attachments({ list, from, fill }: { list: AttachmentMeta[]; from
       ) : null}
       {list.map((att) => {
         const t = att.type || "";
-        // showing or playing a file means holding all of it, so past a point it is only offered as a download
+        // showing or playing a file means holding all of it, so past a point it is only offered as a download;
+        // a video that streams is never held whole, however big
         const inline = att.size <= INLINE_MAX;
         if (inline && t.startsWith("image/")) return tiles ? null : <ImageAttachment key={att.blob_id} att={att} onOpen={() => setViewing(att.blob_id)} fill={fill} />;
-        if (inline && t.startsWith("video/")) return <VideoAttachment key={att.blob_id} att={att} fill={fill} />;
+        if ((inline || canStream()) && t.startsWith("video/")) return <VideoAttachment key={att.blob_id} att={att} fill={fill} />;
         if (inline && t.startsWith("audio/")) return <AudioAttachment key={att.blob_id} att={att} />;
         return <FileAttachment key={att.blob_id} att={att} />;
       })}

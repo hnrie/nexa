@@ -709,9 +709,9 @@ def files_flow(srv, alice, bob, browser, out):
         alice.page.wait_for_selector(f"[title='{path.name}']", timeout=10000)
         alice.composer().press("Enter")
         # The message is in the chat at once, with its upload's progress; this
-        # waits for the message itself, sent. A big video shows only its load
-        # button, which does not name it.
-        shown = "[data-id][data-pending='false'] button:has-text('Load video')" if path == clip else f"[data-id][data-pending='false']:has-text('{path.name}')"
+        # waits for the message itself, sent. A video shows as its player,
+        # which streams it (lib/videoStream.ts) and names it only as its frame's title.
+        shown = f"[data-id][data-pending='false'] iframe[title='{path.name}']" if path == clip else f"[data-id][data-pending='false']:has-text('{path.name}')"
         alice.page.wait_for_selector(shown, timeout=180000)
     singles = [u for m, u in sent if m == "POST" and u.endswith("/attachments")]
     pieces = [u for m, u in sent if m == "PATCH"]
@@ -723,8 +723,8 @@ def files_flow(srv, alice, bob, browser, out):
     bob.open_dm_from_sidebar("Alice")
     for path in (small, big):
         bob.page.wait_for_selector(f"[data-id]:has-text('{path.name}')", timeout=30000)
-    load = bob.page.locator("[data-id] button:has-text('Load video')")
-    load.wait_for(timeout=30000)
+    clip_player = bob.page.locator(f"[data-testid=video-player]:has(iframe[title='{clip.name}'])")
+    clip_player.wait_for(timeout=30000)
     time.sleep(2)
     # only pic.png from earlier may have come down by itself
     assert len({u for u in fetched if "/media/attachments/" in u}) <= 1, f"nothing big should load by itself: {fetched}"
@@ -750,15 +750,20 @@ def files_flow(srv, alice, bob, browser, out):
         bob.page.locator("[data-id]:has-text('small.bin') button[aria-label^='Download']").click()
     assert sha256_file(info.value.path()) == small_sum, "small download differs from what was sent"
 
+    # played, it streams from where it starts; random bytes are no video, which
+    # the player says at once rather than downloading all 30 MB to find out
     before = len(fetched)
-    load.click()
+    clip_player.scroll_into_view_if_needed()
+    clip_player.hover()
+    clip_player.locator("button[aria-label='Play']").first.click()
     for _ in range(50):
-        if len(fetched) > before:
+        if any("/__download/stream/" in u for u in fetched[before:]):
             break
         time.sleep(0.2)
     else:
-        raise AssertionError("the video should load once asked for")
-    bob.page.wait_for_selector("[data-id] video", timeout=60000)
+        raise AssertionError("the video should stream once played")
+    clip_player.locator("text=/cannot play this video/i").wait_for(timeout=30000)
+    assert bob.page.locator("button:has-text('Load Video')").count() == 0, "an unplayable stream should not fall back to downloading it whole"
 
     # without a service worker the page saves it itself
     plain = Session(browser, srv.base, "bob", out, service_workers="block")

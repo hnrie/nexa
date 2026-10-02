@@ -10,14 +10,14 @@
  * together.
  */
 
-const MAGIC = [0x45, 0x43, 0x46, 0x31]; // "ECF1"
-const BASE_IV_LEN = 8;
-const HEADER_LEN = MAGIC.length + BASE_IV_LEN;
-const IV_LEN = 12;
-const LEN_PREFIX = 4;
-const TAG_LEN = 16;
-const CHUNK = 4 * 1024 * 1024;
-const AAD = new TextEncoder().encode("file/v1");
+export const MAGIC = [0x45, 0x43, 0x46, 0x31]; // "ECF1"
+export const BASE_IV_LEN = 8;
+export const HEADER_LEN = MAGIC.length + BASE_IV_LEN;
+export const IV_LEN = 12;
+export const LEN_PREFIX = 4;
+export const TAG_LEN = 16;
+export const CHUNK = 4 * 1024 * 1024;
+export const AAD = new TextEncoder().encode("file/v1");
 
 /** The ciphertext size of a file of `size` bytes. */
 export function cipherSizeOf(size: number): number {

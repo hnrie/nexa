@@ -6,6 +6,9 @@
 .player[data-fill]:not([data-full="true"]) .video { max-height: none; width: 100%; height: 100%; }
 .player[data-full="true"] { max-width: none; width: 100vw; height: 100vh; border-radius: 0; display: flex; align-items: center; justify-content: center; }
 .video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; cursor: pointer; -webkit-touch-callout: none; }
+/* a video playing while it downloads sits in a frame (lib/videoStream.ts); its clicks land on the surface over it */
+iframe.video { border: 0; pointer-events: none; }
+.surface { position: absolute; inset: 0; cursor: pointer; -webkit-touch-callout: none; }
 /* with no recorded size there is no frame, so the video sets the height itself */
 .player[data-sized="false"] .video { max-height: 350px; }
 .player[data-full="true"] .video { max-height: none; }

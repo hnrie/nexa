@@ -60,8 +60,8 @@ let streaming = 0;
 let pinger: ReturnType<typeof setInterval> | null = null;
 const waiters: Array<() => void> = [];
 
-/** The service worker that streams downloads, once it is running. */
-async function downloadWorker(): Promise<ServiceWorker | null> {
+/** The service worker that streams downloads and videos, once it is running. */
+export async function downloadWorker(): Promise<ServiceWorker | null> {
   if (typeof navigator === "undefined" || !navigator.serviceWorker) return null;
   const reg = await navigator.serviceWorker.getRegistration(DOWNLOAD_PATH).catch(() => undefined);
   if (!reg?.scope.endsWith(DOWNLOAD_PATH)) return null;
@@ -91,7 +91,7 @@ export function downloading(): boolean {
   return streaming > 0;
 }
 
-function hex(u: Uint8Array): string {
+export function hex(u: Uint8Array): string {
   return Array.from(u, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
