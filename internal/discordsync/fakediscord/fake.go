@@ -42,6 +42,11 @@ type Server struct {
 	scope     string
 	failJoin  bool
 	nextToken int
+	// redirects are the callbacks listed for the application; nil lists
+	// none in particular and takes any
+	redirects []string
+	// asked is every redirect a code was exchanged with, in order
+	asked []string
 }
 
 // User is a Discord account.
@@ -64,6 +69,16 @@ func New() *Server {
 			return
 		}
 		writeJSON(w, map[string]any{"url": "ws://" + r.Host + "/gw", "shards": 1, "session_start_limit": map[string]any{"total": 1000, "remaining": 999, "reset_after": 0, "max_concurrency": 1}})
+	})
+	mux.HandleFunc("GET /api/v10/applications/@me", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bot bot-token" {
+			http.Error(w, `{"message":"401: Unauthorized","code":0}`, http.StatusUnauthorized)
+			return
+		}
+		f.mu.Lock()
+		list := append([]string{}, f.redirects...)
+		f.mu.Unlock()
+		writeJSON(w, map[string]any{"id": "client-id", "name": "Nexa", "redirect_uris": list})
 	})
 	mux.HandleFunc("POST /api/v10/oauth2/token", f.token)
 	mux.HandleFunc("POST /api/v10/oauth2/token/revoke", func(w http.ResponseWriter, r *http.Request) {
@@ -121,6 +136,22 @@ func (f *Server) Scope(scope string) {
 	f.mu.Lock()
 	f.scope = scope
 	f.mu.Unlock()
+}
+
+// Redirects sets the callbacks listed for the application, as OAuth2,
+// Redirects in the Developer Portal does. A code is then only exchanged with
+// one of them, as on Discord.
+func (f *Server) Redirects(list ...string) {
+	f.mu.Lock()
+	f.redirects = append([]string{}, list...)
+	f.mu.Unlock()
+}
+
+// Exchanged are the redirects codes were exchanged with, in order.
+func (f *Server) Exchanged() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.asked...)
 }
 
 // FailJoin makes adding members fail, as Discord does for someone banned from the server.
@@ -197,7 +228,12 @@ func (f *Server) token(w http.ResponseWriter, r *http.Request) {
 	case "authorization_code":
 		id, ok = f.codes[r.PostForm.Get("code")]
 		delete(f.codes, r.PostForm.Get("code"))
-		if !strings.HasSuffix(r.PostForm.Get("redirect_uri"), "/api/v1/connections/discord/callback") {
+		redirect := r.PostForm.Get("redirect_uri")
+		f.asked = append(f.asked, redirect)
+		if !strings.HasSuffix(redirect, "/api/v1/connections/discord/callback") {
+			ok = false
+		}
+		if f.redirects != nil && !contains(f.redirects, redirect) {
 			ok = false
 		}
 	case "refresh_token":

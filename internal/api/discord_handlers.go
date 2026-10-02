@@ -32,7 +32,7 @@ func (s *Server) WireDiscord(hub *gateway.Hub) {
 	}
 	s.Discord = discordsync.New(discordsync.Config{
 		ClientID: c.DiscordClientID, ClientSecret: c.DiscordClientSecret, BotToken: c.DiscordBotToken,
-		GuildID: c.DiscordGuildID, PublicURL: c.PublicURL, RedirectURL: c.DiscordRedirectURL, API: cmp.Or(s.discordAPI, c.DiscordAPIURL),
+		GuildID: c.DiscordGuildID, PublicURL: c.PublicURL, Origins: c.Origins(), RedirectURL: c.DiscordRedirectURL, API: cmp.Or(s.discordAPI, c.DiscordAPIURL),
 	}, s.Store, hub, s.sealDiscordToken, s.openDiscordToken, s.ProxyURL, s.Log)
 }
 
@@ -41,7 +41,7 @@ func (s *Server) StartDiscord(ctx context.Context) {
 	if s.Discord == nil {
 		return
 	}
-	s.Log.Info("discord activity sync on", "redirect", s.Discord.Redirect())
+	s.Log.Info("discord activity sync on")
 	s.background.Go(func() { s.Discord.Run(ctx) })
 }
 
@@ -78,10 +78,18 @@ func (s *Server) handleDiscordState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	connected, guild, lastErr := s.Discord.Status()
+	bot := map[string]any{"configured": true, "connected": connected, "guild_id": guild, "error": lastErr}
+	// the callback in use, and whether the Developer Portal lists it: Discord's
+	// page refuses everyone when it does not
+	redirect, listed, known := s.Discord.Redirect(r.Context())
+	bot["redirect"] = redirect
+	if known {
+		bot["redirect_listed"] = listed
+	}
 	WriteJSON(w, http.StatusOK, struct {
 		discordsync.State
 		Bot map[string]any `json:"bot"`
-	}{st, map[string]any{"configured": true, "connected": connected, "guild_id": guild, "error": lastErr, "redirect": s.Discord.Redirect()}})
+	}{st, bot})
 }
 
 // discordLimited holds back linking and rejoining, each of which calls Discord.
@@ -103,22 +111,34 @@ func (s *Server) handleDiscordAuthorize(w http.ResponseWriter, r *http.Request) 
 	if s.discordLimited(w, me.ID) {
 		return
 	}
+	// the desktop app says so: it sends the system's browser to Discord, and
+	// that browser is not where the person is signed in. A page from before
+	// this was asked sends no body at all.
+	var body struct {
+		App bool `json:"app"`
+	}
+	if r.ContentLength != 0 {
+		if err := ReadJSON(w, r, &body, 1<<10); err != nil {
+			WriteError(w, err)
+			return
+		}
+	}
 	// back to the address this was started from, which is not always where Discord returns to
 	back := ""
 	if addr, kind := s.originAddress(r.Header.Get("Origin")); kind != notOurs {
 		back = addr
 	}
-	WriteJSON(w, http.StatusOK, map[string]string{"url": s.Discord.AuthorizeURL(me.ID, back)})
+	WriteJSON(w, http.StatusOK, map[string]string{"url": s.Discord.AuthorizeURL(r.Context(), me.ID, back, body.App)})
 }
 
 // handleDiscordCallback is where Discord sends the person back. It finishes
 // the link and goes on to the Activity settings, saying how it went.
 func (s *Server) handleDiscordCallback(w http.ResponseWriter, r *http.Request) {
 	result := "failed"
-	back := ""
+	back, app := "", false
 	if s.Discord != nil {
 		q := r.URL.Query()
-		back = s.Discord.Back(q.Get("state"))
+		back, app = s.Discord.Started(q.Get("state"))
 		_, result = s.Discord.Callback(r.Context(), q.Get("code"), q.Get("state"), q.Get("error"))
 	}
 	// where the link was started, when that is one of Nexa's addresses; a
@@ -127,6 +147,12 @@ func (s *Server) handleDiscordCallback(w http.ResponseWriter, r *http.Request) {
 		back = strings.TrimRight(s.Cfg.PublicURL, "/")
 	}
 	dest := back + "/channels/@me?" + url.Values{"settings": {"activity"}, "discord": {result}}.Encode()
+	// Started in the desktop app, this is the system's browser: it may be
+	// signed in to nobody or to another account, so it gets a page that only
+	// says how it went, and the app hears of the link from the server.
+	if app {
+		dest = strings.TrimRight(s.Cfg.PublicURL, "/") + "/connected/discord?" + url.Values{"result": {result}}.Encode()
+	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	http.Redirect(w, r, dest, http.StatusSeeOther)

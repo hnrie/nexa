@@ -24,6 +24,18 @@ const EvLink = "discord_link"
 // How long a person has to finish on Discord's page after asking to link.
 const stateTTL = 10 * time.Minute
 
+// callbackPath is where Discord sends people back to, under any of Nexa's addresses.
+const callbackPath = "/api/v1/connections/discord/callback"
+
+// How long what Discord last said its listed redirects are is taken as it
+// stands: a redirect added in the Developer Portal is in use a minute later,
+// and whoever is looking at the bot's settings sees it sooner than that.
+const (
+	listedTTL       = time.Minute
+	listedTTLAdmin  = 10 * time.Second
+	listedAskWithin = 4 * time.Second
+)
+
 // How long the bot may be away from Discord before what it last heard stops
 // being shown: it would otherwise go on showing a song that ended long ago.
 const staleAfter = 2 * time.Minute
@@ -50,7 +62,11 @@ type Config struct {
 	// GuildID is the activity server. Empty: the bot's only server.
 	GuildID   string
 	PublicURL string
-	// RedirectURL is the callback listed with Discord. Empty: the one under PublicURL.
+	// Origins are every address this Nexa answers at, PublicURL first: a
+	// callback under any of them reaches this server. Empty: PublicURL alone.
+	Origins []string
+	// RedirectURL names the callback outright (DISCORD_REDIRECT_URL). Empty,
+	// it is chosen from the ones Discord lists: see redirectFor.
 	RedirectURL string
 	// API is Discord's REST API (DefaultAPI); tests point it at a fake.
 	API  string
@@ -79,6 +95,15 @@ type Service struct {
 	connected bool
 	lastErr   string
 	stale     *time.Timer
+	// the redirects Discord lists for the application, when it last said
+	// (zero: it never has) and when it was last asked
+	listed      []string
+	listedAt    time.Time
+	listedAsked time.Time
+
+	// listMu is held while Discord is asked for its redirects, so several
+	// people linking at once ask it once
+	listMu sync.Mutex
 
 	pubMu sync.Mutex
 	pubs  map[ids.ID]*pending
@@ -96,6 +121,12 @@ type oauthState struct {
 	expires time.Time
 	// back is the address the person started from, to return them to
 	back string
+	// redirect is the callback Discord was asked to come back through, which
+	// swapping the code for tokens has to name again, to the letter
+	redirect string
+	// app says the link was started in the desktop app, which sends the
+	// system's browser to Discord and stays where it is
+	app bool
 }
 
 type pending struct {
@@ -135,13 +166,119 @@ func New(cfg Config, st *store.Store, hub Hub, seal func(string) ([]byte, error)
 	return s
 }
 
-// Redirect is the address Discord sends people back to, which has to be
-// listed under OAuth2, Redirects in the Developer Portal.
-func (s *Service) Redirect() string {
+// callbackAt is the callback under one of Nexa's addresses.
+func callbackAt(origin string) string {
+	return strings.TrimRight(origin, "/") + callbackPath
+}
+
+// listedRedirects are the callbacks Discord lists for the application, asked
+// of it again once the last answer is older than maxAge. known is false until
+// Discord has answered once; when it cannot be reached, what it said before
+// stands.
+func (s *Service) listedRedirects(ctx context.Context, maxAge time.Duration) (list []string, known bool) {
+	s.listMu.Lock()
+	defer s.listMu.Unlock()
+	s.mu.Lock()
+	list, known = s.listed, !s.listedAt.IsZero()
+	fresh := !s.listedAsked.IsZero() && time.Since(s.listedAsked) < maxAge
+	s.mu.Unlock()
+	if fresh {
+		return list, known
+	}
+	ctx, cancel := context.WithTimeout(ctx, listedAskWithin)
+	defer cancel()
+	got, err := s.api.redirects(ctx)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.listedAsked = time.Now()
+	if err != nil {
+		s.log.Warn("discord sync: reading the listed redirects", "err", err)
+		return s.listed, !s.listedAt.IsZero()
+	}
+	s.listed, s.listedAt = got, s.listedAsked
+	return got, true
+}
+
+// redirectFor is the callback Discord is asked to send someone back through,
+// when they started at the address `back` ("" for nobody in particular).
+// Discord only opens its page for a callback listed under OAuth2, Redirects in
+// the Developer Portal, so it is the first of these that is listed: the one
+// under the address they started at, then the one under Nexa's own address,
+// then the ones under its other addresses. A person at an address nobody has
+// listed still links, through a callback that is, and is returned to where
+// they started (api/discord_handlers.go); and linking goes on working through
+// a move to a new address before and after that address is listed. With
+// nothing listed, or Discord not answering, it is the one under Nexa's own
+// address. DISCORD_REDIRECT_URL names it outright.
+func (s *Service) redirectFor(ctx context.Context, back string) string {
+	return s.pickRedirect(ctx, back, listedTTL)
+}
+
+func (s *Service) pickRedirect(ctx context.Context, back string, maxAge time.Duration) string {
 	if s.cfg.RedirectURL != "" {
 		return s.cfg.RedirectURL
 	}
-	return strings.TrimRight(s.cfg.PublicURL, "/") + "/api/v1/connections/discord/callback"
+	own := callbackAt(s.cfg.PublicURL)
+	listed, known := s.listedRedirects(ctx, maxAge)
+	if !known {
+		return own
+	}
+	for _, origin := range append([]string{back, s.cfg.PublicURL}, s.cfg.Origins...) {
+		// only ever under an address of Nexa's own, whatever is listed
+		if origin == "" || !s.ours(origin) {
+			continue
+		}
+		if as, ok := listedAs(listed, callbackAt(origin)); ok {
+			return as
+		}
+	}
+	return own
+}
+
+// ours says whether an address is one this Nexa answers at.
+func (s *Service) ours(origin string) bool {
+	origin = strings.TrimRight(origin, "/")
+	for _, o := range append([]string{s.cfg.PublicURL}, s.cfg.Origins...) {
+		if strings.EqualFold(strings.TrimRight(o, "/"), origin) {
+			return true
+		}
+	}
+	return false
+}
+
+// listedAs finds a callback among the listed ones, as Discord has it written:
+// it compares what it is sent with its list to the letter.
+func listedAs(listed []string, callback string) (string, bool) {
+	for _, l := range listed {
+		if strings.EqualFold(l, callback) {
+			return l, true
+		}
+	}
+	return "", false
+}
+
+// Redirect is the callback someone who starts at Nexa's own address comes
+// back through, and whether Discord lists it. known is false when Discord has
+// not said which it lists.
+func (s *Service) Redirect(ctx context.Context) (redirect string, listed, known bool) {
+	redirect = s.pickRedirect(ctx, "", listedTTLAdmin)
+	list, known := s.listedRedirects(ctx, listedTTLAdmin)
+	_, listed = listedAs(list, redirect)
+	return redirect, listed && known, known
+}
+
+// checkRedirect says in the log which callback is in use, and what to do when
+// Discord does not list it: its page would refuse everyone who tries to link.
+func (s *Service) checkRedirect(ctx context.Context) {
+	redirect, listed, known := s.Redirect(ctx)
+	switch {
+	case !known:
+		s.log.Info("discord sync: redirect", "url", redirect)
+	case listed:
+		s.log.Info("discord sync: redirect", "url", redirect, "listed", true)
+	default:
+		s.log.Error("discord sync: Discord does not list this redirect, so nobody can link; add it under OAuth2, Redirects in the Developer Portal", "url", redirect)
+	}
 }
 
 // Run connects the bot and keeps it connected until ctx ends.
@@ -156,6 +293,7 @@ func (s *Service) Run(ctx context.Context) {
 	}
 	s.mu.Unlock()
 	go s.sweepStates(ctx)
+	go s.checkRedirect(ctx)
 	err = s.gw.Run(ctx)
 	if ctx.Err() == nil && err != nil {
 		s.log.Error("discord sync stopped", "err", err)
@@ -492,9 +630,11 @@ func (s *Service) publish(uid ids.ID, raw []json.RawMessage) {
 // --- linking ---------------------------------------------------------------
 
 // AuthorizeURL is Discord's page for linking, for this account. The state in
-// it is single use and lasts ten minutes; `back` is the address of Nexa the
-// person started from, which Callback hands back.
-func (s *Service) AuthorizeURL(uid ids.ID, back string) string {
+// it is single use and lasts ten minutes. `back` is the address of Nexa the
+// person started from, and `app` says they started in the desktop app; Started
+// hands both back when Discord returns them.
+func (s *Service) AuthorizeURL(ctx context.Context, uid ids.ID, back string, app bool) string {
+	redirect := s.redirectFor(ctx, back)
 	state := randomString(32)
 	s.mu.Lock()
 	for k, v := range s.states {
@@ -502,24 +642,27 @@ func (s *Service) AuthorizeURL(uid ids.ID, back string) string {
 			delete(s.states, k)
 		}
 	}
-	s.states[state] = oauthState{uid: uid, expires: time.Now().Add(stateTTL), back: back}
+	s.states[state] = oauthState{uid: uid, expires: time.Now().Add(stateTTL), back: back, redirect: redirect, app: app}
 	s.mu.Unlock()
 	q := url.Values{
 		"response_type": {"code"},
 		"client_id":     {s.cfg.ClientID},
 		"scope":         {"identify guilds.join"},
 		"state":         {state},
-		"redirect_uri":  {s.Redirect()},
+		"redirect_uri":  {redirect},
 		"prompt":        {"consent"},
 	}
 	return "https://discord.com/oauth2/authorize?" + q.Encode()
 }
 
-// Back is the address the link with this state was started from, or "".
-func (s *Service) Back(state string) string {
+// Started is where the link with this state was started: the address of Nexa
+// it was started from ("" when that is not known), and whether that was in the
+// desktop app. A state nobody asked for started nowhere.
+func (s *Service) Started(state string) (back string, app bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.states[state].back
+	st := s.states[state]
+	return st.back, st.app
 }
 
 // Callback finishes a link Discord sent the person back from. It says how it
@@ -535,7 +678,7 @@ func (s *Service) Callback(ctx context.Context, code, state, oauthErr string) (i
 	if oauthErr != "" || code == "" {
 		return st.uid, "denied"
 	}
-	tok, err := s.api.exchange(ctx, code, s.Redirect())
+	tok, err := s.api.exchange(ctx, code, st.redirect)
 	if err != nil {
 		s.log.Warn("discord sync: exchanging the code", "err", err)
 		return st.uid, "failed"

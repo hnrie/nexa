@@ -199,6 +199,22 @@ func (r *rest) revoke(ctx context.Context, token string) error {
 	return err
 }
 
+// redirects are the callbacks listed for the application under OAuth2,
+// Redirects in the Developer Portal, which the bot may read of its own
+// application. Discord opens its page for linking only with one of these.
+func (r *rest) redirects(ctx context.Context) ([]string, error) {
+	var a struct {
+		Redirects *[]string `json:"redirect_uris"`
+	}
+	if _, err := r.do(ctx, http.MethodGet, "/applications/@me", r.botAuth(), nil, "", &a); err != nil {
+		return nil, err
+	}
+	if a.Redirects == nil {
+		return nil, errors.New("discord did not say which redirects are listed")
+	}
+	return *a.Redirects, nil
+}
+
 // me is the Discord account an access token belongs to.
 func (r *rest) me(ctx context.Context, access string) (*User, error) {
 	var u User

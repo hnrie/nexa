@@ -10,11 +10,32 @@ interface DiscordStore {
   clear: () => void;
 }
 
-export const useDiscord = create<DiscordStore>()((set) => ({
+/** How long after asking to link in the desktop app a new link is taken to be that one. */
+const LINK_WAIT_MS = 10 * 60_000;
+let awaitingLink = 0;
+let onLinked: (() => void) | null = null;
+
+/**
+ * The desktop app sends the system's browser to Discord and waits here. When
+ * the link it asked for arrives from the server, `then` runs, once.
+ */
+export function awaitDiscordLink(then: () => void): void {
+  awaitingLink = Date.now();
+  onLinked = then;
+}
+
+export const useDiscord = create<DiscordStore>()((set, get) => ({
   state: null,
   set: (state) => {
+    const was = get().state;
     set({ state });
     alignShare();
+    if (onLinked && state.linked && was && !was.linked) {
+      const then = onLinked;
+      const fresh = Date.now() - awaitingLink < LINK_WAIT_MS;
+      onLinked = null;
+      if (fresh) then();
+    }
   },
   load: async () => {
     try {

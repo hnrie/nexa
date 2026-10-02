@@ -16,6 +16,13 @@
 @media (max-width: 480px) { .card { padding: 26px 20px 22px; border-radius: var(--radius-lg); } .title { font-size: 25px; } }
 .title { margin: 0; font-family: var(--font-display); font-size: 29px; font-weight: 700; letter-spacing: -0.014em; line-height: 1.1; color: var(--text-strong); text-align: center; }
 .subtitle { margin: -10px 0 0; color: var(--text-muted); text-align: center; font-size: 15.5px; line-height: 1.45; }
+/* How something went, above the title: a disc lit from above in the colour of
+   the answer, with its glow thrown down onto the glass. */
+.mark { align-self: center; flex: none; width: 64px; height: 64px; margin-bottom: 2px; border-radius: 50%; display: grid; place-items: center; color: var(--mark, var(--text-brand)); background: radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, var(--mark, var(--brand)) 30%, transparent), color-mix(in srgb, var(--mark, var(--brand)) 12%, transparent)); box-shadow: inset 0 1px 0 var(--edge-light-strong), 0 0 0 1px color-mix(in srgb, var(--mark, var(--brand)) 42%, transparent), 0 14px 34px -12px color-mix(in srgb, var(--mark, var(--brand)) 70%, transparent); animation: settle 520ms var(--ease-spring) 140ms both; }
+.mark[data-tone="good"] { --mark: var(--status-online); }
+.mark[data-tone="warn"] { --mark: var(--text-warning); }
+@keyframes settle { from { opacity: 0; transform: scale(0.82); } }
+@media (prefers-reduced-motion: reduce) { .mark { animation: none; } }
 .form { display: flex; flex-direction: column; gap: 20px; }
 .row { display: flex; gap: 12px; }
 .foot { font-size: 14px; color: var(--text-muted); }

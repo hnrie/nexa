@@ -14,7 +14,7 @@ import { describeError } from "@/lib/errors";
 import { formatRelative } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useDesktop } from "@/stores/desktop";
-import { useDiscord } from "@/stores/discord";
+import { awaitDiscordLink, useDiscord } from "@/stores/discord";
 import { usePresence } from "@/stores/presence";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
@@ -67,11 +67,18 @@ function useDiscordResult(): void {
   }, []);
 }
 
-/** Goes to Discord's page for linking: in the app, in the browser, which comes back to the site. */
+/**
+ * Goes to Discord's page for linking. A browser goes there itself and is sent
+ * back to these settings. The desktop app hands the page to the system's
+ * browser, which is told how it went on a page of its own, and says so here
+ * when the server sends the new link.
+ */
 export async function connectDiscord(): Promise<void> {
   try {
-    const { url } = await connections.authorizeDiscord();
-    if (desktopBridge()) {
+    const inApp = !!desktopBridge();
+    const { url } = await connections.authorizeDiscord(inApp);
+    if (inApp) {
+      awaitDiscordLink(() => useUI.getState().toast(t("settings.activity.discordLinked"), "success"));
       window.open(url, "_blank", "noopener");
       useUI.getState().toast(t("settings.activity.finishInBrowser"), "info");
       return;
@@ -251,6 +258,11 @@ function BotStatus({ state }: { state: DiscordState }) {
       <span className={a.adminHead}>{t("settings.activity.botHead")}</span>
       <span>{bot.connected ? t("settings.activity.botConnected") : t("settings.activity.botDisconnected", { error: bot.error || t("settings.desktop.unknownError") })}</span>
       {bot.redirect ? <span className={a.mono}>{t("settings.activity.botRedirect", { url: bot.redirect })}</span> : null}
+      {bot.redirect && bot.redirect_listed === false ? (
+        <span className={a.adminWarn} data-testid="discord-redirect-unlisted">
+          <TriangleAlert size={14} aria-hidden="true" /> {t("settings.activity.botRedirectUnlisted")}
+        </span>
+      ) : null}
     </div>
   );
 }

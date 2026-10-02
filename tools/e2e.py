@@ -28,9 +28,10 @@ def free_port():
 
 
 class Server:
-    def __init__(self, keep=False):
+    def __init__(self, keep=False, port=None):
         self.dir = Path(tempfile.mkdtemp(prefix="chat-e2e-"))
-        self.port = free_port()
+        # a run that has to name the server's address before it starts picks the port itself
+        self.port = port or free_port()
         self.base = f"http://127.0.0.1:{self.port}"
         self.keep = keep
         # STUN_URLS=none keeps ICE to host candidates: both browsers are on this

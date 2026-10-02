@@ -22,6 +22,7 @@ const NexaCasePage = lazyPage(() => import("@/pages/NexaCasePage"));
 const NexaBugPage = lazyPage(() => import("@/pages/NexaBugPage"));
 const NotesPage = lazyPage(() => import("@/pages/NotesPage"));
 const NoteLinkPage = lazyPage(() => import("@/pages/NoteLinkPage"));
+const DiscordConnectedPage = lazyPage(() => import("@/pages/DiscordConnectedPage"));
 const NotFoundPage = lazyPage(() => import("@/pages/NotFoundPage"));
 // The app itself: its sidebars, conversations, calls and every store behind
 // them. The public pages (the front page, signing in, an invite) never load it.
@@ -64,6 +65,8 @@ export function AppRoutes() {
         {/* a guest link: the call and nothing else, with no account */}
         <Route path="/call/:code" element={<GuestCallPage />} />
         <Route path="/stickers/pack/:packId" element={<RequireAuth><StickerPackPage /></RequireAuth>} />
+        {/* where the browser lands after linking Discord from the desktop app: how it went, signed in or not */}
+        <Route path="/connected/discord" element={<DiscordConnectedPage />} />
         <Route
           path="/channels/*"
           element={

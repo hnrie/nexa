@@ -25,17 +25,26 @@ export interface DiscordState {
   /** Discord activity sync is set up on the server. */
   available: boolean;
   linked: LinkedDiscord | null;
-  /** For admins: whether the bot is set up and connected, and why not. */
-  bot?: { configured: boolean; connected: boolean; guild_id?: string; error?: string; redirect?: string };
+  /**
+   * For admins: whether the bot is set up and connected, and why not; the
+   * callback Discord is asked to come back through, and whether the Developer
+   * Portal lists it (absent when Discord has not said).
+   */
+  bot?: { configured: boolean; connected: boolean; guild_id?: string; error?: string; redirect?: string; redirect_listed?: boolean };
 }
 
 export const connections = {
   discord(): Promise<DiscordState> {
     return api.request<DiscordState>("GET", "/connections/discord");
   },
-  /** Discord's page for linking this account; the app goes there, and Discord sends it back. */
-  authorizeDiscord(): Promise<{ url: string }> {
-    return api.request<{ url: string }>("POST", "/connections/discord/authorize");
+  /**
+   * Discord's page for linking this account; the app goes there, and Discord
+   * sends it back. `app` says this is the desktop app, which hands the page to
+   * the system's browser: that browser is then shown how it went on a page of
+   * its own, rather than this account's settings.
+   */
+  authorizeDiscord(app: boolean): Promise<{ url: string }> {
+    return api.request<{ url: string }>("POST", "/connections/discord/authorize", { app });
   },
   setDiscord(patch: { show?: boolean; kinds?: number }): Promise<DiscordState> {
     return api.request<DiscordState>("PATCH", "/connections/discord", patch);

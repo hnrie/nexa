@@ -77,10 +77,11 @@ type Config struct {
 	DiscordGuildID      string
 	// DiscordAPIURL is Discord's REST API; only end-to-end tests point it at a fake.
 	DiscordAPIURL string
-	// DiscordRedirectURL is where Discord sends people back to after linking,
-	// as listed under OAuth2, Redirects in the Developer Portal. Empty, it is
-	// the callback under PublicURL; set it to keep using an address already
-	// listed there when PublicURL changes.
+	// DiscordRedirectURL names the callback Discord sends people back through
+	// after linking, outright. Empty, as it is meant to be, the callback is
+	// chosen from the ones listed under OAuth2, Redirects in the Developer
+	// Portal (discordsync.redirectFor): the one under the address the person
+	// started at, else PublicURL's, else another of this Nexa's addresses.
 	DiscordRedirectURL string
 	// TurnstileSiteKey and TurnstileSecretKey turn on Cloudflare Turnstile
 	// captchas for the actions bots abuse. Both are free to get; without them
