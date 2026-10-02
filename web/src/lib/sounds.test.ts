@@ -68,18 +68,19 @@ describe("sounds", () => {
     s.preloadSounds();
     await settle();
     const ac = made();
-    expect(ac.decoded).toBe(7);
+    expect(ac.decoded).toBe(8);
     expect(await s.playSound("message")).toBe(true);
-    expect(ac.sources).toBe(1);
     expect(await s.playSound("friend")).toBe(true);
-    expect(ac.tones).toBe(3);
+    expect(ac.sources).toBe(2);
+    expect(await s.playSound("join")).toBe(true);
+    expect(ac.tones).toBe(2);
   });
 
   it("drop a sound that cannot start in time rather than play it late", async () => {
     FakeAudioContext.startsAs = "wait";
     const s = await load();
     s.installAudioUnlock();
-    const played = s.playSound("friend");
+    const played = s.playSound("join");
     await vi.advanceTimersByTimeAsync(1500);
     expect(await played).toBe(false);
     const ac = made();
@@ -197,12 +198,12 @@ describe("sound packs", () => {
     expect(ac.sources).toBe(1);
     expect(ac.decoded).toBe(1);
     expect(fetch).not.toHaveBeenCalled();
-    // Nexa's recording plays for a mention, and its chimes for a friend request
+    // Nexa's recording plays for a mention, and its chimes for someone joining
     expect(await s.playSound("mention")).toBe(true);
     expect(fetch).toHaveBeenCalledWith("/sounds/mention.m4a");
     expect(ac.sources).toBe(2);
-    expect(await s.playSound("friend")).toBe(true);
-    expect(ac.tones).toBe(3);
+    expect(await s.playSound("join")).toBe(true);
+    expect(ac.tones).toBe(2);
     // played again, it is not fetched again
     expect(await s.playSound("message")).toBe(true);
     expect(open).toHaveBeenCalledTimes(1);
@@ -255,11 +256,11 @@ describe("sounds in an iPhone home-screen app", () => {
     s.preloadSounds();
     await settle();
     expect(FakeAudioContext.made).toHaveLength(0);
-    expect(fetch).toHaveBeenCalledTimes(7);
+    expect(fetch).toHaveBeenCalledTimes(8);
     tap();
     await settle();
-    expect(made().decoded).toBe(7);
-    expect(fetch).toHaveBeenCalledTimes(7);
+    expect(made().decoded).toBe(8);
+    expect(fetch).toHaveBeenCalledTimes(8);
   });
 
   it("let audio go after the last sound, and start it again for the next without a tap", async () => {
@@ -282,11 +283,11 @@ describe("sounds in an iPhone home-screen app", () => {
     // it lasts 0.22 s, and audio stays 2 s past that for a sound close behind
     await vi.advanceTimersByTimeAsync(2000);
     expect(ac.state).toBe("running");
-    expect(await s.playSound("friend")).toBe(true);
-    expect(ac.tones).toBe(5);
+    expect(await s.playSound("join")).toBe(true);
+    expect(ac.tones).toBe(4);
     expect(ac.resumes).toBe(2);
-    // that one lasts 0.44 s
-    await vi.advanceTimersByTimeAsync(2300);
+    // and audio is let go 2 s after that one ends
+    await vi.advanceTimersByTimeAsync(2100);
     expect(ac.state).toBe("running");
     await vi.advanceTimersByTimeAsync(200);
     expect(ac.state).toBe("suspended");

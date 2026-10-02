@@ -174,6 +174,7 @@ function tone(ac: AudioContext, freq: number, start: number, dur: number, type: 
 const FILES: Partial<Record<SoundName, string>> = {
   message: "/sounds/message.m4a",
   mention: "/sounds/mention.m4a",
+  friend: "/sounds/friend-request.m4a",
   ring: "/sounds/incoming-call.m4a",
   outgoing: "/sounds/outgoing-call.m4a",
   leave: "/sounds/leave-call.m4a",
