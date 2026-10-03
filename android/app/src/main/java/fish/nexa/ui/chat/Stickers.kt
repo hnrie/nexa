@@ -1,6 +1,8 @@
 package fish.nexa.ui.chat
 
+import android.graphics.Bitmap
 import androidx.annotation.OptIn
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -31,6 +35,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -47,6 +53,7 @@ import fish.nexa.Nexa
 import fish.nexa.crypto.StickerRef
 import fish.nexa.media.Media
 import fish.nexa.media.Streams
+import fish.nexa.media.Webm
 import fish.nexa.ui.components.ButtonSize
 import fish.nexa.ui.components.NxButton
 import fish.nexa.ui.components.Spinner
@@ -63,6 +70,7 @@ import kotlinx.coroutines.withContext
 import fish.nexa.net.StickerInfo
 import okhttp3.Request
 import java.util.zip.GZIPInputStream
+import kotlin.math.roundToInt
 
 /** Where "View Sticker Pack" goes: set by the sticker pack dialog when it exists, so the popout offers it only then. */
 object StickerPacks {
@@ -110,9 +118,46 @@ private fun TgsView(url: String, alt: String, size: Dp, modifier: Modifier) {
     }
 }
 
-@OptIn(UnstableApi::class)
+/**
+ * A video sticker, its see-through parts kept (media/WebmAlpha.kt); one this
+ * cannot read plays in the ordinary player instead.
+ */
 @Composable
 private fun WebmView(url: String, alt: String, size: Dp, modifier: Modifier) {
+    val box = with(LocalDensity.current) { size.roundToPx() }
+    var frame by remember(url) { mutableStateOf<Bitmap?>(null) }
+    var plain by remember(url) { mutableStateOf(false) }
+    LaunchedEffect(url, box) {
+        val clip = Webm.load(url)
+        if (clip == null) {
+            plain = true
+            return@LaunchedEffect
+        }
+        val (w, h) = Webm.fit(clip, box)
+        if (!Webm.play(clip, w, h, loop = true) { frame = it }) plain = true
+    }
+    if (plain) {
+        PlainWebm(url, alt, size, modifier)
+        return
+    }
+    Canvas(modifier.size(size).semantics { contentDescription = alt }) {
+        val bmp = frame ?: return@Canvas
+        // contained and centred, as object-fit: contain draws it
+        val scale = minOf(this.size.width / bmp.width, this.size.height / bmp.height)
+        val w = (bmp.width * scale).roundToInt()
+        val h = (bmp.height * scale).roundToInt()
+        drawImage(
+            bmp.asImageBitmap(),
+            dstOffset = IntOffset(((this.size.width - w) / 2).roundToInt(), ((this.size.height - h) / 2).roundToInt()),
+            dstSize = IntSize(w, h),
+            filterQuality = FilterQuality.Medium,
+        )
+    }
+}
+
+@OptIn(UnstableApi::class)
+@Composable
+private fun PlainWebm(url: String, alt: String, size: Dp, modifier: Modifier) {
     val context = LocalContext.current
     val player = remember(url) {
         ExoPlayer.Builder(context).setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(Streams.factory())).build().apply {
