@@ -304,6 +304,7 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
             with(ch) { c -> put(c, dec).copy(loaded = true, loading = false, failed = 0, hasOlder = page.size >= PAGE, hasNewer = false) }
             if (dec.isNotEmpty()) onHistory?.invoke(ch, dec)
         } catch (e: Exception) {
+            android.util.Log.w("NexaMessages", "first page of $ch failed", e)
             if (gen(ch) == g) with(ch) { it.copy(loading = false, failed = it.failed + 1) }
         }
     }

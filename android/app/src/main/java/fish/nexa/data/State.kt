@@ -306,6 +306,9 @@ class ReadStatesStore(private val channels: ChannelsStore) {
         m.put(channelId, ReadMark(last, 0, 0))
     }
 
+    /** Sets the marker here as given (Mark Unread does this before telling the server). */
+    fun setLocal(channelId: String, mark: ReadMark) = _byChannel.update { it.put(channelId, mark) }
+
     fun bumpMentions(channelId: String) = _byChannel.update { m ->
         val cur = m[channelId] ?: ReadMark(null, 0, 0)
         m.put(channelId, cur.copy(mentions = minOf(100, cur.mentions + 1)))

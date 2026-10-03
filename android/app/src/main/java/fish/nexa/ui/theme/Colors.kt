@@ -219,6 +219,10 @@ fun mixOklab(a: Color, b: Color, t: Float): Color {
     return fromOklab(floatArrayOf(x[0] + (y[0] - x[0]) * t, x[1] + (y[1] - x[1]) * t, x[2] + (y[2] - x[2]) * t), a.alpha + (b.alpha - a.alpha) * t)
 }
 
+/** `color-mix(in srgb, a, b t)`: t is the share of b, mixed in gamma-encoded sRGB as CSS does. */
+fun mixSrgb(a: Color, b: Color, t: Float): Color =
+    Color(a.red + (b.red - a.red) * t, a.green + (b.green - a.green) * t, a.blue + (b.blue - a.blue) * t, a.alpha + (b.alpha - a.alpha) * t)
+
 /** Reads "#rrggbb" (or a 0xRRGGBB number) as a colour. */
 fun parseHex(s: String?): Color? {
     val h = s?.trim()?.removePrefix("#") ?: return null

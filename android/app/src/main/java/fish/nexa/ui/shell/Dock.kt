@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
@@ -208,7 +209,7 @@ fun PageHeader(title: String, icon: (@Composable () -> Unit)? = null, actions: @
     val c = Nx.colors
     Column {
         Row(
-            Modifier.fillMaxWidth().height(52.dp).padding(start = 8.dp, end = 8.dp),
+            Modifier.fillMaxWidth().height(52.dp).padding(start = 18.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -221,11 +222,11 @@ fun PageHeader(title: String, icon: (@Composable () -> Unit)? = null, actions: @
     }
 }
 
-/** The hamburger that opens the drawer, with a dot when something waits elsewhere. */
+/** PageHeaderButtons: the hamburger that opens the drawer; 40 dp to touch, laid out as 32 (margin -4). */
 @Composable
 fun NavButton() {
     val c = Nx.colors
-    val reads by Nexa.readStates.byChannel.collectAsState()
-    @Suppress("UNUSED_VARIABLE") val touch = reads.size
-    IconButton("Menu", t("shell.pageHeader.openNavigation"), { Nav.leftOpen = true }, tint = c.icon, size = 40.dp, iconSize = 22.dp)
+    Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+        IconButton("Menu", t("shell.pageHeader.openNavigation"), { Nav.leftOpen = true }, Modifier.requiredSize(40.dp), tint = c.icon, size = 40.dp, iconSize = 22.dp)
+    }
 }

@@ -122,13 +122,14 @@ class Api(val baseUrl: String) {
     suspend fun get(path: String): JsonElement = request("GET", path)
     suspend fun <T> get(path: String, strategy: DeserializationStrategy<T>): T = request("GET", path, strategy)
 
-    suspend fun execute(client: OkHttpClient, req: Request, carriedToken: Boolean): JsonElement {
+    /** Runs a request and reads its answer off the main thread, whoever calls it. */
+    suspend fun execute(client: OkHttpClient, req: Request, carriedToken: Boolean): JsonElement = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val res = await(client.newCall(req))
         res.use { r ->
             val text = r.body.string()
             if (r.isSuccessful) {
-                if (r.code == 204 || r.code == 205 || text.isEmpty()) return JsonNull
-                return try {
+                if (r.code == 204 || r.code == 205 || text.isEmpty()) return@withContext JsonNull
+                return@withContext try {
                     wireJson.parseToJsonElement(text)
                 } catch (_: Exception) {
                     throw ApiError(r.code, "bad_response", "The server's answer could not be read.")

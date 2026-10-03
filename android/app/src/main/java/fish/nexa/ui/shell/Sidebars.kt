@@ -98,6 +98,7 @@ fun ServerSidebar(serverId: String, channelId: String?) {
     val reads by Nexa.readStates.byChannel.collectAsState()
     val doc by Nexa.settings.doc.collectAsState()
     val voices by Nexa.voiceStates.byUser.collectAsState()
+    // read so the list redraws when read marks, settings or voice states change
     @Suppress("UNUSED_VARIABLE") val touch = reads.size + doc.size + voices.size
     val st = servers[serverId] ?: return
     val tree = remember(channels, serverId) { ChannelTree.of(serverId, channels.values) }
@@ -355,6 +356,7 @@ fun DmSidebar() {
     val rels by Nexa.relationships.byId.collectAsState()
     val users by Nexa.users.byId.collectAsState()
     val presences by Nexa.presence.byId.collectAsState()
+    // read so the list redraws when read marks, people or presence change
     @Suppress("UNUSED_VARIABLE") val touch = reads.size + users.size + presences.size
     val route = Nav.route
     val requests = rels.values.count { it.type == "incoming" }

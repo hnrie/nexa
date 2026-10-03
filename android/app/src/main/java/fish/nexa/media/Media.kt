@@ -3,7 +3,6 @@ package fish.nexa.media
 import android.content.Context
 import android.os.Build
 import coil3.ImageLoader
-import coil3.PlatformContext
 import coil3.annotation.ExperimentalCoilApi
 import coil3.decode.DataSource
 import coil3.decode.ImageSource
@@ -143,6 +142,12 @@ object Media {
         if (!out.exists()) plainFile.copyTo(out, overwrite = true)
     }
 
+    /** The same, from bytes in memory (a picture's small copy). */
+    fun seedBytes(blobId: String, bytes: ByteArray) {
+        val out = File(cacheDir, blobId)
+        if (!out.exists()) out.writeBytes(bytes)
+    }
+
     fun clear() {
         cacheDir.listFiles()?.forEach { it.delete() }
         try {
@@ -169,6 +174,3 @@ class EncryptedFetcher(private val data: EncryptedImage, private val options: Op
         override fun create(data: EncryptedImage, options: Options, imageLoader: ImageLoader): Fetcher = EncryptedFetcher(data, options)
     }
 }
-
-@Suppress("unused")
-private fun PlatformContext.unusedMarker() = Unit

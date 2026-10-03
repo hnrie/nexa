@@ -105,6 +105,15 @@ class SettingsStore(private val api: Api, private val scope: CoroutineScope) {
     fun set(key: String, value: JsonElement) = patch(JsonObject(mapOf(key to value)))
 
     /** Saves what is waiting; true when nothing made here is still unsent. */
+    /** The draft for a conversation, kept with the account so it follows you to other devices. */
+    fun setDraft(channelId: String, text: String) {
+        val drafts = LinkedHashMap(drafts)
+        if (text.isNotEmpty()) drafts[channelId] = JsonPrimitive(text) else drafts.remove(channelId)
+        patch(buildJsonObject { put("drafts", JsonObject(drafts)) })
+    }
+
+    fun draft(channelId: String): String = (drafts[channelId] as? JsonPrimitive)?.contentOrNull ?: ""
+
     suspend fun flush(): Boolean {
         val gen = generation
         saveLock.withLock {

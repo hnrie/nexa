@@ -4725,6 +4725,7 @@
   "activityToggle.hide": "自分のアクティビティを隠す",
   "activityToggle.show": "自分のアクティビティを表示",
   "activityToggle.settings": "アクティビティの設定",
+  "android.composer.photosAndVideos": "写真と動画",
   "keybinds.changeKeybinds": "キー割り当てを変更",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} がおしゃべり中…",

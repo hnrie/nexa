@@ -203,6 +203,7 @@ fun Rail(modifier: Modifier = Modifier) {
     val rels by Nexa.relationships.byId.collectAsState()
     val doc by Nexa.settings.doc.collectAsState()
     val me by Nexa.users.me.collectAsState()
+    // read so the rail redraws when read marks or its layout change
     @Suppress("UNUSED_VARIABLE") val touch = reads.size + doc.size
     val route = Nav.route
     val requests = rels.values.count { it.type == "incoming" }

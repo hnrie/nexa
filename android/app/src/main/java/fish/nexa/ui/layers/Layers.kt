@@ -322,18 +322,37 @@ sealed interface MenuItem {
     data class Slider(val label: String, val value: Float, val range: ClosedFloatingPointRange<Float>, val unit: String = "", val onChange: (Float) -> Unit) : MenuItem
 }
 
-fun openMenu(items: List<MenuItem>, title: String? = null) {
+/**
+ * A text-only menu as a sheet. [header] goes above the items (the message
+ * menu's quick reactions); [onClosed] runs when the sheet has gone.
+ */
+fun openMenu(
+    items: List<MenuItem>,
+    title: String? = null,
+    header: (@Composable (close: () -> Unit) -> Unit)? = null,
+    onClosed: (() -> Unit)? = null,
+    haptic: Boolean = true,
+) {
     if (items.isEmpty()) return
     lateinit var layer: Layer
-    layer = Layer("menu") { close -> MenuSheet(layer, items, title, close) }
+    layer = Layer("menu") { close -> MenuSheet(layer, items, title, header, onClosed, haptic, close) }
     Layers.open(layer)
 }
 
 @Composable
-private fun MenuSheet(layer: Layer, items: List<MenuItem>, title: String?, close: () -> Unit) {
+private fun MenuSheet(
+    layer: Layer,
+    items: List<MenuItem>,
+    title: String?,
+    header: (@Composable (close: () -> Unit) -> Unit)?,
+    onClosed: (() -> Unit)?,
+    haptic: Boolean,
+    close: () -> Unit,
+) {
     val c = Nx.colors
     val haptics = LocalHapticFeedback.current
-    LaunchedEffect(Unit) { haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
+    LaunchedEffect(Unit) { if (haptic) haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { onClosed?.invoke() } }
     var stackOfMenus by remember { mutableStateOf(listOf<MenuItem.Submenu>()) }
     val current = stackOfMenus.lastOrNull()
     val shown = current?.items ?: items
@@ -342,8 +361,9 @@ private fun MenuSheet(layer: Layer, items: List<MenuItem>, title: String?, close
             if (current != null) {
                 MenuRow(MenuItem.Action(t("contextMenu.back"), onClick = {}), back = true) { stackOfMenus = stackOfMenus.dropLast(1) }
                 MenuHeading(current.label)
-            } else if (title != null) {
-                Txt(title, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = c.textMuted, maxLines = 1, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 8.dp))
+            } else {
+                if (title != null) Txt(title, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = c.textMuted, maxLines = 1, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 8.dp))
+                header?.invoke(close)
             }
             for (item in shown) {
                 when (item) {

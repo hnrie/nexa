@@ -15,4 +15,8 @@ object VoiceLocal {
 }
 
 object Speaking { fun isSpeaking(userId: String): Boolean = false }
-object Calls { fun join(channelId: String) {} }
+object Calls {
+    fun join(channelId: String, video: Boolean = false) {}
+    fun inCallOf(channelId: String): Boolean = false
+    fun openGuestLink(channelId: String) {}
+}
