@@ -34,6 +34,14 @@ class MainActivity : ComponentActivity() {
 
     /** A notification, a link or a share opened the app: act on it once signed in. False when it said nothing. */
     private fun open(intent: Intent?): Boolean {
+        // debug builds only: open a screen directly for checking it (adb shell am start ... --es debug.open whatsnew)
+        if (BuildConfig.DEBUG && intent?.getStringExtra("debug.open") == "whatsnew") {
+            lifecycleScope.launch {
+                Nexa.auth.state.first { it is fish.nexa.data.AuthState.Ready }
+                fish.nexa.ui.WhatsNew.openAll()
+            }
+            return true
+        }
         fish.nexa.ui.share.Share.from(intent)?.let { incoming ->
             val direct = fish.nexa.ui.share.Share.channelOf(intent)
             lifecycleScope.launch {

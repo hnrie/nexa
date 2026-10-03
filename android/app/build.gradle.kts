@@ -13,7 +13,7 @@ val keystoreProps = Properties().apply {
 }
 
 /**
- * Strings, sounds and the emoji sprites are the web client's own files, copied
+ * Strings, sounds, the emoji sprites and What's New are the web client's own files, copied
  * into the app's assets at build time, so text translated once is translated
  * everywhere and a sound changed once changes everywhere.
  */
@@ -21,6 +21,7 @@ abstract class CopyWebAssets : DefaultTask() {
     @get:InputDirectory abstract val locales: DirectoryProperty
     @get:InputDirectory abstract val sounds: DirectoryProperty
     @get:InputDirectory abstract val sprites: DirectoryProperty
+    @get:InputFile abstract val whatsNew: RegularFileProperty
     @get:OutputDirectory abstract val outputDir: DirectoryProperty
 
     @TaskAction
@@ -35,6 +36,9 @@ abstract class CopyWebAssets : DefaultTask() {
         copyDir(locales.get().asFile, "locales") { it.name.endsWith(".json") }
         copyDir(sounds.get().asFile, "sounds") { it.name.endsWith(".m4a") }
         copyDir(sprites.get().asFile, "twemoji") { it.name.endsWith(".webp") || it.name.endsWith(".json") }
+        // What's New is the web's own list, read by the app (ui/WhatsNew.kt), so a release is written once
+        out.resolve("whatsnew").mkdirs()
+        whatsNew.get().asFile.copyTo(out.resolve("whatsnew/whatsNew.ts"), overwrite = true)
     }
 }
 
@@ -42,6 +46,7 @@ val copyWebAssets = tasks.register<CopyWebAssets>("copyWebAssets") {
     locales.set(rootProject.file("../web/src/i18n/locales"))
     sounds.set(rootProject.file("../web/public/sounds"))
     sprites.set(rootProject.file("../web/src/assets/twemoji-sprites"))
+    whatsNew.set(rootProject.file("../web/src/lib/whatsNew.ts"))
 }
 
 androidComponents {
