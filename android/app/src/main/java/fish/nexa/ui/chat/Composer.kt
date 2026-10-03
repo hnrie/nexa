@@ -426,13 +426,29 @@ fun Composer(channel: Channel) {
  * limit (that is offered as a notice instead), and no zalgo (lib/zalgo.ts):
  * an insertion stacking more than three marks on a letter is refused.
  */
-private class ComposerInput(private val onPasteTooLong: (String) -> Unit) : androidx.compose.foundation.text.input.InputTransformation {
+private class ComposerInput(
+    private val onPasteTooLong: (String) -> Unit,
+    /** Whether this server has a custom emoji of that name (it is sent as that emoji, so the name stays). */
+    private val ownEmoji: (String) -> Boolean = { false },
+) : androidx.compose.foundation.text.input.InputTransformation {
     override fun androidx.compose.foundation.text.input.TextFieldBuffer.transformInput() {
         val text = asCharSequence().toString()
         if (Zalgo.tooStacked(text)) {
             revertAllChanges()
             Zalgo.refused()
             return
+        }
+        // the closing ":" of a known shortcode turns it into its emoji, in your skin tone
+        if (text.length == originalText.length + 1 && changes.changeCount == 1) {
+            val r = changes.getRange(0)
+            if (r.end - r.start == 1 && text[r.start] == ':') {
+                val closed = fish.nexa.ui.markdown.ShortcodeTyping.closeShortcode(text, selection.end, Nexa.settings.skinTone, ownEmoji)
+                if (closed != null) {
+                    replace(0, length, closed.first)
+                    selection = androidx.compose.ui.text.TextRange(closed.second)
+                    return
+                }
+            }
         }
         if (text.length > Send.MAX_MESSAGE_LENGTH && originalText.length <= Send.MAX_MESSAGE_LENGTH && text.length - originalText.length > 1) {
             val start = changes.let { if (it.changeCount > 0) it.getRange(0).start else 0 }
@@ -557,7 +573,11 @@ private fun ComposerBox(
                 cursorBrush = SolidColor(c.text),
                 interactionSource = interaction,
                 lineLimits = TextFieldLineLimits.MultiLine(1, Int.MAX_VALUE),
-                inputTransformation = ComposerInput(onPasteTooLong),
+                inputTransformation = remember(channel.id) {
+                    ComposerInput(onPasteTooLong) { name ->
+                        channel.serverId?.let { sid -> Nexa.expressions.emojis.value[sid]?.any { it.name.equals(name, ignoreCase = true) } } == true
+                    }
+                },
                 decorator = { inner ->
                     Box {
                         if (state.text.isEmpty()) Txt(placeholder, style = Nx.type.body, color = c.textPlaceholder, maxLines = 1)
@@ -944,10 +964,54 @@ private fun suggestions(channel: Channel, token: AcToken): List<Pair<String, Lis
                 .map { ch -> AcItem("channel", "#${ch.name} ", ch.name, ch.parentId?.let { Nexa.channels.get(it)?.name } ?: "") }
             listOf(t("servers.defaults.textChannels") to list)
         }
-        "emoji" -> listOf(t("server.emoji.emoji") to emojiSuggestions(channel, q))
+        "emoji" -> listOf((if (q.isEmpty()) t("composer.autocomplete.frequentlyUsed") else t("server.emoji.emoji")) to emojiSuggestions(channel, q))
         "command" -> listOf(t("composer.autocomplete.commands") to fish.nexa.ui.markdown.Commands.LIST.filter { it.first.startsWith(q) }.map { (name, desc) -> AcItem("command", "/$name ", "/$name", t(desc)) })
         else -> emptyList()
     }
+}
+
+/**
+ * Emoji for ":" (Composer.tsx): with Smart Emoji, one list of everything
+ * ranked by how well it matches and how much you use it (a lone ":" offers
+ * your frequent ones); without, this server's own custom emoji first, then
+ * other servers' and packs' (up to four in all), filled with standard ones.
+ */
+private fun emojiSuggestions(channel: Channel, query: String): List<AcItem> {
+    val md = fish.nexa.ui.markdown.EmojiData
+    if (!md.loaded()) {
+        md.preload()
+        return emptyList()
+    }
+    val ex = Nexa.expressions
+    val sid = channel.serverId
+    val tone = Nexa.settings.skinTone
+    val packEmoji = ex.packs.value.values.filter { it.kind == "emoji" }.flatMap { p ->
+        p.stickers.map { r -> fish.nexa.net.Emoji(r.id, "", r.name, r.blobId, r.animated, r.creatorId, r.createdAt) }
+    }
+    fun custom(e: fish.nexa.net.Emoji) = AcItem("emoji", fish.nexa.ui.markdown.CustomEmoji.token(e) + " ", ":${e.name}:", emoji = fish.nexa.ui.markdown.CustomEmoji.reactionKey(e))
+    fun std(e: fish.nexa.ui.markdown.EmojiEntry, name: String) = md.withTone(e, tone).let { u -> AcItem("emoji", "$u ", ":$name:", emoji = u) }
+    if (Nexa.settings.smartEmoji) {
+        val candidates = ArrayList<fish.nexa.ui.markdown.EmojiSuggest.Candidate>()
+        if (sid != null) ex.emojis.value[sid]?.forEach { candidates += fish.nexa.ui.markdown.EmojiSuggest.Candidate.Custom(it, own = true) }
+        for ((id, list) in ex.emojis.value) if (id != sid) list.forEach { candidates += fish.nexa.ui.markdown.EmojiSuggest.Candidate.Custom(it) }
+        packEmoji.forEach { candidates += fish.nexa.ui.markdown.EmojiSuggest.Candidate.Custom(it) }
+        md.all().filter { md.has(it.unicode) }.forEach { candidates += fish.nexa.ui.markdown.EmojiSuggest.Candidate.Unicode(it) }
+        val now = System.currentTimeMillis().toDouble()
+        val usage = fish.nexa.ui.markdown.EmojiUsage.sanitize(Nexa.settings.doc.value["emojiUsage"], now)
+        return fish.nexa.ui.markdown.EmojiSuggest.suggest(query, candidates, usage, Nexa.settings.recentEmoji, now).map { s ->
+            when (val c = s.candidate) {
+                is fish.nexa.ui.markdown.EmojiSuggest.Candidate.Custom -> custom(c.emoji)
+                is fish.nexa.ui.markdown.EmojiSuggest.Candidate.Unicode -> std(c.entry, s.name)
+            }
+        }
+    }
+    val q = query.lowercase()
+    val own = if (sid != null) (ex.emojis.value[sid] ?: emptyList()).filter { it.name.lowercase().contains(q) }.sortedBy { if (it.name.lowercase().startsWith(q)) 0 else 1 }.take(4) else emptyList()
+    val others = ex.emojis.value.filterKeys { it != sid }.values.flatten().filter { it.name.lowercase().contains(q) }.sortedBy { if (it.name.lowercase().startsWith(q)) 0 else 1 }.take(4 - own.size)
+    val customs = (own + others)
+    val packs = packEmoji.filter { it.name.lowercase().contains(q) }.take(4 - minOf(customs.size, 4))
+    val all = (customs + packs).map { custom(it) }
+    return all + md.search(q, maxOf(2, 8 - all.size)).map { std(it, it.shortcodes.firstOrNull() ?: it.label) }
 }
 
 /** The bar that stands in for the composer while picking messages to delete. */

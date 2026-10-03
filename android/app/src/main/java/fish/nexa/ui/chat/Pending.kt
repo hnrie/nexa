@@ -62,7 +62,6 @@ fun openExpressionPicker(channelId: String, onPick: (String) -> Unit) {
         },
     ))
 }
-fun emojiSuggestions(channel: fish.nexa.net.Channel, query: String): List<AcItem> = emptyList()
 
 /** lib/scrubMetadata.ts: removes a photo's or video's metadata (place, camera) before it is sent. */
 object MetadataScrub { fun scrub(file: java.io.File, type: String) = Unit }
