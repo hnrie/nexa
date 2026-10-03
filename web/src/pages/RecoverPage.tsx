@@ -89,7 +89,7 @@ export default function RecoverPage() {
   }
 
   return (
-    <AuthLayout title={t("recover.recoverYourAccount")} subtitle={t("recover.useTheRecoveryKeyYouSaved")}>
+    <AuthLayout title={t("recover.recoverYourAccount")} subtitle={t("recover.useTheRecoveryKeyYouSaved")} banner>
       <form className={s.form} onSubmit={(e) => void onSubmit(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
         <Field label={t("settings.account.username")} required>

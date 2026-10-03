@@ -6,6 +6,7 @@ import { guests as guestsApi } from "@/api/guests";
 import { GUEST_FLAG, type Channel, type GuestInfo, type MeUser } from "@/api/types";
 import { NexaWordmark } from "@/components/common/Brand";
 import { Button } from "@/components/common/Button";
+import { AndroidBanner } from "@/components/shell/AndroidBanner";
 import { Spinner } from "@/components/common/Spinner";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { ShareScreenModal } from "@/components/voice/ShareScreenModal";
@@ -257,6 +258,7 @@ export default function GuestCallPage() {
 
   return (
     <div className={s.page}>
+      <AndroidBanner bleed />
       {/* A plain link, like "Back to Nexa": leaving starts the next page afresh. */}
       <a className={s.brand} href="/" aria-label="Nexa"><NexaWordmark height={32} /></a>
       <main className={s.card} data-testid="guest-landing">

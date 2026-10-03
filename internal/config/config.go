@@ -41,7 +41,13 @@ type Config struct {
 	RedisURL string
 	// DesktopDir holds published desktop app installers and update manifests,
 	// served at /desktop/. It defaults to "desktop" inside DataDir.
-	DesktopDir      string
+	DesktopDir string
+	// AndroidDir holds the published Android app: its APKs and manifest.json,
+	// served at /android/. Unlike the desktop builds they are committed to the
+	// repository (tools/android_release.py writes them), so a git pull is all
+	// it takes to offer a new version. It defaults to "downloads/android" in
+	// the working directory, which is the repository chatd runs from.
+	AndroidDir      string
 	MaxUploadBytes  int64
 	MaxAvatarBytes  int64
 	MaxEmojiBytes   int64
@@ -159,6 +165,10 @@ func Load(getenv func(string) string) (Config, error) {
 	str("DESKTOP_DIR", &c.DesktopDir)
 	if c.DesktopDir == "" {
 		c.DesktopDir = filepath.Join(c.DataDir, "desktop")
+	}
+	str("ANDROID_DIR", &c.AndroidDir)
+	if c.AndroidDir == "" {
+		c.AndroidDir = filepath.Join("downloads", "android")
 	}
 	str("REGISTRATION", &c.Registration)
 	str("REGISTRATION_KEY", &c.RegistrationKey)

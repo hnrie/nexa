@@ -19,3 +19,13 @@
 
 /* where the row is tight, the other platforms are one click away on the download page anyway */
 @media (max-width: 900px) { .other { display: none; } }
+
+/* The Android banner. On a public page it spans the page's padding to sit edge
+   to edge at the top. Its words may take a second line on a phone rather than
+   be cut, and its pill keeps the accent's colour on pages that colour every
+   link alike (the front page). */
+.bleed { align-self: stretch; margin: -24px -16px 0; }
+.wrap { white-space: normal; line-height: 1.3; }
+.banner a.download { color: var(--brand); }
+.size { opacity: 0.7; }
+@media (max-width: 480px) { .size { display: none; } }

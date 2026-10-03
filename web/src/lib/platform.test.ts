@@ -1,4 +1,5 @@
-import { detectDesktop, pickDownload } from "./platform";
+import { detectAndroid, detectAndroidAbi, detectDesktop, pickAndroid, pickDownload } from "./platform";
+import type { AndroidFile } from "@/api/android";
 import type { DesktopRelease } from "@/api/desktop";
 
 const WIN = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
@@ -60,5 +61,48 @@ describe("pickDownload", () => {
     expect(pickDownload(rel, { os: "mac", arch: null })?.name).toBe("arm.dmg");
     expect(pickDownload(rel, { os: null, arch: null })).toBeNull();
     expect(pickDownload({ ...rel, files: [] }, { os: "windows", arch: "x64" })).toBeNull();
+  });
+});
+
+describe("detectAndroid", () => {
+  it("finds Android phones and tablets, in any browser", () => {
+    expect(detectAndroid(ANDROID)).toBe(true);
+    expect(detectAndroid("Mozilla/5.0 (Android 15; Mobile; rv:140.0) Gecko/140.0 Firefox/140.0")).toBe(true);
+    expect(detectAndroid("Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")).toBe(true);
+    // a tablet asking for the desktop site still says so through its hints
+    expect(detectAndroid(LINUX, "Android")).toBe(true);
+  });
+  it("leaves out computers, iPhones, Chromebooks and the Android app itself", () => {
+    for (const ua of [WIN, MAC_SAFARI, LINUX, IPHONE, CROS]) expect(detectAndroid(ua)).toBe(false);
+    expect(detectAndroid("Mozilla/5.0 (Linux; Android 15; Pixel 9; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/140.0.0.0 Mobile Safari/537.36 NexaAndroid/1.0.0")).toBe(false);
+  });
+});
+
+describe("detectAndroidAbi and pickAndroid", () => {
+  const files: AndroidFile[] = [
+    { abi: "arm64-v8a", name: "a64.apk", size: 1, sha256: "a" },
+    { abi: "armeabi-v7a", name: "a32.apk", size: 1, sha256: "b" },
+    { abi: "universal", name: "all.apk", size: 3, sha256: "c" },
+  ];
+  it("reads the processor from what the browser offers", () => {
+    expect(detectAndroidAbi({ navPlatform: "Linux aarch64" })).toBe("arm64-v8a");
+    // a 64-bit processor running a 32-bit browser is still a 64-bit phone
+    expect(detectAndroidAbi({ navPlatform: "Linux armv8l" })).toBe("arm64-v8a");
+    expect(detectAndroidAbi({ navPlatform: "Linux armv81" })).toBe("arm64-v8a");
+    expect(detectAndroidAbi({ navPlatform: "Linux armv7l" })).toBe("armeabi-v7a");
+    expect(detectAndroidAbi({ navPlatform: "Linux x86_64" })).toBe("x86_64");
+    expect(detectAndroidAbi({ navPlatform: "Linux i686" })).toBe("x86");
+    expect(detectAndroidAbi({ architecture: "arm", bitness: "32", navPlatform: "Linux armv8l" })).toBe("armeabi-v7a");
+    // Chromium on Android answers its hints with empty strings
+    expect(detectAndroidAbi({ architecture: "", bitness: "", navPlatform: "" })).toBeNull();
+  });
+  it("offers the 64-bit build unless the phone is plainly something else", () => {
+    expect(pickAndroid(files, null)?.name).toBe("a64.apk");
+    expect(pickAndroid(files, "arm64-v8a")?.name).toBe("a64.apk");
+    expect(pickAndroid(files, "armeabi-v7a")?.name).toBe("a32.apk");
+    expect(pickAndroid(files, "x86_64")?.name).toBe("all.apk");
+    expect(pickAndroid(files, "x86")?.name).toBe("all.apk");
+    expect(pickAndroid([files[2]!], null)?.name).toBe("all.apk");
+    expect(pickAndroid([], null)).toBeNull();
   });
 });

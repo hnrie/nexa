@@ -4,9 +4,10 @@ import { Link } from "react-router-dom";
 import { desktop, type DesktopFile } from "@/api/desktop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { desktopBridge } from "@/lib/desktopBridge";
-import { currentPlatform, pickDownload } from "@/lib/platform";
+import { currentPlatform, isAndroidBrowser, pickDownload } from "@/lib/platform";
 import { storage } from "@/lib/storage";
 import { formatBytes } from "@/lib/time";
+import { AndroidBanner } from "./AndroidBanner";
 import s from "./DownloadBanner.module.css";
 
 import { t } from "@/i18n";
@@ -14,11 +15,19 @@ const DISMISSED = "ec:desktopBanner";
 const OS_NAME: Record<DesktopFile["os"], string> = { windows: "Windows", mac: "macOS", linux: "Linux" };
 
 /**
+ * Offers the app this device can run: the Android app to an Android browser
+ * (AndroidBanner, back on every reload), the installer to a computer.
+ */
+export function DownloadBanner() {
+  return isAndroidBrowser() ? <AndroidBanner /> : <DesktopBanner />;
+}
+
+/**
  * Offers the desktop app to a computer that can run it. Saying no thanks keeps
  * it away on that device; the desktop app itself, phones, tablets and anything
  * with no build never see it.
  */
-export function DownloadBanner() {
+function DesktopBanner() {
   const mobile = useIsMobile();
   // sure: the computer is known well enough to hand it a file straight away
   const [pick, setPick] = useState<{ file: DesktopFile; sure: boolean } | null>(null);

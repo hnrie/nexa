@@ -23,10 +23,12 @@ import { Archive, AudioLines, ChevronsLeftRight, CornerUpLeft, Eye, EyeOff, File
 import { NexaTile, NexaWordmark } from "@/components/common/Brand";
 import { hasSavedSession, useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
-import { currentPlatform } from "@/lib/platform";
+import { currentPlatform, isAndroidBrowser } from "@/lib/platform";
 import { CONTACT_EMAIL } from "@/lib/legal";
 import { formatBytes } from "@/lib/time";
 import { admin } from "@/api/admin";
+import { android } from "@/api/android";
+import { AndroidBanner } from "@/components/shell/AndroidBanner";
 import { t, translator } from "@/i18n";
 // The headings' weight, which the app itself never uses: it arrives with this page only.
 import "@fontsource/noto-sans/800.css";
@@ -666,9 +668,19 @@ export default function HomePage() {
   const [os, setOs] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
-    void currentPlatform().then(({ os: kind }) => {
-      if (alive) setOs(kind === "mac" ? "macOS" : kind === "windows" ? "Windows" : kind === "linux" ? "Linux" : null);
-    });
+    // an Android phone is offered its app once one is published
+    if (isAndroidBrowser()) {
+      void android
+        .latest()
+        .then((rel) => {
+          if (alive && rel) setOs("Android");
+        })
+        .catch(() => undefined);
+    } else {
+      void currentPlatform().then(({ os: kind }) => {
+        if (alive) setOs(kind === "mac" ? "macOS" : kind === "windows" ? "Windows" : kind === "linux" ? "Linux" : null);
+      });
+    }
     return () => {
       alive = false;
     };
@@ -684,6 +696,7 @@ export default function HomePage() {
 
   return (
     <div className={s.page} data-still={still || undefined}>
+      <AndroidBanner />
       <header className={s.top} data-scrolled={scrolled || undefined}>
         <div className={s.topInner}>
           <Link to="/" className={s.logo} aria-label="Nexa">

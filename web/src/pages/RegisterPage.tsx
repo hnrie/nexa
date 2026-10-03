@@ -113,7 +113,7 @@ export default function RegisterPage() {
 
   if (policy === "closed" && !recovery) {
     return (
-      <AuthLayout title={t("register.createAnAccount")}>
+      <AuthLayout title={t("register.createAnAccount")} banner>
         <p className={s.note} role="status" style={{ textAlign: "center" }}>{t("register.thisServerIsNotAcceptingNew")}</p>
         <Link to="/login" className={s.center}>{t("register.alreadyHaveAnAccount")}</Link>
       </AuthLayout>
@@ -129,7 +129,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthLayout title={t("register.createAnAccount")}>
+    <AuthLayout title={t("register.createAnAccount")} banner>
       <form className={s.form} onSubmit={(e) => void onSubmit(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
         <Field label={t("settings.account.username")} required error={uProblem ?? nameTaken} hint={t("register.lowercaseLettersNumbersUnderscoresAndDots")}>

@@ -1,21 +1,17 @@
+import { Monitor, MonitorSmartphone, Smartphone, Tablet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { auth as authApi } from "@/api/auth";
 import type { Session } from "@/api/types";
 import { Button } from "@/components/common/Button";
 import { LoadError } from "@/components/common/LoadError";
+import { describeDevice, type DeviceKind } from "@/lib/deviceLabel";
 import { describeError } from "@/lib/errors";
 import { formatDateDivider, formatRelative } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
-function describe(ua: string): string {
-  if (!ua) return t("settings.devices.unknownDevice");
-  // the desktop app is a browser inside, but nobody thinks of it as Chrome
-  const browser = /Electron\//.test(ua) ? t("settings.desktop.desktopApp") : /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) && !/Chrome/.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : t("settings.devices.browser");
-  const os = /iPhone|iPad/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "macOS" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "";
-  return os ? t("settings.devices.browserOnSystem", { browser, system: os }) : browser;
-}
+const KIND_ICON: Record<DeviceKind, typeof Monitor> = { phone: Smartphone, tablet: Tablet, computer: Monitor, unknown: MonitorSmartphone };
 
 export default function DevicesPage() {
   const [list, setList] = useState<Session[] | null>(null);
@@ -92,20 +88,27 @@ export default function DevicesPage() {
       <div style={{ marginTop: 16 }}>
         {list === null && !failed ? <p className={s.hint}>{t("chat.pins.loading")}</p> : null}
         {failed ? <LoadError message={t("settings.devices.yourDevicesCouldNotBeLoaded")} onRetry={() => void load()} /> : null}
-        {sorted?.map((se) => (
-          <div key={se.id} className={s.device} data-current={se.current || undefined}>
-            <div>
-              <div className={s.deviceName}>
-                {describe(se.user_agent)}
-                {se.current ? <span className={s.thisDevice}>{t("settings.devices.thisDevice")}</span> : null}
+        {sorted?.map((se) => {
+          const device = describeDevice(se.user_agent);
+          const Icon = KIND_ICON[device.kind];
+          return (
+            <div key={se.id} className={s.device} data-current={se.current || undefined}>
+              <div className={s.deviceMain}>
+                <span className={s.deviceIcon} data-kind={device.kind} aria-hidden="true"><Icon size={20} /></span>
+                <div className={s.deviceText}>
+                  <div className={s.deviceName}>
+                    {device.label}
+                    {se.current ? <span className={s.thisDevice}>{t("settings.devices.thisDevice")}</span> : null}
+                  </div>
+                  <div className={s.deviceSub}>
+                    {se.ip} · {t("settings.devices.signedIn", { date: formatDateDivider(se.created_at) })} · {se.current ? t("settings.devices.activeNow") : t("settings.devices.lastActive", { when: formatRelative(se.last_seen_at) })}
+                  </div>
+                </div>
               </div>
-              <div className={s.deviceSub}>
-                {se.ip} · {t("settings.devices.signedIn", { date: formatDateDivider(se.created_at) })} · {se.current ? t("settings.devices.activeNow") : t("settings.devices.lastActive", { when: formatRelative(se.last_seen_at) })}
-              </div>
+              {!se.current ? <Button size="sm" variant="secondary" onClick={() => void drop(se.id)}>{t("settings.devices.logOut")}</Button> : null}
             </div>
-            {!se.current ? <Button size="sm" variant="secondary" onClick={() => void drop(se.id)}>{t("settings.devices.logOut")}</Button> : null}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );

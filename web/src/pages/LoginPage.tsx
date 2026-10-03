@@ -162,7 +162,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthLayout title={t("login.welcomeBack")} subtitle={t("login.weReSoExcitedToSee")}>
+    <AuthLayout title={t("login.welcomeBack")} subtitle={t("login.weReSoExcitedToSee")} banner>
       <form className={s.form} onSubmit={(e) => void onPassword(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
         <Field label={t("settings.account.username")} required>

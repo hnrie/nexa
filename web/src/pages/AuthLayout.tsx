@@ -2,14 +2,16 @@ import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { Check } from "lucide-react";
 import { NexaWordmark } from "../components/common/Brand";
 import { Button } from "@/components/common/Button";
+import { AndroidBanner } from "@/components/shell/AndroidBanner";
 import { copyText } from "@/lib/copyText";
 import { useUI } from "@/stores/ui";
 import s from "./Auth.module.css";
 
 import { t } from "@/i18n";
-export function AuthLayout({ title, subtitle, children, width = 480, mark }: { title: string; subtitle?: string; children?: ReactNode; width?: number; /** drawn above the title: how something went, at a glance */ mark?: ReactNode }) {
+export function AuthLayout({ title, subtitle, children, width = 480, mark, banner = false }: { title: string; subtitle?: string; children?: ReactNode; width?: number; /** drawn above the title: how something went, at a glance */ mark?: ReactNode; /** the Android app's banner across the top, on the pages people arrive at */ banner?: boolean }) {
   return (
     <div className={s.page}>
+      {banner ? <AndroidBanner bleed /> : null}
       <div className={s.brand}><NexaWordmark height={38} /></div>
       {/* One landmark, so a screen reader has somewhere to skip to rather than
           reading the page from the top every time. */}

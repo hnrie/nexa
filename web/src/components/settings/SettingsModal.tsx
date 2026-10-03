@@ -1,5 +1,6 @@
-import { Bug, Download, LogOut } from "lucide-react";
+import { Bug, Download, LogOut, Smartphone } from "lucide-react";
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { android } from "@/api/android";
 import { SearchBox } from "@/components/common/SearchBox";
 import { Spinner } from "@/components/common/Spinner";
 import { lazyPage } from "@/lib/lazyChunk";
@@ -7,6 +8,7 @@ import { NavIcon, SettingsLayer, navIconOf, type NavGroup } from "@/components/s
 import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
 import { desktopBridge } from "@/lib/desktopBridge";
+import { isAndroidBrowser } from "@/lib/platform";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { searchSettings, settingsIndex, type SettingEntry } from "./settingsIndex";
 import s from "./Settings.module.css";
@@ -143,6 +145,21 @@ export default function SettingsModal({ onClose, page: initial, packId, modalId,
   const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
   const inApp = !!desktopBridge();
   const mobile = useIsMobile();
+  // an Android browser is offered the Android app instead, once one is published
+  const [androidApp, setAndroidApp] = useState(false);
+  useEffect(() => {
+    if (!isAndroidBrowser()) return;
+    let alive = true;
+    android
+      .latest()
+      .then((rel) => {
+        if (alive) setAndroidApp(!!rel);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
   const groups = navGroups({ inApp, admin: isAdmin });
   const [query, setQuery] = useState("");
   // opened to show one setting (a "Make Your Own" elsewhere), it is brought into view as a search result is
@@ -194,7 +211,12 @@ export default function SettingsModal({ onClose, page: initial, packId, modalId,
           <NavIcon icon={Bug} />
           <span className={s.navLabel}>{t("bugs.report")}</span>
         </button>
-        {!inApp && !mobile ? (
+        {androidApp ? (
+          <button className={s.navItem} onClick={() => window.open("/download", "_blank", "noopener")} data-nav="get-app">
+            <NavIcon icon={Smartphone} />
+            <span className={s.navLabel}>{t("settings.settings.getTheAndroidApp")}</span>
+          </button>
+        ) : !inApp && !mobile ? (
           <button className={s.navItem} onClick={() => window.open("/download", "_blank", "noopener")} data-nav="get-app">
             <NavIcon icon={Download} />
             <span className={s.navLabel}>{t("settings.settings.getTheDesktopApp")}</span>

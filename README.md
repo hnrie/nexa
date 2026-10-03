@@ -18,6 +18,8 @@ chat/
 │                     ratelimit, rpcapps, telegram, textutil, totp
 ├── web/              the React/TypeScript app (Vite); web/dist is what chatd serves
 ├── desktop/          the desktop app (Electron)
+├── android/          the Android app (Kotlin, Jetpack Compose)
+├── downloads/        the published Android APKs and their manifest, served at /android/
 ├── deploy/           systemd and launchd templates, installer, DNS helper
 ├── tools/            screenshot.py and e2e.py (Playwright)
 ├── docs/             design spec, implementation plans, STATUS.md, Discord UI reference captures
@@ -66,8 +68,9 @@ and for restart/stop/update/backup commands.
   screen share up to source resolution at 60 fps, push-to-talk or voice activity,
   per-user volume to 200 %, server mute/deafen/move, and a link-quality readout.
 - **Nexa admin**: stats, registration policy, and enabling or disabling accounts.
-- **Apps**: a desktop app (Electron) for Windows, macOS and Linux, offered by the
-  download page; the web app runs everywhere else, phones included.
+- **Apps**: a desktop app (Electron) for Windows, macOS and Linux, and an Android app,
+  both offered by the download page (Android phones also get a banner); the web app
+  runs everywhere else.
 - **Your data**: a one-click zip export of everything this device can decrypt.
 
 ## How it works
