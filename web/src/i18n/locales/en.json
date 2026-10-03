@@ -4895,6 +4895,8 @@
   "activityToggle.show": "Show My Activity",
   "activityToggle.settings": "Activity Settings",
   "android.composer.photosAndVideos": "Photos and Videos",
+  "android.people.switcherNothing": "Nothing matches. Try another name.",
+  "android.people.switcherPlaceholder": "Search people, conversations and servers",
   "keybinds.changeKeybinds": "Change Your Keybinds",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} is yapping…",

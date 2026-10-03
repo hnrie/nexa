@@ -4726,6 +4726,8 @@
   "activityToggle.show": "自分のアクティビティを表示",
   "activityToggle.settings": "アクティビティの設定",
   "android.composer.photosAndVideos": "写真と動画",
+  "android.people.switcherNothing": "一致するものはありません。別の名前を試してください。",
+  "android.people.switcherPlaceholder": "ユーザー、会話、サーバーを検索",
   "keybinds.changeKeybinds": "キー割り当てを変更",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} がおしゃべり中…",

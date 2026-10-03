@@ -4726,6 +4726,8 @@
   "activityToggle.show": "내 활동 표시",
   "activityToggle.settings": "활동 설정",
   "android.composer.photosAndVideos": "사진 및 동영상",
+  "android.people.switcherNothing": "일치하는 게 없어요. 다른 이름을 써 보세요.",
+  "android.people.switcherPlaceholder": "사람, 대화, 서버 검색",
   "keybinds.changeKeybinds": "단축키 변경",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} 님이 수다 떠는 중…",

@@ -290,7 +290,7 @@ fun JoinRequestButton(name: String, state: String, onSend: () -> Unit) {
  * useJoinRequests: one link for the group, made on first use, sent to each
  * link-only friend in a DM with a line saying what it is.
  */
-class JoinRequests(private val groupId: String) {
+class JoinRequests(private val groupId: String, private val linkOf: (suspend () -> String)? = null) {
     private val states = androidx.compose.runtime.mutableStateMapOf<String, String>()
     private var link: String? = null
 
@@ -301,7 +301,8 @@ class JoinRequests(private val groupId: String) {
         states[userId] = "sending"
         Nexa.scope.launch {
             try {
-                val url = link ?: Invites.url(Invites.create(groupId, 604800, 0).code, Invites.keyOf(groupId)).also { link = it }
+                // the link the group's invite sheet shows, when it is open; else one made for these requests
+                val url = linkOf?.invoke() ?: link ?: Invites.url(Invites.create(groupId, 604800, 0).code, Invites.keyOf(groupId)).also { link = it }
                 val dm = People.openDm(userId)
                 val groupName = Nexa.channels.get(groupId)?.name?.trim().orEmpty()
                 val literal = groupName.replace(Regex("[\\\\*_~|`<>\\[\\]]")) { "\\" + it.value }

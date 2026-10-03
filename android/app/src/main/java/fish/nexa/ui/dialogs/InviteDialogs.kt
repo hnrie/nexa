@@ -178,7 +178,7 @@ internal fun InviteSheet(layer: Layer, serverId: String, channelId: String?, clo
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Txt(t("modals.invite.sendAServerInviteLinkTo"), style = Nx.type.label, color = c.textSubtle)
             LinkRow(link, busy, copied) {
-                copyWithToast(link, t("clipboard.linkCopied"))
+                copyWithToast(link, t("clipboard.copied"))
                 copied = true
             }
             if (made != null) {

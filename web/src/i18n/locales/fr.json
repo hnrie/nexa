@@ -4990,6 +4990,8 @@
   "activityToggle.show": "Afficher mon activité",
   "activityToggle.settings": "Réglages de l’activité",
   "android.composer.photosAndVideos": "Photos et vidéos",
+  "android.people.switcherNothing": "Aucun résultat. Essayez un autre nom.",
+  "android.people.switcherPlaceholder": "Rechercher des personnes, des conversations et des serveurs",
   "keybinds.changeKeybinds": "Modifier vos raccourcis clavier",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} jacasse…",

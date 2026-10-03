@@ -5206,6 +5206,8 @@
   "activityToggle.show": "Показать мою активность",
   "activityToggle.settings": "Настройки активности",
   "android.composer.photosAndVideos": "Фото и видео",
+  "android.people.switcherNothing": "Ничего не найдено. Попробуйте другое имя.",
+  "android.people.switcherPlaceholder": "Поиск людей, бесед и серверов",
   "keybinds.changeKeybinds": "Изменить горячие клавиши",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} болтает…",

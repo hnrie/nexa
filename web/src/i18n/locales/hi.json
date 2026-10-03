@@ -4895,6 +4895,8 @@
   "activityToggle.show": "मेरी गतिविधि दिखाएँ",
   "activityToggle.settings": "गतिविधि सेटिंग्स",
   "android.composer.photosAndVideos": "फ़ोटो और वीडियो",
+  "android.people.switcherNothing": "कुछ मेल नहीं खाता। कोई और नाम आज़माएँ।",
+  "android.people.switcherPlaceholder": "लोग, बातचीत और सर्वर खोजें",
   "keybinds.changeKeybinds": "अपनी शॉर्टकट कुंजियाँ बदलें",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} बक-बक कर रहे हैं…",

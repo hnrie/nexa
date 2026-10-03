@@ -4726,6 +4726,8 @@
   "activityToggle.show": "显示我的动态",
   "activityToggle.settings": "动态设置",
   "android.composer.photosAndVideos": "照片和视频",
+  "android.people.switcherNothing": "没有匹配项。换个名字试试。",
+  "android.people.switcherPlaceholder": "搜索用户、对话和服务器",
   "keybinds.changeKeybinds": "更改你的按键绑定",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} 正在疯狂输出…",

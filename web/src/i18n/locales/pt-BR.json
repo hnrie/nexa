@@ -4991,6 +4991,8 @@
   "activityToggle.show": "Mostrar minha atividade",
   "activityToggle.settings": "Configurações de atividade",
   "android.composer.photosAndVideos": "Fotos e vídeos",
+  "android.people.switcherNothing": "Nada corresponde. Tente outro nome.",
+  "android.people.switcherPlaceholder": "Pesquise pessoas, conversas e servidores",
   "keybinds.changeKeybinds": "Mude suas teclas de atalho",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} está tagarelando…",
