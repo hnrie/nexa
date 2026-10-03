@@ -1,0 +1,107 @@
+{
+ "salt": "030a11181f262d343b424950575e656c",
+ "master": "7a404217d51036f8b2ca85fa7b71246788f5d721e284637d50a313390d608a4c",
+ "authKey": "f0f5cee22891d3059b4b3280750ad8aa2757ed774e468f9563b3c7a639c11a1b",
+ "encKey": "ba0f5b8f5ce9f88d10995d02e333eba0eb90d8da2b61e8660540e34aa63af747",
+ "settingsKey": "f3d27b97f1b0bcdb5cd07598fc680b8794d89f98ca51603ee3a77a977924746f",
+ "priv": "0b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4",
+ "pub": "1b7903a3a13d581b3157352d7b9c936c95b91e9bade2fa0774d96ef5ac17a135",
+ "fingerprint": "92166 59679 49868 01362 36137 04492",
+ "wrapped": "3ZWVeOSZB8Hm4mUTIY4PBJDrfL9xuv8Aj2Us9ooIKYpfSQlkIwoZMKxySLi713BgzCRTHtC3kXom8Ltm",
+ "sealed": "MEfgzo9vR+bDh6HjDH3NQTxL+f/pSr01rccj4oStMh2wZjQEX4pGGu61z5vZNTv8+Z0DNtfWqgMB/vIUKfLPfoXFvSP9ApmpTg==",
+ "root": "656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e",
+ "chanKey": "ce060e24d512e0b35cd28172801ef2ff6b258fb05b03bcc6e30877a449d52b0e",
+ "voiceKey": "85c670226e0a9530603bc004e01670ed654f5460c9852eb32334571106ae4b86",
+ "envelope": {
+  "v": 1,
+  "conv": "77",
+  "epoch": 3,
+  "iv": "KKst14AV9GQ/Due8",
+  "ct": "dAfl+yZJ9e5N3fco9IehjCK9dXycjAlzlsKEVx8AENTLmE5V4SUeDLhvXqWyUzxMdx34nFH4dEKw4QmljDf5l8F1niP3dXANy4Pgt3zWXhVx+MjaXts30Ot5M5vdT4hktf71Akooy0614xPSm5SPtMxDub/dfSd8nSMY+ShKrxjRGJmn8X1V+Xupg2gB2KegHBSwOeRTGJ9Ct0Ac/cbEtHu+g/psvu5WHpsDc1sBBVbyZwgkPDRpazBpJi3lk6xSQkoCexuJNdbBLZ7mMQ85HwDSUr2wKKoIc9ojY0WMm4fvL/w49bKBW6w54FhTeHwUueiBZcKcUPPh8f3er0uW88GxlqOvxGGocaR2MQBLViox5vOQHodFRaNQQ4zFXcWIQz/j+Tcs1HlZwSSTFI8Exl15ocY3Hff8NmEAtAkS8GNcs6mzsiqThGIpKfCY9pVq0k6bvSMz+Xc7+Q52C4VtIIcVKZL+/XPV0vem+BoKMFrzyiS8WIJTUmd85xZ0zs92mf5QXsL2HN5V83OUZLlIzqJKiM0ov7t+vNrOghJZFYGS9kKCmnyrUIVAA089liQNJPE9hubxuTPgPMCdI6Ml5HjCVAjPbSTKFY7eSQWY+VbNVJ/df6iEQOytAVxEZOhy6V5fHNwzpgGaUdxgeymoy6YpK10MGsH/eLOuMBmtOOT9I+5W/DEmTln/9woTbxSkHAz3+Hq7FPahKLtuCPgsuVcfwT0oYHe5VcI1Wh8X1H/8jAJEsl0prroGl6E8ZuQPhgDxJZpQWz7ifIakgUyT5XBcXKeI+QJ2xfImXIMEUQu/MHCGW0z+d9WsYwPe3KM/7iuacWASeJjr"
+ },
+ "aad": {
+  "conv": "77",
+  "epoch": 3,
+  "channelId": "99723385805733891",
+  "authorId": "555"
+ },
+ "payload": {
+  "t": "hello **world** 👋🏽",
+  "att": [
+   {
+    "blob_id": "123",
+    "name": "a.png",
+    "type": "image/png",
+    "size": 42,
+    "key": "BQwTGiEoLzY9REtSWWBnbnV8g4qRmJ+mrbS7wsnQ194=",
+    "w": 640,
+    "h": 480,
+    "spoiler": true,
+    "preview": {
+     "blob_id": "124",
+     "key": "Bg0UGyIpMDc+RUxTWmFob3Z9hIuSmaCnrrW8w8rR2N8=",
+     "size": 1000,
+     "type": "image/webp",
+     "w": 320,
+     "h": 240
+    }
+   }
+  ],
+  "embeds": [
+   {
+    "url": "https://example.com",
+    "title": "Ex",
+    "image_w": 10,
+    "bogus": 1,
+    "post": {
+     "platform": "bluesky",
+     "name": "x",
+     "likes": 3,
+     "media": [
+      {
+       "kind": "photo",
+       "url": "https://a/b.png",
+       "w": 5
+      }
+     ]
+    }
+   }
+  ],
+  "poll": {
+   "question": "Q?",
+   "answers": [
+    {
+     "text": "a",
+     "emoji": {
+      "name": "😀"
+     }
+    },
+    {
+     "text": "b"
+    }
+   ],
+   "hours": 48,
+   "multiselect": true
+  }
+ },
+ "fileKey": "b5a62704290cccc5bd46b9508f16cdefb71e6c4a77fa41aa02dfe081120efeb0",
+ "fileSha": "130fe37e0fdb750fde84402fc31c298a26d6f7405cb8bb96c5c0ed6c2803abc2",
+ "fileSize": 9437307,
+ "emptyKey": "c99596a69b5f3f6081284661d6484895c8728c9031f2b4ec7fd41e425cebe4dd",
+ "emptyFile": "RUNGMXMqRwfMOeXeAAAAEJ+Bcfm4APK6JgxROK4xVDs=",
+ "settings": "B5pK4dhJdPiPXIUyRYMgarlZtBKlYdj/5SrG/k2aRGFCg5Ji+y3YBYPJ8VXhB5aCw1CMJwdyfPC/hoNWMXfwJAq2mT8RYu0=",
+ "noteKey": "4d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f26",
+ "noteHead": "v1.eHWV_VROWVvmr4Rh.n-TXANJqedN8Errg-GJJRdK31Bh6MSZkSI4Nu3mLKrYsBhPRWwxOzOeQzA",
+ "noteKeySealed": "LhUAyxo2A3CWVTEOmO9-dwJL8e84hU6p3rsBsqu7xnV-lcqXPwSWhO1TJE1KtDlX_hTedmcKBRvSGGU5quUKVMRaYJggxcCDtQoetMtwYYCkHajtsNboYF3Vkmc",
+ "link": {
+  "token": "P-ADWYivYzHVTB4HMuyC3zwD",
+  "key": "5hE07SHQEkJbsQcSlNiYMW7Xk7sWUGh6Gp-72OvzbCY"
+ },
+ "linkWrapped": "v1.LS5Mrs6SQDKbw-li.IwHgK97kkqYUTPfNCxrDuUqcmv9UQXcBpSG4lhH15ZVHfWDff8qOrlSDJMpkmD-qBBNHHaxuO2x2uOJQThi2F_Bkd_LyFsJr6w",
+ "linkHash": "65c5a364fd85962269e0404ae29bd4c5d40fe88d5ca362c1e212fc3a4922580d",
+ "recovery": {
+  "auth": "0c51f66ecda0ea027ee52a17134656e8a5173ae6f636adee31442a6f6560009b",
+  "enc": "3207def6a4b1c3992064c6407e6092b7e97721627e50ca75a289d1d344055fd1",
+  "bytes": "0123abcd4567ef0189abcdef0123456789abcdef0123456789abcdef01234567"
+ }
+}

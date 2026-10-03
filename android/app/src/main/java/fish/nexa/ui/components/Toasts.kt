@@ -1,0 +1,118 @@
+package fish.nexa.ui.components
+
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import fish.nexa.Nexa
+import fish.nexa.data.Toast
+import fish.nexa.ui.t
+import fish.nexa.ui.theme.Nx
+import fish.nexa.ui.theme.Radii
+import fish.nexa.ui.theme.boxShadow
+import fish.nexa.ui.theme.panel
+import fish.nexa.ui.theme.ring
+import kotlinx.coroutines.delay
+
+/**
+ * Toasts.module.css on a phone: a column at the top, under the page header,
+ * newest at the bottom. Info and success stay five seconds, errors eight, and
+ * none goes while a finger is on it; a tap dismisses it.
+ */
+@Composable
+fun ToastHost() {
+    val toasts by Nexa.ui.toasts.collectAsState()
+    Box(Modifier.fillMaxSize().statusBarsPadding().padding(top = 60.dp), contentAlignment = Alignment.TopCenter) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            for (toast in toasts) key(toast.id) { ToastView(toast) }
+        }
+    }
+}
+
+@Composable
+private fun ToastView(toast: Toast) {
+    val c = Nx.colors
+    val reduced = Nx.motion.reduced
+    val spring = Nx.motion.spring
+    val interaction = remember { MutableInteractionSource() }
+    val held by interaction.collectIsPressedAsState()
+    val enter = remember { Animatable(if (reduced) 1f else 0f) }
+    LaunchedEffect(Unit) { enter.animateTo(1f, tween(320, easing = spring)) }
+    LaunchedEffect(held) {
+        if (held) return@LaunchedEffect
+        delay(if (toast.kind == "error") 8000 else 5000)
+        Nexa.ui.dismissToast(toast.id)
+    }
+    val dot = when (toast.kind) {
+        "error" -> c.danger
+        "success" -> c.positive
+        else -> c.brand
+    }
+    val kindLabel = when (toast.kind) {
+        "error" -> t("toasts.error")
+        "success" -> t("toasts.done")
+        else -> t("toasts.note")
+    }
+    Box(
+        Modifier
+            .widthIn(max = 480.dp)
+            .graphicsLayer {
+                val p = enter.value
+                alpha = p.coerceIn(0f, 1f)
+                translationY = (1f - p) * -14f * density
+                val s = 0.96f + 0.04f * p
+                scaleX = s
+                scaleY = s
+            }
+            .panel(Radii.Md, c, c.bgFloating.copy(alpha = 0.92f), high = true)
+            .pressable(interaction) { Nexa.ui.dismissToast(toast.id) }
+            .semantics {
+                contentDescription = "$kindLabel: ${toast.text}. ${t("toasts.dismiss")}"
+                liveRegion = if (toast.kind == "error") LiveRegionMode.Assertive else LiveRegionMode.Polite
+            }
+            .padding(start = 30.dp, end = 16.dp, top = 11.dp, bottom = 11.dp),
+    ) {
+        // the glowing dot: a 3 px halo at 22% and a 10 px glow of its colour
+        Box(
+            Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = (-17).dp)
+                .size(8.dp)
+                .ring(CircleShape, dot.copy(alpha = 0.22f), 3.dp)
+                .boxShadow(CircleShape, 0f, 10f, dot)
+                .background(dot, CircleShape),
+        )
+        Txt(toast.text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(550)), color = c.textStrong)
+    }
+}

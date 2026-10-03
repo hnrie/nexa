@@ -1,0 +1,232 @@
+package fish.nexa.ui.shell
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import fish.nexa.Nexa
+import fish.nexa.net.Gateway
+import fish.nexa.ui.components.Txt
+import fish.nexa.ui.chat.FriendsPage
+import fish.nexa.ui.chat.ServerPage
+import fish.nexa.ui.chat.DmPage
+import fish.nexa.ui.components.pressable
+import fish.nexa.ui.layers.LayerHost
+import fish.nexa.ui.layers.Layers
+import fish.nexa.ui.nav.Nav
+import fish.nexa.ui.nav.Route
+import fish.nexa.ui.t
+import fish.nexa.ui.theme.Nx
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+
+/**
+ * The signed-in app on a phone (web AppShell, phone branch): one page at a
+ * time, the navigation drawer over it from the start side, the member list
+ * from the end side, and the layer stack over everything.
+ */
+@Composable
+fun MainShell() {
+    val c = Nx.colors
+    val route = Nav.route
+    val scope = rememberCoroutineScope()
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val density = LocalDensity.current.density
+    val reduced = Nx.motion.reduced
+    val ease = Nx.motion.easeOut
+
+    // How far the drawer is open, 0..1; follows the finger during a swipe.
+    val drawer = remember { Animatable(0f) }
+    val members = remember { Animatable(0f) }
+    var dragging by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Nav.leftOpen) {
+        if (!dragging) drawer.animateTo(if (Nav.leftOpen) 1f else 0f, tween(if (reduced) 0 else 260, easing = ease))
+    }
+    LaunchedEffect(Nav.rightOpen) {
+        members.animateTo(if (Nav.rightOpen) 1f else 0f, tween(if (reduced) 0 else 250, easing = ease))
+    }
+
+    // Back: the topmost layer, then the member drawer, then the drawer, then history.
+    BackHandler(enabled = !Layers.isEmpty || Nav.rightOpen || Nav.leftOpen || Nav.canGoBack) {
+        when {
+            Layers.closeTop() -> Unit
+            Nav.rightOpen -> Nav.rightOpen = false
+            Nav.leftOpen -> Nav.leftOpen = false
+            else -> Nav.back()
+        }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize().background(c.bgRaised)) {
+        val screenW = maxWidth
+        val drawerW: Dp = (screenW - 56.dp).coerceIn(240.dp, 420.dp)
+        val drawerPx = drawerW.value * density
+        val dir = if (rtl) -1f else 1f
+
+        // The one horizontal-swipe recogniser over the whole page (AppShell touch handlers).
+        val swipe = Modifier.pointerInput(rtl, drawerPx) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                if (!Layers.isEmpty) return@awaitEachGesture
+                var total = Offset.Zero
+                var decided: Boolean? = null
+                val t0 = System.currentTimeMillis()
+                val wasOpen = Nav.leftOpen
+                val membersOpen = Nav.rightOpen
+                while (true) {
+                    val ev = awaitPointerEvent(PointerEventPass.Initial)
+                    val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!ch.pressed) break
+                    total += ch.positionChange()
+                    if (decided == null) {
+                        if (abs(total.x) >= 12 * density || abs(total.y) >= 12 * density) {
+                            decided = abs(total.x) > 1.3f * abs(total.y)
+                            if (decided == false) return@awaitEachGesture
+                        } else continue
+                    }
+                    ch.consume()
+                    val dx = total.x * dir
+                    if (!membersOpen) {
+                        dragging = true
+                        val off = ((if (wasOpen) drawerPx else 0f) + dx).coerceIn(0f, drawerPx)
+                        scope.launch { drawer.snapTo(off / drawerPx) }
+                    }
+                }
+                val dx = total.x * dir
+                val elapsed = max(1L, System.currentTimeMillis() - t0)
+                val speed = dx / density / elapsed
+                dragging = false
+                if (decided != true) return@awaitEachGesture
+                if (membersOpen && !wasOpen) {
+                    if (dx > 60 * density || speed > 0.4f) Nav.rightOpen = false
+                    return@awaitEachGesture
+                }
+                val open = if (abs(speed) > 0.4f) dx > 0 else drawer.value > 0.4f
+                if (open) {
+                    Nav.leftOpen = true
+                    scope.launch { drawer.animateTo(1f, tween(if (reduced) 0 else 200, easing = ease)) }
+                } else {
+                    if (!wasOpen && dx < -60 * density) Nav.rightOpen = true
+                    Nav.leftOpen = false
+                    scope.launch { drawer.animateTo(0f, tween(if (reduced) 0 else 200, easing = ease)) }
+                }
+            }
+        }
+
+        Column(Modifier.fillMaxSize().statusBarsPadding().then(swipe)) {
+            ConnectionBanner()
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                when (route) {
+                    is Route.Friends -> FriendsPage()
+                    is Route.Server -> ServerPage(route)
+                    is Route.Dm -> DmPage(route)
+                    else -> PlaceholderPage(route)
+                }
+            }
+        }
+
+        // scrim behind the drawer
+        if (drawer.value > 0.001f) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .alpha(drawer.value)
+                    .background(c.bgOverlay)
+                    .pressable(remember { MutableInteractionSource() }, role = Role.Button) { Nav.leftOpen = false },
+            )
+        }
+        // the navigation drawer: rail, list, dock
+        Box(
+            Modifier
+                .width(drawerW)
+                .fillMaxHeight()
+                .align(if (rtl) Alignment.CenterEnd else Alignment.CenterStart)
+                .graphicsLayer {
+                    translationX = -dir * (1f - drawer.value) * size.width
+                    alpha = if (drawer.value <= 0.001f) 0f else 1f
+                },
+        ) {
+            NavDrawer(open = drawer.value > 0.5f)
+        }
+        // member drawer from the end side
+        if (members.value > 0.001f) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .alpha(members.value)
+                    .background(c.bgOverlay)
+                    .pressable(remember { MutableInteractionSource() }, role = Role.Button) { Nav.rightOpen = false },
+            )
+            Box(
+                Modifier
+                    .width(min(screenW.value - 56f, 320f).dp)
+                    .fillMaxHeight()
+                    .align(if (rtl) Alignment.CenterStart else Alignment.CenterEnd)
+                    .graphicsLayer { translationX = dir * (1f - members.value) * size.width },
+            ) {
+                MemberDrawer()
+            }
+        }
+        LayerHost()
+    }
+}
+
+/** A full-width strip saying the connection is down (AppShell connection banner). */
+@Composable
+private fun ConnectionBanner() {
+    val c = Nx.colors
+    val stateFlow = Nexa.session.gatewayState ?: return
+    val state by stateFlow.collectAsState()
+    val (bg, fg, text) = when (state.status) {
+        Gateway.Status.CONNECTING -> Triple(c.warning, c.onWarning, t("shell.requireAuth.connecting"))
+        Gateway.Status.CLOSED -> Triple(c.dangerHover, c.onDanger, t("shell.appShell.disconnectedReconnecting"))
+        else -> return
+    }
+    if (state.status == Gateway.Status.CONNECTING && !Nexa.session.ready.value) return
+    Box(Modifier.fillMaxWidth().background(bg).padding(horizontal = 12.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
+        Txt(text, style = Nx.type.label.copy(fontSize = Nx.type.sp(13f)), color = fg)
+    }
+}
+
+@Composable
+private fun PlaceholderPage(route: Route) {
+    Column(Modifier.fillMaxSize()) {
+        PageHeader(title = route.toString())
+    }
+}

@@ -56,6 +56,9 @@ on port 8090.
 
 - SQLite is live and the Postgres dialect must keep working: a new migration goes in both
   `internal/db/migrations` and `internal/db/migrations-postgres` with the same number.
-- The Android app is discontinued and removed. Do not add anything for it.
+- The Android app in `android/` is native (Kotlin + Jetpack Compose; the old WebView app is gone).
+  It talks to the server as deployed, so it never depends on unreleased server changes. Read
+  `android/DESIGN.md` before any of its UI work. Build it with `cd android && ./gradlew :app:assembleDebug`
+  (that publishes nothing).
 - The desktop (Electron) source is not checked out on this machine; keep `web/src/lib/desktopBridge.ts`
   compatible with the app people already have installed.

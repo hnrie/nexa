@@ -1,0 +1,358 @@
+package fish.nexa.data
+
+import android.util.Log
+import fish.nexa.Nexa
+import fish.nexa.crypto.Bytes
+import fish.nexa.crypto.DecryptError
+import fish.nexa.crypto.Identity
+import fish.nexa.crypto.Kdf
+import fish.nexa.crypto.KdfParams
+import fish.nexa.crypto.Keys
+import fish.nexa.crypto.WeakKdfError
+import fish.nexa.net.ApiError
+import fish.nexa.net.InstanceInfo
+import fish.nexa.net.KdfInfo
+import fish.nexa.net.KdfParamsJson
+import fish.nexa.net.KeyBundle
+import fish.nexa.net.LoginResult
+import fish.nexa.net.MeUser
+import fish.nexa.net.RecoverBegin
+import fish.nexa.net.RegisterRequest
+import fish.nexa.net.wireJson
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
+import java.net.URLEncoder
+
+/** Where signing in stands (web/src/stores/auth.ts). */
+sealed interface AuthState {
+    data object Loading : AuthState
+    data object Anonymous : AuthState
+    /** Signed in on this device, but the identity key is not here: the password opens it. */
+    data class Locked(val me: MeUser) : AuthState
+    /** The server could not be reached; the token is kept and the check retried. */
+    data class Offline(val message: String) : AuthState
+    data class Ready(val me: MeUser) : AuthState
+}
+
+/** The UI's captcha sheet: a fresh Turnstile token made for `action` on the instance's own page. */
+fun interface CaptchaProvider {
+    suspend fun token(siteKey: String, action: String): String
+}
+
+/** What a login asked for next. */
+sealed interface LoginStep {
+    data object Done : LoginStep
+    data class NeedsCode(val ticket: String, val backupCodesLeft: Int) : LoginStep
+}
+
+class Auth(private val nx: Nexa) {
+    private val _state = MutableStateFlow<AuthState>(AuthState.Loading)
+    val state: StateFlow<AuthState> = _state
+    private val _instance = MutableStateFlow<InstanceInfo?>(null)
+    val instance: StateFlow<InstanceInfo?> = _instance
+
+    var captcha: CaptchaProvider? = null
+    /** The enc key between a password and its second factor, never stored. */
+    private var pendingEncKey: ByteArray? = null
+
+    init {
+        nx.api.onUnauthorized = {
+            if (_state.value is AuthState.Ready) nx.scope.launch { signOutLocally("expired") }
+        }
+        nx.session.onSignedOut = { reason -> nx.scope.launch { signOutLocally(reason) } }
+    }
+
+    suspend fun loadInstance(): InstanceInfo? = try {
+        nx.api.request("GET", "/instance", InstanceInfo.serializer(), auth = false).also { _instance.value = it }
+    } catch (_: Exception) {
+        null
+    }
+
+    /** Sends a guarded request with a captcha token when the server asks for them. */
+    private suspend fun <T> guarded(action: String, send: suspend (String?) -> T): T {
+        val inst = _instance.value ?: loadInstance()
+        suspend fun tokenFor(info: InstanceInfo?): String? {
+            val key = info?.captcha?.takeIf { it.provider == "turnstile" && it.siteKey.isNotEmpty() }?.siteKey ?: return null
+            val p = captcha ?: throw ApiError(0, "captcha_unavailable", "The captcha could not start.")
+            return p.token(key, action)
+        }
+        try {
+            return send(tokenFor(inst))
+        } catch (e: ApiError) {
+            if (e.code != "captcha_required" || inst?.captcha != null) throw e
+            val fresh = loadInstance()
+            if (fresh?.captcha == null) throw e
+            return send(tokenFor(fresh))
+        }
+    }
+
+    /** Opening the app: a stored token is checked, the identity looked for. */
+    suspend fun bootstrap() {
+        loadInstance()
+        val token = nx.secure.getString("token")
+        if (token == null) {
+            _state.value = AuthState.Anonymous
+            return
+        }
+        nx.api.token = token
+        val me = try {
+            nx.api.get("/users/@me", MeUser.serializer())
+        } catch (e: ApiError) {
+            if (e.status == 401) {
+                clearLocal(null)
+                _state.value = AuthState.Anonymous
+            } else if (e.isTransient) {
+                _state.value = AuthState.Offline(e.message ?: "")
+            } else {
+                _state.value = AuthState.Anonymous
+            }
+            return
+        }
+        val identity = loadIdentity(me.id)
+        if (identity == null) {
+            _state.value = AuthState.Locked(me)
+            return
+        }
+        begin(me, identity)
+    }
+
+    private fun loadIdentity(userId: String): Identity? {
+        val raw = nx.secure.get("identity-$userId") ?: return null
+        if (raw.size != 64) return null
+        val pub = raw.copyOfRange(0, 32)
+        val priv = raw.copyOfRange(32, 64)
+        if (!Identity.publicKeyOf(priv).contentEquals(pub)) return null
+        return Identity(pub, priv)
+    }
+
+    private fun saveIdentity(userId: String, id: Identity) = nx.secure.put("identity-$userId", Bytes.concat(id.publicKey, id.privateKey))
+
+    private fun begin(me: MeUser, identity: Identity) {
+        nx.users.setMe(me)
+        nx.misc.nexa.value = me.nexa
+        nx.keys.init(me.id, identity, persist = true)
+        nx.settings.key = Kdf.settingsKey(identity.privateKey)
+        _state.value = AuthState.Ready(me)
+        nx.session.start()
+    }
+
+    private fun params(p: KdfParamsJson) = KdfParams(p.m, p.t, p.p, p.v)
+
+    private suspend fun stretch(password: String, salt: ByteArray, p: KdfParams): Pair<ByteArray, ByteArray> = withContext(Dispatchers.Default) {
+        val master = Kdf.deriveMaster(password, salt, p)
+        val pair = Kdf.authKey(master) to Kdf.encKey(master)
+        master.fill(0)
+        pair
+    }
+
+    suspend fun login(username: String, password: String): LoginStep {
+        val name = username.trim().lowercase()
+        val kdf = nx.api.request("GET", "/auth/kdf?username=" + URLEncoder.encode(name, "UTF-8"), KdfInfo.serializer(), auth = false)
+        val p = params(kdf.params)
+        if (!Kdf.acceptable(p)) throw WeakKdfError("server asked for weak parameters")
+        val (authKey, encKey) = stretch(password, Bytes.unb64(kdf.salt), p)
+        val res = guarded("login") { token ->
+            nx.api.request("POST", "/auth/login", LoginResult.serializer(), buildJsonObject {
+                put("username", name)
+                put("auth_key", Bytes.b64(authKey))
+            }, captcha = token, auth = false)
+        }
+        if (res.mfaRequired) {
+            pendingEncKey = encKey
+            return LoginStep.NeedsCode(res.ticket ?: "", res.backupCodesLeft)
+        }
+        finish(res, encKey)
+        return LoginStep.Done
+    }
+
+    suspend fun completeMfa(ticket: String, code: String?, backupCode: String?) {
+        val enc = pendingEncKey ?: throw ApiError(401, "mfa_expired", "That sign-in timed out. Enter your password again.")
+        val res = nx.api.request("POST", "/auth/login/mfa", LoginResult.serializer(), buildJsonObject {
+            put("ticket", ticket)
+            if (!backupCode.isNullOrBlank()) put("backup_code", backupCode.trim()) else put("code", (code ?: "").replace(Regex("\\s"), ""))
+        }, auth = false)
+        finish(res, enc)
+        pendingEncKey = null
+    }
+
+    private fun finish(res: LoginResult, encKey: ByteArray) {
+        val me = res.user ?: throw ApiError(200, "bad_response", "The server's answer could not be read.")
+        val token = res.token ?: throw ApiError(200, "bad_response", "The server's answer could not be read.")
+        val priv = try {
+            Keys.unwrapPrivateKey(Bytes.unb64(res.encPrivateKey ?: ""), encKey)
+        } catch (_: Exception) {
+            throw DecryptError("Your keys could not be opened with that password.")
+        }
+        val pub = Identity.publicKeyOf(priv)
+        val identity = Identity(pub, priv)
+        nx.api.token = token
+        nx.secure.putString("token", token)
+        nx.secure.putString("account", me.id)
+        saveIdentity(me.id, identity)
+        begin(me, identity)
+    }
+
+    /** A new account: every key is made here and only sealed copies leave the device. Returns the recovery key, shown once. */
+    suspend fun register(username: String, displayName: String, password: String, inviteCode: String?, registrationKey: String?): String {
+        val salt = Bytes.random(16)
+        val p = Kdf.DEFAULT
+        val (authKey, encKey) = stretch(password, salt, p)
+        val identity = Identity.generate()
+        val (recBytes, recDisplay) = Kdf.newRecoveryKey()
+        val body = RegisterRequest(
+            username = username.trim().lowercase(),
+            displayName = displayName.trim(),
+            authKey = Bytes.b64(authKey),
+            kdfSalt = Bytes.b64(salt),
+            kdfParams = KdfParamsJson(p.m, p.t, p.p, 1),
+            publicKey = Bytes.b64(identity.publicKey),
+            encPrivateKey = Bytes.b64(Keys.wrapPrivateKey(identity.privateKey, encKey)),
+            encPrivateKeyRecovery = Bytes.b64(Keys.wrapPrivateKey(identity.privateKey, Kdf.recoveryEncKey(recBytes))),
+            recoveryAuthKey = Bytes.b64(Kdf.recoveryAuthKey(recBytes)),
+            inviteCode = inviteCode?.trim()?.takeIf { it.isNotEmpty() },
+            registrationKey = registrationKey?.trim()?.takeIf { it.isNotEmpty() },
+        )
+        val res = guarded("register") { token ->
+            nx.api.request("POST", "/auth/register", LoginResult.serializer(), wireJson.encodeToJsonElement(RegisterRequest.serializer(), body), captcha = token, auth = false)
+        }
+        val me = res.user ?: throw ApiError(200, "bad_response", "The server's answer could not be read.")
+        val token = res.token ?: throw ApiError(200, "bad_response", "The server's answer could not be read.")
+        nx.api.token = token
+        nx.secure.putString("token", token)
+        nx.secure.putString("account", me.id)
+        saveIdentity(me.id, identity)
+        pendingRegistration = me to identity
+        return recDisplay
+    }
+
+    /** Held until the person has saved their recovery key, then the app opens. */
+    private var pendingRegistration: Pair<MeUser, Identity>? = null
+
+    fun finishRegistration() {
+        val (me, identity) = pendingRegistration ?: return
+        pendingRegistration = null
+        begin(me, identity)
+    }
+
+    /** Forgot the password: the recovery key opens the identity, a new password and recovery key replace the old. */
+    suspend fun recover(username: String, recoveryKey: String, newPassword: String): String {
+        val name = username.trim().lowercase()
+        val rec = Kdf.recoveryKeyBytes(recoveryKey)
+        val recAuth = Kdf.recoveryAuthKey(rec)
+        val begin = guarded("recover") { token ->
+            nx.api.request("POST", "/auth/recover/begin", RecoverBegin.serializer(), buildJsonObject {
+                put("username", name)
+                put("recovery_auth_key", Bytes.b64(recAuth))
+            }, captcha = token, auth = false)
+        }
+        val priv = Keys.unwrapPrivateKey(Bytes.unb64(begin.encPrivateKeyRecovery), Kdf.recoveryEncKey(rec))
+        val identity = Identity(Identity.publicKeyOf(priv), priv)
+        val salt = Bytes.random(16)
+        val p = Kdf.DEFAULT
+        val (authKey, encKey) = stretch(newPassword, salt, p)
+        val (newRec, newRecDisplay) = Kdf.newRecoveryKey()
+        val res = nx.api.request("POST", "/auth/recover/finish", LoginResult.serializer(), buildJsonObject {
+            put("username", name)
+            put("recovery_auth_key", Bytes.b64(recAuth))
+            put("new_auth_key", Bytes.b64(authKey))
+            put("new_kdf_salt", Bytes.b64(salt))
+            put("new_kdf_params", buildJsonObject { put("m", p.m); put("t", p.t); put("p", p.p); put("v", 1) })
+            put("new_enc_private_key", Bytes.b64(Keys.wrapPrivateKey(priv, encKey)))
+            put("new_recovery_auth_key", Bytes.b64(Kdf.recoveryAuthKey(newRec)))
+            put("new_enc_private_key_recovery", Bytes.b64(Keys.wrapPrivateKey(priv, Kdf.recoveryEncKey(newRec))))
+            put("ticket", begin.ticket)
+        }, auth = false)
+        val me = res.user ?: throw ApiError(200, "bad_response", "The server's answer could not be read.")
+        val token = res.token ?: throw ApiError(200, "bad_response", "The server's answer could not be read.")
+        nx.api.token = token
+        nx.secure.putString("token", token)
+        nx.secure.putString("account", me.id)
+        saveIdentity(me.id, identity)
+        pendingRegistration = me to identity
+        return newRecDisplay
+    }
+
+    /** Signed in here but without the identity: the password opens it from the server's sealed copy. */
+    suspend fun unlock(password: String) {
+        val me = (_state.value as? AuthState.Locked)?.me ?: return
+        val bundle = nx.api.get("/users/@me/keys", KeyBundle.serializer())
+        val p = params(bundle.kdfParams)
+        if (!Kdf.acceptable(p)) throw WeakKdfError("server asked for weak parameters")
+        val (_, encKey) = stretch(password, Bytes.unb64(bundle.kdfSalt), p)
+        val priv = try {
+            Keys.unwrapPrivateKey(Bytes.unb64(bundle.encPrivateKey), encKey)
+        } catch (_: Exception) {
+            throw DecryptError("That password is wrong.")
+        }
+        val identity = Identity(Identity.publicKeyOf(priv), priv)
+        saveIdentity(me.id, identity)
+        begin(me, identity)
+    }
+
+    /** The current password's auth key, for the screens that re-check it (2FA, password change, delete). */
+    suspend fun currentAuthKey(password: String): ByteArray {
+        val bundle = nx.api.get("/users/@me/keys", KeyBundle.serializer())
+        val p = params(bundle.kdfParams)
+        if (!Kdf.acceptable(p)) throw WeakKdfError("server asked for weak parameters")
+        return stretch(password, Bytes.unb64(bundle.kdfSalt), p).first
+    }
+
+    suspend fun changePassword(current: String, next: String) {
+        val me = (_state.value as? AuthState.Ready)?.me ?: return
+        val identity = nx.keys.identity ?: return
+        val authKey = currentAuthKey(current)
+        val salt = Bytes.random(16)
+        val p = Kdf.DEFAULT
+        val (newAuth, newEnc) = stretch(next, salt, p)
+        nx.api.request("POST", "/auth/password", buildJsonObject {
+            put("auth_key", Bytes.b64(authKey))
+            put("new_auth_key", Bytes.b64(newAuth))
+            put("new_kdf_salt", Bytes.b64(salt))
+            put("new_kdf_params", buildJsonObject { put("m", p.m); put("t", p.t); put("p", p.p); put("v", 1) })
+            put("new_enc_private_key", Bytes.b64(Keys.wrapPrivateKey(identity.privateKey, newEnc)))
+        })
+        Log.i(TAG, "password changed for ${me.id}")
+    }
+
+    suspend fun logout() {
+        nx.session.stop()
+        try {
+            nx.api.request("POST", "/auth/logout")
+        } catch (_: Exception) {
+        }
+        signOutLocally("logout")
+    }
+
+    private suspend fun signOutLocally(reason: String) {
+        val uid = nx.users.meId ?: nx.secure.getString("account")
+        nx.session.reset()
+        nx.settings.reset()
+        clearLocal(uid)
+        _state.value = AuthState.Anonymous
+        Log.i(TAG, "signed out: $reason")
+    }
+
+    private fun clearLocal(uid: String?) {
+        nx.api.token = null
+        nx.secure.delete("token")
+        if (uid != null) {
+            nx.secure.delete("identity-$uid")
+            nx.secure.delete("roots-$uid")
+        }
+        nx.keys.reset()
+        nx.users.setMe(null)
+    }
+
+    fun retryOffline() = nx.scope.launch { bootstrap() }
+
+    companion object {
+        private const val TAG = "NexaAuth"
+    }
+}
