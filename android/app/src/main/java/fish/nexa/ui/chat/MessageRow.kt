@@ -369,7 +369,8 @@ private fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     }
     val text = payload?.t
     val edited = cm?.m?.editedAt?.let { t("chat.messageItem.edited") }
-    if (!text.isNullOrEmpty()) MessageText(text, if (failed) c.textDanger else c.text, edited)
+    if (cm != null && ChatUi.editing[cm.channelId]?.messageId == cm.id) EditMessage(cm)
+    else if (!text.isNullOrEmpty()) MessageText(text, if (failed) c.textDanger else c.text, edited)
     payload?.sticker?.let { StickerView(it) }
     payload?.poll?.let { if (cm != null) PollCard(cm, ctx) }
     val up = item.pending?.upload
