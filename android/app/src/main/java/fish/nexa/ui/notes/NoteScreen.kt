@@ -467,14 +467,19 @@ private fun SaveStateView(state: SaveState, error: Throwable?, compact: Boolean,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (compact) {
-                    val reduced = Nx.motion.reduced
-                    val breathe = rememberInfiniteTransition(label = "saving")
-                    val a by breathe.animateFloat(1f, 0.35f, infiniteRepeatable(tween(500), RepeatMode.Reverse), label = "breathe")
-                    Box(Modifier.size(8.dp).alpha(if (busy && !reduced) a else 1f).background(if (busy) c.textMuted else c.positive, CircleShape))
+                    if (busy && !Nx.motion.reduced) SavingDot() else Box(Modifier.size(8.dp).background(if (busy) c.textMuted else c.positive, CircleShape))
                 } else Txt(word, style = label, color = if (busy) c.textSubtle else c.textMuted, maxLines = 1)
             }
         }
     }
+}
+
+/** The dot while changes are going: it breathes, and only then, so a saved note draws nothing more. */
+@Composable
+private fun SavingDot() {
+    val breathe = rememberInfiniteTransition(label = "saving")
+    val a by breathe.animateFloat(1f, 0.35f, infiniteRepeatable(tween(500), RepeatMode.Reverse), label = "breathe")
+    Box(Modifier.size(8.dp).alpha(a).background(Nx.colors.textMuted, CircleShape))
 }
 
 /** Files going up from this device into one note, three at a time (NoteEditor.tsx upload queue). */

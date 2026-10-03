@@ -193,7 +193,7 @@ fun NoteLinkView(secret: NoteCrypto.LinkSecret?, variant: LinkVariant, onDone: (
     val files = if (member) head.files else null
     val title = NoteModel.name(head.title)
     Frame(variant, Modifier.semantics(mergeDescendants = false) { contentDescription = t("notes.link.label", "title" to title) }) {
-        // on a phone the card's button goes under its words (.linkTop wraps)
+        // the card's button sits at the end of its top line, the title taking what room is left
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
             Icon("NotebookPen", c.textMuted, size = if (card) 20.dp else 26.dp, modifier = Modifier.padding(top = 2.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -209,6 +209,7 @@ fun NoteLinkView(secret: NoteCrypto.LinkSecret?, variant: LinkVariant, onDone: (
                     color = if (head.title.isBlank()) c.textMuted else c.textStrong,
                 )
             }
+            if (card) button()
         }
         if (head.preview.isNotBlank()) Preview(head.preview, files, card)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp), itemVerticalAlignment = Alignment.CenterVertically) {
@@ -229,8 +230,7 @@ fun NoteLinkView(secret: NoteCrypto.LinkSecret?, variant: LinkVariant, onDone: (
                 )
             }
         }
-        if (card) button()
-        else Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!card) Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             button()
             error?.let { Txt(it, style = Nx.type.bodySmall, color = c.textDanger, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive }) }
         }
