@@ -4984,5 +4984,13 @@
   "whatsNew.r202610024.tagsTitle": "更长的服务器标签",
   "whatsNew.r202610024.tagsBody": "服务器标签现在最多可以有八个字符。",
   "whatsNew.r202610024.zalgoTitle": "告别 Zalgo 文字",
-  "whatsNew.r202610024.zalgoBody": "被层层堆叠的符号埋住的文字现在不能再输入或粘贴了，含有这类文字的旧消息也会被整理好，不再越出自己的那一行。"
+  "whatsNew.r202610024.zalgoBody": "被层层堆叠的符号埋住的文字现在不能再输入或粘贴了，含有这类文字的旧消息也会被整理好，不再越出自己的那一行。",
+  "profile.popout.message": "给 @{name} 发消息",
+  "profile.popout.send": "发送",
+  "profile.roles.remove": "移除身份组 {role}",
+  "profile.roles.add": "添加身份组",
+  "whatsNew.r202610025.popoutTitle": "资料卡在名字旁边打开",
+  "whatsNew.r202610025.popoutBody": "点击名字或头像，旁边就会打开一张小资料卡。你可以直接在那里给对方发消息，或者打开完整资料。",
+  "whatsNew.r202610025.rolesTitle": "资料卡上的身份组",
+  "whatsNew.r202610025.rolesBody": "在服务器里，资料卡会显示对方的身份组。如果你能管理身份组，可以用 + 添加，或者点身份组上的 x 移除。"
 }

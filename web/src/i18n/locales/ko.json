@@ -4984,5 +4984,13 @@
   "whatsNew.r202610024.tagsTitle": "더 길어진 서버 태그",
   "whatsNew.r202610024.tagsBody": "이제 서버 태그를 최대 여덟 글자까지 쓸 수 있어요.",
   "whatsNew.r202610024.zalgoTitle": "zalgo 텍스트는 이제 그만",
-  "whatsNew.r202610024.zalgoBody": "겹겹이 쌓인 기호에 묻힌 글자는 이제 입력하거나 붙여 넣을 수 없어요. 이런 글자가 들어간 예전 메시지도 줄을 벗어나지 않게 정리돼요."
+  "whatsNew.r202610024.zalgoBody": "겹겹이 쌓인 기호에 묻힌 글자는 이제 입력하거나 붙여 넣을 수 없어요. 이런 글자가 들어간 예전 메시지도 줄을 벗어나지 않게 정리돼요.",
+  "profile.popout.message": "@{name}에게 메시지 보내기",
+  "profile.popout.send": "보내기",
+  "profile.roles.remove": "{role} 역할 제거",
+  "profile.roles.add": "역할 추가",
+  "whatsNew.r202610025.popoutTitle": "이름 바로 옆에 열리는 프로필",
+  "whatsNew.r202610025.popoutBody": "이름이나 프로필 사진을 클릭하면 바로 옆에 작은 프로필이 열려요. 거기서 메시지를 보내거나 프로필 전체를 열 수 있어요.",
+  "whatsNew.r202610025.rolesTitle": "프로필에 보이는 역할",
+  "whatsNew.r202610025.rolesBody": "서버에서는 프로필에 그 사람의 역할이 보여요. 역할을 관리할 수 있다면 +로 추가하거나 역할의 x로 뺄 수 있어요."
 }

@@ -5155,5 +5155,13 @@
   "whatsNew.r202610024.tagsTitle": "Längere Server-Tags",
   "whatsNew.r202610024.tagsBody": "Ein Server-Tag kann jetzt bis zu acht Buchstaben haben.",
   "whatsNew.r202610024.zalgoTitle": "Schluss mit Zalgo",
-  "whatsNew.r202610024.zalgoBody": "Text, der unter gestapelten Zeichen verschwindet, lässt sich nicht mehr tippen oder einfügen, und ältere Nachrichten damit werden aufgeräumt, damit sie in ihrer Zeile bleiben."
+  "whatsNew.r202610024.zalgoBody": "Text, der unter gestapelten Zeichen verschwindet, lässt sich nicht mehr tippen oder einfügen, und ältere Nachrichten damit werden aufgeräumt, damit sie in ihrer Zeile bleiben.",
+  "profile.popout.message": "Nachricht an @{name}",
+  "profile.popout.send": "Senden",
+  "profile.roles.remove": "Rolle {role} entfernen",
+  "profile.roles.add": "Rolle hinzufügen",
+  "whatsNew.r202610025.popoutTitle": "Profile öffnen sich neben dem Namen",
+  "whatsNew.r202610025.popoutBody": "Klick auf einen Namen oder ein Profilbild, und direkt daneben öffnet sich ein kleines Profil. Von dort kannst du der Person schreiben oder ihr ganzes Profil öffnen.",
+  "whatsNew.r202610025.rolesTitle": "Rollen im Profil",
+  "whatsNew.r202610025.rolesBody": "In einem Server zeigt das Profil die Rollen der Person. Wenn du Rollen verwalten darfst, fügst du mit + eine hinzu oder nimmst eine mit ihrem x wieder weg."
 }

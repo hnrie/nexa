@@ -12,6 +12,7 @@ import { rangeBetween, useSelection } from "@/stores/selection";
 import { useUsers } from "@/stores/users";
 import { memberColor, useServers } from "@/stores/servers";
 import { useChannels } from "@/stores/channels";
+import { openProfilePopout } from "@/stores/profilePopout";
 import { useRelationships } from "@/stores/relationships";
 import { mentionsMe } from "@/lib/mentionsMe";
 import { useShiftHeld } from "@/hooks/useShiftHeld";
@@ -73,7 +74,6 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   const shownName = useShownName(msg.channel_id, target?.hook ? undefined : target?.author_id);
   const name = target?.hook ? target.hook.name : shownName;
   const setJumpTo = useUI((u) => u.setJumpTo);
-  const openModal = useUI((u) => u.openModal);
   const ctx = useRowRenderCtx();
   // what someone blocked wrote is not quoted back, even over a reply to it
   const targetBlocked = useRelationships((r) => (target ? r.byUser[target.author_id]?.type === "blocked" : false));
@@ -111,7 +111,7 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
           e.stopPropagation();
           // a webhook has no profile; its message is where to go
           if (hook) jump();
-          else openModal("profile", { userId: target.author_id });
+          else openProfilePopout(target.author_id, e.currentTarget, useChannels.getState().byId[msg.channel_id]?.server_id ?? undefined);
         }}
       >
         {name}
@@ -146,7 +146,6 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const [hookCard, setHookCard] = useState<HTMLElement | null>(null);
   const closeHookCard = useCallback(() => setHookCard(null), []);
   const editing = useUI((u) => u.editing?.channelId === msg.channel_id && u.editing.messageId === msg.id);
-  const openModal = useUI((u) => u.openModal);
   const openContextMenu = useUI((u) => u.openContextMenu);
   const dev = useSettings((st) => st.settings.developerMode);
   const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
@@ -220,7 +219,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       setHookCard((cur) => (cur ? null : el));
       return;
     }
-    openModal("profile", { userId: msg.author_id });
+    openProfilePopout(msg.author_id, e.currentTarget, serverId ?? undefined);
   };
   // A row reads as who, when and what, whether or not it shows the name: a
   // message grouped under the one before still says who wrote it.

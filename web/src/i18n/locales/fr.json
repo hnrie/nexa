@@ -5252,5 +5252,13 @@
   "whatsNew.r202610024.tagsTitle": "Des tags de serveur plus longs",
   "whatsNew.r202610024.tagsBody": "Un tag de serveur peut maintenant compter jusqu’à huit lettres.",
   "whatsNew.r202610024.zalgoTitle": "Fini le zalgo",
-  "whatsNew.r202610024.zalgoBody": "Le texte enfoui sous des signes empilés ne peut plus être tapé ni collé, et les anciens messages qui en contiennent sont nettoyés pour rester sur leur ligne."
+  "whatsNew.r202610024.zalgoBody": "Le texte enfoui sous des signes empilés ne peut plus être tapé ni collé, et les anciens messages qui en contiennent sont nettoyés pour rester sur leur ligne.",
+  "profile.popout.message": "Envoyer un message à @{name}",
+  "profile.popout.send": "Envoyer",
+  "profile.roles.remove": "Retirer le rôle {role}",
+  "profile.roles.add": "Ajouter un rôle",
+  "whatsNew.r202610025.popoutTitle": "Les profils s’ouvrent à côté du nom",
+  "whatsNew.r202610025.popoutBody": "Cliquez sur un nom ou une photo de profil et un petit profil s’ouvre juste à côté. De là, vous pouvez envoyer un message à la personne ou ouvrir son profil complet.",
+  "whatsNew.r202610025.rolesTitle": "Les rôles sur les profils",
+  "whatsNew.r202610025.rolesBody": "Sur un serveur, les profils affichent les rôles de la personne. Si vous pouvez gérer les rôles, ajoutez-en un avec le + ou retirez-en un avec son x."
 }

@@ -10,11 +10,10 @@ import s from "./Profile.module.css";
 
 import { t } from "@/i18n";
 /**
- * Someone's profile in a dialog: the mini profile a name or a picture opens,
- * as the profile dialog has always looked, or (full) the whole profile, two
- * columns with its tabs, which the mini one's View Full Profile opens.
+ * Someone's whole profile in a dialog: two columns with its tabs. A name or a
+ * picture opens their popout instead (ProfilePopoutHost), which opens this.
  */
-export default function ProfileModal({ onClose, userId, tab, full }: { onClose: () => void; userId: string; tab?: ProfileTab | undefined; full?: boolean }) {
+export default function ProfileModal({ onClose, userId, tab }: { onClose: () => void; userId: string; tab?: ProfileTab | undefined; full?: boolean }) {
   const me = useAuth((a) => a.me);
   const stored = useUsers((u) => u.byId[userId]);
   const upsertUser = useUsers((u) => u.upsert);
@@ -45,10 +44,10 @@ export default function ProfileModal({ onClose, userId, tab, full }: { onClose: 
   }
   if (!known) return <Modal open onClose={onClose} title={t("profile.profile.profile")}><p className={s.small}>{t("chat.pins.loading")}</p></Modal>;
   // a person's full profile is two columns wide; the system account's card is its own, and narrower
-  const wide = (full || !!tab) && !(stored && isSystemAccount(stored.flags));
+  const system = !!stored && isSystemAccount(stored.flags);
   return (
-    <Modal open onClose={onClose} width={wide ? 940 : 600} bare ariaLabel={stored?.display_name || stored?.username || t("names.unknownUser")}>
-      <ProfileCard userId={userId} variant={wide ? "modal" : "mini"} onClose={onClose} initialTab={tab} />
+    <Modal open onClose={onClose} width={system ? 600 : 940} bare ariaLabel={stored?.display_name || stored?.username || t("names.unknownUser")}>
+      <ProfileCard userId={userId} variant="modal" onClose={onClose} initialTab={tab} />
     </Modal>
   );
 }

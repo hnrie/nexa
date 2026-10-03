@@ -17,6 +17,7 @@ import { useChannels } from "@/stores/channels";
 import { isInstanceAdmin, memberColor, permRolesOf, rolesByPosition, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
+import { openProfilePopout } from "@/stores/profilePopout";
 import { P, compute, has, toPermMember } from "@/lib/perms";
 import { nameOrder } from "./nameOrder";
 import s from "./MemberList.module.css";
@@ -220,7 +221,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
             onClick={(e) => {
               // Ctrl or ⌘ picks a member, Shift a run of them, a tap one while picking
               if (pickClick(e, pickList, row.member.user_id, pickOrder)) return;
-              openModal("profile", { userId: row.member.user_id });
+              openProfilePopout(row.member.user_id, e.currentTarget, st.server.id);
             }}
             onContextMenu={(e) => onContext(e, row.member)}
             data-user={row.member.user_id}

@@ -12,6 +12,7 @@ import { useMessages } from "@/stores/messages";
 import { memberColor, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
+import { openProfilePopout } from "@/stores/profilePopout";
 import { canPin } from "./messageMenu";
 import { MessageBody } from "./MessageItem";
 import { messageFate, useBlockRules } from "@/lib/blocked";
@@ -56,7 +57,6 @@ function PinnedMessage({ msg, collapsed, unpinning, onJump, onUnpin }: { msg: De
   const name = hook ? hook.name : shownName;
   const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
   const color = useServers((st) => (serverId && st.byId[serverId] && !msg.webhook_id ? memberColor(st.byId[serverId], msg.author_id) : undefined));
-  const openModal = useUI((u) => u.openModal);
   const whoId = useId();
   return (
     <article className={s.pinCard} aria-labelledby={whoId} data-testid="pinned-message" data-pin={msg.id}>
@@ -68,7 +68,7 @@ function PinnedMessage({ msg, collapsed, unpinning, onJump, onUnpin }: { msg: De
           {hook ? (
             <span className={s.pinName} dir="auto">{name}</span>
           ) : (
-            <button type="button" className={s.author} style={color ? { color } : undefined} onClick={() => openModal("profile", { userId: msg.author_id })} dir="auto">
+            <button type="button" className={s.author} style={color ? { color } : undefined} onClick={(e) => openProfilePopout(msg.author_id, e.currentTarget, serverId ?? undefined)} dir="auto">
               {name}
             </button>
           )}
@@ -104,7 +104,7 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
   const [attempt, setAttempt] = useState(0);
   const [unpinning, setUnpinning] = useState<string | null>(null);
   const setJumpTo = useUI((u) => u.setJumpTo);
-  const ctx = useRenderCtx();
+  const ctx = useRenderCtx(useChannels((c) => c.byId[channelId]?.server_id));
   const ref = useRef<HTMLDivElement>(null);
   const signal = usePinSignal(channelId);
   const titleId = useId();

@@ -5,9 +5,9 @@ import { formatTimestamp } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import type { DecryptedMessage } from "@/stores/messages";
-import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 import { useVoice } from "@/stores/voice";
+import { openProfilePopout } from "@/stores/profilePopout";
 import { formatCallLength } from "@/voice/callSummary";
 import { joinVoice } from "@/voice/session";
 import s from "./Voice.module.css";
@@ -34,14 +34,13 @@ export function CallLine({ msg }: { msg: DecryptedMessage }) {
   const meId = useAuth((a) => a.me?.id);
   const users = useUsers((u) => u.byId);
   const channel = useChannels((c) => c.byId[msg.channel_id]);
-  const openModal = useUI((u) => u.openModal);
   // a call going on here now is joined from the banner above, not called back
   // (a channel's entry exists only while someone is in its call; this runs on every level update of a call, so it stays cheap)
   const busy = useVoice((v) => v.joining === msg.channel_id || v.mine?.channel_id === msg.channel_id || !!v.byChannel[msg.channel_id]);
   const caller = msg.author_id;
   const summary = msg.call;
   const person = (id: string) => (
-    <button type="button" className={chat.sysName} dir="auto" onClick={() => openModal("profile", { userId: id })}>
+    <button type="button" className={chat.sysName} dir="auto" onClick={(e) => openProfilePopout(id, e.currentTarget, channel?.server_id ?? undefined)}>
       {displayName(users[id])}
     </button>
   );

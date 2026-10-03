@@ -3,6 +3,7 @@ import { CallLine } from "@/components/voice/CallLine";
 import type { DecryptedMessage } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
+import { openProfilePopout } from "@/stores/profilePopout";
 import { formatTimestamp } from "@/lib/time";
 import { pollVerdict, type PollVerdict } from "@/lib/poll";
 import { usePollOf } from "./usePollOf";
@@ -11,14 +12,13 @@ import s from "./Chat.module.css";
 import { t, Tr } from "@/i18n";
 export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
   const users = useUsers((u) => u.byId);
-  const openModal = useUI((u) => u.openModal);
   const setJumpTo = useUI((u) => u.setJumpTo);
   // a poll's closing line speaks for whoever asked: the webhook that posted it, or the person
   const actor = msg.hook?.name ?? displayName(users[msg.author_id]);
   const target = msg.mentions[0] ? displayName(users[msg.mentions[0]]) : t("chat.systemMessage.someone");
   // names that open a profile, and the link to a pinned message, are real buttons
-  const A = <button type="button" className={s.sysName} dir="auto" onClick={() => openModal("profile", { userId: msg.author_id })}>{actor}</button>;
-  const T = msg.mentions[0] ? <button type="button" className={s.sysName} dir="auto" onClick={() => openModal("profile", { userId: msg.mentions[0]! })}>{target}</button> : <b className={s.sysName}>{target}</b>;
+  const A = <button type="button" className={s.sysName} dir="auto" onClick={(e) => openProfilePopout(msg.author_id, e.currentTarget)}>{actor}</button>;
+  const T = msg.mentions[0] ? <button type="button" className={s.sysName} dir="auto" onClick={(e) => openProfilePopout(msg.mentions[0]!, e.currentTarget)}>{target}</button> : <b className={s.sysName}>{target}</b>;
   let icon = <ArrowRightToLine size={18} />;
   let body: React.ReactNode;
   switch (msg.type) {

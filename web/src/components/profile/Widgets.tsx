@@ -197,6 +197,39 @@ function Card({ w, variant }: { w: CardWidget; variant: Variant }) {
 }
 
 /**
+ * The first of someone's widgets in a line, for the popout: what it is, what
+ * is in it, and a few of its boxes (or its picture), the whole of it a press
+ * away on the full profile.
+ */
+export function WidgetPeek({ widgets, onOpen }: { widgets: Widget[]; onOpen?: (() => void) | undefined }) {
+  const w = widgets[0];
+  if (!w) return null;
+  const game = isGameWidget(w);
+  const title = game ? widgetTitle(w) : w.title;
+  const sub = game ? (w.games.length === 1 ? w.games[0]!.name : t("widgets.gameCount", { count: w.games.length })) : (w.text ?? "");
+  const more = widgets.length - 1;
+  const body = (
+    <>
+      <span className={s.peekText}>
+        <span className={s.peekTitle} dir="auto">{title}</span>
+        {sub ? <span className={s.peekSub} dir="auto">{sub}</span> : null}
+      </span>
+      <span className={s.peekArt} aria-hidden="true">
+        {game ? w.games.slice(0, 3).map((g, i) => <GameCover key={i} game={g} css={30} className={s.peekCover} />) : w.image ? <img className={s.peekImage} src={widgetImageUrl(w.image, 40)} alt="" draggable={false} /> : null}
+      </span>
+      {more > 0 ? <span className={s.peekMore}>+{more}</span> : null}
+    </>
+  );
+  return onOpen ? (
+    <button type="button" className={s.peek} onClick={onOpen} aria-label={t("profile.tabs.viewAllWidgets", { count: widgets.length })} data-testid="widget-peek">
+      {body}
+    </button>
+  ) : (
+    <div className={s.peek} data-testid="widget-peek">{body}</div>
+  );
+}
+
+/**
  * Someone's widgets, in the order they put them, laid into their profile's
  * sheet. On their own full profile with none yet, what they could show and
  * the way to Settings. `onShowAll` sends a shelf's Show All somewhere else

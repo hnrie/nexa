@@ -27,6 +27,7 @@ import type { StickerInfo } from "@/api/types";
 import { StickerPackModal } from "./StickerPackModal";
 import { BlockDialog } from "@/components/profile/BlockDialog";
 import type { ProfileTab } from "@/components/profile/ProfileCard";
+import { ProfilePopoutHost } from "@/components/profile/ProfilePopoutHost";
 import { FolderSettingsModal } from "@/components/rail/FolderSettingsModal";
 import type { BugFrom } from "@/components/bugs/ReportBugModal";
 import { InviteDialog } from "@/components/invite/InviteDialog";
@@ -63,6 +64,8 @@ export function ModalHost() {
     <>
       <QuickSwitcher />
       <IncomingCallHost />
+      {/* someone's profile popout, open beside a name or a picture (stores/profilePopout) */}
+      <ProfilePopoutHost />
       {modals.map((m) => (
         <ModalEntry key={m.id} modal={m} />
       ))}

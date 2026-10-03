@@ -4,7 +4,7 @@ import { emojiUrl } from "@/api/users";
 import type { Channel, PublicUser } from "@/api/types";
 import type { RenderCtx } from "@/markdown/ast";
 import { useChannels } from "@/stores/channels";
-import { useUI } from "@/stores/ui";
+import { openProfilePopout } from "@/stores/profilePopout";
 import { useUsers } from "@/stores/users";
 import { useServers, type ServerState } from "@/stores/servers";
 
@@ -67,11 +67,10 @@ function rolesOf(servers: Record<string, ServerState>): Roles {
  * subscribed to nothing, so a component that has one handed down does not
  * re-render every time any user, channel or server anywhere changes.
  */
-function useBuiltCtx(enabled: boolean): RenderCtx | null {
+function useBuiltCtx(enabled: boolean, serverId?: string | null): RenderCtx | null {
   const users = useStable(useUsers, (u) => (enabled ? u.byId : (NONE as typeof u.byId)), sameUsers);
   const channels = useStable(useChannels, (c) => (enabled ? c.byId : (NONE as typeof c.byId)), sameChannels);
   const roles = useStable(useServers, (st) => (enabled ? rolesOf(st.byId) : (NONE as Roles)), sameRoles);
-  const openModal = useUI((u) => u.openModal);
   // The router's history, which stays the same from page to page. useNavigate
   // would re-render every message on the screen each time the address changes.
   // (none outside a router — a list rendered on its own in a test)
@@ -83,7 +82,7 @@ function useBuiltCtx(enabled: boolean): RenderCtx | null {
       channels,
       roles,
       emojiUrl,
-      onUserClick: (id) => openModal("profile", { userId: id }),
+      onUserClick: (id, el) => openProfilePopout(id, el, serverId ?? undefined),
       onChannelClick: (id) => {
         // read when clicked: the map above is only kept current for names
         const ch = useChannels.getState().byId[id];
@@ -91,12 +90,16 @@ function useBuiltCtx(enabled: boolean): RenderCtx | null {
         navigator?.push(ch.server_id ? `/channels/${ch.server_id}/${ch.id}` : `/channels/@me/${ch.id}`);
       },
     };
-  }, [enabled, users, channels, roles, openModal, navigator]);
+  }, [enabled, users, channels, roles, serverId, navigator]);
 }
 
-/** Render context for markdown: names for mentions, emoji urls, role colours, click handlers. */
-export function useRenderCtx(): RenderCtx {
-  return useBuiltCtx(true)!;
+/**
+ * Render context for markdown: names for mentions, emoji urls, role colours,
+ * click handlers. `serverId` is the server the text is read in, whose roles a
+ * mentioned person's popout shows.
+ */
+export function useRenderCtx(serverId?: string | null): RenderCtx {
+  return useBuiltCtx(true, serverId)!;
 }
 
 const Shared = createContext<RenderCtx | null>(null);

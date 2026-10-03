@@ -18,6 +18,7 @@ import { groupMemberMenuItems } from "./groupMemberMenu";
 import { groupMemberBulk } from "@/components/server/memberBulk";
 import { PickBar, PickMark } from "@/components/common/Pick";
 import { pickClick, usePick } from "@/stores/pick";
+import { openProfilePopout } from "@/stores/profilePopout";
 import { nameOrder } from "./nameOrder";
 import s from "./MemberList.module.css";
 import { UserTag } from "@/components/servertag/UserTag";
@@ -76,7 +77,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
             onClick={(e) => {
               // Ctrl or ⌘ picks someone, Shift a run of people, a tap one while picking
               if (pickClick(e, pickList, row.id, pickOrder)) return;
-              openModal("profile", { userId: row.id });
+              openProfilePopout(row.id, e.currentTarget);
             }}
             onContextMenu={(e) => {
               e.preventDefault();

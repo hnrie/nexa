@@ -268,7 +268,7 @@ export function MessageList({ channel }: { channel: Channel }) {
   const [reachedBottom, setReachedBottom] = useState(0);
   // one render context for every row, rather than every row subscribing to
   // every user, channel and server itself
-  const renderCtx = useRenderCtx();
+  const renderCtx = useRenderCtx(channel.server_id);
   // which row is pointed at or focused: only that one draws its toolbar
   const [activeRows] = useState(() => new ActiveRows());
   // what a screen reader is told about a message arriving (see announce below)

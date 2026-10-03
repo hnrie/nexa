@@ -535,7 +535,7 @@ export default function ProfilePage({ anchor }: { anchor?: string | null }) {
         ) : view === "card" ? (
           <div className={d.cardView}>
             <div className={d.cardFrame}>
-              <ProfileCard userId={me.id} variant="mini" preview={preview} previewWidgets={widgets} design={design} />
+              <ProfileCard userId={me.id} variant="popout" preview={preview} previewWidgets={widgets} design={design} />
             </div>
             <aside className={d.aside}>
               <h3 className={d.asideTitle}><Pin size={15} aria-hidden="true" /> {t("designer.card.title")}</h3>

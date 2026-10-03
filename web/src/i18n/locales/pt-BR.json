@@ -5253,5 +5253,13 @@
   "whatsNew.r202610024.tagsTitle": "Tags de servidor mais longas",
   "whatsNew.r202610024.tagsBody": "Agora uma tag de servidor pode ter até oito letras.",
   "whatsNew.r202610024.zalgoTitle": "Chega de zalgo",
-  "whatsNew.r202610024.zalgoBody": "Não dá mais para digitar nem colar texto enterrado sob marcas empilhadas, e as mensagens antigas com esse texto são arrumadas para não saírem da linha."
+  "whatsNew.r202610024.zalgoBody": "Não dá mais para digitar nem colar texto enterrado sob marcas empilhadas, e as mensagens antigas com esse texto são arrumadas para não saírem da linha.",
+  "profile.popout.message": "Conversar com @{name}",
+  "profile.popout.send": "Enviar",
+  "profile.roles.remove": "Remover o cargo {role}",
+  "profile.roles.add": "Adicionar cargo",
+  "whatsNew.r202610025.popoutTitle": "Os perfis abrem ao lado do nome",
+  "whatsNew.r202610025.popoutBody": "Clique num nome ou numa foto e um perfil compacto abre logo ao lado. Dali você pode mandar uma mensagem para a pessoa ou abrir o perfil completo dela.",
+  "whatsNew.r202610025.rolesTitle": "Cargos nos perfis",
+  "whatsNew.r202610025.rolesBody": "Num servidor, os perfis mostram os cargos da pessoa. Se você pode gerenciar cargos, adicione um com o + ou tire um com o x dele."
 }

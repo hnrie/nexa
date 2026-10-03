@@ -347,3 +347,39 @@
 .ghostSection:hover, .ghostSection:focus-visible { border-color: var(--profile-accent); background: color-mix(in srgb, var(--profile-accent) 6%, transparent); }
 .ghostTitle { font-size: 12.5px; line-height: 16px; font-weight: 700; letter-spacing: 0.01em; color: var(--text-muted); }
 .ghostText { font-size: 14px; line-height: 1.4; color: var(--text-subtle); }
+
+/*
+ * The popout a name or a picture opens: the card at its smallest, beside
+ * what was pressed. Who they are, then the few things worth a glance, each
+ * straight on the card with no sheet around them: their own words (a few
+ * lines of them), what they are doing, their first widget in a line, their
+ * roles here, and a box to message them.
+ */
+.card[data-variant="popout"] { --ring: 5px; --av-left: 14px; width: 320px; max-width: 100%; max-height: min(640px, calc(100dvh - 24px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.card[data-variant="popout"] .info { gap: 12px; padding: calc(var(--av) * 0.4 + 10px) 14px 14px; }
+.card[data-variant="popout"] .display { font-size: 20px; }
+.card[data-variant="popout"] .user { font-size: 13.5px; line-height: 19px; }
+.popoutBody { display: flex; flex-direction: column; gap: 12px; }
+/* their words need no heading in so small a card */
+.popoutBody [data-about] > h3 { display: none; }
+.card[data-variant="popout"] .about { font-size: 14px; }
+.card[data-variant="popout"] .about[data-clamp] { max-height: 62px; }
+.card[data-variant="popout"] .moreLink { margin-top: 2px; font-size: 13px; }
+/* the popout around it lends it nothing: the card brings its own colours, edges and shadow */
+.popoutFrame.popoutFrame { background: none; box-shadow: none; border-radius: var(--radius-lg); overflow: visible; }
+.role[data-busy] { opacity: 0.6; }
+.roleX { flex: none; width: 16px; height: 16px; margin-inline: 1px -4px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); transition: background var(--transition), color var(--transition); }
+.roleX:hover:not(:disabled), .roleX:focus-visible { background: var(--bg-hover); color: var(--text-strong); }
+.roleAdd { width: 26px; height: 26px; border-radius: 13px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); background: var(--profile-chip); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); transition: background var(--transition), color var(--transition); }
+.roleAdd:hover:not(:disabled), .roleAdd:focus-visible { color: var(--text-strong); background: var(--profile-chip-hover); }
+.msgBox { display: flex; align-items: center; gap: 4px; height: 40px; padding-inline: 12px 4px; border-radius: var(--radius-sm); background: var(--bg-input); box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 40%, transparent), inset 0 0 0 1px var(--border-subtle); transition: box-shadow var(--transition); }
+.msgBox:focus-within { box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 40%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--focus-ring) 75%, transparent), var(--ring-glow); }
+.msgInput { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: var(--text); font-size: 14.5px; outline: none; }
+.msgInput::placeholder { color: var(--text-placeholder); }
+.msgSend { flex: none; width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); transition: background var(--transition), color var(--transition); }
+.msgSend:hover:not(:disabled) { color: var(--text-strong); background: var(--bg-hover); }
+.msgSend:disabled { opacity: 0.4; cursor: default; }
+@media (max-width: 767px) {
+  /* a phone's sheet is the popout: the card fills it */
+  .card[data-variant="popout"] { width: 100%; max-height: none; overflow: visible; border-radius: 0; box-shadow: none; }
+}

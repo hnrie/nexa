@@ -5252,5 +5252,13 @@
   "whatsNew.r202610024.tagsTitle": "Etiquetas de servidor más largas",
   "whatsNew.r202610024.tagsBody": "Ahora una etiqueta de servidor puede tener hasta ocho letras.",
   "whatsNew.r202610024.zalgoTitle": "Adiós al zalgo",
-  "whatsNew.r202610024.zalgoBody": "Ya no se puede escribir ni pegar texto sepultado bajo marcas apiladas, y los mensajes antiguos con ese texto se arreglan para que no se salgan de su línea."
+  "whatsNew.r202610024.zalgoBody": "Ya no se puede escribir ni pegar texto sepultado bajo marcas apiladas, y los mensajes antiguos con ese texto se arreglan para que no se salgan de su línea.",
+  "profile.popout.message": "Enviar mensaje a @{name}",
+  "profile.popout.send": "Enviar",
+  "profile.roles.remove": "Quitar el rol {role}",
+  "profile.roles.add": "Añadir rol",
+  "whatsNew.r202610025.popoutTitle": "Los perfiles se abren junto al nombre",
+  "whatsNew.r202610025.popoutBody": "Haz clic en un nombre o una foto y se abre un perfil pequeño justo al lado. Desde ahí puedes enviarle un mensaje o abrir su perfil completo.",
+  "whatsNew.r202610025.rolesTitle": "Roles en los perfiles",
+  "whatsNew.r202610025.rolesBody": "En un servidor, los perfiles muestran los roles de la persona. Si puedes gestionar roles, añade uno con el + o quita uno con su x."
 }

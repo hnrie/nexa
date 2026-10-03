@@ -143,3 +143,18 @@
 }
 .addTile { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; border-radius: var(--radius-sm); border: 1.5px dashed color-mix(in srgb, var(--text-muted) 55%, transparent); color: var(--text-subtle); font-size: 14px; font-weight: 650; transition: border-color var(--transition), color var(--transition), background-color var(--transition); }
 .addTile:hover, .addTile:focus-visible { border-color: var(--profile-accent); color: var(--text-strong); background: color-mix(in srgb, var(--profile-accent) 6%, transparent); }
+
+/* the first widget in a line, in the popout: what it is, what is in it, a few of its boxes */
+.peek { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 8px 10px 8px 12px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--profile-chip) 70%, transparent); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); text-align: start; color: inherit; transition: background var(--transition); }
+button.peek:hover, button.peek:focus-visible { background: var(--profile-chip-hover); }
+.peekText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.peekTitle { font-size: 12px; line-height: 15px; font-weight: 700; letter-spacing: 0.01em; color: var(--text-muted); }
+.peekSub { font-size: 14px; line-height: 18px; font-weight: 650; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.peekArt { flex: none; display: flex; align-items: center; }
+.peekCover { width: 26px; border-radius: 4px; }
+/* a fan, the first in front */
+.peekArt > .peekCover:nth-child(1) { z-index: 3; }
+.peekArt > .peekCover:nth-child(2) { z-index: 2; margin-inline-start: -10px; }
+.peekArt > .peekCover:nth-child(3) { z-index: 1; margin-inline-start: -10px; }
+.peekImage { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; }
+.peekMore { flex: none; font-size: 12px; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }

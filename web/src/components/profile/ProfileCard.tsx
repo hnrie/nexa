@@ -1,6 +1,6 @@
 import { NexaProfile } from "@/components/nexa/NexaProfile";
 import { isSystemAccount } from "@/lib/moderation";
-import { Link2, LoaderCircle, MessageCircle, MoreHorizontal, NotebookPen, Pencil, Plus, UserPlus, X } from "lucide-react";
+import { Link2, LoaderCircle, Maximize2, MessageCircle, MoreHorizontal, NotebookPen, Pencil, Plus, SendHorizontal, UserPlus, X } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -14,7 +14,7 @@ import { ActivityList } from "@/components/activity/ActivityCard";
 import { Avatar } from "@/components/common/Avatar";
 import { AdminBadge, OwnerBadge } from "@/components/common/OwnerBadge";
 import { ServerTagChip } from "@/components/servertag/ServerTagChip";
-import { ProfileWidgets, type WidgetDesign } from "./Widgets";
+import { ProfileWidgets, WidgetPeek, type WidgetDesign } from "./Widgets";
 import { readWidgets, type Widget } from "@/lib/widgets";
 import { isOwner } from "@/lib/owner";
 import { Tooltip } from "@/components/common/Tooltip";
@@ -33,7 +33,9 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
 import { useRelationships } from "@/stores/relationships";
-import { useServers } from "@/stores/servers";
+import { canI, memberHighest, rolesByPosition, useServers } from "@/stores/servers";
+import { canActOn, canManageRole, P } from "@/lib/perms";
+import { sendMessage } from "@/components/composer/send";
 import { servers as serversApi } from "@/api/servers";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
@@ -48,11 +50,11 @@ interface Props {
   userId: string;
   /**
    * The full profile ("modal": two columns with tabs, or one on a phone);
-   * the preview in the column beside a DM ("panel"); or the profile a name
-   * or a picture opens ("mini"): the card on its own in a dialog, with the
-   * way to the full one.
+   * the preview in the column beside a DM ("panel"); or the popout a name or
+   * a picture opens ("popout"): small, beside what was pressed, with only
+   * what matters at a glance and the way to the full one.
    */
-  variant: "modal" | "panel" | "mini";
+  variant: "modal" | "panel" | "popout";
   onClose?: () => void;
   /** Settings' live preview: unsaved changes over the account's own profile, with nothing to click. */
   preview?: Partial<PublicUser>;
@@ -84,12 +86,18 @@ function useServerInView(explicit: string | undefined): string | null {
 /**
  * Someone's roles in the server their profile was opened from, highest first,
  * each in its colour, and when they joined it. A big server's members arrive a
- * page at a time, so one who is not loaded yet is asked for.
+ * page at a time, so one who is not loaded yet is asked for. In a popout the
+ * roles are all it says, and whoever may manage them takes one off with its x
+ * or gives another with the + after them, as the member's Roles dialog would.
  */
-function ServerRoles({ serverId, userId }: { serverId: string; userId: string }) {
+function ServerRoles({ serverId, userId, popout }: { serverId: string; userId: string; popout?: boolean }) {
   const server = useServers((st) => st.byId[serverId]);
   const member = server?.members[userId];
   const upsertMember = useServers((st) => st.upsertMember);
+  const meId = useAuth((a) => a.me?.id);
+  const openContextMenu = useUI((u) => u.openContextMenu);
+  const toast = useUI((u) => u.toast);
+  const [busy, setBusy] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   useEffect(() => {
     if (member || missing) return;
@@ -108,6 +116,61 @@ function ServerRoles({ serverId, userId }: { serverId: string; userId: string })
     .map((id) => server.roles[id])
     .filter((r): r is NonNullable<typeof r> => !!r && r.id !== serverId)
     .sort((a, b) => b.position - a.position);
+  const colour = (c: number | null | undefined) => (c ? { background: `#${c.toString(16).padStart(6, "0")}` } : undefined);
+  if (popout) {
+    // who may change them: Manage Roles, and above the member unless it is themselves, and then only roles below their own highest
+    const mine = meId ? memberHighest(server, meId) : { highest: 0, isOwner: false };
+    const theirs = memberHighest(server, userId);
+    const canRoles = !!meId && canI(server, P.MANAGE_ROLES) && (meId === userId || canActOn(mine.highest, theirs.highest, mine.isOwner, theirs.isOwner));
+    const allowed = (position: number) => canRoles && canManageRole(mine.highest, mine.isOwner, position);
+    const addable = rolesByPosition(server).filter((r) => r.id !== serverId && !member.role_ids.includes(r.id) && allowed(r.position));
+    const change = async (roleId: string, on: boolean) => {
+      setBusy(roleId);
+      try {
+        upsertMember(on ? await serversApi.addRole(serverId, userId, roleId) : await serversApi.removeRole(serverId, userId, roleId));
+      } catch (err) {
+        toast(err instanceof ApiError ? err.message : t("server.memberAction.couldNotChangeRoles"), "error");
+      } finally {
+        setBusy(null);
+      }
+    };
+    if (!roles.length && !(canRoles && addable.length)) return null;
+    return (
+      <ul className={s.roles} aria-label={t("profile.profileCard.rolesIn", { server: server.server.name })} data-testid="profile-roles">
+        {roles.map((r) => (
+          <li key={r.id} className={s.role} data-busy={busy === r.id || undefined}>
+            <span className={s.roleDot} style={colour(r.color)} aria-hidden="true" />
+            <span className={s.roleName} dir="auto">{r.name}</span>
+            {allowed(r.position) ? (
+              <button type="button" className={s.roleX} aria-label={t("profile.roles.remove", { role: r.name })} disabled={busy !== null} onClick={() => void change(r.id, false)} data-testid="role-remove">
+                <X size={12} />
+              </button>
+            ) : null}
+          </li>
+        ))}
+        {canRoles && addable.length ? (
+          <li>
+            <Tooltip text={t("profile.roles.add")} side="top">
+              <button
+                type="button"
+                className={s.roleAdd}
+                aria-label={t("profile.roles.add")}
+                aria-haspopup="menu"
+                disabled={busy !== null}
+                onClick={(e) => {
+                  const at = e.currentTarget.getBoundingClientRect();
+                  openContextMenu({ x: at.left, y: at.bottom + 4, items: addable.map((r) => ({ id: r.id, label: r.name, onSelect: () => void change(r.id, true) })) });
+                }}
+                data-testid="role-add"
+              >
+                <Plus size={14} />
+              </button>
+            </Tooltip>
+          </li>
+        ) : null}
+      </ul>
+    );
+  }
   return (
     <>
       <div className={s.section} data-testid="profile-roles">
@@ -116,7 +179,7 @@ function ServerRoles({ serverId, userId }: { serverId: string; userId: string })
           <ul className={s.roles}>
             {roles.map((r) => (
               <li key={r.id} className={s.role}>
-                <span className={s.roleDot} style={r.color ? { background: `#${r.color.toString(16).padStart(6, "0")}` } : undefined} aria-hidden="true" />
+                <span className={s.roleDot} style={colour(r.color)} aria-hidden="true" />
                 <span className={s.roleName} dir="auto">{r.name}</span>
               </li>
             ))}
@@ -130,6 +193,58 @@ function ServerRoles({ serverId, userId }: { serverId: string; userId: string })
         <p>{dateOf(member.joined_at)}</p>
       </div>
     </>
+  );
+}
+
+/**
+ * The popout's own way to say something: a message to them, sent in your DM
+ * with them (begun if there is none yet), which then opens.
+ */
+function MessageBox({ user, onSent }: { user: PublicUser; onSent?: (() => void) | undefined }) {
+  const nav = useNavigate();
+  const upsertChannel = useChannels((c) => c.upsert);
+  const toast = useUI((u) => u.toast);
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const send = async () => {
+    const body = text.trim();
+    if (!body || sending) return;
+    setSending(true);
+    try {
+      const ch = await channelsApi.createDM([user.id]);
+      upsertChannel(ch);
+      // sealed and sent as the message box would; it shows in the DM at once, and says so there if it fails
+      void sendMessage(ch.id, body);
+      setText("");
+      onSent?.();
+      nav(`/channels/@me/${ch.id}`);
+    } catch (err) {
+      toast(dmOpenError(err, t("profile.profileCard.couldNotOpenAConversation")), "error");
+    } finally {
+      setSending(false);
+    }
+  };
+  return (
+    <form
+      className={s.msgBox}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void send();
+      }}
+    >
+      <input
+        className={s.msgInput}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={t("profile.popout.message", { name: user.display_name || user.username })}
+        aria-label={t("profile.popout.message", { name: user.display_name || user.username })}
+        maxLength={4000}
+        data-testid="popout-message"
+      />
+      <button type="submit" className={s.msgSend} aria-label={t("profile.popout.send")} disabled={!text.trim() || sending}>
+        {sending ? <LoaderCircle size={16} className={s.spin} /> : <SendHorizontal size={16} />}
+      </button>
+    </form>
   );
 }
 
@@ -241,10 +356,10 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const isMe = !visitor && me?.id === userId;
   const base: PublicUser | undefined = visitor ? visitor.user : isMe && me ? me : stored;
   const user: PublicUser | undefined = base ? { ...base, ...preview } : undefined;
-  // the preview and the mini profile are one column, with one widget and the way to the rest
+  // the preview and the popout are one column, with one widget and the way to the rest
   const compact = variant !== "modal";
   const panel = variant === "panel";
-  const mini = variant === "mini";
+  const popout = variant === "popout";
   const narrow = useNarrow(cardEl, !compact);
   const visitorWidgets = visitor?.widgets;
   const shownWidgets = useMemo(() => previewWidgets ?? (visitor ? readWidgets(visitorWidgets) : widgets), [previewWidgets, visitor, visitorWidgets, widgets]);
@@ -308,7 +423,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const banner = bannerUrl(user.banner_id, panel || (!compact && !narrow) ? 340 : 600);
   const friend = !visitor && rel?.type === "friend";
   const interactive = !preview && !visitor;
-  const avatarSize = panel ? 80 : 120;
+  const avatarSize = panel || popout ? 80 : 120;
 
   const colours: Record<string, string> = theme ? { "--profile-top": theme.top, "--profile-bottom": theme.bottom } : tint ? { "--profile-tint": tint } : {};
   const cardStyle = { "--av": `${avatarSize}px`, ...colours } as CSSProperties;
@@ -340,7 +455,9 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const more = (e: MouseEvent<HTMLButtonElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const items: ContextMenuItem[] = [];
-    if (compact) items.push({ id: "full", label: t("profile.profileCard.viewFullProfile"), onSelect: () => viewFull(), separatorAfter: true });
+    if (compact) items.push({ id: "full", label: t("profile.profileCard.viewFullProfile"), onSelect: () => viewFull() });
+    if (popout) items.push({ id: "link", label: t("profileLink.copy"), onSelect: copyLink });
+    if (compact) items[items.length - 1]!.separatorAfter = true;
     if (friend) {
       items.push({ id: "nick", label: rel.nickname ? t("profile.profileCard.editFriendNickname") : t("profile.profileCard.addFriendNickname"), onSelect: () => void editNickname() });
       // asked first, as the friends list asks: neither is quick to take back
@@ -363,9 +480,12 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const shownName = friend && rel.nickname ? rel.nickname : user.display_name;
   const mutualServers = mutual.servers.filter((id) => servers[id]);
   const mutualCount = mutual.friends.length + mutualServers.length;
-  // the whole profile, in place of the mini one (a profile dialog replaces the one open)
-  const viewFull = (tab?: ProfileTab) => openModal("profile", { userId, full: true, ...(tab ? { tab } : {}) });
-  const buttons = interactive && !panel;
+  // the whole profile, which the popout makes way for
+  const viewFull = (tab?: ProfileTab) => {
+    if (popout) onClose?.();
+    openModal("profile", { userId, full: true, ...(tab ? { tab } : {}) });
+  };
+  const buttons = interactive && !compact;
   const copyLink = () => copyProfileLink(user.username);
   const editWidgets = () => {
     onClose?.();
@@ -420,7 +540,19 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
       <div className={s.banner} style={bannerStyle} />
       {design ? <Spot design={design} part="banner" label={user.banner_id ? t("designer.spot.banner") : t("designer.spot.addBanner")} /> : null}
       <div className={s.bannerBtns}>
-        {!interactive ? null : panel ? (
+        {!interactive ? null : popout ? (
+          <>
+            {isMe ? (
+              <BannerButton label={t("profile.profileCard.editProfile")} onClick={() => { onClose?.(); openModal("settings", { page: "profiles" }); }}><Pencil size={16} /></BannerButton>
+            ) : !rel ? (
+              <BannerButton label={busy ? t("people.request.sending") : t("profile.profileCard.addFriend")} onClick={addFriend} busy={busy} testId="profile-add-friend">
+                {busy ? <LoaderCircle size={18} className={s.spin} /> : <UserPlus size={18} />}
+              </BannerButton>
+            ) : null}
+            <BannerButton label={t("profile.profileCard.viewFullProfile")} onClick={() => viewFull()} testId="profile-full"><Maximize2 size={16} /></BannerButton>
+            {!isMe ? <BannerButton label={t("chat.chat.more")} onClick={more} testId="profile-more"><MoreHorizontal size={18} /></BannerButton> : null}
+          </>
+        ) : panel ? (
           isMe ? (
             <>
               <BannerButton label={t("profile.profileCard.editProfile")} onClick={() => openModal("settings", { page: "profiles" })}><Pencil size={16} /></BannerButton>
@@ -437,13 +569,13 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
               <BannerButton label={t("chat.chat.more")} onClick={more} testId="profile-more"><MoreHorizontal size={18} /></BannerButton>
             </>
           )
-        ) : onClose && (mini || narrow) ? (
+        ) : onClose && narrow ? (
           // two columns put the close button at the dialog's corner, beside the tabs
           <BannerButton label={t("chat.attachments.close")} onClick={onClose}><X size={18} /></BannerButton>
         ) : null}
       </div>
       <div className={s.avatar}>
-        {panel ? (
+        {compact && !design ? (
           <button className={s.avatarBtn} aria-label={t("profile.profileCard.viewFullProfileOf", { name: shownName })} onClick={() => viewFull()} data-testid="profile-avatar">
             <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={avatarSize} status={st} dotSize={18} />
           </button>
@@ -479,7 +611,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
       <div className={s.ident}>
         <div className={s.nameRow}>
           <h2 className={s.display}>
-            {design?.inline?.name ?? (panel ? <button className={s.displayBtn} onClick={() => viewFull()} data-testid="profile-name">{shownName}</button> : shownName)}
+            {design?.inline?.name ?? (compact && !design ? <button className={s.displayBtn} onClick={() => viewFull()} data-testid="profile-name">{shownName}</button> : shownName)}
             {design && !design.inline?.name ? <Spot design={design} part="name" label={t("designer.spot.name")} /> : null}
           </h2>
           {/* the server tag they wear, which opens the server it is from (not for a visitor, who has no account to ask with) */}
@@ -614,7 +746,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
       <span className={s.ghostText}>{t("designer.ghost.about")}</span>
     </button>
   ) : user.about_me ? (
-    <div className={[s.section, design ? s.spotWrap : ""].join(" ")}>
+    <div className={[s.section, design ? s.spotWrap : ""].join(" ")} data-about="">
       {design ? <Spot design={design} part="about" label={t("designer.spot.about")} /> : null}
       <h3>{t("settings.profile.aboutMe")}</h3>
       <div ref={bioRef} className={s.about} data-clamp={compact || undefined} data-overflow={(compact && bioClamped) || undefined}>
@@ -649,21 +781,51 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
     </>
   );
 
-  if (compact) {
-    // The preview, and the mini profile a name opens (drawn as the profile
-    // dialog always was): one widget, the first they put, and the way to the
-    // rest, which is the whole profile.
-    const first = shownWidgets.slice(0, 1);
+  if (popout) {
+    // The popout: who they are, what you have in common, a few lines of their
+    // own, what they are doing, their first widget in a line, their roles
+    // here, and a message to them. Everything else is on the full profile.
     return (
       <div
         className={s.card}
-        data-variant={mini ? "modal" : variant}
-        data-layout={mini ? "mini" : undefined}
+        data-variant="popout"
         data-design={design ? "" : undefined}
         data-themed={theme?.text}
         data-tinted={!theme && tint ? "" : undefined}
         style={cardStyle}
-        data-testid={mini ? "profile-modal" : `profile-${variant}`}
+        data-testid="profile-popout-card"
+      >
+        {top}
+        <div className={s.info}>
+          {identity}
+          {noteSection || aboutSection || activities.length || shownWidgets.length || (inServer && interactive) ? (
+            <div className={s.popoutBody}>
+              {noteSection}
+              {aboutSection}
+              {activities.length ? <ActivityList activities={activities} /> : null}
+              {shownWidgets.length ? <WidgetPeek widgets={shownWidgets} onOpen={interactive ? () => viewFull("widgets") : undefined} /> : null}
+              {inServer && interactive ? <ServerRoles serverId={inServer} userId={userId} popout /> : null}
+            </div>
+          ) : null}
+          {interactive && !isMe && rel?.type !== "blocked" ? <MessageBox user={user} onSent={onClose} /> : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (compact) {
+    // The preview beside a DM: one widget, the first they put, and the way to
+    // the rest, which is the whole profile.
+    const first = shownWidgets.slice(0, 1);
+    return (
+      <div
+        className={s.card}
+        data-variant={variant}
+        data-design={design ? "" : undefined}
+        data-themed={theme?.text}
+        data-tinted={!theme && tint ? "" : undefined}
+        style={cardStyle}
+        data-testid={`profile-${variant}`}
       >
         {top}
         <div className={s.info}>
@@ -674,7 +836,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
             {aboutSection}
             {first.length ? (
               <div className={s.section}>
-                <ProfileWidgets widgets={first} variant={mini ? "modal" : "panel"} onShowAll={interactive ? () => viewFull("widgets") : undefined} />
+                <ProfileWidgets widgets={first} variant="panel" onShowAll={interactive ? () => viewFull("widgets") : undefined} />
                 {interactive && shownWidgets.length > 1 ? (
                   <button className={s.moreLink} onClick={() => viewFull("widgets")} data-testid="view-all-widgets">{t("profile.tabs.viewAllWidgets", { count: shownWidgets.length })}</button>
                 ) : null}

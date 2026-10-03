@@ -5155,5 +5155,13 @@
   "whatsNew.r202610024.tagsTitle": "Longer Server Tags",
   "whatsNew.r202610024.tagsBody": "A server tag can have up to eight letters now.",
   "whatsNew.r202610024.zalgoTitle": "No More Zalgo",
-  "whatsNew.r202610024.zalgoBody": "Text buried under stacked marks can't be typed or pasted anymore, and older messages with it are tidied so they stay on their line."
+  "whatsNew.r202610024.zalgoBody": "Text buried under stacked marks can't be typed or pasted anymore, and older messages with it are tidied so they stay on their line.",
+  "profile.popout.message": "Message @{name}",
+  "profile.popout.send": "Send",
+  "profile.roles.remove": "Remove {role}",
+  "profile.roles.add": "Add a Role",
+  "whatsNew.r202610025.popoutTitle": "Profiles Open Beside Names",
+  "whatsNew.r202610025.popoutBody": "Click a name or a picture and a small profile opens right next to it. You can message them from there, or open their full profile.",
+  "whatsNew.r202610025.rolesTitle": "Roles on Profiles",
+  "whatsNew.r202610025.rolesBody": "In a server, profiles show the person's roles. If you can manage roles, add one with the + or take one off with its x."
 }

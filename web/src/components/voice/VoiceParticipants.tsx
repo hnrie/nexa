@@ -11,6 +11,7 @@ import { canI, useServers } from "@/stores/servers";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
+import { openProfilePopout } from "@/stores/profilePopout";
 import { setUserLocalMute, setUserVolume } from "@/voice/session";
 import s from "./Voice.module.css";
 
@@ -42,7 +43,7 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
             data-speaking={!!speaking[p.user_id]}
             data-user={p.user_id}
             data-guest={guest || undefined}
-            onClick={() => !guest && openModal("profile", { userId: p.user_id })}
+            onClick={(e) => !guest && openProfilePopout(p.user_id, e.currentTarget, server?.server.id)}
             onContextMenu={(e) => {
               e.preventDefault();
               const vol = volumes[p.user_id] ?? 100;

@@ -5,10 +5,25 @@ import s from "./Popout.module.css";
 
 const GAP = 8;
 
-/** Beside what opened it: above when there is room, else below, always on screen. */
-function place(anchor: DOMRect, box: DOMRect, prefer: "above" | "below"): { left: number; top: number } {
+type Prefer = "above" | "below" | "side";
+
+/**
+ * Beside what opened it, always on screen: above when there is room, else
+ * below; or, for "side", next to it (after it in the reading direction when
+ * there is room, before it when not), its top in line with the anchor's.
+ */
+function place(anchor: DOMRect, box: DOMRect, prefer: Prefer): { left: number; top: number } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+  if (prefer === "side") {
+    const rtl = document.documentElement.dir === "rtl";
+    const after = rtl ? anchor.left - GAP - box.width : anchor.right + GAP;
+    const before = rtl ? anchor.right + GAP : anchor.left - GAP - box.width;
+    const fits = (x: number) => x >= 4 && x + box.width <= vw - 4;
+    const left = fits(after) ? after : fits(before) ? before : Math.max(4, Math.min(after, vw - box.width - 4));
+    const top = Math.max(4, Math.min(anchor.top, vh - box.height - 4));
+    return { left, top };
+  }
   const above = anchor.top - box.height - GAP;
   const below = anchor.bottom + GAP;
   let top = prefer === "above" ? (above >= 4 ? above : below) : below + box.height <= vh - 4 ? below : above;
@@ -25,7 +40,7 @@ function place(anchor: DOMRect, box: DOMRect, prefer: "above" | "below"): { left
  * opens and gives it back when it closes, and goes away with a press
  * anywhere else, with Escape, or when what it opened from scrolls away.
  */
-export function Popout({ anchor, onClose, label, children, className, prefer = "above", testId }: { anchor: HTMLElement; onClose: () => void; label: string; children: ReactNode; className?: string; prefer?: "above" | "below"; testId?: string }) {
+export function Popout({ anchor, onClose, label, children, className, prefer = "above", testId }: { anchor: HTMLElement; onClose: () => void; label: string; children: ReactNode; className?: string; prefer?: Prefer; testId?: string }) {
   const card = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
   const inside = useRef(false);
@@ -41,6 +56,14 @@ export function Popout({ anchor, onClose, label, children, className, prefer = "
     setAt(place(a, box, prefer));
   }, [anchor, onClose, prefer]);
   useLayoutEffect(reposition, [reposition, children]);
+  // what it holds can grow once it is open (a profile still loading), and is placed again when it does
+  useEffect(() => {
+    const el = card.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => reposition());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [reposition]);
 
   const focused = useRef(false);
   useEffect(() => {
@@ -58,8 +81,10 @@ export function Popout({ anchor, onClose, label, children, className, prefer = "
   useEffect(() => {
     const down = (e: PointerEvent) => {
       const t = e.target as Node;
-      // what opened it toggles it, so a press there is left to its own click
+      // what opened it toggles it, so a press there is left to its own click;
+      // a menu opened from inside it (a role to give) is part of it while open
       if (card.current?.contains(t) || anchor.contains(t)) return;
+      if (t instanceof Element && t.closest('[role="menu"]')) return;
       onClose();
     };
     const key = (e: KeyboardEvent) => {

@@ -51,8 +51,8 @@
 }
 
 /* the profile card a name opens, and which widget it shows */
-.cardView { display: grid; grid-template-columns: minmax(0, 600px) minmax(220px, 280px); justify-content: center; align-items: start; gap: 24px; }
-.cardFrame { min-width: 0; width: 100%; max-width: 600px; justify-self: center; }
+.cardView { display: grid; grid-template-columns: minmax(0, 320px) minmax(220px, 300px); justify-content: center; align-items: start; gap: 28px; }
+.cardFrame { min-width: 0; width: 100%; max-width: 320px; justify-self: center; }
 .aside { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: var(--radius-md); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); }
 .asideTitle { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-strong); }
 .asideTitle svg { color: var(--text-brand); }
@@ -83,8 +83,10 @@
 .panelTitle { margin: 0 0 4px; font-size: 15.5px; font-weight: 700; color: var(--text-strong); }
 .panelHint { margin: 0 0 14px; font-size: 13.5px; line-height: 1.45; color: var(--text-muted); }
 
-@container (max-width: 860px) {
+@container (max-width: 640px) {
   .cardView { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 860px) {
   .chatView { grid-template-columns: minmax(0, 1fr); }
 }
 
