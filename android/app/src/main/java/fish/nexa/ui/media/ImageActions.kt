@@ -43,8 +43,12 @@ private suspend fun fullPicture(image: ImageTarget): Pair<File, String> {
     }
 }
 
-/** Copy Image and Save Image, put first in the menu of a message opened on one of its pictures. */
-fun imageMenuItems(image: ImageTarget): List<MenuItem> = listOf(
+/**
+ * Copy Image and Save Image, put first in the menu of a message opened on one
+ * of its pictures (a line under them, before the message's own actions), or
+ * alone in the viewer's menu.
+ */
+fun imageMenuItems(image: ImageTarget, separatorAfter: Boolean = true): List<MenuItem> = listOf(
     MenuItem.Action(t("chat.messageMenu.copyImage")) {
         Nexa.scope.launch {
             try {
@@ -57,7 +61,7 @@ fun imageMenuItems(image: ImageTarget): List<MenuItem> = listOf(
             }
         }
     },
-    MenuItem.Action(t("chat.messageMenu.saveImage"), separatorAfter = true) {
+    MenuItem.Action(t("chat.messageMenu.saveImage"), separatorAfter = separatorAfter) {
         Nexa.scope.launch {
             try {
                 val (file, type) = fullPicture(image)

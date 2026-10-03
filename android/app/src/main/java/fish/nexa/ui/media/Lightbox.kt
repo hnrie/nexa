@@ -128,7 +128,9 @@ private fun LightboxView(layer: Layer, items: List<LightboxItem>, start: Int, cl
         Modifier
             .fillMaxSize()
             .graphicsLayer { alpha = enter.value }
-            .background(Color(0xDB08050E).copy(alpha = 0.86f * dim)),
+            // the web dims to 86% and blurs what is behind; nothing here can blur the chat behind a
+            // layer, so the room is darker instead, to leave the chat as unreadable as the blur does
+            .background(Color(0xFF08050E).copy(alpha = 0.95f * dim)),
     ) {
         HorizontalPager(
             state = pager,
@@ -420,7 +422,7 @@ private fun ZoomablePicture(
                     onTap = { if (scale <= 1.01f) onClose() },
                     onLongPress = {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        openMenu(imageMenuItems(ImageTarget(item.att, item.src, item.name, item.type, item.cm)), haptic = false)
+                        openMenu(imageMenuItems(ImageTarget(item.att, item.src, item.name, item.type, item.cm), separatorAfter = false), haptic = false)
                     },
                 )
             },
