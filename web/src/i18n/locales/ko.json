@@ -2862,7 +2862,6 @@
   "profile.profileCard.viewFullBio": "소개 전체 보기",
   "profile.profileCard.viewFullProfile": "프로필 전체 보기",
   "profile.profileCard.viewFullProfileOf": "{name}의 전체 프로필 보기",
-  "profileLink.cardLabel": "{name}님의 프로필",
   "profileLink.copy": "프로필 링크 복사",
   "profileLink.couldNotLoad": "프로필을 불러오지 못했습니다.",
   "profileLink.couldNotLoadToast": "프로필을 불러오지 못했습니다. 연결을 확인하고 다시 시도하세요.",
@@ -2872,7 +2871,6 @@
   "profileLink.missingBody": "링크가 잘못 입력되었거나 상대가 사용자 이름을 바꿨을 수 있습니다.",
   "profileLink.missingTitle": "프로필을 볼 수 없음",
   "profileLink.missingToast": "해당 프로필을 볼 수 없습니다.",
-  "profileLink.viewProfile": "프로필 보기",
   "rail.rail.addAServer": "서버 추가",
   "rail.rail.and": "{first}, {second}",
   "rail.rail.channelUnread": "{name}, {what}",
@@ -5044,5 +5042,7 @@
   "widgets.music.noPreview": "이 노래는 미리 듣기가 없어요.",
   "widgets.music.previewFailed": "미리 듣기를 재생하지 못했어요. 잠시 후 다시 시도하세요.",
   "whatsNew.r202610027.previewsTitle": "노래 미리 듣기",
-  "whatsNew.r202610027.previewsBody": "누군가의 최애 노래에서 노래를 누르면 그 자리에서 30초를 들을 수 있어요. 옆의 화살표를 누르면 Deezer에서 전곡을 열 수 있어요."
+  "whatsNew.r202610027.previewsBody": "누군가의 최애 노래에서 노래를 누르면 그 자리에서 30초를 들을 수 있어요. 옆의 화살표를 누르면 Deezer에서 전곡을 열 수 있어요.",
+  "whatsNew.r202610028.linksTitle": "채팅 속 프로필 링크",
+  "whatsNew.r202610028.linksBody": "프로필 링크가 이제 이름을 클릭했을 때 뜨는 카드로 보여요. 지금 하고 있는 것, 첫 번째 위젯, 메시지를 보낼 수 있는 칸이 함께 나와요. 링크를 열면 지금처럼 전체 프로필이 보여요."
 }

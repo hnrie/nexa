@@ -2862,7 +2862,6 @@
   "profile.profileCard.viewFullBio": "自己紹介を全文表示",
   "profile.profileCard.viewFullProfile": "プロフィール全体を表示",
   "profile.profileCard.viewFullProfileOf": "{name} のプロフィール全体を見る",
-  "profileLink.cardLabel": "{name} のプロフィール",
   "profileLink.copy": "プロフィールのリンクをコピー",
   "profileLink.couldNotLoad": "プロフィールを読み込めませんでした。",
   "profileLink.couldNotLoadToast": "プロフィールを読み込めませんでした。接続を確認して、もう一度お試しください。",
@@ -2872,7 +2871,6 @@
   "profileLink.missingBody": "リンクが間違っているか、相手がユーザー名を変更した可能性があります。",
   "profileLink.missingTitle": "プロフィールを表示できません",
   "profileLink.missingToast": "そのプロフィールは表示できません。",
-  "profileLink.viewProfile": "プロフィールを表示",
   "rail.rail.addAServer": "サーバーを追加",
   "rail.rail.and": "{first}、{second}",
   "rail.rail.channelUnread": "{name}、{what}",
@@ -5044,5 +5042,7 @@
   "widgets.music.noPreview": "この曲には試聴がありません。",
   "widgets.music.previewFailed": "試聴を再生できませんでした。少ししてからもう一度試してください。",
   "whatsNew.r202610027.previewsTitle": "曲の試聴",
-  "whatsNew.r202610027.previewsBody": "誰かの「お気に入りの曲」で曲を押すと、その場で30秒試聴できます。横の矢印から曲全体をDeezerで開けます。"
+  "whatsNew.r202610027.previewsBody": "誰かの「お気に入りの曲」で曲を押すと、その場で30秒試聴できます。横の矢印から曲全体をDeezerで開けます。",
+  "whatsNew.r202610028.linksTitle": "チャットのプロフィールリンク",
+  "whatsNew.r202610028.linksBody": "プロフィールへのリンクに、名前をクリックしたときと同じカードが表示されるようになりました。今していること、最初のウィジェット、メッセージ欄が見られます。リンク自体を開くと、これまでどおりプロフィール全体が表示されます。"
 }

@@ -3078,7 +3078,6 @@
   "profile.profileCard.viewFullBio": "Ver biografía completa",
   "profile.profileCard.viewFullProfile": "Ver perfil completo",
   "profile.profileCard.viewFullProfileOf": "Ver el perfil completo de {name}",
-  "profileLink.cardLabel": "Perfil de {name}",
   "profileLink.copy": "Copiar enlace del perfil",
   "profileLink.couldNotLoad": "No se pudo cargar el perfil.",
   "profileLink.couldNotLoadToast": "No se pudo cargar el perfil. Revisa tu conexión e inténtalo de nuevo.",
@@ -3088,7 +3087,6 @@
   "profileLink.missingBody": "Puede que el enlace esté mal escrito o que la persona haya cambiado su nombre de usuario.",
   "profileLink.missingTitle": "Perfil no disponible",
   "profileLink.missingToast": "Ese perfil no está disponible.",
-  "profileLink.viewProfile": "Ver perfil",
   "rail.rail.addAServer": "Añadir un servidor",
   "rail.rail.and": "{first} y {second}",
   "rail.rail.channelUnread": "{name}, {what}",
@@ -5320,5 +5318,7 @@
   "widgets.music.noPreview": "Esta canción no tiene vista previa.",
   "widgets.music.previewFailed": "No se pudo reproducir la vista previa. Inténtalo de nuevo en un momento.",
   "whatsNew.r202610027.previewsTitle": "Vistas previas de canciones",
-  "whatsNew.r202610027.previewsBody": "Pulsa una canción en las Canciones favoritas de alguien para escuchar 30 segundos ahí mismo. La flecha de al lado abre la canción completa en Deezer."
+  "whatsNew.r202610027.previewsBody": "Pulsa una canción en las Canciones favoritas de alguien para escuchar 30 segundos ahí mismo. La flecha de al lado abre la canción completa en Deezer.",
+  "whatsNew.r202610028.linksTitle": "Enlaces de perfil en los chats",
+  "whatsNew.r202610028.linksBody": "Un enlace al perfil de alguien ahora muestra la tarjeta que ves al hacer clic en su nombre, con lo que está haciendo, su primer widget y un cuadro para escribirle. Al abrir el enlace sigues viendo su perfil completo."
 }

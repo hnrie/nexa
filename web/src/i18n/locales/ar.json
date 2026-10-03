@@ -3472,7 +3472,6 @@
   "profile.profileCard.viewFullBio": "عرض النبذة كاملة",
   "profile.profileCard.viewFullProfile": "عرض الملف الشخصي كاملًا",
   "profile.profileCard.viewFullProfileOf": "عرض الملف الكامل لـ {name}",
-  "profileLink.cardLabel": "الملف الشخصي لـ {name}",
   "profileLink.copy": "نسخ رابط الملف الشخصي",
   "profileLink.couldNotLoad": "تعذّر تحميل الملف الشخصي.",
   "profileLink.couldNotLoadToast": "تعذّر تحميل الملف الشخصي. تحقّق من اتصالك وحاول مرة أخرى.",
@@ -3482,7 +3481,6 @@
   "profileLink.missingBody": "ربما كُتب الرابط بشكل خاطئ، أو ربما غيّر الشخص اسم المستخدم.",
   "profileLink.missingTitle": "الملف الشخصي غير متاح",
   "profileLink.missingToast": "هذا الملف الشخصي غير متاح.",
-  "profileLink.viewProfile": "عرض الملف الشخصي",
   "rail.rail.addAServer": "إضافة خادم",
   "rail.rail.and": "{first} و{second}",
   "rail.rail.channelUnread": "{name}، {what}",
@@ -5829,5 +5827,7 @@
   "widgets.music.noPreview": "لا توجد معاينة لهذه الأغنية.",
   "widgets.music.previewFailed": "تعذّر تشغيل المعاينة. حاول مرة أخرى بعد قليل.",
   "whatsNew.r202610027.previewsTitle": "معاينات الأغاني",
-  "whatsNew.r202610027.previewsBody": "اضغط على أغنية في الأغاني المفضلة لدى أي شخص لتسمع 30 ثانية منها في مكانها. والسهم بجانبها يفتح الأغنية كاملة في Deezer."
+  "whatsNew.r202610027.previewsBody": "اضغط على أغنية في الأغاني المفضلة لدى أي شخص لتسمع 30 ثانية منها في مكانها. والسهم بجانبها يفتح الأغنية كاملة في Deezer.",
+  "whatsNew.r202610028.linksTitle": "روابط الملفات الشخصية في المحادثات",
+  "whatsNew.r202610028.linksBody": "يعرض رابط الملف الشخصي الآن البطاقة نفسها التي تظهر عند النقر على الاسم، مع ما يفعله الشخص الآن وأول أداة لديه وخانة لمراسلته. وما زال فتح الرابط نفسه يعرض الملف الشخصي كاملًا."
 }

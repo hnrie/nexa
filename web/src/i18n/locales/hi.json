@@ -2994,7 +2994,6 @@
   "profile.profileCard.viewFullBio": "पूरा परिचय देखें",
   "profile.profileCard.viewFullProfile": "पूरी प्रोफ़ाइल देखें",
   "profile.profileCard.viewFullProfileOf": "{name} की पूरी प्रोफ़ाइल देखें",
-  "profileLink.cardLabel": "{name} की प्रोफ़ाइल",
   "profileLink.copy": "प्रोफ़ाइल लिंक कॉपी करें",
   "profileLink.couldNotLoad": "प्रोफ़ाइल लोड नहीं हो सकी।",
   "profileLink.couldNotLoadToast": "प्रोफ़ाइल लोड नहीं हो सकी। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
@@ -3004,7 +3003,6 @@
   "profileLink.missingBody": "हो सकता है लिंक गलत लिखा हो, या उस व्यक्ति ने अपना यूज़रनेम बदल दिया हो।",
   "profileLink.missingTitle": "प्रोफ़ाइल उपलब्ध नहीं है",
   "profileLink.missingToast": "वह प्रोफ़ाइल उपलब्ध नहीं है।",
-  "profileLink.viewProfile": "प्रोफ़ाइल देखें",
   "rail.rail.addAServer": "सर्वर जोड़ें",
   "rail.rail.and": "{first} और {second}",
   "rail.rail.channelUnread": "{name}, {what}",
@@ -5219,5 +5217,7 @@
   "widgets.music.noPreview": "इस गाने का कोई प्रीव्यू नहीं है।",
   "widgets.music.previewFailed": "प्रीव्यू नहीं चल सका। थोड़ी देर में फिर कोशिश करें।",
   "whatsNew.r202610027.previewsTitle": "गानों के प्रीव्यू",
-  "whatsNew.r202610027.previewsBody": "किसी के पसंदीदा गानों में किसी गाने को दबाएँ और वहीं उसके 30 सेकंड सुनें। बगल का तीर पूरा गाना Deezer पर खोलता है।"
+  "whatsNew.r202610027.previewsBody": "किसी के पसंदीदा गानों में किसी गाने को दबाएँ और वहीं उसके 30 सेकंड सुनें। बगल का तीर पूरा गाना Deezer पर खोलता है।",
+  "whatsNew.r202610028.linksTitle": "चैट में प्रोफ़ाइल लिंक",
+  "whatsNew.r202610028.linksBody": "किसी की प्रोफ़ाइल का लिंक अब वही कार्ड दिखाता है जो उनके नाम पर क्लिक करने से खुलता है, जिसमें वे अभी क्या कर रहे हैं, उनका पहला विजेट और उन्हें मैसेज भेजने का बॉक्स होता है। लिंक खोलने पर अब भी पूरी प्रोफ़ाइल दिखती है।"
 }

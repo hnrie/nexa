@@ -356,6 +356,8 @@
  * roles here, and a box to message them.
  */
 .card[data-variant="popout"] { --ring: 5px; --av-left: 14px; width: 320px; max-width: 100%; max-height: min(640px, calc(100dvh - 24px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+/* laid in a message under a link to the profile: framed as the chat's cards are rather than lifted off it, and as tall as it is */
+.card[data-variant="popout"][data-embedded] { max-height: none; overflow: hidden; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge); }
 .card[data-variant="popout"] .info { gap: 12px; padding: calc(var(--av) * 0.4 + 10px) 14px 14px; }
 .card[data-variant="popout"] .display { font-size: 20px; }
 .card[data-variant="popout"] .user { font-size: 13.5px; line-height: 19px; }
@@ -380,6 +382,6 @@
 .msgSend:hover:not(:disabled) { color: var(--text-strong); background: var(--bg-hover); }
 .msgSend:disabled { opacity: 0.4; cursor: default; }
 @media (max-width: 767px) {
-  /* a phone's sheet is the popout: the card fills it */
-  .card[data-variant="popout"] { width: 100%; max-height: none; overflow: visible; border-radius: 0; box-shadow: none; }
+  /* a phone's sheet is the popout: the card fills it (one in a message stays a card) */
+  .card[data-variant="popout"]:not([data-embedded]) { width: 100%; max-height: none; overflow: visible; border-radius: 0; box-shadow: none; }
 }

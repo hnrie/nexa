@@ -3078,7 +3078,6 @@
   "profile.profileCard.viewFullBio": "Voir la bio complète",
   "profile.profileCard.viewFullProfile": "Voir le profil complet",
   "profile.profileCard.viewFullProfileOf": "Voir le profil complet de {name}",
-  "profileLink.cardLabel": "Profil de {name}",
   "profileLink.copy": "Copier le lien du profil",
   "profileLink.couldNotLoad": "Impossible de charger le profil.",
   "profileLink.couldNotLoadToast": "Impossible de charger le profil. Vérifiez votre connexion et réessayez.",
@@ -3088,7 +3087,6 @@
   "profileLink.missingBody": "Le lien est peut-être mal écrit, ou la personne a changé de nom d’utilisateur.",
   "profileLink.missingTitle": "Profil indisponible",
   "profileLink.missingToast": "Ce profil n’est pas disponible.",
-  "profileLink.viewProfile": "Voir le profil",
   "rail.rail.addAServer": "Ajouter un serveur",
   "rail.rail.and": "{first} et {second}",
   "rail.rail.channelUnread": "{name}, {what}",
@@ -5320,5 +5318,7 @@
   "widgets.music.noPreview": "Cette chanson n’a pas d’extrait.",
   "widgets.music.previewFailed": "Impossible de lire l’extrait. Réessayez dans un instant.",
   "whatsNew.r202610027.previewsTitle": "Des extraits des chansons",
-  "whatsNew.r202610027.previewsBody": "Appuyez sur une chanson dans les Chansons préférées de quelqu’un pour en écouter 30 secondes sur place. La flèche à côté ouvre la chanson entière sur Deezer."
+  "whatsNew.r202610027.previewsBody": "Appuyez sur une chanson dans les Chansons préférées de quelqu’un pour en écouter 30 secondes sur place. La flèche à côté ouvre la chanson entière sur Deezer.",
+  "whatsNew.r202610028.linksTitle": "Les liens de profil dans les discussions",
+  "whatsNew.r202610028.linksBody": "Un lien vers le profil de quelqu’un affiche désormais la carte qui s’ouvre quand on clique sur son nom, avec ce qu’il fait, son premier widget et une zone pour lui écrire. Ouvrir le lien affiche toujours son profil complet."
 }

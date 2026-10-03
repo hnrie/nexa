@@ -2994,7 +2994,6 @@
   "profile.profileCard.viewFullBio": "Ganze Bio ansehen",
   "profile.profileCard.viewFullProfile": "Ganzes Profil ansehen",
   "profile.profileCard.viewFullProfileOf": "Vollständiges Profil von {name} ansehen",
-  "profileLink.cardLabel": "Profil von {name}",
   "profileLink.copy": "Profillink kopieren",
   "profileLink.couldNotLoad": "Das Profil konnte nicht geladen werden.",
   "profileLink.couldNotLoadToast": "Das Profil konnte nicht geladen werden. Prüf deine Verbindung und versuch es noch mal.",
@@ -3004,7 +3003,6 @@
   "profileLink.missingBody": "Vielleicht ist der Link falsch geschrieben, oder die Person hat ihren Benutzernamen geändert.",
   "profileLink.missingTitle": "Profil nicht verfügbar",
   "profileLink.missingToast": "Dieses Profil ist nicht verfügbar.",
-  "profileLink.viewProfile": "Profil ansehen",
   "rail.rail.addAServer": "Server hinzufügen",
   "rail.rail.and": "{first} und {second}",
   "rail.rail.channelUnread": "{name}, {what}",
@@ -5219,5 +5217,7 @@
   "widgets.music.noPreview": "Für diesen Song gibt es keine Hörprobe.",
   "widgets.music.previewFailed": "Die Hörprobe ließ sich nicht abspielen. Versuch es gleich noch einmal.",
   "whatsNew.r202610027.previewsTitle": "Hörproben von Songs",
-  "whatsNew.r202610027.previewsBody": "Drück auf einen Song in den Lieblingssongs von jemandem, um 30 Sekunden davon direkt dort zu hören. Der Pfeil daneben öffnet den ganzen Song auf Deezer."
+  "whatsNew.r202610027.previewsBody": "Drück auf einen Song in den Lieblingssongs von jemandem, um 30 Sekunden davon direkt dort zu hören. Der Pfeil daneben öffnet den ganzen Song auf Deezer.",
+  "whatsNew.r202610028.linksTitle": "Profil-Links im Chat",
+  "whatsNew.r202610028.linksBody": "Ein Link zu einem Profil zeigt jetzt die Karte, die du beim Klick auf den Namen bekommst, mit dem, was die Person gerade macht, ihrem ersten Widget und einem Feld, um ihr zu schreiben. Der Link selbst öffnet weiterhin das ganze Profil."
 }

@@ -73,6 +73,12 @@ interface Props {
   initialTab?: ProfileTab | undefined;
   /** Drawn in the profile designer, every part editable (with preview). */
   design?: ProfileDesign | undefined;
+  /**
+   * The popout laid in a message, under a link to the profile
+   * (chat/ProfileCards): the same card, sitting in the chat instead of
+   * floating over it.
+   */
+  embedded?: boolean;
 }
 
 /** The server whose page is open, which a profile opened from it belongs to. */
@@ -322,7 +328,7 @@ function useNarrow(el: HTMLElement | null, on: boolean): boolean {
  * an About tab. A profile with two theme colours is a gradient from top to
  * bottom, with its text and buttons turned to read on it.
  */
-export function ProfileCard({ userId, variant, onClose, preview, previewWidgets, serverId, visitor, initialTab, design }: Props) {
+export function ProfileCard({ userId, variant, onClose, preview, previewWidgets, serverId, visitor, initialTab, design, embedded }: Props) {
   const nav = useNavigate();
   const inServer = useServerInView(serverId);
   const me = useAuth((a) => a.me);
@@ -789,6 +795,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
       <div
         className={s.card}
         data-variant="popout"
+        data-embedded={embedded || undefined}
         data-design={design ? "" : undefined}
         data-themed={theme?.text}
         data-tinted={!theme && tint ? "" : undefined}

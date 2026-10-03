@@ -1,17 +1,13 @@
 import { RotateCw, UserX } from "lucide-react";
-import { useMemo, useState, type CSSProperties } from "react";
-import type { PublicUser, UnfurlResult } from "@/api/types";
-import { bannerUrl } from "@/api/users";
-import { Avatar } from "@/components/common/Avatar";
+import { useEffect, useMemo } from "react";
+import type { UnfurlResult } from "@/api/types";
 import { Button } from "@/components/common/Button";
 import v from "@/components/invite/Invite.module.css";
+import { ProfileCard } from "@/components/profile/ProfileCard";
 import { t } from "@/i18n";
 import { MAX_PROFILE_CARDS, profileLinksIn, type ProfileLinkRef } from "@/lib/appLinks";
-import { profileTheme } from "@/lib/avatarColor";
-import { useRenderCtx } from "@/lib/markdownCtx";
 import { loadSharedProfile, useSharedProfile } from "@/lib/profileLinks";
-import { Markdown } from "@/markdown";
-import { useUI } from "@/stores/ui";
+import { fetchMissingUsers, useUsers } from "@/stores/users";
 import s from "./ProfileCards.module.css";
 
 /** One card per profile a message links to, even when the sender's device made no preview for it. */
@@ -25,11 +21,11 @@ function cardLinks(nodes: unknown, embeds: UnfurlResult[] | null | undefined): P
 }
 
 /**
- * The profiles under a message, each drawn as the person's card: their
- * banner (or their colours), their picture, their names and the start of
- * their about me, with View Profile. Each card asks the server itself, so it
- * shows the profile as it is now and a link sent without a preview gets one
- * too. It wears the invite card's frame, so every link to Nexa reads alike.
+ * The profiles under a message, each drawn as the popout a name opens: their
+ * banner, picture and names, a few lines of their own, what they are doing,
+ * their first widget, a box to message them and the way to their full
+ * profile. Each card asks the server itself, so it shows the profile as it is
+ * now and a link sent without a preview gets one too.
  */
 export function ProfileCards({ nodes, embeds }: { nodes: unknown; embeds: UnfurlResult[] | null | undefined }) {
   const links = useMemo(() => cardLinks(nodes, embeds), [nodes, embeds]);
@@ -69,72 +65,36 @@ function ProfileLinkCard({ username }: { username: string }) {
       </div>
     );
   }
-  if (entry?.status !== "ready") return <ProfileCardSkeleton />;
-  return <ProfileCardView user={entry.user} />;
+  return <ProfileLinkPopout id={entry?.status === "ready" ? entry.user.id : null} />;
 }
 
-function ProfileCardView({ user }: { user: PublicUser }) {
-  const ctx = useRenderCtx();
-  const [bannerFailed, setBannerFailed] = useState(false);
-  const banner = bannerFailed ? null : bannerUrl(user.banner_id, 480);
-  const name = user.display_name || user.username;
-  const open = () => useUI.getState().openModal("profile", { userId: user.id, full: true });
+/**
+ * The popout itself, once the link has said who it is and the app has the
+ * whole of them: the card a link shows is what anyone may see, without the
+ * key or status the popout's buttons need, so it is never put in their place.
+ */
+function ProfileLinkPopout({ id }: { id: string | null }) {
+  const known = useUsers((u) => (id ? !!u.byId[id] : false));
+  useEffect(() => {
+    if (id && !known) fetchMissingUsers([id]);
+  }, [id, known]);
+  if (!id || !known) return <ProfileCardSkeleton />;
   return (
-    <div className={v.view} data-variant="card" role="group" aria-label={t("profileLink.cardLabel", { name })} data-testid="profile-card" data-profile-state="ready">
-      {banner ? (
-        <div className={v.band} data-kind="banner">
-          <img className={v.bandImg} src={banner} alt="" draggable={false} onError={() => setBannerFailed(true)} />
-        </div>
-      ) : (
-        // their colours, as their profile shows them without a banner
-        <div className={v.band} data-kind="plain" style={{ "--band-color": profileTheme(user.accent_color, user.accent_color_2, user.id) } as CSSProperties} />
-      )}
-      <div className={v.top}>
-        <button type="button" className={s.ring} onClick={open} aria-label={t("profile.profileCard.viewFullProfileOf", { name })} tabIndex={-1}>
-          <Avatar id={user.id} avatarId={user.avatar_id} name={name} size={56} />
-        </button>
-      </div>
-      <div className={v.body}>
-        <div className={v.main}>
-          <p className={v.name}><bdi>{name}</bdi></p>
-          <p className={s.handle}>
-            <bdi>{user.username}</bdi>
-            {user.pronouns ? (
-              <>
-                <span aria-hidden="true">·</span>
-                <bdi>{user.pronouns}</bdi>
-              </>
-            ) : null}
-          </p>
-        </div>
-        <div className={v.cardActions}>
-          <Button size="sm" variant="secondary" onClick={open} data-testid="profile-card-view">{t("profileLink.viewProfile")}</Button>
-        </div>
-        {user.about_me ? (
-          <div className={s.about} dir="auto">
-            <Markdown source={user.about_me} ctx={ctx} inline />
-          </div>
-        ) : null}
-      </div>
+    <div className={s.popout} data-testid="profile-card" data-profile-state="ready">
+      <ProfileCard userId={id} variant="popout" embedded />
     </div>
   );
 }
 
-/** The same frame while the server is asked, so nothing jumps when it answers. */
+/** The popout's shape while the server is asked, so nothing jumps when it answers. */
 function ProfileCardSkeleton() {
   return (
-    <div className={v.view} data-variant="card" data-loading="true" aria-busy="true" data-testid="profile-card" data-profile-state="loading">
+    <div className={s.skeleton} aria-busy="true" data-testid="profile-card" data-profile-state="loading">
       <span className="visually-hidden">{t("profileLink.loading")}</span>
-      <div className={v.band} data-kind="plain" />
-      <div className={v.top}>
-        <span className={s.ring}><span className={s.blank} /></span>
-      </div>
-      <div className={v.body}>
-        <div className={v.main}>
-          <span className={v.bar} data-w="name" />
-          <span className={v.bar} data-w="counts" />
-        </div>
-      </div>
+      <span className={s.skelBanner} />
+      <span className={s.skelAvatar} />
+      <span className={s.skelBar} data-w="name" />
+      <span className={s.skelBar} data-w="user" />
     </div>
   );
 }

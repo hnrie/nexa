@@ -3234,7 +3234,6 @@
   "profile.profileCard.viewFullBio": "Показать всю биографию",
   "profile.profileCard.viewFullProfile": "Открыть полный профиль",
   "profile.profileCard.viewFullProfileOf": "Открыть полный профиль {name}",
-  "profileLink.cardLabel": "Профиль {name}",
   "profileLink.copy": "Копировать ссылку на профиль",
   "profileLink.couldNotLoad": "Не удалось загрузить профиль.",
   "profileLink.couldNotLoadToast": "Не удалось загрузить профиль. Проверьте подключение и попробуйте снова.",
@@ -3244,7 +3243,6 @@
   "profileLink.missingBody": "Возможно, в ссылке опечатка или человек сменил имя пользователя.",
   "profileLink.missingTitle": "Профиль недоступен",
   "profileLink.missingToast": "Этот профиль недоступен.",
-  "profileLink.viewProfile": "Открыть профиль",
   "rail.rail.addAServer": "Добавить сервер",
   "rail.rail.and": "{first} и {second}",
   "rail.rail.channelUnread": "{name}, {what}",
@@ -5542,5 +5540,7 @@
   "widgets.music.noPreview": "У этой песни нет отрывка для прослушивания.",
   "widgets.music.previewFailed": "Не удалось воспроизвести отрывок. Попробуйте чуть позже.",
   "whatsNew.r202610027.previewsTitle": "Отрывки песен",
-  "whatsNew.r202610027.previewsBody": "Нажмите на песню в «Любимых песнях», чтобы прослушать 30 секунд прямо там. Стрелка рядом открывает всю песню в Deezer."
+  "whatsNew.r202610027.previewsBody": "Нажмите на песню в «Любимых песнях», чтобы прослушать 30 секунд прямо там. Стрелка рядом открывает всю песню в Deezer.",
+  "whatsNew.r202610028.linksTitle": "Ссылки на профили в чатах",
+  "whatsNew.r202610028.linksBody": "Ссылка на профиль теперь показывает ту же карточку, что открывается по нажатию на имя: чем человек занят, его первый виджет и поле, чтобы ему написать. Сама ссылка по-прежнему открывает весь профиль."
 }

@@ -2862,7 +2862,6 @@
   "profile.profileCard.viewFullBio": "查看完整简介",
   "profile.profileCard.viewFullProfile": "查看完整资料",
   "profile.profileCard.viewFullProfileOf": "查看 {name} 的完整资料",
-  "profileLink.cardLabel": "{name} 的个人资料",
   "profileLink.copy": "复制个人资料链接",
   "profileLink.couldNotLoad": "无法加载个人资料。",
   "profileLink.couldNotLoadToast": "无法加载个人资料。请检查网络连接后重试。",
@@ -2872,7 +2871,6 @@
   "profileLink.missingBody": "链接可能有误，或者对方已更改了用户名。",
   "profileLink.missingTitle": "个人资料不可用",
   "profileLink.missingToast": "该个人资料不可用。",
-  "profileLink.viewProfile": "查看个人资料",
   "rail.rail.addAServer": "添加服务器",
   "rail.rail.and": "{first}，{second}",
   "rail.rail.channelUnread": "{name}，{what}",
@@ -5044,5 +5042,7 @@
   "widgets.music.noPreview": "这首歌没有试听片段。",
   "widgets.music.previewFailed": "无法播放试听片段。请稍后再试。",
   "whatsNew.r202610027.previewsTitle": "歌曲试听",
-  "whatsNew.r202610027.previewsBody": "在别人的“最爱的歌曲”中点一首歌，就能当场试听 30 秒。旁边的箭头可以在 Deezer 上打开整首歌。"
+  "whatsNew.r202610027.previewsBody": "在别人的“最爱的歌曲”中点一首歌，就能当场试听 30 秒。旁边的箭头可以在 Deezer 上打开整首歌。",
+  "whatsNew.r202610028.linksTitle": "聊天中的个人资料链接",
+  "whatsNew.r202610028.linksBody": "个人资料链接现在会显示和点击名字时一样的卡片，包括对方正在做什么、第一个小组件和发消息的输入框。打开链接本身仍会显示完整的个人资料。"
 }

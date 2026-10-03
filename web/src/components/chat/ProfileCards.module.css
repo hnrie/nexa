@@ -1,12 +1,34 @@
-/* A profile link in a message (ProfileCards.tsx), in the invite card's frame
-   (components/invite/Invite.module.css) with what is a person's own: a round
-   picture set into the band, their username and pronouns, and the start of
-   their about me. */
+/*
+ * A profile link in a message (ProfileCards.tsx): the person's popout, laid
+ * under the message as cards are; while it is asked for, a frame of the same
+ * shape (banner, picture, two lines), so nothing jumps when it comes.
+ */
 .cards { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 4px; max-width: 100%; }
 .cards > * { max-width: 100%; }
-/* the picture's ring is drawn in the card's own colour, as the invite icon's is */
-.ring { flex: none; display: flex; padding: var(--ring); border-radius: 50%; background: var(--surface); box-shadow: 0 10px 22px -12px rgba(0, 0, 0, 0.6); }
-button.ring { cursor: pointer; }
-.blank { display: block; width: var(--icon); height: var(--icon); border-radius: 50%; background: var(--bg-active); }
-.handle { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; min-width: 0; font-size: 13px; line-height: 18px; color: var(--text-muted); overflow-wrap: anywhere; }
-.about { grid-column: 1 / -1; margin-top: 6px; font-size: 14px; line-height: 1.4; color: var(--text); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.popout { width: 320px; max-width: 100%; }
+.skeleton {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 320px;
+  max-width: 100%;
+  padding-bottom: 16px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg-floating);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge);
+}
+.skelBanner { display: block; aspect-ratio: 17 / 6; background: var(--bg-active); }
+/* the picture set into the banner's edge, where the popout puts it */
+.skelAvatar { display: block; width: 90px; height: 90px; margin: -50px 0 0 9px; border-radius: 50%; background: var(--bg-active); box-shadow: 0 0 0 5px var(--bg-floating); }
+.skelBar { display: block; height: 12px; margin-inline-start: 14px; border-radius: 6px; background: var(--bg-active); }
+.skelBar[data-w="name"] { width: 46%; height: 16px; }
+.skelBar[data-w="user"] { width: 30%; }
+[dir="rtl"] .skelAvatar { margin: -50px 9px 0 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .skelBanner, .skelAvatar, .skelBar { animation: breathe 1.4s ease-in-out infinite; }
+}
+@keyframes breathe {
+  50% { opacity: 0.55; }
+}

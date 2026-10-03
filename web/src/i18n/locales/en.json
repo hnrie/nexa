@@ -2609,7 +2609,6 @@
   "profile.profileCard.viewFullBio": "View Full Bio",
   "profile.profileCard.viewFullProfile": "View Full Profile",
   "profile.profileCard.viewFullProfileOf": "View {name}'s Full Profile",
-  "profileLink.cardLabel": "{name}'s profile",
   "profileLink.copy": "Copy Profile Link",
   "profileLink.couldNotLoad": "Could not load the profile.",
   "profileLink.couldNotLoadToast": "Could not load the profile. Check your connection and try again.",
@@ -2619,7 +2618,6 @@
   "profileLink.missingBody": "The link may be mistyped, or the person may have changed their username.",
   "profileLink.missingTitle": "Profile Unavailable",
   "profileLink.missingToast": "That profile isn't available.",
-  "profileLink.viewProfile": "View Profile",
   "rail.rail.addAServer": "Add a Server",
   "rail.rail.and": "{first} and {second}",
   "rail.rail.channelUnread": "{name}, {what}",
@@ -5219,5 +5217,7 @@
   "widgets.music.noPreview": "There's no preview of this song.",
   "widgets.music.previewFailed": "Couldn't play the preview. Try again in a moment.",
   "whatsNew.r202610027.previewsTitle": "Song Previews",
-  "whatsNew.r202610027.previewsBody": "Press a song in someone's Favourite Songs to hear 30 seconds of it right there. The arrow beside it opens the whole song on Deezer."
+  "whatsNew.r202610027.previewsBody": "Press a song in someone's Favourite Songs to hear 30 seconds of it right there. The arrow beside it opens the whole song on Deezer.",
+  "whatsNew.r202610028.linksTitle": "Profile Links in Chats",
+  "whatsNew.r202610028.linksBody": "A link to someone's profile now shows the card you get by clicking their name, with what they're up to, their first widget and a box to message them. Opening the link itself still shows their whole profile."
 }
