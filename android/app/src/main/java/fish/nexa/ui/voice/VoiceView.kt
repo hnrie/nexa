@@ -78,6 +78,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import fish.nexa.Nexa
+import fish.nexa.net.Channel
 import fish.nexa.net.VoiceState
 import fish.nexa.ui.Icon
 import fish.nexa.ui.components.Avatar
@@ -86,6 +87,8 @@ import fish.nexa.ui.components.pressable
 import fish.nexa.ui.layers.Layer
 import fish.nexa.ui.layers.Layers
 import fish.nexa.ui.layers.openMenu
+import fish.nexa.ui.shell.ChannelGlyph
+import fish.nexa.ui.shell.PageHeader
 import fish.nexa.ui.t
 import fish.nexa.ui.theme.Nx
 import fish.nexa.ui.theme.Radii
@@ -220,6 +223,15 @@ fun VoiceView(channelId: String, modifier: Modifier = Modifier, embedded: Boolea
     DarkScope {
         if (!connected) Lobby(channelId, state, byUser, modifier)
         else Stage(channelId, state, byUser, modifier, embedded, full)
+    }
+}
+
+/** ServerPage.tsx's VoiceRoom: a server's voice channel, its header with the channel's glyph, and the call filling the rest. */
+@Composable
+fun VoiceChannelPage(channel: Channel) {
+    Column(Modifier.fillMaxSize()) {
+        PageHeader(channel.name, icon = { ChannelGlyph(channel, 22.dp, Nx.colors.textMuted) })
+        VoiceView(channel.id, Modifier.weight(1f).fillMaxWidth())
     }
 }
 
