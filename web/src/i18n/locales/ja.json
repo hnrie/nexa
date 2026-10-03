@@ -5124,5 +5124,6 @@
   "android.people.switcherPlaceholder": "ユーザー、会話、サーバーを検索",
   "android.media.cannotPlayVideo": "この動画はここでは再生できません。",
   "android.media.savedToDownloads": "ダウンロードに保存しました。",
-  "android.media.savedToPictures": "写真に保存しました。"
+  "android.media.savedToPictures": "写真に保存しました。",
+  "bugs.context.appAndroid": "Android アプリ"
 }

@@ -5299,5 +5299,6 @@
   "android.people.switcherPlaceholder": "लोग, बातचीत और सर्वर खोजें",
   "android.media.cannotPlayVideo": "यह वीडियो यहाँ नहीं चल सकता।",
   "android.media.savedToDownloads": "डाउनलोड में सहेजा गया।",
-  "android.media.savedToPictures": "चित्रों में सहेजा गया।"
+  "android.media.savedToPictures": "चित्रों में सहेजा गया।",
+  "bugs.context.appAndroid": "Android ऐप"
 }

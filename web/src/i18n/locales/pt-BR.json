@@ -5401,5 +5401,6 @@
   "android.people.switcherPlaceholder": "Pesquise pessoas, conversas e servidores",
   "android.media.cannotPlayVideo": "Este vídeo não pode ser reproduzido aqui.",
   "android.media.savedToDownloads": "Salvo em Downloads.",
-  "android.media.savedToPictures": "Salvo em Imagens."
+  "android.media.savedToPictures": "Salvo em Imagens.",
+  "bugs.context.appAndroid": "App para Android"
 }

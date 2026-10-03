@@ -540,7 +540,7 @@ private fun ConversationStart(channel: Channel) {
                 StartAvatar { Avatar(other, name, Nexa.users.get(other)?.avatarId, 80.dp) }
                 StartTitle(name)
                 Txt(Nexa.users.get(other)?.username ?: "", style = Nx.type.body.copy(fontSize = Nx.type.sp(18f), fontWeight = FontWeight(500)), color = c.textSubtle, modifier = Modifier.padding(top = 6.dp, bottom = 12.dp))
-                StartText(t("chat.messageList.dmStart", "name" to name))
+                StartText(boldIn("chat.messageList.dmStart", "name", name))
             }
             channel.type == "group_dm" -> {
                 val name = Names.channel(channel)
@@ -553,19 +553,19 @@ private fun ConversationStart(channel: Channel) {
                     Box(Modifier.padding(top = 12.dp)) {
                         NxButton(t("chat.chat.addFriends"), { openCreateDm() }, size = ButtonSize.SM, icon = "UserPlus")
                     }
-                } else StartText(t("chat.messageList.groupStart", "name" to name) + " " + endToEnd)
+                } else StartText(boldIn("chat.messageList.groupStart", "name", name, " $endToEnd"))
             }
             channel.type == "subchat" -> {
                 StartTitle(channel.name)
                 Spacer(Modifier.height(8.dp))
                 val parent = channel.parentId?.let { Nexa.channels.get(it) }?.let { Names.channel(it) } ?: t("chat.messageList.thisConversation")
-                StartText(t("chat.messageList.subchatStart", "where" to parent))
+                StartText(boldIn("chat.messageList.subchatStart", "where", parent))
             }
             else -> {
                 StartTitle(t("chat.messageList.welcomeToChannel", "name" to channel.name))
                 Spacer(Modifier.height(8.dp))
                 val topic = channel.topic.takeIf { it.isNotBlank() }
-                StartText(listOfNotNull(t("chat.messageList.channelStart", "name" to "#${channel.name}"), topic, endToEnd).joinToString(" "))
+                StartText(boldIn("chat.messageList.channelStart", "name", "#${channel.name}", listOfNotNull(topic, endToEnd).joinToString(" ", prefix = " ")))
             }
         }
     }
@@ -591,12 +591,30 @@ private fun StartTitle(text: String) = Txt(
 )
 
 @Composable
-private fun StartText(text: String) = Txt(
+private fun StartText(text: String) = StartText(androidx.compose.ui.text.AnnotatedString(text))
+
+@Composable
+private fun StartText(text: androidx.compose.ui.text.AnnotatedString) = androidx.compose.foundation.text.BasicText(
     text,
-    style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(23.25f)),
-    color = Nx.colors.textMuted,
     modifier = Modifier.widthIn(max = 560.dp),
+    style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(23.25f), color = Nx.colors.textMuted),
 )
+
+/** A sentence with one of its values in bold, as the web's `<Tr values={{ name: <b>…</b> }}>` draws it. */
+private fun boldIn(key: String, arg: String, value: String, after: String = ""): androidx.compose.ui.text.AnnotatedString {
+    val mark = "\u0000"
+    val parts = t(key, arg to mark).split(mark)
+    return androidx.compose.ui.text.buildAnnotatedString {
+        append(parts.first())
+        if (parts.size > 1) {
+            pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight(700)))
+            append(value)
+            pop()
+            append(parts.drop(1).joinToString(value))
+        }
+        append(after)
+    }
+}
 
 /** A stretch of messages from people you blocked: folded to a count, opened on request. */
 @Composable

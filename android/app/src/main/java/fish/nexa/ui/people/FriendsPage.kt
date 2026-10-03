@@ -214,7 +214,7 @@ fun FriendsPage() {
     }
 }
 
-/** The header: the menu button, the report button, the title; the tab strip below it. */
+/** The header: the menu button, the title, the report button; the tab strip below it. */
 @Composable
 private fun FriendsHeader(tab: Tab, pending: Int, onTab: (Tab) -> Unit) {
     val c = Nx.colors
@@ -228,10 +228,11 @@ private fun FriendsHeader(tab: Tab, pending: Int, onTab: (Tab) -> Unit) {
     ) {
         Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NavButton()
-            IconButton("Bug", t("bugs.report"), { fish.nexa.ui.chat.openBugReport("friends") }, tint = c.icon, size = 40.dp, iconSize = 22.dp)
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 Icon("Users", c.textBrand, size = 22.dp)
                 Txt(t("sidebar.dMSidebar.friends"), style = Nx.type.headerTitle.copy(fontSize = Nx.type.sp(16.5f), fontWeight = FontWeight(680)), color = c.textStrong, maxLines = 1)
+                // after the title, as the web's header orders it
+                IconButton("Bug", t("bugs.report"), { fish.nexa.ui.bugs.openBugReport("friends") }, tint = c.icon, size = 40.dp, iconSize = 22.dp)
             }
             AddTab(selected = tab == Tab.ADD) { onTab(Tab.ADD) }
         }

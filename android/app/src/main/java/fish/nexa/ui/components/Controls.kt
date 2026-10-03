@@ -322,7 +322,7 @@ fun NxTextField(
                 .sunken(shape, c)
                 .border(1.dp, edge, shape)
                 .defaultMinSize(minHeight = 42.dp),
-            contentAlignment = Alignment.CenterStart,
+            contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart,
         ) {
             BasicTextField(
                 value = value,
@@ -346,8 +346,9 @@ fun NxTextField(
                     .padding(start = 12.dp, end = if (password || trailing != null) 46.dp else 12.dp, top = if (singleLine) 0.dp else 10.dp, bottom = if (singleLine) 0.dp else 10.dp)
                     .semantics { if (label != null) contentDescription = label },
                 decorationBox = { inner ->
-                    Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.defaultMinSize(minHeight = 42.dp)) {
-                        if (value.isEmpty() && placeholder != null) Txt(placeholder, style = type.input, color = c.textPlaceholder, maxLines = 1)
+                    // a box of several lines starts at the top, its placeholder wrapping as the web's textarea does
+                    Box(contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart, modifier = if (singleLine) Modifier.defaultMinSize(minHeight = 42.dp) else Modifier) {
+                        if (value.isEmpty() && placeholder != null) Txt(placeholder, style = type.input, color = c.textPlaceholder, maxLines = if (singleLine) 1 else Int.MAX_VALUE)
                         inner()
                     }
                 },

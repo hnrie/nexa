@@ -77,6 +77,12 @@ describe("the context a report carries", () => {
     expect(rows.find((r) => r.key === "app")!.value).not.toBe("web");
     expect(rows.find((r) => r.key === "plugins")!.value).toBe("0");
   });
+
+  it("names a report from the Android app in words", () => {
+    const [app] = contextRows({ app: "android" });
+    expect(app!.value).not.toBe("android");
+    expect(app!.value).toBeTruthy();
+  });
 });
 
 describe("what a report can take", () => {

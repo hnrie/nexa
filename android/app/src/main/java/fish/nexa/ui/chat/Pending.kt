@@ -42,5 +42,4 @@ fun openExpressionPicker(channelId: String, onPick: (String) -> Unit) {
     ))
 }
 
-fun openBugReport(from: String) = Unit
 

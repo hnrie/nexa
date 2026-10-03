@@ -5124,5 +5124,6 @@
   "android.people.switcherPlaceholder": "搜索用户、对话和服务器",
   "android.media.cannotPlayVideo": "无法在此播放该视频。",
   "android.media.savedToDownloads": "已保存到“下载”。",
-  "android.media.savedToPictures": "已保存到“图片”。"
+  "android.media.savedToPictures": "已保存到“图片”。",
+  "bugs.context.appAndroid": "Android 应用"
 }

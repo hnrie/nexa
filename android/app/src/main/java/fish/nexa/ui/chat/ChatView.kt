@@ -40,6 +40,7 @@ import fish.nexa.Nexa
 import fish.nexa.data.KeyPins
 import fish.nexa.net.Channel
 import fish.nexa.ui.Icon
+import fish.nexa.ui.bugs.openBugReport
 import fish.nexa.ui.components.Avatar
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable

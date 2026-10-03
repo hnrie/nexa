@@ -5622,5 +5622,6 @@
   "android.people.switcherPlaceholder": "Поиск людей, бесед и серверов",
   "android.media.cannotPlayVideo": "Это видео нельзя воспроизвести здесь.",
   "android.media.savedToDownloads": "Сохранено в «Загрузки».",
-  "android.media.savedToPictures": "Сохранено в «Изображения»."
+  "android.media.savedToPictures": "Сохранено в «Изображения».",
+  "bugs.context.appAndroid": "Приложение для Android"
 }

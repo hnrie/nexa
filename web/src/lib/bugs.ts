@@ -274,7 +274,7 @@ function contextLabel(key: keyof BugContext): string {
 function contextValue(key: keyof BugContext, v: string): string {
   switch (key) {
     case "app":
-      return v === "desktop" ? t("bugs.context.appDesktop") : v === "web" ? t("bugs.context.appWeb") : v;
+      return v === "desktop" ? t("bugs.context.appDesktop") : v === "web" ? t("bugs.context.appWeb") : v === "android" ? t("bugs.context.appAndroid") : v;
     case "device":
       return v === "phone" ? t("bugs.context.phone") : v === "tablet" ? t("bugs.context.tablet") : v === "computer" ? t("bugs.context.computer") : v;
     case "custom_css":

@@ -377,7 +377,7 @@ private fun SettingsList(query: String, setQuery: (String) -> Unit, onOpen: (Str
                     }
                     Spacer(Modifier.height(20.dp))
                     NavCard {
-                        NavRow("Bug", t("bugs.report"), first = true, chevron = false) { fish.nexa.ui.chat.openBugReport("settings") }
+                        NavRow("Bug", t("bugs.report"), first = true, chevron = false) { fish.nexa.ui.bugs.openBugReport("settings") }
                         NavRow("LogOut", t("settings.settings.logOut"), danger = true, chevron = false) { fish.nexa.ui.shell.confirmLogout() }
                     }
                 }

@@ -5909,5 +5909,6 @@
   "android.people.switcherPlaceholder": "ابحث عن الأشخاص والمحادثات والخوادم",
   "android.media.cannotPlayVideo": "لا يمكن تشغيل هذا الفيديو هنا.",
   "android.media.savedToDownloads": "تم الحفظ في التنزيلات.",
-  "android.media.savedToPictures": "تم الحفظ في الصور."
+  "android.media.savedToPictures": "تم الحفظ في الصور.",
+  "bugs.context.appAndroid": "تطبيق Android"
 }

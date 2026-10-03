@@ -129,8 +129,13 @@ From the owner (CLAUDE.md and standing feedback):
   all eleven locales with real translations, and `python3 tools/i18n_check.py` must pass.
 - A major feature or noticeable change gets a What's New entry.
 - Check every screen on the emulator in Dark, Light and one preset; look before calling it done.
+- Compare every screen with the same screen of the web app at phone width (a headless Playwright
+  screenshot of a scratch web build, same account and data) before it is done: it must at least
+  look similar in layout, sizes, colours and words.
+- An improvement made here for phones (a gesture, a better flow, a smarter default) goes to the web
+  too, so the two stay consistent: list it in section 7 and port it.
 
-## 7. Phone improvements beyond the web (port back where they help)
+## 7. Phone improvements beyond the web (each one is brought to the web too)
 
 Swipe a message to reply; answer from the notification; share pictures and text into Nexa from any
 app; picture-in-picture for calls; pinch-to-zoom pictures that pull down to close; haptics on

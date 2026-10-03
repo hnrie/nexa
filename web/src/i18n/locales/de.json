@@ -5299,5 +5299,6 @@
   "android.people.switcherPlaceholder": "Personen, Unterhaltungen und Server suchen",
   "android.media.cannotPlayVideo": "Dieses Video kann hier nicht abgespielt werden.",
   "android.media.savedToDownloads": "In Downloads gespeichert.",
-  "android.media.savedToPictures": "In Bilder gespeichert."
+  "android.media.savedToPictures": "In Bilder gespeichert.",
+  "bugs.context.appAndroid": "Android-App"
 }
