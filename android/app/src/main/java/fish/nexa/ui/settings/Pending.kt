@@ -8,6 +8,4 @@ import fish.nexa.ui.t
 @Composable fun ProfilesPage() = PageTitle(t("settings.profile.profiles"))
 @Composable fun BoxScope.ProfilesSaveBar() = Unit
 
-@Composable fun AboutPage() = PageTitle(t("settings.about.title"))
 @Composable fun LicensesPage() = PageTitle(t("settings.licenses.licenses"))
-@Composable fun AdminPage() = PageTitle(t("settings.admin.nexaAdmin"))
