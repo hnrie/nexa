@@ -16,8 +16,6 @@ import fish.nexa.ui.theme.Nx
 import kotlinx.serialization.json.JsonObject
 
 @Composable fun StickerView(sticker: StickerRef) = Txt(fish.nexa.ui.t("chat.messageItem.sticker"), color = Nx.colors.textMuted)
-@Composable fun PollCard(cm: ChatMessage, ctx: ListCtx) = Txt(cm.payload?.poll?.question ?: "", color = Nx.colors.textStrong)
-@Composable fun Embeds(embeds: List<JsonObject>, cm: ChatMessage, ctx: ListCtx) = Unit
 @Composable fun ServerTagChip(tag: WornTag, small: Boolean) = Txt(tag.text, color = Nx.colors.textBrand)
 fun openReactionPicker(cm: ChatMessage, ctx: ListCtx) = Unit
 

@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,7 +56,11 @@ import fish.nexa.ui.Time
 import fish.nexa.ui.components.Avatar
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
+import fish.nexa.media.Unfurl
+import fish.nexa.media.isOnlyMediaLinks
 import fish.nexa.ui.media.Attachments
+import fish.nexa.ui.media.Embeds
+import fish.nexa.ui.media.HookBody
 import fish.nexa.ui.media.PressedImage
 import fish.nexa.ui.media.UploadCard
 import fish.nexa.ui.shell.Names
@@ -370,7 +375,12 @@ private fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
         }
         return
     }
-    val text = payload?.t
+    val embeds = if (cm != null && !cm.m.suppressEmbeds) payload?.embeds?.takeIf { it.isNotEmpty() } else null
+    // a GIF or picture link shows only the picture, the way an uploaded one does (isOnlyMediaLinks)
+    val doc by Nexa.settings.doc.collectAsState()
+    val mediaOnly = embeds != null && remember(doc) { Nexa.settings.imagePreviews } &&
+        remember(payload?.t, embeds) { isOnlyMediaLinks(payload?.t ?: "", embeds.mapNotNull { Unfurl.of(it) }) }
+    val text = if (mediaOnly) null else payload?.t
     val edited = cm?.m?.editedAt?.let { t("chat.messageItem.edited") }
     if (!text.isNullOrEmpty()) MessageText(text, if (failed) c.textDanger else c.text, edited)
     payload?.sticker?.let { StickerView(it) }
@@ -379,7 +389,8 @@ private fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     val up = item.pending?.upload
     if (up != null) UploadCard(ctx.channel.id, item.pending, up)
     else payload?.att?.takeIf { it.isNotEmpty() }?.let { Attachments(it, cm, ctx) }
-    if (cm != null && !cm.m.suppressEmbeds) payload?.embeds?.takeIf { it.isNotEmpty() }?.let { Embeds(it, cm, ctx) }
+    if (cm != null && embeds != null) Embeds(embeds, cm, ctx)
+    if (cm?.hook != null) HookBody(cm, ctx)
 }
 
 /** The failed-send line: what happened, then Retry and Delete. */

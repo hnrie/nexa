@@ -483,6 +483,32 @@ private fun openFull(handle: VideoHandle, name: String, poster: String?, onDownl
     Layers.open(layer)
 }
 
+/** A post's GIF: a silent video that loops by itself; a tap pauses it or plays it again (Loop in PostEmbed.tsx). */
+@OptIn(UnstableApi::class)
+@Composable
+fun LoopingVideo(url: String, poster: String?) {
+    val context = LocalContext.current
+    val player = remember(url) {
+        ExoPlayer.Builder(context).setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(Streams.factory())).build().apply {
+            setMediaItem(MediaItem.fromUri(url))
+            volume = 0f
+            repeatMode = Player.REPEAT_MODE_ONE
+            playWhenReady = true
+            prepare()
+        }
+    }
+    DisposableEffect(player) { onDispose { player.release() } }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .pressable(remember { MutableInteractionSource() }) { if (player.isPlaying) player.pause() else player.play() },
+    ) {
+        if (!poster.isNullOrEmpty()) AsyncImage(poster, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        ContentFrame(player, Modifier.fillMaxSize(), surfaceType = SURFACE_TYPE_TEXTURE_VIEW, contentScale = ContentScale.Crop)
+    }
+}
+
 /** An uploaded video: streamed as it decrypts, its first frame and length fetched by themselves when it is small. */
 @OptIn(UnstableApi::class)
 @Composable
