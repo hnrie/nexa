@@ -27,7 +27,10 @@ export interface Release {
 export const RELEASES: Release[] = [
   {
     id: "2026-10-02.8",
-    items: [{ icon: Link, title: "whatsNew.r202610028.linksTitle", body: "whatsNew.r202610028.linksBody" }],
+    items: [
+      { icon: Link, title: "whatsNew.r202610028.linksTitle", body: "whatsNew.r202610028.linksBody" },
+      { icon: Smartphone, title: "whatsNew.r202610028.androidTitle", body: "whatsNew.r202610028.androidBody" },
+    ],
   },
   {
     id: "2026-10-02.7",

@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { NexaWordmark } from "@/components/common/Brand";
 import { Button } from "@/components/common/Button";
+import { AndroidBanner } from "@/components/shell/AndroidBanner";
 import { Spinner } from "@/components/common/Spinner";
 import { InviteGone, InviteSkeleton, InviteView, targetOfPreview } from "@/components/invite/InviteView";
 import { useInviteJoin } from "@/components/invite/useInviteJoin";
@@ -142,6 +143,7 @@ export default function InvitePage() {
 
   return (
     <div className={s.page}>
+      <AndroidBanner bleed />
       {/* what this is, for someone who has never heard of it, and a way on from a dead link */}
       <Link to="/" className={s.brand} aria-label="Nexa"><NexaWordmark height={32} /></Link>
       <main className={s.invite} data-testid="invite-page">{card}</main>

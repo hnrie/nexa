@@ -3,6 +3,7 @@
  * Phones, tablets (an iPad asks for the desktop site but has a touch screen)
  * and Chromebooks get none.
  */
+import type { AndroidFile } from "@/api/android";
 import type { DesktopFile, DesktopRelease } from "@/api/desktop";
 
 export interface DesktopTarget {
@@ -61,6 +62,75 @@ export function pickDownload(rel: DesktopRelease, target: DesktopTarget): Deskto
 export function noDesktopBuild(): boolean {
   const nav = navigator as Navigator & { userAgentData?: { mobile?: boolean } };
   return detectDesktop({ ua: navigator.userAgent, mobile: nav.userAgentData?.mobile, touchPoints: navigator.maxTouchPoints }).os === null;
+}
+
+/**
+ * An Android phone or tablet's browser, which is offered the Android app. A
+ * Chromebook says CrOS and keeps the web app, and the Android app's own web
+ * views (NexaAndroid/ in their user agent) are the app already.
+ */
+export function detectAndroid(ua: string, platform?: string): boolean {
+  if (/CrOS|NexaAndroid\//i.test(ua)) return false;
+  return /Android/i.test(ua) || (!!platform && /android/i.test(platform));
+}
+
+export type AndroidAbi = "arm64-v8a" | "armeabi-v7a" | "x86_64" | "x86";
+
+export interface AndroidHints {
+  /** navigator.platform: "Linux aarch64", "Linux armv8l", "Linux armv7l"… */
+  navPlatform?: string | undefined;
+  /** navigator.userAgentData's high-entropy hints, which Chromium on Android leaves empty */
+  architecture?: string | undefined;
+  bitness?: string | undefined;
+}
+
+/**
+ * Which processor build this phone takes, or null when the browser does not
+ * say. Chromium on Android reports no architecture through its hints, so the
+ * older navigator.platform is what tells: "armv8l" is a 64-bit processor
+ * running a 32-bit browser, still a 64-bit phone, and "armv7l" a 32-bit one.
+ */
+export function detectAndroidAbi(h: AndroidHints): AndroidAbi | null {
+  const arch = h.architecture?.toLowerCase();
+  const bits = h.bitness === "64" || h.bitness === "32" ? h.bitness : null;
+  if (arch === "arm" && bits) return bits === "64" ? "arm64-v8a" : "armeabi-v7a";
+  if (arch === "x86" && bits) return bits === "64" ? "x86_64" : "x86";
+  const p = h.navPlatform ?? "";
+  if (/aarch64|arm64|armv8|armv9/i.test(p)) return "arm64-v8a";
+  if (/armv[4-7]/i.test(p)) return "armeabi-v7a";
+  if (/x86_64|amd64/i.test(p)) return "x86_64";
+  if (/i[3-6]86|x86/i.test(p)) return "x86";
+  return null;
+}
+
+/**
+ * The build to offer first. Nearly every phone sold now is 64-bit ARM, so that
+ * is the one when the browser will not say; a 32-bit phone gets its own, and
+ * anything else the universal build, which installs anywhere.
+ */
+export function pickAndroid(files: AndroidFile[], abi: AndroidAbi | null): AndroidFile | null {
+  const by = (want: string) => files.find((f) => f.abi === want);
+  const want = abi === "armeabi-v7a" || abi === "x86_64" ? abi : abi === "x86" ? "universal" : "arm64-v8a";
+  return by(want) ?? by("universal") ?? files[0] ?? null;
+}
+
+/** Whether this browser is on Android, where the app is offered rather than an installer. */
+export function isAndroidBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+  return detectAndroid(navigator.userAgent, nav.userAgentData?.platform);
+}
+
+/** What this phone's browser says about its processor, for picking an APK. */
+export async function currentAndroidAbi(): Promise<AndroidAbi | null> {
+  const nav = navigator as Navigator & { userAgentData?: { getHighEntropyValues?: (h: string[]) => Promise<{ architecture?: string; bitness?: string }> } };
+  let hints: { architecture?: string; bitness?: string } = {};
+  try {
+    hints = (await nav.userAgentData?.getHighEntropyValues?.(["architecture", "bitness"])) ?? {};
+  } catch {
+    /* not offered */
+  }
+  return detectAndroidAbi({ navPlatform: navigator.platform, architecture: hints.architecture, bitness: hints.bitness });
 }
 
 /** Reads the hints from this browser, including the slower ones Chromium offers. */

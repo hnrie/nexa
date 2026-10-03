@@ -8,6 +8,7 @@ import { Spinner } from "@/components/common/Spinner";
 import v from "@/components/invite/Invite.module.css";
 import { ProfileCard } from "@/components/profile/ProfileCard";
 import p from "@/components/profile/Profile.module.css";
+import { AndroidBanner } from "@/components/shell/AndroidBanner";
 import { t } from "@/i18n";
 import { profileThemeOf } from "@/lib/avatarColor";
 import { useDominantColor } from "@/lib/dominantColor";
@@ -127,6 +128,7 @@ function ProfileLinkPage({ username }: { username: string }) {
 
   return (
     <div className={s.page} style={glow ? ({ "--profile-glow": glow } as CSSProperties) : undefined} data-glow={glow ? "" : undefined}>
+      <AndroidBanner bleed />
       {/* what this is, for someone who has never heard of it, and a way on from a dead link */}
       <Link to="/" className={s.brand} aria-label="Nexa"><NexaWordmark height={32} /></Link>
       <main className={s.main}>{body}</main>
