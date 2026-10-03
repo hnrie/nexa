@@ -10,10 +10,14 @@ import kotlin.math.sqrt
  * The microphone's last stage before the encoder (voice.md 8.2), in the
  * audio processing module's capture post-processing hook: RNNoise when
  * Enhanced noise suppression is on (the platform's own noise suppression is
- * off then), the input volume, and the level that voice activity and the
- * speaking ring go by. It runs on the audio thread, 10 ms at a time, whether or
- * not the sent track is let through, so voice activity can hear speech while
- * the call's copy of the microphone is silenced.
+ * off then), the input volume, the level that voice activity and the speaking
+ * ring go by, and the gate voice activity and push to talk work through.
+ *
+ * The gate is here rather than on the track because libwebrtc stops recording
+ * altogether once every sent track is disabled (AudioState::ShouldRecord): a
+ * gate on `enabled` would leave voice activity nothing to listen to. So the
+ * track stays enabled while the call may hear this device, and a shut gate
+ * sends silence, measured first, 10 ms at a time on the audio thread.
  */
 object Denoise : ExternalAudioProcessingFactory.AudioProcessing {
     private const val TAG = "Denoise"
@@ -24,8 +28,11 @@ object Denoise : ExternalAudioProcessingFactory.AudioProcessing {
     /** The input volume, 0..2. */
     @Volatile var gain = 1f
 
-    /** A test signal in place of the microphone (debug builds): 1 steady, 2 in phrases. */
+    /** A test signal in place of the microphone (debug builds): 1 steady, 2 in phrases, 3 noise. */
     @Volatile var tone = 0
+
+    /** Whether what the microphone hears goes on to the encoder; silence goes when not. */
+    @Volatile var open = true
 
     /** The level of the last 20 ms of processed microphone, 0..1 (RMS x 4, as the web's LevelMeter). */
     @Volatile var level = 0f
@@ -67,7 +74,7 @@ object Denoise : ExternalAudioProcessingFactory.AudioProcessing {
             logged = true
             Log.i(TAG, "first block: $numFrames frames, $numBands band(s), direct=${buffer.isDirect}, ${buffer.capacity()} bytes")
         }
-        val l = nativeProcess(p, buffer, numFrames, numFrames * 100, enhanced, gain, tone)
+        val l = nativeProcess(p, buffer, numFrames, numFrames * 100, enhanced, gain, tone, open)
         if (l < 0) return
         level = sqrt((l * l + previous * previous) / 2f)
         previous = l
@@ -76,5 +83,5 @@ object Denoise : ExternalAudioProcessingFactory.AudioProcessing {
 
     private external fun nativeCreate(): Long
     private external fun nativeDestroy(ptr: Long)
-    private external fun nativeProcess(ptr: Long, buffer: ByteBuffer, frames: Int, rate: Int, denoise: Boolean, gain: Float, tone: Int): Float
+    private external fun nativeProcess(ptr: Long, buffer: ByteBuffer, frames: Int, rate: Int, denoise: Boolean, gain: Float, tone: Int, pass: Boolean): Float
 }

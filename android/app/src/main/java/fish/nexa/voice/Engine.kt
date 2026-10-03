@@ -108,14 +108,25 @@ internal object Engine {
     }
 
     /**
-     * The sent track is silenced with `enabled`, never taken away: a track
-     * taken away between phrases froze its timestamps and made every listener's
-     * jitter buffer grow (voice.md 6.6).
+     * The sent track is never taken away: a track taken away between phrases
+     * froze its timestamps and made every listener's jitter buffer grow
+     * (voice.md 6.6). Muted, deafened, server-muted or interrupted, the track
+     * is disabled, and libwebrtc then stops the microphone itself (the
+     * system's indicator goes out). Between phrases, and with push to talk
+     * let go, the capture hook sends silence instead, so voice activity keeps
+     * listening; where the hook cannot run, `enabled` does both jobs.
      */
     fun applyTransmit() {
         val s = session ?: return
-        val on = shouldTransmit() && gateOpen()
-        s.micTrack?.let { runCatching { it.setEnabled(on) } }
+        val transmit = shouldTransmit()
+        val gate = gateOpen()
+        if (Denoise.available) {
+            Denoise.open = gate
+            s.micTrack?.let { runCatching { it.setEnabled(transmit) } }
+        } else {
+            Denoise.open = true
+            s.micTrack?.let { runCatching { it.setEnabled(transmit && gate) } }
+        }
     }
 
     fun setPttHeld(on: Boolean) {
@@ -447,6 +458,7 @@ internal object Engine {
         s.camera = null
         s.screen = null
         Denoise.tone = 0
+        Denoise.open = true
         AudioRoute.leave()
         if (notify && s.announced) Calls.sendState(null)
         fish.nexa.media.Sounds.play(fish.nexa.media.Sounds.Name.LEAVE)

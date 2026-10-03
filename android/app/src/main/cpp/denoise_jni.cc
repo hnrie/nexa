@@ -86,9 +86,12 @@ JNIEXPORT void JNICALL Java_fish_nexa_voice_Denoise_nativeDestroy(JNIEnv*, jobje
 }
 
 // Processes one block in place. Returns its level (0..1), or -1 when the
-// buffer could not be read.
+// buffer could not be read. With `pass` off the block is measured and then
+// silenced: voice activity still hears it, the encoder gets silence (and
+// Opus's DTX sends next to nothing), and the stream's timestamps keep moving.
 JNIEXPORT jfloat JNICALL Java_fish_nexa_voice_Denoise_nativeProcess(
-    JNIEnv* env, jobject, jlong ptr, jobject buffer, jint frames, jint rate, jboolean denoise, jfloat gain, jint tone) {
+    JNIEnv* env, jobject, jlong ptr, jobject buffer, jint frames, jint rate, jboolean denoise, jfloat gain, jint tone,
+    jboolean pass) {
   auto* d = reinterpret_cast<Denoiser*>(ptr);
   auto* data = static_cast<float*>(env->GetDirectBufferAddress(buffer));
   const jlong capacity = env->GetDirectBufferCapacity(buffer);
@@ -124,6 +127,7 @@ JNIEXPORT jfloat JNICALL Java_fish_nexa_voice_Denoise_nativeProcess(
     const double s = double(x) / 32768.0;
     sum += s * s;
   }
+  if (pass != JNI_TRUE) memset(data, 0, sizeof(float) * size_t(frames));
   return float(std::min(1.0, sqrt(sum / frames) * 4.0));
 }
 
