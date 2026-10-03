@@ -48,7 +48,7 @@ object FrameCryptoNative {
  */
 class FrameKeys {
     private val lock = Any()
-    private var handle: Long = FrameCryptoNative.nativeCreateKeys()
+    private var handle: Long = if (FrameCryptoNative.loaded) FrameCryptoNative.nativeCreateKeys() else 0L
 
     fun set(keys: VoiceKeys?) = synchronized(lock) {
         if (handle == 0L) return@synchronized

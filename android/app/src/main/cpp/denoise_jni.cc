@@ -10,6 +10,7 @@
 
 #include <jni.h>
 #include <math.h>
+#include <stdint.h>
 #include <string.h>
 
 #include <algorithm>
@@ -28,6 +29,7 @@ struct Denoiser {
   float out[kFrame];
   float prev = 0.f;  // the last input sample of the block before, so stretching joins up
   long tone_at = 0;  // samples of test signal made so far
+  uint32_t noise = 2463534242u;  // xorshift state of the test noise
 };
 
 // Linear stretch of `n` samples to `m`, continuing from `prev`.
@@ -44,10 +46,17 @@ void Stretch(const float* in, int n, float prev, float* out, int m) {
 
 // A test signal in place of the microphone (debug builds): 1 is a steady 440 Hz
 // tone, 2 the same in 1.5 s phrases with 1.5 s pauses, as the web's delay
-// harness speaks.
+// harness speaks, and 3 steady white noise (what noise suppression removes).
 void Tone(Denoiser* d, float* data, int frames, int rate, int mode) {
   for (int i = 0; i < frames; i++) {
     const long n = d->tone_at++;
+    if (mode == 3) {
+      d->noise ^= d->noise << 13;
+      d->noise ^= d->noise >> 17;
+      d->noise ^= d->noise << 5;
+      data[i] = (float(d->noise % 20001u) - 10000.f) * 0.4f;
+      continue;
+    }
     const double t = double(n) / double(rate);
     bool on = true;
     if (mode == 2) on = fmod(t, 3.0) < 1.5;
