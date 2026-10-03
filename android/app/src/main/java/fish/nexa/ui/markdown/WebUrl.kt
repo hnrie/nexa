@@ -68,6 +68,34 @@ class WebUrl private constructor(
             null
         }
 
+        /**
+         * `new URL(input, base)` for an http(s) base: an address with a scheme
+         * of its own stands alone (null when that scheme is not http or https),
+         * and anything else is read against the base: `//host…`, `/path`,
+         * `?query`, `#fragment` or a path relative to the base's folder.
+         */
+        fun parse(input: String, base: WebUrl): WebUrl? {
+            val t = input.trim { it <= ' ' }
+            val scheme = Regex("^[A-Za-z][A-Za-z0-9+.-]*:").find(t)?.value
+            if (scheme != null) {
+                val name = scheme.dropLast(1).lowercase()
+                if (name != "http" && name != "https") return null
+                val rest = t.substring(scheme.length)
+                // "https:x" with the base's own scheme is relative; with another it stands alone
+                if (rest.startsWith("/") || rest.startsWith("\\") || name != base.scheme) return parse(t)
+                return parse(rest, base)
+            }
+            val joined = when {
+                t.startsWith("//") || t.startsWith("\\\\") || t.startsWith("/\\") || t.startsWith("\\/") -> base.scheme + ":" + t
+                t.startsWith("/") || t.startsWith("\\") -> base.origin + t
+                t.startsWith("?") -> base.origin + base.pathname + t
+                t.startsWith("#") -> base.origin + base.pathname + base.search + t
+                t.isEmpty() -> base.origin + base.pathname + base.search
+                else -> base.origin + base.pathname.substring(0, base.pathname.lastIndexOf('/') + 1) + t
+            }
+            return parse(joined)
+        }
+
         private class Invalid : Exception() {
             override fun fillInStackTrace(): Throwable = this
         }

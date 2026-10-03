@@ -54,11 +54,11 @@ object AppLinks {
     /**
      * What a link leads to when it is one of the app's own pages, or null for
      * everything else. `here` is the instance's address (the page the web
-     * would be on). Links in messages are absolute; a relative one gives null.
+     * would be on); a relative link is read against it.
      */
     fun appLink(href: String, here: String): AppLink? {
         val cur = WebUrl.parse(here) ?: return null
-        val u = WebUrl.parse(href) ?: return null
+        val u = WebUrl.parse(href, cur) ?: return null
         val host = u.host.lowercase()
         if (host != cur.host.lowercase() && host != publicHost) return null
         val path = u.pathname
