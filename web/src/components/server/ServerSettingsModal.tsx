@@ -10,6 +10,7 @@ import { SettingsLayer, type NavGroup } from "./SettingsLayer";
 
 import { t } from "@/i18n";
 const OverviewPage = lazyPage(() => import("./pages/ServerOverviewPage"));
+const ServerTagPage = lazyPage(() => import("./pages/ServerTagPage"));
 const RolesPage = lazyPage(() => import("./pages/RolesPage"));
 const MembersPage = lazyPage(() => import("./pages/MembersPage"));
 const BansPage = lazyPage(() => import("./pages/BansPage"));
@@ -28,6 +29,7 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
   const owner = !!st && st.server.owner_id === meId;
   const pages: { id: string; label: string; ok: boolean; group: number; danger?: boolean }[] = [
     { id: "overview", label: t("server.channelSettings.overview"), ok: canI(st, P.MANAGE_SERVER), group: 0 },
+    { id: "tag", label: t("serverTag.page.title"), ok: canI(st, P.MANAGE_SERVER), group: 0 },
     { id: "roles", label: t("server.members.roles"), ok: canI(st, P.MANAGE_ROLES), group: 0 },
     { id: "emoji", label: t("modals.customStatus.emoji"), ok: true, group: 0 },
     { id: "stickers", label: t("pickers.expressionPicker.stickers"), ok: true, group: 0 },
@@ -52,6 +54,7 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
   if (owner) groups.push({ head: "", items: [{ id: "delete", label: t("server.deleteServer.deleteServer"), danger: true }] });
   const body =
     page === "overview" ? <OverviewPage serverId={serverId} /> :
+    page === "tag" ? <ServerTagPage serverId={serverId} /> :
     page === "roles" ? <RolesPage serverId={serverId} /> :
     page === "members" ? <MembersPage serverId={serverId} /> :
     page === "bans" ? <BansPage serverId={serverId} /> :

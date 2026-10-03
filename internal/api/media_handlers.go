@@ -55,7 +55,7 @@ func (s *Server) limitsFor(kind string) media.Limits {
 		return media.Limits{MaxBytes: s.Cfg.MaxEmojiBytes, MaxW: 512, MaxH: 512}
 	case "sticker":
 		return media.Limits{MaxBytes: s.Cfg.MaxStickerBytes, MaxW: 1024, MaxH: 1024}
-	default: // avatar, icon
+	default: // avatar, icon, and what is cut on the server: a tag's badge (server_tags.go), a widget's picture (widgets.go)
 		return media.Limits{MaxBytes: s.Cfg.MaxAvatarBytes, MaxW: 4096, MaxH: 4096}
 	}
 }

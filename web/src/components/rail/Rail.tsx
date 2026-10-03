@@ -10,7 +10,8 @@ import { useMediaQuery } from "@/hooks/useIsMobile";
 import { useReorder } from "@/hooks/useReorder";
 import { initials } from "@/lib/avatarColor";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
-import { entryId, moveEntry, resolveRail, siblingIds, dropEntry, type RailDrop, type RailEntry, type ServerFolder } from "@/lib/railLayout";
+import { moveEntry, resolveRail, siblingIds, dropEntry, type RailDrop, type RailEntry, type ServerFolder } from "@/lib/railLayout";
+import { railDropAt, type RailDrag, type RailRow } from "@/lib/railDrop";
 import { badgeText, serverUnread, unreadConversations } from "@/lib/unread";
 import { compareIds, idAt } from "@/lib/ids";
 import { useAuth } from "@/stores/auth";
@@ -55,22 +56,8 @@ type Waiting = { channel: Channel | null; count: number; at: string };
 
 const NO_PICKS: string[] = [];
 
-/** What is being dragged: a server, or a whole folder. */
-type Drag = { id: string; folder: boolean };
-/** What a dragged thing is over: a server on its own, one in an open folder, or a folder's own tile. */
-type Target = "server" | "inFolder" | "folder" | "openFolder";
-
-/**
- * Where on an entry a drop lands, from how far down it the pointer is. A
- * server's middle makes a folder of the two and a folder's middle takes the
- * server in; the edges put it before or after. Among a folder's servers, and
- * for a folder being dragged, there are only the two halves.
- */
-export function dropZone(drag: Drag, target: Target, y: number): RailDrop["where"] {
-  if (drag.folder || target === "inFolder") return y < 0.5 ? "before" : "after";
-  if (target === "openFolder") return y < 0.25 ? "before" : "combine";
-  return y < 0.25 ? "before" : y > 0.75 ? "after" : "combine";
-}
+/** The type a drag from the rail carries: not text, so a text box it passes over does not take the id. */
+const RAIL_DRAG = "application/x-nexa-rail";
 
 /**
  * The 72 px server rail: home (DMs), the conversations with messages waiting,
@@ -96,14 +83,15 @@ export function Rail() {
   const openConvo = loc.pathname.match(/^\/channels\/@me\/(\d+)/)?.[1];
   // HTML5 dragging is for a mouse; on a touch screen a held server opens its menu, which makes the same moves
   const canDrag = useMediaQuery("(hover: hover) and (pointer: fine)");
-  const [drag, setDragShown] = useState<Drag | null>(null);
+  const [drag, setDragShown] = useState<RailDrag | null>(null);
   const [over, setOverShown] = useState<RailDrop | null>(null);
   // The same two for the drag events themselves, which come faster than the
   // rail is drawn: one reading the state could still see no drag at all, and
   // a drop could land where the pointer was a moment before.
-  const dragRef = useRef<Drag | null>(null);
+  const dragRef = useRef<RailDrag | null>(null);
   const overRef = useRef<RailDrop | null>(null);
   const railRef = useRef<HTMLElement>(null);
+  const sepRef = useRef<HTMLDivElement>(null);
 
   // Home's pill and count are for friend requests alone. A conversation with
   // messages waiting already stands under it with its own count, and a second
@@ -187,7 +175,7 @@ export function Rail() {
     openContextMenu({ ...menuPoint(e), label: folderName(f), items: folderMenuItems(f.id, { openModal, moves: reorder.menuItems(f.id) }) });
   };
 
-  const setDrag = (next: Drag | null) => {
+  const setDrag = (next: RailDrag | null) => {
     dragRef.current = next;
     setDragShown(next);
   };
@@ -203,18 +191,38 @@ export function Rail() {
     e.stopPropagation();
     setDrag({ id, folder });
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", id);
+    e.dataTransfer.setData(RAIL_DRAG, id);
   };
-  const onDragOver = (e: DragEvent, id: string, target: Target, folderId?: string) => {
+  /** The rows as drawn right now: unread conversations can come and go above them mid-drag. */
+  const measureRows = (): RailRow[] => {
+    const rail = railRef.current;
+    if (!rail) return [];
+    return [...rail.querySelectorAll<HTMLElement>("[data-rail-row]")].map((el) => {
+      const r = el.getBoundingClientRect();
+      const folder = el.hasAttribute("data-rail-folder");
+      const row: RailRow = { id: el.dataset["railRow"]!, folder, top: r.top, bottom: r.bottom };
+      const parent = el.dataset["railParent"];
+      if (parent) row.parent = parent;
+      // an open folder's sleeve is the wrapper round its tile and its servers
+      const sleeve = el.parentElement;
+      if (folder && sleeve?.dataset["open"] === "true") row.end = sleeve.getBoundingClientRect().bottom;
+      return row;
+    });
+  };
+  /** Where a drop with the pointer at this height would land: nowhere above the line under home. */
+  const dropAt = (d: RailDrag, y: number): RailDrop | null => {
+    const sep = sepRef.current?.getBoundingClientRect();
+    if (sep && y < sep.top) return null;
+    return railDropAt(measureRows(), d, y);
+  };
+  // One target for the whole rail rather than one per tile, so the space
+  // between tiles and round a folder's sleeve takes a drop too (lib/railDrop).
+  const onRailDragOver = (e: DragEvent) => {
     const d = dragRef.current;
+    // a file or some text dragged in from elsewhere is not the rail's to take
     if (!d) return;
-    e.stopPropagation();
-    const r = e.currentTarget.getBoundingClientRect();
-    const where = dropZone(d, target, (e.clientY - r.top) / Math.max(1, r.height));
-    // a folder goes beside another folder, never among its servers
-    const next: RailDrop = d.folder && target === "inFolder" && folderId ? { id: folderId, where } : { id, where };
-    if (next.id === d.id) {
-      // back over itself, where dropping does nothing: forget where it was over before
+    const next = dropAt(d, e.clientY);
+    if (!next) {
       if (overRef.current) setOver(null);
       return;
     }
@@ -223,21 +231,17 @@ export function Rail() {
     const was = overRef.current;
     if (was?.id !== next.id || was.where !== next.where) setOver(next);
   };
-  /** Over the space around the pinned ones' line or the add button: the end of the list above it. */
-  const onDragOverEnd = (e: DragEvent, lastId: string | undefined) => {
-    const d = dragRef.current;
-    if (!d || !lastId || lastId === d.id) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    const was = overRef.current;
-    if (was?.id !== lastId || was.where !== "after") setOver({ id: lastId, where: "after" });
+  const onRailDragLeave = (e: DragEvent) => {
+    // out of the rail altogether, not from one of its tiles onto the next
+    if (dragRef.current && !e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(null);
   };
   const onDrop = (e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
     const d = dragRef.current;
-    const o = overRef.current;
-    if (d && o) changeRail((l) => dropEntry(l, d.id, o));
+    if (!d) return;
+    e.preventDefault();
+    // where the pointer is as it lets go, which the last line drawn may be a move behind
+    const o = dropAt(d, e.clientY) ?? overRef.current;
+    if (o) changeRail((l) => dropEntry(l, d.id, o));
     endDrag();
   };
   const dropOf = (id: string) => (over?.id === id ? over.where : undefined);
@@ -258,12 +262,10 @@ export function Rail() {
         data-muted={muted}
         data-drop={dropOf(id)}
         data-dragging={drag?.id === id}
+        data-rail-row={id}
+        data-rail-parent={folder?.id}
         draggable={canDrag}
         onDragStart={(e) => onDragStart(e, id, false)}
-        onDragOver={(e) => onDragOver(e, id, folder ? "inFolder" : "server", folder?.id)}
-        // entering counts as being over: a quick move sends only that, and the ring came a move late
-        onDragEnter={(e) => onDragOver(e, id, folder ? "inFolder" : "server", folder?.id)}
-        onDrop={onDrop}
         onContextMenu={(e) => onServerContext(e, id)}
         onKeyDown={reorder.onKeyDown(id)}
         data-server={id}
@@ -311,11 +313,14 @@ export function Rail() {
     const name = folderName(f);
     const label = t("organize.rail.folderLabel", { name, count: ids.length });
     const drop = dropOf(f.id);
+    // a server about to land among this folder's servers lights the sleeve it lands in
+    const into = open && !!over && over.where !== "combine" && ids.includes(over.id) && over.id !== drag?.id;
     return (
       <div
         key={f.id}
         className={s.folder}
         data-open={open}
+        data-into={into || undefined}
         data-drop={drop === "before" || drop === "after" ? drop : undefined}
         data-dragging={drag?.id === f.id}
         data-folder={f.id}
@@ -328,11 +333,10 @@ export function Rail() {
           data-selected={!open && holdsActive}
           data-unread={!open && fUnread && !holdsActive}
           data-drop={drop === "combine" ? "combine" : undefined}
+          data-rail-row={f.id}
+          data-rail-folder=""
           draggable={canDrag}
           onDragStart={(e) => onDragStart(e, f.id, true)}
-          onDragOver={(e) => onDragOver(e, f.id, open ? "openFolder" : "folder")}
-          onDragEnter={(e) => onDragOver(e, f.id, open ? "openFolder" : "folder")}
-          onDrop={onDrop}
           onContextMenu={(e) => onFolderContext(e, f)}
           onKeyDown={reorder.onKeyDown(f.id)}
           data-reorder-id={f.id}
@@ -358,11 +362,9 @@ export function Rail() {
 
   const renderEntry = (e: RailEntry) => (typeof e === "string" ? renderServer(e, null) : renderFolder(e));
   const bulk = isPicking ? railBulk(picked, { nav, openModal }) : null;
-  const lastPinned = layout.pinned.at(-1);
-  const lastRest = layout.rest.at(-1);
 
   return (
-    <nav className={s.rail} aria-label={t("rail.rail.servers")} ref={railRef} onDragEnd={endDrag}>
+    <nav className={s.rail} aria-label={t("rail.rail.servers")} ref={railRef} onDragOver={onRailDragOver} onDragEnter={onRailDragOver} onDragLeave={onRailDragLeave} onDrop={onDrop} onDragEnd={endDrag}>
       {reorder.live}
       <div className={s.item} data-selected={home} data-unread={friendRequests > 0 && !home} data-testid="home">
         <span className={s.pill} />
@@ -442,7 +444,7 @@ export function Rail() {
           </div>
         );
       })}
-      <div className={s.sep} />
+      <div className={s.sep} ref={sepRef} />
       {layout.pinned.length > 0 ? (
         // named, so a screen reader hears where the pinned ones end
         <div className={s.section} role="group" aria-label={t("organize.pinned")} data-testid="rail-pinned">
@@ -450,12 +452,12 @@ export function Rail() {
         </div>
       ) : null}
       {layout.pinned.length > 0 && layout.rest.length > 0 ? (
-        <div className={s.pinSep} aria-hidden="true" onDragOver={(e) => onDragOverEnd(e, lastPinned ? entryId(lastPinned) : undefined)} onDragEnter={(e) => onDragOverEnd(e, lastPinned ? entryId(lastPinned) : undefined)} onDrop={onDrop}>
+        <div className={s.pinSep} aria-hidden="true">
           <Pin size={12} />
         </div>
       ) : null}
       {layout.rest.map(renderEntry)}
-      <div className={[s.item, s.add].join(" ")} onDragOver={(e) => onDragOverEnd(e, lastRest ? entryId(lastRest) : undefined)} onDragEnter={(e) => onDragOverEnd(e, lastRest ? entryId(lastRest) : undefined)} onDrop={onDrop}>
+      <div className={[s.item, s.add].join(" ")}>
         <span className={s.pill} />
         <Tooltip text={t("rail.rail.addAServer")} side="right">
           <button className={s.btn} aria-label={t("rail.rail.addAServer")} data-testid="add-server" onClick={() => openModal("createServer")}>

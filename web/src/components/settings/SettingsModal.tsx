@@ -32,6 +32,7 @@ const NotificationsPage = lazyPage(() => import("./NotificationsPage"));
 const SoundsPage = lazyPage(() => import("./SoundsPage"));
 const StickersPage = lazyPage(() => import("./StickersPage"));
 const VoicePage = lazyPage(() => import("./VoicePage"));
+const KeybindsPage = lazyPage(() => import("./KeybindsPage"));
 const AdvancedPage = lazyPage(() => import("./AdvancedPage"));
 const AdminPage = lazyPage(() => import("./AdminPage"));
 const DesktopPage = lazyPage(() => import("./DesktopPage"));
@@ -86,6 +87,7 @@ function navGroups(opts: { inApp: boolean; admin: boolean }): NavGroup[] {
       head: t("settings.groups.app"),
       items: [
         { id: "voice", label: t("settings.voice.voiceVideo") },
+        { id: "keybinds", label: t("keybinds.title") },
         { id: "activity", label: t("settings.activity.title") },
         // only where there is a desktop app to have settings for
         ...(opts.inApp ? [{ id: "desktop", label: t("settings.desktop.desktopApp") }] : []),
@@ -129,7 +131,7 @@ function useFindSetting(page: string, anchor: string | null, done: () => void): 
   }, [page, anchor, done]);
 }
 
-export default function SettingsModal({ onClose, page: initial, packId, modalId, resume }: { onClose: () => void; page: string; packId?: string | undefined; modalId?: number; resume?: string | undefined }) {
+export default function SettingsModal({ onClose, page: initial, packId, modalId, resume, anchor: openAt }: { onClose: () => void; page: string; packId?: string | undefined; modalId?: number; resume?: string | undefined; anchor?: string | undefined }) {
   // pages that were folded into others open where they went
   // The whole app is drawn again when the language changes, this with it: it
   // comes back on the page it was showing (kept with the modal), not the one
@@ -143,7 +145,8 @@ export default function SettingsModal({ onClose, page: initial, packId, modalId,
   const mobile = useIsMobile();
   const groups = navGroups({ inApp, admin: isAdmin });
   const [query, setQuery] = useState("");
-  const [anchor, setAnchor] = useState<string | null>(null);
+  // opened to show one setting (a "Make Your Own" elsewhere), it is brought into view as a search result is
+  const [anchor, setAnchor] = useState<string | null>(resume ? null : (openAt ?? null));
   const clearAnchor = useMemo(() => () => setAnchor(null), []);
   useFindSetting(page, anchor, clearAnchor);
 
@@ -172,6 +175,7 @@ export default function SettingsModal({ onClose, page: initial, packId, modalId,
     page === "sounds" ? <SoundsPage /> :
     page === "stickers" ? <StickersPage initialPackId={packId} /> :
     page === "voice" ? <VoicePage /> :
+    page === "keybinds" ? <KeybindsPage onVoice={() => setPage("voice")} /> :
     page === "advanced" ? <AdvancedPage /> :
     page === "blocked" ? <BlockedPage /> :
     page === "licenses" ? <LicensesPage /> :

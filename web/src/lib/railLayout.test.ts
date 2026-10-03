@@ -162,6 +162,14 @@ describe("dropEntry", () => {
     expect(dropEntry(one, "4", { id: "fa", where: "combine" })).toBe(one);
   });
 
+  it("takes the last server out beside its own folder, where the folder was", () => {
+    const one: RailLayout = { pinned: [folder("fp", ["7"])], rest: ["2", folder("fa", ["4"]), "3"] };
+    expect(dropEntry(one, "4", { id: "fa", where: "before" })).toEqual({ pinned: [folder("fp", ["7"])], rest: ["2", "4", "3"] });
+    expect(dropEntry(one, "4", { id: "fa", where: "after" })).toEqual({ pinned: [folder("fp", ["7"])], rest: ["2", "4", "3"] });
+    // pinned ones stay pinned
+    expect(dropEntry(one, "7", { id: "fp", where: "after" })).toEqual({ pinned: ["7"], rest: ["2", folder("fa", ["4"]), "3"] });
+  });
+
   it("does not put a folder in a folder: among another folder's servers, it goes beside it", () => {
     const two: RailLayout = { pinned: [], rest: [folder("fb", ["7"]), "2", folder("fa", ["4", "5"])] };
     expect(dropEntry(two, "fb", { id: "5", where: "combine" }).rest).toEqual(["2", folder("fa", ["4", "5"]), folder("fb", ["7"])]);

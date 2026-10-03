@@ -291,9 +291,19 @@ export function dropEntry(layout: RailLayout, dragId: string, drop: RailDrop, ma
   }
   const next = clone(layout);
   const e = take(next, dragId);
-  // the target went with it: the last server of a folder dropped on its own folder
-  const at = e === null ? null : findPlace(next, target.id);
-  if (e === null || !at) return layout;
+  if (e === null) return layout;
+  const at = findPlace(next, target.id);
+  if (!at) {
+    // The target went with it: the last server of a folder, dropped beside
+    // its own folder, which taking it out emptied. Out of the folder is what
+    // was asked, and where the folder stood is where that is. Dropped on its
+    // own folder, there is nowhere else for it to go.
+    if (from.folder && target.id === from.folder.id && target.where !== "combine") {
+      next[from.section].splice(from.index, 0, e);
+      return next;
+    }
+    return layout;
+  }
   if (target.where === "combine") {
     const server = e as string;
     if (at.folder) {

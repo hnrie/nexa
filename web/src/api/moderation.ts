@@ -9,12 +9,12 @@
  */
 import { api, type UploadOptions } from "./client";
 import type { BugCounts, BugMessage, MemberBug } from "./bugs";
-import type { Activity, Emoji, PublicUser, Snowflake, StickerPack } from "./types";
+import type { Activity, Emoji, PublicUser, ServerTag, Snowflake, StickerPack } from "./types";
 
 export type ModAction = "avatar_remove" | "field_reset" | "mute" | "ban" | "delete" | "server_reset" | "expression_takedown";
-export type ResetField = "username" | "display_name" | "about_me" | "pronouns" | "status" | "nicknames";
+export type ResetField = "username" | "display_name" | "about_me" | "pronouns" | "status" | "nicknames" | "typing_style" | "widgets" | "server_tag";
 /** What a server_reset can take back of what a server shows everyone. */
-export type ServerField = "icon" | "banner" | "name" | "description";
+export type ServerField = "icon" | "banner" | "name" | "description" | "tag";
 /** What an expression_takedown can take back of a pack: its name, its description, its public listing. */
 export type PackField = "name" | "description" | "public";
 
@@ -219,6 +219,8 @@ export interface ModUser extends PublicUser {
    * which are kept while they are away. Absent from older servers.
    */
   presence?: { status: "online" | "idle" | "dnd" | "offline"; activities?: Activity[] };
+  /** The profile's widgets (lib/widgets), on one account's page only. */
+  widgets?: unknown;
 }
 
 /** A server someone owns, or goes by a nickname or a picture of their own in. */
@@ -244,6 +246,8 @@ export interface ModServer {
   created_at: number;
   member_count: number;
   channel_count: number;
+  /** Its server tag, if it has one (absent from older servers). */
+  tag?: ServerTag | null;
   /** Why the viewer cannot act on it: its owner is out of their reach ("" when they can). */
   blocked: BlockReason;
 }

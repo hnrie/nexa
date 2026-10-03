@@ -20,6 +20,7 @@ import { PickBar, PickMark } from "@/components/common/Pick";
 import { pickClick, usePick } from "@/stores/pick";
 import { nameOrder } from "./nameOrder";
 import s from "./MemberList.module.css";
+import { UserTag } from "@/components/servertag/UserTag";
 
 import { t } from "@/i18n";
 
@@ -98,9 +99,10 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
             <Avatar id={row.id} avatarId={users[row.id]?.avatar_id ?? null} name={row.name} size={32} status={statusOf(p)} />
             <span className={s.text}>
               <span className={s.name}>
-                {row.name}
+                <span className={s.nameText}>{row.name}</span>
                 {isOwner(row.id) ? <OwnerCrown /> : channel.owner_id === row.id ? <Crown size={14} className={s.crown} aria-label={t("chat.groupMemberList.groupOwner")} /> : null}
                 {!isOwner(row.id) && isInstanceAdmin(row.id) ? <AdminHammer /> : null}
+                <UserTag userId={row.id} size="sm" />
               </span>
               <StatusLine
                 className={s.sub}

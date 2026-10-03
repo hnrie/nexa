@@ -143,4 +143,6 @@ export const IPC = {
   restartApp: "app:restart",
   windowState: "app:window-state",
   paste: "app:paste",
+  setShortcuts: "app:set-shortcuts",
+  shortcut: "app:shortcut",
 } as const;

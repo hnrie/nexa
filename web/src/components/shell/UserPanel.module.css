@@ -37,18 +37,26 @@
 .statusOpt { align-items: flex-start; }
 .statusDot { margin-top: 4px; }
 
-/* Mute and deafen sit side by side, and on a touch screen a slip hit the
-   other, so the buttons are a finger wide there. Three of those beside the
-   name left the name a letter or two ("E…") in a phone's drawer and cut
-   "Online" short on a tablet, so on touch screens the buttons get a row of
-   their own under the name. */
+/* Mute, deafen and activity sit side by side, and on a touch screen a slip
+   hit the next one, so the buttons are a finger wide there. Three of those
+   beside the name left the name a letter or two ("E…") in a phone's drawer
+   and cut "Online" short on a tablet, so on touch screens the buttons get a
+   row of their own under the name. */
 @media (pointer: coarse) {
   .icon { width: 40px; height: 40px; }
 }
 /* Under the rail and the list together the card is wide enough for the name
-   and three finger-sized buttons in one row; only a narrow one stacks them. */
+   and its buttons in one row; only a narrow one stacks them. Finger-sized,
+   the four take more of the row, so they stack a little sooner. */
 @container dock (max-width: 300px) {
   .panel { flex-wrap: wrap; height: auto; padding: 4px; gap: 0; }
   .me { flex: 1 0 100%; }
   .btns { flex: 1 0 100%; justify-content: space-evenly; }
+}
+@media (pointer: coarse) {
+  @container dock (max-width: 360px) {
+    .panel { flex-wrap: wrap; height: auto; padding: 4px; gap: 0; }
+    .me { flex: 1 0 100%; }
+    .btns { flex: 1 0 100%; justify-content: space-evenly; }
+  }
 }

@@ -28,17 +28,18 @@ func init() {
 	})
 }
 
-const userCols = `id, username, display_name, auth_hash, kdf_salt, kdf_params, public_key, enc_private_key, enc_private_key_recovery, recovery_auth_hash, avatar_id, banner_id, about_me, pronouns, accent_color, accent_color_2, status_text, status_emoji, status_expires_at, presence_pref, dm_privacy, flags, created_at, updated_at, group_link_only`
+const userCols = `id, username, display_name, auth_hash, kdf_salt, kdf_params, public_key, enc_private_key, enc_private_key_recovery, recovery_auth_hash, avatar_id, banner_id, about_me, pronouns, accent_color, accent_color_2, status_text, status_emoji, status_expires_at, presence_pref, dm_privacy, flags, created_at, updated_at, group_link_only, typing_style, tag_server_id, tag_text, tag_badge, tag_color`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
 func scanUser(r rowScanner) (*User, error) {
 	var u User
 	var recoveryHash sql.NullString
-	var avatar, banner, accent, accent2, statusExp sql.NullInt64
+	var avatar, banner, accent, accent2, statusExp, tagServer, tagColor sql.NullInt64
 	var linkOnly int64
 	err := r.Scan(&u.ID, &u.Username, &u.DisplayName, &u.AuthHash, &u.KDFSalt, &u.KDFParams, &u.PublicKey, &u.EncPrivateKey, &u.EncPrivateKeyRecovery, &recoveryHash,
-		&avatar, &banner, &u.AboutMe, &u.Pronouns, &accent, &accent2, &u.StatusText, &u.StatusEmoji, &statusExp, &u.PresencePref, &u.DMPrivacy, &u.Flags, &u.CreatedAt, &u.UpdatedAt, &linkOnly)
+		&avatar, &banner, &u.AboutMe, &u.Pronouns, &accent, &accent2, &u.StatusText, &u.StatusEmoji, &statusExp, &u.PresencePref, &u.DMPrivacy, &u.Flags, &u.CreatedAt, &u.UpdatedAt, &linkOnly,
+		&u.TypingStyle, &tagServer, &u.TagText, &u.TagBadge, &tagColor)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -50,6 +51,7 @@ func scanUser(r rowScanner) (*User, error) {
 	u.AccentColor, u.AccentColor2 = intPtr(accent), intPtr(accent2)
 	u.StatusExpiresAt = int64Ptr(statusExp)
 	u.GroupLinkOnly = linkOnly == 1
+	u.TagServerID, u.TagColor = idPtr(tagServer), intPtr(tagColor)
 	return &u, nil
 }
 
@@ -84,9 +86,10 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 			}
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(username) DO NOTHING`,
+		res, err := tx.ExecContext(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(username) DO NOTHING`,
 			int64(u.ID), u.Username, u.DisplayName, u.AuthHash, u.KDFSalt, u.KDFParams, u.PublicKey, u.EncPrivateKey, u.EncPrivateKeyRecovery, recovery,
-			nullID(u.AvatarID), nullID(u.BannerID), u.AboutMe, u.Pronouns, nullInt(u.AccentColor), nullInt(u.AccentColor2), u.StatusText, u.StatusEmoji, nullInt64(u.StatusExpiresAt), u.PresencePref, u.DMPrivacy, u.Flags, u.CreatedAt, u.UpdatedAt, boolInt(u.GroupLinkOnly))
+			nullID(u.AvatarID), nullID(u.BannerID), u.AboutMe, u.Pronouns, nullInt(u.AccentColor), nullInt(u.AccentColor2), u.StatusText, u.StatusEmoji, nullInt64(u.StatusExpiresAt), u.PresencePref, u.DMPrivacy, u.Flags, u.CreatedAt, u.UpdatedAt, boolInt(u.GroupLinkOnly),
+			u.TypingStyle, nullID(u.TagServerID), u.TagText, u.TagBadge, nullInt(u.TagColor))
 		if err != nil {
 			return err
 		}
@@ -280,6 +283,9 @@ func (s *Store) UpdateProfile(ctx context.Context, id ids.ID, p ProfilePatch) er
 	if p.GroupLinkOnly != nil {
 		set("group_link_only", boolInt(*p.GroupLinkOnly))
 	}
+	if p.TypingStyle != nil {
+		set("typing_style", *p.TypingStyle)
+	}
 	if len(sets) == 0 {
 		return nil
 	}
@@ -417,7 +423,17 @@ func (s *Store) DeleteAccount(ctx context.Context, id ids.ID) error {
 		if err := releaseBlobRefs(ctx, tx, `SELECT avatar_id FROM users WHERE id = ? UNION ALL SELECT banner_id FROM users WHERE id = ?`, int64(id), int64(id)); err != nil {
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE users SET username = ?, display_name = 'Deleted User', auth_hash = '!', enc_private_key = ?, enc_private_key_recovery = NULL, recovery_auth_hash = NULL, avatar_id = NULL, banner_id = NULL, about_me = '', pronouns = '', status_text = '', status_emoji = '', signup_invite = NULL, flags = flags | ?, updated_at = ? WHERE id = ?`, anon, []byte{}, FlagDeleted, nowMs(), int64(id))
+		// and the pictures their widgets held
+		var widgets string
+		if err := tx.QueryRowContext(ctx, `SELECT widgets FROM users WHERE id = ?`, int64(id)).Scan(&widgets); err != nil && err != sql.ErrNoRows {
+			return err
+		}
+		for img := range WidgetImages(widgets) {
+			if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - 1")+` WHERE id = ?`, int64(img)); err != nil {
+				return err
+			}
+		}
+		res, err := tx.ExecContext(ctx, `UPDATE users SET username = ?, display_name = 'Deleted User', auth_hash = '!', enc_private_key = ?, enc_private_key_recovery = NULL, recovery_auth_hash = NULL, avatar_id = NULL, banner_id = NULL, about_me = '', pronouns = '', status_text = '', status_emoji = '', typing_style = '', tag_server_id = NULL, tag_text = '', tag_badge = '', tag_color = NULL, widgets = '', signup_invite = NULL, flags = flags | ?, updated_at = ? WHERE id = ?`, anon, []byte{}, FlagDeleted, nowMs(), int64(id))
 		if err != nil {
 			return err
 		}

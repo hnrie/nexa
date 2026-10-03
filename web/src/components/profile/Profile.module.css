@@ -25,7 +25,7 @@
   color: var(--text);
   box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high);
 }
-.card[data-variant="modal"] { --ring: 7px; --av-left: 24px; }
+.card[data-variant="modal"] { --ring: 7px; --av-left: 24px; width: 100%; }
 .card[data-variant="panel"] { width: 100%; min-height: 100%; border-radius: 0; background: var(--bg-base); box-shadow: none; --sheet-bg: color-mix(in oklab, var(--bg-raised) 70%, var(--bg-base)); }
 
 /* no colours of its own: a glow of the banner's main colour comes down from the top of the card */
@@ -225,4 +225,84 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (pointer: coarse) {
   .requestBtn { height: 40px; padding: 0 16px; }
+}
+
+/*
+ * The full profile in two columns: the person on a card of their own down the
+ * left, and their widgets, what they are doing and what you have in common
+ * behind tabs on the right. It keeps one height whatever is on it, so a long
+ * profile scrolls inside its columns rather than growing past the window.
+ */
+.card[data-layout="wide"] {
+  --av-left: 20px;
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 16px;
+  height: min(720px, var(--profile-max-h, calc(100dvh - 48px)));
+  padding: 12px;
+}
+.side {
+  min-height: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  border-radius: calc(var(--radius-lg) - 4px);
+  background: var(--sheet-bg);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle);
+}
+.card[data-layout="wide"] .side .info { gap: 14px; padding: calc(var(--av) * 0.4 + 14px) 20px 20px; }
+.card[data-layout="wide"] .side .display { font-size: 25px; }
+/* the left card is the sheet: what it says sits straight on it */
+.card[data-layout="wide"] .side .sheet { padding: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.main { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+.tabsBar { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.tabPanel { min-height: 0; }
+.card[data-layout="wide"] .tabPanel { flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-bottom: 2px; }
+.closeBtn { flex: none; margin-inline-start: auto; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); transition: background var(--transition), color var(--transition); }
+.closeBtn:hover { background: var(--bg-hover); color: var(--text-strong); }
+
+/* the tabs: the same sunken strip with a raised choice as the Friends page's */
+.tabs { display: flex; align-items: center; gap: 2px; min-width: 0; padding: 3px; border-radius: 12px; background: var(--bg-input); box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 45%, transparent), inset 0 0 0 1px var(--border-subtle); overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 9px; color: var(--text-muted); font-size: 14.5px; font-weight: 600; white-space: nowrap; transition: background-color var(--transition), color var(--transition), box-shadow var(--transition); }
+.tab:hover { color: var(--text-strong); }
+.tab[data-selected="true"] { background: var(--sheen), var(--bg-surface); color: var(--text-strong); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-low); }
+.tab:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.tabCount { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-active); color: var(--text-subtle); font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* a tab's own heading and button: Your Widgets, and the way to change them */
+.panelHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.panelHead h3 { margin: 0; font-size: 12.5px; line-height: 16px; font-weight: 700; letter-spacing: 0.01em; color: var(--text-muted); }
+.panelBtn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: var(--radius-pill); background: var(--profile-chip); color: var(--text-strong); font-size: 13.5px; font-weight: 650; box-shadow: inset 0 1px 0 var(--edge-light); transition: background var(--transition); }
+.panelBtn:hover { background: var(--profile-chip-hover); }
+.emptyTab { margin: 0; padding: 32px 12px; text-align: center; font-size: 14px; line-height: 1.45; color: var(--text-muted); }
+
+/*
+ * One column, on a phone or anywhere else too narrow for two: the person at
+ * the top, then the tabs, which stay at the top of the sheet as it scrolls,
+ * so another tab is a tap away however far down one has been read.
+ */
+/* clipped to its corners without being a scroller itself, which would keep the tabs from staying put */
+.card[data-layout="narrow"] { overflow: clip; }
+.card[data-layout="narrow"] .info { gap: 14px; padding: calc(var(--av) * 0.4 + 14px) 16px 14px; }
+.card[data-layout="narrow"] .tabsBar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--bg-floating) 84%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: 0 1px 0 var(--border-subtle);
+}
+.card[data-layout="narrow"][data-themed] .tabsBar { background: var(--sheet-bg); }
+/* clear of the handle a phone's sheet is pulled by, which stays at its top */
+@media (max-width: 767px) {
+  .card[data-layout="narrow"] .tabsBar { padding-top: 18px; }
+}
+.card[data-layout="narrow"] .tabs { flex: 1; }
+.card[data-layout="narrow"] .tab { flex: 1 0 auto; }
+.card[data-layout="narrow"] .tabPanel { padding: 12px 16px 20px; }
+@media (pointer: coarse) {
+  .tab { height: 36px; }
 }

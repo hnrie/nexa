@@ -13,6 +13,7 @@ import (
 	"evilion.xyz/chat/internal/config"
 	"evilion.xyz/chat/internal/discordsync"
 	"evilion.xyz/chat/internal/egress"
+	"evilion.xyz/chat/internal/games"
 	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
@@ -102,6 +103,8 @@ type Server struct {
 	limHookMgr      *ratelimit.Limiter
 	limVote         *ratelimit.Limiter
 	limDiscord      *ratelimit.Limiter
+	// limTag paces changes to a server's tag, which reach everyone wearing it
+	limTag *ratelimit.Limiter
 
 	// handoffs are sealed sign-ins on their way from a moved address to Nexa's own (handoff.go)
 	handoffs handoffStore
@@ -113,6 +116,9 @@ type Server struct {
 	Egress *egress.Proxy
 	// Apps looks up Discord Rich Presence applications for activities.
 	Apps *rpcapps.Cache
+	// Games searches the games people put on their profile widgets, and keeps
+	// their covers (internal/games); off without IGDB credentials.
+	Games *games.Client
 	// activityHub resolves activity previews the way the gateway shows them.
 	activityHub *gateway.Hub
 	// Discord shows linked Discord accounts' activity (nil when not configured; see WireDiscord).
@@ -263,6 +269,8 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limVote: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
 		// linking Discord and rejoining its activity server, per account: each calls Discord
 		limDiscord: ratelimit.New(ratelimit.Every(10, time.Minute), 10, 10*time.Minute),
+		// each change can repaint every wearer's profile everywhere it is shown
+		limTag: ratelimit.New(ratelimit.Every(20, time.Hour), 10, 2*time.Hour),
 	}
 }
 
@@ -275,7 +283,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"upload": s.limUpload, "unfurl": s.limUnfurl, "proxy": s.limProxy, "youtube": s.limYouTube, "refresh": s.limRefresh, "voice": s.limVoice,
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
 		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile,
-		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord,
+		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord, "server-tag": s.limTag,
 		"note": s.limNote, "note-save": s.limNoteSave, "note-update": s.limNoteUpdate, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,
 	}
 }

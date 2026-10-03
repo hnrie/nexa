@@ -64,6 +64,11 @@ type Config struct {
 	// KlipyAPIKey enables GIF search. Without it the picker still offers
 	// whatever has been favourited.
 	KlipyAPIKey string
+	// IGDBClientID and IGDBClientSecret (a Twitch developer application's)
+	// turn on searching games for profile widgets (internal/games). Without
+	// them people add games by name with a picture of their own.
+	IGDBClientID     string
+	IGDBClientSecret string
 	// TelegramBotToken enables Telegram sticker pack imports. The token never
 	// leaves this server: the client only ever sends a pack URL.
 	TelegramBotToken string
@@ -163,6 +168,8 @@ func Load(getenv func(string) string) (Config, error) {
 	str("TURN_KEY_ID", &c.TurnKeyID)
 	str("TURN_API_TOKEN", &c.TurnAPIToken)
 	str("KLIPY_API_KEY", &c.KlipyAPIKey)
+	str("IGDB_CLIENT_ID", &c.IGDBClientID)
+	str("IGDB_CLIENT_SECRET", &c.IGDBClientSecret)
 	str("TELEGRAM_BOT_TOKEN", &c.TelegramBotToken)
 	str("DISCORD_CLIENT_ID", &c.DiscordClientID)
 	str("DISCORD_CLIENT_SECRET", &c.DiscordClientSecret)

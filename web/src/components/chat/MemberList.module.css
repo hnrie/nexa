@@ -14,6 +14,8 @@
 .name { display: flex; align-items: center; gap: 4px; font-size: 15.5px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sub { font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crown { color: var(--warning); flex: none; }
+/* a long name gives way to the crown and the tag after it, rather than pushing them out of sight */
+.nameText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* On phones, tablets and narrow windows the list slides in from the right over
    the conversation (ChatView's useIsNarrow). It is mounted as it opens, so the
    slide-in is an animation; the slide-out is the transition. */

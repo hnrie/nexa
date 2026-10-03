@@ -36,6 +36,20 @@ export interface PublicUser {
    */
   group_link_only?: boolean;
   created_at: number;
+  /** How "is typing…" looks for them (lib/typingStyle), or null for the plain one. Read with readTypingStyle. */
+  typing_style?: unknown;
+  /** The server tag they wear beside their name, or null. */
+  server_tag?: WornTag | null;
+}
+
+/** A server's tag as someone wears it: its letters, its badge and its colour. */
+export interface WornTag {
+  server_id: Snowflake;
+  text: string;
+  /** "icon:<name>" for a badge every server has, "image:<id>" for the server's own picture. */
+  badge: string;
+  /** 0xRRGGBB, or null for the accent colour. */
+  color: number | null;
 }
 
 /** The extra fields the server only ever hands to the account's owner. */
@@ -110,6 +124,33 @@ export interface Server {
   default_notifications: number;
   flags: number;
   created_at: number;
+  /** The tag its members can wear beside their name (lib/serverTags), or null. */
+  tag?: ServerTag | null;
+}
+
+/** A server's tag, as its members and admins see it. */
+export interface ServerTag {
+  text: string;
+  /** "icon:<name>" for a badge every server has, "image:<id>" for the server's own picture. */
+  badge: string;
+  /** 0xRRGGBB, or null for the accent colour. */
+  color: number | null;
+  /** Kept to members with one of `roles` (and whoever runs the server). */
+  limited: boolean;
+  roles: Snowflake[];
+  /** Whoever opens the tag can join the server from it. */
+  join: boolean;
+}
+
+/** What opening someone's tag shows: the server it is from, and what the viewer can do there. */
+export interface ServerTagPreview {
+  server: { id: Snowflake; name: string; icon_id: Snowflake | null; banner_id: Snowflake | null; description: string; member_count: number; online_count: number };
+  tag: { text: string; badge: string; color: number | null };
+  member: boolean;
+  /** For a member: whether they may wear it. */
+  can_wear?: boolean;
+  /** For someone outside it: the invite to join through, when the server lets people join from its tag. */
+  invite?: string;
 }
 
 export interface Member {

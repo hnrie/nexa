@@ -23,7 +23,7 @@ func (s *Server) modServerRoutes(mux *http.ServeMux) {
 }
 
 // serverResetFields are what a server_reset can take back.
-var serverResetFields = []string{"icon", "banner", "name", "description"}
+var serverResetFields = []string{"icon", "banner", "name", "description", "tag"}
 
 // modServerView is a server in the panel, and whether this moderator may act on it.
 type modServerView struct {
@@ -180,7 +180,7 @@ func (s *Server) handleModServerAction(w http.ResponseWriter, r *http.Request) {
 	var fields []string
 	for _, f := range req.Fields {
 		if !OneOf(f, serverResetFields...) {
-			WriteError(w, E(http.StatusBadRequest, "unknown_field", "Only a server's icon, banner, name and description can be taken back."))
+			WriteError(w, E(http.StatusBadRequest, "unknown_field", "Only a server's icon, banner, name, description and tag can be taken back."))
 			return
 		}
 		if !chosen[f] {
@@ -202,8 +202,19 @@ func (s *Server) handleModServerAction(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "field_empty", "That server has no description to clear."))
 		return
 	}
-	reset := store.ModServerReset{Icon: chosen["icon"], Banner: chosen["banner"], Description: chosen["description"]}
+	var tag *store.ServerTag
+	if chosen["tag"] {
+		if m.Tag == nil {
+			WriteError(w, E(http.StatusBadRequest, "no_tag", "That server has no tag to remove."))
+			return
+		}
+		tag = m.Tag
+	}
+	reset := store.ModServerReset{Icon: chosen["icon"], Banner: chosen["banner"], Description: chosen["description"], Tag: tag != nil}
 	oldVals, newVals := map[string]string{}, map[string]string{}
+	if tag != nil {
+		oldVals["tag"], newVals["tag"] = tag.Text, ""
+	}
 	if chosen["name"] {
 		name := resetPrefix + randomSuffix()
 		reset.Name = &name
@@ -218,6 +229,18 @@ func (s *Server) handleModServerAction(w http.ResponseWriter, r *http.Request) {
 	if err := s.Store.ModResetServer(ctx, c, m.ID, reset, log); err != nil {
 		WriteError(w, err)
 		return
+	}
+	if tag != nil {
+		// gone from the server, so off everyone wearing it, with its badge and the invite kept for it
+		if img, ok := store.TagImage(tag.Badge); ok {
+			s.releaseBlob(ctx, img)
+		}
+		if tag.Invite != "" {
+			_ = s.Store.DeleteInvite(ctx, tag.Invite)
+		}
+		if taken, err := s.Store.TakeOffTags(ctx, m.ID, nil); err == nil {
+			s.tagChanged(ctx, taken)
+		}
 	}
 	if updated, err := s.Store.ServerByID(ctx, m.ID); err == nil {
 		s.emitServer(ctx, m.ID, "server_update", updated)

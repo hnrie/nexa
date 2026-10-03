@@ -65,7 +65,7 @@
  * the theme's own surfaces, so it reads on a dark rail and on a light one.
  */
 .folder { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.folder[data-open="true"] { width: 58px; padding-bottom: 5px; border-radius: 18px; background: color-mix(in srgb, var(--folder) 16%, var(--bg-canvas)); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px color-mix(in srgb, var(--folder) 24%, transparent); }
+.folder[data-open="true"] { width: 58px; padding-bottom: 5px; border-radius: 18px; background: color-mix(in srgb, var(--folder) 16%, var(--bg-canvas)); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px color-mix(in srgb, var(--folder) 24%, transparent); transition: background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
 .folderBtn { border-radius: 16px; background: var(--sheen), color-mix(in srgb, var(--folder) 34%, var(--bg-surface)); color: color-mix(in srgb, var(--folder) 72%, var(--text-strong)); }
 .item.folderItem:hover .btn.folderBtn, .item.folderItem[data-selected="true"] .btn.folderBtn { background: var(--sheen), color-mix(in srgb, var(--folder) 52%, var(--bg-surface)); color: color-mix(in srgb, var(--folder) 72%, var(--text-strong)); box-shadow: inset 0 1px 0 var(--edge-light-strong), 0 0 0 1px var(--panel-edge), var(--shadow-medium); }
 .folder[data-open="true"] .btn.folderBtn { background: transparent; box-shadow: none; }
@@ -78,6 +78,16 @@
 .folder[data-open="true"] .pill { inset-inline-start: -7px; }
 .folder[data-open="true"] .badge { inset-inline-end: -2px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--folder) 16%, var(--bg-canvas)); }
 .folder[data-open="true"] .item[data-drop="before"]::before, .folder[data-open="true"] .item[data-drop="after"]::after { inset-inline: 4px; }
+/*
+ * In or out of a folder, said twice so it is never a guess. A server about to
+ * land among a folder's servers lights the folder's sleeve, and its line is
+ * drawn inside the sleeve: under the last server, in the sleeve's own foot
+ * rather than across its edge. One about to land beside an open folder gets a
+ * line wider than the sleeve, outside it, and the sleeve stays as it was.
+ */
+.folder[data-into] { background: color-mix(in srgb, var(--folder) 26%, var(--bg-canvas)); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 2px color-mix(in srgb, var(--folder) 70%, transparent), 0 6px 18px -8px color-mix(in srgb, var(--folder) 80%, transparent); }
+.folder[data-open="true"] > .item:last-child[data-drop="after"]::after { bottom: -4px; }
+.folder[data-open="true"][data-drop="before"]::before, .folder[data-open="true"][data-drop="after"]::after { inset-inline: -2px; }
 
 /* picking several servers (stores/pick.ts): the circle in the tile's top corner, and a picked tile ringed in the accent */
 .pickMark { position: absolute; top: -3px; inset-inline-start: calc(50% - 28px); z-index: 2; pointer-events: none; filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--shade) 60%, transparent)); }

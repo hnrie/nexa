@@ -35,16 +35,23 @@ type ModServerFilter struct {
 const modServerCountCols = `(SELECT count(*) FROM server_members m WHERE m.server_id = s.id),
 	(SELECT count(*) FROM channels c WHERE c.server_id = s.id AND c.type <> 'category')`
 
+// modServerCols is what the panel reads of a server: everything a member
+// sees, its tag included, and how many members and channels it has.
+var modServerCols = prefixed("s", serverCols) + `, ` + prefixed("s", serverTagCols) + `, ` + modServerCountCols
+
 func scanModServer(r rowScanner) (*ModServer, error) {
 	var m ModServer
-	var icon, banner, system sql.NullInt64
-	if err := r.Scan(&m.ID, &m.Name, &icon, &banner, &m.OwnerID, &m.Description, &system, &m.DefaultNotifications, &m.Flags, &m.CreatedAt, &m.MemberCount, &m.ChannelCount); err != nil {
+	var icon, banner, system, tagColor sql.NullInt64
+	var tagText, tagBadge, tagRoles, tagInvite string
+	if err := r.Scan(&m.ID, &m.Name, &icon, &banner, &m.OwnerID, &m.Description, &system, &m.DefaultNotifications, &m.Flags, &m.CreatedAt,
+		&tagText, &tagBadge, &tagColor, &tagRoles, &tagInvite, &m.MemberCount, &m.ChannelCount); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
 	m.IconID, m.BannerID, m.SystemChannelID = idPtr(icon), idPtr(banner), idPtr(system)
+	m.Tag = tagOf(tagText, tagBadge, tagColor, tagRoles, tagInvite)
 	return &m, nil
 }
 
@@ -53,7 +60,7 @@ func (s *Store) ModServers(ctx context.Context, f ModServerFilter) ([]*ModServer
 	if f.Limit <= 0 || f.Limit > 120 {
 		f.Limit = 60
 	}
-	q := `SELECT ` + prefixed("s", serverCols) + `, ` + modServerCountCols + ` FROM servers s`
+	q := `SELECT ` + modServerCols + ` FROM servers s`
 	var args []any
 	if term := strings.TrimSpace(strings.ToLower(f.Query)); term != "" {
 		like := "%" + escapeLike(term) + "%"
@@ -95,7 +102,7 @@ func (s *Store) ModServers(ctx context.Context, f ModServerFilter) ([]*ModServer
 
 // ModServerByID loads one server for the panel.
 func (s *Store) ModServerByID(ctx context.Context, id ids.ID) (*ModServer, error) {
-	return scanModServer(s.db.R.QueryRowContext(ctx, `SELECT `+prefixed("s", serverCols)+`, `+modServerCountCols+` FROM servers s WHERE s.id = ?`, int64(id)))
+	return scanModServer(s.db.R.QueryRowContext(ctx, `SELECT `+modServerCols+` FROM servers s WHERE s.id = ?`, int64(id)))
 }
 
 // CountServers is how many servers there are.
@@ -151,6 +158,9 @@ type ModServerReset struct {
 	Banner      bool
 	Name        *string
 	Description bool
+	// Tag takes the server's tag away. Taking it off the people wearing it,
+	// and letting its badge and invite go, is the caller's to do after.
+	Tag bool
 }
 
 // ModResetServer takes back parts of what a server shows everyone and opens
@@ -187,6 +197,9 @@ func (s *Store) ModResetServer(ctx context.Context, c *ModCase, serverID ids.ID,
 		}
 		if f.Description {
 			sets = append(sets, "description = ''")
+		}
+		if f.Tag {
+			sets = append(sets, "tag_text = ''", "tag_badge = ''", "tag_color = NULL", "tag_roles = ''", "tag_invite = ''")
 		}
 		if len(sets) == 0 {
 			return errors.New("server reset: nothing to reset")

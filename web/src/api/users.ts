@@ -1,6 +1,7 @@
 import { api } from "./client";
 import type { PurgeCounts } from "./moderation";
 import type { KdfParamsJson, MeUser, PublicUser, SettingsBlob, Snowflake } from "./types";
+import type { TypingStyle } from "@/lib/typingStyle";
 
 export type MePatch = Partial<{
   username: string;
@@ -15,6 +16,8 @@ export type MePatch = Partial<{
   presence_pref: MeUser["presence_pref"];
   dm_privacy: MeUser["dm_privacy"];
   group_link_only: boolean;
+  /** null for the plain "is typing…" (lib/typingStyle). */
+  typing_style: TypingStyle | null;
 }>;
 
 type Progress = (loaded: number, total: number) => void;
@@ -45,8 +48,22 @@ export const users = {
   get(id: Snowflake): Promise<PublicUser> {
     return api.request<PublicUser>("GET", `/users/${id}`);
   },
-  profile(id: Snowflake): Promise<{ user: PublicUser; mutual_friends: Snowflake[]; mutual_servers: Snowflake[] }> {
+  /** The whole profile: with the mutual friends and servers, and its widgets (read with readWidgets). */
+  profile(id: Snowflake): Promise<{ user: PublicUser; mutual_friends: Snowflake[]; mutual_servers: Snowflake[]; widgets?: unknown }> {
     return api.request("GET", `/users/${id}/profile`);
+  },
+  /** Replaces the account's widgets (lib/widgets), as the server cleaned them. */
+  setWidgets(widgets: unknown[]): Promise<{ widgets: unknown }> {
+    return api.request("PUT", "/users/@me/widgets", { widgets });
+  },
+  /** A picture for a widget, sent whole with the part framed; the server cuts it in this shape. */
+  uploadWidgetImage(file: Blob, crop: { x: number; y: number; w: number; h: number } | null, shape: "wide" | "square" | "cover"): Promise<{ id: Snowflake; shape: string }> {
+    const q = new URLSearchParams({ shape, ...(crop ? { x: String(crop.x), y: String(crop.y), w: String(crop.w), h: String(crop.h) } : {}) });
+    return api.upload(`/users/@me/widgets/image?${q.toString()}`, file, { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" } });
+  },
+  /** Games on IGDB by name, found by this server; `ready` is false where game search is not set up. */
+  searchGames(q: string): Promise<{ games: { id: string; name: string; cover?: string; year?: number }[]; ready: boolean }> {
+    return api.request("GET", `/games/search?q=${encodeURIComponent(q)}`);
   },
   /**
    * The profile a profile link shows (lib/profileLinks), which anyone may ask
@@ -54,7 +71,7 @@ export const users = {
    * status or encryption key. Never put it in the users store, where it would
    * stand in for the full record.
    */
-  shared(username: string): Promise<PublicUser> {
+  shared(username: string): Promise<PublicUser & { widgets?: unknown }> {
     return api.request("GET", `/profiles/${encodeURIComponent(username)}`);
   },
   search(q: string): Promise<PublicUser[]> {

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { t, useLocale } from "@/i18n";
 import { gateway } from "@/gateway/session";
 import { desktopBridge, type DisplaySourceRequest, type RpcActivity } from "@/lib/desktopBridge";
+import { accelerator, KEYBIND_ACTIONS, keybindsOf, type KeybindAction } from "@/lib/keybinds";
+import { runKeybind } from "@/lib/keybindActions";
 import { unreadTotal } from "@/lib/title";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -18,7 +20,8 @@ import { DisplayPicker } from "./DisplayPicker";
  * Everything the page does for the desktop app while it runs inside it: sends
  * Rich Presence activities to chatd, tells the app who is signed in, how many
  * messages wait and whether a call is on, answers the tray's Mute and Deafen,
- * and shows the screen picker. Renders nothing in a browser.
+ * holds the keybinds system-wide, and shows the screen picker. Renders nothing
+ * in a browser.
  */
 export function DesktopEffects() {
   const [picker, setPicker] = useState<DisplaySourceRequest | null>(null);
@@ -128,6 +131,46 @@ export function DesktopEffects() {
       }),
     );
     offs.push(bridge.onDisplaySources((req) => setPicker(req)));
+
+    // The keybinds, held system-wide so they answer with a game or anything
+    // else in front (app 1.2.2 and later). The whole set goes each time it
+    // changes; the app says which keys it got.
+    if (bridge.setShortcuts && bridge.onShortcut) {
+      const setShortcuts = bridge.setShortcuts;
+      offs.push(
+        bridge.onShortcut((action) => {
+          if ((KEYBIND_ACTIONS as string[]).includes(action)) runKeybind(action as KeybindAction);
+        }),
+      );
+      let held = "";
+      const hold = () => {
+        const st = useSettings.getState().settings;
+        const binds = keybindsOf(st.keybinds);
+        const list = st.backgroundKeybinds === false ? [] : KEYBIND_ACTIONS.flatMap((action) => {
+          const accel = accelerator(binds[action]);
+          return accel ? [{ action, accelerator: accel }] : [];
+        });
+        const key = JSON.stringify(list);
+        if (key === held) return;
+        held = key;
+        void setShortcuts(list)
+          .then((res) => {
+            if (held !== key) return;
+            if (list.length === 0) useDesktop.getState().setShortcuts(null);
+            else useDesktop.getState().setShortcuts(Object.fromEntries(res.map((r) => [r.action, r.ok])));
+          })
+          .catch(() => useDesktop.getState().setShortcuts(null));
+      };
+      hold();
+      offs.push(useSettings.subscribe((s, prev) => {
+        if (s.settings.keybinds !== prev.settings.keybinds || s.settings.backgroundKeybinds !== prev.settings.backgroundKeybinds) hold();
+      }));
+      // signed out, nobody's keys are held
+      offs.push(() => {
+        void setShortcuts([]).catch(() => undefined);
+        useDesktop.getState().setShortcuts(null);
+      });
+    }
     void bridge.updates.getState().then((u) => useDesktop.getState().setUpdate(u));
     offs.push(bridge.updates.onState((u) => useDesktop.getState().setUpdate(u)));
 

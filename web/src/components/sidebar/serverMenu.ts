@@ -10,6 +10,8 @@ import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { copyAndSay } from "@/lib/copyText";
 import { openMenuItems } from "./openMenu";
+import { canWearTag } from "@/lib/serverTags";
+import { wearServerTag } from "@/components/settings/ServerTagChooser";
 
 import { t } from "@/i18n";
 export interface MenuCtx {
@@ -73,6 +75,10 @@ export function serverMenuItems(serverId: string, ctx: MenuCtx): ContextMenuItem
   items.push({ id: "mute", label: muted ? t("sidebar.serverMenu.unmuteServer") : t("sidebar.serverMenu.muteServer"), onSelect: () => toggleMuted(serverId) });
   items.push({ id: "notif", label: t("modals.serverNotifications.notificationSettings"), onSelect: () => ctx.openModal("serverNotifications", { serverId }), separatorAfter: true });
   items.push({ id: "profile", label: t("sidebar.serverMenu.editServerProfile"), onSelect: () => ctx.openModal("serverProfile", { serverId }) });
+  // its tag, beside your name everywhere: on with one press, and off again
+  const tag = st.server.tag;
+  if (tag && me?.server_tag?.server_id === serverId) items.push({ id: "tagOff", label: t("serverTag.menu.takeOff"), onSelect: () => void wearServerTag(null) });
+  else if (tag && canWearTag(st)) items.push({ id: "tagOn", label: t("serverTag.menu.wear", { tag: tag.text }), onSelect: () => void wearServerTag(serverId, tag.text) });
   if (!owner) {
     items.push({
       id: "leave",

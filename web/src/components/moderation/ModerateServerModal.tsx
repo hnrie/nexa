@@ -11,10 +11,11 @@ import { fieldLabel, personName, previewText } from "@/lib/moderation";
 import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
 import { ServerIcon } from "./ProfileSheet";
+import { ServerTagChip } from "@/components/servertag/ServerTagChip";
 import m from "./Moderation.module.css";
 
 const MAX_REASON = 1000;
-const FIELDS: ServerField[] = ["icon", "banner", "name", "description"];
+const FIELDS: ServerField[] = ["icon", "banner", "name", "description", "tag"];
 
 /**
  * Taking down parts of what a server shows everyone: its icon, banner, name
@@ -23,7 +24,7 @@ const FIELDS: ServerField[] = ["icon", "banner", "name", "description"];
  */
 export function ModerateServerModal({ server, owner, preset, onClose, onDone }: { server: ModServer; owner: Person | undefined; preset?: ServerField[] | undefined; onClose: () => void; onDone: (c: StaffCase) => void }) {
   const toast = useUI((u) => u.toast);
-  const empty: Record<ServerField, boolean> = { icon: !server.icon_id, banner: !server.banner_id, name: false, description: !server.description };
+  const empty: Record<ServerField, boolean> = { icon: !server.icon_id, banner: !server.banner_id, name: false, description: !server.description, tag: !server.tag };
   const [fields, setFields] = useState<ServerField[]>((preset ?? []).filter((f) => !empty[f]));
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -54,6 +55,8 @@ export function ModerateServerModal({ server, owner, preset, onClose, onDone }: 
     switch (f) {
       case "icon":
         return server.icon_id ? <ServerIcon id={server.id} iconId={server.icon_id} name={server.name} size={32} /> : null;
+      case "tag":
+        return server.tag ? <ServerTagChip tag={{ server_id: server.id, text: server.tag.text, badge: server.tag.badge, color: server.tag.color ?? null }} open={false} /> : null;
       case "banner":
         return <span className={m.bannerPreview} style={server.banner_id ? { backgroundImage: `url(${bannerUrl(server.banner_id, 160)})` } : { background: profileTheme(null, null, server.id) }} aria-hidden="true" />;
       default:
@@ -64,6 +67,7 @@ export function ModerateServerModal({ server, owner, preset, onClose, onDone }: 
     if (empty[f]) return t("moderation.form.none");
     if (f === "name") return server.name;
     if (f === "description") return previewText(server.description);
+    if (f === "tag") return server.tag?.text ?? "";
     return f === "icon" ? t("moderation.servers.iconSet") : t("moderation.form.bannerSet");
   };
   const quick = [t("moderation.quick.hateful"), t("moderation.quick.impersonation"), t("moderation.quick.spam"), t("moderation.quick.harassment"), t("moderation.quick.explicit"), t("moderation.servers.quickScam")];

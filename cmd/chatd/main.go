@@ -7,8 +7,8 @@ import (
 	"crypto/rand"
 	"errors"
 	"flag"
-	"io"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -27,6 +27,7 @@ import (
 	"evilion.xyz/chat/internal/config"
 	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/egress"
+	"evilion.xyz/chat/internal/games"
 	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
@@ -135,6 +136,12 @@ func main() {
 		srv.Unfurl.Fetcher.Resolver = out.Resolver()
 		srv.Apps = rpcapps.New()
 		srv.Apps.Client.Transport = out.Transport()
+	}
+	// the games people put on their profiles, searched on IGDB and their covers kept, here for everyone
+	srv.Games = games.New(cfg.IGDBClientID, cfg.IGDBClientSecret, filepath.Join(cfg.DataDir, "games"))
+	srv.Games.Log = log
+	if out != nil {
+		srv.Games.HTTP.Transport = out.Transport()
 	}
 	hub := gateway.New(st, srv.Auth, log, cfg.Origins())
 	srv.Bcast = hub

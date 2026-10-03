@@ -25,6 +25,7 @@ import { copyAndSay } from "@/lib/copyText";
 import { isInstanceAdmin } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
 import { useAuth } from "@/stores/auth";
+import { UserTag } from "@/components/servertag/UserTag";
 import s from "@/components/friends/Friends.module.css";
 import { ReportBugButton } from "@/components/bugs/ReportBugButton";
 import bugStyles from "@/components/bugs/Bugs.module.css";
@@ -356,6 +357,7 @@ function FriendRow({ rel, presenceUser, order, picking, picked }: { rel: Relatio
             ) : isInstanceAdmin(rel.user.id) || (rel.user.flags & 1) !== 0 ? (
               <span className={s.rowBadge}><AdminHammer size={14} /></span>
             ) : null}
+            <UserTag userId={rel.user.id} size="sm" />
             <span className={s.rowUser}>{presenceUser.username}</span>
           </span>
           {/* On a touch screen the username is never hovered into view, and it

@@ -9,6 +9,10 @@ import { profileTheme } from "@/lib/avatarColor";
 import { copyAndSay } from "@/lib/copyText";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { FLAG_ADMIN, FLAG_DELETED, FLAG_DISABLED, fieldLabel, fullDate, previewText } from "@/lib/moderation";
+import { readTypingStyle, typingStyleText } from "@/lib/typingStyle";
+import { readWidgets, widgetsText } from "@/lib/widgets";
+import { widgetTitle } from "@/components/profile/Widgets";
+import { ServerTagChip } from "@/components/servertag/ServerTagChip";
 import { formatRelative, formatShortDate } from "@/lib/time";
 import { Markdown } from "@/markdown";
 import { usePresence } from "@/stores/presence";
@@ -60,6 +64,8 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
   const reset = (f: ResetField) => onModerate({ action: "field_reset", preset: { fields: [f] } });
   const status = [user.status_emoji, user.status_text].filter(Boolean).join(" ");
   const nicknamed = servers.filter((s) => s.nickname);
+  const typing = typingStyleText(readTypingStyle(user.typing_style));
+  const widgets = widgetsText(readWidgets(user.widgets), widgetTitle);
   const owned = servers.filter((s) => s.owner);
 
   const rows: { part: Part; label: string; value: ReactNode; empty: boolean; action: string; icon: ReactNode; danger?: boolean; run: () => void; testid: string }[] = [
@@ -133,6 +139,47 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
       icon: <Eraser size={15} aria-hidden="true" />,
       run: () => reset("nicknames"),
       testid: "sheet-nicknames",
+    },
+    {
+      part: null,
+      label: fieldLabel("typing_style"),
+      value: typing ? <bdi>{typing}</bdi> : t("moderation.sheet.notSet"),
+      empty: !typing,
+      action: t("moderation.sheet.clear"),
+      icon: <Eraser size={15} aria-hidden="true" />,
+      run: () => reset("typing_style"),
+      testid: "sheet-typing_style",
+    },
+    {
+      part: null,
+      label: fieldLabel("widgets"),
+      value: widgets.length ? (
+        <ul className={p.nickList}>
+          {widgets.map((w, i) => (
+            <li key={i}>
+              <span className={p.nickServer}>{w.title}</span>
+              <bdi className={p.nick}>{w.text}</bdi>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        t("moderation.sheet.none")
+      ),
+      empty: widgets.length === 0,
+      action: t("moderation.sheet.removeAll"),
+      icon: <Eraser size={15} aria-hidden="true" />,
+      run: () => reset("widgets"),
+      testid: "sheet-widgets",
+    },
+    {
+      part: null,
+      label: fieldLabel("server_tag"),
+      value: user.server_tag ? <ServerTagChip tag={user.server_tag} open={false} /> : t("moderation.sheet.none"),
+      empty: !user.server_tag,
+      action: t("moderation.sheet.takeOff"),
+      icon: <Eraser size={15} aria-hidden="true" />,
+      run: () => reset("server_tag"),
+      testid: "sheet-server_tag",
     },
   ];
 

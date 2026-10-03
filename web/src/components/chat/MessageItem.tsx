@@ -43,6 +43,7 @@ import { buildMessageMenu, canDelete, canEdit, canRemoveEmbeds, confirmRemoveEmb
 import { useRowActive } from "./activeRow";
 import { useShownName } from "./useShownName";
 import { HookAvatar, HookPopout, HookTags } from "./webhook/HookHeader";
+import { UserTag } from "@/components/servertag/UserTag";
 import { HookBody } from "./webhook/HookBody";
 import { HookPoll } from "./webhook/HookPoll";
 import { hookText } from "@/lib/webhookMessage";
@@ -281,7 +282,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           </button>
           <div className={s.headerRow} id={whoId}>
             <button type="button" className={s.author} data-author={msg.author_id} data-webhook={msg.webhook_id} style={color ? { color } : undefined} onClick={profile} dir="auto" aria-haspopup={hook ? "dialog" : undefined}>{name}</button>
-            {hook ? <HookTags /> : null}
+            {hook ? <HookTags /> : <UserTag userId={msg.author_id} />}
             <HeaderTime at={msg.created_at} />
           </div>
           {hookCard && hook && msg.webhook_id ? <HookPopout hook={hook} webhookId={msg.webhook_id} anchor={hookCard} onClose={closeHookCard} /> : null}

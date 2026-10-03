@@ -3,12 +3,12 @@ import { t } from "@/i18n";
 import { Tooltip } from "./Tooltip";
 import s from "./OwnerBadge.module.css";
 
-/** The owner's crown: the same Crown icon used for server owners, cycling rainbow. */
+/** The owner's crown: the Crown icon server owners have, in the accent rather than gold. */
 export function OwnerCrown({ size = 14 }: { size?: number }) {
   return <Crown size={size} className={s.crown} aria-label={t("profile.profileCard.owner")} />;
 }
 
-/** The owner's badge: crown plus "Owner" in animated rainbow text. */
+/** The owner's badge: the crown and "Owner" on a pill in the accent, as the admin panel draws staff. */
 export function OwnerBadge() {
   return (
     <Tooltip text={t("profile.profileCard.ownerTip")} side="top">
@@ -20,12 +20,12 @@ export function OwnerBadge() {
   );
 }
 
-/** A Nexa admin's mark: a hammer, cycling the rainbow the way the owner's crown does. */
+/** A Nexa admin's mark: a hammer, in the accent as the owner's crown is. */
 export function AdminHammer({ size = 14 }: { size?: number }) {
   return <Hammer size={size} className={s.hammer} role="img" aria-label={t("profile.profileCard.admin")} />;
 }
 
-/** A Nexa admin's badge: the hammer plus "Admin" in animated rainbow text. */
+/** A Nexa admin's badge: the hammer and "Admin" on the same pill as the owner's. */
 export function AdminBadge() {
   return (
     <Tooltip text={t("profile.profileCard.adminTip")} side="top">

@@ -46,9 +46,12 @@ export function profileLinkItem(userId: string): ContextMenuItem | null {
   return { id: "copy-profile-link", label: t("profileLink.copy"), onSelect: () => copyProfileLink(username) };
 }
 
+/** A profile as its link shows it: the person, and the widgets on their profile (lib/widgets). */
+export type SharedUser = PublicUser & { widgets?: unknown };
+
 export type SharedProfileEntry =
   | { status: "loading" }
-  | { status: "ready"; user: PublicUser; at: number }
+  | { status: "ready"; user: SharedUser; at: number }
   /** no such account, or one whose link shows nothing (banned, deleted) */
   | { status: "missing"; at: number }
   | { status: "failed"; at: number };
@@ -75,7 +78,7 @@ function due(e: SharedProfileEntry | undefined, now: number): boolean {
 interface LoadOptions {
   /** Ask again even if the answer is fresh: after trying again by hand. */
   force?: boolean;
-  fetch?: (username: string) => Promise<PublicUser>;
+  fetch?: (username: string) => Promise<SharedUser>;
   now?: () => number;
 }
 

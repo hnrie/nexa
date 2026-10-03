@@ -13,6 +13,9 @@ import { useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 import s from "./UserPanel.module.css";
 import { micMenuItems } from "@/components/voice/deviceMenus";
+import { ActivityToggle } from "@/components/activity/ActivityToggle";
+import { bindText, keybindsOf } from "@/lib/keybinds";
+import { useSettings } from "@/stores/settings";
 
 import { t } from "@/i18n";
 import { confirmLogout } from "@/lib/confirmLogout";
@@ -41,6 +44,8 @@ export function UserPanel() {
   const toggleMute = useVoiceLocal((v) => v.toggleMute);
   const openContextMenu = useUI((u) => u.openContextMenu);
   const toggleDeafen = useVoiceLocal((v) => v.toggleDeafen);
+  // the account's own keys for these, shown in their tooltips (Settings, Keybinds)
+  const keys = keybindsOf(useSettings((x) => x.settings.keybinds));
   // in a call, the ring the call draws round whoever talks goes round your own picture here too
   const speaking = useVoice((v) => !!me && !!v.mine && !!v.speaking[me.id]);
   const [open, setOpen] = useState(false);
@@ -104,7 +109,7 @@ export function UserPanel() {
         </span>
       </button>
       <div className={s.btns}>
-        <Tooltip text={muted ? t("settings.notifications.unmute") : t("settings.notifications.mute")}>
+        <Tooltip text={muted ? t("settings.notifications.unmute") : t("settings.notifications.mute")} keys={bindText(keys.mute) || undefined}>
           <button
             className={s.icon}
             data-on={!muted}
@@ -128,11 +133,12 @@ export function UserPanel() {
             {muted ? <MicOff size={20} /> : <Mic size={20} />}
           </button>
         </Tooltip>
-        <Tooltip text={deafened ? t("shell.user.undeafen") : t("shell.user.deafen")}>
+        <Tooltip text={deafened ? t("shell.user.undeafen") : t("shell.user.deafen")} keys={bindText(keys.deafen) || undefined}>
           <button className={s.icon} data-on={!deafened} onClick={toggleDeafen} aria-label={deafened ? t("shell.user.undeafen") : t("shell.user.deafen")}>
             {deafened ? <HeadphoneOff size={20} /> : <Headphones size={20} />}
           </button>
         </Tooltip>
+        <ActivityToggle className={s.icon} />
         {update?.status === "ready" ? (
           <Tooltip text={t("shell.user.restartToUpdateTo", { version: update.version ?? t("shell.user.theNewVersion") })}>
             <button className={[s.icon, s.update].join(" ")} onClick={() => void applyUpdate("restart")} aria-label={t("settings.desktop.restartToUpdate")} data-testid="update-ready">

@@ -20,6 +20,7 @@ import { useUsers } from "@/stores/users";
 import { P, compute, has, toPermMember } from "@/lib/perms";
 import { nameOrder } from "./nameOrder";
 import s from "./MemberList.module.css";
+import { UserTag } from "@/components/servertag/UserTag";
 
 import { t } from "@/i18n";
 
@@ -230,9 +231,10 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
             <Avatar id={row.member.user_id} avatarId={row.member.avatar_id ?? row.user?.avatar_id ?? null} name={name} size={32} status={statusOf(p)} />
             <span className={s.text}>
               <span className={s.name} style={row.color ? { color: row.color } : undefined}>
-                {name}
+                <span className={s.nameText}>{name}</span>
                 {isOwner(row.member.user_id) ? <OwnerCrown /> : st.server.owner_id === row.member.user_id ? <Crown size={14} className={s.crown} aria-label={t("chat.memberList.serverOwner")} /> : null}
                 {!isOwner(row.member.user_id) && isInstanceAdmin(row.member.user_id) ? <AdminHammer /> : null}
+                <UserTag userId={row.member.user_id} size="sm" />
               </span>
               <StatusLine
                 className={s.sub}

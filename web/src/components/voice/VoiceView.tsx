@@ -37,6 +37,7 @@ import { P } from "@/lib/perms";
 import { CALL_PANEL_DEFAULT, CALL_PANEL_KEY, clampCallPanel, readCallPanel } from "@/lib/callPanel";
 import { callFullscreenWay, enterElementFullscreen, enterVideoFullscreen, exitElementFullscreen, fullscreenElement, lockLandscape, onFullscreenChange, streamFullscreenWay, unlockOrientation } from "@/lib/fullscreen";
 import { memberName } from "@/lib/names";
+import { bindText, keybindsOf } from "@/lib/keybinds";
 import { storage } from "@/lib/storage";
 import { pinchView, type View } from "@/lib/zoomPan";
 import { useAuth } from "@/stores/auth";
@@ -193,9 +194,9 @@ function gridAspect(count: number, w: number, h: number): number {
   return best.aspect;
 }
 
-function ControlButton({ label, onClick, children, on, off, danger, testId, className, menu }: { label: string; onClick: () => void; children: ReactNode; on?: boolean; off?: boolean; danger?: boolean; testId?: string; className?: string; menu?: { label: string; open: (anchor: DOMRect) => void; testId?: string } }) {
+function ControlButton({ label, keys, onClick, children, on, off, danger, testId, className, menu }: { label: string; keys?: string; onClick: () => void; children: ReactNode; on?: boolean; off?: boolean; danger?: boolean; testId?: string; className?: string; menu?: { label: string; open: (anchor: DOMRect) => void; testId?: string } }) {
   const button = (
-    <Tooltip text={label} side="top">
+    <Tooltip text={label} keys={keys || undefined} side="top">
       {/* The label flips between "Mute" and "Unmute", which is the whole state; adding aria-pressed on top of it announced "Unmute, pressed" for a muted mic and no state at all for a live one. */}
       <button
         className={[s.ctl, danger ? s.leave : "", className ?? ""].join(" ")}
@@ -372,6 +373,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const deafened = useVoiceLocal((v) => v.deafened);
   const toggleMute = useVoiceLocal((v) => v.toggleMute);
   const toggleDeafen = useVoiceLocal((v) => v.toggleDeafen);
+  // the account's keys for these two, said in their tooltips (Settings, Keybinds)
+  const binds = keybindsOf(useSettings((x) => x.settings.keybinds));
   const serverState = useServers((st) => (channel.server_id ? st.byId[channel.server_id] : undefined));
   const openContextMenu = useUI((u) => u.openContextMenu);
   const openModal = useUI((u) => u.openModal);
@@ -906,8 +909,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           ) : null}
         </div>
         <div className={s.controlsMain}>
-          <ControlButton label={micBlocked ? tr_("voice.voice.microphoneBlockedTryAgain") : muted ? tr_("voice.voice.unmute") : tr_("voice.voice.mute")} off={muted || micBlocked} onClick={micBlocked ? () => void retryMic() : toggleMute} testId="voice-mute" menu={{ label: tr_("voice.voice.microphoneOptions"), open: (r) => void openDeviceMenu("mic", r), testId: "mic-menu" }}>{muted || micBlocked ? <MicOff size={22} /> : <Mic size={22} />}</ControlButton>
-          <ControlButton label={deafened ? tr_("voice.voice.undeafen") : tr_("voice.voice.deafen")} off={deafened} onClick={toggleDeafen}>{deafened ? <HeadphoneOff size={22} /> : <Headphones size={22} />}</ControlButton>
+          <ControlButton label={micBlocked ? tr_("voice.voice.microphoneBlockedTryAgain") : muted ? tr_("voice.voice.unmute") : tr_("voice.voice.mute")} keys={micBlocked ? undefined : bindText(binds.mute)} off={muted || micBlocked} onClick={micBlocked ? () => void retryMic() : toggleMute} testId="voice-mute" menu={{ label: tr_("voice.voice.microphoneOptions"), open: (r) => void openDeviceMenu("mic", r), testId: "mic-menu" }}>{muted || micBlocked ? <MicOff size={22} /> : <Mic size={22} />}</ControlButton>
+          <ControlButton label={deafened ? tr_("voice.voice.undeafen") : tr_("voice.voice.deafen")} keys={bindText(binds.deafen)} off={deafened} onClick={toggleDeafen}>{deafened ? <HeadphoneOff size={22} /> : <Headphones size={22} />}</ControlButton>
           <ControlButton label={localVideo ? tr_("voice.voice.turnOffCamera") : tr_("voice.voice.turnOnCamera")} on={!!localVideo} onClick={() => void toggleCamera()} menu={{ label: tr_("voice.voice.cameraOptions"), open: (r) => void openDeviceMenu("camera", r), testId: "camera-menu" }}>{localVideo ? <Video size={22} /> : <VideoOff size={22} />}</ControlButton>
           {localVideo && canFlip ? (
             <ControlButton label={tr_("voice.voice.switchCamera")} onClick={() => void flipCamera()} testId="flip-camera"><SwitchCamera size={22} /></ControlButton>

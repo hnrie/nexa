@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { AudioLines, BadgeCheck, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, FolderPlus, Globe, Headphones, House, IdCard, ImagePlus, Images, Keyboard, LayoutGrid, Link, MapPinOff, MessageSquareDashed, MessageSquarePlus, MessagesSquare, MousePointerClick, Music, Newspaper, NotebookPen, Palette, PanelBottom, PanelsTopLeft, Pin, Puzzle, RefreshCw, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, TvMinimalPlay, Type, UserCheck, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
+import { AudioLines, BadgeCheck, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, FolderPlus, Gamepad2, Globe, Headphones, House, IdCard, ImagePlus, Images, Keyboard, LayoutGrid, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessagesSquare, MousePointerClick, Music, Newspaper, NotebookPen, Palette, PanelBottom, PanelsTopLeft, Pin, Puzzle, RefreshCw, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, Tag, TvMinimalPlay, Type, UserCheck, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,18 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-10-02.3",
+    items: [
+      { icon: LayoutGrid, title: "whatsNew.r202610023.widgetsTitle", body: "whatsNew.r202610023.widgetsBody" },
+      { icon: PanelsTopLeft, title: "whatsNew.r202610023.profileTitle", body: "whatsNew.r202610023.profileBody" },
+      { icon: Tag, title: "whatsNew.r202610023.tagsTitle", body: "whatsNew.r202610023.tagsBody" },
+      { icon: MessageCircleMore, title: "whatsNew.r202610023.typingTitle", body: "whatsNew.r202610023.typingBody" },
+      { icon: Keyboard, title: "whatsNew.r202610023.keybindsTitle", body: "whatsNew.r202610023.keybindsBody" },
+      { icon: Gamepad2, title: "whatsNew.r202610023.activityTitle", body: "whatsNew.r202610023.activityBody" },
+      { icon: FolderPlus, title: "whatsNew.r202610023.railTitle", body: "whatsNew.r202610023.railBody" },
+    ],
+  },
   {
     id: "2026-10-02.2",
     items: [

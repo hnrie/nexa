@@ -10,6 +10,11 @@ export interface CropResult {
   blob: Blob;
   /** True when the original bytes are used unchanged (an animation kept whole). */
   original: boolean;
+  /**
+   * With serverCrop: the part framed, in the picture's own pixels. The file
+   * goes whole, and the server cuts this part out of it.
+   */
+  crop?: { x: number; y: number; w: number; h: number };
 }
 
 interface Props {
@@ -21,6 +26,12 @@ interface Props {
   title?: string;
   /** Longest edge of the exported image. */
   maxSize?: number;
+  /**
+   * The server cuts the picture (internal/media/crop.go): the file goes whole
+   * with the part framed, so a moving picture is cut and still moves. There
+   * is then no choice to keep it uncut.
+   */
+  serverCrop?: boolean;
   onDone: (result: CropResult) => void;
   onClose: () => void;
 }
@@ -28,12 +39,12 @@ interface Props {
 const VIEW = 320;
 
 /** Pan-and-zoom cropper. Animated files can be kept whole instead of flattened. */
-export function ImageCropModal({ file, aspect, round = false, title = t("common.imageCrop.editImage"), maxSize = 1024, onDone, onClose }: Props) {
+export function ImageCropModal({ file, aspect, round = false, title = t("common.imageCrop.editImage"), maxSize = 1024, serverCrop = false, onDone, onClose }: Props) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [animated, setAnimated] = useState(() => animatedByType(file.type));
-  const [keepOriginal, setKeepOriginal] = useState(animated);
+  const [keepOriginal, setKeepOriginal] = useState(animated && !serverCrop);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
@@ -58,7 +69,7 @@ export function ImageCropModal({ file, aspect, round = false, title = t("common.
     void isAnimatedImage(file).then((yes) => {
       if (!alive || !yes) return;
       setAnimated(true);
-      setKeepOriginal(true);
+      if (!serverCrop) setKeepOriginal(true);
     });
     return () => {
       alive = false;
@@ -102,6 +113,17 @@ export function ImageCropModal({ file, aspect, round = false, title = t("common.
       return;
     }
     if (!img) return;
+    if (serverCrop) {
+      // where the frame sits on the picture, in the picture's own pixels
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+      const x = Math.max(0, Math.round(((nw * scale - boxW) / 2 - offset.x) / scale));
+      const y = Math.max(0, Math.round(((nh * scale - boxH) / 2 - offset.y) / scale));
+      const w = Math.max(1, Math.min(nw - x, Math.round(boxW / scale)));
+      const h = Math.max(1, Math.min(nh - y, Math.round(boxH / scale)));
+      onDone({ blob: file, original: true, crop: { x, y, w, h } });
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -177,7 +199,7 @@ export function ImageCropModal({ file, aspect, round = false, title = t("common.
           <input className={s.range} type="range" min={1} max={5} step={0.01} value={zoom} disabled={keepOriginal} onChange={(e) => setZoom(Number(e.target.value))} aria-label={t("common.imageCrop.zoom")} />
           <button className={s.reset} aria-label={t("common.imageCrop.reset")} title={t("common.imageCrop.reset")} onClick={() => { setZoom(1); setOffset({ x: 0, y: 0 }); }}><RotateCcw size={16} /></button>
         </div>
-        {animated ? (
+        {animated && !serverCrop ? (
           <label className={s.keep}>
             <input type="checkbox" checked={keepOriginal} onChange={(e) => setKeepOriginal(e.target.checked)} />
             <span>{t("common.imageCrop.uploadTheOriginalSoItKeeps")}</span>
@@ -185,6 +207,7 @@ export function ImageCropModal({ file, aspect, round = false, title = t("common.
         ) : null}
         {error ? <p className={s.error} data-testid="crop-error">{error}</p> : null}
         <p className={s.hint}>{t("common.imageCrop.dragToMoveScrollOrUse")}</p>
+        {animated && serverCrop ? <p className={s.hint}>{t("common.imageCrop.keepsMoving")}</p> : null}
       </div>
     </Modal>
   );

@@ -9,6 +9,7 @@ import { EMPTY_DM_LIST, sanitizeDMList, type DMListLayout } from "@/lib/dmLayout
 import type { CustomCss, CustomTheme, PluginEntry } from "@/lib/look/types";
 import { sanitizeUsage, type EmojiUsage } from "@/lib/emojiUsage";
 import { DEFAULT_SOUNDS, sanitizeSounds, type SoundSettings } from "@/lib/soundPacks";
+import { sanitizeKeybinds, type Keybinds } from "@/lib/keybinds";
 
 /** A classic theme, "system", or the id of a gallery preset or a custom theme (lib/look). */
 export type Theme = "dark" | "light" | "ash" | "onyx" | "system" | (string & {});
@@ -104,6 +105,15 @@ export interface Settings {
   shareActivity: boolean;
   /** Show as Idle after a while away, while the status chosen is Online (see lib/away.ts). */
   autoIdle: boolean;
+  /**
+   * The keys chosen for muting, deafening and sharing activity (lib/keybinds),
+   * only the ones changed from the defaults; "" is a key taken off.
+   */
+  keybinds: Partial<Keybinds>;
+  /** In the desktop app, the keybinds answer even while another window is in front. */
+  backgroundKeybinds: boolean;
+  /** Show others' own typing styles (lib/typingStyle); off, everyone is shown with the plain dots. */
+  customTyping: boolean;
   sidebarWidth: number;
   showMembers: boolean;
   recentEmoji: string[];
@@ -206,6 +216,9 @@ export const DEFAULT_SETTINGS: Settings = {
   developerMode: false,
   shareActivity: true,
   autoIdle: true,
+  keybinds: {},
+  backgroundKeybinds: true,
+  customTyping: true,
   sidebarWidth: 240,
   showMembers: true,
   recentEmoji: [],
@@ -292,6 +305,10 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
 
     spellWords: Array.isArray(inc.spellWords) ? inc.spellWords.filter((w): w is string => typeof w === "string" && w.length > 0 && w.length <= 64).slice(-2000) : base.spellWords,
     sendButton: typeof inc.sendButton === "boolean" ? inc.sendButton : base.sendButton,
+
+    keybinds: "keybinds" in inc ? sanitizeKeybinds(inc.keybinds) : base.keybinds,
+    backgroundKeybinds: typeof inc.backgroundKeybinds === "boolean" ? inc.backgroundKeybinds : base.backgroundKeybinds,
+    customTyping: typeof inc.customTyping === "boolean" ? inc.customTyping : base.customTyping,
 
     searchIndex: typeof inc.searchIndex === "boolean" ? inc.searchIndex : base.searchIndex,
     // no more than search/recent.ts keeps, whatever an older or odd copy holds

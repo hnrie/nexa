@@ -11,6 +11,9 @@ import { TextArea, TextInput } from "@/components/common/TextInput";
 import { profileTheme } from "@/lib/avatarColor";
 import { describeError } from "@/lib/errors";
 import { actionIcon, fieldLabel, formatSpan, fullDate, relativeTo, severity, SPAN } from "@/lib/moderation";
+import { readTypingStyle, typingStyleText } from "@/lib/typingStyle";
+import { readWidgets, widgetsText } from "@/lib/widgets";
+import { widgetTitle } from "@/components/profile/Widgets";
 import { formatBytes } from "@/lib/time";
 import { usePresence } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
@@ -26,6 +29,8 @@ const MAX_MUTE = 365 * SPAN.DAY;
 const MAX_BAN = 5 * 365 * SPAN.DAY;
 
 const ACTIONS: ModAction[] = ["avatar_remove", "field_reset", "mute", "ban", "delete"];
+/** The fields a reset empties rather than writing MODERATOR_REMOVED_ in. */
+const CLEARED: ResetField[] = ["status", "nicknames", "typing_style", "widgets", "server_tag"];
 
 function unitLabel(u: number): string {
   switch (u) {
@@ -177,6 +182,9 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
     status: [user.status_emoji, user.status_text].filter(Boolean).join(" "),
     // without the list, the server says whether there are any
     nicknames: nicknamed ? nicknamed.map((x) => `${x.name}: ${x.nickname}`).join(", ") : t("moderation.form.everyServer"),
+    typing_style: typingStyleText(readTypingStyle(user.typing_style)),
+    widgets: widgetsText(readWidgets(user.widgets), widgetTitle).map((w) => `${w.title}: ${w.text}`).join(" / "),
+    server_tag: user.server_tag?.text ?? "",
   };
   const trimmed = reason.trim();
   const reasonOk = [...trimmed].length >= 3 && [...reason].length <= MAX_REASON;
@@ -322,7 +330,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
             <div className={m.section}>
               <span className={m.sectionLabel}>{t("moderation.form.whatToReset")}</span>
               <div className={m.choiceRow}>
-                {(["username", "display_name", "about_me", "pronouns", "status", "nicknames"] as ResetField[]).map((f) => {
+                {(["username", "display_name", "about_me", "pronouns", "status", "nicknames", "typing_style", "widgets", "server_tag"] as ResetField[]).map((f) => {
                   const empty = f === "nicknames" ? !!nicknamed && nicknamed.length === 0 : f !== "username" && f !== "display_name" && !values[f];
                   return (
                     <label key={f} className={m.pick} data-checked={fields.includes(f)} data-disabled={empty} data-testid={`field-${f}`}>
@@ -335,7 +343,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
                   );
                 })}
               </div>
-              <p className={m.note}>{fields.includes("username") ? t("moderation.form.resetUsernameNote") : t("moderation.form.resetNote")}</p>
+              <p className={m.note}>{fields.includes("username") ? t("moderation.form.resetUsernameNote") : fields.length && fields.every((f) => CLEARED.includes(f)) ? t("moderation.form.clearNote") : t("moderation.form.resetNote")}</p>
             </div>
           ) : null}
 

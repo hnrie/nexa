@@ -1,0 +1,13 @@
+/* A card lifted off whatever it opened from: the floating panel, lit along its top edge. */
+.popout {
+  position: fixed;
+  z-index: var(--z-menu);
+  outline: none;
+  max-width: calc(100vw - 8px);
+  background: var(--bg-floating);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high);
+  animation: popoutIn 170ms var(--ease-out);
+  overflow: hidden;
+}
+@keyframes popoutIn { from { opacity: 0; transform: translateY(4px) scale(0.97); } }

@@ -64,5 +64,8 @@ if (origin && location.origin === origin) {
     onWindowState: listen<WindowState>(IPC.windowState),
     // the page's own right-click menu pastes through the app, which alone may read the clipboard (main/pasteGate.ts)
     paste: (): Promise<boolean> => ipcRenderer.invoke(IPC.paste),
+    // keybinds that answer with another window in front (main/shortcuts.ts)
+    setShortcuts: (list: { action: string; accelerator: string }[]): Promise<{ action: string; ok: boolean }[]> => ipcRenderer.invoke(IPC.setShortcuts, Array.isArray(list) ? list.map((x) => ({ action: String(x?.action), accelerator: String(x?.accelerator) })) : []),
+    onShortcut: listen<string>(IPC.shortcut),
   });
 }

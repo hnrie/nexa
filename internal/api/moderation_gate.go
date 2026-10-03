@@ -49,6 +49,7 @@ var muteAllowed = map[string]bool{
 	"PATCH /api/v1/users/@me":                                           true, // clearing fields and private preferences only
 	"DELETE /api/v1/users/@me/avatar":                                   true,
 	"DELETE /api/v1/users/@me/banner":                                   true,
+	"DELETE /api/v1/users/@me/server-tag":                               true,
 	"POST /api/v1/channels/{id}/messages/{mid}/ack":                     true,
 	"POST /api/v1/client-errors":                                        true,
 	"POST /api/v1/proxy/refresh":                                        true,

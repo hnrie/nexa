@@ -35,6 +35,7 @@ import { NexaAvatar, OfficialBadge } from "@/components/nexa/NexaBits";
 import { useNexa } from "@/stores/nexa";
 import { useNotes } from "@/stores/notes";
 import { useModeration } from "@/stores/moderation";
+import { UserTag } from "@/components/servertag/UserTag";
 import s from "./Sidebar.module.css";
 
 import { t } from "@/i18n";
@@ -437,8 +438,10 @@ export function DMSidebar() {
     let avatar: React.ReactNode;
     let crowned = false;
     let admin = false;
+    let tagOf: string | null = null;
     if (ch.type === "dm") {
       const other = ch.recipient_ids.find((uid) => uid !== meId) ?? ch.recipient_ids[0] ?? "";
+      tagOf = other;
       const u = users[other];
       const st = customStatus(presence[other]);
       const act = activitiesOf(presence[other])[0];
@@ -475,6 +478,7 @@ export function DMSidebar() {
                 <span className={s.name} dir="auto">{name}</span>
                 {/* the owner of Nexa is crowned wherever they are listed, and its admins carry the hammer */}
                 {crowned ? <OwnerCrown size={14} /> : admin ? <AdminHammer size={14} /> : null}
+                {tagOf ? <UserTag userId={tagOf} size="sm" /> : null}
               </span>
               {sub}
             </span>

@@ -51,6 +51,8 @@ function verbs(): Record<string, string> {
     webhook_create: t("server.auditLog.verb.webhook_create"),
     webhook_update: t("server.auditLog.verb.webhook_update"),
     webhook_delete: t("server.auditLog.verb.webhook_delete"),
+    server_tag_update: t("server.auditLog.verb.server_tag_update"),
+    server_tag_delete: t("server.auditLog.verb.server_tag_delete"),
   };
 }
 
@@ -176,6 +178,16 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
         return [t("server.auditLog.userLimit"), num ? String(num) : t("server.channelSettings.noLimit")];
       case "color":
         return [t("server.roles.roleColour"), num ? `#${num.toString(16).padStart(6, "0")}` : t("server.roles.default")];
+      case "tag":
+        return [t("serverTag.page.tagLabel"), str || none()];
+      case "tag_badge":
+        return [t("serverTag.page.badge"), str?.startsWith("image:") ? t("serverTag.page.yourPicture") : (str ?? "").replace(/^icon:/, "")];
+      case "tag_color":
+        return [t("serverTag.page.color"), typeof num === "number" ? `#${num.toString(16).padStart(6, "0")}` : t("serverTag.page.accent")];
+      case "tag_limited":
+        return [t("serverTag.page.who"), v ? t("serverTag.page.someRoles") : t("serverTag.page.everyone")];
+      case "tag_join":
+        return [t("serverTag.page.join"), onOff(v)];
       case "hoist":
         return [t("server.roles.displayRoleMembersSeparatelyFromOnline"), onOff(v)];
       case "mentionable":

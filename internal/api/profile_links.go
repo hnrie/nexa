@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -60,8 +61,17 @@ func (s *Server) handleSharedProfile(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusNotFound, "profile_not_found", "There is no profile at this link."))
 		return
 	}
+	// the widgets show on the card a link opens, as they do in the app
+	widgets, err := s.Store.UserWidgets(r.Context(), p.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	w.Header().Set("Cache-Control", "no-cache")
-	WriteJSON(w, http.StatusOK, p)
+	WriteJSON(w, http.StatusOK, struct {
+		*store.PublicUser
+		Widgets json.RawMessage `json:"widgets"`
+	}{p, widgetsJSON(widgets)})
 }
 
 // profileLinkName is the username a link to one of our profiles names, at any

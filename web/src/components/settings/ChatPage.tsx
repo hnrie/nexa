@@ -52,6 +52,7 @@ export default function ChatPage() {
       <Toggle setting="sendButton" checked={st.sendButton} onChange={(v) => patch({ sendButton: v })} label={t("settings.appearance.sendButton")} description={t("settings.appearance.sendButtonHint")} />
       <Toggle setting="smartEmoji" checked={st.smartEmoji} onChange={(v) => patch({ smartEmoji: v })} label={t("settings.appearance.smartEmoji")} description={t("settings.appearance.smartEmojiHint")} />
       <h3 className={s.h5}>{t("settings.chat.reading")}</h3>
+      <Toggle setting="customTyping" checked={st.customTyping !== false} onChange={(v) => patch({ customTyping: v })} label={t("settings.chat.customTyping")} description={t("settings.chat.customTypingHint")} />
       <Toggle
         setting="tts"
         checked={st.tts}

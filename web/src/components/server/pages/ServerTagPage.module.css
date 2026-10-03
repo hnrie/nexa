@@ -1,0 +1,45 @@
+/*
+ * Server Settings, Server Tag. The badges are a grid of small tiles, the
+ * chosen one ringed in the tag's own colour (--tag), so the colour picked
+ * below shows up here as well. The first tile is the server's own picture,
+ * or the way to put one up.
+ */
+.badges { --tag: var(--brand); display: grid; grid-template-columns: repeat(auto-fill, minmax(42px, 1fr)); gap: 8px; max-width: 460px; }
+.tile, .upload {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--sheen), var(--bg-surface);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle);
+  color: var(--icon);
+  transition: box-shadow var(--transition), color var(--transition), background-color var(--transition), transform var(--dur) var(--ease-out);
+}
+.tile:hover, .upload:hover:not(:disabled) { color: var(--text-strong); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-strong); transform: translateY(-1px); }
+.tile[data-on], .upload[data-on] {
+  background: var(--sheen), color-mix(in oklab, var(--tag) 18%, var(--bg-surface));
+  color: color-mix(in oklab, var(--tag), var(--text-strong) 30%);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 2px var(--tag), 0 6px 16px -8px var(--tag);
+}
+.upload { background: transparent; box-shadow: inset 0 0 0 1.5px var(--border); overflow: hidden; }
+.upload img { width: 70%; height: 70%; border-radius: 6px; object-fit: cover; }
+.upload:disabled { opacity: 0.6; cursor: progress; }
+
+/* the roles a tag can be kept to, each a chip in its own colour */
+.roles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.role { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding-inline: 9px 12px; border-radius: var(--radius-pill); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); font-size: 13.5px; font-weight: 600; color: var(--text-subtle); transition: box-shadow var(--transition), color var(--transition), background-color var(--transition); }
+.role:hover { color: var(--text-strong); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-strong); }
+.role[data-on] { background: var(--sheen), color-mix(in srgb, var(--brand) 16%, var(--bg-surface)); color: var(--text-strong); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 2px color-mix(in srgb, var(--brand) 80%, transparent); }
+.roleDot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--text-muted); }
+
+/* the tag beside a name, as a message and the member list show it */
+.stage { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: var(--radius-lg); background: color-mix(in oklab, var(--bg-base) 55%, var(--bg-raised)); box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 30%, transparent), inset 0 0 0 1px var(--border-subtle); }
+.msg { display: flex; gap: 12px; min-width: 0; }
+.msgText { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.msgHead { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.msgName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 650; color: var(--text-strong); }
+.msgBody { margin: 0; font-size: 14px; line-height: 1.4; color: var(--text); overflow-wrap: anywhere; }
+.member { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 8px; border-radius: var(--radius-sm); background: var(--bg-hover); }
+.memberName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 550; color: var(--text); }
+.big { display: flex; justify-content: center; padding-top: 12px; border-top: 1px solid var(--border-subtle); }

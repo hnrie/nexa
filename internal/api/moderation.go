@@ -117,6 +117,8 @@ type modUserView struct {
 	Ban           *restrictionView `json:"ban"`
 	// Blocked is why this moderator cannot act on the account ("" when they can).
 	Blocked string `json:"blocked"`
+	// Widgets are the profile's widgets, on one account's page only.
+	Widgets json.RawMessage `json:"widgets,omitempty"`
 	// Presence is how the account looks to everyone right now: online, idle,
 	// do not disturb or offline (as someone invisible looks), and what they
 	// are doing. Their custom status is in the profile fields, kept even
@@ -214,6 +216,9 @@ func (s *Server) modUserDetail(ctx context.Context, me, u *store.User) (modUserV
 	v := modUserView{PublicUser: u.Public(), AdminFlags: u.Flags, Blocked: s.moderationBlock(ctx, me, u), Presence: s.presenceFor(ctx, u)}
 	if seen, err := s.Store.LastSeen(ctx, u.ID); err == nil {
 		v.LastSeenAt = seen
+	}
+	if raw, err := s.Store.UserWidgets(ctx, u.ID); err == nil && raw != "" {
+		v.Widgets = json.RawMessage(raw)
 	}
 	mute, ban, err := s.Store.ActiveRestrictions(ctx, u.ID, now)
 	if err != nil {

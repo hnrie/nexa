@@ -1,61 +1,34 @@
-/* The owner's crown and badge. The crown starts gold like every
-   other owner crown and cycles the rainbow; the word is rainbow text. Both
-   hold still for anyone who asked for less motion. */
-.crown {
-  color: var(--warning);
+/* The owner's crown and an admin's hammer, and the badges on a profile that
+   carry them. They wear the accent the way the admin panel's own staff badges
+   do (components/moderation/Moderation.module.css, .staffBadge): the mark in
+   the accent's text colour, the badge a pill tinted with it and ringed in it,
+   held still. On a profile in its own colours the accent's text colour is the
+   card's own white or near black, so the badge still reads on it. A server
+   owner's crown stays gold (MemberList, GroupMemberList): it is a different
+   thing to be. */
+.crown,
+.hammer {
+  color: var(--text-brand);
   flex: none;
-  animation: owner-hue 4s linear infinite;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 22px;
-  padding: 0 9px;
+  gap: 3px;
+  height: 20px;
+  padding: 0 7px;
   border-radius: 999px;
-  background: var(--bg-active);
-  box-shadow: inset 0 1px 0 var(--edge-light), inset 0 0 0 1px var(--border-subtle);
-  font-size: 12px;
+  font-family: var(--font);
+  font-size: 11px;
   font-weight: 700;
+  letter-spacing: 0;
   white-space: nowrap;
+  color: var(--text-brand);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 30%, transparent);
 }
 
 .text {
-  background: linear-gradient(90deg, #ff3b3b, #ff8c00, #ffd400, #3ddc84, #3b82f6, #a855f7, #ff3b3b);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: owner-slide 4s linear infinite;
-}
-
-/* An admin's hammer starts violet, so it never reads as the owner's gold
-   crown, and cycles the rainbow the same way. A fixed colour, not the theme's
-   accent: a profile card in its own colours sets that to plain white or black,
-   and turning the hue of a grey leaves it grey. */
-.hammer {
-  color: #a855f7;
-  flex: none;
-  animation: owner-hue 4s linear infinite;
-}
-
-@keyframes owner-hue {
-  to {
-    filter: hue-rotate(360deg);
-  }
-}
-
-@keyframes owner-slide {
-  to {
-    background-position: 200% 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .crown,
-  .hammer,
-  .text {
-    animation: none;
-  }
+  color: inherit;
 }

@@ -1,6 +1,6 @@
 import { api, captchaOptions } from "./client";
 import { t } from "@/i18n";
-import type { AuditEntry, Ban, Channel, Invite, InvitePreview, Member, PermString, PublicUser, Role, Server, ServerKeyInfo, ServerView, Snowflake } from "./types";
+import type { AuditEntry, Ban, Channel, Invite, InvitePreview, Member, MeUser, PermString, PublicUser, Role, Server, ServerKeyInfo, ServerTagPreview, ServerView, Snowflake } from "./types";
 
 /**
  * What accepting an invite gives back. A server invite answers with the server
@@ -92,6 +92,31 @@ export const servers = {
   },
   leave(id: Snowflake): Promise<void> {
     return api.request<void>("POST", `/servers/${id}/leave`);
+  },
+  /** Sets the server's tag (lib/serverTags); the badge is "icon:<name>" or an "image:<id>" from uploadTagBadge. */
+  setTag(id: Snowflake, body: { text: string; badge: string; color: number | null; limited: boolean; roles: Snowflake[]; join: boolean }): Promise<Server> {
+    return api.request<Server>("PUT", `/servers/${id}/tag`, body);
+  },
+  deleteTag(id: Snowflake): Promise<void> {
+    return api.request<void>("DELETE", `/servers/${id}/tag`);
+  },
+  /**
+   * A picture for the tag's badge, sent whole with the part that was framed:
+   * the server cuts it, and a moving picture stays moving.
+   */
+  uploadTagBadge(id: Snowflake, file: Blob, crop: { x: number; y: number; w: number; h: number } | null, onProgress?: Progress): Promise<{ badge: string; id: Snowflake; animated: boolean }> {
+    const q = crop ? `?x=${crop.x}&y=${crop.y}&w=${crop.w}&h=${crop.h}` : "";
+    const opts: { method: string; headers: Record<string, string>; onProgress?: Progress } = { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" } };
+    if (onProgress) opts.onProgress = onProgress;
+    return api.upload(`/servers/${id}/tag/badge${q}`, file, opts);
+  },
+  /** What someone's tag opens: the server it is from. */
+  tagPreview(id: Snowflake): Promise<ServerTagPreview> {
+    return api.request<ServerTagPreview>("GET", `/server-tags/${id}`);
+  },
+  /** Puts this server's tag on the account; null takes the account's tag off. */
+  wearTag(id: Snowflake | null): Promise<MeUser> {
+    return id ? api.request<MeUser>("PUT", "/users/@me/server-tag", { server_id: id }) : api.request<MeUser>("DELETE", "/users/@me/server-tag");
   },
   transfer(id: Snowflake, userId: Snowflake): Promise<Server> {
     return api.request<Server>("POST", `/servers/${id}/transfer`, { user_id: userId });

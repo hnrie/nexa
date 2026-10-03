@@ -265,10 +265,6 @@ export function Composer({ channel }: { channel: Channel }) {
   const placeholder = channel.type === "dm" ? tr_("composer.composer.messageUser", { name }) : isServer ? tr_("composer.composer.messageChannel", { name }) : tr_("composer.composer.messageGroup", { name });
 
   useEffect(() => {
-    if (lastTyping.current) {
-      lastTyping.current = 0;
-      gateway()?.sendTypingStop(channel.id);
-    }
     touched.current = false;
     setText(useSettings.getState().settings.drafts[channel.id] ?? "");
     setAc(null);
@@ -277,6 +273,14 @@ export function Composer({ channel }: { channel: Channel }) {
     // On a touch screen a focus right after the tap that opened the conversation raises the keyboard over it.
     if (window.matchMedia?.("(pointer: fine)")?.matches) setTimeout(() => focusQuietly(taRef.current, hush), 0);
     return () => {
+      // Leaving a conversation mid-sentence stops the typing line there at
+      // once. This runs with the conversation being left; run after the
+      // switch, it told the new one, which had never heard, and the old one
+      // went on showing it for ten seconds.
+      if (lastTyping.current) {
+        lastTyping.current = 0;
+        gateway()?.sendTypingStop(channel.id);
+      }
       // the last words typed before leaving are still waiting on the save timer
       if (draftTimer.current) {
         clearTimeout(draftTimer.current);

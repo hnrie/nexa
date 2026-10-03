@@ -1,0 +1,123 @@
+/*
+ * Profile widgets, laid into the profile's sheet like the rest of what it
+ * says about someone. Box art is the stuff of them: every game is drawn in
+ * the shape of its box, lit along its top edge and set a little off the sheet
+ * with its own shadow, so a shelf of them reads as things someone owns. The
+ * favourite and the cards someone makes sit in a tile of their own, and the
+ * favourite's tile takes the colours of its cover, blurred to a glow behind
+ * it: the one bright thing on the sheet.
+ */
+.board { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.board[data-variant="modal"] { gap: 18px; }
+.widget { min-width: 0; }
+.widget h3, .head { margin: 0 0 8px; font-size: 12.5px; line-height: 16px; font-weight: 700; letter-spacing: 0.01em; color: var(--text-muted); }
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.head h3 { margin: 0; }
+.count { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* a game's box: its cover, or a picture its owner put up, or its name on a colour */
+.cover {
+  position: relative;
+  display: block;
+  flex: none;
+  aspect-ratio: 3 / 4;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--bg-active);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 0 1px color-mix(in srgb, var(--text-strong) 8%, transparent), 0 6px 14px -8px color-mix(in srgb, var(--shade) 85%, transparent);
+}
+.cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* the shine along a box's top edge, over the picture */
+.cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 28%); pointer-events: none; }
+.coverName {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 6px;
+  background: linear-gradient(165deg, color-mix(in oklab, var(--cover-tint) 78%, #fff), color-mix(in oklab, var(--cover-tint) 70%, #000));
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* Favourite Game: a tile of its own, the box beside its name and why, the cover's colours behind */
+.favorite {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--profile-chip) 70%, transparent);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle);
+}
+.glow { position: absolute; inset: -40%; z-index: -1; background-size: cover; background-position: center; filter: blur(32px) saturate(1.6); opacity: 0.4; pointer-events: none; }
+[data-theme="light"] .glow { opacity: 0.28; }
+.favorite .cover { width: 76px; }
+.board[data-variant="panel"] .favorite .cover { width: 56px; }
+.favText { min-width: 0; display: flex; flex-direction: column; }
+.favText h3 { margin: 0 0 2px; }
+.favName { font-family: var(--font-display); font-size: 19px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; color: var(--text-strong); overflow-wrap: anywhere; }
+.board[data-variant="panel"] .favName { font-size: 16.5px; }
+.favNote { margin: 5px 0 0; font-size: 14px; line-height: 1.4; color: var(--text); overflow-wrap: anywhere; white-space: pre-wrap; }
+
+/* Playing Now: a row a game, with how it is played */
+.rows { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.row .cover { width: 36px; border-radius: 5px; }
+.rowText { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.rowName { font-size: 15px; font-weight: 650; line-height: 19px; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.tag { height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: var(--radius-pill); background: var(--profile-chip); font-size: 12px; font-weight: 600; color: var(--text-subtle); }
+
+/*
+ * Want to Play and Games I've Played: a shelf of boxes, four across in a
+ * narrow card and six in a wide one. The names come up on hover; a touch
+ * screen has no hover, so there they are written under each box.
+ */
+.shelfWrap { container-type: inline-size; }
+.shelf { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 8px; margin: 0; padding: 0; list-style: none; }
+@container (min-width: 420px) {
+  .shelf { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px 10px; }
+}
+.shelf li { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.tip { display: block; }
+.shelf .cover { width: 100%; }
+.caption { display: none; font-size: 11.5px; font-weight: 600; line-height: 14px; color: var(--text-subtle); overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+@media (pointer: coarse) {
+  .caption { display: -webkit-box; }
+}
+.more { margin-top: 10px; font-size: 13.5px; font-weight: 650; color: var(--text-brand); }
+.more:hover { text-decoration: underline; }
+
+/* a card of the person's own: a tile like the favourite's, without the glow */
+.card { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--profile-chip) 70%, transparent); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); }
+.cardImg { display: block; width: 100%; aspect-ratio: 12 / 5; object-fit: cover; background: var(--bg-active); }
+.cardBody { display: flex; flex-direction: column; padding: 12px; }
+.cardTop { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.cardSquare { flex: none; width: 56px; height: 56px; border-radius: 12px; object-fit: cover; background: var(--bg-active); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 6px 14px -8px color-mix(in srgb, var(--shade) 80%, transparent); }
+.widget h3.cardTitle { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1.25; letter-spacing: -0.005em; color: var(--text-strong); overflow-wrap: anywhere; }
+.cardText { margin: 6px 0 0; font-size: 14px; line-height: 1.45; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; margin: 12px 0 0; }
+.stat { min-width: 0; padding: 7px 10px 8px; border-radius: 9px; background: var(--profile-chip); box-shadow: inset 0 1px 0 var(--edge-light); }
+.stat dt { font-size: 12px; font-weight: 600; line-height: 15px; color: var(--text-muted); overflow-wrap: anywhere; }
+.stat dd { margin: 2px 0 0; font-size: 15px; font-weight: 700; line-height: 19px; color: var(--text-strong); overflow-wrap: anywhere; }
+.link { align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; max-width: 100%; margin-top: 12px; height: 32px; padding: 0 12px; border-radius: var(--radius-pill); background: var(--profile-chip); color: var(--text-strong); font-size: 13.5px; font-weight: 650; box-shadow: inset 0 1px 0 var(--edge-light); transition: background var(--transition); }
+.link:hover { background: var(--profile-chip-hover); text-decoration: none; }
+.link svg { flex: none; }
+.linkText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.linkHost { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-weight: 600; }
+
+/* someone's own profile with no widgets: what they could show, and the way there */
+.empty { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 14px; border-radius: var(--radius-sm); border: 1.5px dashed var(--border); }
+.emptyText { flex: 1 1 200px; margin: 0; font-size: 14px; line-height: 1.4; color: var(--text-subtle); }
+.emptyBtn { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: var(--radius-pill); background: var(--profile-chip); color: var(--text-strong); font-size: 13.5px; font-weight: 650; box-shadow: inset 0 1px 0 var(--edge-light); transition: background var(--transition); }
+.emptyBtn:hover { background: var(--profile-chip-hover); }

@@ -26,6 +26,7 @@ import { GuestLinkModal } from "@/components/voice/GuestLinkModal";
 import type { StickerInfo } from "@/api/types";
 import { StickerPackModal } from "./StickerPackModal";
 import { BlockDialog } from "@/components/profile/BlockDialog";
+import type { ProfileTab } from "@/components/profile/ProfileCard";
 import { FolderSettingsModal } from "@/components/rail/FolderSettingsModal";
 import type { BugFrom } from "@/components/bugs/ReportBugModal";
 import { InviteDialog } from "@/components/invite/InviteDialog";
@@ -119,8 +120,8 @@ function ModalEntry({ modal }: { modal: ModalState }) {
           on a slow phone connection a tap that shows nothing for seconds is a
           tap people repeat: the dialog's place is taken at once instead. */}
       <Suspense fallback={<Loading onClose={close} />}>
-        {modal?.kind === "settings" ? <SettingsModal onClose={close} page={(modal.props?.["page"] as string | undefined) ?? "account"} packId={modal.props?.["packId"] as string | undefined} modalId={modal.id} resume={modal.props?.["resume"] as string | undefined} /> : null}
-        {modal?.kind === "profile" ? <ProfileModal onClose={close} userId={modal.props?.["userId"] as string} /> : null}
+        {modal?.kind === "settings" ? <SettingsModal onClose={close} page={(modal.props?.["page"] as string | undefined) ?? "account"} packId={modal.props?.["packId"] as string | undefined} modalId={modal.id} resume={modal.props?.["resume"] as string | undefined} anchor={modal.props?.["anchor"] as string | undefined} /> : null}
+        {modal?.kind === "profile" ? <ProfileModal onClose={close} userId={modal.props?.["userId"] as string} tab={modal.props?.["tab"] as ProfileTab | undefined} /> : null}
         {modal?.kind === "screenPermission" ? <ScreenPermission stale={Boolean(modal.props?.["stale"])} onClose={close} /> : null}
         {modal?.kind === "subchat" ? <SubchatModal onClose={close} channel={modal.props?.["channel"] as never} parentId={modal.props?.["parentId"] as string | undefined} /> : null}
         {modal?.kind === "serverSettings" ? <ServerSettingsModal onClose={close} serverId={String(modal.props?.["serverId"])} page={modal.props?.["page"] as string | undefined} /> : null}

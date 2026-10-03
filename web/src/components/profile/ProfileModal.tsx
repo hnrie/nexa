@@ -4,11 +4,12 @@ import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { useAuth } from "@/stores/auth";
 import { useUsers } from "@/stores/users";
-import { ProfileCard } from "./ProfileCard";
+import { ProfileCard, type ProfileTab } from "./ProfileCard";
+import { isSystemAccount } from "@/lib/moderation";
 import s from "./Profile.module.css";
 
 import { t } from "@/i18n";
-export default function ProfileModal({ onClose, userId }: { onClose: () => void; userId: string }) {
+export default function ProfileModal({ onClose, userId, tab }: { onClose: () => void; userId: string; tab?: ProfileTab | undefined }) {
   const me = useAuth((a) => a.me);
   const stored = useUsers((u) => u.byId[userId]);
   const upsertUser = useUsers((u) => u.upsert);
@@ -38,9 +39,11 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
     );
   }
   if (!known) return <Modal open onClose={onClose} title={t("profile.profile.profile")}><p className={s.small}>{t("chat.pins.loading")}</p></Modal>;
+  // a person's full profile is two columns wide; the system account's card is its own, and narrower
+  const system = !!stored && isSystemAccount(stored.flags);
   return (
-    <Modal open onClose={onClose} width={600} bare ariaLabel={stored?.display_name || stored?.username || t("names.unknownUser")}>
-      <ProfileCard userId={userId} variant="modal" onClose={onClose} />
+    <Modal open onClose={onClose} width={system ? 600 : 940} bare ariaLabel={stored?.display_name || stored?.username || t("names.unknownUser")}>
+      <ProfileCard userId={userId} variant="modal" onClose={onClose} initialTab={tab} />
     </Modal>
   );
 }

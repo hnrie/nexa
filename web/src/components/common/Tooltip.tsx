@@ -9,6 +9,8 @@ type Side = "top" | "right" | "bottom" | "left";
 
 interface Props {
   text: string;
+  /** The keys that do the same, shown quietly after the words: "Ctrl+Shift+M". */
+  keys?: string;
   side?: Side;
   children: ReactNode;
   className?: string;
@@ -88,7 +90,7 @@ function place(anchor: DOMRect, box: DOMRect, wanted: Side): { left: number; top
  * labels. A message row clips what paints outside it, so a bubble rendered in
  * place there is simply never seen.
  */
-export function Tooltip({ text, side = "top", children, className, delay = 250 }: Props) {
+export function Tooltip({ text, keys, side = "top", children, className, delay = 250 }: Props) {
   const wrap = useRef<HTMLSpanElement>(null);
   const bubble = useRef<HTMLSpanElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -110,7 +112,7 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
     const box = bubble.current?.getBoundingClientRect();
     if (anchor && box) setAt(place(anchor, box, side));
     if (wrap.current) setPaint(tooltipPaint(wrap.current));
-  }, [open, side, text]);
+  }, [open, side, text, keys]);
 
   const show = () => {
     if (coarsePointer()) return;
@@ -177,6 +179,7 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
               }
             >
               {text}
+              {keys ? <span className={s.keys} dir="ltr">{keys}</span> : null}
             </span>,
             // tooltips come and go too often to each follow full screen; they look where to mount as they open
             portalRoot(),

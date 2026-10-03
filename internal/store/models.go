@@ -70,6 +70,15 @@ type User struct {
 	PublicKey       []byte  `json:"public_key"`
 	CreatedAt       int64   `json:"created_at"`
 	UpdatedAt       int64   `json:"-"`
+	// TypingStyle is how "is typing…" looks for this account to everyone
+	// else, as the JSON the server writes (api/typing_style.go), or "".
+	TypingStyle string `json:"-"`
+	// The server tag worn, copied from its server when it was put on and kept
+	// in step by the server (api/server_tags.go). TagServerID nil wears none.
+	TagServerID *ids.ID `json:"-"`
+	TagText     string  `json:"-"`
+	TagBadge    string  `json:"-"`
+	TagColor    *int    `json:"-"`
 
 	AuthHash              string `json:"-"`
 	KDFSalt               []byte `json:"-"`
@@ -84,31 +93,55 @@ type User struct {
 // GroupLinkOnly says the account joins group chats only from an invite link
 // (users.group_link_only): friends picking people for a group see it as Link
 // Only. It is sent when false too, so a user_update that turns it off
-// replaces the old value instead of leaving it standing.
+// replaces the old value instead of leaving it standing. TypingStyle and
+// ServerTag go out as null when there is none, for the same reason.
 type PublicUser struct {
-	ID              ids.ID  `json:"id"`
-	Username        string  `json:"username"`
-	DisplayName     string  `json:"display_name"`
-	AvatarID        *ids.ID `json:"avatar_id"`
-	BannerID        *ids.ID `json:"banner_id"`
-	AboutMe         string  `json:"about_me"`
-	Pronouns        string  `json:"pronouns"`
-	AccentColor     *int    `json:"accent_color"`
-	AccentColor2    *int    `json:"accent_color_2"`
-	StatusText      string  `json:"status_text"`
-	StatusEmoji     string  `json:"status_emoji"`
-	StatusExpiresAt *int64  `json:"status_expires_at"`
-	PublicKey       []byte  `json:"public_key"`
-	Flags           int64   `json:"flags"`
-	GroupLinkOnly   bool    `json:"group_link_only"`
-	CreatedAt       int64   `json:"created_at"`
+	ID              ids.ID          `json:"id"`
+	Username        string          `json:"username"`
+	DisplayName     string          `json:"display_name"`
+	AvatarID        *ids.ID         `json:"avatar_id"`
+	BannerID        *ids.ID         `json:"banner_id"`
+	AboutMe         string          `json:"about_me"`
+	Pronouns        string          `json:"pronouns"`
+	AccentColor     *int            `json:"accent_color"`
+	AccentColor2    *int            `json:"accent_color_2"`
+	StatusText      string          `json:"status_text"`
+	StatusEmoji     string          `json:"status_emoji"`
+	StatusExpiresAt *int64          `json:"status_expires_at"`
+	PublicKey       []byte          `json:"public_key"`
+	Flags           int64           `json:"flags"`
+	GroupLinkOnly   bool            `json:"group_link_only"`
+	CreatedAt       int64           `json:"created_at"`
+	TypingStyle     json.RawMessage `json:"typing_style"`
+	ServerTag       *WornTag        `json:"server_tag"`
+}
+
+// WornTag is the server tag someone wears, as everyone sees it beside their name.
+type WornTag struct {
+	ServerID ids.ID `json:"server_id"`
+	Text     string `json:"text"`
+	Badge    string `json:"badge"`
+	Color    *int   `json:"color"`
 }
 
 // Public returns the shareable view of u.
 func (u *User) Public() PublicUser {
-	return PublicUser{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, AvatarID: u.AvatarID, BannerID: u.BannerID,
+	p := PublicUser{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, AvatarID: u.AvatarID, BannerID: u.BannerID,
 		AboutMe: u.AboutMe, Pronouns: u.Pronouns, AccentColor: u.AccentColor, AccentColor2: u.AccentColor2, StatusText: u.StatusText, StatusEmoji: u.StatusEmoji,
 		StatusExpiresAt: u.StatusExpiresAt, PublicKey: u.PublicKey, Flags: u.Flags & publicFlags, GroupLinkOnly: u.GroupLinkOnly, CreatedAt: u.CreatedAt}
+	if u.TypingStyle != "" {
+		p.TypingStyle = json.RawMessage(u.TypingStyle)
+	}
+	p.ServerTag = u.WornTag()
+	return p
+}
+
+// WornTag is the tag u wears, or nil.
+func (u *User) WornTag() *WornTag {
+	if u.TagServerID == nil || u.TagText == "" {
+		return nil
+	}
+	return &WornTag{ServerID: *u.TagServerID, Text: u.TagText, Badge: u.TagBadge, Color: u.TagColor}
 }
 
 // ProfilePatch describes optional profile changes. A nil pointer means "leave
@@ -128,6 +161,8 @@ type ProfilePatch struct {
 	PresencePref    *string
 	DMPrivacy       *string
 	GroupLinkOnly   *bool
+	// TypingStyle replaces the style with this JSON; "" is the plain one.
+	TypingStyle *string
 }
 
 // Session is a login on one device.
@@ -236,6 +271,9 @@ type Server struct {
 	DefaultNotifications int     `json:"default_notifications"`
 	Flags                int64   `json:"flags"`
 	CreatedAt            int64   `json:"created_at"`
+	// Tag is the tag its members can wear (server_tags.go), or nil. Read
+	// by ServerByID and ServersForUser; other server reads leave it nil.
+	Tag *ServerTag `json:"tag"`
 }
 
 // ServerPatch is an optional set of server changes.

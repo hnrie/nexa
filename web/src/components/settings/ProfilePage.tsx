@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { bannerUrl, users as usersApi } from "@/api/users";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
@@ -14,6 +14,14 @@ import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
 import { SaveBar } from "@/components/server/SettingsLayer";
+import { readTypingStyle, sameTypingStyle, type TypingStyle } from "@/lib/typingStyle";
+import { TypingStyleEditor } from "./TypingStyleEditor";
+import { ServerTagChooser } from "./ServerTagChooser";
+import { WidgetsEditor } from "./WidgetsEditor";
+import { readWidgets, type Widget } from "@/lib/widgets";
+import { describeError } from "@/lib/errors";
+import { LoaderCircle } from "lucide-react";
+import w from "./WidgetsEditor.module.css";
 const PRESETS = ["#8000ff", "#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#1abc9c", "#e67e22", "#607d8b"];
 
 /** A colour column may be missing entirely on an older server, so treat anything but a number as unset. */
@@ -34,11 +42,30 @@ export default function ProfilePage() {
   const [about, setAbout] = useState(() => aboutToEdit(me?.about_me ?? ""));
   const [accent, setAccent] = useState<string | null>(hexOf(me?.accent_color));
   const [accent2, setAccent2] = useState<string | null>(hexOf(me?.accent_color_2));
+  const [typing, setTyping] = useState<TypingStyle | null>(() => readTypingStyle(me?.typing_style));
   const [crop, setCrop] = useState<{ file: File; kind: "avatar" | "banner" } | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<"avatar" | "banner" | null>(null);
   const avatarRef = useRef<HTMLInputElement>(null);
   const bannerRef = useRef<HTMLInputElement>(null);
+  // the widgets come with the whole profile, not with the account; null until they have
+  const [widgets, setWidgets] = useState<Widget[]>([]);
+  const [savedWidgets, setSavedWidgets] = useState<Widget[] | null>(null);
+  const [widgetsFailed, setWidgetsFailed] = useState(false);
+  const meId = me?.id;
+  const loadWidgets = useCallback(() => {
+    if (!meId) return;
+    setWidgetsFailed(false);
+    usersApi.profile(meId).then(
+      (p) => {
+        const list = readWidgets(p.widgets);
+        setWidgets(list);
+        setSavedWidgets(list);
+      },
+      () => setWidgetsFailed(true),
+    );
+  }, [meId]);
+  useEffect(loadWidgets, [loadWidgets]);
 
   useEffect(() => {
     if (!me) return;
@@ -47,6 +74,7 @@ export default function ProfilePage() {
     setAbout(aboutToEdit(me.about_me));
     setAccent(hexOf(me.accent_color));
     setAccent2(hexOf(me.accent_color_2));
+    setTyping(readTypingStyle(me.typing_style));
   }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const savedAbout = me?.about_me ?? "";
   const loadedAbout = useMemo(() => aboutToEdit(savedAbout), [savedAbout]);
@@ -55,24 +83,37 @@ export default function ProfilePage() {
   if (!me) return null;
   const currentAccent = hexOf(me.accent_color);
   const currentAccent2 = hexOf(me.accent_color_2);
-  const dirty = displayName !== me.display_name || pronouns !== me.pronouns || about !== loadedAbout || accent !== currentAccent || accent2 !== currentAccent2;
+  const savedTyping = readTypingStyle(me.typing_style);
+  const typingChanged = !sameTypingStyle(typing, savedTyping);
+  const profileChanged = displayName !== me.display_name || pronouns !== me.pronouns || about !== loadedAbout || accent !== currentAccent || accent2 !== currentAccent2 || typingChanged;
+  const widgetsChanged = savedWidgets !== null && JSON.stringify(widgets) !== JSON.stringify(savedWidgets);
+  const dirty = profileChanged || widgetsChanged;
   const hex = (v: string | null) => (v ? parseInt(v.slice(1), 16) : null);
   const themeCss = profileTheme(hex(accent), hex(accent2), me.id);
 
   const save = async () => {
     setSaving(true);
     try {
-      const u = await usersApi.patchMe({ display_name: displayName.trim(), pronouns: pronouns.trim(), about_me: aboutOut, accent_color: hex(accent), accent_color_2: hex(accent2) });
-      setMe(u);
-      // the server trims and cleans what it stores, so take its copy back or the form stays "unsaved"
-      setDisplayName(u.display_name);
-      setPronouns(u.pronouns);
-      setAbout(aboutToEdit(u.about_me));
-      setAccent(hexOf(u.accent_color));
-      setAccent2(hexOf(u.accent_color_2));
+      if (profileChanged) {
+        const u = await usersApi.patchMe({ display_name: displayName.trim(), pronouns: pronouns.trim(), about_me: aboutOut, accent_color: hex(accent), accent_color_2: hex(accent2), ...(typingChanged ? { typing_style: typing } : {}) });
+        setMe(u);
+        // the server trims and cleans what it stores, so take its copy back or the form stays "unsaved"
+        setDisplayName(u.display_name);
+        setPronouns(u.pronouns);
+        setAbout(aboutToEdit(u.about_me));
+        setAccent(hexOf(u.accent_color));
+        setAccent2(hexOf(u.accent_color_2));
+        setTyping(readTypingStyle(u.typing_style));
+      }
+      if (widgetsChanged) {
+        const res = await usersApi.setWidgets(widgets);
+        const list = readWidgets(res.widgets);
+        setWidgets(list);
+        setSavedWidgets(list);
+      }
       toast(t("settings.profile.profileSaved"), "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("settings.privacy.couldNotSave"), "error");
+      toast(err instanceof ApiError ? describeError(err, t("settings.privacy.couldNotSave")) : t("settings.privacy.couldNotSave"), "error");
     } finally {
       setSaving(false);
     }
@@ -83,6 +124,8 @@ export default function ProfilePage() {
     setAbout(loadedAbout);
     setAccent(currentAccent);
     setAccent2(currentAccent2);
+    setTyping(savedTyping);
+    if (savedWidgets) setWidgets(savedWidgets);
   };
   const upload = async (kind: "avatar" | "banner", file: File) => {
     if (file.size > 10 * 1024 * 1024) return toast(t("settings.profile.imagesAreLimitedTo10Mb"), "error");
@@ -159,12 +202,32 @@ export default function ProfilePage() {
           <Field as="div" label={t("settings.profile.aboutMe")} hint={t("settings.profile.aboutHintLeft", { count: ABOUT_MAX - aboutOut.length })}>
             <AboutMeEditor value={about} onChange={setAbout} max={ABOUT_MAX} placeholder={t("settings.profile.tellPeopleAboutYourself")} label={t("settings.profile.aboutMe")} />
           </Field>
+          <div>
+            <div data-setting="widgets" className={w.head}>{t("widgets.title")}</div>
+            <p className={w.hint}>{t("widgets.hint")}</p>
+            {savedWidgets ? (
+              <WidgetsEditor value={widgets} onChange={setWidgets} />
+            ) : widgetsFailed ? (
+              <div className={w.loading}>
+                <span>{t("widgets.couldNotLoad")}</span>
+                <Button size="sm" variant="secondary" onClick={loadWidgets}>{t("invite.tryAgain")}</Button>
+              </div>
+            ) : (
+              <div className={w.loading} aria-busy="true"><LoaderCircle size={16} className={w.spin} aria-hidden="true" /> {t("common.working")}</div>
+            )}
+          </div>
+          <ServerTagChooser />
+          <div>
+            <div data-setting="typingStyle" className={s.h5} style={{ marginTop: 0 }}>{t("typing.editor.title")}</div>
+            <p className={s.hint} style={{ margin: "0 0 12px" }}>{t("typing.editor.hint")}</p>
+            <TypingStyleEditor value={typing} onChange={setTyping} name={displayName.trim() || me.display_name} />
+          </div>
         </div>
         <div className={s.preview}>
           <div className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.preview")}</div>
           {/* the profile exactly as others will see it, theme and all, with the changes not yet saved */}
           <div className={s.previewCard} data-testid="profile-preview">
-            <ProfileCard userId={me.id} variant="panel" preview={{ display_name: displayName || me.display_name, pronouns, about_me: aboutOut, accent_color: hex(accent), accent_color_2: hex(accent2) }} />
+            <ProfileCard userId={me.id} variant="panel" preview={{ display_name: displayName || me.display_name, pronouns, about_me: aboutOut, accent_color: hex(accent), accent_color_2: hex(accent2) }} previewWidgets={widgets} />
           </div>
         </div>
       </div>

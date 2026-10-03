@@ -24,7 +24,8 @@ type modActionReq struct {
 		Avatar bool `json:"avatar"`
 		Banner bool `json:"banner"`
 	} `json:"images"`
-	// field_reset: username, display_name, about_me, pronouns, status, nicknames
+	// field_reset: username, display_name, about_me, pronouns, status,
+	// nicknames, typing_style, widgets, server_tag
 	Fields []string `json:"fields"`
 	// mute and ban: how long; a ban can be permanent instead
 	DurationMS int64 `json:"duration_ms"`
@@ -50,8 +51,10 @@ const (
 )
 
 // resetFields are the profile fields a field_reset can take back. Nicknames
-// are the names the account goes by in its servers, all of them at once.
-var resetFields = []string{"username", "display_name", "about_me", "pronouns", "status", "nicknames"}
+// are the names the account goes by in its servers, all of them at once; the
+// typing style, the widgets and the server tag worn are cleared rather than
+// overwritten, as a status is.
+var resetFields = []string{"username", "display_name", "about_me", "pronouns", "status", "nicknames", "typing_style", "widgets", "server_tag"}
 
 // readReason checks a moderator's reason, which the member reads.
 func readReason(w http.ResponseWriter, raw string) (string, bool) {
@@ -176,7 +179,7 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 	var fields []string
 	for _, f := range req.Fields {
 		if !OneOf(f, resetFields...) {
-			WriteError(w, E(http.StatusBadRequest, "unknown_field", "Only the username, display name, about me, pronouns, custom status and server nicknames can be reset."))
+			WriteError(w, E(http.StatusBadRequest, "unknown_field", "Only the username, display name, about me, pronouns, custom status, server nicknames, typing indicator, widgets and server tag can be reset."))
 			return
 		}
 		if !chosen[f] {
@@ -202,7 +205,17 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 			}
 		}
 	}
-	empty := map[string]bool{"about_me": target.AboutMe == "", "pronouns": target.Pronouns == "", "status": target.StatusText == "" && target.StatusEmoji == "", "nicknames": len(nicknamed) == 0}
+	var widgets string
+	if chosen["widgets"] {
+		raw, err := s.Store.UserWidgets(ctx, target.ID)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		widgets = raw
+	}
+	empty := map[string]bool{"about_me": target.AboutMe == "", "pronouns": target.Pronouns == "", "status": target.StatusText == "" && target.StatusEmoji == "", "nicknames": len(nicknamed) == 0,
+		"typing_style": target.TypingStyle == "", "widgets": widgets == "", "server_tag": target.WornTag() == nil}
 	for _, f := range fields {
 		if empty[f] {
 			WriteError(w, E(http.StatusBadRequest, "field_empty", "That field is already empty, so there is nothing to reset."))
@@ -247,6 +260,15 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 					was = append(was, m.Name+": "+m.Nickname)
 				}
 				oldVals[field], newVals[field] = clipRunes(strings.Join(was, "\n"), maxKeptOldValue), ""
+			case "typing_style":
+				f.TypingStyle = true
+				oldVals[field], newVals[field] = typingStyleText(target.TypingStyle), ""
+			case "widgets":
+				f.Widgets = true
+				oldVals[field], newVals[field] = clipRunes(widgetsText(widgets), maxKeptOldValue), ""
+			case "server_tag":
+				f.ServerTag = true
+				oldVals[field], newVals[field] = target.TagText, ""
 			}
 		}
 		c.Details = mustJSON(map[string]any{"fields": fields, "old": oldVals, "new": newVals})

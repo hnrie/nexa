@@ -143,6 +143,14 @@ export function fieldLabel(f: ResetField | ServerField): string {
       return t("moderation.field.pronouns");
     case "nicknames":
       return t("moderation.field.nicknames");
+    case "typing_style":
+      return t("moderation.field.typingStyle");
+    case "widgets":
+      return t("moderation.field.widgets");
+    case "server_tag":
+      return t("moderation.field.serverTagWorn");
+    case "tag":
+      return t("moderation.field.serverTag");
     case "icon":
       return t("moderation.field.serverIcon");
     case "banner":

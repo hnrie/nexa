@@ -46,6 +46,18 @@ func TestMigrationMovesTheOldDMDefault(t *testing.T) {
 	ALTER TABLE blobs DROP COLUMN blocked;
 	ALTER TABLE sticker_packs DROP COLUMN discover_blocked;
 	DROP TABLE blocked_images;
+	ALTER TABLE users DROP COLUMN typing_style;
+	DROP INDEX users_tag_server;
+	ALTER TABLE users DROP COLUMN tag_server_id;
+	ALTER TABLE users DROP COLUMN tag_text;
+	ALTER TABLE users DROP COLUMN tag_badge;
+	ALTER TABLE users DROP COLUMN tag_color;
+	ALTER TABLE servers DROP COLUMN tag_text;
+	ALTER TABLE servers DROP COLUMN tag_badge;
+	ALTER TABLE servers DROP COLUMN tag_color;
+	ALTER TABLE servers DROP COLUMN tag_roles;
+	ALTER TABLE servers DROP COLUMN tag_invite;
+	ALTER TABLE users DROP COLUMN widgets;
 	PRAGMA user_version = 17;`)
 	if err != nil {
 		t.Fatal(err)

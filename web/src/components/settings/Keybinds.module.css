@@ -1,0 +1,60 @@
+/*
+ * Settings, Keybinds. The keys are drawn as keys: a cap with a lit top edge
+ * and a darker lip at its foot, in the panel's own colours, so a bind reads
+ * as something to press rather than as text. A row taking a new key glows
+ * in the accent while it listens.
+ */
+.list { border-radius: var(--radius-lg); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-low); overflow: hidden; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; min-height: 68px; padding: 12px 14px 12px 18px; transition: background-color var(--transition), box-shadow var(--transition); }
+.row + .row { border-top: 1px solid var(--border-subtle); }
+.row[data-recording] { background: color-mix(in srgb, var(--brand) 9%, transparent); box-shadow: inset 3px 0 0 var(--brand); }
+[dir="rtl"] .row[data-recording] { box-shadow: inset -3px 0 0 var(--brand); }
+.what { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.name { font-size: 15px; font-weight: 650; color: var(--text-strong); }
+.desc { font-size: 13px; line-height: 1.35; color: var(--text-muted); overflow-wrap: anywhere; }
+.side { display: flex; align-items: center; gap: 10px; margin-inline-start: auto; }
+
+/* the keys, written left to right whatever the language: that is how they are pressed */
+.keys { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; direction: ltr; }
+.cap {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--bg-input), var(--text-strong) 7%), var(--bg-input));
+  box-shadow: inset 0 1px 0 var(--edge-light), inset 0 -2px 0 color-mix(in srgb, var(--shade) 60%, transparent), 0 0 0 1px var(--border);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+/* a modifier held while listening, before the key that finishes the bind */
+.cap[data-held] { background: color-mix(in srgb, var(--brand) 22%, var(--bg-input)); box-shadow: inset 0 1px 0 var(--edge-light), inset 0 -2px 0 color-mix(in srgb, var(--brand) 55%, transparent), 0 0 0 1px color-mix(in srgb, var(--brand) 55%, transparent); }
+.none { font-size: 14px; color: var(--text-muted); }
+.listening { font-size: 14px; font-weight: 600; color: var(--text-brand); animation: listen 1.6s ease-in-out infinite; }
+@keyframes listen { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+.btns { display: flex; align-items: center; gap: 4px; }
+.clear { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--icon); transition: background-color var(--transition), color var(--transition); }
+.clear:hover { background: var(--bg-hover); color: var(--text-strong); }
+@media (pointer: coarse) { .clear { width: 40px; height: 40px; } }
+
+/* what went wrong with a key just pressed, or what stands in its way */
+.note { flex: 1 0 100%; display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
+.note[data-tone="danger"] { color: var(--text-danger); }
+.note[data-tone="warn"] { color: var(--text-warning); }
+.note svg { flex: none; margin-top: 1px; }
+
+.foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-top: 12px; }
+.where { font-size: 13.5px; line-height: 1.4; color: var(--text-muted); margin: 0; flex: 1 1 260px; }
+.link { padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--link); }
+.link:hover { text-decoration: underline; }
+
+@media (max-width: 767px) {
+  .row { padding-inline: 14px 10px; }
+  .side { flex: 1 0 100%; justify-content: space-between; margin-inline-start: 0; }
+}

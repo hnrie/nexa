@@ -13,4 +13,6 @@
 .tip[data-side="bottom"]::after { bottom: 100%; left: calc(var(--arrow, 50%) - 5px); border-bottom-color: var(--tooltip-bg); }
 .tip[data-side="left"]::after { left: 100%; top: calc(var(--arrow, 50%) - 5px); border-left-color: var(--tooltip-bg); }
 .tip[data-side="right"]::after { right: 100%; top: calc(var(--arrow, 50%) - 5px); border-right-color: var(--tooltip-bg); }
+/* the keys that do the same thing, after the words and quieter than them */
+.keys { margin-inline-start: 8px; font-weight: 500; opacity: 0.7; white-space: nowrap; }
 @keyframes tipIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }

@@ -650,6 +650,12 @@ type ModFieldReset struct {
 	StatusText string
 	// Nicknames clears the nickname the account goes by in every server.
 	Nicknames bool
+	// TypingStyle puts the account's typing line back to the plain one.
+	TypingStyle bool
+	// Widgets takes every widget off the profile and lets their pictures go.
+	Widgets bool
+	// ServerTag takes off the server tag the account wears.
+	ServerTag bool
 	// HeldUsername is the name the reset took off the account.
 	HeldUsername string
 }
@@ -678,6 +684,18 @@ func (s *Store) ModResetFields(ctx context.Context, c *ModCase, f ModFieldReset,
 		set("status_emoji", "")
 		set("status_expires_at", nil)
 	}
+	if f.TypingStyle {
+		set("typing_style", "")
+	}
+	if f.Widgets {
+		set("widgets", "")
+	}
+	if f.ServerTag {
+		set("tag_server_id", nil)
+		set("tag_text", "")
+		set("tag_badge", "")
+		set("tag_color", nil)
+	}
 	if len(sets) == 0 && !f.Nicknames {
 		return errors.New("field reset: nothing to reset")
 	}
@@ -693,12 +711,27 @@ func (s *Store) ModResetFields(ctx context.Context, c *ModCase, f ModFieldReset,
 				return ErrUsernameTaken
 			}
 		}
+		// the pictures the widgets name, given back once the widgets are gone
+		var widgets string
+		if f.Widgets {
+			if err := tx.QueryRowContext(ctx, `SELECT widgets FROM users WHERE id = ?`, int64(c.UserID)).Scan(&widgets); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return ErrNotFound
+				}
+				return err
+			}
+		}
 		res, err := tx.ExecContext(ctx, `UPDATE users SET `+strings.Join(sets, ", ")+` WHERE id = ?`, args...)
 		if err != nil {
 			return err
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrNotFound
+		}
+		for id := range WidgetImages(widgets) {
+			if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - 1")+` WHERE id = ?`, int64(id)); err != nil {
+				return err
+			}
 		}
 		if f.Nicknames {
 			if _, err := tx.ExecContext(ctx, `UPDATE server_members SET nickname = '' WHERE user_id = ? AND nickname <> ''`, int64(c.UserID)); err != nil {

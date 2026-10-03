@@ -216,6 +216,14 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 		}
 		p.DMPrivacy = &v
 	}
+	if v, ok := raw["typing_style"]; ok {
+		style, problem := cleanTypingStyle(v)
+		if problem != "" {
+			bad("invalid_typing_style", problem)
+			return
+		}
+		p.TypingStyle = &style
+	}
 	if v, ok := raw["group_link_only"]; ok {
 		var b bool
 		if err := json.Unmarshal(v, &b); err != nil || string(v) == "null" {
@@ -229,7 +237,7 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 	// put anything new on it.
 	filled := func(v *string) bool { return v != nil && *v != "" }
 	public := p.Username != nil || p.DisplayName != nil || p.AccentColor != nil || p.AccentColor2 != nil ||
-		filled(p.AboutMe) || filled(p.Pronouns) || filled(p.StatusText) || filled(p.StatusEmoji)
+		filled(p.AboutMe) || filled(p.Pronouns) || filled(p.StatusText) || filled(p.StatusEmoji) || filled(p.TypingStyle)
 	if public && mutedFor(w, r) {
 		return
 	}
@@ -412,7 +420,13 @@ func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
 	if servers == nil {
 		servers = []ids.ID{}
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"user": u.Public(), "mutual_friends": friends, "mutual_servers": servers})
+	// the profile's widgets come with the whole profile, not with every mention of the person
+	widgets, err := s.Store.UserWidgets(r.Context(), u.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"user": u.Public(), "mutual_friends": friends, "mutual_servers": servers, "widgets": widgetsJSON(widgets)})
 }
 
 func (s *Server) handlePublicKey(w http.ResponseWriter, r *http.Request) {

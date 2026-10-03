@@ -195,6 +195,15 @@ export interface EvilionDesktop {
    * straight after a right click and a click, or the keys that do the same.
    */
   paste?(): Promise<boolean>;
+  /**
+   * Holds these keybinds system-wide, so they answer with another window in
+   * front (app 1.2.2 and later), in place of the ones held before; an empty
+   * list lets go of them all. Says which ones the system gave: a key another
+   * program holds cannot be taken.
+   */
+  setShortcuts?(list: { action: string; accelerator: string }[]): Promise<{ action: string; ok: boolean }[]>;
+  /** A keybind held system-wide was pressed (app 1.2.2 and later). */
+  onShortcut?(cb: (action: string) => void): () => void;
 }
 
 export function desktopBridge(): EvilionDesktop | null {

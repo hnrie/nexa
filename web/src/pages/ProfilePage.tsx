@@ -112,6 +112,7 @@ function ProfileLinkPage({ username }: { username: string }) {
           variant="modal"
           visitor={{
             user,
+            widgets: user.widgets,
             actions: (
               <>
                 <Link to={`/login?next=${next}`} className={p.primary} data-testid="profile-link-login">{t("profileLink.logInToAddFriend")}</Link>

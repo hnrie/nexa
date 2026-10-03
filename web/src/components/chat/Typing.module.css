@@ -1,0 +1,41 @@
+/*
+ * Someone's own way of typing: their emoji, moving the way they chose, then
+ * their name and their words. The emoji take turns, like the plain dots do,
+ * so three of them read as one small thing happening rather than three.
+ * Anyone who asked for less motion sees them breathe in place instead, which
+ * still says someone is writing.
+ */
+.styled { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
+.emoji { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.slot { --s: 18px; display: inline-flex; width: var(--s); height: var(--s); transform-origin: 50% 70%; }
+.glyph { width: 100%; height: 100%; object-fit: contain; font-size: calc(var(--s) * 0.82); line-height: 1; }
+.words { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.words b { font-weight: 600; color: var(--text); }
+
+.emoji[data-motion="wave"] .slot { animation: typeWave 1.3s var(--ease-in-out) infinite; animation-delay: calc(var(--i) * 0.16s); }
+.emoji[data-motion="pulse"] .slot { animation: typePulse 1.3s ease-in-out infinite; animation-delay: calc(var(--i) * 0.18s); }
+.emoji[data-motion="wiggle"] .slot { animation: typeWiggle 1.5s ease-in-out infinite; animation-delay: calc(var(--i) * 0.2s); }
+@keyframes typeWave { 0%, 55%, 100% { transform: translateY(0); } 25% { transform: translateY(-4px); } }
+@keyframes typePulse { 0%, 55%, 100% { transform: scale(1); } 25% { transform: scale(1.3); } }
+@keyframes typeWiggle { 0%, 60%, 100% { transform: rotate(0); } 15% { transform: rotate(-16deg); } 35% { transform: rotate(14deg); } }
+@keyframes typeCalm { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .emoji:not([data-motion="still"]) .slot { animation: typeCalm 1.6s ease-in-out infinite !important; animation-delay: calc(var(--i) * 0.2s) !important; transform: none !important; } }
+[data-reduced-motion="true"] .emoji:not([data-motion="still"]) .slot { animation: typeCalm 1.6s ease-in-out infinite !important; animation-delay: calc(var(--i) * 0.2s) !important; transform: none !important; }
+
+/* larger, for showing it off: the card that opens from it, and Settings' preview */
+.styled[data-size="big"] { gap: 12px; font-size: 16px; }
+.styled[data-size="big"] .emoji { gap: 5px; }
+.styled[data-size="big"] .slot { --s: 28px; }
+/* shown off, the words have room to wrap rather than be cut short */
+.styled[data-size="big"] .words { white-space: normal; overflow-wrap: anywhere; }
+.styled[data-size="big"] .emoji[data-motion="wave"] .slot { animation-name: typeWaveBig; }
+@keyframes typeWaveBig { 0%, 55%, 100% { transform: translateY(0); } 25% { transform: translateY(-7px); } }
+
+/* the typing line, when it is someone's own: a press on it shows it off and offers the same */
+.lineBtn { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; margin-inline-start: -6px; padding: 1px 6px; border-radius: var(--radius-xs); color: inherit; text-align: start; transition: background-color var(--transition); }
+.lineBtn:hover { background: var(--bg-hover); }
+
+/* the card a typing line opens */
+.card { width: 320px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.stage { display: flex; align-items: center; min-height: 64px; padding: 14px 16px; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--bg-base) 55%, var(--bg-floating)); box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 30%, transparent), inset 0 0 0 1px var(--border-subtle); color: var(--text-subtle); font-size: 15px; overflow: hidden; }
+.cardText { margin: 0; font-size: 14px; line-height: 1.4; color: var(--text-muted); }

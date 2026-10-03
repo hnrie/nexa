@@ -451,10 +451,17 @@ func (s *Server) handleServerDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	// whoever wore its tag has it taken off with the server (store.DeleteServer)
+	wearers, err := s.Store.TagWearers(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	if err := s.Store.DeleteServer(r.Context(), srv.ID); err != nil {
 		WriteError(w, err)
 		return
 	}
+	s.tagChanged(r.Context(), wearers)
 	s.voiceServerDeleted(chans, members)
 	s.Bcast.EmitUsers(members, "server_delete", map[string]any{"id": srv.ID})
 	w.WriteHeader(http.StatusNoContent)
@@ -478,6 +485,8 @@ func (s *Server) removeMember(r *http.Request, srv *store.Server, uid ids.ID, ev
 		return err
 	}
 	s.forgetCounts(srv.ID)
+	// nobody wears the tag of a server they are no longer in
+	s.takeOffLeaver(ctx, srv.ID, uid)
 	payload := map[string]any{"server_id": srv.ID, "user_id": uid}
 	for k, v := range extra {
 		payload[k] = v
@@ -1370,6 +1379,7 @@ func (s *Server) handleRoleDelete(w http.ResponseWriter, r *http.Request) {
 	s.audit(r, srv.ID, me.ID, "role_delete", "role", &role.ID, map[string]any{"name": role.Name}, "")
 	s.emitServer(r.Context(), srv.ID, "role_delete", map[string]any{"id": role.ID, "server_id": srv.ID})
 	s.syncVisibility(r.Context(), srv.ID, before, nil)
+	s.tagRoleGone(r.Context(), srv, role.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1641,6 +1651,10 @@ func (s *Server) handleMemberPatch(w http.ResponseWriter, r *http.Request) {
 	if rolesSet || patch.TimeoutUntil != nil {
 		s.syncVisibility(r.Context(), srv.ID, before, nil)
 	}
+	if rolesSet {
+		// a tag kept to some roles comes off whoever no longer has one
+		s.RecheckTagWearers(r.Context(), srv.ID, []ids.ID{m.UserID})
+	}
 	WriteJSON(w, http.StatusOK, updated)
 }
 
@@ -1702,6 +1716,9 @@ func (s *Server) handleMemberRole(add bool) http.HandlerFunc {
 		s.audit(r, srv.ID, me.ID, map[bool]string{true: "member_role_add", false: "member_role_remove"}[add], "user", &m.UserID, map[string]any{"role": rid}, "")
 		s.emitServer(r.Context(), srv.ID, "member_update", updated)
 		s.syncVisibility(r.Context(), srv.ID, before, nil)
+		if !add {
+			s.RecheckTagWearers(r.Context(), srv.ID, []ids.ID{m.UserID})
+		}
 		WriteJSON(w, http.StatusOK, updated)
 	}
 }

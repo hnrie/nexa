@@ -88,19 +88,19 @@ func (s *Store) CreateServer(ctx context.Context, owner ids.ID, name string, def
 
 // ServerByID loads a server.
 func (s *Store) ServerByID(ctx context.Context, id ids.ID) (*Server, error) {
-	return scanServer(s.db.R.QueryRowContext(ctx, `SELECT `+serverCols+` FROM servers WHERE id = ?`, int64(id)))
+	return scanServerTagged(s.db.R.QueryRowContext(ctx, `SELECT `+serverCols+`, `+serverTagCols+` FROM servers WHERE id = ?`, int64(id)))
 }
 
 // ServersForUser lists the servers a user belongs to, oldest membership first.
 func (s *Store) ServersForUser(ctx context.Context, uid ids.ID) ([]*Server, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+prefixed("s", serverCols)+` FROM servers s JOIN server_members m ON m.server_id = s.id WHERE m.user_id = ? ORDER BY m.joined_at, s.id`, int64(uid))
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+prefixed("s", serverCols)+`, `+prefixed("s", serverTagCols)+` FROM servers s JOIN server_members m ON m.server_id = s.id WHERE m.user_id = ? ORDER BY m.joined_at, s.id`, int64(uid))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := []*Server{}
 	for rows.Next() {
-		srv, err := scanServer(rows)
+		srv, err := scanServerTagged(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -177,6 +177,19 @@ func (s *Store) DeleteServer(ctx context.Context, id ids.ID) error {
 			UNION ALL SELECT st.blob_id FROM stickers st JOIN sticker_packs p ON p.id = st.pack_id WHERE p.server_id = ?
 			UNION ALL SELECT avatar_id FROM webhooks WHERE server_id = ?`,
 			int64(id), int64(id), int64(id), int64(id), int64(id)); err != nil {
+			return err
+		}
+		// its tag's picture goes too, and nobody wears the tag of a server that is gone
+		var badge string
+		if err := tx.QueryRowContext(ctx, `SELECT tag_badge FROM servers WHERE id = ?`, int64(id)).Scan(&badge); err != nil && err != sql.ErrNoRows {
+			return err
+		}
+		if img, ok := TagImage(badge); ok {
+			if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - 1")+` WHERE id = ?`, int64(img)); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE users SET tag_server_id = NULL, tag_text = '', tag_badge = '', tag_color = NULL WHERE tag_server_id = ?`, int64(id)); err != nil {
 			return err
 		}
 		for _, q := range []string{

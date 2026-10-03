@@ -1,0 +1,16 @@
+/* Settings, Profiles, Server Tag: the one worn, on a card of its own, and the list to choose from. */
+.head { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 14.5px; font-weight: 700; letter-spacing: -0.005em; color: var(--text-strong); }
+.hint { margin: 0 0 10px; font-size: 14px; color: var(--text-muted); }
+.card { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; min-height: 58px; padding: 10px 12px 10px 14px; border-radius: var(--radius-md); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); }
+.from { flex: 1 1 120px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14.5px; font-weight: 600; color: var(--text); }
+.none { flex: 1 1 160px; font-size: 14px; color: var(--text-muted); }
+.btns { display: flex; gap: 6px; margin-inline-start: auto; }
+
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 10px; border-radius: var(--radius-md); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); }
+.icon { flex: none; width: 40px; height: 40px; border-radius: 30%; object-fit: cover; }
+.icon[data-initials] { display: flex; align-items: center; justify-content: center; background: var(--bg-active); color: var(--text-strong); font-size: 14px; font-weight: 700; }
+.rowText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rowName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 600; color: var(--text-strong); }
+.rowNote { font-size: 12.5px; color: var(--text-muted); }
+.wearing { flex: none; font-size: 13px; font-weight: 600; color: var(--text-muted); padding-inline: 8px; }

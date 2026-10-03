@@ -2,6 +2,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Copy, Eraser, FolderOpen, Gave
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { moderation as modApi, type ModPack, type ModServer, type People, type ServerField, type StaffCase } from "@/api/moderation";
+import { ServerTagChip } from "@/components/servertag/ServerTagChip";
 import type { Emoji } from "@/api/types";
 import { bannerUrl } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
@@ -102,6 +103,13 @@ export function ServerPage() {
       value: server.description ? <span className={p.clip2} dir="auto">{previewText(server.description)}</span> : t("moderation.sheet.notSet"),
       empty: !server.description,
       action: t("moderation.sheet.clear"),
+      icon: <Eraser size={15} aria-hidden="true" />,
+    },
+    {
+      field: "tag",
+      value: server.tag ? <ServerTagChip tag={{ server_id: server.id, text: server.tag.text, badge: server.tag.badge, color: server.tag.color ?? null }} open={false} /> : t("moderation.sheet.notSet"),
+      empty: !server.tag,
+      action: t("moderation.sheet.remove"),
       icon: <Eraser size={15} aria-hidden="true" />,
     },
   ];

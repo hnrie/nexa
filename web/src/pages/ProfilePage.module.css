@@ -11,7 +11,7 @@
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 .main { margin-bottom: auto; flex-shrink: 0; width: 100%; display: flex; justify-content: center; }
 /* the card brings its own edges and shadow; this adds the light it throws in their colour */
-.profile { width: 100%; max-width: 600px; border-radius: var(--radius-lg); box-shadow: 0 40px 100px -40px color-mix(in srgb, var(--profile-glow) 60%, transparent); animation: rise 520ms var(--ease-out) 60ms both; }
+.profile { --profile-max-h: calc(100dvh - 150px); width: 100%; max-width: 940px; border-radius: var(--radius-lg); box-shadow: 0 40px 100px -40px color-mix(in srgb, var(--profile-glow) 60%, transparent); animation: rise 520ms var(--ease-out) 60ms both; }
 /* a dead link or a failed load is the invite page's own card */
 .main > [data-gone] { max-width: 440px; border-radius: var(--radius-xl); box-shadow: inset 0 1px 0 var(--edge-light-strong), 0 0 0 1px var(--panel-edge), var(--shadow-high), 0 40px 100px -40px color-mix(in srgb, var(--brand) 55%, transparent); animation: rise 520ms var(--ease-out) 60ms both; }
 .waiting { display: flex; justify-content: center; padding: 48px 0; }

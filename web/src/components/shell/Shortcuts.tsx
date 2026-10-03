@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { installNotifications, setNotificationNavigator } from "@/lib/notify";
 import { installTTS } from "@/lib/tts";
-import { playSound } from "@/lib/sounds";
 import { installTitleBadge } from "@/lib/title";
 import { useAuth } from "@/stores/auth";
 import { channelTree, selectDMs, useChannels } from "@/stores/channels";
@@ -10,7 +9,9 @@ import { useMessages } from "@/stores/messages";
 import { useReadStates } from "@/stores/readStates";
 import { useTabs } from "@/stores/tabs";
 import { useUI } from "@/stores/ui";
-import { useVoiceLocal } from "@/stores/voiceLocal";
+import { actionFor, comboOf, keybindsOf, learnLayout } from "@/lib/keybinds";
+import { runKeybind } from "@/lib/keybindActions";
+import { useSettings } from "@/stores/settings";
 
 function inEditable(t: EventTarget | null): boolean {
   const el = t as HTMLElement | null;
@@ -27,6 +28,8 @@ export function Shortcuts() {
   useEffect(() => {
     installNotifications();
     installTTS();
+    // what each key is labelled on this keyboard, for Settings, Keybinds and the tooltips that show them
+    learnLayout();
     setNotificationNavigator(nav);
     const stop = installTitleBadge();
     return () => {
@@ -39,16 +42,14 @@ export function Shortcuts() {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       const ui = useUI.getState();
-      if (mod && e.shiftKey && e.code === "KeyM") {
+      // The account's own keys for mute, deafen and activity (Settings, Keybinds).
+      // Held down, a key repeats: that is one press, not a toggle every few
+      // milliseconds. The sound comes from the voice session, not from here, or
+      // it played twice.
+      const bound = actionFor(keybindsOf(useSettings.getState().settings.keybinds), comboOf(e));
+      if (bound) {
         e.preventDefault();
-        useVoiceLocal.getState().toggleMute();
-        playSound(useVoiceLocal.getState().muted ? "mute" : "unmute");
-        return;
-      }
-      if (mod && e.shiftKey && e.code === "KeyD") {
-        e.preventDefault();
-        useVoiceLocal.getState().toggleDeafen();
-        playSound(useVoiceLocal.getState().deafened ? "mute" : "unmute");
+        if (!e.repeat) runKeybind(bound);
         return;
       }
       if (mod && e.key === "/") {

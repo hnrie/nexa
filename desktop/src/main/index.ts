@@ -2,7 +2,7 @@
  * Nexa for the desktop: one window on the live site, a tray icon, the
  * Rich Presence server, and updates.
  */
-import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, nativeImage, powerMonitor, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { IPC, type DesktopSettings, type Identity, type WindowState } from "../shared/bridge";
@@ -10,6 +10,7 @@ import { BASE, ORIGIN, isAppUrl } from "./config";
 import { chooseDisplaySource, handleDisplayMedia, lockPermissions, openScreenSettings, restartApp, screenAccess, shareAudioFailed } from "./permissions";
 import { RpcService } from "./rpc/service";
 import { PasteGate } from "./pasteGate";
+import { applyShortcuts, cleanRequests } from "./shortcuts";
 import { SettingsStore } from "./settings";
 import { offerMoveToApplications, retireOlderCopies } from "./succession";
 import { createTray, fillTray, type TrayActions } from "./tray";
@@ -79,6 +80,12 @@ async function start(): Promise<void> {
   // real input the page cannot make up: the right-click menu's Paste waits for it (pasteGate.ts)
   win.webContents.on("input-event", (_e, input) => pasteGate.mouse(input.type, (input as Electron.MouseInputEvent).button));
   win.webContents.on("before-input-event", (_e, input) => pasteGate.key(input.type, input.key, input.shift));
+  // A page that goes away (a reload, the offline page) lets go of the keybinds
+  // it held: the next one asks again for its own, and one that cannot answer
+  // them must not keep the keys from every other program.
+  win.webContents.on("did-start-navigation", (nav) => {
+    if (nav.isMainFrame && !nav.isSameDocument) globalShortcut.unregisterAll();
+  });
   handleDisplayMedia(() => win, log);
   applicationMenu(() => win, () => void updater?.check());
   // a copy opened from the disk image or Downloads offers to move into Applications, once
@@ -230,6 +237,9 @@ function registerIpc(): void {
     win.webContents.paste();
     return true;
   });
+  // The keybinds held system-wide. The page sends the whole set each time
+  // they change, and an empty one when nobody is signed in.
+  handle(IPC.setShortcuts, (list: unknown) => applyShortcuts(globalShortcut, cleanRequests(list), (action) => toPage(IPC.shortcut, action)));
   // Dismissal only. Which screen is shared is answered by the picker window,
   // which this page cannot reach — the extra arguments the page used to send
   // are ignored rather than accepted and dropped, so that a change here cannot
@@ -337,6 +347,7 @@ app.on("before-quit", () => {
   quitting = true;
 });
 app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
   stopRpc();
   settings.flush();
 });

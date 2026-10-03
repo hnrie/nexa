@@ -948,10 +948,12 @@ func (h *Hub) buildGuestReady(ctx context.Context, g *store.Guest, session *stor
 // buildReady assembles the initial state for a user.
 func (h *Hub) buildReady(ctx context.Context, u *store.User, session *store.Session) (*ReadyPayload, error) {
 	p := &ReadyPayload{SessionID: session.ID, Servers: []any{}, VoiceStates: []any{}, Presences: []Presence{}, Users: []store.PublicUser{}}
+	pub := u.Public()
 	p.User = map[string]any{"id": u.ID, "username": u.Username, "display_name": u.DisplayName, "avatar_id": u.AvatarID, "banner_id": u.BannerID,
 		"about_me": u.AboutMe, "pronouns": u.Pronouns, "accent_color": u.AccentColor, "status_text": u.StatusText, "status_emoji": u.StatusEmoji,
 		"status_expires_at": u.StatusExpiresAt, "public_key": u.PublicKey, "created_at": u.CreatedAt, "flags": u.Flags, "presence_pref": u.PresencePref,
-		"dm_privacy": u.DMPrivacy, "has_recovery": u.RecoveryAuthHash != ""}
+		"dm_privacy": u.DMPrivacy, "has_recovery": u.RecoveryAuthHash != "", "accent_color_2": u.AccentColor2, "group_link_only": u.GroupLinkOnly,
+		"typing_style": pub.TypingStyle, "server_tag": pub.ServerTag}
 	var err error
 	if p.Channels, err = h.st.DMChannelsForUser(ctx, u.ID); err != nil {
 		return nil, err
