@@ -253,13 +253,16 @@ class Decryptor final : public RefCounted<webrtc::FrameDecryptorInterface> {
     seen_.fetch_add(1, std::memory_order_relaxed);
     const uint8_t* data = encrypted_frame.data();
     const size_t len = encrypted_frame.size();
-    const int index = FrameKeyIndex(data, len);
-    if (index < 0 || frame.size() < len - kTrailer - kTagLen) return Fail();
-
     const bool video = media_type == webrtc::MEDIA_TYPE_VIDEO;
+    // a browser sends some of DTX's empty frames as they are (frameCrypto.ts
+    // never seals one): nothing to open, and silence either way
+    if (len == 0 && !video) return Result(Status::kOk, 0);
+    const int index = FrameKeyIndex(data, len);
+    if (index < 0 || frame.size() < len - kTrailer - kTagLen) return Fail(len, index, false);
+
     long written = -1;
-    keys_->With(index, [&](const AesGcm& cipher) { written = OpenFrame(cipher, video, data, len, frame.data()); });
-    if (written <= 0) return Fail();
+    const bool held = keys_->With(index, [&](const AesGcm& cipher) { written = OpenFrame(cipher, video, data, len, frame.data()); });
+    if (written <= 0) return Fail(len, index, held);
 
     if (video) {
       // frameSize.ts: a key frame over the cap is never decoded, nor anything
@@ -297,11 +300,22 @@ class Decryptor final : public RefCounted<webrtc::FrameDecryptorInterface> {
     return Result(Status::kFailedToDecrypt, 0);
   }
 
+  // The first few frames a receiver cannot open, told apart: too short, a key
+  // this device does not hold, or one that does not open with the key it has.
+  Result Fail(size_t len, int index, bool held) {
+    if (told_.fetch_add(1, std::memory_order_relaxed) < 8) {
+      __android_log_print(ANDROID_LOG_DEBUG, "FrameCrypto", "could not open a frame: %zu bytes, key %d (%s), %lld seen",
+                          len, index, index < 0 ? "none" : held ? "held" : "not held", (long long)seen());
+    }
+    return Fail();
+  }
+
   KeySetPtr keys_;
   std::atomic<int64_t> seen_{0};
   std::atomic<int64_t> opened_{0};
   std::atomic<bool> blocked_{false};
   std::atomic<bool> too_large_{false};
+  std::atomic<int> told_{0};
 };
 
 template <typename T>
