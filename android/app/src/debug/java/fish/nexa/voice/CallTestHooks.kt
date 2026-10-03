@@ -17,7 +17,7 @@ import org.json.JSONObject
  *   am broadcast -a fish.nexa.debug.TONE --ei mode 0..3      (the microphone replaced: 1 tone, 2 tone in phrases, 3 noise)
  *   am broadcast -a fish.nexa.debug.CAMERA
  *   am broadcast -a fish.nexa.debug.WATCH --es user ID --ez on true
- *   am broadcast -a fish.nexa.debug.STATS                    (logged as NexaCallTest)
+ *   am broadcast -a fish.nexa.debug.STATS [--es nonce X]     (logged as NexaCallTest, with the nonce)
  *   am broadcast -a fish.nexa.debug.SEAL                     (the frame crypto against the web's vectors)
  *   am broadcast -a fish.nexa.debug.WRONGKEY --ez on true    (this call's frames sealed and opened with wrong keys)
  *   am broadcast -a fish.nexa.debug.RTP                      (the SFU connection's media stats, logged)
@@ -30,7 +30,10 @@ class CallTestHooks : BroadcastReceiver() {
             "fish.nexa.debug.TONE" -> Denoise.tone = intent.getIntExtra("mode", 0)
             "fish.nexa.debug.CAMERA" -> Calls.toggleCamera()
             "fish.nexa.debug.WATCH" -> intent.getStringExtra("user")?.let { Calls.setWatching(it, intent.getBooleanExtra("on", true)) }
-            "fish.nexa.debug.STATS" -> Calls.scope.launch { Log.i(TAG, stats().toString()) }
+            "fish.nexa.debug.STATS" -> {
+                val nonce = intent.getStringExtra("nonce")
+                Calls.scope.launch { Log.i(TAG, stats().put("nonce", nonce).toString()) }
+            }
             "fish.nexa.debug.SEAL" -> Log.i(TAG, "seal " + vectors())
             "fish.nexa.debug.RTP" -> Calls.scope.launch { Log.i(TAG, "rtp " + rtp()) }
             "fish.nexa.debug.WRONGKEY" -> Calls.scope.launch { Log.i(TAG, "wrongkey " + wrongKeys(intent.getBooleanExtra("on", true))) }
