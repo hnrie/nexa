@@ -104,6 +104,8 @@ fun App() {
     val loaded by Nexa.settings.loaded.collectAsState()
     val look = if (loaded && auth is AuthState.Ready) Appearance.of(doc) else Appearance.remembered()
     LaunchedEffect(look, loaded) { if (loaded) Appearance.remember(look) }
+    // going idle when away, and Discord showing activity only while sharing is on
+    LaunchedEffect(Unit) { fish.nexa.ui.settings.ActivitySync.start() }
     val locale = (doc["locale"] as? JsonPrimitive)?.contentOrNull
     LaunchedEffect(locale, loaded) {
         if (!loaded) return@LaunchedEffect
@@ -142,12 +144,15 @@ fun App() {
                         while (true) {
                             awaitPointerEvent(PointerEventPass.Initial)
                             fish.nexa.data.LockTimers.activity()
+                            fish.nexa.ui.settings.ActivitySync.touch()
                         }
                     }
                 }
                 .onPreviewKeyEvent {
                     fish.nexa.data.LockTimers.activity()
-                    false
+                    fish.nexa.ui.settings.ActivitySync.touch()
+                    // the keybinds answer first, even inside a text box, as they do on the web
+                    auth is AuthState.Ready && fish.nexa.ui.settings.Keybinds.handle(it)
                 },
         ) {
             when (val s = auth) {
