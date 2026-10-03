@@ -53,6 +53,31 @@ object Nav {
         publish()
     }
 
+    /**
+     * A web address inside Nexa (a notification's path, a shared link):
+     * /channels/@me[/<id>[/<message>]], /channels/@me/notes[/<id>],
+     * /channels/@me/nexa, /channels/<server>[/<channel>[/<message>]], /channels/@admin.
+     * False when it names nothing the app opens.
+     */
+    fun openPath(path: String): Boolean {
+        val parts = path.substringBefore('?').substringBefore('#').trim('/').split('/').filter { it.isNotEmpty() }
+        if (parts.firstOrNull() != "channels" || parts.size < 2) return false
+        val id = Regex("^\\d{1,20}$")
+        val next: Route = when (parts[1]) {
+            "@me" -> when {
+                parts.size == 2 -> Route.Friends
+                parts[2] == "notes" -> Route.Notes(parts.getOrNull(3)?.takeIf { id.matches(it) })
+                parts[2] == "nexa" -> Route.NexaConvo
+                id.matches(parts[2]) -> Route.Dm(parts[2], parts.getOrNull(3)?.takeIf { id.matches(it) })
+                else -> return false
+            }
+            "@admin" -> Route.Admin
+            else -> if (id.matches(parts[1])) Route.Server(parts[1], parts.getOrNull(2)?.takeIf { id.matches(it) }, parts.getOrNull(3)?.takeIf { id.matches(it) }) else return false
+        }
+        go(next)
+        return true
+    }
+
     /** History back; false when there is nothing to go back to. */
     fun back(): Boolean {
         val prev = history.removeLastOrNull() ?: return false

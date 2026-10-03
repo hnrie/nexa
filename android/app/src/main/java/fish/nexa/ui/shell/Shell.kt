@@ -71,6 +71,17 @@ fun MainShell() {
     val reduced = Nx.motion.reduced
     val ease = Nx.motion.easeOut
 
+    // Android 13 asks before an app may notify: once, when the signed-in app first shows
+    val askNotify = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT < 33) return@LaunchedEffect
+        val prefs = Nexa.app.getSharedPreferences("notify", android.content.Context.MODE_PRIVATE)
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(Nexa.app, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted || prefs.getBoolean("asked", false)) return@LaunchedEffect
+        prefs.edit().putBoolean("asked", true).apply()
+        askNotify.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     // How far the drawer is open, 0..1; follows the finger during a swipe.
     val drawer = remember { Animatable(0f) }
     val members = remember { Animatable(0f) }

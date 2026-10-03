@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -440,17 +443,18 @@ private fun DateDivider(at: Long) {
 @Composable
 private fun NewDivider() {
     val c = Nx.colors
-    Box(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 8.dp + 9.dp).height(10.dp)) {
+    // the pill sits across the line and overlaps the row above it, so it draws above its neighbours
+    Box(Modifier.zIndex(1f).fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 8.dp).height(1.dp)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.danger.copy(alpha = 0.8f)))
         val shape = RoundedCornerShape(999.dp)
+        // 18 dp tall on a 1 dp line: held at its full height and centred across the line
         Box(
             Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 0.dp)
-                .graphicsLayer { translationY = -9f * density }
+                .align(Alignment.CenterEnd)
+                .wrapContentHeight(unbounded = true)
+                .requiredHeight(18.dp)
                 .boxShadow(shape, 2f, 6f, c.danger.copy(alpha = 0.45f))
                 .background(dangerGradient(c), shape)
-                .height(18.dp)
                 .padding(horizontal = 7.dp),
             contentAlignment = Alignment.Center,
         ) {

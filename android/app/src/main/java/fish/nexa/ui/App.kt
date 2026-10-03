@@ -59,7 +59,12 @@ fun App() {
     ) else Appearance.remembered()
     LaunchedEffect(look, loaded) { if (loaded) Appearance.remember(look) }
     val locale = (doc["locale"] as? JsonPrimitive)?.contentOrNull
-    LaunchedEffect(locale, loaded) { if (loaded) I18n.use(locale) }
+    LaunchedEffect(locale, loaded) {
+        if (!loaded) return@LaunchedEffect
+        I18n.use(locale)
+        // the notification channels are named in the app's language
+        fish.nexa.notify.Notifier.installChannels()
+    }
     @Suppress("UNUSED_VARIABLE") val lang = I18n.tag
 
     NexaTheme(

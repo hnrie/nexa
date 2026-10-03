@@ -93,8 +93,23 @@ class Auth(private val nx: Nexa) {
         }
     }
 
-    /** Opening the app: a stored token is checked, the identity looked for. */
+    private val booting = kotlinx.coroutines.sync.Mutex()
+
+    /**
+     * Opening the app (or its background connection starting): a stored token
+     * is checked, the identity looked for. Runs once at a time, and not again
+     * once signed in.
+     */
     suspend fun bootstrap() {
+        if (_state.value is AuthState.Ready || !booting.tryLock()) return
+        try {
+            bootstrapOnce()
+        } finally {
+            booting.unlock()
+        }
+    }
+
+    private suspend fun bootstrapOnce() {
         loadInstance()
         val token = nx.secure.getString("token")
         if (token == null) {

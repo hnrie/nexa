@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
@@ -84,6 +85,10 @@ class Session(private val nx: Nexa) {
     var onSignedOut: ((reason: String) -> Unit)? = null
     var onBanned: (() -> Unit)? = null
 
+    /** Alerts (notify.ts dispatchHooks): a message that arrived, a friend request that came in. */
+    var onMessage: ((Message, Boolean, ChatMessage) -> Unit)? = null
+    var onFriendRequest: ((Relationship) -> Unit)? = null
+
     fun start() {
         if (gateway != null) return
         val gen = ++generation
@@ -100,10 +105,13 @@ class Session(private val nx: Nexa) {
                 _events.tryEmit(e)
             }
         }
+        // sweeps expired typing only while someone is typing, so an idle connection sleeps
         typingSweeper = nx.scope.launch {
-            while (true) {
-                delay(1000)
-                nx.typing.sweep()
+            nx.typing.byChannel.collectLatest { m ->
+                if (m.isNotEmpty()) while (true) {
+                    delay(1000)
+                    nx.typing.sweep()
+                }
             }
         }
         nx.messages.resolveAuthors = { ids -> ensureUsers(ids) }
@@ -259,7 +267,9 @@ class Session(private val nx: Nexa) {
             }
             "relationship_add" -> decode(d, Relationship.serializer())?.let { r ->
                 judgeAll(listOf(r.user))
+                val was = nx.relationships.typeOf(r.user.id)
                 nx.relationships.set(r)
+                if (r.type == "incoming" && was != "incoming") onFriendRequest?.invoke(r)
             }
             "relationship_remove" -> d.str("user_id")?.let { nx.relationships.remove(it) }
             "read_state" -> decode(d, ReadState.serializer())?.let { nx.readStates.apply(it) }
@@ -333,7 +343,7 @@ class Session(private val nx: Nexa) {
         for (ch in keep) nx.scope.launch { nx.messages.syncGap(ch) }
     }
 
-    private fun mentionsMe(m: Message, meId: String): Boolean {
+    fun mentionsMe(m: Message, meId: String): Boolean {
         if (m.mentionEveryone || meId in m.mentions) return true
         if (m.mentionRoles.isEmpty()) return false
         val sid = nx.channels.get(m.channelId)?.serverId ?: return false
@@ -341,7 +351,7 @@ class Session(private val nx: Nexa) {
         return m.mentionRoles.any { it in mine }
     }
 
-    private fun isQuiet(cm: ChatMessage): Boolean {
+    fun isQuiet(cm: ChatMessage): Boolean {
         if (nx.relationships.isBlocked(cm.authorId)) return true
         if (nx.settings.hideBlockedReplies) {
             val reply = cm.m.replyToId ?: return false
@@ -372,6 +382,7 @@ class Session(private val nx: Nexa) {
             val type = nx.channels.get(m.channelId)?.type
             if (!mine && (type == null || type == "dm" || type == "group_dm" || type == "subchat")) nx.readStates.bumpUnread(m.channelId)
         }
+        onMessage?.invoke(m, mine, dec)
     }
 
     private fun adjustEditMentions(d: JsonElement?, m: Message, meId: String?) {

@@ -1,6 +1,10 @@
 package fish.nexa
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
+import fish.nexa.data.AuthState
+import kotlinx.coroutines.launch
 import fish.nexa.ui.I18n
 import fish.nexa.ui.Lucide
 import fish.nexa.ui.auth.CaptchaHost
@@ -15,5 +19,31 @@ class NexaApp : Application() {
         fish.nexa.media.Media.init(this)
         fish.nexa.media.Twemoji.init(this)
         Nexa.auth.captcha = CaptchaHost
+        fish.nexa.notify.Notifier.install()
+        // signed in: stay connected in the background (Nexa has no push); signed out: stop
+        Nexa.scope.launch {
+            Nexa.auth.state.collect { s ->
+                when (s) {
+                    is AuthState.Ready -> fish.nexa.notify.ConnectionService.start(this@NexaApp)
+                    AuthState.Anonymous -> fish.nexa.notify.ConnectionService.stop(this@NexaApp)
+                    else -> Unit
+                }
+            }
+        }
+        Nexa.scope.launch { Nexa.auth.bootstrap() }
+        watchNetwork()
+    }
+
+    /** When the network comes back: retry signing in if that failed offline, and reconnect at once. */
+    private fun watchNetwork() {
+        val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        runCatching {
+            cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    if (Nexa.auth.state.value is AuthState.Offline) Nexa.scope.launch { Nexa.auth.bootstrap() }
+                    else Nexa.session.wake()
+                }
+            })
+        }
     }
 }
