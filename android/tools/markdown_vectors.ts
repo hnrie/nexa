@@ -33,6 +33,8 @@ import { loadEmoji, allEmoji, emojiGroups, searchEmoji, withTone, emojiByShortco
 import { emojiToken, emojiReactionKey, searchCustomEmoji } from "@/stores/expressions";
 import { reactionKeyOf } from "@/components/chat/Reactions";
 import { shownInvite, parseInviteFragment } from "@/lib/inviteLink";
+import { isPostLink } from "@/lib/postLinks";
+import { isProxied, proxyDeadline, mediaKey, mediaSrc } from "@/lib/mediaLinks";
 
 const OUT = join(process.cwd(), "../android/app/src/test/resources/web-markdown-vectors.json.gz");
 
@@ -392,8 +394,31 @@ async function main(): Promise<void> {
     "https://nexa.fish/invite/abc#k=1.x", "https://nexa.fish/invite/abc/#k", "https://nexa.fish/invite/abc", "https://nexa.fish/invite/a/b#k", "https://evil.example/invite/abc#k",
     "http://nexa.fish/invite/abc#k", "https://nexa.fish:443/invite/abc#k", "not a url",
   ].map((url) => ({ url, shown: shownInvite(url) }));
+  // media links, as a page at https://nexa.fish sees them at NOW
+  const nowWas = Date.now;
+  Date.now = () => NOW;
+  (g as { location?: unknown }).location = { href: "https://nexa.fish/channels/@me", origin: "https://nexa.fish" };
+  const fresh = Math.floor((NOW + 3_600_000) / 1000);
+  const soon = Math.floor((NOW + 60_000) / 1000);
+  const mediaUrls = [
+    `https://nexa.fish/media/proxy/${fresh}-abc/key1/pic.png`, `/media/proxy/${fresh}-abc/key2`, `https://nexa.fish/media/proxy/${soon}-x/key3`,
+    `https://nexa.fish/media/proxy/old-signature/key4`, "https://nexa.fish/media/avatar/1", "/media/avatar/2", "//evil.example/x", "/\\evil.example/x",
+    "/\tx", "https://evil.example/pic.png", "data:image/png;base64,AA", "blob:https://nexa.fish/1", "relative/path.png", "https://nexa.fish:8443/media/x",
+    `https://other.example/media/proxy/${fresh}-a/k`, "",
+  ];
+  const media = mediaUrls.map((url) => {
+    const src = mediaSrc(url);
+    return { url, proxied: isProxied(url), deadline: proxyDeadline(url), key: mediaKey(url), src: src === undefined ? "pending" : src === null ? "blocked" : src === url ? "usable" : "renewed" };
+  });
+  Date.now = nowWas;
+  delete (g as { location?: unknown }).location;
   if (!hadWindow) delete g.window;
-  const fragments = ["#k=12." + "A".repeat(43), "#x=1&k=3." + "_".repeat(43) + "&y", "#k=1." + "A".repeat(39), "#k=1." + "A".repeat(44), "", "#k=a.B"].map((hash) => {
+  const posts = [
+    "https://x.com/a/status/1", "https://mobile.twitter.com/a", "https://a.b.c.x.com/x", "https://a.b.c.d.x.com/x", "https://i.redd.it/x.png", "https://redd.it/abc",
+    "https://www.youtube.com/watch?v=1", "https://youtu.be/1", "https://m.youtu.be/1", "https://mastodon.social/@ann/1234567890", "https://m.example/@ann@other.example/12345678901",
+    "https://m.example/users/ann/statuses/1234567890/", "https://example.com/@ann/123", "ftp://x.com/a", "not a url", "https://X.COM./a", "https://bsky.app/profile/x/post/y",
+  ].map((url) => ({ url, value: isPostLink(url) }));
+  const fragments =["#k=12." + "A".repeat(43), "#x=1&k=3." + "_".repeat(43) + "&y", "#k=1." + "A".repeat(39), "#k=1." + "A".repeat(44), "", "#k=a.B"].map((hash) => {
     const key = parseInviteFragment(hash);
     return { hash, key: key ? { epoch: key.epoch, root: Buffer.from(key.root).toString("hex") } : null };
   });
@@ -478,6 +503,8 @@ async function main(): Promise<void> {
     targets: targetsOut,
     cards,
     invites,
+    media,
+    posts,
     fragments,
     picker,
     suggestions,
