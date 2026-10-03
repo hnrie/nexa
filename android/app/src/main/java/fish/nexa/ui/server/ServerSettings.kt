@@ -81,6 +81,8 @@ private fun ServerSettingsLayer(layer: Layer, serverId: String, initial: String?
             "audit" -> AuditLogPage(serverId)
             "emoji" -> EmojiPage(serverId)
             "stickers" -> ServerStickersPage(serverId)
+            "tag" -> ServerTagPage(serverId)
+            "members" -> MembersPage(serverId)
             "delete" -> DeleteServerPage(serverId) {
                 close()
                 Nav.go(Route.Friends, replace = true)
