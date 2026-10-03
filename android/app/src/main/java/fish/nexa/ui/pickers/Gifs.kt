@@ -128,6 +128,8 @@ fun GifPicker(pick: (Pickers.Gif) -> Unit) {
     var gen by remember { mutableStateOf(0) }
     var dead by remember { mutableStateOf(setOf<String>()) }
 
+    // without search on this server, the favourites are all there is
+    LaunchedEffect(enabled) { if (enabled == false) view = "favorites" }
     LaunchedEffect(Unit) {
         enabled = runCatching { (Nexa.api.get("/gif/status") as? JsonObject)?.get("enabled")?.let { (it as JsonPrimitive).content == "true" } ?: false }.getOrDefault(false)
     }
