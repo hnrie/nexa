@@ -76,7 +76,7 @@ class Auth(private val nx: Nexa) {
     }
 
     /** Sends a guarded request with a captcha token when the server asks for them. */
-    private suspend fun <T> guarded(action: String, send: suspend (String?) -> T): T {
+    suspend fun <T> guarded(action: String, send: suspend (String?) -> T): T {
         val inst = _instance.value ?: loadInstance()
         suspend fun tokenFor(info: InstanceInfo?): String? {
             val key = info?.captcha?.takeIf { it.provider == "turnstile" && it.siteKey.isNotEmpty() }?.siteKey ?: return null
