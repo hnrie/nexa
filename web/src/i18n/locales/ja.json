@@ -5107,5 +5107,8 @@
   "whatsNew.r202610028.androidTitle": "Android 版 Nexa",
   "whatsNew.r202610028.androidBody": "Android スマートフォン向けの Nexa アプリが登場しました。通知、通話、タッチ操作に合わせたジェスチャーに対応しています。ダウンロードページか、スマートフォンに表示されるバナーから入手できます。",
   "android.people.switcherNothing": "一致するものはありません。別の名前を試してください。",
-  "android.people.switcherPlaceholder": "ユーザー、会話、サーバーを検索"
+  "android.people.switcherPlaceholder": "ユーザー、会話、サーバーを検索",
+  "android.media.cannotPlayVideo": "この動画はここでは再生できません。",
+  "android.media.savedToDownloads": "ダウンロードに保存しました。",
+  "android.media.savedToPictures": "写真に保存しました。"
 }

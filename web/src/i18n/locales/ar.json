@@ -5892,5 +5892,8 @@
   "whatsNew.r202610028.androidTitle": "Nexa لأندرويد",
   "whatsNew.r202610028.androidBody": "أصبح لـ Nexa تطبيق لهواتف أندرويد، مع الإشعارات والمكالمات وإيماءات مصمّمة للّمس. احصل عليه من صفحة التنزيل، أو من الشريط الذي يظهر على هاتفك.",
   "android.people.switcherNothing": "لا توجد نتائج. جرّب اسمًا آخر.",
-  "android.people.switcherPlaceholder": "ابحث عن الأشخاص والمحادثات والخوادم"
+  "android.people.switcherPlaceholder": "ابحث عن الأشخاص والمحادثات والخوادم",
+  "android.media.cannotPlayVideo": "لا يمكن تشغيل هذا الفيديو هنا.",
+  "android.media.savedToDownloads": "تم الحفظ في التنزيلات.",
+  "android.media.savedToPictures": "تم الحفظ في الصور."
 }

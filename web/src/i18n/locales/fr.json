@@ -5383,5 +5383,8 @@
   "whatsNew.r202610028.androidTitle": "Nexa pour Android",
   "whatsNew.r202610028.androidBody": "Nexa a maintenant une application pour les téléphones Android, avec les notifications, les appels et des gestes pensés pour le tactile. Téléchargez-la depuis la page de téléchargement, ou depuis la bannière sur votre téléphone.",
   "android.people.switcherNothing": "Aucun résultat. Essayez un autre nom.",
-  "android.people.switcherPlaceholder": "Rechercher des personnes, des conversations et des serveurs"
+  "android.people.switcherPlaceholder": "Rechercher des personnes, des conversations et des serveurs",
+  "android.media.cannotPlayVideo": "Cette vidéo ne peut pas être lue ici.",
+  "android.media.savedToDownloads": "Enregistré dans Téléchargements.",
+  "android.media.savedToPictures": "Enregistré dans Images."
 }

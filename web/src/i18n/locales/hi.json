@@ -5282,5 +5282,8 @@
   "whatsNew.r202610028.androidTitle": "Android के लिए Nexa",
   "whatsNew.r202610028.androidBody": "अब Android फ़ोन के लिए Nexa ऐप है, जिसमें सूचनाएँ, कॉल और टच के लिए बने जेस्चर हैं। इसे डाउनलोड पेज से या अपने फ़ोन पर दिखने वाले बैनर से पाएँ।",
   "android.people.switcherNothing": "कुछ मेल नहीं खाता। कोई और नाम आज़माएँ।",
-  "android.people.switcherPlaceholder": "लोग, बातचीत और सर्वर खोजें"
+  "android.people.switcherPlaceholder": "लोग, बातचीत और सर्वर खोजें",
+  "android.media.cannotPlayVideo": "यह वीडियो यहाँ नहीं चल सकता।",
+  "android.media.savedToDownloads": "डाउनलोड में सहेजा गया।",
+  "android.media.savedToPictures": "चित्रों में सहेजा गया।"
 }

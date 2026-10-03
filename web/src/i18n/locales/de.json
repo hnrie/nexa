@@ -5282,5 +5282,8 @@
   "whatsNew.r202610028.androidTitle": "Nexa für Android",
   "whatsNew.r202610028.androidBody": "Nexa gibt es jetzt als App für Android-Handys, mit Benachrichtigungen, Anrufen und Gesten für den Touchscreen. Du bekommst sie auf der Download-Seite oder über das Banner auf deinem Handy.",
   "android.people.switcherNothing": "Nichts passt. Versuch einen anderen Namen.",
-  "android.people.switcherPlaceholder": "Personen, Unterhaltungen und Server suchen"
+  "android.people.switcherPlaceholder": "Personen, Unterhaltungen und Server suchen",
+  "android.media.cannotPlayVideo": "Dieses Video kann hier nicht abgespielt werden.",
+  "android.media.savedToDownloads": "In Downloads gespeichert.",
+  "android.media.savedToPictures": "In Bilder gespeichert."
 }

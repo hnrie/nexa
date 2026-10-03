@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import fish.nexa.Nexa
+import fish.nexa.media.GifFavorites
 import fish.nexa.media.Media
 import fish.nexa.ui.Icon
 import fish.nexa.ui.components.NxTextField
@@ -54,62 +55,9 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.put
-
-/**
- * GIF favourites (lib/gifFavorites.ts): kept in the account's encrypted
- * settings, newest first, at most 500; a GIF is one favourite however its
- * address was signed.
- */
-object GifFavorites {
-    const val MAX = 500
-
-    data class Fav(val url: String, val w: Int?, val h: Int?, val att: JsonObject?)
-
-    private fun key(url: String): String = url.substringBefore("?").substringBefore("#")
-
-    fun all(): List<Fav> = (Nexa.settings.doc.value["favoriteGifs"] as? JsonArray)?.mapNotNull { el ->
-        val o = el as? JsonObject ?: return@mapNotNull null
-        val url = (o["url"] as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
-        Fav(url, (o["w"] as? JsonPrimitive)?.intOrNull, (o["h"] as? JsonPrimitive)?.intOrNull, o["att"] as? JsonObject)
-    } ?: emptyList()
-
-    fun isFavorite(url: String): Boolean {
-        val k = key(url)
-        return all().any { key(it.url) == k }
-    }
-
-    private fun save(list: List<Fav>) {
-        Nexa.settings.patch(buildJsonObject {
-            put("favoriteGifs", JsonArray(list.map { f ->
-                buildJsonObject {
-                    put("url", f.url)
-                    f.w?.let { put("w", it) }
-                    f.h?.let { put("h", it) }
-                    f.att?.let { put("att", it) }
-                }
-            }))
-        })
-    }
-
-    /** Adds or takes away; true when it is a favourite now. */
-    fun toggle(url: String, w: Int?, h: Int?, att: JsonObject? = null): Boolean {
-        val favs = all()
-        val k = key(url)
-        if (favs.any { key(it.url) == k }) {
-            save(favs.filter { key(it.url) != k })
-            return false
-        }
-        save((listOf(Fav(url, w, h, att)) + favs).take(MAX))
-        return true
-    }
-
-    fun remove(urls: Set<String>) = save(all().filter { it.url !in urls })
-}
 
 private data class GifResult(val url: String, val preview: String, val w: Int?, val h: Int?)
 

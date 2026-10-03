@@ -90,6 +90,9 @@ class Auth(private val nx: Nexa) {
         null
     }
 
+    /** For requests outside signing in that may need a captcha (joining through an invite, friend requests). */
+    suspend fun <T> withCaptcha(action: String, send: suspend (String?) -> T): T = guarded(action, send)
+
     /** Sends a guarded request with a captcha token when the server asks for them. */
     suspend fun <T> guarded(action: String, send: suspend (String?) -> T): T {
         val inst = _instance.value ?: loadInstance()

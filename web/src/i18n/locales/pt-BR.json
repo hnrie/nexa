@@ -5384,5 +5384,8 @@
   "whatsNew.r202610028.androidTitle": "Nexa para Android",
   "whatsNew.r202610028.androidBody": "O Nexa agora tem um app para celulares Android, com notificações, chamadas e gestos feitos para o toque. Baixe na página de downloads ou pelo banner no seu celular.",
   "android.people.switcherNothing": "Nada corresponde. Tente outro nome.",
-  "android.people.switcherPlaceholder": "Pesquise pessoas, conversas e servidores"
+  "android.people.switcherPlaceholder": "Pesquise pessoas, conversas e servidores",
+  "android.media.cannotPlayVideo": "Este vídeo não pode ser reproduzido aqui.",
+  "android.media.savedToDownloads": "Salvo em Downloads.",
+  "android.media.savedToPictures": "Salvo em Imagens."
 }

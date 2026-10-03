@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +56,13 @@ import fish.nexa.ui.Time
 import fish.nexa.ui.components.Avatar
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
+import fish.nexa.media.Unfurl
+import fish.nexa.media.isOnlyMediaLinks
+import fish.nexa.ui.media.Attachments
+import fish.nexa.ui.media.Embeds
+import fish.nexa.ui.media.HookBody
+import fish.nexa.ui.media.PressedImage
+import fish.nexa.ui.media.UploadCard
 import fish.nexa.ui.shell.Names
 import fish.nexa.ui.shell.openProfile
 import fish.nexa.ui.t
@@ -148,7 +156,7 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                     enabled = cm != null && !ctx.selecting,
                     canReply = cm != null && canSend(ctx),
                     swipe = swipe,
-                    onLongPress = { cm?.let { openMessageMenu(it, ctx) } },
+                    onLongPress = { cm?.let { openMessageMenu(it, ctx, PressedImage.take()) } },
                     onReply = { cm?.let { ChatUi.reply[ctx.channel.id] = ChatUi.Reply(it.id, ping = it.authorId != ctx.meId) } },
                 ),
             ),
@@ -387,7 +395,12 @@ internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
         }
         return
     }
-    val text = payload?.t
+    val embeds = if (cm != null && !cm.m.suppressEmbeds) payload?.embeds?.takeIf { it.isNotEmpty() } else null
+    // a GIF or picture link shows only the picture, the way an uploaded one does (isOnlyMediaLinks)
+    val doc by Nexa.settings.doc.collectAsState()
+    val mediaOnly = embeds != null && remember(doc) { Nexa.settings.imagePreviews } &&
+        remember(payload?.t, embeds) { isOnlyMediaLinks(payload?.t ?: "", embeds.mapNotNull { Unfurl.of(it) }) }
+    val text = if (mediaOnly) null else payload?.t
     val edited = cm?.m?.editedAt?.let { t("chat.messageItem.edited") }
     if (cm != null && ChatUi.editing[cm.channelId]?.messageId == cm.id) EditMessage(cm)
     else if (!text.isNullOrEmpty()) fish.nexa.ui.markdown.MarkdownView(
@@ -396,10 +409,20 @@ internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     )
     payload?.sticker?.let { StickerView(it) }
     payload?.poll?.let { if (cm != null) PollCard(cm, ctx) }
+    // files on their way up show their progress until the message is in (Sending… once they are up)
     val up = item.pending?.upload
-    if (up != null && !up.done) UploadCard(ctx.channel.id, item.pending, up)
+    if (up != null) UploadCard(ctx.channel.id, item.pending, up)
     else payload?.att?.takeIf { it.isNotEmpty() }?.let { Attachments(it, cm, ctx) }
-    if (cm != null && !cm.m.suppressEmbeds) payload?.embeds?.takeIf { it.isNotEmpty() }?.let { Embeds(it, cm, ctx) }
+    if (cm != null && embeds != null) Embeds(embeds, cm, ctx)
+    if (cm?.hook != null) HookBody(cm, ctx)
+    // cards for the Nexa invites and profiles the message links to (none once its embeds were removed)
+    if (cm != null && !cm.m.suppressEmbeds) {
+        val sealed = remember(embeds, cm.hook) {
+            (embeds ?: fish.nexa.data.Hooks.of(cm.hook)?.linkEmbeds?.takeIf { it.isNotEmpty() })?.mapNotNull { Unfurl.of(it) } ?: emptyList()
+        }
+        InviteCards(payload?.t, sealed)
+        ProfileCards(payload?.t, sealed)
+    }
 }
 
 /** The failed-send line: what happened, then Retry and Delete. */

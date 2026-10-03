@@ -1,14 +1,18 @@
 package fish.nexa.data
 
+import androidx.compose.runtime.mutableStateMapOf
 import fish.nexa.Nexa
 import fish.nexa.crypto.Bytes
+import fish.nexa.net.ApiError
 import fish.nexa.net.Channel
+import fish.nexa.net.InvitePreview
 import fish.nexa.net.PublicUser
 import fish.nexa.net.ServerView
 import fish.nexa.net.wireJson
 import fish.nexa.ui.nav.Route
 import fish.nexa.ui.profile.ProfileLinks
 import fish.nexa.ui.t
+import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -121,5 +125,52 @@ object Invites {
             (res["expires_at"] as? JsonPrimitive)?.content?.toLongOrNull(),
             (res["max_uses"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0,
         )
+    }
+
+    // -----------------------------------------------------------------------
+    // lib/invitePreviews.ts: what an invite in a message leads to, kept a few
+    // minutes, and asked again a little after a failure
+
+    sealed interface Entry {
+        data object Loading : Entry
+        data class Ready(val preview: InvitePreview, val at: Long) : Entry
+        data class Invalid(val at: Long) : Entry
+        data class Failed(val at: Long) : Entry
+    }
+
+    private const val FRESH_MS = 5 * 60_000L
+    private const val RETRY_MS = 30_000L
+
+    val byCode = mutableStateMapOf<String, Entry>()
+    private val inflight = HashSet<String>()
+
+    private fun due(e: Entry?, now: Long): Boolean = when (e) {
+        null -> true
+        Entry.Loading -> false
+        is Entry.Ready -> now - e.at > FRESH_MS
+        is Entry.Invalid -> now - e.at > FRESH_MS
+        is Entry.Failed -> now - e.at > RETRY_MS
+    }
+
+    fun load(code: String, force: Boolean = false) {
+        synchronized(inflight) { if (code in inflight) return }
+        val cur = byCode[code]
+        if (!force && !due(cur, System.currentTimeMillis())) return
+        if (cur !is Entry.Ready) byCode[code] = Entry.Loading
+        synchronized(inflight) { inflight += code }
+        Nexa.scope.launch {
+            try {
+                val p = Nexa.api.request("GET", "/invites/${java.net.URLEncoder.encode(code, "UTF-8")}", InvitePreview.serializer())
+                byCode[code] = Entry.Ready(p, System.currentTimeMillis())
+            } catch (e: Exception) {
+                byCode[code] = when {
+                    e is ApiError && e.status == 404 -> Entry.Invalid(System.currentTimeMillis())
+                    cur is Entry.Ready -> cur.copy(at = System.currentTimeMillis())
+                    else -> Entry.Failed(System.currentTimeMillis())
+                }
+            } finally {
+                synchronized(inflight) { inflight -= code }
+            }
+        }
     }
 }

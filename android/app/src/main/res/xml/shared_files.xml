@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the folder Copy Image writes its one shared picture to: nothing else in the cache can be named. -->
+<paths>
+    <cache-path name="shared" path="shared/" />
+</paths>

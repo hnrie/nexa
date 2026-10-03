@@ -474,9 +474,9 @@ object Webhooks {
 
     fun content(hook: JsonObject?): fish.nexa.ui.markdown.Webhook.Content? = hook?.let { fish.nexa.ui.markdown.Webhook.sanitize(it) }
 
-    /** What the rest of the app reads as the message: its words, and the previews the server made for its links. */
+    /** What the row draws as the message itself: the webhook's words and the files it lists (data/Webhook.kt). */
     fun payloadOf(hook: JsonObject): MessagePayload {
-        val c = content(hook) ?: return MessagePayload()
-        return MessagePayload(t = c.content.ifEmpty { null }, embeds = c.linkEmbeds.ifEmpty { null })
+        val h = Hooks.of(hook) ?: return MessagePayload()
+        return MessagePayload(t = h.content.takeIf { it.isNotEmpty() }, att = Hooks.listedAttachments(h).takeIf { it.isNotEmpty() })
     }
 }

@@ -5605,5 +5605,8 @@
   "whatsNew.r202610028.androidTitle": "Nexa для Android",
   "whatsNew.r202610028.androidBody": "У Nexa появилось приложение для телефонов на Android: с уведомлениями, звонками и жестами для сенсорного экрана. Скачайте его на странице загрузок или из баннера на телефоне.",
   "android.people.switcherNothing": "Ничего не найдено. Попробуйте другое имя.",
-  "android.people.switcherPlaceholder": "Поиск людей, бесед и серверов"
+  "android.people.switcherPlaceholder": "Поиск людей, бесед и серверов",
+  "android.media.cannotPlayVideo": "Это видео нельзя воспроизвести здесь.",
+  "android.media.savedToDownloads": "Сохранено в «Загрузки».",
+  "android.media.savedToPictures": "Сохранено в «Изображения»."
 }
