@@ -59,6 +59,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
@@ -184,22 +185,25 @@ private fun isLive(t: Tile) = t.kind == Tile.Kind.SCREEN && !t.me
 private fun Modifier.stageBackground(brand: Color): Modifier = drawBehind {
     val base = Color(0xFF040307)
     drawRect(base)
-    // radial-gradient(120% 70% at 50% -10%, brand 16% on #06040b, #040307 72%)
+    // radial-gradient(120% 70% at 50% -10%, brand 16% on #06040b, #040307 72%);
+    // the glow's circle starts above the stage, so it is kept to the stage's box
     val ry = size.height * 0.7f
     val rx = size.width * 1.2f
     val center = Offset(size.width / 2f, -size.height * 0.1f)
-    scale(scaleX = rx / ry, scaleY = 1f, pivot = center) {
-        drawCircle(
-            Brush.radialGradient(
-                0f to mixOklab(Color(0xFF06040B), brand, 0.16f),
-                0.72f to base,
-                1f to base,
-                center = center,
+    clipRect {
+        scale(scaleX = rx / ry, scaleY = 1f, pivot = center) {
+            drawCircle(
+                Brush.radialGradient(
+                    0f to mixOklab(Color(0xFF06040B), brand, 0.16f),
+                    0.72f to base,
+                    1f to base,
+                    center = center,
+                    radius = ry,
+                ),
                 radius = ry,
-            ),
-            radius = ry,
-            center = center,
-        )
+                center = center,
+            )
+        }
     }
 }
 

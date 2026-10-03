@@ -40,15 +40,19 @@ fun DarkScope(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalColors provides colors, content = content)
 }
 
-/** A person in a call, by the name the place shows them by: "You", a server nickname, their name, a guest's chosen name. */
+/**
+ * A person in a call, by the name the place shows them by (VoiceView.tsx's
+ * nameOf): a server nickname, their name, a guest's chosen name, and "You" only
+ * for this account while its own profile has not loaded.
+ */
 fun callName(userId: String, channelId: String?): String {
-    if (userId == Nexa.users.meId) return t("callScreen.you")
     val serverId = channelId?.let { Nexa.channels.get(it)?.serverId }
     val nick = serverId?.let { Nexa.servers.get(it)?.members?.get(userId)?.nickname }?.takeIf { it.isNotBlank() }
     if (nick != null) return nick
     val u = Nexa.users.get(userId)
     if (u != null) return Names.display(u)
-    return Nexa.voiceStates.byUser.value[userId]?.user?.displayName?.takeIf { it.isNotBlank() } ?: t("names.unknownUser")
+    return Nexa.voiceStates.byUser.value[userId]?.user?.displayName?.takeIf { it.isNotBlank() }
+        ?: if (userId == Nexa.users.meId) t("callScreen.you") else t("names.unknownUser")
 }
 
 /** The avatar picture id for someone in a call, guests included. */
