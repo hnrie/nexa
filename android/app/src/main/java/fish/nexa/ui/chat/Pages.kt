@@ -3,7 +3,6 @@ package fish.nexa.ui.chat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import fish.nexa.Nexa
@@ -15,7 +14,7 @@ import fish.nexa.ui.shell.Names
 import fish.nexa.ui.shell.PageHeader
 import fish.nexa.ui.t
 import fish.nexa.ui.voice.CallArea
-import fish.nexa.ui.voice.VoiceView
+import fish.nexa.ui.voice.VoiceChannelPage
 import fish.nexa.voice.Calls
 
 // TEMPORARY: the chat view, friends page and member lists replace these. The calls
@@ -25,10 +24,7 @@ import fish.nexa.voice.Calls
 
 @Composable fun ServerPage(route: Route.Server) {
     val ch = route.channelId?.let { Nexa.channels.get(it) }
-    Column(Modifier.fillMaxSize()) {
-        PageHeader(ch?.name ?: "")
-        if (ch?.type == "voice") VoiceView(ch.id, Modifier.weight(1f).fillMaxWidth())
-    }
+    if (ch?.type == "voice") VoiceChannelPage(ch) else Column(Modifier.fillMaxSize()) { PageHeader(ch?.name ?: "") }
 }
 
 @Composable fun DmPage(route: Route.Dm) {
