@@ -213,7 +213,7 @@ object Staging {
             Nexa.ui.toast(t("composer.composer.overServerLimit", "name" to name, "limit" to limitText()), "error")
             return@withContext null
         }
-        MetadataScrub.scrub(out, type)
+        fish.nexa.data.MetadataScrub.scrub(out)
         val preview = if (type.startsWith("image/") || type.startsWith("video/")) out.path else null
         Staged("f$seq", out, name, type, preview = preview)
     }

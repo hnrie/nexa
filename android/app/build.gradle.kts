@@ -205,6 +205,10 @@ dependencies {
 
     implementation("androidx.media3:media3-exoplayer:1.11.1")
     implementation("androidx.media3:media3-datasource-okhttp:1.11.1")
+    // the video surface as a composable (PlayerSurface); the controls are drawn in Nexa's own look
+    implementation("androidx.media3:media3-ui-compose:1.11.1")
+    // Lottie stickers (.tgs is gzipped Lottie JSON)
+    implementation("com.airbnb.android:lottie-compose:6.7.1")
 
     implementation("org.bouncycastle:bcprov-jdk18on:1.86")
     implementation("com.lambdapioneer.argon2kt:argon2kt:1.6.0")

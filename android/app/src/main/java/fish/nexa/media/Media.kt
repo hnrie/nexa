@@ -88,8 +88,12 @@ object Media {
 
     private val locks = ConcurrentHashMap<String, Mutex>()
 
-    /** The decrypted file for an attachment, fetched and opened once and then kept in the private cache. */
-    suspend fun decrypted(blobId: String, keyB64: String, size: Long?, onProgress: ((Long, Long) -> Unit)? = null): File {
+    /**
+     * The decrypted file for an attachment, fetched and opened once and then
+     * kept in the private cache. [plainSize] is the size the message gave; the
+     * download must be exactly its encrypted size, or it is refused unopened.
+     */
+    suspend fun decrypted(blobId: String, keyB64: String, plainSize: Long?, onProgress: ((Long, Long) -> Unit)? = null): File {
         val out = File(cacheDir, blobId)
         if (out.exists() && out.length() > 0) return out
         val lock = locks.getOrPut(blobId) { Mutex() }
@@ -102,21 +106,45 @@ object Media {
                 res.use { r ->
                     if (!r.isSuccessful) throw ApiError(r.code, "http_${r.code}", "The file could not be downloaded.")
                     val len = r.body.contentLength()
-                    if (size != null && len >= 0 && r.header("Content-Encoding") == null && len != size) {
+                    if (plainSize != null && len >= 0 && r.header("Content-Encoding") == null && len != FileCrypto.encryptedSize(plainSize)) {
                         throw DecryptError("file: the server sent a file of another size")
                     }
                     val tmp = File(cacheDir, "$blobId.part")
                     try {
                         tmp.outputStream().buffered(1 shl 16).use { os ->
-                            FileCrypto.decryptStream(r.body.byteStream().buffered(1 shl 16), key, os) { done -> onProgress?.invoke(done, size ?: len) }
+                            FileCrypto.decryptStream(r.body.byteStream().buffered(1 shl 16), key, os) { done -> onProgress?.invoke(done, plainSize ?: len) }
                         }
                         if (!tmp.renameTo(out)) throw java.io.IOException("could not keep the file")
                     } finally {
                         tmp.delete()
                     }
                 }
+                trim()
                 out
             }
+        }
+    }
+
+    /** A file already opened on this device, or null; touching it keeps it in the cache longer. */
+    fun cached(blobId: String, plain: Boolean = false): File? {
+        val f = File(cacheDir, if (plain) "plain-$blobId" else blobId)
+        if (!f.exists() || f.length() == 0L) return null
+        f.setLastModified(System.currentTimeMillis())
+        return f
+    }
+
+    /** How much opened media the cache keeps before the least recently shown goes. */
+    private const val DISK_BUDGET = 1024L * 1024 * 1024
+
+    /** Keeps the opened files within the budget, oldest first; a file being written is never touched. */
+    fun trim() {
+        val files = cacheDir.listFiles()?.filter { it.isFile && !it.name.endsWith(".part") } ?: return
+        var total = files.sumOf { it.length() }
+        if (total <= DISK_BUDGET) return
+        for (f in files.sortedBy { it.lastModified() }) {
+            if (total <= DISK_BUDGET) break
+            val n = f.length()
+            if (f.delete()) total -= n
         }
     }
 

@@ -466,8 +466,9 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
 object Webhooks {
     fun sanitize(el: JsonElement): JsonObject? = el as? JsonObject
 
+    /** What the row draws as the message itself: the webhook's words and the files it lists (data/Webhook.kt). */
     fun payloadOf(hook: JsonObject): MessagePayload {
-        val content = (hook["content"] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content
-        return MessagePayload(t = content?.takeIf { it.isNotEmpty() })
+        val h = Hooks.of(hook) ?: return MessagePayload()
+        return MessagePayload(t = h.content.takeIf { it.isNotEmpty() }, att = Hooks.listedAttachments(h).takeIf { it.isNotEmpty() })
     }
 }

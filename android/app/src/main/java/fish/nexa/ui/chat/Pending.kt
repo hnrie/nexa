@@ -33,9 +33,6 @@ fun openFormattingEditor(channelId: String, text: String, onInsert: (String) -> 
 fun openExpressionPicker(channelId: String, onPick: (String) -> Unit) = Unit
 fun emojiSuggestions(channel: fish.nexa.net.Channel, query: String): List<AcItem> = emptyList()
 
-/** lib/scrubMetadata.ts: removes a photo's or video's metadata (place, camera) before it is sent. */
-object MetadataScrub { fun scrub(file: java.io.File, type: String) = Unit }
-
 fun openChannelTopic(channel: fish.nexa.net.Channel) = Unit
 fun openVerifyKey(userId: String) = Unit
 fun openBugReport(from: String) = Unit
