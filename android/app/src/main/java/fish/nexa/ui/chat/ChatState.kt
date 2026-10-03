@@ -39,6 +39,9 @@ object ChatUi {
     /** Bumped to snap a conversation to its newest message (after sending). */
     val toBottom = mutableStateMapOf<String, Int>()
 
+    /** Text for a conversation's composer to put at its caret ("Mention" in a member menu: `ec:insert-text`). */
+    val inserts = mutableStateMapOf<String, String>()
+
     fun jumpTo(channelId: String, messageId: String) {
         jumpSeq += 1
         jump = Jump(channelId, messageId, jumpSeq)

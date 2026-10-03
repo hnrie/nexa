@@ -36,9 +36,6 @@ fun emojiSuggestions(channel: fish.nexa.net.Channel, query: String): List<AcItem
 /** lib/scrubMetadata.ts: removes a photo's or video's metadata (place, camera) before it is sent. */
 object MetadataScrub { fun scrub(file: java.io.File, type: String) = Unit }
 
-fun openChannelTopic(channel: fish.nexa.net.Channel) = Unit
 fun openBugReport(from: String) = Unit
 @Composable fun ChatPanels(channel: fish.nexa.net.Channel) = Unit
 
-@Composable fun MemberList(serverId: String, channelId: String?) = Unit
-@Composable fun GroupMemberList(channel: fish.nexa.net.Channel) = Unit
