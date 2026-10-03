@@ -187,7 +187,9 @@ class SettingsStore(private val api: Api, private val scope: CoroutineScope) {
     val fontFace get() = str("fontFace") ?: "default"
     val compact get() = str("messageDisplay") == "compact"
     val reducedMotion get() = bool("reducedMotion", false)
-    val underlineLinks get() = bool("underlineLinks", false)
+    /** Set by the theme in use: Greyscale and High Contrast underline links whatever the setting says. */
+    @Volatile var lookUnderlines = false
+    val underlineLinks get() = bool("underlineLinks", false) || lookUnderlines
     val locale get() = str("locale")
     val linkPreviews get() = bool("linkPreviews", true)
     val imagePreviews get() = bool("imagePreviews", true)
