@@ -69,9 +69,10 @@ class FrameKeys {
 }
 
 /**
- * A `webrtc::FrameEncryptorInterface*` a sender is handed. The C++ object is
- * reference-counted and the sender holds a reference of its own, so this one
- * is let go exactly once.
+ * What a sender is handed: a `webrtc::FrameEncryptorInterface*`, or the facade
+ * that stands for one where libwebrtc's vtables are relative (frame_crypto.cc).
+ * The C++ object is reference-counted and the sender holds a reference of its
+ * own, so this one is let go exactly once.
  */
 class NativeFrameEncryptor(keys: Long) : FrameEncryptor {
     private var pointer = FrameCryptoNative.nativeCreateEncryptor(keys)
@@ -86,7 +87,7 @@ class NativeFrameEncryptor(keys: Long) : FrameEncryptor {
     }
 }
 
-/** A `webrtc::FrameDecryptorInterface*` for a pulled track, and what it has seen. */
+/** The same for a pulled track's `webrtc::FrameDecryptorInterface*`, and what it has seen. */
 class NativeFrameDecryptor(keys: Long) : FrameDecryptor {
     private var pointer = FrameCryptoNative.nativeCreateDecryptor(keys)
 

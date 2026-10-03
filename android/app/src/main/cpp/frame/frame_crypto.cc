@@ -6,6 +6,8 @@
 // is decoded. The key index is the conversation epoch's low byte, so a call
 // keeps playing while its keys rotate.
 
+#include <android/log.h>
+#include <dlfcn.h>
 #include <jni.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +30,76 @@ namespace {
 void RandomBytes(uint8_t* out, size_t len) {
   arc4random_buf(out, len);
 }
+
+// How libwebrtc calls these objects. This SDK's libwebrtc is built the way
+// Chrome is, and on arm64 Chrome compiles C++ with relative vtables (clang's
+// -fexperimental-relative-c++-abi-vtables): a virtual call reads a 32-bit
+// offset from the vtable and adds it to the vtable's address, where the usual
+// layout holds a pointer. An object compiled here with the usual layout sends
+// such a call into nowhere. So on those builds libwebrtc is handed a facade:
+// a vtable of offsets made at run time, to functions that take the facade
+// first (as a member function takes `this`) and call the real object.
+//
+// Which kind of build it is shows in libwebrtc's own setFrameEncryptor entry:
+// its first virtual call loads the slot with LDRSW (a signed 32-bit load)
+// when the vtables are relative, and with LDR (a pointer) when they are not.
+bool RelativeVtables() {
+#if defined(__aarch64__)
+  static const bool relative = [] {
+    bool found = true;  // what this SDK (150.7871.01) is, if its code cannot be read
+    void* lib = dlopen("libjingle_peerconnection_so.so", RTLD_NOW | RTLD_NOLOAD);
+    const auto* code = lib == nullptr
+        ? nullptr
+        : reinterpret_cast<const uint32_t*>(dlsym(lib, "Java_org_webrtc_RtpSender_nativeSetFrameEncryptor"));
+    if (code != nullptr) {
+      found = false;
+      for (int i = 0; i < 32; i++) {
+        const uint32_t insn = code[i];
+        if ((insn & 0xFFC00000u) == 0xB9800000u) {  // LDRSW Xt, [Xn, #imm]
+          found = true;
+          break;
+        }
+        // the first call (BLR, or BLRAA and its kin) or the return: past the slot load
+        if ((insn & 0xFFFFFC1Fu) == 0xD63F0000u || (insn & 0xFEFFF800u) == 0xD63F0800u ||
+            (insn & 0xFFFFFC1Fu) == 0xD65F0000u || insn == 0xD65F0BFFu || insn == 0xD65F0FFFu) {
+          break;
+        }
+      }
+    }
+    if (lib != nullptr) dlclose(lib);
+    __android_log_print(ANDROID_LOG_INFO, "FrameCrypto", "libwebrtc's vtables are %s%s", found ? "relative" : "pointers",
+                        code == nullptr ? " (assumed)" : "");
+    return found;
+  }();
+  return relative;
+#else
+  return false;
+#endif
+}
+
+// What libwebrtc holds on a relative-vtable build: the vtable, then the object
+// its calls are for.
+struct Facade {
+  const int32_t* vtable = nullptr;
+  void* self = nullptr;
+};
+
+// Six slots, in the order the interfaces declare them: AddRef, Release, the
+// two destructors, then the interface's own two functions. The two words in
+// front stand where the offset to top and the type info go.
+struct RelativeVtable {
+  int32_t head[2] = {0, 0};
+  int32_t slots[6] = {0, 0, 0, 0, 0, 0};
+};
+
+template <typename F>
+int32_t OffsetFrom(const int32_t* point, F fn) {
+  return int32_t(reinterpret_cast<intptr_t>(fn) - reinterpret_cast<intptr_t>(point));
+}
+
+// libwebrtc lets go of what it holds through Release and never deletes it, so
+// the destructors' slots only need somewhere harmless to go.
+void FacadeNoDelete(Facade*) {}
 
 // The keys of one call: the newest epochs this device holds, and which one seals.
 class KeySet {
@@ -95,9 +167,18 @@ class RefCounted : public Base {
   mutable std::atomic<int> refs_{1};
 };
 
-class Encryptor : public RefCounted<webrtc::FrameEncryptorInterface> {
+const int32_t* EncryptorVtable();
+const int32_t* DecryptorVtable();
+
+class Encryptor final : public RefCounted<webrtc::FrameEncryptorInterface> {
  public:
-  explicit Encryptor(KeySetPtr keys) : keys_(std::move(keys)) { RandomBytes(salt_, kSaltLen); }
+  explicit Encryptor(KeySetPtr keys) : keys_(std::move(keys)) {
+    RandomBytes(salt_, kSaltLen);
+    facade.vtable = RelativeVtables() ? EncryptorVtable() : nullptr;
+    facade.self = this;
+  }
+
+  Facade facade;
 
   int Encrypt(webrtc::MediaType media_type,
               uint32_t /*ssrc*/,
@@ -155,9 +236,14 @@ class Encryptor : public RefCounted<webrtc::FrameEncryptorInterface> {
   uint32_t counter_ = 0;
 };
 
-class Decryptor : public RefCounted<webrtc::FrameDecryptorInterface> {
+class Decryptor final : public RefCounted<webrtc::FrameDecryptorInterface> {
  public:
-  explicit Decryptor(KeySetPtr keys) : keys_(std::move(keys)) {}
+  explicit Decryptor(KeySetPtr keys) : keys_(std::move(keys)) {
+    facade.vtable = RelativeVtables() ? DecryptorVtable() : nullptr;
+    facade.self = this;
+  }
+
+  Facade facade;
 
   Result Decrypt(webrtc::MediaType media_type,
                  const void* /*csrcs*/,
@@ -218,6 +304,94 @@ class Decryptor : public RefCounted<webrtc::FrameDecryptorInterface> {
   std::atomic<bool> too_large_{false};
 };
 
+template <typename T>
+void FacadeAddRef(const Facade* f) {
+  static_cast<const T*>(f->self)->AddRef();
+}
+
+template <typename T>
+webrtc::RefCountReleaseStatus FacadeRelease(const Facade* f) {
+  return static_cast<const T*>(f->self)->Release();
+}
+
+int FacadeEncrypt(Facade* f,
+                  webrtc::MediaType media_type,
+                  uint32_t ssrc,
+                  webrtc::ArrayView<const uint8_t> additional_data,
+                  webrtc::ArrayView<const uint8_t> frame,
+                  webrtc::ArrayView<uint8_t> encrypted_frame,
+                  size_t* bytes_written) {
+  return static_cast<Encryptor*>(f->self)->Encrypt(media_type, ssrc, additional_data, frame, encrypted_frame, bytes_written);
+}
+
+size_t FacadeMaxCiphertext(Facade* f, webrtc::MediaType media_type, size_t frame_size) {
+  return static_cast<Encryptor*>(f->self)->GetMaxCiphertextByteSize(media_type, frame_size);
+}
+
+webrtc::FrameDecryptorInterface::Result FacadeDecrypt(Facade* f,
+                                                      webrtc::MediaType media_type,
+                                                      const void* csrcs,
+                                                      webrtc::ArrayView<const uint8_t> additional_data,
+                                                      webrtc::ArrayView<const uint8_t> encrypted_frame,
+                                                      webrtc::ArrayView<uint8_t> frame) {
+  return static_cast<Decryptor*>(f->self)->Decrypt(media_type, csrcs, additional_data, encrypted_frame, frame);
+}
+
+size_t FacadeMaxPlaintext(Facade* f, webrtc::MediaType media_type, size_t encrypted_frame_size) {
+  return static_cast<Decryptor*>(f->self)->GetMaxPlaintextByteSize(media_type, encrypted_frame_size);
+}
+
+const int32_t* EncryptorVtable() {
+  static RelativeVtable table;
+  static std::once_flag once;
+  std::call_once(once, [] {
+    int32_t* at = table.slots;
+    at[0] = OffsetFrom(at, &FacadeAddRef<Encryptor>);
+    at[1] = OffsetFrom(at, &FacadeRelease<Encryptor>);
+    at[2] = OffsetFrom(at, &FacadeNoDelete);
+    at[3] = OffsetFrom(at, &FacadeNoDelete);
+    at[4] = OffsetFrom(at, &FacadeEncrypt);
+    at[5] = OffsetFrom(at, &FacadeMaxCiphertext);
+  });
+  return table.slots;
+}
+
+const int32_t* DecryptorVtable() {
+  static RelativeVtable table;
+  static std::once_flag once;
+  std::call_once(once, [] {
+    int32_t* at = table.slots;
+    at[0] = OffsetFrom(at, &FacadeAddRef<Decryptor>);
+    at[1] = OffsetFrom(at, &FacadeRelease<Decryptor>);
+    at[2] = OffsetFrom(at, &FacadeNoDelete);
+    at[3] = OffsetFrom(at, &FacadeNoDelete);
+    at[4] = OffsetFrom(at, &FacadeDecrypt);
+    at[5] = OffsetFrom(at, &FacadeMaxPlaintext);
+  });
+  return table.slots;
+}
+
+// The pointer Kotlin holds and hands to libwebrtc, and back.
+jlong HandleOf(Encryptor* e) {
+  return RelativeVtables() ? reinterpret_cast<jlong>(&e->facade)
+                           : reinterpret_cast<jlong>(static_cast<webrtc::FrameEncryptorInterface*>(e));
+}
+
+jlong HandleOf(Decryptor* d) {
+  return RelativeVtables() ? reinterpret_cast<jlong>(&d->facade)
+                           : reinterpret_cast<jlong>(static_cast<webrtc::FrameDecryptorInterface*>(d));
+}
+
+Encryptor* EncryptorOf(jlong ptr) {
+  return RelativeVtables() ? static_cast<Encryptor*>(reinterpret_cast<Facade*>(ptr)->self)
+                           : static_cast<Encryptor*>(reinterpret_cast<webrtc::FrameEncryptorInterface*>(ptr));
+}
+
+Decryptor* DecryptorOf(jlong ptr) {
+  return RelativeVtables() ? static_cast<Decryptor*>(reinterpret_cast<Facade*>(ptr)->self)
+                           : static_cast<Decryptor*>(reinterpret_cast<webrtc::FrameDecryptorInterface*>(ptr));
+}
+
 // The handle Kotlin holds: a shared_ptr kept alive on the heap.
 struct KeysHandle {
   KeySetPtr keys;
@@ -272,21 +446,21 @@ JNIEXPORT void JNICALL Java_fish_nexa_voice_FrameCryptoNative_nativeReleaseKeys(
 JNIEXPORT jlong JNICALL Java_fish_nexa_voice_FrameCryptoNative_nativeCreateEncryptor(JNIEnv*, jobject, jlong handle_ptr) {
   auto* handle = reinterpret_cast<KeysHandle*>(handle_ptr);
   if (handle == nullptr) return 0;
-  return reinterpret_cast<jlong>(static_cast<webrtc::FrameEncryptorInterface*>(new Encryptor(handle->keys)));
+  return nexa::HandleOf(new Encryptor(handle->keys));
 }
 
 JNIEXPORT jlong JNICALL Java_fish_nexa_voice_FrameCryptoNative_nativeCreateDecryptor(JNIEnv*, jobject, jlong handle_ptr) {
   auto* handle = reinterpret_cast<KeysHandle*>(handle_ptr);
   if (handle == nullptr) return 0;
-  return reinterpret_cast<jlong>(static_cast<webrtc::FrameDecryptorInterface*>(new Decryptor(handle->keys)));
+  return nexa::HandleOf(new Decryptor(handle->keys));
 }
 
 JNIEXPORT void JNICALL Java_fish_nexa_voice_FrameCryptoNative_nativeReleaseEncryptor(JNIEnv*, jobject, jlong ptr) {
-  if (ptr != 0) reinterpret_cast<webrtc::FrameEncryptorInterface*>(ptr)->Release();
+  if (ptr != 0) nexa::EncryptorOf(ptr)->Release();
 }
 
 JNIEXPORT void JNICALL Java_fish_nexa_voice_FrameCryptoNative_nativeReleaseDecryptor(JNIEnv*, jobject, jlong ptr) {
-  if (ptr != 0) reinterpret_cast<webrtc::FrameDecryptorInterface*>(ptr)->Release();
+  if (ptr != 0) nexa::DecryptorOf(ptr)->Release();
 }
 
 JNIEXPORT jlongArray JNICALL Java_fish_nexa_voice_FrameCryptoNative_nativeStats(JNIEnv* env, jobject, jlong handle_ptr) {
@@ -308,8 +482,7 @@ JNIEXPORT jlongArray JNICALL Java_fish_nexa_voice_FrameCryptoNative_nativeStats(
 JNIEXPORT jlongArray JNICALL Java_fish_nexa_voice_FrameCryptoNative_nativeDecryptorCounts(JNIEnv* env, jobject, jlong ptr) {
   jlong out[3] = {0, 0, 0};
   if (ptr != 0) {
-    // the Decryptor is the only FrameDecryptorInterface this library makes
-    auto* d = static_cast<Decryptor*>(reinterpret_cast<webrtc::FrameDecryptorInterface*>(ptr));
+    const Decryptor* d = nexa::DecryptorOf(ptr);
     out[0] = d->seen();
     out[1] = d->opened();
     out[2] = d->too_large() ? 1 : 0;
