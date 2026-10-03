@@ -83,7 +83,6 @@ class Session(private val nx: Nexa) {
     private val fetchingChannels = HashSet<String>()
 
     var onSignedOut: ((reason: String) -> Unit)? = null
-    var onBanned: (() -> Unit)? = null
 
     /** Locked during a call: the connection stays for the call, and only its events are taken (applyLockedEvent). */
     @Volatile var lockedInCall = false
@@ -308,7 +307,10 @@ class Session(private val nx: Nexa) {
             "nexa_announcement", "nexa_announcement_delete" -> NexaInbox.onEvent(e.t, d)
             "note_update", "note_delete", "note_invite", "note_invite_delete", "note_presence", "note_cursor", "note_crdt" -> fish.nexa.notes.Notes.onEvent(e.t, d)
             "session_expired" -> onSignedOut?.invoke(d.str("reason") ?: "expired")
-            "account_banned" -> onBanned?.invoke()
+            // the socket was shut on a ban; what the ban screen needs comes over REST
+            "account_banned" -> nx.scope.launch {
+                runCatching { (nx.api.get("/nexa") as? JsonObject)?.get("state")?.let { NexaInbox.setState(it) } }
+            }
             else -> Unit // voice signalling, calls, notes and staff events are handled by the modules that listen to `events`
         }
     }

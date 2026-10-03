@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
@@ -19,6 +21,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import fish.nexa.Nexa
+import fish.nexa.crypto.PollPayload
 import fish.nexa.data.ChatMessage
 import fish.nexa.ui.Icon
 import fish.nexa.ui.Time
@@ -49,6 +52,13 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
     }
     val nameStyle = SpanStyle(color = c.textStrong, fontWeight = FontWeight(500))
     val linkStyle = TextLinkStyles(SpanStyle(color = c.link))
+    // a closed poll's question and answers: from the list, or fetched when the list does not hold the poll (usePollOf.ts)
+    val held = if (m.type == "system_poll_result") m.replyToId?.let { Nexa.messages.get(ctx.channel.id).byId[it]?.payload?.poll } else null
+    val fetched by produceState<PollPayload?>(null, m.replyToId, held == null) {
+        val id = m.replyToId
+        if (m.type == "system_poll_result" && held == null && id != null) value = FetchedPolls.load(ctx.channel.id, id)
+    }
+    val poll = held ?: fetched
 
     /** Fills a translated sentence, putting a tappable name or link where each {placeholder} is. */
     fun fill(template: String, parts: Map<String, AnnotatedString.Builder.() -> Unit>): AnnotatedString = buildAnnotatedString {
@@ -83,7 +93,7 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
         else fill(t("chat.systemMessage.madeOwner"), mapOf("actor" to person(actor), "target" to person(target)))
         "system_pin" -> fill(t("chat.systemMessage.pinned"), mapOf("actor" to person(actor), "message" to jumpLink(t("chat.systemMessage.aMessage"), m.replyToId)))
         "system_join" -> fill(t("chat.systemMessage.joined"), mapOf("actor" to person(actor)))
-        "system_poll_result" -> pollResult(cm, ctx, ::fill, person(actor), jumpLink(t("chat.systemMessage.viewPoll"), m.replyToId))
+        "system_poll_result" -> pollResult(cm, poll, ::fill, person(actor), jumpLink(t("chat.systemMessage.viewPoll"), m.replyToId))
         else -> fill(t("chat.systemMessage.didSomething"), mapOf("actor" to person(actor)))
     }
     val full = buildAnnotatedString {
@@ -108,23 +118,45 @@ private fun Modifier.offsetStart(dp: Int): Modifier = this.layout { measurable, 
     layout(0, p.height) { p.placeRelative((dp * density).toInt(), 0) }
 }
 
+/** Polls read from messages the list does not hold, by message id, each fetched once (usePollOf.ts loadPoll). */
+private object FetchedPolls {
+    private val polls = java.util.concurrent.ConcurrentHashMap<String, PollPayload>()
+    /** Gone, or out of reach, stays so; a moment offline does not. */
+    private val unreachable = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    suspend fun load(channelId: String, messageId: String): PollPayload? {
+        polls[messageId]?.let { return it }
+        if (messageId in unreachable) return null
+        return try {
+            val m = Nexa.api.get("/channels/$channelId/messages/$messageId", fish.nexa.net.Message.serializer())
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Nexa.messages.decrypt(m) }.payload?.poll?.also { polls[messageId] = it }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: fish.nexa.net.ApiError) {
+            if (e.status == 404 || e.status == 403) unreachable += messageId
+            null
+        } catch (_: Exception) {
+            null
+        }
+    }
+}
+
 private fun pollResult(
     cm: ChatMessage,
-    ctx: ListCtx,
+    poll: PollPayload?,
     fill: (String, Map<String, AnnotatedString.Builder.() -> Unit>) -> AnnotatedString,
     actor: AnnotatedString.Builder.() -> Unit,
     view: AnnotatedString.Builder.() -> Unit,
 ): AnnotatedString {
     val outcome = cm.m.pollResult
-    val original = cm.m.replyToId?.let { Nexa.messages.get(ctx.channel.id).byId[it] }
-    val question = original?.payload?.poll?.question
+    val question = poll?.question
     val head = if (question != null) fill(t("chat.systemMessage.pollClosed"), mapOf("actor" to actor, "question" to { withStyle(SpanStyle(fontWeight = FontWeight(600))) { append(question) } }))
     else fill(t("chat.systemMessage.pollClosedUntitled"), mapOf("actor" to actor))
     val result = when {
         outcome == null || outcome.totalVotes == 0 -> t("chat.systemMessage.pollNoVotes")
         outcome.victorAnswerId == 0 -> t("chat.systemMessage.pollTie")
         else -> {
-            val answer = original?.payload?.poll?.answers?.getOrNull(outcome.victorAnswerId - 1)?.text ?: ""
+            val answer = poll?.answers?.getOrNull(outcome.victorAnswerId - 1)?.text ?: ""
             val pct = if (outcome.totalVotes > 0) Math.round(outcome.victorAnswerVotes * 100.0 / outcome.totalVotes) else 0
             t("chat.systemMessage.pollWinner", "answer" to answer, "percent" to pct)
         }

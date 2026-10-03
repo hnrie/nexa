@@ -58,6 +58,16 @@ object Mentions {
 
     fun extract(raw: String, channelId: String): Md.Extracted = Md.extract(raw, users(), scope(channelId))
 
+    /**
+     * A custom emoji as it reads in the message box (Composer.tsx emojiText):
+     * its :name:, when sending that name brings back this very emoji, and its
+     * raw token otherwise, which is never wrong.
+     */
+    fun emojiText(token: String, name: String, channelId: String): String {
+        val short = ":$name:"
+        return if (extract(short, channelId).text == token) short else token
+    }
+
     fun urls(text: String): List<String> = Markdown.extractUrls(text)
 
     /** For copying a message: every role and channel name this device knows, so it reads as the message does. */

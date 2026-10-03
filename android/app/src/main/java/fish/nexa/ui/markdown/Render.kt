@@ -355,12 +355,22 @@ private class Builder(
     /** A link to Nexa itself opens here; anything else in the browser. */
     private fun openLink(url: String) {
         when (val app = AppLinks.appLink(url, Nexa.api.baseUrl)) {
-            is AppLinks.AppLink.Route -> Nav.openPath(app.path)
-            is AppLinks.AppLink.Invite -> fish.nexa.ui.dialogs.Dialogs.openInvite(app.code)
+            // a page of Nexa the app has no screen of its own for: the Terms and Privacy Policy in their sheet, the rest in the browser
+            is AppLinks.AppLink.Route -> if (!Nav.openPath(app.path)) when (app.path.substringBefore('?').substringBefore('#').trimEnd('/')) {
+                "/terms" -> fish.nexa.ui.legal.Legal.openDocument("terms")
+                "/privacy" -> fish.nexa.ui.legal.Legal.openDocument("privacy")
+                else -> browse(if (url.startsWith("/")) Nexa.api.baseUrl + url else url)
+            }
+            // the key after the # comes along: without it a new member could not read the history
+            is AppLinks.AppLink.Invite -> fish.nexa.ui.dialogs.Dialogs.openInvite(app.code, app.hash)
             is AppLinks.AppLink.Profile -> fish.nexa.ui.profile.Profiles.openByUsername(app.username)
             is AppLinks.AppLink.Note -> fish.nexa.ui.notes.openNoteLink(app.token, app.hash)
-            null -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            null -> browse(url)
         }
+    }
+
+    private fun browse(url: String) {
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
     private fun AnnotatedString.Builder.mention(n: Node.Mention, covered: Boolean) {

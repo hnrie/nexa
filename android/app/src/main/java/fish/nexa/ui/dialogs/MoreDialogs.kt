@@ -104,7 +104,7 @@ internal fun CreateServerSheet(layer: Layer, close: () -> Unit) {
                 // the icon goes up once the server exists; a failure there still leaves the server made
                 icon?.let { picked ->
                     try {
-                        Nexa.servers.setServer(wireJson.decodeFromJsonElement(Server.serializer(), uploadPicture("POST", "/servers/${view.id}/icon", picked)))
+                        Nexa.servers.setServer(wireJson.decodeFromJsonElement(Server.serializer(), uploadPicture("PUT", "/servers/${view.id}/icon", picked)))
                     } catch (e: Exception) {
                         Nexa.ui.toast(
                             if (e is fish.nexa.net.ApiError) t("modals.createServer.theServerWasMadeButItsIcon", "error" to (e.message ?: "")) else t("modals.createServer.theServerWasMadeButIts"),

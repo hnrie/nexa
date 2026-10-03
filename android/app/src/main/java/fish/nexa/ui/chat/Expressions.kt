@@ -29,7 +29,11 @@ fun openExpressionPicker(channelId: String, onPick: (String) -> Unit) {
     }
     fish.nexa.ui.pickers.Pickers.open(fish.nexa.ui.pickers.Pickers.Opener(
         listOf(fish.nexa.ui.pickers.Pickers.Tab.GIFS, fish.nexa.ui.pickers.Pickers.Tab.STICKERS, fish.nexa.ui.pickers.Pickers.Tab.EMOJI), serverId,
-        onEmoji = { onPick(it.text) },
+        // a custom emoji reads as its :name: in the box where that name brings it back
+        onEmoji = { p ->
+            val name = p.custom?.name ?: p.packEmoji?.name
+            onPick(if (name != null) fish.nexa.data.Mentions.emojiText(p.text, name, channelId) else p.text)
+        },
         onSticker = { s ->
             fish.nexa.data.Send.sendMessage(channelId, "", reply().copy(sticker = StickerRef(s.id, s.blobId, s.name, s.width?.toDouble(), s.height?.toDouble(), s.animated, s.format)))
             fish.nexa.Nexa.scope.launch { runCatching { fish.nexa.Nexa.api.request("POST", "/stickers/recent", kotlinx.serialization.json.buildJsonObject { put("sticker_id", kotlinx.serialization.json.JsonPrimitive(s.id)) }) } }

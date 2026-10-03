@@ -55,6 +55,14 @@ object Nav {
 
     val canGoBack get() = history.isNotEmpty()
 
+    /** Whether the page has a member list to open from the end side: a server's channel, or a group. */
+    val hasMembers: Boolean
+        get() = when (val r = route) {
+            is Route.Server -> r.channelId != null
+            is Route.Dm -> Nexa.channels.get(r.channelId)?.type == "group_dm"
+            else -> false
+        }
+
     /** The page going back leads to, if there is one. */
     val previous: Route? get() = history.lastOrNull()
 
@@ -87,7 +95,7 @@ object Nav {
         }
         // an invite link, a profile link
         if (parts.size == 2 && parts[0] == "invite") {
-            fish.nexa.ui.dialogs.Dialogs.openInvite(parts[1])
+            fish.nexa.ui.dialogs.Dialogs.openInvite(parts[1], path.substringAfter('#', "").let { if (it.isEmpty()) "" else "#$it" })
             return true
         }
         if (parts.size == 1 && parts[0].startsWith("@") && parts[0].length > 1) {

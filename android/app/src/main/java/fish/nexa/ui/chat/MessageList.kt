@@ -551,7 +551,8 @@ private fun ConversationStart(channel: Channel) {
                 if (alone) {
                     StartText(t("chat.messageList.groupAlone") + " " + endToEnd)
                     Box(Modifier.padding(top = 12.dp)) {
-                        NxButton(t("chat.chat.addFriends"), { openCreateDm() }, size = ButtonSize.SM, icon = "UserPlus")
+                        // whoever is picked here joins this group, and is handed its key like anyone added later
+                        NxButton(t("chat.chat.addFriends"), { fish.nexa.ui.dialogs.Dialogs.createDm(groupId = channel.id) }, size = ButtonSize.SM, icon = "UserPlus")
                     }
                 } else StartText(boldIn("chat.messageList.groupStart", "name", name, " $endToEnd"))
             }
@@ -636,7 +637,8 @@ private fun BlockedRun(row: ListRow.Blocked, ctx: ListCtx, toggle: () -> Unit) {
     }
 }
 
+/** A call's line (SystemMessage.tsx system_call): told from where the reader stands, with Call Back or Join. */
 @Composable
 fun CallRecordRow(cm: ChatMessage, ctx: ListCtx) {
-    SystemRow(cm, ctx)
+    fish.nexa.ui.voice.CallLine(cm, Modifier.padding(start = if (ctx.selecting) 34.dp else 0.dp))
 }

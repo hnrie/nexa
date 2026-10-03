@@ -136,6 +136,7 @@ fun EditMessage(cm: ChatMessage) {
                 .semantics { contentDescription = t("composer.editYourMessage") },
             textStyle = Nx.type.body.copy(color = c.text),
             cursorBrush = SolidColor(c.text),
+            keyboardOptions = messageKeyboard(),
             lineLimits = TextFieldLineLimits.MultiLine(1, Int.MAX_VALUE),
             inputTransformation = EditInput { held = it },
         )

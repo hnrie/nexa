@@ -49,6 +49,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import kotlinx.serialization.json.booleanOrNull
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -109,6 +110,7 @@ import fish.nexa.ui.theme.topEdge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -275,11 +277,16 @@ fun Composer(channel: Channel) {
         }
     }
 
-    // drafts, typing and autocomplete follow the text
+    // autocomplete follows the text and the caret
     LaunchedEffect(channelId) {
         snapshotFlow { state.text.toString() to state.selection.end }.distinctUntilChanged().collect { (text, caret) ->
-            TypingSender.typed(channelId, text.isEmpty())
             ac = acToken(text, caret, st != null, Nexa.settings.smartEmoji)
+        }
+    }
+    // typing goes out when the words change, not when a draft is opened or the caret moves; spaces alone are not typing
+    LaunchedEffect(channelId) {
+        snapshotFlow { state.text.toString() }.distinctUntilChanged().drop(1).collect { text ->
+            TypingSender.typed(channelId, text.isBlank())
         }
     }
     LaunchedEffect(channelId) {
@@ -596,6 +603,8 @@ private fun ComposerBox(
                 textStyle = Nx.type.body.copy(color = c.text),
                 cursorBrush = SolidColor(c.text),
                 interactionSource = interaction,
+                // sentences start with a capital, and the keyboard checks spelling unless that is turned off
+                keyboardOptions = messageKeyboard(),
                 lineLimits = TextFieldLineLimits.MultiLine(1, Int.MAX_VALUE),
                 inputTransformation = remember(channel.id) {
                     ComposerInput(onPasteTooLong) { name ->
@@ -1012,7 +1021,7 @@ private fun emojiSuggestions(channel: Channel, query: String): List<AcItem> {
     val packEmoji = ex.packs.value.values.filter { it.kind == "emoji" }.flatMap { p ->
         p.stickers.map { r -> fish.nexa.net.Emoji(r.id, "", r.name, r.blobId, r.animated, r.creatorId, r.createdAt) }
     }
-    fun custom(e: fish.nexa.net.Emoji) = AcItem("emoji", fish.nexa.ui.markdown.CustomEmoji.token(e) + " ", ":${e.name}:", emoji = fish.nexa.ui.markdown.CustomEmoji.reactionKey(e))
+    fun custom(e: fish.nexa.net.Emoji) = AcItem("emoji", fish.nexa.data.Mentions.emojiText(fish.nexa.ui.markdown.CustomEmoji.token(e), e.name, channel.id) + " ", ":${e.name}:", emoji = fish.nexa.ui.markdown.CustomEmoji.reactionKey(e))
     fun std(e: fish.nexa.ui.markdown.EmojiEntry, name: String) = md.withTone(e, tone).let { u -> AcItem("emoji", "$u ", ":$name:", emoji = u) }
     if (Nexa.settings.smartEmoji) {
         val candidates = ArrayList<fish.nexa.ui.markdown.EmojiSuggest.Candidate>()
@@ -1138,4 +1147,12 @@ fun composerPlaceholder(channel: fish.nexa.net.Channel): String = when (channel.
     "dm" -> t("composer.composer.messageUser", "name" to (Names.otherOf(channel)?.let { Names.shown(it) } ?: ""))
     "group_dm", "subchat" -> t("composer.composer.messageGroup", "name" to Names.channel(channel))
     else -> t("composer.composer.messageChannel", "name" to channel.name)
+}
+
+/** The keyboard a message is written with: capitals at the start of sentences, and spell checking as the settings say. */
+@Composable
+fun messageKeyboard(): androidx.compose.foundation.text.KeyboardOptions {
+    val doc by Nexa.settings.doc.collectAsState()
+    val spell = (doc["spellcheck"] as? kotlinx.serialization.json.JsonPrimitive)?.booleanOrNull != false
+    return androidx.compose.foundation.text.KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences, autoCorrectEnabled = spell)
 }

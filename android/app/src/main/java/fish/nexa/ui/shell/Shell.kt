@@ -163,7 +163,8 @@ fun MainShell() {
                     Nav.leftOpen = true
                     scope.launch { drawer.animateTo(1f, tween(if (reduced) 0 else 200, easing = ease)) }
                 } else {
-                    if (!wasOpen && dx < -60 * density) Nav.rightOpen = true
+                    // only a page with members has a member drawer: a server channel, or a group
+                    if (!wasOpen && dx < -60 * density && Nav.hasMembers) Nav.rightOpen = true
                     Nav.leftOpen = false
                     scope.launch { drawer.animateTo(0f, tween(if (reduced) 0 else 200, easing = ease)) }
                 }

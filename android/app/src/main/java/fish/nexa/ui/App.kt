@@ -8,6 +8,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -162,7 +164,19 @@ fun App() {
                 is AuthState.PinLocked -> fish.nexa.ui.auth.PasscodeScreen(s)
                 is AuthState.Offline -> OfflineScreen(s)
                 // while banned, the ban screen stands in place of the whole app
-                is AuthState.Ready -> if (banned()) fish.nexa.ui.nexa.BanScreen() else MainShell()
+                is AuthState.Ready -> {
+                    val isBanned = banned()
+                    // back from a ban: the connection the server shut is opened again
+                    var wasBanned by remember { mutableStateOf(false) }
+                    LaunchedEffect(isBanned) {
+                        if (isBanned) wasBanned = true
+                        else if (wasBanned) {
+                            wasBanned = false
+                            Nexa.session.restart()
+                        }
+                    }
+                    if (isBanned) fish.nexa.ui.nexa.BanScreen() else MainShell()
+                }
             }
             fish.nexa.ui.nexa.DeletedNoticeHost()
             CaptchaHost.Sheet()

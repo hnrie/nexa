@@ -265,7 +265,10 @@ private fun openMoreMenu(channel: Channel) {
     if (server) items += MenuItem.Action(t("chat.chat.invitePeople")) { openInvite(channel.serverId!!, channel.id) }
     else {
         val conv = if (channel.type == "subchat") channel.parentId?.let { Nexa.channels.get(it) } ?: channel else channel
-        if (conv.type == "dm") items += MenuItem.Action(t("chat.chat.addFriendsToDm")) { openCreateDm() }
+        // the person already here comes along into the new group
+        if (conv.type == "dm") items += MenuItem.Action(t("chat.chat.addFriendsToDm")) {
+            fish.nexa.ui.dialogs.Dialogs.createDm(initial = listOfNotNull(conv.recipientIds.firstOrNull { it != fish.nexa.Nexa.users.meId }))
+        }
         else items += MenuItem.Action(t("chat.chat.inviteToGroup")) { openGroupInvite(conv.id) }
     }
     if (server || channel.type == "group_dm") {
