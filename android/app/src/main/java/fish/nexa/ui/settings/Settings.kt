@@ -624,6 +624,7 @@ private fun androidx.compose.foundation.layout.BoxScope.PageOverlay(id: String) 
     when (id) {
         "profiles" -> ProfilesSaveBar()
         "appearance" -> ThemeBuilderSaveBar()
+        "stickers" -> PackSaveBar()
     }
 }
 
