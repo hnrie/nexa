@@ -70,7 +70,11 @@ class Auth(private val nx: Nexa) {
     }
 
     suspend fun loadInstance(): InstanceInfo? = try {
-        nx.api.request("GET", "/instance", InstanceInfo.serializer(), auth = false).also { _instance.value = it }
+        nx.api.request("GET", "/instance", InstanceInfo.serializer(), auth = false).also {
+            _instance.value = it
+            // links to Nexa's public address open in the app as well as links to this one
+            fish.nexa.ui.markdown.AppLinks.setPublicUrl(it.publicUrl.ifEmpty { null })
+        }
     } catch (_: Exception) {
         null
     }

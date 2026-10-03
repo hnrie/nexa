@@ -142,7 +142,7 @@ object Notifier {
             mentioned -> CH_MENTIONS
             else -> CH_SERVERS
         }
-        val hookName = (dec.hook?.get("username") as? JsonPrimitive)?.contentOrNull
+        val hookName = fish.nexa.data.Webhooks.content(dec.hook)?.name
         val author = hookName ?: Names.display(Nexa.users.get(m.authorId))
         val line = Line(m.authorId, author, if (hookName != null) null else Nexa.users.get(m.authorId)?.avatarId, previewOf(dec), m.createdAt)
         synchronized(history) {

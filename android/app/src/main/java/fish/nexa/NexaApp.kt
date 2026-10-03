@@ -19,6 +19,12 @@ class NexaApp : Application() {
         fish.nexa.media.Media.init(this)
         fish.nexa.media.Twemoji.init(this)
         fish.nexa.ui.markdown.EmojiAssets.init(this)
+        // the picker offers only emoji Twemoji has drawn; the tables load off the main thread
+        fish.nexa.ui.markdown.EmojiData.has = { fish.nexa.media.Twemoji.has(it) }
+        Nexa.scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            fish.nexa.ui.markdown.Shortcodes.preload()
+            fish.nexa.ui.markdown.EmojiData.preload()
+        }
         Nexa.auth.captcha = CaptchaHost
         fish.nexa.notify.Notifier.install()
         // notifications read a message's words as plain text, mentions as names

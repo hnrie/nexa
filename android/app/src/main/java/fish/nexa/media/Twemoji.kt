@@ -73,6 +73,8 @@ object Twemoji {
         val c = code(text) ?: return null
         at[c]?.let { return it }
         if (text.contains(ZWJ)) code(text.replace(VS16, ""))?.let { at[it]?.let { hit -> return hit } }
+        // the names Twemoji gives a sequence, also when it was sent without its variation selectors
+        for (name in fish.nexa.ui.markdown.TwemojiFiles.files(text)) at[name]?.let { return it }
         return null
     }
 

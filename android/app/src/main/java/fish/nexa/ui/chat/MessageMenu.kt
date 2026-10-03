@@ -144,7 +144,7 @@ fun openMessageMenu(cm: ChatMessage, ctx: ListCtx, image: ImageTarget? = null) {
         }
     }
     items += MenuItem.Action(t("chat.messageItem.markUnread")) { markUnread(cm) }
-    val hasEmbeds = !cm.payload?.embeds.isNullOrEmpty() || cm.hook?.get("link_embeds") != null
+    val hasEmbeds = !cm.payload?.embeds.isNullOrEmpty() || fish.nexa.data.Webhooks.content(cm.hook)?.linkEmbeds?.isNotEmpty() == true
     if (hasEmbeds && canDelete(cm.m)) {
         val hidden = cm.m.suppressEmbeds
         items += MenuItem.Action(if (hidden) t("chat.messageMenu.showEmbeds") else t("chat.messageMenu.removeEmbeds")) {

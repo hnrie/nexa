@@ -104,9 +104,10 @@ private fun sameDay(a: Long, b: Long): Boolean {
 
 private data class Prev(val authorId: String, val at: Long, val system: Boolean, val hook: String?)
 
+/** Webhook messages group only when the webhook and the name and picture it sent match. */
 private fun hookKey(cm: ChatMessage?): String? {
-    val h = cm?.hook ?: return null
-    return "${cm.m.webhookId}|${h["username"]}|${h["avatar_url"]}"
+    val h = fish.nexa.data.Webhooks.content(cm?.hook) ?: return null
+    return "${cm!!.m.webhookId}|${h.name}|${h.avatarId ?: h.avatarUrl ?: ""}"
 }
 
 /** shouldGroup: same author within 7 minutes on the same day, a plain message, no reply, after no system line. */

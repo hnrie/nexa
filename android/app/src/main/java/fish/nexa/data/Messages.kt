@@ -463,11 +463,20 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
 }
 
 /** A webhook's message, held to what can be drawn (web/src/lib/webhookMessage.ts); fleshed out with the renderer. */
+/**
+ * Webhook messages: posted by programs, not encrypted, read as the web reads
+ * them (lib/webhookMessage.ts, ported in ui/markdown/Webhook.kt). The raw
+ * object is kept on the message; [content] is its checked form.
+ */
 object Webhooks {
-    fun sanitize(el: JsonElement): JsonObject? = el as? JsonObject
+    /** The message's webhook object when it is a well-formed one. */
+    fun sanitize(el: JsonElement?): JsonObject? = if (fish.nexa.ui.markdown.Webhook.sanitize(el) != null) el as? JsonObject else null
 
+    fun content(hook: JsonObject?): fish.nexa.ui.markdown.Webhook.Content? = hook?.let { fish.nexa.ui.markdown.Webhook.sanitize(it) }
+
+    /** What the rest of the app reads as the message: its words, and the previews the server made for its links. */
     fun payloadOf(hook: JsonObject): MessagePayload {
-        val content = (hook["content"] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content
-        return MessagePayload(t = content?.takeIf { it.isNotEmpty() })
+        val c = content(hook) ?: return MessagePayload()
+        return MessagePayload(t = c.content.ifEmpty { null }, embeds = c.linkEmbeds.ifEmpty { null })
     }
 }
