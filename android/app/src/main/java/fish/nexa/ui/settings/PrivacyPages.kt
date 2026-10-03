@@ -150,9 +150,9 @@ fun BlockedPage() {
     val doc = settingsDoc()
     val rels by Nexa.relationships.byId.collectAsState()
     val users by Nexa.users.byId.collectAsState()
-    val blocking = doc.obj("blocking")
-    val hideMessages = blocking?.bool("hideMessages", false) ?: false
-    val hideReplies = hideMessages && (blocking?.bool("hideReplies", false) ?: false)
+    val blocking = doc.obj("blocking") ?: kotlinx.serialization.json.JsonObject(emptyMap())
+    val hideMessages = blocking.bool("hideMessages", false)
+    val hideReplies = hideMessages && blocking.bool("hideReplies", false)
     PageTitle(t("people.blockedPage.title"))
     Hint(t("people.blockedPage.intro"))
 

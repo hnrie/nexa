@@ -5,11 +5,8 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import fish.nexa.ui.t
 
-@Composable fun AccountPage(openPage: (String, String?) -> Unit) = PageTitle(t("settings.account.myAccount"))
 @Composable fun ProfilesPage() = PageTitle(t("settings.profile.profiles"))
 @Composable fun BoxScope.ProfilesSaveBar() = Unit
-@Composable fun SecurityPage() = PageTitle(t("settings.security.security"))
-@Composable fun DevicesPage() = PageTitle(t("settings.devices.devices"))
 @Composable fun SoundsPage() = PageTitle(t("settings.sounds.title"))
 @Composable fun StickersPage() = PageTitle(t("settings.groups.emojiStickers"))
 @Composable fun AppearancePage() = PageTitle(t("settings.appearance.appearance"))

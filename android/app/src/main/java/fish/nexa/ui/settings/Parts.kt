@@ -82,12 +82,13 @@ fun PageTitle(text: String) {
 
 /** `.h5`: a section heading, 14.5 sp bold, 28 dp above and 10 below. */
 @Composable
-fun SectionHeading(text: String, modifier: Modifier = Modifier, first: Boolean = false, trailing: (@Composable RowScope.() -> Unit)? = null) {
+fun SectionHeading(text: String, modifier: Modifier = Modifier, first: Boolean = false, icon: String? = null, trailing: (@Composable RowScope.() -> Unit)? = null) {
     Row(
         modifier.fillMaxWidth().padding(top = if (first) 0.dp else 28.dp, bottom = 10.dp).semantics { heading() },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (icon != null) Icon(icon, Nx.colors.textBrand, size = 18.dp)
         Txt(text, style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(700)), color = Nx.colors.textStrong, modifier = Modifier.weight(1f))
         trailing?.invoke(this)
     }
@@ -242,7 +243,7 @@ fun DeviceRow(
 
 /** `.dangerBox`: what cannot be undone, in a faintly red box with its button. */
 @Composable
-fun DangerBox(title: String, body: String?, button: String, onClick: () -> Unit, anchor: String? = null) {
+fun DangerBox(title: String?, body: String?, button: String, onClick: () -> Unit, anchor: String? = null, loading: Boolean = false) {
     val c = Nx.colors
     val shape = Radii.Md
     Column(
@@ -255,11 +256,205 @@ fun DangerBox(title: String, body: String?, button: String, onClick: () -> Unit,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Txt(title, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong)
-            if (body != null) Txt(body, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
+            if (title != null) Txt(title, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong)
+            if (body != null) Txt(body, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20f)), color = if (title == null) c.text else c.textMuted)
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            NxButton(button, onClick, kind = ButtonKind.DANGER, size = ButtonSize.SM)
+            NxButton(button, onClick, kind = ButtonKind.DANGER, size = ButtonSize.SM, loading = loading)
+        }
+    }
+}
+
+/** A box of words in a dialog: red for what cannot be undone, amber to warn, green for good news. */
+@Composable
+fun NoticeBox(text: String, tone: Color, modifier: Modifier = Modifier, icon: String? = null) {
+    val c = Nx.colors
+    Row(
+        modifier
+            .fillMaxWidth()
+            .background(tone.copy(alpha = 0.12f), Radii.Sm)
+            .border(1.dp, tone.copy(alpha = 0.5f), Radii.Sm)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (icon != null) Icon(icon, tone, size = 18.dp)
+        Txt(text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20.3f)), color = c.text, modifier = Modifier.weight(1f))
+    }
+}
+
+/** A sunken box of monospace text (keys, codes), which can be selected and copied. */
+@Composable
+fun MonoBox(text: String, modifier: Modifier = Modifier, center: Boolean = false, size: Float = 15f) {
+    val c = Nx.colors
+    Box(
+        modifier
+            .fillMaxWidth()
+            .sunken(Radii.Md, c)
+            .border(1.dp, c.borderSubtle, Radii.Md)
+            .padding(16.dp),
+        contentAlignment = if (center) Alignment.Center else Alignment.CenterStart,
+    ) {
+        androidx.compose.foundation.text.selection.SelectionContainer {
+            Txt(
+                text,
+                style = Nx.type.code.copy(fontSize = Nx.type.sp(size), lineHeight = Nx.type.sp(size * 1.7f), letterSpacing = androidx.compose.ui.unit.TextUnit(0.04f, androidx.compose.ui.unit.TextUnitType.Em)),
+                color = c.textStrong,
+                align = if (center) androidx.compose.ui.text.style.TextAlign.Center else null,
+            )
+        }
+    }
+}
+
+/**
+ * A setting picked from a short list (the web's `<select>`): the label (and
+ * a line under it) with the chosen option at the end; a tap lists them all.
+ */
+@Composable
+fun <T> SelectRow(
+    label: String,
+    value: T,
+    options: List<Pair<String, T>>,
+    onPick: (T) -> Unit,
+    sub: String? = null,
+    anchor: String? = null,
+    divider: Boolean = true,
+) {
+    val c = Nx.colors
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val current = options.firstOrNull { it.second == value }?.first ?: ""
+    Column(Modifier.fillMaxWidth().settingAnchor(anchor)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(if (pressed) c.bgHover else Color.Transparent)
+                .pressable(interaction) {
+                    fish.nexa.ui.layers.openMenu(
+                        options.map { (name, v) -> fish.nexa.ui.layers.MenuItem.Action(name, checked = v == value) { onPick(v) } },
+                        title = label,
+                    )
+                }
+                .semantics { contentDescription = "$label, $current" }
+                .padding(vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Txt(label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), fontWeight = FontWeight(550)), color = c.text)
+                if (sub != null) Txt(sub, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), lineHeight = Nx.type.sp(18.9f)), color = c.textMuted)
+            }
+            Row(
+                Modifier
+                    .sunken(Radii.Sm, c)
+                    .ring(Radii.Sm, c.borderSubtle)
+                    .padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Txt(current, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(550)), color = c.text, maxLines = 1)
+                Icon("ChevronDown", c.textMuted, size = 16.dp)
+            }
+        }
+        if (divider) Box(Modifier.fillMaxWidth().size(1.dp).background(c.borderSubtle))
+    }
+}
+
+/**
+ * A dialog's sheet whose title, footer and closability follow its steps: a
+ * dialog that ends on a key or codes to save cannot be swiped or tapped away.
+ */
+class SheetCtl(title: String?) {
+    var title by mutableStateOf(title)
+    var closable by mutableStateOf(true)
+    var footer by mutableStateOf(true)
+    internal var closeFn: () -> Unit = {}
+
+    /** Closes it, even from a step that could not be dismissed. */
+    fun close() {
+        closable = true
+        closeFn()
+    }
+}
+
+fun openSettingsSheet(
+    key: String,
+    ctl: SheetCtl,
+    footer: (@Composable RowScope.(SheetCtl) -> Unit)? = null,
+    content: @Composable ColumnScope.(SheetCtl) -> Unit,
+) {
+    lateinit var layer: fish.nexa.ui.layers.Layer
+    layer = fish.nexa.ui.layers.Layer(key, canClose = { ctl.closable }) { close ->
+        ctl.closeFn = close
+        fish.nexa.ui.layers.Sheet(
+            layer,
+            title = ctl.title,
+            closeButton = ctl.closable,
+            footer = if (footer != null && ctl.footer) {
+                { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) { footer(ctl) } }
+            } else null,
+        ) { content(ctl) }
+    }
+    fish.nexa.ui.layers.Layers.open(layer)
+}
+
+/** Copies [text]; a key or codes are marked sensitive, so the keyboard's clipboard strip hides them. */
+fun copyText(context: android.content.Context, text: String, sensitive: Boolean = false): Boolean = try {
+    val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+    val clip = android.content.ClipData.newPlainText("Nexa", text)
+    if (sensitive) clip.description.extras = android.os.PersistableBundle().apply { putBoolean("android.content.extra.IS_SENSITIVE", true) }
+    cm.setPrimaryClip(clip)
+    true
+} catch (_: Exception) {
+    false
+}
+
+/** Saves text as a file the person picks a place for (the web's download). */
+@Composable
+fun rememberTextFileSaver(onDone: (Boolean) -> Unit = {}): (name: String, text: String) -> Unit {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val pending = remember { mutableStateOf<String?>(null) }
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        val text = pending.value
+        pending.value = null
+        if (uri != null && text != null) {
+            val ok = runCatching { ctx.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } != null }.getOrDefault(false)
+            onDone(ok)
+        }
+    }
+    return { name, text ->
+        pending.value = text
+        launcher.launch(name)
+    }
+}
+
+/** A QR code drawn black on white (for a phone camera to read), with what it holds as its description. */
+@Composable
+fun QrCode(text: String, size: Dp, label: String, modifier: Modifier = Modifier) {
+    val matrix = remember(text) {
+        runCatching {
+            com.google.zxing.qrcode.QRCodeWriter().encode(
+                text, com.google.zxing.BarcodeFormat.QR_CODE, 0, 0,
+                mapOf(com.google.zxing.EncodeHintType.MARGIN to 0, com.google.zxing.EncodeHintType.ERROR_CORRECTION to com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.M),
+            )
+        }.getOrNull()
+    }
+    Box(
+        modifier
+            .size(size)
+            .background(Color.White, Radii.Sm)
+            .padding(10.dp)
+            .semantics { contentDescription = label },
+    ) {
+        androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+            val m = matrix ?: return@Canvas
+            val cell = this.size.minDimension / m.width
+            for (y in 0 until m.height) for (x in 0 until m.width) {
+                if (m.get(x, y)) drawRect(
+                    Color.Black,
+                    androidx.compose.ui.geometry.Offset(kotlin.math.floor(x * cell), kotlin.math.floor(y * cell)),
+                    androidx.compose.ui.geometry.Size(kotlin.math.ceil(cell) + 0.5f, kotlin.math.ceil(cell) + 0.5f),
+                )
+            }
         }
     }
 }

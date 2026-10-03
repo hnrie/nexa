@@ -42,6 +42,16 @@ class MainActivity : ComponentActivity() {
             }
             return true
         }
+        // ... --es debug.open settings/appearance (or settings/profiles/typing): a settings page, for the same
+        val debugSettings = intent?.getStringExtra("debug.open")?.takeIf { BuildConfig.DEBUG && it.startsWith("settings") }
+        if (debugSettings != null) {
+            val parts = debugSettings.split("/")
+            lifecycleScope.launch {
+                Nexa.auth.state.first { it is fish.nexa.data.AuthState.Ready }
+                fish.nexa.ui.settings.Settings.open(parts.getOrNull(1), parts.getOrNull(2))
+            }
+            return true
+        }
         fish.nexa.ui.share.Share.from(intent)?.let { incoming ->
             val direct = fish.nexa.ui.share.Share.channelOf(intent)
             lifecycleScope.launch {
@@ -70,5 +80,18 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         Nexa.ui.setVisible(false)
+    }
+
+    // The app's own pickers, cameras and share sheets cover it without leaving
+    // it, so they do not count as leaving for the passcode's lock.
+    @Deprecated("Deprecated in Java")
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+        fish.nexa.data.LockTimers.picking = true
+        super.startActivityForResult(intent, requestCode, options)
+    }
+
+    override fun startActivity(intent: Intent, options: Bundle?) {
+        if (intent.action == Intent.ACTION_CHOOSER) fish.nexa.data.LockTimers.picking = true
+        super.startActivity(intent, options)
     }
 }

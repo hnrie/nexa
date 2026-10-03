@@ -9,6 +9,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import fish.nexa.Nexa
 import fish.nexa.data.AuthState
 import fish.nexa.ui.auth.AuthFlow
@@ -74,11 +77,29 @@ fun App() {
         reducedMotion = look.reducedMotion || Motion.systemOff(),
         rtl = I18n.rtl,
     ) {
-        Box(Modifier.fillMaxSize().background(Nx.colors.bgCanvas)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Nx.colors.bgCanvas)
+                // every touch and key holds off the passcode's idle lock (watched, never taken)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent(PointerEventPass.Initial)
+                            fish.nexa.data.LockTimers.activity()
+                        }
+                    }
+                }
+                .onPreviewKeyEvent {
+                    fish.nexa.data.LockTimers.activity()
+                    false
+                },
+        ) {
             when (val s = auth) {
                 AuthState.Loading -> Splash()
                 AuthState.Anonymous -> AuthFlow()
                 is AuthState.Locked -> LockScreen(s)
+                is AuthState.PinLocked -> fish.nexa.ui.auth.PasscodeScreen(s)
                 is AuthState.Offline -> OfflineScreen(s)
                 is AuthState.Ready -> MainShell()
             }

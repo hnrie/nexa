@@ -335,7 +335,7 @@ fun NxTextField(
                 cursorBrush = SolidColor(c.focusRing),
                 visualTransformation = if (password && !reveal) PasswordVisualTransformation() else VisualTransformation.None,
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = if (password) KeyboardType.Password else keyboardType,
+                    keyboardType = if (password && keyboardType != KeyboardType.NumberPassword) KeyboardType.Password else keyboardType,
                     imeAction = imeAction,
                     autoCorrectEnabled = autoCorrect,
                     capitalization = if (capitalize) androidx.compose.ui.text.input.KeyboardCapitalization.Sentences else androidx.compose.ui.text.input.KeyboardCapitalization.None,
