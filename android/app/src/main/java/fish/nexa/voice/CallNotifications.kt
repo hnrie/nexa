@@ -13,6 +13,7 @@ import android.graphics.Bitmap
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.util.Log
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.ContextCompat
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -42,7 +43,8 @@ internal object CallNotifications {
     const val CHANNEL_MISSED = "missed_calls"
     private const val TAG_RING = "ec-call-"
 
-    private val avatars = HashMap<String, Bitmap>()
+    private val avatars = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
+    private val looked = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     private fun manager(): NotificationManager = Nexa.app.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -76,16 +78,17 @@ internal object CallNotifications {
         return PendingIntent.getActivity(context, (action + channelId).hashCode(), i, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     }
 
-    private fun person(name: String, userId: String?): Person {
+    /** Someone as the call notifications show them: their picture, or their initial on their colour as the app draws it. */
+    private fun person(name: String, id: String?): Person {
         val b = Person.Builder().setName(name).setImportant(true)
-        val bmp = userId?.let { avatars[it] }
+        val bmp = id?.let { avatars[it] ?: letterAvatar(it, name) }
         if (bmp != null) b.setIcon(Icon.createWithBitmap(bmp))
         return b.build()
     }
 
     /** Fetches someone's avatar for the call notifications, once; null-safe and quick to give up. */
     private suspend fun loadAvatar(userId: String) {
-        if (avatars.containsKey(userId)) return
+        if (avatars.containsKey(userId) || !looked.add(userId)) return
         val id = Nexa.users.get(userId)?.avatarId ?: return
         val url = Media.avatarUrl(id, 96, 2f) ?: return
         val bmp = withTimeoutOrNull(3_000) {
@@ -93,6 +96,34 @@ internal object CallNotifications {
             ((res as? SuccessResult)?.image as? coil3.BitmapImage)?.bitmap
         } ?: return
         avatars[userId] = circle(bmp)
+    }
+
+    /** Avatar.tsx's fallback in a bitmap: the initial in Wix Madefor Display on the id's colour, lit from above. */
+    private fun letterAvatar(id: String, name: String): Bitmap {
+        val size = 96
+        val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(out)
+        val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        p.color = fish.nexa.ui.components.AvatarColor.of(id).toArgb()
+        c.drawCircle(size / 2f, size / 2f, size / 2f, p)
+        p.shader = android.graphics.LinearGradient(
+            0f, 0f, 0f, size.toFloat(),
+            intArrayOf(0x1AFFFFFF, 0x00FFFFFF, 0x00000000, 0x38000000),
+            floatArrayOf(0f, 0.12f, 0.7f, 1f),
+            android.graphics.Shader.TileMode.CLAMP,
+        )
+        c.drawCircle(size / 2f, size / 2f, size / 2f, p)
+        p.shader = null
+        p.color = android.graphics.Color.WHITE
+        p.textAlign = android.graphics.Paint.Align.CENTER
+        p.textSize = size * 0.42f
+        val face = runCatching { androidx.core.content.res.ResourcesCompat.getFont(Nexa.app, R.font.wix_madefor_display) }.getOrNull()
+        p.typeface = if (face != null && Build.VERSION.SDK_INT >= 28) android.graphics.Typeface.create(face, 660, false) else face
+        val text = fish.nexa.ui.components.AvatarColor.initials(name)
+        val bounds = android.graphics.Rect()
+        p.getTextBounds(text, 0, text.length, bounds)
+        c.drawText(text, size / 2f, size / 2f - bounds.exactCenterY(), p)
+        return out
     }
 
     private fun circle(src: Bitmap): Bitmap {
@@ -134,13 +165,25 @@ internal object CallNotifications {
         val st = Voice.state.value
         val ch = st.mine?.channelId ?: st.joining
         val place = placeOf(ch)
+        val channel = ch?.let { Nexa.channels.get(it) }
+        // a DM's call shows the other person; a group or a server shows the place
+        val other = channel?.takeIf { it.type == "dm" }?.recipientIds?.firstOrNull { it != Nexa.users.meId }
+        if (other != null && !avatars.containsKey(other) && other !in looked) {
+            Nexa.scope.launch(Dispatchers.IO) {
+                runCatching { loadAvatar(other) }
+                if (avatars.containsKey(other)) CallService.update()
+            }
+        }
         val muted = VoiceLocal.state.value.muted
         val hangUp = CallService.pending(context, CallActionReceiver.ACTION_LEAVE, ch)
         val mute = Notification.Action.Builder(
-            Icon.createWithResource(context, R.drawable.ic_call),
+            Icon.createWithResource(context, if (muted) R.drawable.ic_mic_off else R.drawable.ic_mic),
             if (muted) t("voice.voice.unmute") else t("voice.voice.mute"),
             CallService.pending(context, CallActionReceiver.ACTION_MUTE, ch),
         ).build()
+        // how long the call has run, once someone is in it with this device
+        val mine = st.mine
+        val since = if (mine != null && mine.joinedAt > 0 && st.calling != mine.channelId) mine.joinedAt else null
         val b = Notification.Builder(context, CHANNEL_CALLS)
             .setSmallIcon(R.drawable.ic_call)
             .setContentTitle(place)
@@ -150,8 +193,10 @@ internal object CallNotifications {
             .setCategory(Notification.CATEGORY_CALL)
             .setContentIntent(activity(context, CallActivity.ACTION_OPEN, ch))
             .setVisibility(Notification.VISIBILITY_PUBLIC)
+        if (since != null) b.setWhen(since).setShowWhen(true).setUsesChronometer(true)
         if (Build.VERSION.SDK_INT >= 31) {
-            b.setStyle(Notification.CallStyle.forOngoingCall(person(place.ifEmpty { "Nexa" }, null), hangUp))
+            val placeId = other ?: channel?.serverId ?: ch
+            b.setStyle(Notification.CallStyle.forOngoingCall(person(place.ifEmpty { "Nexa" }, placeId), hangUp))
             b.addAction(mute)
         } else {
             b.addAction(mute)
