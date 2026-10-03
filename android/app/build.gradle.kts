@@ -22,6 +22,8 @@ abstract class CopyWebAssets : DefaultTask() {
     @get:InputDirectory abstract val sounds: DirectoryProperty
     @get:InputDirectory abstract val sprites: DirectoryProperty
     @get:InputFile abstract val whatsNew: RegularFileProperty
+    @get:InputDirectory abstract val legalDocs: DirectoryProperty
+    @get:InputFile abstract val legalVersion: RegularFileProperty
     @get:OutputDirectory abstract val outputDir: DirectoryProperty
 
     @TaskAction
@@ -39,6 +41,9 @@ abstract class CopyWebAssets : DefaultTask() {
         // What's New is the web's own list, read by the app (ui/WhatsNew.kt), so a release is written once
         out.resolve("whatsnew").mkdirs()
         whatsNew.get().asFile.copyTo(out.resolve("whatsnew/whatsNew.ts"), overwrite = true)
+        // the Terms and Privacy Policy, and which version of them people agree to (lib/legal.ts)
+        copyDir(legalDocs.get().asFile, "legal") { it.name.endsWith(".txt") }
+        legalVersion.get().asFile.copyTo(out.resolve("legal/legal.ts"), overwrite = true)
     }
 }
 
@@ -47,6 +52,8 @@ val copyWebAssets = tasks.register<CopyWebAssets>("copyWebAssets") {
     sounds.set(rootProject.file("../web/public/sounds"))
     sprites.set(rootProject.file("../web/src/assets/twemoji-sprites"))
     whatsNew.set(rootProject.file("../web/src/lib/whatsNew.ts"))
+    legalDocs.set(rootProject.file("../docs/legal"))
+    legalVersion.set(rootProject.file("../web/src/lib/legal.ts"))
 }
 
 androidComponents {

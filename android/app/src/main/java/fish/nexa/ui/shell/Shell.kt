@@ -82,8 +82,11 @@ fun MainShell() {
         askNotify.launch(android.Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    // What's New, once per update, when nothing else is open
-    LaunchedEffect(Unit) { fish.nexa.ui.WhatsNew.maybeShow() }
+    // the Terms first (per device, as on the web), then What's New once per update, when nothing else is open
+    LaunchedEffect(Unit) {
+        fish.nexa.ui.legal.Legal.gateIfNeeded()
+        fish.nexa.ui.WhatsNew.maybeShow()
+    }
 
     // How far the drawer is open, 0..1; follows the finger during a swipe.
     val drawer = remember { Animatable(0f) }

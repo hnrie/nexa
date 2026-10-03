@@ -469,7 +469,13 @@ fun RegisterScreen(onLogin: () -> Unit) {
         }
         NxButton(t("settings.security.continue"), { submit() }, size = ButtonSize.LG, block = true, loading = busy, enabled = ready || busy)
         if (progress.isNotEmpty()) Note(progress, center = true)
-        Note(t("legal.gatePrivacy"))
+        // the agreement, with the two documents a tap away
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Note(t("legal.gatePrivacy"))
+            NxButton(t("legal.termsTitle"), { fish.nexa.ui.legal.Legal.openDocument("terms") }, kind = ButtonKind.LINK, inline = true)
+            Txt("·", style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = Nx.colors.textMuted)
+            NxButton(t("legal.privacyTitle"), { fish.nexa.ui.legal.Legal.openDocument("privacy") }, kind = ButtonKind.LINK, inline = true)
+        }
         Foot(null, t("register.alreadyHaveAnAccount"), onLogin)
     }
 }
