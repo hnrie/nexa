@@ -1,7 +1,6 @@
 package fish.nexa.voice
 
 import android.content.Context
-import android.icu.text.RelativeDateTimeFormatter
 import android.util.Log
 import fish.nexa.Nexa
 import fish.nexa.data.GatewayEvent
@@ -30,7 +29,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.util.concurrent.Executors
-import kotlin.math.abs
 
 /**
  * Calls as the rest of the app sees them (web/src/voice/session.ts): joining
@@ -535,21 +533,10 @@ object Calls {
 
     /** The sentence for an account mute in force, or null when there is none. */
     private fun mutedSentence(): String? {
-        val mute = (Nexa.misc.nexa.value as? JsonObject)?.get("mute") as? JsonObject ?: return null
-        val expires = (mute["expires_at"] as? JsonPrimitive)?.longOrNull
+        val mute = fish.nexa.data.NexaInbox.mute() ?: return null
+        val expires = mute.expiresAt
         val now = System.currentTimeMillis()
-        if (expires != null && expires <= now) return null
         if (expires == null) return t("nexa.muted.toastPermanent")
-        return t("nexa.muted.toast", "when" to relative(expires - now))
-    }
-
-    private fun relative(ms: Long): String {
-        val f = RelativeDateTimeFormatter.getInstance(I18n.locale)
-        val minutes = abs(ms) / 60_000
-        return when {
-            minutes < 60 -> f.format(maxOf(1, minutes).toDouble(), RelativeDateTimeFormatter.Direction.NEXT, RelativeDateTimeFormatter.RelativeUnit.MINUTES)
-            minutes < 48 * 60 -> f.format((minutes / 60).toDouble(), RelativeDateTimeFormatter.Direction.NEXT, RelativeDateTimeFormatter.RelativeUnit.HOURS)
-            else -> f.format((minutes / (24 * 60)).toDouble(), RelativeDateTimeFormatter.Direction.NEXT, RelativeDateTimeFormatter.RelativeUnit.DAYS)
-        }
+        return t("nexa.muted.toast", "when" to fish.nexa.ui.Time.relativeTo(expires, now))
     }
 }

@@ -297,8 +297,15 @@ class Session(private val nx: Nexa) {
                 v.user?.let { cu -> if (nx.users.get(cu.id) == null && cu.flags and 8L == 0L) ensureUsers(listOf(cu.id)) }
                 nx.voiceStates.apply(v)
             }
-            "nexa_state" -> nx.misc.nexa.value = d
-            "nexa_notice", "nexa_case", "nexa_bug" -> (d as? JsonObject)?.get("state")?.let { nx.misc.nexa.value = it }
+            "nexa_state" -> {
+                nx.misc.nexa.value = d
+                NexaInbox.onEvent(e.t, d)
+            }
+            "nexa_notice", "nexa_case", "nexa_bug" -> {
+                (d as? JsonObject)?.get("state")?.let { nx.misc.nexa.value = it }
+                NexaInbox.onEvent(e.t, d)
+            }
+            "nexa_announcement", "nexa_announcement_delete" -> NexaInbox.onEvent(e.t, d)
             "session_expired" -> onSignedOut?.invoke(d.str("reason") ?: "expired")
             "account_banned" -> onBanned?.invoke()
             else -> Unit // voice signalling, calls, notes and staff events are handled by the modules that listen to `events`
@@ -322,6 +329,7 @@ class Session(private val nx: Nexa) {
         judgeAll(d.users)
         nx.users.upsert(d.users + d.user.asPublic())
         nx.misc.nexa.value = d.nexa ?: d.user.nexa
+        NexaInbox.setState(d.nexa ?: d.user.nexa)
         nx.channels.replaceAll(d.channels + d.servers.flatMap { it.channels })
         nx.relationships.replaceAll(d.relationships)
         nx.readStates.replaceAll(d.readStates)

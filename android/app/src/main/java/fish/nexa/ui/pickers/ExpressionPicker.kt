@@ -501,8 +501,8 @@ private fun ToneButton(tone: Int) {
                         Box(
                             Modifier
                                 .size(32.dp)
+                                .then(if (on) Modifier.ring(Radii.Sm, c.brand, 2.dp).background(c.bgSelected, Radii.Sm) else Modifier)
                                 .clip(Radii.Sm)
-                                .then(if (on) Modifier.background(c.bgSelected).ring(Radii.Sm, c.brand, 2.dp) else Modifier)
                                 .pressable(remember { MutableInteractionSource() }) {
                                     Nexa.settings.patch(buildJsonObject { put("skinTone", i) })
                                     open = false

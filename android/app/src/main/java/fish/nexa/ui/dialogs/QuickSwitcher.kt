@@ -225,8 +225,8 @@ private fun PlaceRow(p: Place, active: Boolean) {
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
+            .then(if (active) Modifier.ring(Radii.Sm, c.brand.copy(alpha = 0.26f)).background(c.brand.copy(alpha = 0.18f), Radii.Sm) else Modifier.background(if (pressed) c.bgHover else Color.Transparent, Radii.Sm))
             .clip(Radii.Sm)
-            .then(if (active) Modifier.ring(Radii.Sm, c.brand.copy(alpha = 0.26f)).background(c.brand.copy(alpha = 0.18f), Radii.Sm) else Modifier.background(if (pressed) c.bgHover else Color.Transparent))
             .pressable(interaction, onClick = p.go)
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

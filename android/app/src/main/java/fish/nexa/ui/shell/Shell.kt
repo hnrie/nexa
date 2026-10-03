@@ -177,6 +177,9 @@ fun MainShell() {
                     is Route.Friends -> FriendsPage()
                     is Route.Server -> ServerPage(route)
                     is Route.Dm -> DmPage(route)
+                    is Route.NexaConvo -> fish.nexa.ui.nexa.NexaPage()
+                    is Route.NexaCase -> fish.nexa.ui.nexa.NexaCasePage(route.caseId)
+                    is Route.NexaBug -> fish.nexa.ui.nexa.NexaBugPage(route.reportId)
                     else -> PlaceholderPage(route)
                 }
             }
@@ -225,6 +228,8 @@ fun MainShell() {
             }
         }
         LayerHost()
+        // a notice from Nexa, over everything until it is dismissed
+        fish.nexa.ui.nexa.NoticePopupHost()
     }
 }
 

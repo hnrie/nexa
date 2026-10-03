@@ -113,8 +113,8 @@ fun openColourPicker(name: String, value: String, alpha: Boolean, onChange: (Str
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(1.6f)
-                .clip(Radii.Md)
                 .ring(Radii.Md, c.borderSubtle)
+                .clip(Radii.Md)
                 .semantics { contentDescription = t("android.look.shade") }
                 .pointerInput(Unit) {
                     fun at(p: Offset) {

@@ -107,8 +107,8 @@ fun ActivityCard(a: Activity) {
     Box(
         Modifier
             .fillMaxWidth()
-            .clip(shape)
             .ring(shape, c.borderSubtle)
+            .clip(shape)
             .background(c.bgSurface.copy(alpha = c.bgSurface.alpha * 0.72f), shape)
             .topEdge(shape, c.edgeLight),
     ) {

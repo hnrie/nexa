@@ -72,6 +72,13 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import fish.nexa.Nexa
+import fish.nexa.ui.nav.Route
+import fish.nexa.ui.nav.Nav
+import fish.nexa.ui.components.NxButton
+import fish.nexa.ui.components.ButtonSize
+import fish.nexa.ui.components.ButtonKind
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.runtime.mutableIntStateOf
 import fish.nexa.data.P
 import fish.nexa.data.Send
 import fish.nexa.data.SendOptions
@@ -210,8 +217,8 @@ fun ComposerSlot(channel: Channel) {
         if (selecting) SelectionBar(channel)
         else {
             TypingBar(channel)
-            val muted = Nexa.users.me.collectAsState().value?.let { NexaRestrictions.mutedUntil(it) }
-            if (muted != null) MutedBar(muted) else Composer(channel)
+            val mute = mutedNow()
+            if (mute != null) MutedBar(mute) else Composer(channel)
         }
     }
 }
@@ -1072,9 +1079,26 @@ private fun SelectionBar(channel: Channel) {
     }
 }
 
+/**
+ * The account's mute while it is in force (useMute): read again the moment it
+ * runs out, so the composer comes back by itself.
+ */
+@Composable
+fun mutedNow(): fish.nexa.data.Restriction? {
+    val standing by fish.nexa.data.NexaInbox.standing.collectAsState()
+    var tick by remember { mutableIntStateOf(0) }
+    val mute = standing?.mute?.takeIf { tick >= 0 && it.inForce() }
+    LaunchedEffect(mute?.expiresAt) {
+        val until = mute?.expiresAt ?: return@LaunchedEffect
+        kotlinx.coroutines.delay((until - System.currentTimeMillis() + 250).coerceAtLeast(0))
+        tick++
+    }
+    return mute
+}
+
 /** When moderators have muted the account (NexaNotices MutedBar), this stands where the composer was. */
 @Composable
-private fun MutedBar(until: Long) {
+private fun MutedBar(mute: fish.nexa.data.Restriction) {
     val c = Nx.colors
     val shape = Radii.Sm
     Row(
@@ -1083,7 +1107,9 @@ private fun MutedBar(until: Long) {
             .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
             .border(1.dp, c.warning.copy(alpha = 0.35f), shape)
             .background(mixSrgb(c.bgComposer, c.warning, 0.10f), shape)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite },
+        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon("MessageSquareOff", c.warning, size = 22.dp)
@@ -1096,22 +1122,13 @@ private fun MutedBar(until: Long) {
                 },
                 style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(19.6f), color = c.text),
             )
+            val until = mute.expiresAt
             Txt(
-                if (until == Long.MAX_VALUE) t("nexa.muted.untilLifted") else t("nexa.muted.until", "when" to Time.full(until), "rel" to Time.relative(until)),
-                style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, modifier = Modifier.padding(top = 4.dp),
+                if (until == null) t("nexa.muted.untilLifted") else t("nexa.muted.until", "when" to Time.full(until), "rel" to Time.relativeTo(until)),
+                style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted,
             )
         }
-    }
-}
-
-/** The account's moderation state, as the shell knows it. */
-object NexaRestrictions {
-    /** When the account's mute ends (Long.MAX_VALUE until lifted), or null when it can talk. */
-    fun mutedUntil(me: fish.nexa.net.MeUser): Long? {
-        val mute = (me.nexa as? kotlinx.serialization.json.JsonObject)?.get("mute") as? kotlinx.serialization.json.JsonObject ?: return null
-        val until = (mute["until"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull()
-        if (until != null && until <= System.currentTimeMillis()) return null
-        return until ?: Long.MAX_VALUE
+        NxButton(t("nexa.muted.details"), { Nav.go(Route.NexaCase(mute.caseId)) }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM)
     }
 }
 

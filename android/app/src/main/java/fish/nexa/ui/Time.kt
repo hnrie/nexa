@@ -77,6 +77,10 @@ object Time {
         return format(Kind.SHORT_DATE, ms)
     }
 
+    /** "in 3 days" or "3 days ago": a moment either side of now (lib/moderation.ts relativeTo, the `<t:R>` style). */
+    fun relativeTo(ms: Long, now: Long = System.currentTimeMillis()): String =
+        fish.nexa.ui.markdown.TimeFormat.formatStamp(ms, 'R', now, I18n.locale)
+
     /** "just now", "5 minutes ago", "2 hours ago", else the date. */
     fun relative(ms: Long, now: Long = System.currentTimeMillis()): String {
         val s = maxOf(0L, ((now - ms) / 1000.0).roundToLong())

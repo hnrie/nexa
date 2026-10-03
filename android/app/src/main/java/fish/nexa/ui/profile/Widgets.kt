@@ -417,7 +417,7 @@ private fun Favorite(w: Widgets.GameWidget) {
     val g = w.games.firstOrNull() ?: return
     val density = LocalDensity.current.density
     val glow = Widgets.gamePicture(g, 40, density)
-    Box(Modifier.fillMaxWidth().clip(Radii.Sm).background(p.chip.copy(alpha = p.chip.alpha * 0.7f)).ring(Radii.Sm, c.borderSubtle).topEdge(Radii.Sm, c.edgeLight)) {
+    Box(Modifier.fillMaxWidth().ring(Radii.Sm, c.borderSubtle).clip(Radii.Sm).background(p.chip.copy(alpha = p.chip.alpha * 0.7f)).topEdge(Radii.Sm, c.edgeLight)) {
         if (glow != null) AsyncImage(glow, null, Media.loader, Modifier.matchParentSize().graphicsLayer { alpha = if (c.isLight) 0.28f else 0.4f; scaleX = 1.8f; scaleY = 1.8f }.blur(32.dp), contentScale = ContentScale.Crop)
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             GameCover(g, 76, 76.dp)
@@ -654,7 +654,7 @@ private fun CardWidget(w: Widgets.CardWidget) {
     val c = Nx.colors
     val p = LocalProfile.current
     val density = LocalDensity.current.density
-    Column(Modifier.fillMaxWidth().clip(Radii.Sm).background(p.chip.copy(alpha = p.chip.alpha * 0.7f)).ring(Radii.Sm, c.borderSubtle).topEdge(Radii.Sm, c.edgeLight)) {
+    Column(Modifier.fillMaxWidth().ring(Radii.Sm, c.borderSubtle).clip(Radii.Sm).background(p.chip.copy(alpha = p.chip.alpha * 0.7f)).topEdge(Radii.Sm, c.edgeLight)) {
         if (w.image != null && w.shape != "square") AsyncImage(Media.widgetUrl(w.image, 520, density), null, Media.loader, Modifier.fillMaxWidth().aspectRatio(12f / 5f).background(c.bgActive), contentScale = ContentScale.Crop)
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -710,9 +710,9 @@ fun WidgetPeek(widgets: List<Widgets.Widget>, onOpen: (() -> Unit)?) {
         Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp)
+            .ring(Radii.Sm, c.borderSubtle)
             .clip(Radii.Sm)
             .background(if (pressed) p.chipHover else p.chip.copy(alpha = p.chip.alpha * 0.7f))
-            .ring(Radii.Sm, c.borderSubtle)
             .topEdge(Radii.Sm, c.edgeLight)
             .then(if (onOpen != null) Modifier.pressable(interaction, onClick = onOpen).semantics { contentDescription = t("profile.tabs.viewAllWidgets", "count" to widgets.size) } else Modifier)
             .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),

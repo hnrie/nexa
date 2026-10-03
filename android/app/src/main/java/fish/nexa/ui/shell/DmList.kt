@@ -1,5 +1,7 @@
 package fish.nexa.ui.shell
 
+import fish.nexa.data.NexaInbox
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -17,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,7 +41,6 @@ import fish.nexa.data.Ids
 import fish.nexa.net.Channel
 import fish.nexa.net.PublicUser
 import fish.nexa.ui.Icon
-import fish.nexa.ui.components.Avatar
 import fish.nexa.ui.components.CountBadge
 import fish.nexa.ui.components.IconButton
 import fish.nexa.ui.components.Pick
@@ -58,7 +58,6 @@ import fish.nexa.ui.profile.AccountFlags
 import fish.nexa.ui.profile.NexaOwner
 import fish.nexa.ui.profile.ProfileLinks
 import fish.nexa.ui.profile.StatusLine
-import fish.nexa.ui.profile.callWith
 import fish.nexa.ui.profile.confirmBlockPeople
 import fish.nexa.ui.profile.confirmRemoveFriends
 import fish.nexa.ui.profile.copyWithToast
@@ -70,35 +69,19 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 /** The official Nexa conversation's standing (MeUser.nexa): when it last said something, and what is unread. */
-object NexaInbox {
-    private fun state(): JsonObject? = Nexa.users.me.value?.nexa as? JsonObject
-    fun latest(): Long = (state()?.get("latest") as? JsonPrimitive)?.longOrNull ?: 0L
-    fun unread(): Int = ((state()?.get("unread") as? JsonPrimitive)?.longOrNull ?: 0L).toInt()
-    fun closedAt(): Long = (Nexa.settings.doc.value["nexaClosed"] as? JsonPrimitive)?.longOrNull ?: 0L
-    /** dmArrange nexaListed: listed once Nexa has said something, and after a close only once it says something new. */
-    fun listed(): Boolean = latest() > 0 && latest() > closedAt()
-
-    fun markSeen() {
-        Nexa.scope.launch { runCatching { Nexa.api.request("POST", "/nexa/seen", buildJsonObject {}) } }
-        val me = Nexa.users.me.value ?: return
-        val st = state() ?: return
-        Nexa.users.setMe(me.copy(nexa = JsonObject(st + ("unread" to JsonPrimitive(0)))))
-    }
-
-    fun close() {
-        if (Nav.route is Route.NexaConvo) Nav.go(Route.Friends, replace = true)
-        markSeen()
-        val l = DmArrange.current()
-        val next = DmLayout.forget(l, DmLayout.NEXA_ID)
-        Nexa.settings.patch(buildJsonObject {
-            put("nexaClosed", latest().takeIf { it > 0 } ?: System.currentTimeMillis())
-            if (next !== l) put("dmList", DmLayout.toJson(next))
-        })
-    }
+/** closeNexa (DMSidebar.tsx): read it, and take it off the list until it says something new. */
+fun closeNexa() {
+    if (Nav.route.let { it is Route.NexaConvo || it is Route.NexaCase || it is Route.NexaBug }) Nav.go(Route.Friends, replace = true)
+    NexaInbox.markSeen()
+    val l = DmArrange.current()
+    val next = DmLayout.forget(l, DmLayout.NEXA_ID)
+    Nexa.settings.patch(buildJsonObject {
+        put("nexaClosed", NexaInbox.latest().takeIf { it > 0 } ?: System.currentTimeMillis())
+        if (next !== l) put("dmList", DmLayout.toJson(next))
+    })
 }
 
 /** components/sidebar/dmArrange.ts and dmMenu.ts: changing the arrangement, and the rows' menus. */
@@ -280,7 +263,7 @@ private fun nexaMenu(moves: List<MenuItem.Action>, select: Boolean): List<MenuIt
     add(MenuItem.Action(t("sidebar.dmMenu.markAsRead"), disabled = NexaInbox.unread() == 0, separatorAfter = !select) { NexaInbox.markSeen() })
     if (select) add(MenuItem.Action(t("pick.select"), separatorAfter = true) { Pick.start("dms", DmLayout.NEXA_ID) })
     addAll(DmArrange.arrangeItems(DmLayout.NEXA_ID, moves))
-    add(MenuItem.Action(t("sidebar.dMSidebar.closeDm")) { NexaInbox.close() })
+    add(MenuItem.Action(t("sidebar.dMSidebar.closeDm")) { closeNexa() })
 }
 
 private fun groupMenu(g: DmLayout.Group, unread: Boolean, pinned: Boolean, moves: List<MenuItem.Action>): List<MenuItem> {
@@ -326,7 +309,7 @@ private object DmBulk {
         val groups = ids.count { Nexa.channels.get(it)?.type == "group_dm" }
         val run: suspend () -> Unit = {
             Pick.clear()
-            for (id in ids) if (id == DmLayout.NEXA_ID) NexaInbox.close() else closeDm(id)
+            for (id in ids) if (id == DmLayout.NEXA_ID) closeNexa() else closeDm(id)
         }
         if (groups == 0) Nexa.scope.launch { run() }
         else confirm(t("pick.closeTitle", "count" to ids.size), t("pick.closeBody", "count" to groups), t("pick.closeConfirm")) { run() }

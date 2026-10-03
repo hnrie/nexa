@@ -158,8 +158,8 @@ private fun Chip(label: String, on: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
             .heightIn(min = 36.dp)
-            .clip(Radii.Pill)
             .then(if (on) Modifier.background(c.brand, Radii.Pill) else Modifier.ring(Radii.Pill, c.border).background(c.bgSurface, Radii.Pill))
+            .clip(Radii.Pill)
             .pressable(remember { MutableInteractionSource() }, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,

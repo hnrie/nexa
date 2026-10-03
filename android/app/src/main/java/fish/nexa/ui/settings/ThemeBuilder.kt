@@ -420,8 +420,8 @@ private fun ColourField(
             Box(
                 Modifier
                     .size(44.dp)
-                    .clip(Radii.Sm)
                     .ring(Radii.Sm, c.borderStrong)
+                    .clip(Radii.Sm)
                     .pressable(remember { MutableInteractionSource() }) { openColourPicker(label, value, alpha, onChange) }
                     .semantics { contentDescription = t("settings.themeBuilder.pick", "name" to label) },
             ) {

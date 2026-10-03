@@ -14,6 +14,10 @@ sealed interface Route {
     data class Dm(val channelId: String, val jumpTo: String? = null) : Route
     /** `/channels/@me/nexa`: the official Nexa conversation. */
     data object NexaConvo : Route
+    /** `/channels/@me/nexa/cases/<id>`: a moderation case's thread. */
+    data class NexaCase(val caseId: String) : Route
+    /** `/channels/@me/nexa/bugs/<id>`: a bug report's thread. */
+    data class NexaBug(val reportId: String) : Route
     /** `/channels/@me/notes[/<id>]`. */
     data class Notes(val noteId: String? = null) : Route
     /** `/channels/<server>/<channel>`. */
@@ -21,13 +25,15 @@ sealed interface Route {
     /** `/channels/@admin`: staff only. */
     data object Admin : Route
 
-    val isHome get() = this is Friends || this is Dm || this is NexaConvo || this is Notes
+    val isHome get() = this is Friends || this is Dm || this is NexaConvo || this is NexaCase || this is NexaBug || this is Notes
 
     /** The web address for this place (without a message to jump to). */
     fun toPath(): String = when (this) {
         Friends -> "/channels/@me"
         is Dm -> "/channels/@me/$channelId"
         NexaConvo -> "/channels/@me/nexa"
+        is NexaCase -> "/channels/@me/nexa/cases/$caseId"
+        is NexaBug -> "/channels/@me/nexa/bugs/$reportId"
         is Notes -> if (noteId != null) "/channels/@me/notes/$noteId" else "/channels/@me/notes"
         is Server -> if (channelId != null) "/channels/$serverId/$channelId" else "/channels/$serverId"
         Admin -> "/channels/@admin"
@@ -86,7 +92,11 @@ object Nav {
             "@me" -> when {
                 parts.size == 2 -> Route.Friends
                 parts[2] == "notes" -> Route.Notes(parts.getOrNull(3)?.takeIf { id.matches(it) })
-                parts[2] == "nexa" -> Route.NexaConvo
+                parts[2] == "nexa" -> when {
+                    parts.getOrNull(3) == "cases" && parts.getOrNull(4)?.let { id.matches(it) } == true -> Route.NexaCase(parts[4])
+                    parts.getOrNull(3) == "bugs" && parts.getOrNull(4)?.let { id.matches(it) } == true -> Route.NexaBug(parts[4])
+                    else -> Route.NexaConvo
+                }
                 id.matches(parts[2]) -> Route.Dm(parts[2], parts.getOrNull(3)?.takeIf { id.matches(it) })
                 else -> return false
             }

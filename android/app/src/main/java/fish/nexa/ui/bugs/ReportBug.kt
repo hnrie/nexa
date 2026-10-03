@@ -73,10 +73,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
-import okhttp3.MediaType
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.RequestBody
-import okio.BufferedSink
 
 /** Where the dialog was opened from, which the report can say (lib/bugs.ts BugFrom). */
 private val FROM = setOf("dm", "group", "friends", "settings", "nexa")
@@ -146,51 +142,53 @@ private fun deviceContext(from: String): Map<String, String> {
     return out.filterValues { it.isNotEmpty() }
 }
 
+/** A sent report's device details, in reading order and put into words (BugFacts). */
+fun factRows(c: JsonObject): List<Pair<String, String>> = contextRows(c.mapNotNull { (k, v) -> (v as? JsonPrimitive)?.contentOrNull?.let { k to it } }.toMap())
+
 /** A report's context in reading order, put into words (lib/bugs.ts contextRows). */
 private fun contextRows(c: Map<String, String>): List<Pair<String, String>> {
-    val order = listOf("app", "app_version", "build", "os", "device", "screen", "window", "language", "theme", "opened_from")
+    val order = listOf("app", "app_version", "build", "server", "browser", "os", "device", "screen", "window", "language", "theme", "custom_css", "plugins", "opened_from")
     return order.mapNotNull { key ->
-        val v = c[key] ?: return@mapNotNull null
+        val v = c[key]?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
         val label = when (key) {
             "app" -> t("bugs.context.app")
             "app_version" -> t("bugs.context.appVersion")
             "build" -> t("bugs.context.build")
+            "server" -> t("bugs.context.server")
+            "browser" -> t("bugs.context.browser")
             "os" -> t("bugs.context.system")
             "device" -> t("bugs.context.device")
             "screen" -> t("bugs.context.screen")
             "window" -> t("bugs.context.window")
             "language" -> t("bugs.context.language")
             "theme" -> t("bugs.context.theme")
+            "custom_css" -> t("bugs.context.customCss")
+            "plugins" -> t("bugs.context.plugins")
             else -> t("bugs.context.openedFrom")
         }
         val value = when (key) {
-            "app" -> if (v == "android") t("bugs.context.appAndroid") else v
-            "device" -> if (v == "phone") t("bugs.context.phone") else if (v == "tablet") t("bugs.context.tablet") else v
+            "app" -> when (v) {
+                "desktop" -> t("bugs.context.appDesktop")
+                "web" -> t("bugs.context.appWeb")
+                "android" -> t("bugs.context.appAndroid")
+                else -> v
+            }
+            "device" -> when (v) {
+                "phone" -> t("bugs.context.phone")
+                "tablet" -> t("bugs.context.tablet")
+                "computer" -> t("bugs.context.computer")
+                else -> v
+            }
+            "custom_css" -> when (v) {
+                "on" -> t("bugs.context.on")
+                "off" -> t("bugs.context.off")
+                else -> v
+            }
             "theme" -> if (v == "custom") t("bugs.context.customTheme") else v
-            "opened_from" -> t("bugs.from.$v")
+            "opened_from" -> if (v in FROM) t("bugs.from.$v") else v
             else -> v
         }
         label to value
-    }
-}
-
-/** Sends a file's bytes from the phone's storage as they are read, counting them as they go. */
-private class StreamBody(private val uri: Uri, private val type: MediaType?, private val size: Long, private val onProgress: (Float) -> Unit) : RequestBody() {
-    override fun contentType(): MediaType? = type
-    override fun contentLength(): Long = size
-
-    override fun writeTo(sink: BufferedSink) {
-        Nexa.app.contentResolver.openInputStream(uri)?.use { input ->
-            val buf = ByteArray(64 * 1024)
-            var sent = 0L
-            while (true) {
-                val n = input.read(buf)
-                if (n < 0) break
-                sink.write(buf, 0, n)
-                sent += n
-                if (size > 0) onProgress((sent.toFloat() / size).coerceAtMost(1f))
-            }
-        } ?: throw java.io.IOException("unreadable")
     }
 }
 
@@ -238,7 +236,7 @@ private fun ReportBugSheet(layer: Layer, from: String, close: () -> Unit) {
         p.job = scope.launch {
             try {
                 val name = java.net.URLEncoder.encode(p.name.take(120), "UTF-8")
-                val body = StreamBody(p.uri, p.type.toMediaTypeOrNull(), p.size) { f -> p.progress = f }
+                val body = fish.nexa.net.UriBody(p.uri, p.type, p.size) { f -> p.progress = f }
                 val req = Nexa.api.requestBuilder("/bugs/attachments?name=$name").post(body).header("Content-Type", p.type).build()
                 val res = withContext(kotlinx.coroutines.Dispatchers.IO) { Nexa.api.execute(Nexa.api.http, req, true) } as? JsonObject
                 p.id = (res?.get("id") as? JsonPrimitive)?.contentOrNull

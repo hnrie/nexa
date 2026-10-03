@@ -2,9 +2,16 @@ package fish.nexa.ui.theme
 
 import androidx.compose.foundation.background
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.innerShadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.shadow.Shadow
@@ -28,8 +35,20 @@ fun Modifier.boxShadow(shape: Shape, y: Float, blur: Float, color: Color, spread
 /** `inset 0 1px 0 color`: the lit top edge. */
 fun Modifier.topEdge(shape: Shape, color: Color): Modifier = innerShadow(shape, Shadow(radius = 0.dp, color = color, offset = DpOffset(0.dp, 1.dp)))
 
-/** `0 0 0 1px color`: a hairline ring outside the shape. */
-fun Modifier.ring(shape: Shape, color: Color, width: Dp = 1.dp): Modifier = dropShadow(shape, Shadow(radius = 0.dp, color = color, spread = width))
+/**
+ * `0 0 0 1px color`: a hairline ring outside the shape. Like a CSS box-shadow
+ * it never draws inside the shape, so it can sit anywhere in a modifier chain
+ * without painting over the background it surrounds.
+ */
+fun Modifier.ring(shape: Shape, color: Color, width: Dp = 1.dp): Modifier = drawWithCache {
+    val w = width.toPx()
+    val inner = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
+    val outer = Path().apply {
+        addOutline(shape.createOutline(Size(size.width + 2 * w, size.height + 2 * w), layoutDirection, this@drawWithCache))
+        translate(Offset(-w, -w))
+    }
+    onDrawBehind { clipPath(inner, ClipOp.Difference) { drawPath(outer, color) } }
+}
 
 fun Modifier.shadowLow(shape: Shape, c: NexaColors) = shadowLayer(shape, 1f, 2f, 0f, c.shadeAt(0.55f))
 

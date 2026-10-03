@@ -571,9 +571,9 @@ private fun SoundRow(
             Box(
                 Modifier
                     .size(40.dp)
+                    .ring(CircleShape, c.borderSubtle)
                     .clip(CircleShape)
                     .sunken(CircleShape, c)
-                    .ring(CircleShape, c.borderSubtle)
                     .pressable(remember { MutableInteractionSource() }) { SoundPreview.preview(id, packId) }
                     .semantics { contentDescription = t("settings.sounds.playSound", "name" to name) },
                 contentAlignment = Alignment.Center,

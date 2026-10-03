@@ -161,8 +161,10 @@ fun App() {
                 is AuthState.Locked -> LockScreen(s)
                 is AuthState.PinLocked -> fish.nexa.ui.auth.PasscodeScreen(s)
                 is AuthState.Offline -> OfflineScreen(s)
-                is AuthState.Ready -> MainShell()
+                // while banned, the ban screen stands in place of the whole app
+                is AuthState.Ready -> if (banned()) fish.nexa.ui.nexa.BanScreen() else MainShell()
             }
+            fish.nexa.ui.nexa.DeletedNoticeHost()
             CaptchaHost.Sheet()
             ToastHost()
         }
@@ -193,4 +195,11 @@ object Themes {
         Nexa.settings.lookUnderlines = resolved.underlineLinks
         return Looks.colors(resolved, look.accent)
     }
+}
+
+/** useBan: whether a ban is in force, read again whenever the standing changes. */
+@Composable
+private fun banned(): Boolean {
+    val standing by fish.nexa.data.NexaInbox.standing.collectAsState()
+    return standing?.ban?.inForce() == true
 }

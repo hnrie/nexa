@@ -604,9 +604,9 @@ private fun NoteSection(userId: String, focus: Boolean, onDone: () -> Unit) {
                         onDone()
                     }
                 }
+                .then(if (focused) Modifier.ring(RoundedCornerShape(8.dp), c.focusRing.copy(alpha = 0.6f)) else Modifier)
                 .clip(RoundedCornerShape(8.dp))
                 .background(if (focused) c.bgInput else Color.Transparent)
-                .then(if (focused) Modifier.ring(RoundedCornerShape(8.dp), c.focusRing.copy(alpha = 0.6f)) else Modifier)
                 .heightIn(min = 36.dp)
                 .padding(horizontal = 8.dp, vertical = 8.dp)
                 .semantics { contentDescription = t("profile.profileCard.note") },

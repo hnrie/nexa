@@ -179,6 +179,7 @@ class Auth(private val nx: Nexa) {
     private fun begin(me: MeUser, identity: Identity) {
         nx.users.setMe(me)
         nx.misc.nexa.value = me.nexa
+        NexaInbox.setState(me.nexa)
         nx.keys.init(me.id, identity, persist = !AppLock.has(me.id))
         nx.settings.key = Kdf.settingsKey(identity.privateKey)
         _state.value = AuthState.Ready(me)
@@ -393,6 +394,8 @@ class Auth(private val nx: Nexa) {
         pendingPolicy = null
         nx.keys.reset()
         nx.users.setMe(null)
+        NexaInbox.reset()
+        PrivateFiles.clear()
     }
 
     fun retryOffline() = nx.scope.launch { bootstrap() }
