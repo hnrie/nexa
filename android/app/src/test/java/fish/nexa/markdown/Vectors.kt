@@ -46,6 +46,28 @@ object Vectors {
     /** The English catalogue, as the web's `t()` reads it with no values. */
     val tr: (String) -> String = { key -> english[key] ?: key }
 
+    private val englishRaw: JsonObject by lazy { Json.parseToJsonElement(File(root, "../../web/src/i18n/locales/en.json").readText()) as JsonObject }
+
+    /** The web's `t(key, values)` in English: plural forms by count, {name} filled, numbers as Intl writes them. */
+    val trValues: (String, Map<String, Any>) -> String = { key, values ->
+        val raw = englishRaw[key]
+        val template = when (raw) {
+            is JsonPrimitive -> raw.content
+            is JsonObject -> {
+                val count = (values["count"] as? Number)?.toDouble() ?: 0.0
+                ((if (count == 1.0) raw["one"] else null) ?: raw["other"])!!.let { (it as JsonPrimitive).content }
+            }
+            else -> key
+        }
+        Regex("\\{(\\w+)\\}").replace(template) { m ->
+            when (val v = values[m.groupValues[1]]) {
+                null -> m.value
+                is Number -> java.text.NumberFormat.getInstance(java.util.Locale.ENGLISH).format(v)
+                else -> v.toString()
+            }
+        }
+    }
+
     fun useAssets() {
         val assets = File(root, "src/main/assets/emoji")
         EmojiAssets.use({ FileInputStream(File(assets, "shortcodes.json")) }, { FileInputStream(File(assets, "emoji.json")) })
