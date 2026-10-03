@@ -307,7 +307,7 @@ private fun VoiceParticipantRow(serverId: String, v: fish.nexa.net.VoiceState) {
             .fillMaxWidth()
             .height(32.dp)
             .background(if (pressed) c.bgHover else Color.Transparent, Radii.Sm)
-            .pressable(interaction) { if (!guest) openProfile(v.userId) }
+            .pressable(interaction, onLongClick = { v.channelId?.let { ch -> openMenu(fish.nexa.ui.voice.voicePersonMenu(v.userId, ch), title = name) } }) { if (!guest) openProfile(v.userId) }
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),

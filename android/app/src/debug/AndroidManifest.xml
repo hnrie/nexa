@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: the hooks the call tests drive through adb. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <receiver
+            android:name="fish.nexa.voice.CallTestHooks"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="fish.nexa.debug.CALL" />
+                <action android:name="fish.nexa.debug.LEAVE" />
+                <action android:name="fish.nexa.debug.TONE" />
+                <action android:name="fish.nexa.debug.CAMERA" />
+                <action android:name="fish.nexa.debug.WATCH" />
+                <action android:name="fish.nexa.debug.STATS" />
+                <action android:name="fish.nexa.debug.SEAL" />
+                <action android:name="fish.nexa.debug.WRONGKEY" />
+                <action android:name="fish.nexa.debug.RTP" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

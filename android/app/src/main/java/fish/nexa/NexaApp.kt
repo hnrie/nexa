@@ -39,6 +39,9 @@ class NexaApp : Application() {
                 }
             }
         }
+        // calls: rings, the mute buttons and the voice events, from the start
+        fish.nexa.voice.Calls.install(this)
+        fish.nexa.voice.Pip.install(this)
         Nexa.scope.launch { Nexa.auth.bootstrap() }
         watchNetwork()
     }

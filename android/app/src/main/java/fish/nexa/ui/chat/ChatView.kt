@@ -91,16 +91,20 @@ fun ChatView(channelId: String) {
     Column(Modifier.fillMaxSize()) {
         ChatHeader(channel)
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            Column(Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
-                if (channel.locked && !unlocked) LockedSubchat(channel, lockFailed, onRecheck = { recheck += 1 }) {
-                    // a message that came in while it was shut left the list thinking it could not load
-                    Nexa.messages.clearChannel(channelId)
-                    unlocked = true
-                } else {
-                    MessageList(channel, Modifier.weight(1f))
-                    ComposerSlot(channel)
+            val conversation = @Composable {
+                Column(Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
+                    if (channel.locked && !unlocked) LockedSubchat(channel, lockFailed, onRecheck = { recheck += 1 }) {
+                        // a message that came in while it was shut left the list thinking it could not load
+                        Nexa.messages.clearChannel(channelId)
+                        unlocked = true
+                    } else {
+                        MessageList(channel, Modifier.weight(1f))
+                        ComposerSlot(channel)
+                    }
                 }
             }
+            // a DM's or group's call sits above its messages (its banner while others are in it)
+            if (channel.serverId == null) fish.nexa.ui.voice.CallArea(callChannelOf(channel)) { conversation() } else conversation()
             ChatPanels(channel)
         }
     }

@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -427,12 +428,13 @@ private fun MenuRow(item: MenuItem.Action, back: Boolean = false, chevron: Boole
         if (chevron) Icon(if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) "ChevronLeft" else "ChevronRight", c.textMuted, size = 16.dp)
         item.checked?.let { on ->
             if (item.toggle) {
+                // a border, not ring(): ring is a shadow of the whole shape, and behind an empty box it reads as filled
                 Box(
-                    Modifier.size(16.dp).then(if (on) Modifier.background(c.brand, RoundedCornerShape(4.dp)) else Modifier.ring(RoundedCornerShape(4.dp), color, 2.dp)),
+                    Modifier.size(16.dp).then(if (on) Modifier.background(c.brand, RoundedCornerShape(4.dp)) else Modifier.border(2.dp, color, RoundedCornerShape(4.dp))),
                     contentAlignment = Alignment.Center,
                 ) { if (on) Icon("Check", Color.White, size = 12.dp, stroke = 3.5f) }
             } else {
-                Box(Modifier.size(14.dp).alpha(if (on) 1f else 0.7f).ring(CircleShape, color, 2.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(14.dp).alpha(if (on) 1f else 0.7f).border(2.dp, color, CircleShape), contentAlignment = Alignment.Center) {
                     if (on) Box(Modifier.size(6.dp).background(color, CircleShape))
                 }
             }
