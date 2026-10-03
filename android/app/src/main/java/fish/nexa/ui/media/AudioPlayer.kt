@@ -295,7 +295,7 @@ fun AudioPlayer(source: Uri, name: String, fileSize: Long?, durationHint: Double
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     shape.forEachIndexed { i, h ->
-                        val on = (i + 0.5f) / shape.size <= played
+                        val on = i.toFloat() / shape.size <= played
                         Box(Modifier.weight(1f).fillMaxHeight(h).clip(RoundedCornerShape(1.dp)).background(if (on) c.brand else c.bgActive))
                     }
                 }

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,10 +35,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import fish.nexa.Nexa
@@ -81,6 +82,13 @@ private fun ownHosts(): Set<String> = listOfNotNull(
     runCatching { URI(Nexa.api.baseUrl).authority?.lowercase() }.getOrNull(),
     runCatching { URI(Nexa.auth.instance.value?.publicUrl ?: "").authority?.lowercase() }.getOrNull(),
 ).filter { it.isNotEmpty() }.toSet()
+
+/** Pulls this up over what sits above it by [by], as a negative top margin does on the web. */
+private fun Modifier.overlapAbove(by: Dp): Modifier = layout { measurable, constraints ->
+    val p = measurable.measure(constraints)
+    val shift = by.roundToPx()
+    layout(p.width, maxOf(0, p.height - shift)) { p.placeRelative(0, -shift) }
+}
 
 private val INVITE_PATH = Regex("^/invite/([A-Za-z0-9_-]{1,64})/?$")
 private val PROFILE_PATH = Regex("^/@([A-Za-z0-9_.]{2,32})/?$")
@@ -214,15 +222,15 @@ fun InviteCardView(target: InviteTarget, lead: (@Composable () -> Unit)?, action
         } else {
             Box(Modifier.fillMaxWidth().height(44.dp).background(if (target.id != null && target.iconId == null) AvatarColor.of(target.id) else c.bgActive))
         }
-        // the icon, ringed in the card's own colour so it reads as set into the band
-        Box(Modifier.padding(start = 12.dp).offset(y = (-32).dp).background(surface, RoundedCornerShape(22.dp)).padding(4.dp)) {
+        // the icon, ringed in the card's own colour so it reads as set into the band, half over its edge
+        Box(Modifier.padding(start = 12.dp).overlapAbove(32.dp).background(surface, RoundedCornerShape(22.dp)).padding(4.dp)) {
             if (target.iconId != null) AsyncImage(Media.iconUrl(target.iconId, 56, density), null, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.size(56.dp).clip(RoundedCornerShape(17.dp)))
             else Box(
                 Modifier.size(56.dp).clip(RoundedCornerShape(17.dp)).background(target.id?.let { AvatarColor.of(it) } ?: c.bgActive),
                 contentAlignment = Alignment.Center,
             ) { Txt(AvatarColor.initials(target.name), style = Nx.type.body.copy(fontSize = Nx.type.sp(20f), fontWeight = FontWeight(700)), color = if (target.id != null) Color.White else c.textStrong) }
         }
-        Column(Modifier.offset(y = (-24).dp).padding(horizontal = 16.dp).padding(bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     lead?.invoke()
@@ -286,10 +294,10 @@ private fun InviteSkeleton() {
             .semantics { contentDescription = t("invite.loading") },
     ) {
         Box(Modifier.fillMaxWidth().height(44.dp).background(c.bgActive))
-        Box(Modifier.padding(start = 12.dp).offset(y = (-32).dp).background(c.embedBg, RoundedCornerShape(22.dp)).padding(4.dp)) {
+        Box(Modifier.padding(start = 12.dp).overlapAbove(32.dp).background(c.embedBg, RoundedCornerShape(22.dp)).padding(4.dp)) {
             Box(Modifier.size(56.dp).background(c.bgActive, RoundedCornerShape(17.dp)))
         }
-        Column(Modifier.offset(y = (-20).dp).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.fillMaxWidth(0.55f).height(16.dp).background(c.bgActive, RoundedCornerShape(6.dp)))
             Box(Modifier.fillMaxWidth(0.4f).height(12.dp).background(c.bgActive, RoundedCornerShape(6.dp)))
         }
@@ -390,13 +398,15 @@ private fun ProfileLinkCardView(user: PublicUser) {
             .pressable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) { openProfile(user.id) }
             .semantics { contentDescription = user.name },
     ) {
-        Box(Modifier.fillMaxWidth().aspectRatio(17f / 6f).background(user.accentColor?.let { fish.nexa.ui.theme.rgbColor(it) } ?: c.bgActive)) {
+        // a profile with no colour of its own takes its avatar's (profileTheme in lib/avatarColor.ts)
+        Box(Modifier.fillMaxWidth().aspectRatio(17f / 6f).background(user.accentColor?.let { fish.nexa.ui.theme.rgbColor(it) } ?: AvatarColor.of(user.id))) {
             if (user.bannerId != null) AsyncImage(Media.bannerUrl(user.bannerId, 320, density), null, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
-        Box(Modifier.padding(start = 9.dp).offset(y = (-50).dp).background(c.bgFloating, CircleShape).padding(5.dp)) {
-            Avatar(user.id, user.name, user.avatarId, 80.dp)
+        val presences by Nexa.presence.byId.collectAsState()
+        Box(Modifier.padding(start = 9.dp).overlapAbove(50.dp).background(c.bgFloating, CircleShape).padding(5.dp)) {
+            Avatar(user.id, user.name, user.avatarId, 80.dp, status = presences[user.id]?.status ?: "offline")
         }
-        Column(Modifier.offset(y = (-40).dp).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Txt(user.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(20f), fontWeight = FontWeight(700)), color = c.textStrong, maxLines = 1)
             Txt(user.username, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textSubtle, maxLines = 1)
             if (user.aboutMe.isNotBlank()) Txt(user.aboutMe, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text, maxLines = 3, modifier = Modifier.padding(top = 8.dp))
@@ -414,10 +424,10 @@ private fun ProfileSkeleton() {
             .semantics { contentDescription = t("profileLink.loading") },
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(17f / 6f).background(c.bgActive))
-        Box(Modifier.padding(start = 9.dp).offset(y = (-50).dp).background(c.bgFloating, CircleShape).padding(5.dp)) {
+        Box(Modifier.padding(start = 9.dp).overlapAbove(50.dp).background(c.bgFloating, CircleShape).padding(5.dp)) {
             Box(Modifier.size(80.dp).background(c.bgActive, CircleShape))
         }
-        Column(Modifier.offset(y = (-36).dp).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.fillMaxWidth(0.46f).height(16.dp).background(c.bgActive, RoundedCornerShape(6.dp)))
             Box(Modifier.fillMaxWidth(0.3f).height(12.dp).background(c.bgActive, RoundedCornerShape(6.dp)))
         }
