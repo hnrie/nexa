@@ -15,5 +15,8 @@ class NexaApp : Application() {
         fish.nexa.media.Media.init(this)
         fish.nexa.media.Twemoji.init(this)
         Nexa.auth.captcha = CaptchaHost
+        // calls: rings, the mute buttons and the voice events, from the start
+        fish.nexa.voice.Calls.install(this)
+        fish.nexa.voice.Pip.install(this)
     }
 }
