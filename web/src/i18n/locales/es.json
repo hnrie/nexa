@@ -5018,6 +5018,8 @@
   "android.notify.channelServers": "Mensajes de servidores",
   "android.notify.connectedBody": "Los mensajes nuevos te llegan al instante. Mantén pulsado para ocultar esto.",
   "android.notify.connectedTitle": "Sigue conectado",
+  "android.share.nothing": "Todavía no hay conversaciones a las que enviar.",
+  "android.share.title": "Enviar a",
   "keybinds.changeKeybinds": "Cambia tus teclas rápidas",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} está parloteando…",

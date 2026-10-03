@@ -19,4 +19,5 @@ object Dialogs {
     fun quickSwitcher() = pending("Find or Start a Conversation")
     fun createDm() = pending("Select Friends")
     fun customStatus() = pending("Set a Custom Status")
+    fun openInvite(code: String) = pending("Invite")
 }

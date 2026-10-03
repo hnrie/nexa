@@ -4754,6 +4754,8 @@
   "android.notify.channelServers": "服务器消息",
   "android.notify.connectedBody": "新消息会立即送达。长按可隐藏此通知。",
   "android.notify.connectedTitle": "保持连接",
+  "android.share.nothing": "还没有可以发送的对话。",
+  "android.share.title": "发送到",
   "keybinds.changeKeybinds": "更改你的按键绑定",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} 正在疯狂输出…",

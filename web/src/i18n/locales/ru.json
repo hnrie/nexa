@@ -5234,6 +5234,8 @@
   "android.notify.channelServers": "Сообщения на серверах",
   "android.notify.connectedBody": "Новые сообщения приходят сразу. Нажмите и удерживайте, чтобы скрыть это.",
   "android.notify.connectedTitle": "На связи",
+  "android.share.nothing": "Пока некуда отправить.",
+  "android.share.title": "Отправить",
   "keybinds.changeKeybinds": "Изменить горячие клавиши",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} болтает…",

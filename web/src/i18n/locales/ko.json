@@ -4754,6 +4754,8 @@
   "android.notify.channelServers": "서버 메시지",
   "android.notify.connectedBody": "새 메시지가 바로 도착합니다. 길게 눌러 이 알림을 숨길 수 있습니다.",
   "android.notify.connectedTitle": "연결 유지 중",
+  "android.share.nothing": "아직 보낼 수 있는 대화가 없습니다.",
+  "android.share.title": "보낼 곳",
   "keybinds.changeKeybinds": "단축키 변경",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} 님이 수다 떠는 중…",

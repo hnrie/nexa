@@ -279,6 +279,18 @@ fun Composer(channel: Channel) {
     }
     val slowLeft = ((slowUntil - now) / 1000.0).coerceAtLeast(0.0)
 
+    // words shared from another app go in after what is already there
+    val injected = ChatUi.inject[channelId]
+    LaunchedEffect(injected) {
+        val add = injected ?: return@LaunchedEffect
+        ChatUi.inject.remove(channelId)
+        state.edit {
+            val sep = if (length > 0 && !asCharSequence().endsWith("\n")) "\n" else ""
+            append(sep + add)
+            placeCursorAtEnd()
+        }
+    }
+
     // drafts, typing and autocomplete follow the text
     LaunchedEffect(channelId) {
         snapshotFlow { state.text.toString() to state.selection.end }.distinctUntilChanged().collect { (text, caret) ->

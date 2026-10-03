@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -25,6 +26,8 @@ import fish.nexa.ui.theme.Nx
 fun ServerPage(route: Route.Server) {
     val channels by Nexa.channels.byId.collectAsState()
     val ch = route.channelId?.let { channels[it] }
+    // a link to a message: open there
+    LaunchedEffect(route) { if (ch != null && route.jumpTo != null) ChatUi.jumpTo(ch.id, route.jumpTo) }
     when {
         ch == null -> NoChannel(route.serverId)
         ch.type == "voice" -> fish.nexa.ui.voice.VoiceChannelPage(ch)
@@ -57,5 +60,6 @@ fun DmPage(route: Route.Dm) {
         Box(Modifier.fillMaxSize()) { PageHeader("") }
         return
     }
+    LaunchedEffect(route) { route.jumpTo?.let { ChatUi.jumpTo(route.channelId, it) } }
     ChatView(route.channelId)
 }

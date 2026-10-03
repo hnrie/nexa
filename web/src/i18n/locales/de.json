@@ -4923,6 +4923,8 @@
   "android.notify.channelServers": "Servernachrichten",
   "android.notify.connectedBody": "Neue Nachrichten erreichen dich sofort. Lange drücken, um das auszublenden.",
   "android.notify.connectedTitle": "Bleibt verbunden",
+  "android.share.nothing": "Noch keine Unterhaltungen zum Senden.",
+  "android.share.title": "Senden an",
   "keybinds.changeKeybinds": "Tastenbelegung ändern",
   "typing.own": "{a} {words} …",
   "typing.presets.yapping": "{a} quasselt …",

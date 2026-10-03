@@ -29,6 +29,34 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Nexa's own links open here: conversations, messages, invites and profiles. The server
+                 publishes /.well-known/assetlinks.json for the release key, so Android verifies them. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="nexa.fish" />
+                <data android:host="mathtest.lol" />
+                <data android:host="chat.evilion.xyz" />
+                <data android:pathPrefix="/channels/" />
+                <data android:pathPrefix="/invite/" />
+                <data android:pathPattern="/@.*" />
+            </intent-filter>
+            <!-- sharing into Nexa from other apps: words, links, pictures and files -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <service

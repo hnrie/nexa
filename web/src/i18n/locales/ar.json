@@ -5509,6 +5509,8 @@
   "android.notify.channelServers": "رسائل الخوادم",
   "android.notify.connectedBody": "تصلك الرسائل الجديدة فورًا. اضغط مطولًا لإخفاء هذا.",
   "android.notify.connectedTitle": "يبقى متصلًا",
+  "android.share.nothing": "لا توجد محادثات للإرسال إليها بعد.",
+  "android.share.title": "إرسال إلى",
   "keybinds.changeKeybinds": "تغيير مفاتيحك",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} يثرثر…",

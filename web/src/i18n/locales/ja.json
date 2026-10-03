@@ -4754,6 +4754,8 @@
   "android.notify.channelServers": "サーバーのメッセージ",
   "android.notify.connectedBody": "新しいメッセージがすぐに届きます。長押しするとこの表示を隠せます。",
   "android.notify.connectedTitle": "接続中",
+  "android.share.nothing": "送信できる会話はまだありません。",
+  "android.share.title": "送信先",
   "keybinds.changeKeybinds": "キー割り当てを変更",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} がおしゃべり中…",
