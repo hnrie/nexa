@@ -63,6 +63,9 @@ import fish.nexa.ui.theme.mixSrgb
 import fish.nexa.ui.theme.ring
 import fish.nexa.ui.theme.sheen
 import fish.nexa.ui.theme.topEdge
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -171,25 +174,103 @@ private fun SpellWords(words: List<String>) {
 
 /** Plays a sound for the settings pages; the app's sound player fills it in (Sounds.preview). */
 object SoundPreview {
-    var preview: (id: String, pack: String?) -> Unit = { id, _ -> playBundled(id) }
+    /** Set by the app's sound player when there is one (Sounds.preview); until then this plays it itself. */
+    var preview: (id: String, pack: String?) -> Unit = { id, pack -> play(id, pack) }
 
     private val FILES = mapOf(
         "message" to "message.m4a", "mention" to "mention.m4a", "friend" to "friend-request.m4a", "ring" to "incoming-call.m4a",
         "outgoing" to "outgoing-call.m4a", "leave" to "leave-call.m4a", "mute" to "mute.m4a", "unmute" to "unmute.m4a",
     )
 
-    /** Until the player is wired in: Nexa's own recordings, played once. */
-    private fun playBundled(id: String) {
-        val file = FILES[id] ?: return
+    private fun attributes() = android.media.AudioAttributes.Builder()
+        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .build()
+
+    /** The pack's own recording if it has one, else Nexa's, else the tones; once, at the chosen volume. */
+    private fun play(id: String, pack: String?) {
+        val s = soundSettingsOf(Nexa.settings.doc.value["sounds"])
+        val volume = s.volume / 100f
+        val file = s.packs.firstOrNull { it.id == (pack ?: s.pack) }?.files?.get(id)
+        Nexa.scope.launch {
+            val custom = file?.let { f -> runCatching { fish.nexa.media.Media.decrypted(f.blob, f.key, f.size.takeIf { it > 0 }) }.getOrNull() }
+            withContext(Dispatchers.Main) {
+                val played = runCatching {
+                    val mp = android.media.MediaPlayer()
+                    mp.setAudioAttributes(attributes())
+                    val asset = FILES[id]
+                    when {
+                        custom != null -> mp.setDataSource(custom.path)
+                        asset != null -> Nexa.app.assets.openFd("sounds/$asset").use { fd -> mp.setDataSource(fd.fileDescriptor, fd.startOffset, fd.length) }
+                        else -> {
+                            mp.release()
+                            return@runCatching false
+                        }
+                    }
+                    // recordings are mastered near full scale
+                    mp.setVolume(0.7f * volume, 0.7f * volume)
+                    mp.setOnCompletionListener { it.release() }
+                    mp.prepare()
+                    mp.start()
+                    true
+                }.getOrDefault(false)
+                if (!played) synth(id, volume)
+            }
+        }
+    }
+
+    private class Tone(val freq: Double, val start: Double, val dur: Double)
+
+    /** The tones the web synthesises where there is no recording (Someone Joins has none). */
+    private fun synth(id: String, volume: Float) {
+        val (tones, wave, gain) = when (id) {
+            "message" -> Triple(listOf(Tone(880.0, 0.0, 0.09), Tone(1174.7, 0.09, 0.12)), "sine", 0.18)
+            "mention" -> Triple(listOf(Tone(784.0, 0.0, 0.08), Tone(987.8, 0.09, 0.08), Tone(1318.5, 0.18, 0.16)), "sine", 0.18)
+            "friend" -> Triple(listOf(Tone(587.3, 0.0, 0.10), Tone(880.0, 0.10, 0.10), Tone(1174.7, 0.20, 0.22)), "triangle", 0.20)
+            "join" -> Triple(listOf(Tone(523.3, 0.0, 0.08), Tone(784.0, 0.08, 0.12)), "triangle", 0.18)
+            "leave" -> Triple(listOf(Tone(784.0, 0.0, 0.08), Tone(523.3, 0.08, 0.12)), "triangle", 0.18)
+            "mute" -> Triple(listOf(Tone(440.0, 0.0, 0.07), Tone(330.0, 0.07, 0.10)), "square", 0.08)
+            "unmute" -> Triple(listOf(Tone(330.0, 0.0, 0.07), Tone(440.0, 0.07, 0.10)), "square", 0.08)
+            else -> Triple(listOf(Tone(659.3, 0.0, 0.25), Tone(880.0, 0.30, 0.25)), "sine", 0.15)
+        }
+        val rate = 44_100
+        val total = tones.maxOf { it.start + it.dur } + 0.03
+        val pcm = ShortArray((total * rate).toInt())
+        val peak = maxOf(0.0002, gain * volume)
+        for (tone in tones) {
+            val from = (tone.start * rate).toInt()
+            val n = ((tone.dur + 0.02) * rate).toInt()
+            for (i in 0 until n) {
+                val tt = i.toDouble() / rate
+                val phase = (tone.freq * tt) % 1.0
+                val v = when (wave) {
+                    "square" -> if (phase < 0.5) 1.0 else -1.0
+                    "triangle" -> 1 - 4 * Math.abs(phase - 0.5)
+                    else -> Math.sin(2 * Math.PI * phase)
+                }
+                // 10 ms up to the peak, then an exponential fall to 0.0001 at the tone's end
+                val env = when {
+                    tt < 0.010 -> peak * tt / 0.010
+                    tt >= tone.dur -> 0.0
+                    else -> peak * Math.pow(0.0001 / peak, (tt - 0.010) / (tone.dur - 0.010))
+                }
+                val k = from + i
+                if (k < pcm.size) pcm[k] = (pcm[k] + v * env * 32767).toInt().coerceIn(-32768, 32767).toShort()
+            }
+        }
         runCatching {
-            val fd = Nexa.app.assets.openFd("sounds/$file")
-            val mp = android.media.MediaPlayer()
-            mp.setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
-            mp.setDataSource(fd.fileDescriptor, fd.startOffset, fd.length)
-            fd.close()
-            mp.setOnCompletionListener { it.release() }
-            mp.prepare()
-            mp.start()
+            val track = android.media.AudioTrack.Builder()
+                .setAudioAttributes(attributes())
+                .setAudioFormat(android.media.AudioFormat.Builder().setEncoding(android.media.AudioFormat.ENCODING_PCM_16BIT).setSampleRate(rate).setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO).build())
+                .setTransferMode(android.media.AudioTrack.MODE_STATIC)
+                .setBufferSizeInBytes(pcm.size * 2)
+                .build()
+            track.write(pcm, 0, pcm.size)
+            track.play()
+            Nexa.scope.launch {
+                kotlinx.coroutines.delay((total * 1000).toLong() + 200)
+                runCatching { track.release() }
+            }
         }
     }
 }
