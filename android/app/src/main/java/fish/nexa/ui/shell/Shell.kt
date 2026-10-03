@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import fish.nexa.Nexa
 import fish.nexa.net.Gateway
 import fish.nexa.ui.components.Txt
-import fish.nexa.ui.chat.FriendsPage
+import fish.nexa.ui.people.FriendsPage
 import fish.nexa.ui.chat.ServerPage
 import fish.nexa.ui.chat.DmPage
 import fish.nexa.ui.components.pressable

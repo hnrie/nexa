@@ -263,7 +263,7 @@ fun Sheet(
                 val body = Modifier.weight(1f, fill = false).fillMaxWidth()
                 Column(
                     (if (scroll) body.verticalScroll(rememberScrollState()) else body)
-                        .padding(start = padding, end = padding, top = padding, bottom = if (footer == null) padding else 0.dp)
+                        .padding(start = padding, end = padding, top = padding, bottom = padding)
                         .then(if (footer == null) Modifier.navigationBarsPadding() else Modifier),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     content = content,
