@@ -20,6 +20,7 @@ import org.json.JSONObject
  *   am broadcast -a fish.nexa.debug.STATS                    (logged as NexaCallTest)
  *   am broadcast -a fish.nexa.debug.SEAL                     (the frame crypto against the web's vectors)
  *   am broadcast -a fish.nexa.debug.WRONGKEY --ez on true    (this call's frames sealed and opened with wrong keys)
+ *   am broadcast -a fish.nexa.debug.RTP                      (the SFU connection's media stats, logged)
  */
 class CallTestHooks : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -31,6 +32,7 @@ class CallTestHooks : BroadcastReceiver() {
             "fish.nexa.debug.WATCH" -> intent.getStringExtra("user")?.let { Calls.setWatching(it, intent.getBooleanExtra("on", true)) }
             "fish.nexa.debug.STATS" -> Calls.scope.launch { Log.i(TAG, stats().toString()) }
             "fish.nexa.debug.SEAL" -> Log.i(TAG, "seal " + vectors())
+            "fish.nexa.debug.RTP" -> Calls.scope.launch { Log.i(TAG, "rtp " + rtp()) }
             "fish.nexa.debug.WRONGKEY" -> Calls.scope.launch { Log.i(TAG, "wrongkey " + wrongKeys(intent.getBooleanExtra("on", true))) }
         }
     }
@@ -57,12 +59,36 @@ class CallTestHooks : BroadcastReceiver() {
         o.put("level", Denoise.level.toDouble())
         o.put("enhanced", Denoise.enhanced)
         o.put("tone", Denoise.tone)
+        o.put("interrupted", st.interrupted)
+        o.put("vadOpen", s?.vadOpen)
+        o.put("noiseFloor", s?.noiseFloor?.toDouble())
+        o.put("micEnabled", s?.micTrack?.let { runCatching { it.enabled() }.getOrNull() })
+        o.put("micState", s?.micTrack?.let { runCatching { it.state().name }.getOrNull() })
         o.put("quality", st.quality?.let { JSONObject().put("rtt", it.rtt).put("loss", it.loss) })
         o.put("crypto", s?.transport?.cryptoStats()?.let { JSONArray(it.toList()) })
         o.put("route", AudioRoute.current.value?.kind?.name)
         o.put("ringing", JSONArray(Voice.ringing.value.keys.toList()))
         o.put("me", Nexa.users.meId)
         return o
+    }
+
+    /** What the SFU connection sends and receives: media sources, outbound and inbound streams. */
+    private suspend fun rtp(): String {
+        val t = Engine.current()?.transport as? SfuTransport ?: return "no SFU call"
+        val f = SfuTransport::class.java.getDeclaredField("pc").apply { isAccessible = true }
+        val report = WebRtc.stats(f.get(t) as org.webrtc.PeerConnection) ?: return "no stats"
+        val keep = setOf("media-source", "outbound-rtp", "inbound-rtp", "codec")
+        val fields = setOf("kind", "audioLevel", "totalAudioEnergy", "totalSamplesDuration", "packetsSent", "bytesSent", "packetsReceived",
+            "bytesReceived", "framesEncoded", "framesDecoded", "frameWidth", "frameHeight", "framesPerSecond", "mimeType", "sdpFmtpLine",
+            "concealedSamples", "totalSamplesReceived", "targetBitrate", "encoderImplementation", "decoderImplementation", "mid", "qualityLimitationReason")
+        val out = JSONArray()
+        for (st in report.statsMap.values) {
+            if (st.type !in keep) continue
+            val o = JSONObject().put("type", st.type)
+            for ((k, v) in st.members) if (k in fields) o.put(k, v.toString())
+            out.put(o)
+        }
+        return out.toString()
     }
 
     /** Swaps the SFU call's keys for wrong ones with the same indices (or back), so nothing either side seals can be opened. */
