@@ -186,6 +186,9 @@ class AnchorHost(val scroll: ScrollState) {
     val positions = HashMap<String, LayoutCoordinates>()
     var found by mutableStateOf<String?>(null)
     var foundAt by mutableLongStateOf(0L)
+
+    /** A level inside the page (the Theme Builder over Appearance): back and the swipe close it before the page. */
+    var inner by mutableStateOf<(() -> Unit)?>(null)
 }
 
 val LocalAnchors = compositionLocalOf<AnchorHost?> { null }
@@ -268,6 +271,7 @@ private fun SettingsLayer(layer: Layer, startPage: String?, startAnchor: String?
             PageView(
                 current,
                 anchor,
+                isTop = isTop,
                 onAnchorDone = { anchor = null },
                 onBack = { page = null },
                 onClose = { Unsaved.unlessUnsaved { close() } },
@@ -477,6 +481,7 @@ private fun NavRow(icon: String, label: String, sub: String? = null, first: Bool
 private fun PageView(
     id: String,
     anchor: String?,
+    isTop: Boolean,
     onAnchorDone: () -> Unit,
     onBack: () -> Unit,
     onClose: () -> Unit,
@@ -491,7 +496,8 @@ private fun PageView(
     val drag = remember { Animatable(0f) }
     val scroll = rememberScrollState()
     val host = remember { AnchorHost(scroll) }
-    val back = { Unsaved.unlessUnsaved(onBack) }
+    val back = { Unsaved.unlessUnsaved { host.inner?.invoke() ?: onBack() } }
+    BackHandler(enabled = isTop && host.inner != null) { Unsaved.unlessUnsaved { host.inner?.invoke() } }
 
     // a search result or link: bring the setting into view (it may take a moment to appear) and light it
     LaunchedEffect(anchor) {
@@ -548,7 +554,11 @@ private fun PageView(
                         val speed = dx / density / maxOf(1L, System.currentTimeMillis() - t0)
                         val done = dx > widthPx / 3f || (speed > 0.5f && dx > 40f * density)
                         scope.launch {
-                            if (done && !Unsaved.blocking) {
+                            val inner = host.inner
+                            if (done && !Unsaved.blocking && inner != null) {
+                                drag.animateTo(0f, tween(if (reduced) 0 else 200, easing = ease))
+                                inner()
+                            } else if (done && !Unsaved.blocking) {
                                 drag.animateTo(dir * widthPx, tween(if (reduced) 0 else 160, easing = ease))
                                 onBack()
                             } else {
@@ -613,6 +623,7 @@ private fun SettingsPageContent(id: String, openPage: (String, String?) -> Unit)
 private fun androidx.compose.foundation.layout.BoxScope.PageOverlay(id: String) {
     when (id) {
         "profiles" -> ProfilesSaveBar()
+        "appearance" -> ThemeBuilderSaveBar()
     }
 }
 

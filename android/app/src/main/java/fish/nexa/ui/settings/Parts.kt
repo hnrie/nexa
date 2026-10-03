@@ -318,11 +318,13 @@ fun <T> SelectRow(
     sub: String? = null,
     anchor: String? = null,
     divider: Boolean = true,
+    /** Shown when no option is the value (a list that only fills things in, like Start From). */
+    placeholder: String? = null,
 ) {
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val current = options.firstOrNull { it.second == value }?.first ?: ""
+    val current = options.firstOrNull { it.second == value }?.first ?: placeholder ?: ""
     Column(Modifier.fillMaxWidth().settingAnchor(anchor)) {
         Row(
             Modifier
@@ -523,7 +525,15 @@ object Unsaved {
  * shown, and shakes red when leaving is tried.
  */
 @Composable
-fun BoxScope.SaveBar(dirty: Boolean, saving: Boolean, onReset: () -> Unit, onSave: () -> Unit) {
+fun BoxScope.SaveBar(
+    dirty: Boolean,
+    saving: Boolean,
+    onReset: () -> Unit,
+    onSave: () -> Unit,
+    text: String = t("server.settingsLayer.carefulYouHaveUnsavedChanges"),
+    resetLabel: String = t("common.imageCrop.reset"),
+    saveLabel: String = t("server.settingsLayer.saveChanges"),
+) {
     val c = Nx.colors
     val key = remember { Any() }
     LaunchedEffect(dirty) {
@@ -569,13 +579,13 @@ fun BoxScope.SaveBar(dirty: Boolean, saving: Boolean, onReset: () -> Unit, onSav
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Txt(
-            t("server.settingsLayer.carefulYouHaveUnsavedChanges"),
+            text,
             style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(550)),
             color = if (red) c.onDanger else c.text,
             modifier = Modifier.weight(1f),
         )
-        NxButton(t("common.imageCrop.reset"), onReset, kind = ButtonKind.GHOST, size = ButtonSize.SM)
-        NxButton(t("server.settingsLayer.saveChanges"), onSave, kind = ButtonKind.POSITIVE, size = ButtonSize.SM, loading = saving)
+        NxButton(resetLabel, onReset, kind = ButtonKind.GHOST, size = ButtonSize.SM)
+        NxButton(saveLabel, onSave, kind = ButtonKind.POSITIVE, size = ButtonSize.SM, loading = saving)
     }
 }
 

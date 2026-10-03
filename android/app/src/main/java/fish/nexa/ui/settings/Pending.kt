@@ -9,7 +9,6 @@ import fish.nexa.ui.t
 @Composable fun BoxScope.ProfilesSaveBar() = Unit
 @Composable fun SoundsPage() = PageTitle(t("settings.sounds.title"))
 @Composable fun StickersPage() = PageTitle(t("settings.groups.emojiStickers"))
-@Composable fun AppearancePage() = PageTitle(t("settings.appearance.appearance"))
 @Composable fun VoicePage() = PageTitle(t("settings.voice.voiceVideo"))
 @Composable fun KeybindsPage() = PageTitle(t("keybinds.title"))
 @Composable fun ActivityPage() = PageTitle(t("settings.activity.title"))
