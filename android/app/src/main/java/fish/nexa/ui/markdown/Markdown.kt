@@ -351,6 +351,20 @@ object Markdown {
 
     internal fun translate(key: String): String = fish.nexa.ui.t(key)
 
+    // the parser's line shapes, for the formatting editor writing lines that must not become blocks
+    private val shapes = Parser(filesOn = false, exactOn = false)
+
+    internal fun lineIsRule(line: String): Boolean = shapes.isRule(line)
+
+    internal fun lineIsHeading(line: String): Boolean = shapes.headingLine(line) != null
+
+    internal fun lineIsFootnoteDef(line: String): Boolean = shapes.footnoteDef(line) != null
+
+    internal fun lineIsAlert(line: String): Boolean = shapes.alertLine(line) != null
+
+    /** A list item's indent length and its number when ordered; null when the line is no item. */
+    internal fun lineListItem(line: String): Pair<Int, String?>? = shapes.listLine(line)?.let { it.indent.length to it.number }
+
     // -----------------------------------------------------------------------
     // one parse
     // -----------------------------------------------------------------------
