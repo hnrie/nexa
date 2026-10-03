@@ -11,11 +11,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
+import fish.nexa.media.Media
 import fish.nexa.ui.components.AvatarColor
 import fish.nexa.ui.theme.NexaColors
 import fish.nexa.ui.theme.adjustOklch
@@ -144,7 +144,7 @@ object ProfileTheme {
         var color by remember(url) { mutableStateOf(url?.let { synchronized(known) { known[it] } }) }
         LaunchedEffect(url) {
             if (url == null || synchronized(known) { known.containsKey(url) }) return@LaunchedEffect
-            val result = SingletonImageLoader.get(context).execute(ImageRequest.Builder(context).data(url).size(64).allowHardware(false).build())
+            val result = Media.loader.execute(ImageRequest.Builder(context).data(url).size(64).allowHardware(false).build())
             val found = (result as? SuccessResult)?.image?.toBitmap()?.let { dominant(it) }
             synchronized(known) { known[url] = found }
             color = found

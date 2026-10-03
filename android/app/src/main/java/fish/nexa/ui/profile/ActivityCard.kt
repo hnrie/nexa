@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import fish.nexa.media.Media
 import fish.nexa.Nexa
 import fish.nexa.net.Activity
 import fish.nexa.ui.Icon
@@ -113,7 +114,7 @@ fun ActivityCard(a: Activity) {
     ) {
         if (large != null) {
             AsyncImage(
-                large, null,
+                large, null, Media.loader,
                 Modifier.matchParentSize().graphicsLayer { alpha = 0.42f; scaleX = 1.8f; scaleY = 1.8f }.blur(34.dp),
                 contentScale = ContentScale.Crop,
             )
@@ -132,7 +133,7 @@ fun ActivityCard(a: Activity) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.size(76.dp)) {
                     if (large != null) AsyncImage(
-                        large, a.assets?.largeText ?: a.name,
+                        large, a.assets?.largeText ?: a.name, Media.loader,
                         Modifier.size(76.dp).boxShadow(Radii.Sm, 8f, 20f, Color.Black.copy(alpha = 0.55f), spread = -8f).clip(Radii.Sm).background(c.bgActive).linked(a.assets?.largeUrl),
                         contentScale = ContentScale.Crop,
                     ) else Box(
@@ -141,7 +142,7 @@ fun ActivityCard(a: Activity) {
                     ) { Icon(Activities.icon(a.type), c.textSubtle, size = 32.dp) }
                     a.assets?.smallImage?.let { small ->
                         AsyncImage(
-                            small, a.assets.smallText ?: "",
+                            small, a.assets.smallText ?: "", Media.loader,
                             Modifier.align(Alignment.BottomEnd).offset(6.dp, 6.dp).size(30.dp).clip(CircleShape).background(Color(10, 6, 20).copy(alpha = 0.6f)).padding(2.dp).clip(CircleShape).linked(a.assets.smallUrl),
                             contentScale = ContentScale.Crop,
                         )

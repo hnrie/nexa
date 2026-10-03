@@ -139,6 +139,8 @@ fun Sheet(
     bare: Boolean = false,
     scroll: Boolean = true,
     padding: Dp = 16.dp,
+    /** The sheet's own colour, for content that brings its own (a profile in its colours). */
+    fill: Color? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = Nx.colors
@@ -219,7 +221,7 @@ fun Sheet(
         BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().imePadding(), contentAlignment = Alignment.BottomCenter) {
             val maxH = maxHeight * 0.92f
             val shape = RoundedCornerShape(topStart = Radii.lg, topEnd = Radii.lg)
-            Column(
+            Box(
                 Modifier
                     .widthIn(max = maxWidth)
                     .fillMaxWidth()
@@ -231,52 +233,52 @@ fun Sheet(
                     .onSizeChanged { height = it.height.toFloat() }
                     .shadowHigh(shape, c)
                     .ring(shape, c.panelEdge)
-                    .background(c.bgFloating, shape)
+                    .background(fill ?: c.bgFloating, shape)
                     .topEdge(shape, c.edgeLight)
                     .clip(shape),
             ) {
-                // grip and title: the handle the sheet is dragged by
-                Column(dragModifier.fillMaxWidth()) {
-                    if (bare) {
-                        Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.TopCenter) {
-                            Box(Modifier.size(38.dp, 5.dp).background(Color.White.copy(alpha = 0.78f), RoundedCornerShape(3.dp)))
-                        }
-                    } else {
+                Column {
+                    // grip and title: the handle the sheet is dragged by
+                    if (!bare) Column(dragModifier.fillMaxWidth()) {
                         Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.TopCenter) {
                             Box(Modifier.size(36.dp, 4.dp).background(c.borderStrong, RoundedCornerShape(2.dp)))
                         }
-                    }
-                    if (title != null || (closeButton && !bare)) {
-                        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 10.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (title != null) Txt(
-                                title,
-                                style = Nx.type.heading.copy(fontSize = Nx.type.sp(21f), fontWeight = FontWeight(680), lineHeight = Nx.type.sp(25.2f)),
-                                color = c.textStrong,
-                                modifier = Modifier.weight(1f).semantics { heading() },
-                            ) else Spacer(Modifier.weight(1f))
-                            if (closeButton) {
-                                fish.nexa.ui.components.IconButton("X", t("chat.attachments.close"), { dismiss() }, tint = c.textMuted, iconSize = 20.dp)
+                        if (title != null || closeButton) {
+                            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 10.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                if (title != null) Txt(
+                                    title,
+                                    style = Nx.type.heading.copy(fontSize = Nx.type.sp(21f), fontWeight = FontWeight(680), lineHeight = Nx.type.sp(25.2f)),
+                                    color = c.textStrong,
+                                    modifier = Modifier.weight(1f).semantics { heading() },
+                                ) else Spacer(Modifier.weight(1f))
+                                if (closeButton) {
+                                    fish.nexa.ui.components.IconButton("X", t("chat.attachments.close"), { dismiss() }, tint = c.textMuted, iconSize = 20.dp)
+                                }
                             }
                         }
                     }
+                    val body = Modifier.weight(1f, fill = false).fillMaxWidth()
+                    Column(
+                        (if (scroll) body.verticalScroll(rememberScrollState()) else body)
+                            .padding(start = padding, end = padding, top = padding, bottom = padding)
+                            .then(if (footer == null) Modifier.navigationBarsPadding() else Modifier),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        content = content,
+                    )
+                    if (footer != null) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(fish.nexa.ui.theme.mixOklab(c.bgBase, c.bgFloating, 0.45f))
+                                .topEdge(RoundedCornerShape(0.dp), c.borderSubtle)
+                                .navigationBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                        ) { footer() }
+                    }
                 }
-                val body = Modifier.weight(1f, fill = false).fillMaxWidth()
-                Column(
-                    (if (scroll) body.verticalScroll(rememberScrollState()) else body)
-                        .padding(start = padding, end = padding, top = padding, bottom = padding)
-                        .then(if (footer == null) Modifier.navigationBarsPadding() else Modifier),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    content = content,
-                )
-                if (footer != null) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .background(fish.nexa.ui.theme.mixOklab(c.bgBase, c.bgFloating, 0.45f))
-                            .topEdge(RoundedCornerShape(0.dp), c.borderSubtle)
-                            .navigationBarsPadding()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                    ) { footer() }
+                // a bare sheet's content runs to its top edge (a banner), with the grip floating over it
+                if (bare) Box(dragModifier.align(Alignment.TopCenter).size(160.dp, 30.dp), contentAlignment = Alignment.TopCenter) {
+                    Box(Modifier.padding(top = 8.dp).size(38.dp, 5.dp).background(Color.White.copy(alpha = 0.78f), RoundedCornerShape(3.dp)))
                 }
             }
         }

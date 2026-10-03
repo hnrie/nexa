@@ -384,7 +384,7 @@ fun GameCover(g: Widgets.Game, css: Int, width: Dp?, shape: Shape = RoundedCorne
             .background(c.bgActive)
             .then(if (named) Modifier.semantics { contentDescription = g.name } else Modifier),
     ) {
-        if (src != null && !broken) AsyncImage(src, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, onError = { broken = true })
+        if (src != null && !broken) AsyncImage(src, null, Media.loader, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, onError = { broken = true })
         else NameTile(g.name, small = false, size = width ?: 80.dp)
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color.White.copy(alpha = 0.12f), 0.28f to Color.Transparent)))
     }
@@ -405,7 +405,7 @@ fun MusicArt(type: String, m: Widgets.Music, css: Int, size: Dp?) {
             .clip(shape)
             .background(c.bgActive),
     ) {
-        if (src != null && !broken) AsyncImage(src, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, onError = { broken = true })
+        if (src != null && !broken) AsyncImage(src, null, Media.loader, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, onError = { broken = true })
         else NameTile(m.name, small = css < 64 || type == "artists", size = size ?: css.dp)
     }
 }
@@ -418,7 +418,7 @@ private fun Favorite(w: Widgets.GameWidget) {
     val density = LocalDensity.current.density
     val glow = Widgets.gamePicture(g, 40, density)
     Box(Modifier.fillMaxWidth().clip(Radii.Sm).background(p.chip.copy(alpha = p.chip.alpha * 0.7f)).ring(Radii.Sm, c.borderSubtle).topEdge(Radii.Sm, c.edgeLight)) {
-        if (glow != null) AsyncImage(glow, null, Modifier.matchParentSize().graphicsLayer { alpha = if (c.isLight) 0.28f else 0.4f; scaleX = 1.8f; scaleY = 1.8f }.blur(32.dp), contentScale = ContentScale.Crop)
+        if (glow != null) AsyncImage(glow, null, Media.loader, Modifier.matchParentSize().graphicsLayer { alpha = if (c.isLight) 0.28f else 0.4f; scaleX = 1.8f; scaleY = 1.8f }.blur(32.dp), contentScale = ContentScale.Crop)
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             GameCover(g, 76, 76.dp)
             Column(Modifier.weight(1f)) {
@@ -655,10 +655,10 @@ private fun CardWidget(w: Widgets.CardWidget) {
     val p = LocalProfile.current
     val density = LocalDensity.current.density
     Column(Modifier.fillMaxWidth().clip(Radii.Sm).background(p.chip.copy(alpha = p.chip.alpha * 0.7f)).ring(Radii.Sm, c.borderSubtle).topEdge(Radii.Sm, c.edgeLight)) {
-        if (w.image != null && w.shape != "square") AsyncImage(Media.widgetUrl(w.image, 520, density), null, Modifier.fillMaxWidth().aspectRatio(12f / 5f).background(c.bgActive), contentScale = ContentScale.Crop)
+        if (w.image != null && w.shape != "square") AsyncImage(Media.widgetUrl(w.image, 520, density), null, Media.loader, Modifier.fillMaxWidth().aspectRatio(12f / 5f).background(c.bgActive), contentScale = ContentScale.Crop)
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (w.image != null && w.shape == "square") AsyncImage(Media.widgetUrl(w.image, 56, density), null, Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)).background(c.bgActive), contentScale = ContentScale.Crop)
+                if (w.image != null && w.shape == "square") AsyncImage(Media.widgetUrl(w.image, 56, density), null, Media.loader, Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)).background(c.bgActive), contentScale = ContentScale.Crop)
                 Txt(w.title, style = Nx.type.name.copy(fontSize = Nx.type.sp(17f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(21.25f)), color = c.textStrong)
             }
             w.text?.let { Txt(it, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20.3f)), color = c.text, modifier = Modifier.padding(top = 6.dp)) }
@@ -731,7 +731,7 @@ fun WidgetPeek(widgets: List<Widgets.Widget>, onOpen: (() -> Unit)?) {
                 is Widgets.MusicWidget -> w.music.take(3).forEachIndexed { i, m ->
                     Box(Modifier.offset(x = (-10 * i).dp).zIndex((3 - i).toFloat())) { MusicArt(w.type, m, 30, 26.dp) }
                 }
-                is Widgets.CardWidget -> w.image?.let { AsyncImage(Media.widgetUrl(it, 40, density), null, Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop) }
+                is Widgets.CardWidget -> w.image?.let { AsyncImage(Media.widgetUrl(it, 40, density), null, Media.loader, Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop) }
             }
         }
         if (widgets.size > 1) Txt("+${widgets.size - 1}", style = Nx.type.hint.copy(fontWeight = FontWeight(700), fontFeatureSettings = "tnum"), color = c.textMuted)

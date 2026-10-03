@@ -37,7 +37,6 @@ fun emojiSuggestions(channel: fish.nexa.net.Channel, query: String): List<AcItem
 object MetadataScrub { fun scrub(file: java.io.File, type: String) = Unit }
 
 fun openChannelTopic(channel: fish.nexa.net.Channel) = Unit
-fun openVerifyKey(userId: String) = Unit
 fun openBugReport(from: String) = Unit
 @Composable fun ChatPanels(channel: fish.nexa.net.Channel) = Unit
 

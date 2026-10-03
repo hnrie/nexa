@@ -7,6 +7,8 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -147,7 +149,8 @@ fun ActivityIcon(a: Activity, more: Int = 0, size: androidx.compose.ui.unit.Dp =
  */
 @Composable
 fun StatusLine(userId: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
-    val p = Nexa.presence.byId.value[userId]
+    val all by Nexa.presence.byId.collectAsState()
+    val p = all[userId]
     val custom = Presences.customStatus(p)
     val acts = Presences.activitiesOf(p)
     val act = acts.firstOrNull()

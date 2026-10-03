@@ -84,6 +84,16 @@ fun copyWithToast(text: String, toast: String) {
     if (android.os.Build.VERSION.SDK_INT < 33) Nexa.ui.toast(toast, "success")
 }
 
+/** lib/errors.ts dmOpenError: why a conversation could not be opened, in the words for each refusal. */
+fun dmOpenError(e: Throwable, fallback: String): String = when ((e as? fish.nexa.net.ApiError)?.code) {
+    "dm_friends_servers" -> t("errors.dmFriendsServers")
+    "dm_friends_only" -> t("errors.dmFriendsOnly")
+    "dm_closed" -> t("errors.dmClosed")
+    "blocked" -> t("errors.dmBlocked")
+    "link_only" -> t("errors.linkOnly")
+    else -> describeError(e, fallback)
+}
+
 /** Opens (or creates) the DM with someone and goes there. */
 fun openDmWith(userId: String, then: (suspend (String) -> Unit)? = null) {
     Nexa.scope.launch {
@@ -92,7 +102,7 @@ fun openDmWith(userId: String, then: (suspend (String) -> Unit)? = null) {
             Nav.go(Route.Dm(ch.id))
             then?.invoke(ch.id)
         } catch (e: Exception) {
-            Nexa.ui.toast(describeError(e, t("profile.profileCard.couldNotOpenAConversation")), "error")
+            Nexa.ui.toast(dmOpenError(e, t("profile.profileCard.couldNotOpenAConversation")), "error")
         }
     }
 }
