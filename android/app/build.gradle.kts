@@ -213,4 +213,6 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20250517")
+    // the ICU the web's own Node was built with, standing in for the phone's android.icu in JVM tests
+    testImplementation("com.ibm.icu:icu4j:78.3")
 }
