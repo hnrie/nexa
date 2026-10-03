@@ -430,6 +430,17 @@ class KeyManager(
         return job.await()
     }
 
+    /**
+     * A key an invite link carried (#k=epoch.root): kept like a granted one and
+     * granted to this account on the server, so its other devices get it too.
+     */
+    suspend fun adopt(conv: String, epoch: Int, root: ByteArray) {
+        if (ring.get(conv, epoch) != null) return
+        ring.set(conv, epoch, root)
+        saveRoots()
+        userId?.let { grantTo(conv, epoch, listOf(it)) }
+    }
+
     suspend fun grantTo(conv: String, epoch: Int, userIds: List<String>) {
         val root = ring.get(conv, epoch) ?: return
         if (userIds.isEmpty()) return

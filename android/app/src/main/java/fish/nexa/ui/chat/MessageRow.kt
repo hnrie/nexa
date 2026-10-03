@@ -391,6 +391,14 @@ private fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     else payload?.att?.takeIf { it.isNotEmpty() }?.let { Attachments(it, cm, ctx) }
     if (cm != null && embeds != null) Embeds(embeds, cm, ctx)
     if (cm?.hook != null) HookBody(cm, ctx)
+    // cards for the Nexa invites and profiles the message links to (none once its embeds were removed)
+    if (cm != null && !cm.m.suppressEmbeds) {
+        val sealed = remember(embeds, cm.hook) {
+            (embeds ?: fish.nexa.data.Hooks.of(cm.hook)?.linkEmbeds?.takeIf { it.isNotEmpty() })?.mapNotNull { Unfurl.of(it) } ?: emptyList()
+        }
+        InviteCards(payload?.t, sealed)
+        ProfileCards(payload?.t, sealed)
+    }
 }
 
 /** The failed-send line: what happened, then Retry and Delete. */
