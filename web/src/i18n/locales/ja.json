@@ -4818,10 +4818,10 @@
   "server.auditLog.verb.server_tag_delete": "がサーバータグを削除しました",
   "common.imageCrop.keepsMoving": "切り抜いた後も、動きはそのままです。",
   "widgets.title": "ウィジェット",
-  "widgets.hint": "好きなゲームや今プレイしているゲームを紹介したり、自分だけのカードを作ったりできます。あなたのプロフィールを見られる人には、誰にでも表示されます。",
+  "widgets.hint": "好きなゲームや音楽、今プレイしているゲームを紹介したり、自分だけのカードを作ったりできます。あなたのプロフィールを見られる人には、誰にでも表示されます。",
   "widgets.add": "ウィジェットを追加",
   "widgets.addOne": "ウィジェットを追加",
-  "widgets.emptyOwn": "好きなゲームや今プレイしているゲームを紹介したり、自分だけのカードを作ったりしましょう。",
+  "widgets.emptyOwn": "好きなゲームや音楽、今プレイしているゲームを紹介したり、自分だけのカードを作ったりしましょう。",
   "widgets.used": "{count}/{max}",
   "widgets.full": "プロフィールに置けるウィジェットの数が上限に達しました。別のものを追加するには、どれかを外してください。",
   "widgets.onProfile": "すでにプロフィールにあります。",
@@ -4992,5 +4992,50 @@
   "whatsNew.r202610025.popoutTitle": "プロフィールが名前の横に開きます",
   "whatsNew.r202610025.popoutBody": "名前やプロフィール画像をクリックすると、そのすぐ横に小さなプロフィールが開きます。そこからメッセージを送ったり、プロフィール全体を開いたりできます。",
   "whatsNew.r202610025.rolesTitle": "プロフィールにロールを表示",
-  "whatsNew.r202610025.rolesBody": "サーバー内では、プロフィールにその人のロールが表示されます。ロールを管理できる場合は、+ で付けたり、x で外したりできます。"
+  "whatsNew.r202610025.rolesBody": "サーバー内では、プロフィールにその人のロールが表示されます。ロールを管理できる場合は、+ で付けたり、x で外したりできます。",
+  "widgets.type.artists": "お気に入りのアーティスト",
+  "widgets.type.albums": "お気に入りのアルバム",
+  "widgets.type.songs": "お気に入りの曲",
+  "widgets.about.artists": "一日中聴いていられるアーティストを12組まで。",
+  "widgets.about.albums": "そらで歌えるほど聴いたアルバムを12枚まで。",
+  "widgets.about.songs": "絶対にスキップしない曲を10曲まで。",
+  "widgets.group.games": "ゲーム",
+  "widgets.group.music": "音楽",
+  "widgets.group.cards": "カード",
+  "widgets.artistCount": {
+    "other": "アーティスト {count} 組"
+  },
+  "widgets.albumCount": {
+    "other": "アルバム {count} 枚"
+  },
+  "widgets.songCount": {
+    "other": "{count} 曲"
+  },
+  "widgets.music.onDeezer": "Deezerで開く",
+  "widgets.music.search.artists": "アーティストを検索",
+  "widgets.music.search.albums": "アルバムを検索",
+  "widgets.music.search.songs": "曲を検索",
+  "widgets.music.placeholder.artists": "アーティスト名、または曲名やアルバム名",
+  "widgets.music.placeholder.albums": "アルバム名、またはアーティスト名や収録曲",
+  "widgets.music.placeholder.songs": "曲名、またはアーティスト名やアルバム名",
+  "widgets.music.namePlaceholder": "名前を入力",
+  "widgets.music.notSetUp": "ここでは音楽検索が設定されていないため、名前で追加します。それぞれに画像を付けられます。",
+  "widgets.music.unavailable": "音楽検索が今は応答していません。少ししてからもう一度試すか、名前で追加してください。",
+  "widgets.music.noResults": "一致するものがありません。名前で追加できます。",
+  "widgets.music.results": "見つかった音楽",
+  "widgets.music.credit": "音楽情報の提供元：{site}",
+  "widgets.music.yours.artists": "あなたのアーティスト",
+  "widgets.music.yours.albums": "あなたのアルバム",
+  "widgets.music.yours.songs": "あなたの曲",
+  "widgets.music.noneYet": "上で検索して、表示するものを選んでください。",
+  "widgets.music.fans": {
+    "other": "ファン {fans} 人"
+  },
+  "widgets.music.viaSong": "曲：{name}",
+  "widgets.music.viaAlbum": "アルバム：{name}",
+  "widgets.music.single": "シングル",
+  "widgets.music.ep": "EP",
+  "widgets.music.compilation": "コンピレーション",
+  "whatsNew.r202610026.musicTitle": "プロフィールに音楽を",
+  "whatsNew.r202610026.musicBody": "お気に入りのアーティスト、アルバム、曲を紹介できます。覚えているとおりに探せて、曲名を入れれば歌っている人が、アルバム名を入れれば収録曲が見つかります。設定の「プロフィール」で追加してください。"
 }

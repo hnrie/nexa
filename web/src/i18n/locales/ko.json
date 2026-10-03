@@ -4818,10 +4818,10 @@
   "server.auditLog.verb.server_tag_delete": "님이 서버 태그를 삭제했습니다",
   "common.imageCrop.keepsMoving": "자른 뒤에도 계속 움직여요.",
   "widgets.title": "위젯",
-  "widgets.hint": "좋아하는 게임과 지금 하는 게임을 보여 주거나 나만의 카드를 만들어 보세요. 내 프로필을 볼 수 있는 사람은 모두 볼 수 있어요.",
+  "widgets.hint": "좋아하는 게임과 음악, 지금 하는 게임을 보여 주거나 나만의 카드를 만들어 보세요. 내 프로필을 볼 수 있는 사람은 모두 볼 수 있어요.",
   "widgets.add": "위젯 추가",
   "widgets.addOne": "위젯 추가",
-  "widgets.emptyOwn": "좋아하는 게임과 지금 하는 게임을 보여 주거나 나만의 카드를 만들어 보세요.",
+  "widgets.emptyOwn": "좋아하는 게임과 음악, 지금 하는 게임을 보여 주거나 나만의 카드를 만들어 보세요.",
   "widgets.used": "{count}/{max}",
   "widgets.full": "프로필에 넣을 수 있는 위젯이 가득 찼어요. 다른 위젯을 추가하려면 하나를 빼 주세요.",
   "widgets.onProfile": "이미 프로필에 있어요.",
@@ -4992,5 +4992,50 @@
   "whatsNew.r202610025.popoutTitle": "이름 바로 옆에 열리는 프로필",
   "whatsNew.r202610025.popoutBody": "이름이나 프로필 사진을 클릭하면 바로 옆에 작은 프로필이 열려요. 거기서 메시지를 보내거나 프로필 전체를 열 수 있어요.",
   "whatsNew.r202610025.rolesTitle": "프로필에 보이는 역할",
-  "whatsNew.r202610025.rolesBody": "서버에서는 프로필에 그 사람의 역할이 보여요. 역할을 관리할 수 있다면 +로 추가하거나 역할의 x로 뺄 수 있어요."
+  "whatsNew.r202610025.rolesBody": "서버에서는 프로필에 그 사람의 역할이 보여요. 역할을 관리할 수 있다면 +로 추가하거나 역할의 x로 뺄 수 있어요.",
+  "widgets.type.artists": "최애 아티스트",
+  "widgets.type.albums": "최애 앨범",
+  "widgets.type.songs": "최애 노래",
+  "widgets.about.artists": "하루 종일 들을 수 있는 아티스트 최대 12명.",
+  "widgets.about.albums": "외울 만큼 들은 앨범 최대 12장.",
+  "widgets.about.songs": "절대 건너뛰지 않는 노래 최대 10곡.",
+  "widgets.group.games": "게임",
+  "widgets.group.music": "음악",
+  "widgets.group.cards": "카드",
+  "widgets.artistCount": {
+    "other": "아티스트 {count}명"
+  },
+  "widgets.albumCount": {
+    "other": "앨범 {count}장"
+  },
+  "widgets.songCount": {
+    "other": "노래 {count}곡"
+  },
+  "widgets.music.onDeezer": "Deezer에서 열기",
+  "widgets.music.search.artists": "아티스트 검색",
+  "widgets.music.search.albums": "앨범 검색",
+  "widgets.music.search.songs": "노래 검색",
+  "widgets.music.placeholder.artists": "아티스트, 또는 그 아티스트의 노래나 앨범",
+  "widgets.music.placeholder.albums": "앨범, 또는 그 앨범의 아티스트나 수록곡",
+  "widgets.music.placeholder.songs": "노래, 또는 그 노래의 아티스트나 앨범",
+  "widgets.music.namePlaceholder": "이름을 입력하세요",
+  "widgets.music.notSetUp": "여기서는 음악 검색이 설정되어 있지 않아 이름으로 추가해요. 하나하나에 사진을 넣을 수 있어요.",
+  "widgets.music.unavailable": "지금은 음악 검색이 응답하지 않아요. 잠시 후 다시 시도하거나 이름으로 추가하세요.",
+  "widgets.music.noResults": "일치하는 항목이 없어요. 이름으로 추가할 수 있어요.",
+  "widgets.music.results": "찾은 음악",
+  "widgets.music.credit": "음악 정보 제공: {site}",
+  "widgets.music.yours.artists": "내 아티스트",
+  "widgets.music.yours.albums": "내 앨범",
+  "widgets.music.yours.songs": "내 노래",
+  "widgets.music.noneYet": "위에서 검색해 보여 줄 항목을 고르세요.",
+  "widgets.music.fans": {
+    "other": "팬 {fans}명"
+  },
+  "widgets.music.viaSong": "노래: {name}",
+  "widgets.music.viaAlbum": "앨범: {name}",
+  "widgets.music.single": "싱글",
+  "widgets.music.ep": "EP",
+  "widgets.music.compilation": "컴필레이션",
+  "whatsNew.r202610026.musicTitle": "프로필에 음악을",
+  "whatsNew.r202610026.musicBody": "최애 아티스트, 앨범, 노래를 보여 주고 기억나는 대로 찾아보세요. 노래를 입력하면 만든 사람을, 앨범을 입력하면 수록곡을 찾을 수 있어요. 설정의 프로필에서 추가하세요."
 }

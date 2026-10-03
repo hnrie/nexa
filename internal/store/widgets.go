@@ -59,8 +59,9 @@ func (s *Store) SetUserWidgets(ctx context.Context, uid ids.ID, raw string) erro
 	})
 }
 
-// WidgetImages is every picture widgets' JSON names: an "image" on a widget
-// or on one of its games, as the server writes them.
+// WidgetImages is every picture widgets' JSON names: an "image" on a widget,
+// on one of its games or on one of its artists, albums or songs, as the
+// server writes them.
 func WidgetImages(raw string) map[ids.ID]bool {
 	out := map[ids.ID]bool{}
 	if raw == "" {
@@ -71,6 +72,9 @@ func WidgetImages(raw string) map[ids.ID]bool {
 		Games []struct {
 			Image string `json:"image"`
 		} `json:"games"`
+		Music []struct {
+			Image string `json:"image"`
+		} `json:"music"`
 	}
 	if json.Unmarshal([]byte(raw), &list) != nil {
 		return out
@@ -84,6 +88,9 @@ func WidgetImages(raw string) map[ids.ID]bool {
 		add(w.Image)
 		for _, g := range w.Games {
 			add(g.Image)
+		}
+		for _, m := range w.Music {
+			add(m.Image)
 		}
 	}
 	return out

@@ -2,6 +2,7 @@ import { api } from "./client";
 import type { PurgeCounts } from "./moderation";
 import type { KdfParamsJson, MeUser, PublicUser, SettingsBlob, Snowflake } from "./types";
 import type { TypingStyle } from "@/lib/typingStyle";
+import type { FoundMusic, MusicWidgetType } from "@/lib/widgets";
 
 export type MePatch = Partial<{
   username: string;
@@ -69,6 +70,13 @@ export const users = {
   /** Games on IGDB by name, found by this server; `ready` is false where game search is not set up. */
   searchGames(q: string): Promise<{ games: { id: string; name: string; cover?: string; year?: number }[]; ready: boolean }> {
     return api.request("GET", `/games/search?q=${encodeURIComponent(q)}`);
+  },
+  /**
+   * Artists, albums or songs on Deezer, found by this server from a name, a
+   * song or an album, best first; `ready` is false where music search is off.
+   */
+  searchMusic(kind: MusicWidgetType, q: string, signal?: AbortSignal): Promise<{ results: FoundMusic[]; ready: boolean }> {
+    return api.request("GET", `/music/search?kind=${kind}&q=${encodeURIComponent(q)}`, undefined, signal ? { signal } : undefined);
   },
   /**
    * The profile a profile link shows (lib/profileLinks), which anyone may ask

@@ -1,19 +1,25 @@
-import { Bookmark, Gamepad2, GripVertical, Heart, ImagePlus, Library, LoaderCircle, PanelTop, Plus, Search, Check, X, type LucideIcon } from "lucide-react";
+import { Bookmark, Disc3, Gamepad2, GripVertical, Heart, ImagePlus, Library, LoaderCircle, MicVocal, Music, PanelTop, Plus, Search, Check, X, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { users as usersApi } from "@/api/users";
 import { Button } from "@/components/common/Button";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
 import { Modal } from "@/components/common/Modal";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
-import { GameCover, ProfileWidgets, widgetTitle } from "@/components/profile/Widgets";
+import { GameCover, MusicArt, ProfileWidgets, widgetTitle } from "@/components/profile/Widgets";
 import { useReorder } from "@/hooks/useReorder";
 import { Tr, t } from "@/i18n";
 import { describeError } from "@/lib/errors";
-import { LIMITS, MAX_CARDS, MOST_GAMES, WIDGET_TYPES, widgetImageUrl, type CardWidget, type GameWidget, type Widget, type WidgetGame, type WidgetStat, type WidgetType } from "@/lib/widgets";
+import { GAME_TYPES, LIMITS, MAX_CARDS, MOST_GAMES, MOST_MUSIC, MUSIC_TYPES, songLength, widgetImageUrl, type CardWidget, type FoundMusic, type GameWidget, type MusicWidget, type Widget, type WidgetGame, type WidgetMusic, type WidgetStat, type WidgetType } from "@/lib/widgets";
 import { useUI } from "@/stores/ui";
 import s from "./WidgetsEditor.module.css";
 
-const KIND_ICONS: Record<WidgetType, LucideIcon> = { favorite: Heart, playing: Gamepad2, wishlist: Bookmark, played: Library, custom: PanelTop };
+const KIND_ICONS: Record<WidgetType, LucideIcon> = { favorite: Heart, playing: Gamepad2, wishlist: Bookmark, played: Library, artists: MicVocal, albums: Disc3, songs: Music, custom: PanelTop };
+/** The kinds of widget, in the groups Add a Widget lists them in. */
+const KIND_GROUPS: { title: string; types: WidgetType[] }[] = [
+  { title: "widgets.group.games", types: GAME_TYPES },
+  { title: "widgets.group.music", types: MUSIC_TYPES },
+  { title: "widgets.group.cards", types: ["custom"] },
+];
 const IMAGE_TYPES = "image/png,image/jpeg,image/gif,image/webp";
 /** What a dragged row carries, so a drop from anywhere else is ignored. */
 const ROW_DRAG = "application/x-nexa-widget";
@@ -89,28 +95,36 @@ function moved<T>(items: T[], keyOf: (item: T) => string, key: string, delta: nu
   return next;
 }
 
-/** Add a Widget: the five kinds, each with what it shows, and why one cannot be added. */
+/** Add a Widget: every kind, in groups, each with what it shows, and why one cannot be added. */
 export function AddWidgetDialog({ widgets, onPick, onClose }: { widgets: Widget[]; onPick: (type: WidgetType) => void; onClose: () => void }) {
   const cards = widgets.filter((w) => w.type === "custom").length;
+  const ids = useId();
   return (
     <Modal open onClose={onClose} title={t("widgets.addOne")} width={480}>
-      <ul className={s.kinds}>
-        {WIDGET_TYPES.map((type) => {
-          const Icon = KIND_ICONS[type];
-          const taken = type === "custom" ? cards >= MAX_CARDS : widgets.some((w) => w.type === type);
-          return (
-            <li key={type}>
-              <button className={s.kind} disabled={taken} onClick={() => onPick(type)} data-testid={`widget-kind-${type}`}>
-                <span className={s.icon} aria-hidden="true"><Icon size={20} /></span>
-                <span className={s.kindText}>
-                  <span className={s.kindName}>{widgetTitle({ type })}</span>
-                  <span className={s.kindAbout}>{taken ? (type === "custom" ? t("widgets.cardsFull") : t("widgets.onProfile")) : t(`widgets.about.${type}`)}</span>
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      <div className={s.groups}>
+        {KIND_GROUPS.map((group, g) => (
+          <section key={group.title} aria-labelledby={`${ids}-${g}`}>
+            <h3 className={s.groupTitle} id={`${ids}-${g}`}>{t(group.title)}</h3>
+            <ul className={s.kinds}>
+              {group.types.map((type) => {
+                const Icon = KIND_ICONS[type];
+                const taken = type === "custom" ? cards >= MAX_CARDS : widgets.some((w) => w.type === type);
+                return (
+                  <li key={type}>
+                    <button className={s.kind} disabled={taken} onClick={() => onPick(type)} data-testid={`widget-kind-${type}`}>
+                      <span className={s.icon} aria-hidden="true"><Icon size={20} /></span>
+                      <span className={s.kindText}>
+                        <span className={s.kindName}>{widgetTitle({ type })}</span>
+                        <span className={s.kindAbout}>{taken ? (type === "custom" ? t("widgets.cardsFull") : t("widgets.onProfile")) : t(`widgets.about.${type}`)}</span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
     </Modal>
   );
 }
@@ -454,6 +468,290 @@ function TagEditor({ tags, onChange, game, suggest, onFocus }: { tags: string[];
         </div>
       ) : null}
     </>
+  );
+}
+
+const musicKey = (m: WidgetMusic) => (m.id ? `d:${m.id}` : `n:${m.name.toLowerCase()}\u0000${(m.by ?? "").toLowerCase()}`);
+const compact = (n: number) => {
+  try {
+    return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(n);
+  } catch {
+    return String(n);
+  }
+};
+
+/** What tells one found apart from others of its name: whose it is, what it is, how it was found. */
+function foundAbout(type: MusicWidget["type"], r: FoundMusic): string {
+  if (type === "artists") {
+    if (r.via) return t(r.via.kind === "song" ? "widgets.music.viaSong" : "widgets.music.viaAlbum", { name: r.via.name });
+    return r.fans ? t("widgets.music.fans", { count: r.fans, fans: compact(r.fans) }) : "";
+  }
+  const what = r.record === "single" ? t("widgets.music.single") : r.record === "ep" ? t("widgets.music.ep") : r.record === "compile" ? t("widgets.music.compilation") : "";
+  return [r.by, type === "songs" ? r.album : what].filter(Boolean).join(" · ");
+}
+
+/**
+ * A music widget: a search of Deezer through this server that finds what
+ * was meant from a name, a song or an album, or one typed in by name with a
+ * picture of its own; and the ones chosen, in order.
+ */
+export function MusicWidgetDialog({ initial, onDone, onClose }: { initial: MusicWidget; onDone: (w: MusicWidget) => void; onClose: () => void }) {
+  const toast = useUI((u) => u.toast);
+  const type = initial.type;
+  const most = MOST_MUSIC[type];
+  const [items, setItems] = useState<WidgetMusic[]>(initial.music);
+  const [q, setQ] = useState("");
+  const [found, setFound] = useState<{ q: string; results: FoundMusic[] } | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [failed, setFailed] = useState(false);
+  // whether this server can search Deezer at all, asked once as the dialog opens
+  const [ready, setReady] = useState<boolean | null>(null);
+  const [crop, setCrop] = useState<{ file: File; key: string } | null>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const pictureFor = useRef<string | null>(null);
+  const searchLabel = useId();
+  const query = q.trim();
+
+  useEffect(() => {
+    let alive = true;
+    usersApi.searchMusic(type, "").then(
+      (res) => alive && setReady(res.ready),
+      () => alive && setReady(true),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [type]);
+
+  useEffect(() => {
+    setFailed(false);
+    if (!query || ready === false) {
+      setFound(null);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    // a search a key press made stale is called off, not just ignored
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => {
+      usersApi.searchMusic(type, query, ctrl.signal).then(
+        (res) => {
+          setReady(res.ready);
+          setFound({ q: query, results: res.results });
+          setSearching(false);
+        },
+        () => {
+          if (ctrl.signal.aborted) return;
+          setFailed(true);
+          setSearching(false);
+        },
+      );
+    }, 280);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, [query, ready, type]);
+
+  const has = (m: WidgetMusic) => items.some((x) => musicKey(x) === musicKey(m));
+  const isFull = items.length >= most;
+  const add = (m: WidgetMusic) => {
+    if (has(m)) return setItems(items.filter((x) => musicKey(x) !== musicKey(m)));
+    if (isFull) return;
+    setItems([...items, m]);
+  };
+  const fromFound = (r: FoundMusic): WidgetMusic => ({ id: r.id, name: r.name, ...(r.by && type !== "artists" ? { by: r.by } : {}), ...(r.art ? { art: r.art } : {}), ...(r.duration && type === "songs" ? { duration: r.duration } : {}) });
+  const addByName = () => {
+    const name = query.slice(0, LIMITS.music);
+    if (!name) return;
+    add({ name });
+    setQ("");
+    searchRef.current?.focus();
+  };
+  const patch = (key: string, change: Partial<WidgetMusic>) => setItems((list) => list.map((m) => (musicKey(m) === key ? { ...m, ...change } : m)));
+  const drag = useRowDrag(items, musicKey, setItems);
+  const reorder = useReorder({
+    ids: items.map(musicKey),
+    move: (key, delta) => {
+      const next = moved(items, musicKey, key, delta);
+      if (next) setItems(next);
+      return !!next;
+    },
+    name: (key) => items.find((m) => musicKey(m) === key)?.name ?? "",
+  });
+  const upload = async (key: string, file: Blob, area: { x: number; y: number; w: number; h: number } | null) => {
+    setUploading(key);
+    try {
+      const res = await usersApi.uploadWidgetImage(file, area, "square");
+      patch(key, { image: res.id });
+    } catch (err) {
+      toast(describeError(err, t("composer.composer.uploadFailed")), "error");
+    } finally {
+      setUploading(null);
+    }
+  };
+  const choosePicture = (key: string) => {
+    pictureFor.current = key;
+    fileRef.current?.click();
+  };
+
+  const results = found && found.q === query ? found.results : [];
+  // a name typed that the search did not find exactly can go in as it is
+  const exact = results.some((r) => r.name.toLowerCase() === query.toLowerCase());
+  const byName = !!query && !exact && !items.some((m) => !m.id && m.name.toLowerCase() === query.toLowerCase());
+  const canSave = items.length > 0 && uploading === null;
+  const placeholder = ready === false ? t("widgets.music.namePlaceholder") : t(`widgets.music.placeholder.${type}`);
+
+  const resultRow = (r: FoundMusic) => {
+    const item = fromFound(r);
+    const on = has(item);
+    const about = foundAbout(type, r);
+    return (
+      <li key={r.id}>
+        <button className={s.result} aria-pressed={on} disabled={!on && isFull} onClick={() => add(item)} data-testid="music-result">
+          <MusicArt type={type} item={item} css={36} className={s.resultArt} />
+          <span className={s.resultStack}>
+            <span className={s.resultName} dir="auto">{r.name}</span>
+            {about ? <span className={s.resultAbout} dir="auto">{about}</span> : null}
+          </span>
+          {r.duration && type === "songs" ? <span className={s.resultYear}>{songLength(r.duration)}</span> : null}
+          <span className={s.resultMark} aria-hidden="true">{on ? <Check size={15} /> : <Plus size={15} />}</span>
+        </button>
+      </li>
+    );
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={widgetTitle(initial)}
+      width={520}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button>
+          <Button onClick={() => onDone({ ...initial, music: items })} disabled={!canSave} data-testid="widget-done">{t("pick.done")}</Button>
+        </>
+      }
+    >
+      <input
+        ref={fileRef}
+        type="file"
+        accept={IMAGE_TYPES}
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          const key = pictureFor.current;
+          if (f && key) setCrop({ file: f, key });
+          e.target.value = "";
+        }}
+      />
+      <span className={s.label} id={searchLabel}>{t(`widgets.music.search.${type}`)}</span>
+      <div className={s.searchBox}>
+        <Search size={17} className={s.searchIcon} aria-hidden="true" />
+        <TextInput
+          ref={searchRef}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              const first = results[0];
+              if (first && !has(fromFound(first))) add(fromFound(first));
+              else if (!first && byName && ready === false) addByName();
+            }
+          }}
+          maxLength={LIMITS.music}
+          placeholder={placeholder}
+          aria-labelledby={searchLabel}
+          autoComplete="off"
+          spellCheck={false}
+          data-testid="music-search"
+          autoFocus
+        />
+      </div>
+      {ready === false ? <p className={s.note}>{t("widgets.music.notSetUp")}</p> : null}
+      {query ? (
+        <ul className={s.results} aria-label={t("widgets.music.results")} aria-busy={searching || undefined}>
+          {results.map(resultRow)}
+          {searching && !results.length ? <li><p className={s.status}>{t("widgets.game.searching")}</p></li> : null}
+          {!searching && failed ? <li><p className={s.status}>{t("widgets.music.unavailable")}</p></li> : null}
+          {!searching && !failed && ready !== false && found?.q === query && !results.length ? <li><p className={s.status}>{t("widgets.music.noResults")}</p></li> : null}
+          {byName && !searching ? (
+            <li>
+              <button className={s.result} disabled={isFull} onClick={addByName} data-testid="music-by-name">
+                <span className={s.byName} data-square="" data-round={type === "artists" || undefined} aria-hidden="true"><Plus size={14} /></span>
+                <span className={s.resultText}><span className={s.resultName} dir="auto">{t("widgets.game.addByName", { name: query })}</span></span>
+              </button>
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+      {ready ? (
+        <p className={s.credit}>
+          <Tr id="widgets.music.credit" values={{ site: <a href="https://www.deezer.com" target="_blank" rel="noopener noreferrer">Deezer</a> }} />
+        </p>
+      ) : null}
+
+      <div className={s.labelRow}>
+        <span className={s.label}>{t(`widgets.music.yours.${type}`)}</span>
+        <span className={s.count}>{t("widgets.used", { count: items.length, max: most })}</span>
+      </div>
+      {items.length === 0 ? (
+        <p className={s.empty}>{t("widgets.music.noneYet")}</p>
+      ) : (
+        <ul className={s.chosen} aria-label={t(`widgets.music.yours.${type}`)}>
+          {items.map((m) => {
+            const key = musicKey(m);
+            return (
+              <li key={key} className={s.chosenRow} data-reorder-id={key} onKeyDown={reorder.onKeyDown(key)} {...drag.row(key)}>
+                <span className={s.grip} aria-hidden="true" {...drag.grip(key)}><GripVertical size={16} /></span>
+                <MusicArt type={type} item={m} css={36} className={s.chosenArt} />
+                <div className={s.chosenMain}>
+                  <span className={s.chosenText}>
+                    <span className={s.chosenName} dir="auto">{m.name}</span>
+                    {m.by ? <span className={s.chosenBy} dir="auto">{m.by}</span> : null}
+                  </span>
+                  {!m.art && !m.id ? (
+                    <div className={s.chosenBtns}>
+                      <button className={s.chip} disabled={uploading !== null} onClick={() => choosePicture(key)}>
+                        {uploading === key ? <LoaderCircle size={14} className={s.spin} aria-hidden="true" /> : <ImagePlus size={14} aria-hidden="true" />}
+                        {m.image ? t("widgets.changePicture") : t("widgets.addPicture")}
+                      </button>
+                      {m.image ? <button className={s.chip} onClick={() => patch(key, { image: undefined })}>{t("widgets.removePicture")}</button> : null}
+                    </div>
+                  ) : null}
+                </div>
+                <button className={s.iconBtn} aria-label={t("widgets.game.remove", { name: m.name })} onClick={() => setItems(items.filter((x) => musicKey(x) !== key))}>
+                  <X size={16} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {items.length > 1 ? <p className={s.small}>{reorder.hint}</p> : null}
+      {reorder.live}
+
+      {crop ? (
+        <ImageCropModal
+          file={crop.file}
+          aspect={1}
+          round={type === "artists"}
+          maxSize={512}
+          serverCrop
+          title={t("widgets.card.cropTitle")}
+          onClose={() => setCrop(null)}
+          onDone={({ blob, crop: area }) => {
+            const key = crop.key;
+            setCrop(null);
+            void upload(key, blob, area ?? null);
+          }}
+        />
+      ) : null}
+    </Modal>
   );
 }
 

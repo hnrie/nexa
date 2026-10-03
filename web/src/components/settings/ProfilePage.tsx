@@ -9,7 +9,7 @@ import { Modal } from "@/components/common/Modal";
 import { Popout } from "@/components/common/Popout";
 import { StyledTyping } from "@/components/chat/TypingLine";
 import { ProfileCard, type ProfileDesign, type ProfilePart, type ProfileTab } from "@/components/profile/ProfileCard";
-import { widgetTitle, type WidgetDesign } from "@/components/profile/Widgets";
+import { widgetName, type WidgetDesign } from "@/components/profile/Widgets";
 import { ServerTagChip } from "@/components/servertag/ServerTagChip";
 import { SaveBar } from "@/components/server/SettingsLayer";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -19,14 +19,14 @@ import { useDominantColor } from "@/lib/dominantColor";
 import { describeError } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
 import { readTypingStyle, sameTypingStyle, type TypingStyle } from "@/lib/typingStyle";
-import { isGameWidget, newWidgetId, readWidgets, type Widget, type WidgetType } from "@/lib/widgets";
+import { isGameWidget, isMusicType, isMusicWidget, newWidgetId, readWidgets, type Widget, type WidgetType } from "@/lib/widgets";
 import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
 import { AboutMeEditor, aboutToEdit, aboutToSave } from "./AboutMeEditor";
 import { CustomColorIcon } from "./CustomColorIcon";
 import { ServerTagList, wearServerTag } from "./ServerTagChooser";
 import { TypingStyleEditor } from "./TypingStyleEditor";
-import { AddWidgetDialog, CardDialog, GameWidgetDialog } from "./WidgetsEditor";
+import { AddWidgetDialog, CardDialog, GameWidgetDialog, MusicWidgetDialog } from "./WidgetsEditor";
 import st from "./Settings.module.css";
 import d from "./Designer.module.css";
 
@@ -465,7 +465,7 @@ export default function ProfilePage({ anchor }: { anchor?: string | null }) {
   const startWidget = (type: WidgetType) => {
     setAdding(false);
     const id = newWidgetId();
-    setEditing({ widget: type === "custom" ? { id, type, title: "" } : { id, type, games: [] }, isNew: true });
+    setEditing({ widget: type === "custom" ? { id, type, title: "" } : isMusicType(type) ? { id, type, music: [] } : { id, type, games: [] }, isNew: true });
   };
   const doneWidget = (w: Widget) => {
     if (!editing) return;
@@ -545,7 +545,7 @@ export default function ProfilePage({ anchor }: { anchor?: string | null }) {
                   {widgets.map((w) => (
                     <button key={w.id} type="button" role="radio" aria-checked={first?.id === w.id} className={d.choice} onClick={() => widgetTools.feature(w.id)} data-testid={`designer-card-${w.type}`}>
                       <span className={d.choiceDot} aria-hidden="true" />
-                      <span className={d.choiceText} dir="auto">{isGameWidget(w) ? widgetTitle(w) : w.title}</span>
+                      <span className={d.choiceText} dir="auto">{widgetName(w)}</span>
                     </button>
                   ))}
                 </div>
@@ -628,7 +628,8 @@ export default function ProfilePage({ anchor }: { anchor?: string | null }) {
 
       {adding ? <AddWidgetDialog widgets={widgets} onPick={startWidget} onClose={() => setAdding(false)} /> : null}
       {editing && isGameWidget(editing.widget) ? <GameWidgetDialog initial={editing.widget} onDone={doneWidget} onClose={() => setEditing(null)} /> : null}
-      {editing && !isGameWidget(editing.widget) ? <CardDialog initial={editing.widget} isNew={editing.isNew} onDone={doneWidget} onClose={() => setEditing(null)} /> : null}
+      {editing && isMusicWidget(editing.widget) ? <MusicWidgetDialog initial={editing.widget} onDone={doneWidget} onClose={() => setEditing(null)} /> : null}
+      {editing && editing.widget.type === "custom" ? <CardDialog initial={editing.widget} isNew={editing.isNew} onDone={doneWidget} onClose={() => setEditing(null)} /> : null}
 
       {crop ? (
         <ImageCropModal

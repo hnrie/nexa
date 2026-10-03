@@ -4818,10 +4818,10 @@
   "server.auditLog.verb.server_tag_delete": "移除了服务器标签",
   "common.imageCrop.keepsMoving": "裁剪后它依然会动。",
   "widgets.title": "小组件",
-  "widgets.hint": "展示你喜爱的游戏和正在玩的游戏，或者自己制作卡片。所有能看到你个人资料的人都能看到它们。",
+  "widgets.hint": "展示你喜爱的游戏和音乐、正在玩的游戏，或者自己制作卡片。所有能看到你个人资料的人都能看到它们。",
   "widgets.add": "添加小组件",
   "widgets.addOne": "添加一个小组件",
-  "widgets.emptyOwn": "展示你喜爱的游戏和正在玩的游戏，或者自己制作一张卡片。",
+  "widgets.emptyOwn": "展示你喜爱的游戏和音乐、正在玩的游戏，或者自己制作一张卡片。",
   "widgets.used": "{count}/{max}",
   "widgets.full": "你的个人资料已经放不下更多小组件了。移除一个才能添加新的。",
   "widgets.onProfile": "已经在你的个人资料上了。",
@@ -4992,5 +4992,50 @@
   "whatsNew.r202610025.popoutTitle": "资料卡在名字旁边打开",
   "whatsNew.r202610025.popoutBody": "点击名字或头像，旁边就会打开一张小资料卡。你可以直接在那里给对方发消息，或者打开完整资料。",
   "whatsNew.r202610025.rolesTitle": "资料卡上的身份组",
-  "whatsNew.r202610025.rolesBody": "在服务器里，资料卡会显示对方的身份组。如果你能管理身份组，可以用 + 添加，或者点身份组上的 x 移除。"
+  "whatsNew.r202610025.rolesBody": "在服务器里，资料卡会显示对方的身份组。如果你能管理身份组，可以用 + 添加，或者点身份组上的 x 移除。",
+  "widgets.type.artists": "最爱的艺人",
+  "widgets.type.albums": "最爱的专辑",
+  "widgets.type.songs": "最爱的歌曲",
+  "widgets.about.artists": "你能听上一整天的艺人，最多十二位。",
+  "widgets.about.albums": "你倒背如流的专辑，最多十二张。",
+  "widgets.about.songs": "你从不跳过的歌，最多十首。",
+  "widgets.group.games": "游戏",
+  "widgets.group.music": "音乐",
+  "widgets.group.cards": "卡片",
+  "widgets.artistCount": {
+    "other": "{count} 位艺人"
+  },
+  "widgets.albumCount": {
+    "other": "{count} 张专辑"
+  },
+  "widgets.songCount": {
+    "other": "{count} 首歌"
+  },
+  "widgets.music.onDeezer": "在 Deezer 上打开",
+  "widgets.music.search.artists": "搜索艺人",
+  "widgets.music.search.albums": "搜索专辑",
+  "widgets.music.search.songs": "搜索歌曲",
+  "widgets.music.placeholder.artists": "艺人，或其歌曲、专辑",
+  "widgets.music.placeholder.albums": "专辑，或其艺人、其中的歌曲",
+  "widgets.music.placeholder.songs": "歌曲，或其艺人、专辑",
+  "widgets.music.namePlaceholder": "输入名称",
+  "widgets.music.notSetUp": "这里没有设置音乐搜索，所以只能按名称添加。你可以给每一项配一张图片。",
+  "widgets.music.unavailable": "音乐搜索暂时没有响应。请稍后再试，或者按名称添加。",
+  "widgets.music.noResults": "没有找到匹配的结果。你可以按名称添加。",
+  "widgets.music.results": "找到的音乐",
+  "widgets.music.credit": "音乐信息来自 {site}",
+  "widgets.music.yours.artists": "你的艺人",
+  "widgets.music.yours.albums": "你的专辑",
+  "widgets.music.yours.songs": "你的歌曲",
+  "widgets.music.noneYet": "在上方搜索，挑选要展示的内容。",
+  "widgets.music.fans": {
+    "other": "{fans} 位粉丝"
+  },
+  "widgets.music.viaSong": "歌曲：{name}",
+  "widgets.music.viaAlbum": "专辑：{name}",
+  "widgets.music.single": "单曲",
+  "widgets.music.ep": "EP",
+  "widgets.music.compilation": "合辑",
+  "whatsNew.r202610026.musicTitle": "在个人资料中展示音乐",
+  "whatsNew.r202610026.musicBody": "展示你最爱的艺人、专辑和歌曲，按你记得的方式搜索：输入歌名能找到演唱者，输入专辑名能找到其中的歌曲。可在“设置”的“个人资料”中添加。"
 }

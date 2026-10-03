@@ -31,6 +31,7 @@ import (
 	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
+	"evilion.xyz/chat/internal/music"
 	"evilion.xyz/chat/internal/rpcapps"
 	"evilion.xyz/chat/internal/store"
 	"evilion.xyz/chat/internal/unfurl"
@@ -142,6 +143,12 @@ func main() {
 	srv.Games.Log = log
 	if out != nil {
 		srv.Games.HTTP.Transport = out.Transport()
+	}
+	// and their music, searched on Deezer and its pictures kept the same way
+	srv.Music = music.New(filepath.Join(cfg.DataDir, "music"))
+	srv.Music.Log = log
+	if out != nil {
+		srv.Music.HTTP.Transport = out.Transport()
 	}
 	hub := gateway.New(st, srv.Auth, log, cfg.Origins())
 	srv.Bcast = hub

@@ -4987,10 +4987,10 @@
   "server.auditLog.verb.server_tag_delete": "hat den Server-Tag entfernt",
   "common.imageCrop.keepsMoving": "Es bleibt auch nach dem Zuschneiden bewegt.",
   "widgets.title": "Widgets",
-  "widgets.hint": "Zeig die Spiele, die du liebst, und was du gerade spielst, oder erstelle eigene Karten. Alle, die dein Profil sehen können, sehen sie.",
+  "widgets.hint": "Zeig die Spiele und die Musik, die du liebst, und was du gerade spielst, oder erstelle eigene Karten. Alle, die dein Profil sehen können, sehen sie.",
   "widgets.add": "Widgets hinzufügen",
   "widgets.addOne": "Widget hinzufügen",
-  "widgets.emptyOwn": "Zeig die Spiele, die du liebst, und was du gerade spielst, oder erstelle eine eigene Karte.",
+  "widgets.emptyOwn": "Zeig die Spiele und die Musik, die du liebst, und was du gerade spielst, oder erstelle eine eigene Karte.",
   "widgets.used": "{count} von {max}",
   "widgets.full": "Dein Profil hat so viele Widgets, wie hineinpassen. Nimm eins heraus, um ein anderes hinzuzufügen.",
   "widgets.onProfile": "Schon in deinem Profil.",
@@ -5163,5 +5163,54 @@
   "whatsNew.r202610025.popoutTitle": "Profile öffnen sich neben dem Namen",
   "whatsNew.r202610025.popoutBody": "Klick auf einen Namen oder ein Profilbild, und direkt daneben öffnet sich ein kleines Profil. Von dort kannst du der Person schreiben oder ihr ganzes Profil öffnen.",
   "whatsNew.r202610025.rolesTitle": "Rollen im Profil",
-  "whatsNew.r202610025.rolesBody": "In einem Server zeigt das Profil die Rollen der Person. Wenn du Rollen verwalten darfst, fügst du mit + eine hinzu oder nimmst eine mit ihrem x wieder weg."
+  "whatsNew.r202610025.rolesBody": "In einem Server zeigt das Profil die Rollen der Person. Wenn du Rollen verwalten darfst, fügst du mit + eine hinzu oder nimmst eine mit ihrem x wieder weg.",
+  "widgets.type.artists": "Lieblingskünstler",
+  "widgets.type.albums": "Lieblingsalben",
+  "widgets.type.songs": "Lieblingssongs",
+  "widgets.about.artists": "Die Künstler, die du den ganzen Tag hören könntest, bis zu zwölf.",
+  "widgets.about.albums": "Die Alben, die du auswendig kennst, bis zu zwölf.",
+  "widgets.about.songs": "Die Songs, die du nie überspringst, bis zu zehn.",
+  "widgets.group.games": "Spiele",
+  "widgets.group.music": "Musik",
+  "widgets.group.cards": "Karten",
+  "widgets.artistCount": {
+    "one": "{count} Künstler",
+    "other": "{count} Künstler"
+  },
+  "widgets.albumCount": {
+    "one": "{count} Album",
+    "other": "{count} Alben"
+  },
+  "widgets.songCount": {
+    "one": "{count} Song",
+    "other": "{count} Songs"
+  },
+  "widgets.music.onDeezer": "Auf Deezer öffnen",
+  "widgets.music.search.artists": "Künstler suchen",
+  "widgets.music.search.albums": "Alben suchen",
+  "widgets.music.search.songs": "Songs suchen",
+  "widgets.music.placeholder.artists": "Künstler, Song oder Album",
+  "widgets.music.placeholder.albums": "Album, Künstler oder einer der Songs",
+  "widgets.music.placeholder.songs": "Song, Künstler oder Album",
+  "widgets.music.namePlaceholder": "Namen eingeben",
+  "widgets.music.notSetUp": "Die Musiksuche ist hier nicht eingerichtet, Musik wird also per Name eingetragen. Du kannst jedem Eintrag ein Bild geben.",
+  "widgets.music.unavailable": "Die Musiksuche antwortet gerade nicht. Versuch es gleich noch einmal oder füge es per Name hinzu.",
+  "widgets.music.noResults": "Dazu passt nichts. Du kannst es per Name hinzufügen.",
+  "widgets.music.results": "Gefundene Musik",
+  "widgets.music.credit": "Musikinfos von {site}",
+  "widgets.music.yours.artists": "Deine Künstler",
+  "widgets.music.yours.albums": "Deine Alben",
+  "widgets.music.yours.songs": "Deine Songs",
+  "widgets.music.noneYet": "Such oben und wähl aus, was du zeigen willst.",
+  "widgets.music.fans": {
+    "one": "{fans} Fan",
+    "other": "{fans} Fans"
+  },
+  "widgets.music.viaSong": "Song: {name}",
+  "widgets.music.viaAlbum": "Album: {name}",
+  "widgets.music.single": "Single",
+  "widgets.music.ep": "EP",
+  "widgets.music.compilation": "Compilation",
+  "whatsNew.r202610026.musicTitle": "Musik auf deinem Profil",
+  "whatsNew.r202610026.musicBody": "Zeig deine Lieblingskünstler, -alben und -songs und finde sie so, wie du sie im Kopf hast: Gib einen Song ein, um zu finden, wer ihn gemacht hat, oder ein Album, um seine Songs zu finden. Füge sie unter Einstellungen, Profile hinzu."
 }

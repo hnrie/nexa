@@ -293,6 +293,18 @@ func (c *Client) Lookup(ctx context.Context, ids []string) (map[string]Game, err
 	return out, nil
 }
 
+// Kept is where a cover is kept at a size, if it has been fetched already.
+func (c *Client) Kept(imageID, size string) (string, bool) {
+	if _, ok := CoverSizes[size]; !ok || !CoverPattern.MatchString(imageID) {
+		return "", false
+	}
+	path := filepath.Join(c.Dir, "covers", imageID+"-"+size+".jpg")
+	if fi, err := os.Stat(path); err == nil && fi.Size() > 0 {
+		return path, true
+	}
+	return "", false
+}
+
 // CoverFile is a game's cover kept at a size ("s" or "l"), fetched the first
 // time it is asked for. Only IGDB's own picture addresses are ever fetched.
 func (c *Client) CoverFile(ctx context.Context, imageID, size string) (string, error) {

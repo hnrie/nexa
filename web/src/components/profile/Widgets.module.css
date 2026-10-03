@@ -158,3 +158,136 @@ button.peek:hover, button.peek:focus-visible { background: var(--profile-chip-ho
 .peekArt > .peekCover:nth-child(3) { z-index: 1; margin-inline-start: -10px; }
 .peekImage { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; }
 .peekMore { flex: none; font-size: 12px; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/*
+ * The music widgets, drawn from the pictures Deezer has, kept here. Artists
+ * are faces, so round. Albums are records: each square sleeve has the edge
+ * of its disc showing beside it, and pointing at one draws the disc a little
+ * further out, the one thing on the sheet that moves. Songs are a tracklist,
+ * numbered in the order they were put and with their lengths, the way the
+ * back of a sleeve prints them.
+ */
+.art {
+  position: relative;
+  display: block;
+  flex: none;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-active);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 0 1px color-mix(in srgb, var(--text-strong) 8%, transparent), 0 6px 14px -8px color-mix(in srgb, var(--shade) 85%, transparent);
+}
+.art[data-round] { border-radius: 50%; }
+.art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.artName {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 6px;
+  background: linear-gradient(165deg, color-mix(in oklab, var(--cover-tint) 78%, #fff), color-mix(in oklab, var(--cover-tint) 70%, #000));
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.artName[data-small] { align-items: center; justify-content: center; padding: 0; line-height: 1; }
+
+/* Favourite Artists: faces with their names, six across in a wide card, four in a narrow one and three beside a chat */
+.lineup { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 10px; margin: 0; padding: 0; list-style: none; }
+@container (min-width: 420px) {
+  .lineup { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px 12px; }
+}
+.artist { display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0; color: inherit; text-align: center; border-radius: 10px; }
+.portrait { width: 100%; transition: box-shadow var(--transition); }
+/* a name may reach a little into the gaps, so "Radiohead" is not broken under a small face */
+.artistName { display: -webkit-box; width: calc(100% + 6px); margin-inline: -3px; font-size: 12.5px; font-weight: 650; line-height: 15px; color: var(--text-strong); overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+a.artist:hover { text-decoration: none; }
+@media (hover: hover) {
+  a.artist:hover .artistName { text-decoration: underline; text-underline-offset: 2px; }
+  a.artist:hover .portrait { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 0 2px color-mix(in srgb, var(--profile-accent, var(--brand)) 70%, transparent), 0 6px 14px -8px color-mix(in srgb, var(--shade) 85%, transparent); }
+}
+
+/*
+ * Favourite Albums: sleeves, each with room beside it for the edge of its
+ * record. Five across in a wide card, where a title has room to be read,
+ * four in a narrow one and three beside a chat.
+ */
+.crate { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 10px; margin: 0; padding: 0; list-style: none; overflow-x: clip; }
+@container (min-width: 420px) {
+  .crate { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px 14px; }
+}
+.board[data-variant="panel"] .crate, .board[data-variant="panel"] .lineup { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; }
+@container (max-width: 300px) {
+  .crate, .lineup { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.album { display: flex; flex-direction: column; min-width: 0; color: inherit; border-radius: 6px; }
+a.album:hover { text-decoration: none; }
+@media (hover: hover) {
+  a.album:hover .albumName { text-decoration: underline; text-underline-offset: 2px; }
+}
+.sleeve { position: relative; display: block; padding-inline-end: 13%; margin-bottom: 7px; }
+.sleeveArt { position: relative; z-index: 1; width: 100%; border-radius: 3px; }
+/*
+ * Black vinyl: fine grooves, its edge catching the light, and a glint across
+ * the side that shows (a turn on hover carries it round). Lit from its own
+ * rim, so it reads on a dark sheet as well as a light one.
+ */
+.record {
+  position: absolute;
+  top: 5%;
+  bottom: 5%;
+  inset-inline-end: 0;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    conic-gradient(from 0deg, transparent 0deg 52deg, rgba(255, 255, 255, 0.24) 78deg, transparent 104deg, transparent 232deg, rgba(255, 255, 255, 0.12) 258deg, transparent 284deg),
+    repeating-radial-gradient(circle, rgba(255, 255, 255, 0.07) 0 0.7px, transparent 0.7px 2.4px),
+    radial-gradient(circle, #2b2830 0 15%, #19171d 15.5% 64%, #111014 72%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.5), 0 6px 14px -8px rgba(0, 0, 0, 0.7);
+  transition: transform 420ms var(--ease-out);
+}
+[dir="rtl"] .record { transform: scaleX(-1); }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  a.album:hover .record, a.album:focus-visible .record { transform: translateX(16%) rotate(28deg); }
+  [dir="rtl"] a.album:hover .record, [dir="rtl"] a.album:focus-visible .record { transform: scaleX(-1) translateX(16%) rotate(28deg); }
+}
+.albumName, .albumBy { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.albumName { font-size: 12.5px; font-weight: 650; line-height: 16px; color: var(--text-strong); }
+.albumBy { font-size: 12px; line-height: 15px; color: var(--text-muted); }
+
+/*
+ * Favourite Songs: a row a song. One column shows the first five (four beside
+ * a chat) with the rest a press away; a wide card has room for all of them in
+ * two columns, read down the first and on down the second.
+ */
+.tracks { display: flex; flex-direction: column; gap: 2px; margin: 0 -6px; padding: 0; list-style: none; }
+.tracks:not([data-all]) > li[data-past] { display: none; }
+.track { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 50px; padding: 4px 6px; border-radius: 9px; color: inherit; transition: background var(--transition); }
+a.track:hover { text-decoration: none; }
+@media (hover: hover) {
+  a.track:hover { background: var(--profile-chip); }
+}
+.trackNo { flex: none; min-width: 1.3em; text-align: end; font-size: 13px; font-weight: 650; line-height: 1; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.trackArt { width: 40px; border-radius: 5px; }
+.trackText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.trackName, .trackBy { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trackName { font-size: 14.5px; font-weight: 650; line-height: 18px; color: var(--text-strong); }
+.trackBy { font-size: 12.5px; line-height: 16px; color: var(--text-muted); }
+.trackLen { flex: none; font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+@container (min-width: 480px) {
+  .tracks[data-two] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), auto); grid-auto-flow: column; gap: 2px 14px; }
+  .tracks[data-two] > li[data-past] { display: block; }
+  .moreNarrow { display: none; }
+}
+
+/* the popout's line: artists' faces round, covers square, in the same fan as games' boxes */
+.peekMusic { width: 26px; border-radius: 4px; }
+.peekArt > .peekMusic:nth-child(1) { z-index: 3; }
+.peekArt > .peekMusic:nth-child(2) { z-index: 2; margin-inline-start: -10px; }
+.peekArt > .peekMusic:nth-child(3) { z-index: 1; margin-inline-start: -10px; }
+.peekArt > .peekMusic[data-round] { border-radius: 50%; box-shadow: 0 0 0 2px var(--profile-chip, var(--bg-floating)); }

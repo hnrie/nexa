@@ -1,8 +1,8 @@
 import { ArrowDown, ArrowUp, ExternalLink, LayoutGrid, Pencil, Pin, Plus, Trash2 } from "lucide-react";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { Tooltip } from "@/components/common/Tooltip";
-import { avatarColor } from "@/lib/avatarColor";
-import { gamePicture, isGameWidget, linkHost, MAX_WIDGETS, widgetImageUrl, type CardWidget, type GameWidget, type Widget, type WidgetGame } from "@/lib/widgets";
+import { avatarColor, initials } from "@/lib/avatarColor";
+import { gamePicture, isGameWidget, isMusicWidget, linkHost, MAX_WIDGETS, musicLink, musicPicture, songLength, widgetImageUrl, type CardWidget, type GameWidget, type MusicWidget, type MusicWidgetType, type Widget, type WidgetGame, type WidgetMusic } from "@/lib/widgets";
 import { t } from "@/i18n";
 import s from "./Widgets.module.css";
 
@@ -24,7 +24,7 @@ export interface WidgetDesign {
 
 /** One widget in the designer: pressing it changes it, and its tools sit along its top. */
 function Designed({ w, index, count, design, children }: { w: Widget; index: number; count: number; design: WidgetDesign; children: ReactNode }) {
-  const name = isGameWidget(w) ? widgetTitle(w) : w.title;
+  const name = widgetName(w);
   return (
     <div className={s.designed} data-first={index === 0 || undefined} data-testid={`designed-${w.type}`}>
       {children}
@@ -46,7 +46,7 @@ function Designed({ w, index, count, design, children }: { w: Widget; index: num
   );
 }
 
-/** What each kind of games widget is called, on a profile and in the editor. */
+/** What each kind of widget is called, on a profile and in the editor. */
 export function widgetTitle(w: Pick<Widget, "type">): string {
   switch (w.type) {
     case "favorite":
@@ -57,9 +57,27 @@ export function widgetTitle(w: Pick<Widget, "type">): string {
       return t("widgets.type.wishlist");
     case "played":
       return t("widgets.type.played");
+    case "artists":
+      return t("widgets.type.artists");
+    case "albums":
+      return t("widgets.type.albums");
+    case "songs":
+      return t("widgets.type.songs");
     default:
       return t("widgets.type.custom");
   }
+}
+
+/** A widget's name where it is listed: a card's own title, else what its kind is called. */
+export function widgetName(w: Widget): string {
+  return w.type === "custom" ? w.title : widgetTitle(w);
+}
+
+/** How many a music widget holds, in the words for its kind. */
+export function musicCount(type: MusicWidgetType, count: number): string {
+  if (type === "artists") return t("widgets.artistCount", { count });
+  if (type === "albums") return t("widgets.albumCount", { count });
+  return t("widgets.songCount", { count });
 }
 
 /**
@@ -159,6 +177,143 @@ function Shelf({ w, variant, onShowAll }: { w: GameWidget; variant: Variant; onS
   );
 }
 
+/**
+ * An artist's photo, round, or the cover of an album or of the album a song
+ * is on: from Deezer, or the picture its owner put up, or its name on a
+ * colour of its own when it has neither (or it would not load). An artist's,
+ * or one drawn small, is only the first letter, as an avatar's is.
+ */
+export function MusicArt({ type, item, css, className }: { type: MusicWidgetType; item: WidgetMusic; css: number; className?: string | undefined }) {
+  const src = musicPicture(type, item, css);
+  const [broken, setBroken] = useState<string | null>(null);
+  const shown = src && broken !== src ? src : null;
+  const small = css < 64 || type === "artists";
+  return (
+    <span className={[s.art, className ?? ""].join(" ")} data-round={type === "artists" || undefined} style={{ "--cover-tint": avatarColor(item.name) } as CSSProperties} aria-hidden="true">
+      {shown ? (
+        <img src={shown} alt="" loading="lazy" draggable={false} onError={() => setBroken(shown)} />
+      ) : (
+        <span className={s.artName} data-small={small || undefined} style={small ? { fontSize: Math.round(css * 0.4) } : undefined} dir="auto">
+          {small ? initials(item.name) : item.name}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** One artist, album or song: a link to it on Deezer when it was found there, else just itself. */
+function Linked({ type, item, className, children }: { type: MusicWidgetType; item: WidgetMusic; className: string | undefined; children: ReactNode }) {
+  const href = musicLink(type, item);
+  if (!href) return <span className={className}>{children}</span>;
+  return (
+    <a className={className} href={href} target="_blank" rel="noopener noreferrer" title={t("widgets.music.onDeezer")} data-testid="music-link">
+      {children}
+    </a>
+  );
+}
+
+function MusicHead({ w }: { w: MusicWidget }) {
+  return (
+    <div className={s.head}>
+      <h3>{widgetTitle(w)}</h3>
+      <span className={s.count} aria-label={musicCount(w.type, w.music.length)}>{w.music.length.toLocaleString()}</span>
+    </div>
+  );
+}
+
+/** Show All past the first few: on the full profile where it is a preview (onShowAll), or here. */
+function MoreMusic({ all, setAll, onShowAll, className }: { all: boolean; setAll: (v: boolean) => void; onShowAll?: (() => void) | undefined; className?: string | undefined }) {
+  if (onShowAll) return <button className={s.more} onClick={onShowAll}>{t("widgets.showAll")}</button>;
+  return (
+    <button className={[s.more, className ?? ""].join(" ")} onClick={() => setAll(!all)} aria-expanded={all}>
+      {all ? t("widgets.showFewer") : t("widgets.showAll")}
+    </button>
+  );
+}
+
+/** Favourite Artists: their faces in a row with their names under them, like a bill. */
+function Artists({ w, variant, onShowAll }: { w: MusicWidget; variant: Variant; onShowAll?: (() => void) | undefined }) {
+  const [all, setAll] = useState(false);
+  const most = variant === "panel" ? 3 : onShowAll ? 6 : 12;
+  const shown = all ? w.music : w.music.slice(0, most);
+  return (
+    <section className={[s.widget, s.shelfWrap].join(" ")} data-testid="widget-artists">
+      <MusicHead w={w} />
+      <ul className={s.lineup} aria-label={widgetTitle(w)}>
+        {shown.map((m, i) => (
+          <li key={`${m.id ?? m.name}-${i}`}>
+            <Linked type="artists" item={m} className={s.artist}>
+              <MusicArt type="artists" item={m} css={variant === "panel" ? 64 : 88} className={s.portrait} />
+              <span className={s.artistName} dir="auto">{m.name}</span>
+            </Linked>
+          </li>
+        ))}
+      </ul>
+      {w.music.length > most ? <MoreMusic all={all} setAll={setAll} onShowAll={onShowAll} /> : null}
+    </section>
+  );
+}
+
+/** Favourite Albums: a crate of sleeves, the edge of each one's record showing. */
+function Albums({ w, variant, onShowAll }: { w: MusicWidget; variant: Variant; onShowAll?: (() => void) | undefined }) {
+  const [all, setAll] = useState(false);
+  const most = variant === "panel" ? 3 : onShowAll ? 5 : 12;
+  const shown = all ? w.music : w.music.slice(0, most);
+  return (
+    <section className={[s.widget, s.shelfWrap].join(" ")} data-testid="widget-albums">
+      <MusicHead w={w} />
+      <ul className={s.crate} aria-label={widgetTitle(w)}>
+        {shown.map((m, i) => (
+          <li key={`${m.id ?? m.name}-${i}`}>
+            <Linked type="albums" item={m} className={s.album}>
+              <span className={s.sleeve}>
+                <span className={s.record} aria-hidden="true" />
+                <MusicArt type="albums" item={m} css={variant === "panel" ? 64 : 88} className={s.sleeveArt} />
+              </span>
+              <span className={s.albumName} dir="auto">{m.name}</span>
+              {m.by ? <span className={s.albumBy} dir="auto">{m.by}</span> : null}
+            </Linked>
+          </li>
+        ))}
+      </ul>
+      {w.music.length > most ? <MoreMusic all={all} setAll={setAll} onShowAll={onShowAll} /> : null}
+    </section>
+  );
+}
+
+/**
+ * Favourite Songs: a tracklist, numbered in the order they were put, with
+ * each song's length. One column shows five (four beside a chat); a wide one
+ * sets them all in two, down the first and on down the second.
+ */
+function Songs({ w, variant, onShowAll }: { w: MusicWidget; variant: Variant; onShowAll?: (() => void) | undefined }) {
+  const [all, setAll] = useState(false);
+  const n = w.music.length;
+  const cap = variant === "panel" ? 4 : 5;
+  const two = variant === "modal" && n > cap;
+  return (
+    <section className={[s.widget, s.shelfWrap].join(" ")} data-testid="widget-songs">
+      <MusicHead w={w} />
+      <ol className={s.tracks} role="list" aria-label={widgetTitle(w)} data-two={two || undefined} data-all={all || undefined} style={{ "--rows": Math.ceil(n / 2) } as CSSProperties}>
+        {w.music.map((m, i) => (
+          <li key={`${m.id ?? m.name}-${i}`} data-past={i >= cap || undefined}>
+            <Linked type="songs" item={m} className={s.track}>
+              <span className={s.trackNo} aria-hidden="true">{(i + 1).toLocaleString()}</span>
+              <MusicArt type="songs" item={m} css={40} className={s.trackArt} />
+              <span className={s.trackText}>
+                <span className={s.trackName} dir="auto">{m.name}</span>
+                {m.by ? <span className={s.trackBy} dir="auto">{m.by}</span> : null}
+              </span>
+              {m.duration ? <span className={s.trackLen}>{songLength(m.duration)}</span> : null}
+            </Linked>
+          </li>
+        ))}
+      </ol>
+      {n > cap ? <MoreMusic all={all} setAll={setAll} onShowAll={onShowAll} className={two ? s.moreNarrow : undefined} /> : null}
+    </section>
+  );
+}
+
 function Card({ w, variant }: { w: CardWidget; variant: Variant }) {
   const wide = w.image && w.shape !== "square" ? w.image : null;
   const square = w.image && w.shape === "square" ? w.image : null;
@@ -204,9 +359,19 @@ function Card({ w, variant }: { w: CardWidget; variant: Variant }) {
 export function WidgetPeek({ widgets, onOpen }: { widgets: Widget[]; onOpen?: (() => void) | undefined }) {
   const w = widgets[0];
   if (!w) return null;
-  const game = isGameWidget(w);
-  const title = game ? widgetTitle(w) : w.title;
-  const sub = game ? (w.games.length === 1 ? w.games[0]!.name : t("widgets.gameCount", { count: w.games.length })) : (w.text ?? "");
+  const title = widgetName(w);
+  let sub: string;
+  let art: ReactNode = null;
+  if (isGameWidget(w)) {
+    sub = w.games.length === 1 ? w.games[0]!.name : t("widgets.gameCount", { count: w.games.length });
+    art = w.games.slice(0, 3).map((g, i) => <GameCover key={i} game={g} css={30} className={s.peekCover} />);
+  } else if (isMusicWidget(w)) {
+    sub = w.music.length === 1 ? w.music[0]!.name : musicCount(w.type, w.music.length);
+    art = w.music.slice(0, 3).map((m, i) => <MusicArt key={i} type={w.type} item={m} css={30} className={s.peekMusic} />);
+  } else {
+    sub = w.text ?? "";
+    art = w.image ? <img className={s.peekImage} src={widgetImageUrl(w.image, 40)} alt="" draggable={false} /> : null;
+  }
   const more = widgets.length - 1;
   const body = (
     <>
@@ -214,9 +379,7 @@ export function WidgetPeek({ widgets, onOpen }: { widgets: Widget[]; onOpen?: ((
         <span className={s.peekTitle} dir="auto">{title}</span>
         {sub ? <span className={s.peekSub} dir="auto">{sub}</span> : null}
       </span>
-      <span className={s.peekArt} aria-hidden="true">
-        {game ? w.games.slice(0, 3).map((g, i) => <GameCover key={i} game={g} css={30} className={s.peekCover} />) : w.image ? <img className={s.peekImage} src={widgetImageUrl(w.image, 40)} alt="" draggable={false} /> : null}
-      </span>
+      <span className={s.peekArt} aria-hidden="true">{art}</span>
       {more > 0 ? <span className={s.peekMore}>+{more}</span> : null}
     </>
   );
@@ -248,6 +411,11 @@ export function ProfileWidgets({ widgets, variant, onAdd, onShowAll, design }: {
     );
   }
   const draw = (w: Widget) => {
+    if (isMusicWidget(w)) {
+      if (w.type === "artists") return <Artists key={w.id} w={w} variant={variant} onShowAll={onShowAll} />;
+      if (w.type === "albums") return <Albums key={w.id} w={w} variant={variant} onShowAll={onShowAll} />;
+      return <Songs key={w.id} w={w} variant={variant} onShowAll={onShowAll} />;
+    }
     if (!isGameWidget(w)) return <Card key={w.id} w={w} variant={variant} />;
     if (w.type === "favorite") return <Favorite key={w.id} w={w} variant={variant} />;
     if (w.type === "playing") return <Playing key={w.id} w={w} />;

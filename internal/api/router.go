@@ -17,6 +17,7 @@ import (
 	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
+	"evilion.xyz/chat/internal/music"
 	"evilion.xyz/chat/internal/ratelimit"
 	"evilion.xyz/chat/internal/realtime"
 	"evilion.xyz/chat/internal/rpcapps"
@@ -105,6 +106,8 @@ type Server struct {
 	limDiscord      *ratelimit.Limiter
 	// limTag paces changes to a server's tag, which reach everyone wearing it
 	limTag *ratelimit.Limiter
+	// limMusic paces someone's music searches, which share what Deezer allows this server
+	limMusic *ratelimit.Limiter
 
 	// handoffs are sealed sign-ins on their way from a moved address to Nexa's own (handoff.go)
 	handoffs handoffStore
@@ -119,6 +122,10 @@ type Server struct {
 	// Games searches the games people put on their profile widgets, and keeps
 	// their covers (internal/games); off without IGDB credentials.
 	Games *games.Client
+	// Music searches the artists, albums and songs people put on their
+	// profile widgets, and keeps their pictures (internal/music); nil turns
+	// the search off.
+	Music *music.Client
 	// activityHub resolves activity previews the way the gateway shows them.
 	activityHub *gateway.Hub
 	// Discord shows linked Discord accounts' activity (nil when not configured; see WireDiscord).
@@ -271,6 +278,8 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limDiscord: ratelimit.New(ratelimit.Every(10, time.Minute), 10, 10*time.Minute),
 		// each change can repaint every wearer's profile everywhere it is shown
 		limTag: ratelimit.New(ratelimit.Every(20, time.Hour), 10, 2*time.Hour),
+		// a search as someone types, a few for each thing they add
+		limMusic: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
 	}
 }
 
@@ -283,7 +292,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"upload": s.limUpload, "unfurl": s.limUnfurl, "proxy": s.limProxy, "youtube": s.limYouTube, "refresh": s.limRefresh, "voice": s.limVoice,
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
 		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile,
-		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord, "server-tag": s.limTag,
+		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord, "server-tag": s.limTag, "music-search": s.limMusic,
 		"note": s.limNote, "note-save": s.limNoteSave, "note-update": s.limNoteUpdate, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,
 	}
 }

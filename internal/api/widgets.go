@@ -12,21 +12,24 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/games"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
+	"evilion.xyz/chat/internal/music"
 	"evilion.xyz/chat/internal/store"
 )
 
 // Profile widgets: sections of a profile that show what someone is into. The
 // games they love most, are playing, want to play and have played, found on
-// IGDB (internal/games) or added by name with a picture of their own, and
-// cards they make themselves: a title, a picture, a few words, a handful of
-// numbers and a link. Shown to anyone who sees the profile, in the order they
-// are put in.
+// IGDB (internal/games) or added by name with a picture of their own; the
+// artists, albums and songs they love, found on Deezer (internal/music) or
+// added by name the same way; and cards they make themselves: a title, a
+// picture, a few words, a handful of numbers and a link. Shown to anyone who
+// sees the profile, in the order they are put in.
 
 const (
 	maxWidgets      = 8
@@ -44,7 +47,13 @@ const (
 	maxStatValue    = 40
 	maxLinkLabel    = 32
 	maxLinkURL      = 512
-	maxWidgetsBytes = 24 << 10
+	maxMusicName    = 100
+	maxSongLength   = 24 * 60 * 60
+	maxWidgetsBytes = 32 << 10
+	// how many of the artists, albums and songs saved at once Deezer is asked
+	// about, when no search brought them: a few, so a save cannot spend
+	// everyone's share of what Deezer allows
+	maxMusicLookups = 6
 	// how large a widget's picture is kept: square ones (a card's picture
 	// beside its title), wide ones (across a card's top) and covers (a game
 	// added by name, in the shape of a box)
@@ -63,6 +72,24 @@ type widgetGame struct {
 	Tags  []string `json:"tags,omitempty"`
 }
 
+// widgetMusic is an artist, an album or a song on a music widget.
+type widgetMusic struct {
+	// ID is Deezer's; Art the id of its picture there.
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name"`
+	// By is an album's or a song's artist.
+	By  string `json:"by,omitempty"`
+	Art string `json:"art,omitempty"`
+	// Image is a picture of the person's own, for one added by name.
+	Image string `json:"image,omitempty"`
+	// Duration is a song's length in seconds.
+	Duration int `json:"duration,omitempty"`
+}
+
+// musicKinds are the music widgets and what each holds, with how many.
+var musicKinds = map[string]music.Kind{"artists": music.Artists, "albums": music.Albums, "songs": music.Songs}
+var mostMusic = map[string]int{"artists": 12, "albums": 12, "songs": 10}
+
 type widgetStat struct {
 	Label string `json:"label"`
 	Value string `json:"value"`
@@ -74,16 +101,17 @@ type widgetLink struct {
 }
 
 type widget struct {
-	ID    string       `json:"id"`
-	Type  string       `json:"type"`
-	Games []widgetGame `json:"games,omitempty"`
-	Note  string       `json:"note,omitempty"`
-	Title string       `json:"title,omitempty"`
-	Image string       `json:"image,omitempty"`
-	Shape string       `json:"shape,omitempty"`
-	Text  string       `json:"text,omitempty"`
-	Stats []widgetStat `json:"stats,omitempty"`
-	Link  *widgetLink  `json:"link,omitempty"`
+	ID    string        `json:"id"`
+	Type  string        `json:"type"`
+	Games []widgetGame  `json:"games,omitempty"`
+	Music []widgetMusic `json:"music,omitempty"`
+	Note  string        `json:"note,omitempty"`
+	Title string        `json:"title,omitempty"`
+	Image string        `json:"image,omitempty"`
+	Shape string        `json:"shape,omitempty"`
+	Text  string        `json:"text,omitempty"`
+	Stats []widgetStat  `json:"stats,omitempty"`
+	Link  *widgetLink   `json:"link,omitempty"`
 }
 
 var widgetID = regexp.MustCompile(`^[a-z0-9]{4,16}$`)
@@ -92,7 +120,10 @@ func (s *Server) widgetRoutes(mux *http.ServeMux) {
 	mux.Handle("PUT /api/v1/users/@me/widgets", s.authed(s.handleWidgetsPut))
 	mux.Handle("POST /api/v1/users/@me/widgets/image", s.userLimited(s.limUpload, s.handleWidgetImage))
 	mux.Handle("GET /api/v1/games/search", s.authed(s.handleGameSearch))
-	mux.Handle("GET /media/game/{cover}", ipLimited(s.limProxy, s.handleGameCover))
+	// kept pictures are served like avatars; only fetching one counts against a limit (fetchLimited)
+	mux.HandleFunc("GET /media/game/{cover}", s.handleGameCover)
+	mux.Handle("GET /api/v1/music/search", s.userLimited(s.limMusic, s.handleMusicSearch))
+	mux.HandleFunc("GET /media/music/{kind}/{art}", s.handleMusicArt)
 }
 
 // line is a single line of someone's own words, cleaned, at most max runes.
@@ -152,9 +183,133 @@ func (s *Server) cleanGame(in widgetGame, tags bool, known map[string]games.Game
 	return out, ""
 }
 
+// cleanMusic checks one artist, album or song of a widget. One found on
+// Deezer is named and drawn as Deezer has it (known), whatever was sent;
+// when Deezer cannot be asked, what was sent is kept, checked for shape.
+func cleanMusic(in widgetMusic, kind music.Kind, known map[string]music.Item) (widgetMusic, string) {
+	out := widgetMusic{}
+	if in.ID != "" {
+		if !music.IDPattern.MatchString(in.ID) {
+			return out, "That isn't one from the music search."
+		}
+		out.ID = in.ID
+		if it, ok := known[string(kind)+":"+in.ID]; ok {
+			if it.ID == "" {
+				return out, "Deezer doesn't have one of those. Search for it again."
+			}
+			out.Name, out.By, out.Art = it.Name, it.By, it.Art
+			if kind == music.Songs {
+				out.Duration = it.Duration
+			}
+			return out, ""
+		}
+		if music.ArtPattern.MatchString(in.Art) {
+			out.Art = in.Art
+		}
+		if kind == music.Songs && in.Duration > 0 && in.Duration <= maxSongLength {
+			out.Duration = in.Duration
+		}
+	} else if in.Image != "" {
+		if _, err := ids.Parse(in.Image); err != nil {
+			return out, "That picture has gone. Put it up again."
+		}
+		out.Image = in.Image
+	}
+	name, ok := line(in.Name, maxMusicName)
+	if !ok || name == "" {
+		return out, "Each one needs a name of at most 100 characters."
+	}
+	out.Name = name
+	if kind != music.Artists {
+		by, ok := line(in.By, maxMusicName)
+		if !ok {
+			return out, "An artist's name is at most 100 characters."
+		}
+		out.By = by
+	}
+	return out, ""
+}
+
+// musicKnown is what Deezer says about every artist, album and song in
+// widgets being saved, by kind and id: as a search or a lookup already said,
+// as the profile had them before (before), or asked about now, a few at
+// most. One Deezer says it does not have is there with no id.
+func (s *Server) musicKnown(ctx context.Context, in []widget, before string) map[string]music.Item {
+	out := map[string]music.Item{}
+	var saved []widget
+	if before != "" && json.Unmarshal([]byte(before), &saved) != nil {
+		saved = nil
+	}
+	for _, w := range saved {
+		kind, ok := musicKinds[w.Type]
+		if !ok {
+			continue
+		}
+		for _, m := range w.Music {
+			if m.ID != "" {
+				out[string(kind)+":"+m.ID] = music.Item{ID: m.ID, Name: m.Name, By: m.By, Art: m.Art, Duration: m.Duration}
+			}
+		}
+	}
+	type ask struct {
+		kind music.Kind
+		id   string
+	}
+	var missing []ask
+	asking := map[string]bool{}
+	for _, w := range in {
+		kind, ok := musicKinds[w.Type]
+		if !ok {
+			continue
+		}
+		for _, m := range w.Music {
+			key := string(kind) + ":" + m.ID
+			if !music.IDPattern.MatchString(m.ID) || asking[key] {
+				continue
+			}
+			if _, ok := out[key]; ok {
+				continue
+			}
+			if it, ok := s.Music.Known(kind, m.ID); ok {
+				out[key] = it
+				continue
+			}
+			asking[key] = true
+			missing = append(missing, ask{kind, m.ID})
+		}
+	}
+	if len(missing) == 0 || !s.Music.On() {
+		return out
+	}
+	lctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, a := range missing[:min(len(missing), maxMusicLookups)] {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			it, err := s.Music.Lookup(lctx, a.kind, a.id)
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case err == nil:
+				out[string(a.kind)+":"+a.id] = it
+			case errors.Is(err, music.ErrUnknown):
+				out[string(a.kind)+":"+a.id] = music.Item{}
+			default:
+				s.Log.Warn("deezer lookup", "err", err)
+			}
+		}()
+	}
+	wg.Wait()
+	return out
+}
+
 // cleanWidgets checks widgets their owner sent and writes them the one way
-// they are kept. The second result is why they were refused.
-func (s *Server) cleanWidgets(ctx context.Context, raw json.RawMessage) (string, string) {
+// they are kept; before is how the profile had them. The second result is
+// why they were refused.
+func (s *Server) cleanWidgets(ctx context.Context, raw json.RawMessage, before string) (string, string) {
 	var in []widget
 	if err := json.Unmarshal(raw, &in); err != nil {
 		return "", "widgets must be a list."
@@ -181,6 +336,7 @@ func (s *Server) cleanWidgets(ctx context.Context, raw json.RawMessage) (string,
 		}
 		known = found
 	}
+	knownMusic := s.musicKnown(ctx, in, before)
 	out := make([]widget, 0, len(in))
 	seenType := map[string]bool{}
 	seenID := map[string]bool{}
@@ -214,6 +370,32 @@ func (s *Server) cleanWidgets(ctx context.Context, raw json.RawMessage) (string,
 					return "", "What you say about your favourite is at most 200 characters."
 				}
 				next.Note = note
+			}
+		case "artists", "albums", "songs":
+			if seenType[w.Type] {
+				return "", "A profile has one of each kind of music widget."
+			}
+			seenType[w.Type] = true
+			if len(w.Music) == 0 || len(w.Music) > mostMusic[w.Type] {
+				return "", "A music widget holds between one and its most."
+			}
+			kind := musicKinds[w.Type]
+			seen := map[string]bool{}
+			for _, m := range w.Music {
+				clean, problem := cleanMusic(m, kind, knownMusic)
+				if problem != "" {
+					return "", problem
+				}
+				// the same one twice is there once
+				key := "id:" + clean.ID
+				if clean.ID == "" {
+					key = "name:" + strings.ToLower(clean.Name) + "\x00" + strings.ToLower(clean.By)
+				}
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				next.Music = append(next.Music, clean)
 			}
 		case "custom":
 			cards++
@@ -288,7 +470,7 @@ func (s *Server) cleanWidgets(ctx context.Context, raw json.RawMessage) (string,
 	}
 	text := strings.TrimSuffix(b.String(), "\n")
 	if len(text) > maxWidgetsBytes {
-		return "", "That's more than a profile can hold. Take a few games out."
+		return "", "That's more than a profile can hold. Take a few things out."
 	}
 	return text, ""
 }
@@ -319,7 +501,12 @@ func (s *Server) handleWidgetsPut(w http.ResponseWriter, r *http.Request) {
 	if len(req.Widgets) == 0 || string(req.Widgets) == "null" {
 		req.Widgets = json.RawMessage("[]")
 	}
-	clean, problem := s.cleanWidgets(r.Context(), req.Widgets)
+	before, err := s.Store.UserWidgets(r.Context(), me.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	clean, problem := s.cleanWidgets(r.Context(), req.Widgets, before)
 	if problem != "" {
 		WriteError(w, E(http.StatusBadRequest, "invalid_widgets", problem))
 		return
@@ -408,6 +595,13 @@ func (s *Server) handleGameCover(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if path, ok := s.Games.Kept(cover, size); ok {
+		serveKept(w, r, path)
+		return
+	}
+	if !s.fetchLimited(w, r) {
+		return
+	}
 	path, err := s.Games.CoverFile(r.Context(), cover, size)
 	if err != nil {
 		if errors.Is(err, games.ErrUnknown) {
@@ -417,6 +611,80 @@ func (s *Server) handleGameCover(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not fetch the cover", http.StatusBadGateway)
 		return
 	}
+	serveKept(w, r, path)
+}
+
+// handleMusicSearch finds artists, albums or songs on Deezer, from a name,
+// a song or an album (internal/music).
+func (s *Server) handleMusicSearch(w http.ResponseWriter, r *http.Request) {
+	kind, ok := musicKinds[r.URL.Query().Get("kind")]
+	if !ok {
+		WriteError(w, E(http.StatusBadRequest, "invalid_kind", "kind is artists, albums or songs."))
+		return
+	}
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	list := []music.Item{}
+	on := s.Music.On()
+	if on && q != "" && len(q) <= 200 {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		found, err := s.Music.Search(ctx, kind, q)
+		cancel()
+		if err != nil {
+			s.Log.Warn("deezer search", "err", err)
+			WriteError(w, E(http.StatusBadGateway, "music_unavailable", "Music search isn't answering right now. Try again in a moment, or add it by name."))
+			return
+		}
+		list = found
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"results": list, "ready": on})
+}
+
+// handleMusicArt serves an artist's photo or a cover, fetched from Deezer
+// once and kept. It only ever fetches Deezer's own picture addresses.
+func (s *Server) handleMusicArt(w http.ResponseWriter, r *http.Request) {
+	kind, art := r.PathValue("kind"), r.PathValue("art")
+	size := r.URL.Query().Get("size")
+	if size != "s" {
+		size = "l"
+	}
+	if !s.Music.On() || !music.ArtKinds[kind] || !music.ArtPattern.MatchString(art) {
+		http.NotFound(w, r)
+		return
+	}
+	if path, ok := s.Music.Kept(kind, art, size); ok {
+		serveKept(w, r, path)
+		return
+	}
+	if !s.fetchLimited(w, r) {
+		return
+	}
+	path, err := s.Music.ArtFile(r.Context(), kind, art, size)
+	if err != nil {
+		if errors.Is(err, music.ErrUnknown) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, "could not fetch the picture", http.StatusBadGateway)
+		return
+	}
+	serveKept(w, r, path)
+}
+
+// fetchLimited counts a picture this server has yet to fetch from IGDB or
+// Deezer against the address asking, as the media proxy's fetches are; the
+// ones already kept are not counted, or a page of search results would run
+// out. It answers for itself when the limit is reached.
+func (s *Server) fetchLimited(w http.ResponseWriter, r *http.Request) bool {
+	ok, retry := s.limProxy.Allow(auth.RateKey(r))
+	if !ok {
+		w.Header().Set("Retry-After", retryAfter(retry))
+		WriteError(w, ErrRateLimited)
+	}
+	return ok
+}
+
+// serveKept serves a picture kept from IGDB or Deezer, whose id names it for good.
+func serveKept(w http.ResponseWriter, r *http.Request, path string) {
 	f, err := os.Open(path)
 	if err != nil {
 		http.NotFound(w, r)
@@ -449,7 +717,15 @@ func widgetsText(raw string) string {
 	lines := make([]string, 0, len(list))
 	for _, w := range list {
 		var parts []string
-		if w.Type == "custom" {
+		if _, ok := musicKinds[w.Type]; ok {
+			for _, m := range w.Music {
+				name := m.Name
+				if m.By != "" {
+					name += " (" + m.By + ")"
+				}
+				parts = append(parts, name)
+			}
+		} else if w.Type == "custom" {
 			parts = append(parts, w.Title)
 			if w.Text != "" {
 				parts = append(parts, w.Text)

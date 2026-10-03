@@ -4987,10 +4987,10 @@
   "server.auditLog.verb.server_tag_delete": "removed the server tag",
   "common.imageCrop.keepsMoving": "It keeps moving once it's cut.",
   "widgets.title": "Widgets",
-  "widgets.hint": "Show the games you love and what you're playing now, or make cards of your own. Everyone who can see your profile sees them.",
+  "widgets.hint": "Show the games and music you love and what you're playing now, or make cards of your own. Everyone who can see your profile sees them.",
   "widgets.add": "Add Widgets",
   "widgets.addOne": "Add a Widget",
-  "widgets.emptyOwn": "Show the games you love and what you're playing now, or make a card of your own.",
+  "widgets.emptyOwn": "Show the games and music you love and what you're playing now, or make a card of your own.",
   "widgets.used": "{count} of {max}",
   "widgets.full": "Your profile has as many widgets as it can hold. Take one off to add another.",
   "widgets.onProfile": "Already on your profile.",
@@ -5163,5 +5163,54 @@
   "whatsNew.r202610025.popoutTitle": "Profiles Open Beside Names",
   "whatsNew.r202610025.popoutBody": "Click a name or a picture and a small profile opens right next to it. You can message them from there, or open their full profile.",
   "whatsNew.r202610025.rolesTitle": "Roles on Profiles",
-  "whatsNew.r202610025.rolesBody": "In a server, profiles show the person's roles. If you can manage roles, add one with the + or take one off with its x."
+  "whatsNew.r202610025.rolesBody": "In a server, profiles show the person's roles. If you can manage roles, add one with the + or take one off with its x.",
+  "widgets.type.artists": "Favourite Artists",
+  "widgets.type.albums": "Favourite Albums",
+  "widgets.type.songs": "Favourite Songs",
+  "widgets.about.artists": "The artists you could listen to all day, up to twelve.",
+  "widgets.about.albums": "The albums you know by heart, up to twelve.",
+  "widgets.about.songs": "The songs you never skip, up to ten.",
+  "widgets.group.games": "Games",
+  "widgets.group.music": "Music",
+  "widgets.group.cards": "Cards",
+  "widgets.artistCount": {
+    "one": "{count} artist",
+    "other": "{count} artists"
+  },
+  "widgets.albumCount": {
+    "one": "{count} album",
+    "other": "{count} albums"
+  },
+  "widgets.songCount": {
+    "one": "{count} song",
+    "other": "{count} songs"
+  },
+  "widgets.music.onDeezer": "Open on Deezer",
+  "widgets.music.search.artists": "Search for Artists",
+  "widgets.music.search.albums": "Search for Albums",
+  "widgets.music.search.songs": "Search for Songs",
+  "widgets.music.placeholder.artists": "An artist, or a song or album of theirs",
+  "widgets.music.placeholder.albums": "An album, or its artist or one of its songs",
+  "widgets.music.placeholder.songs": "A song, or its artist or album",
+  "widgets.music.namePlaceholder": "Type its name",
+  "widgets.music.notSetUp": "Music search isn't set up here, so music goes in by name. You can give each one a picture.",
+  "widgets.music.unavailable": "Music search isn't answering right now. Try again in a moment, or add it by name.",
+  "widgets.music.noResults": "Nothing matches that. You can add it by name.",
+  "widgets.music.results": "Music found",
+  "widgets.music.credit": "Music info from {site}",
+  "widgets.music.yours.artists": "Your Artists",
+  "widgets.music.yours.albums": "Your Albums",
+  "widgets.music.yours.songs": "Your Songs",
+  "widgets.music.noneYet": "Search above and pick the ones to show.",
+  "widgets.music.fans": {
+    "one": "{fans} fan",
+    "other": "{fans} fans"
+  },
+  "widgets.music.viaSong": "Song: {name}",
+  "widgets.music.viaAlbum": "Album: {name}",
+  "widgets.music.single": "Single",
+  "widgets.music.ep": "EP",
+  "widgets.music.compilation": "Compilation",
+  "whatsNew.r202610026.musicTitle": "Music on Your Profile",
+  "whatsNew.r202610026.musicBody": "Show your favourite artists, albums and songs, and find them however you remember them: type a song to find who made it, or an album to find its songs. Add them in Settings, Profiles."
 }

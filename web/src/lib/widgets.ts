@@ -1,7 +1,8 @@
 /**
  * Profile widgets (internal/api/widgets.go): sections of a profile that show
  * what someone is into. Games they love, are playing, want to play and have
- * played, found on IGDB or added by name, and cards they make themselves.
+ * played, found on IGDB or added by name; the artists, albums and songs they
+ * love, found on Deezer or added by name; and cards they make themselves.
  * The server checks and keeps them; this is their shape on this side, read
  * defensively, and the addresses of their pictures.
  */
@@ -20,13 +21,46 @@ export interface WidgetGame {
   tags?: string[];
 }
 
+/** An artist, an album or a song on a music widget. */
+export interface WidgetMusic {
+  /** Deezer's id, when it came from the music search. */
+  id?: string;
+  name: string;
+  /** An album's or a song's artist. */
+  by?: string;
+  /** Deezer's id for its picture. */
+  art?: string;
+  /** A picture of the person's own, for one added by name. */
+  image?: string;
+  /** A song's length in seconds. */
+  duration?: number;
+}
+
+/** An artist, album or song the music search found (internal/music), with what tells it apart. */
+export interface FoundMusic {
+  id: string;
+  name: string;
+  by?: string;
+  art?: string;
+  duration?: number;
+  /** The album a song is on. */
+  album?: string;
+  /** What an album is when it is not one. */
+  record?: "single" | "ep" | "compile";
+  /** How many follow an artist on Deezer. */
+  fans?: number;
+  /** The song or album an artist was found through. */
+  via?: { kind: "song" | "album"; name: string };
+}
+
 export interface WidgetStat {
   label: string;
   value: string;
 }
 
 export type GameWidgetType = "favorite" | "playing" | "wishlist" | "played";
-export type WidgetType = GameWidgetType | "custom";
+export type MusicWidgetType = "artists" | "albums" | "songs";
+export type WidgetType = GameWidgetType | MusicWidgetType | "custom";
 
 export interface GameWidget {
   id: string;
@@ -34,6 +68,12 @@ export interface GameWidget {
   games: WidgetGame[];
   /** Only for Favorite Game: why. */
   note?: string;
+}
+
+export interface MusicWidget {
+  id: string;
+  type: MusicWidgetType;
+  music: WidgetMusic[];
 }
 
 export interface CardWidget {
@@ -47,18 +87,29 @@ export interface CardWidget {
   link?: { url: string; label?: string };
 }
 
-export type Widget = GameWidget | CardWidget;
+export type Widget = GameWidget | MusicWidget | CardWidget;
 
 export const GAME_TYPES: GameWidgetType[] = ["favorite", "playing", "wishlist", "played"];
-export const WIDGET_TYPES: WidgetType[] = [...GAME_TYPES, "custom"];
+export const MUSIC_TYPES: MusicWidgetType[] = ["artists", "albums", "songs"];
+export const WIDGET_TYPES: WidgetType[] = [...GAME_TYPES, ...MUSIC_TYPES, "custom"];
 export const MAX_WIDGETS = 8;
 export const MAX_CARDS = 4;
 /** The most games each kind of games widget holds. */
 export const MOST_GAMES: Record<GameWidgetType, number> = { favorite: 1, playing: 5, wishlist: 20, played: 20 };
-export const LIMITS = { note: 200, tags: 3, tag: 20, game: 100, title: 40, text: 300, stats: 6, label: 24, value: 40, linkLabel: 32 };
+/** The most each kind of music widget holds. */
+export const MOST_MUSIC: Record<MusicWidgetType, number> = { artists: 12, albums: 12, songs: 10 };
+export const LIMITS = { note: 200, tags: 3, tag: 20, game: 100, music: 100, title: 40, text: 300, stats: 6, label: 24, value: 40, linkLabel: 32 };
 
 export function isGameWidget(w: Widget): w is GameWidget {
-  return w.type !== "custom";
+  return (GAME_TYPES as string[]).includes(w.type);
+}
+
+export function isMusicWidget(w: Widget): w is MusicWidget {
+  return (MUSIC_TYPES as string[]).includes(w.type);
+}
+
+export function isMusicType(type: WidgetType): type is MusicWidgetType {
+  return (MUSIC_TYPES as string[]).includes(type);
 }
 
 const str = (v: unknown, max: number): string => (typeof v === "string" ? v.slice(0, max) : "");
@@ -73,6 +124,22 @@ function readGame(x: unknown): WidgetGame | null {
   if (typeof g["cover"] === "string" && /^[a-z0-9]{6,32}$/.test(g["cover"])) out.cover = g["cover"];
   if (typeof g["image"] === "string" && /^\d{1,20}$/.test(g["image"])) out.image = g["image"];
   if (Array.isArray(g["tags"])) out.tags = g["tags"].filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.slice(0, LIMITS.tag)).slice(0, LIMITS.tags);
+  return out;
+}
+
+function readMusic(x: unknown, type: MusicWidgetType): WidgetMusic | null {
+  if (!x || typeof x !== "object") return null;
+  const m = x as Record<string, unknown>;
+  const name = str(m["name"], LIMITS.music).trim();
+  if (!name) return null;
+  const out: WidgetMusic = { name };
+  if (typeof m["id"] === "string" && /^\d{1,20}$/.test(m["id"])) out.id = m["id"];
+  const by = type === "artists" ? "" : str(m["by"], LIMITS.music).trim();
+  if (by) out.by = by;
+  if (typeof m["art"] === "string" && /^[0-9a-f]{32}$/.test(m["art"])) out.art = m["art"];
+  if (typeof m["image"] === "string" && /^\d{1,20}$/.test(m["image"])) out.image = m["image"];
+  const secs = m["duration"];
+  if (type === "songs" && typeof secs === "number" && secs > 0 && secs <= 86400) out.duration = Math.round(secs);
   return out;
 }
 
@@ -107,6 +174,11 @@ export function readWidgets(x: unknown): Widget[] {
       out.push(card);
       continue;
     }
+    if (type === "artists" || type === "albums" || type === "songs") {
+      const music = Array.isArray(w["music"]) ? w["music"].map((m) => readMusic(m, type)).filter((m): m is WidgetMusic => !!m).slice(0, MOST_MUSIC[type]) : [];
+      if (music.length) out.push({ id, type, music });
+      continue;
+    }
     if (type !== "favorite" && type !== "playing" && type !== "wishlist" && type !== "played") continue;
     const games = Array.isArray(w["games"]) ? w["games"].map(readGame).filter((g): g is WidgetGame => !!g).slice(0, MOST_GAMES[type]) : [];
     if (games.length === 0) continue;
@@ -135,6 +207,33 @@ export function gamePicture(g: WidgetGame, css: number): string | null {
   return null;
 }
 
+/** A picture kept from Deezer: an artist's photo or a cover, "s" for rows and "l" for shelves. */
+export function musicArtUrl(kind: "artist" | "cover", art: string, size: "s" | "l"): string {
+  return `${api.baseUrl}/media/music/${kind}/${art}?size=${size}`;
+}
+
+/** The picture of an artist, album or song drawn `css` pixels across: Deezer's, the one its owner put up, or none. */
+export function musicPicture(type: MusicWidgetType, m: WidgetMusic, css: number): string | null {
+  if (m.art) return musicArtUrl(type === "artists" ? "artist" : "cover", m.art, mediaSize(css) > 128 ? "l" : "s");
+  if (m.image) return widgetImageUrl(m.image, css);
+  return null;
+}
+
+/** Where an artist, album or song found on Deezer is there, to listen to it. */
+export function musicLink(type: MusicWidgetType, m: WidgetMusic): string | null {
+  if (!m.id) return null;
+  return `https://www.deezer.com/${type === "artists" ? "artist" : type === "albums" ? "album" : "track"}/${m.id}`;
+}
+
+/** A song's length the way a sleeve prints it: 3:07, or 1:02:07. */
+export function songLength(secs: number): string {
+  const s = Math.max(0, Math.round(secs));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+
 /** A short id for a new widget, as the server takes them. */
 export function newWidgetId(): string {
   return `w${Math.random().toString(36).slice(2, 10)}`;
@@ -153,6 +252,7 @@ export function linkHost(url: string): string {
 export function widgetsText(widgets: Widget[], title: (w: Widget) => string): { title: string; text: string }[] {
   return widgets.map((w) => {
     if (isGameWidget(w)) return { title: title(w), text: [w.games.map((g) => g.name).join(", "), w.note].filter(Boolean).join(" · ") };
+    if (isMusicWidget(w)) return { title: title(w), text: w.music.map((m) => (m.by ? `${m.name} (${m.by})` : m.name)).join(", ") };
     return { title: title(w), text: [w.title, w.text, ...(w.stats ?? []).map((st) => `${st.label}: ${st.value}`), w.link?.url].filter(Boolean).join(" · ") };
   });
 }

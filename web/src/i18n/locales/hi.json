@@ -4987,10 +4987,10 @@
   "server.auditLog.verb.server_tag_delete": "ने सर्वर टैग हटाया",
   "common.imageCrop.keepsMoving": "काटने के बाद भी यह चलती रहेगी।",
   "widgets.title": "विजेट",
-  "widgets.hint": "अपने पसंदीदा गेम और अभी जो खेल रहे हैं, वह दिखाएँ, या अपने कार्ड बनाएँ। जो भी आपकी प्रोफ़ाइल देख सकता है, उसे ये दिखते हैं।",
+  "widgets.hint": "अपने पसंदीदा गेम और संगीत और अभी जो खेल रहे हैं, वह दिखाएँ, या अपने कार्ड बनाएँ। जो भी आपकी प्रोफ़ाइल देख सकता है, उसे ये दिखते हैं।",
   "widgets.add": "विजेट जोड़ें",
   "widgets.addOne": "एक विजेट जोड़ें",
-  "widgets.emptyOwn": "अपने पसंदीदा गेम और अभी जो खेल रहे हैं, वह दिखाएँ, या अपना कोई कार्ड बनाएँ।",
+  "widgets.emptyOwn": "अपने पसंदीदा गेम और संगीत और अभी जो खेल रहे हैं, वह दिखाएँ, या अपना कोई कार्ड बनाएँ।",
   "widgets.used": "{max} में से {count}",
   "widgets.full": "आपकी प्रोफ़ाइल में जितने विजेट आ सकते हैं, उतने हो चुके हैं। नया जोड़ने के लिए कोई एक हटाएँ।",
   "widgets.onProfile": "पहले से आपकी प्रोफ़ाइल पर है।",
@@ -5163,5 +5163,54 @@
   "whatsNew.r202610025.popoutTitle": "प्रोफ़ाइल नाम के पास ही खुलती है",
   "whatsNew.r202610025.popoutBody": "किसी नाम या तस्वीर पर क्लिक करें, और उसके ठीक पास एक छोटी प्रोफ़ाइल खुल जाएगी। वहीं से आप उन्हें संदेश भेज सकते हैं या उनकी पूरी प्रोफ़ाइल खोल सकते हैं।",
   "whatsNew.r202610025.rolesTitle": "प्रोफ़ाइल पर भूमिकाएँ",
-  "whatsNew.r202610025.rolesBody": "सर्वर में प्रोफ़ाइल पर उस व्यक्ति की भूमिकाएँ दिखती हैं। अगर आप भूमिकाएँ प्रबंधित कर सकते हैं, तो + से कोई भूमिका जोड़ें या उसके x से हटाएँ।"
+  "whatsNew.r202610025.rolesBody": "सर्वर में प्रोफ़ाइल पर उस व्यक्ति की भूमिकाएँ दिखती हैं। अगर आप भूमिकाएँ प्रबंधित कर सकते हैं, तो + से कोई भूमिका जोड़ें या उसके x से हटाएँ।",
+  "widgets.type.artists": "पसंदीदा कलाकार",
+  "widgets.type.albums": "पसंदीदा एल्बम",
+  "widgets.type.songs": "पसंदीदा गाने",
+  "widgets.about.artists": "वे कलाकार जिन्हें आप दिन भर सुन सकते हैं, बारह तक।",
+  "widgets.about.albums": "वे एल्बम जो आपको ज़ुबानी याद हैं, बारह तक।",
+  "widgets.about.songs": "वे गाने जिन्हें आप कभी स्किप नहीं करते, दस तक।",
+  "widgets.group.games": "गेम",
+  "widgets.group.music": "संगीत",
+  "widgets.group.cards": "कार्ड",
+  "widgets.artistCount": {
+    "one": "{count} कलाकार",
+    "other": "{count} कलाकार"
+  },
+  "widgets.albumCount": {
+    "one": "{count} एल्बम",
+    "other": "{count} एल्बम"
+  },
+  "widgets.songCount": {
+    "one": "{count} गाना",
+    "other": "{count} गाने"
+  },
+  "widgets.music.onDeezer": "Deezer पर खोलें",
+  "widgets.music.search.artists": "कलाकार खोजें",
+  "widgets.music.search.albums": "एल्बम खोजें",
+  "widgets.music.search.songs": "गाने खोजें",
+  "widgets.music.placeholder.artists": "कोई कलाकार, या उनका कोई गाना या एल्बम",
+  "widgets.music.placeholder.albums": "कोई एल्बम, या उसका कलाकार या उसका कोई गाना",
+  "widgets.music.placeholder.songs": "कोई गाना, या उसका कलाकार या एल्बम",
+  "widgets.music.namePlaceholder": "नाम लिखें",
+  "widgets.music.notSetUp": "यहाँ संगीत खोज सेट नहीं है, इसलिए संगीत नाम से जोड़ा जाता है। आप हर एक को एक तस्वीर दे सकते हैं।",
+  "widgets.music.unavailable": "संगीत खोज अभी जवाब नहीं दे रही। थोड़ी देर में फिर कोशिश करें, या इसे नाम से जोड़ें।",
+  "widgets.music.noResults": "इससे मेल खाता कुछ नहीं मिला। आप इसे नाम से जोड़ सकते हैं।",
+  "widgets.music.results": "मिला हुआ संगीत",
+  "widgets.music.credit": "संगीत की जानकारी: {site}",
+  "widgets.music.yours.artists": "आपके कलाकार",
+  "widgets.music.yours.albums": "आपके एल्बम",
+  "widgets.music.yours.songs": "आपके गाने",
+  "widgets.music.noneYet": "ऊपर खोजें और दिखाने के लिए चुनें।",
+  "widgets.music.fans": {
+    "one": "{fans} प्रशंसक",
+    "other": "{fans} प्रशंसक"
+  },
+  "widgets.music.viaSong": "गाना: {name}",
+  "widgets.music.viaAlbum": "एल्बम: {name}",
+  "widgets.music.single": "सिंगल",
+  "widgets.music.ep": "EP",
+  "widgets.music.compilation": "संकलन",
+  "whatsNew.r202610026.musicTitle": "आपकी प्रोफ़ाइल पर संगीत",
+  "whatsNew.r202610026.musicBody": "अपने पसंदीदा कलाकार, एल्बम और गाने दिखाएँ और उन्हें वैसे ही खोजें जैसे आपको याद हों: किसी गाने का नाम लिखकर उसका कलाकार ढूँढें, या किसी एल्बम का नाम लिखकर उसके गाने। इन्हें सेटिंग्स, प्रोफ़ाइलें में जोड़ें।"
 }

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ID_EPOCH } from "@/lib/ids";
 import { resetInterrupts } from "@/lib/interrupt";
 import { acceptTerms, termsKey } from "@/lib/legal";
-import { RELEASES } from "@/lib/whatsNew";
+import { RELEASES, unseenReleases } from "@/lib/whatsNew";
 import { useAuth } from "@/stores/auth";
 import { DEFAULT_SETTINGS, useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
@@ -98,10 +98,10 @@ describe("What's New", () => {
   });
 
   it("shows an account that saw the first release of a day only what came after it", () => {
-    signIn(OLD, { seen: "2026-10-01" });
-    render(<WhatsNew />);
-    expect(screen.getByText("Nexa Is Now at nexa.fish")).toBeTruthy();
-    expect(screen.queryByText("Richer YouTube Videos")).toBeNull();
+    // a list of its own: the real one grows past what the dialog shows at once with every release
+    const releases = ["2026-09-26.3", "2026-09-26.2", "2026-09-26", "2026-09-20"].map((id) => ({ id, items: [{ icon: Sparkles, title: "t", body: "b" }] }));
+    const created = Date.parse("2026-02-01T00:00:00Z");
+    expect(unseenReleases("2026-09-26", created, releases, Infinity).map((r) => r.id)).toEqual(["2026-09-26.3", "2026-09-26.2"]);
   });
 
   it("puts the releases of one day under one date", () => {
