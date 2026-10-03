@@ -5402,5 +5402,7 @@
   "android.media.cannotPlayVideo": "Este vídeo não pode ser reproduzido aqui.",
   "android.media.savedToDownloads": "Salvo em Downloads.",
   "android.media.savedToPictures": "Salvo em Imagens.",
-  "bugs.context.appAndroid": "App para Android"
+  "bugs.context.appAndroid": "App para Android",
+  "whatsNew.r202610028.swipeBody": "No celular, deslize uma mensagem para a esquerda e solte quando a seta acender para respondê-la.",
+  "whatsNew.r202610028.swipeTitle": "Deslize para responder"
 }

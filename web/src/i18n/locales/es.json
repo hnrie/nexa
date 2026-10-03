@@ -5401,5 +5401,7 @@
   "android.media.cannotPlayVideo": "Este video no se puede reproducir aquí.",
   "android.media.savedToDownloads": "Guardado en Descargas.",
   "android.media.savedToPictures": "Guardado en Imágenes.",
-  "bugs.context.appAndroid": "App de Android"
+  "bugs.context.appAndroid": "App de Android",
+  "whatsNew.r202610028.swipeBody": "En el móvil, desliza un mensaje hacia la izquierda y suéltalo cuando se ilumine la flecha para responderlo.",
+  "whatsNew.r202610028.swipeTitle": "Desliza para responder"
 }

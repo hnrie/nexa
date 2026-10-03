@@ -5125,5 +5125,7 @@
   "android.media.cannotPlayVideo": "이 동영상은 여기서 재생할 수 없습니다.",
   "android.media.savedToDownloads": "다운로드에 저장했습니다.",
   "android.media.savedToPictures": "사진에 저장했습니다.",
-  "bugs.context.appAndroid": "Android 앱"
+  "bugs.context.appAndroid": "Android 앱",
+  "whatsNew.r202610028.swipeBody": "휴대폰에서 메시지를 왼쪽으로 밀고 화살표가 밝아지면 손을 떼면 답장할 수 있어요.",
+  "whatsNew.r202610028.swipeTitle": "밀어서 답장"
 }

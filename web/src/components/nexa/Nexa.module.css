@@ -806,6 +806,38 @@
   text-overflow: ellipsis;
   min-width: 0;
 }
+/* The title and what it is about: side by side where there is room; on a
+   phone the second line goes under the first, so neither is cut short. */
+.headerText,
+.headerLine {
+  display: contents;
+}
+@media (max-width: 767px) {
+  .headerText {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .headerLine {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .headerText .headerName {
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .headerText .headerSub {
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  .header > .spacer {
+    display: none;
+  }
+}
 .back {
   width: 32px;
   height: 32px;

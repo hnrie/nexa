@@ -5125,5 +5125,7 @@
   "android.media.cannotPlayVideo": "この動画はここでは再生できません。",
   "android.media.savedToDownloads": "ダウンロードに保存しました。",
   "android.media.savedToPictures": "写真に保存しました。",
-  "bugs.context.appAndroid": "Android アプリ"
+  "bugs.context.appAndroid": "Android アプリ",
+  "whatsNew.r202610028.swipeBody": "スマートフォンでメッセージを左にスワイプし、矢印が光ったら指を離すと返信できます。",
+  "whatsNew.r202610028.swipeTitle": "スワイプで返信"
 }

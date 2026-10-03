@@ -83,6 +83,29 @@
 @media (hover: hover) { .msg[data-mentioned="true"]:hover { background: color-mix(in srgb, var(--brand) 13%, transparent); } }
 .msg[data-mentioned="true"]::before { content: ""; position: absolute; inset-inline-start: 0; top: 3px; bottom: 3px; width: 3px; border-radius: 3px; background: var(--focus-ring); box-shadow: 0 0 8px color-mix(in srgb, var(--focus-ring) 60%, transparent); }
 .msg[data-highlight="true"] { animation: flash 2s ease-out; }
+/* Swiped to reply on a touch screen (lib/swipeReply.ts): the row follows the
+   finger and the reply arrow waits at the end of the line, lit once letting
+   go would reply. */
+.msg[data-swiping] { transform: translateX(var(--swipe, 0px)); }
+.msg[data-swipe-back] { transition: transform 220ms var(--ease-out); }
+.msg[data-swiping]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 18px;
+  width: 20px;
+  height: 20px;
+  margin-top: -10px;
+  background: var(--text-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 17 4 12 9 7'/%3E%3Cpath d='M20 18v-2a4 4 0 0 0-4-4H4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 17 4 12 9 7'/%3E%3Cpath d='M20 18v-2a4 4 0 0 0-4-4H4'/%3E%3C/svg%3E") center / contain no-repeat;
+  opacity: var(--swipe-p, 0);
+  /* held still on screen while the row moves under it */
+  transform: translateX(calc(var(--swipe, 0px) * -1)) scale(calc(0.6 + 0.4 * var(--swipe-p, 0)));
+  pointer-events: none;
+}
+[dir="rtl"] .msg[data-swiping]::after { transform: translateX(calc(var(--swipe, 0px) * -1)) scale(calc(0.6 + 0.4 * var(--swipe-p, 0))) scaleX(-1); }
+.msg[data-armed]::after { background: var(--text-brand); }
 @keyframes flash { 0% { background: color-mix(in srgb, var(--brand) 40%, transparent); } 100% { background: transparent; } }
 /* Which row you landed on is the whole point of jumping to it, so when motion
    is reduced the highlight simply sits there for the two seconds the fade would

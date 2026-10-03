@@ -590,14 +590,15 @@ fun NexaPage() {
 
 private data class DayMark(val at: Long)
 
+/** A line with the date where a new day starts: in the conversation as a pill (the chat's), in a thread as plain words (`.dayDivider`). */
 @Composable
-private fun DayDivider(at: Long) {
+private fun DayDivider(at: Long, pill: Boolean = true) {
     val c = Nx.colors
-    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 0.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = if (pill) 0.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.weight(1f).height(1.dp).background(c.borderSubtle))
-        Box(Modifier.padding(horizontal = 8.dp).background(c.bgRaised, RoundedCornerShape(999.dp)).ring(RoundedCornerShape(999.dp), c.borderSubtle).padding(horizontal = 10.dp, vertical = 3.dp)) {
+        if (pill) Box(Modifier.padding(horizontal = 8.dp).ring(RoundedCornerShape(999.dp), c.borderSubtle).background(c.bgRaised, RoundedCornerShape(999.dp)).padding(horizontal = 10.dp, vertical = 3.dp)) {
             Txt(Time.dateDivider(at), style = Nx.type.hint.copy(fontWeight = FontWeight(600)), color = c.textMuted)
-        }
+        } else Txt(Time.dateDivider(at), style = Nx.type.hint.copy(fontWeight = FontWeight(600)), color = c.textMuted, modifier = Modifier.padding(horizontal = 8.dp))
         Box(Modifier.weight(1f).height(1.dp).background(c.borderSubtle))
     }
 }
@@ -984,7 +985,7 @@ private fun ThreadView(
                 Txt(emptyNote, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20.3f)), color = c.textMuted, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp).widthIn(max = 640.dp))
             }
             for (r in rows) {
-                if (r is DayMark) item("day" + r.at) { DayDivider(r.at) }
+                if (r is DayMark) item("day" + r.at) { DayDivider(r.at, pill = false) }
                 else {
                     @Suppress("UNCHECKED_CAST") val (line, grouped) = r as Pair<ThreadLine, Boolean>
                     item(line.id) { if (line.kind == "system") SystemLine(line, action) else LineView(line, grouped) }

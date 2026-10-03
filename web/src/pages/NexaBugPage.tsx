@@ -46,12 +46,14 @@ export default function NexaBugPage() {
           <ChevronLeft size={22} className={s.flip} />
         </button>
         <NexaAvatar size={24} />
-        <span className={s.headerName}>{report ? t("bugs.page.title", { number: bugNumber(report.number) }) : t("bugs.page.titleLoading")}</span>
-        {report ? (
-          <span className={s.headerSub} dir="auto">
-            {report.subject}
-          </span>
-        ) : null}
+        <span className={s.headerText}>
+          <span className={s.headerName}>{report ? t("bugs.page.title", { number: bugNumber(report.number) }) : t("bugs.page.titleLoading")}</span>
+          {report ? (
+            <span className={s.headerSub} dir="auto">
+              {report.subject}
+            </span>
+          ) : null}
+        </span>
         <span className={s.spacer} />
         {report ? <BugStatusChip status={report.status} /> : null}
       </header>

@@ -5300,5 +5300,7 @@
   "android.media.cannotPlayVideo": "This video cannot be played here.",
   "android.media.savedToDownloads": "Saved to Downloads.",
   "android.media.savedToPictures": "Saved to Pictures.",
-  "bugs.context.appAndroid": "Android app"
+  "bugs.context.appAndroid": "Android app",
+  "whatsNew.r202610028.swipeBody": "On a phone, swipe a message to the left and let go when the arrow lights up to reply to it.",
+  "whatsNew.r202610028.swipeTitle": "Swipe to Reply"
 }

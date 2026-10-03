@@ -14,6 +14,7 @@ import { useReadStates } from "@/stores/readStates";
 import { useSelection } from "@/stores/selection";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
+import { installSwipeReply } from "@/lib/swipeReply";
 import { useUsers } from "@/stores/users";
 import { useChannels } from "@/stores/channels";
 import { MessageItem } from "./MessageItem";
@@ -231,6 +232,19 @@ export function MessageList({ channel }: { channel: Channel }) {
   /** The row at the top of the view, and how far down it sat, as picking began or ended. */
   const pickAnchor = useRef<{ id: string; top: number } | null>(null);
   const atBottom = useRef(true);
+  // on a touch screen, a message swiped against the reading direction is replied to
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    return installSwipeReply(
+      el,
+      (row) => {
+        const id = row.dataset["id"];
+        if (id) useUI.getState().setReplyTo({ channelId: channel.id, messageId: id, ping: true });
+      },
+      (row) => row.dataset["pending"] !== "true" && row.dataset["failed"] !== "true" && row.dataset["pickable"] === undefined,
+    );
+  }, [channel.id]);
   /**
    * Where the reader is, while they are anywhere but the bottom: noted as
    * they scroll and after every change, and put back after every change.

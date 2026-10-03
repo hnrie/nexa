@@ -82,9 +82,13 @@ export default function NexaPage() {
       <header className={s.header}>
         <PageHeaderButtons />
         <NexaAvatar size={24} />
-        <span className={s.headerName}>Nexa</span>
-        <OfficialBadge />
-        <span className={s.headerSub}>{t("nexa.headerSub")}</span>
+        <span className={s.headerText}>
+          <span className={s.headerLine}>
+            <span className={s.headerName}>Nexa</span>
+            <OfficialBadge />
+          </span>
+          <span className={s.headerSub}>{t("nexa.headerSub")}</span>
+        </span>
         <span className={s.spacer} />
         <ReportBugButton from="nexa" labelled />
       </header>

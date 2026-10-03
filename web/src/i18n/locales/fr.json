@@ -5401,5 +5401,7 @@
   "android.media.cannotPlayVideo": "Cette vidéo ne peut pas être lue ici.",
   "android.media.savedToDownloads": "Enregistré dans Téléchargements.",
   "android.media.savedToPictures": "Enregistré dans Images.",
-  "bugs.context.appAndroid": "Application Android"
+  "bugs.context.appAndroid": "Application Android",
+  "whatsNew.r202610028.swipeBody": "Sur téléphone, faites glisser un message vers la gauche et relâchez quand la flèche s'allume pour y répondre.",
+  "whatsNew.r202610028.swipeTitle": "Glisser pour répondre"
 }

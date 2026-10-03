@@ -9,6 +9,7 @@ import { TermsGate } from "@/components/legal/TermsGate";
 import { WhatsNew } from "@/components/shell/WhatsNewDialog";
 import { DownloadBanner } from "@/components/shell/DownloadBanner";
 import { RpcBanner } from "@/components/shell/RpcBanner";
+import { rowSwipeActive } from "@/lib/swipeReply";
 import { DiscordBanner } from "@/components/shell/DiscordBanner";
 import { UpdatePrompt } from "@/components/shell/UpdateDialog";
 import { DesktopEffects } from "@/components/desktop/DesktopEffects";
@@ -180,6 +181,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!d || !t) return;
     const dx = (t.clientX - d.x) * flow();
     const dy = t.clientY - d.y;
+    // a message being swiped to reply has this touch, not the drawers
+    if (rowSwipeActive()) {
+      drag.current = null;
+      return;
+    }
     if (d.axis === "") {
       if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
       d.axis = Math.abs(dx) > Math.abs(dy) * 1.3 ? "x" : "y";
@@ -196,6 +202,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     const d = drag.current;
     const t = e.changedTouches[0];
     drag.current = null;
+    if (rowSwipeActive()) {
+      setDragX(null);
+      return;
+    }
     if (!d || !t || d.axis !== "x") {
       setDragX(null);
       return;

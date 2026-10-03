@@ -52,8 +52,10 @@ export default function NexaCasePage() {
           <ChevronLeft size={22} className={s.flip} />
         </button>
         <NexaAvatar size={24} />
-        <span className={s.headerName}>{thread ? t("nexa.notice.caseNumber", { number: thread.case.number }) : t("nexa.caseTitle")}</span>
-        {thread ? <span className={s.headerSub}>{noticeTitle(thread.case.action, thread.case.details)}</span> : null}
+        <span className={s.headerText}>
+          <span className={s.headerName}>{thread ? t("nexa.notice.caseNumber", { number: thread.case.number }) : t("nexa.caseTitle")}</span>
+          {thread ? <span className={s.headerSub}>{noticeTitle(thread.case.action, thread.case.details)}</span> : null}
+        </span>
         <span className={s.spacer} />
         {standing ? (
           <span className={[s.chip, s.headerChip].join(" ")} data-tone={standing.tone}>

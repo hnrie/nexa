@@ -137,6 +137,14 @@ From the owner (CLAUDE.md and standing feedback):
 
 ## 7. Phone improvements beyond the web (each one is brought to the web too)
 
-Swipe a message to reply; answer from the notification; share pictures and text into Nexa from any
-app; picture-in-picture for calls; pinch-to-zoom pictures that pull down to close; haptics on
-long-press, reactions and the push-to-talk key; the composer riding the keyboard's own animation.
+| Improvement | On the web |
+|---|---|
+| Swipe a message against the reading direction to reply (a tick when armed) | Done: lib/swipeReply.ts, phones and tablets |
+| Thread and Nexa headers keep their second line under the title instead of cutting it | Done: Nexa page, case and bug pages |
+| A subchat's password dialog keeps the name already typed; a new subchat opens; deleting one only leaves it if you are in it | Done: SubchatPanel, SubchatModal |
+| Share pictures and text into Nexa from any app | To do: a share target in the installed web app's manifest |
+| Picture-in-picture when leaving the app mid-call | To do: the browser's picture-in-picture for the call's video |
+| Answer from the notification | Not possible on the web (notifications cannot take text) |
+| Pinch-to-zoom pictures that pull down to close | Already there (Lightbox) |
+| Haptics on long-press, reactions and the push-to-talk key | Partly: long-press and swipe vibrate where the browser can |
+| The composer riding the keyboard's own animation | Not possible on the web (the browser moves the page) |

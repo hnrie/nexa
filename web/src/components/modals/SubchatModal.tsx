@@ -4,6 +4,7 @@
  * reaches the server proves it was typed and nothing more.
  */
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import type { Channel } from "@/api/types";
@@ -17,10 +18,11 @@ import { useChannels } from "@/stores/channels";
 import { t } from "@/i18n";
 const MAX_NAME = 48;
 
-export default function SubchatModal({ onClose, channel, parentId }: { onClose: () => void; channel?: Channel; parentId?: string }) {
+export default function SubchatModal({ onClose, channel, parentId, name: typed }: { onClose: () => void; channel?: Channel; parentId?: string; name?: string }) {
   const editing = !!channel;
+  const nav = useNavigate();
   const upsert = useChannels((c) => c.upsert);
-  const [name, setName] = useState(channel?.name ?? "");
+  const [name, setName] = useState(channel?.name ?? (typed ?? "").slice(0, MAX_NAME));
   // editing: a subchat that already has one keeps it unless this is switched
   const [wantsPassword, setWantsPassword] = useState(!!channel?.locked);
   const [password, setPassword] = useState("");
@@ -50,6 +52,10 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
       } else if (parentId) {
         const made = await channelsApi.createSubchat(parentId, trimmed, lock);
         upsert(made);
+        onClose();
+        // a new subchat opens, as one made from the panel's box does
+        nav(`/channels/@me/${made.id}`);
+        return;
       }
       onClose();
     } catch (err) {

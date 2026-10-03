@@ -15,13 +15,14 @@ import { useLayerPresence } from "./useLayerPresence";
 
 import { t } from "@/i18n";
 /** Menu for one subchat row: edit its name and password, or delete for everyone. */
-export function subchatMenuItems(ch: Channel, ctx: { openModal: (k: string, p?: Record<string, unknown>) => void; nav: (p: string) => void }): ContextMenuItem[] {
+export function subchatMenuItems(ch: Channel, ctx: { openModal: (k: string, p?: Record<string, unknown>) => void; nav: (p: string) => void; path?: string }): ContextMenuItem[] {
   const toast = useUI.getState().toast;
   const remove = async () => {
     try {
       await channelsApi.close(ch.id);
       useChannels.getState().remove(ch.id);
-      if (ch.parent_id) ctx.nav(`/channels/@me/${ch.parent_id}`);
+      // only someone in the subchat is taken back to its conversation; anywhere else they stay put
+      if (ch.parent_id && (ctx.path ?? window.location.pathname).split("/").includes(ch.id)) ctx.nav(`/channels/@me/${ch.parent_id}`);
     } catch (err) {
       toast(err instanceof ApiError ? err.message : t("chat.subchat.couldNotDeleteThatSubchat"), "error");
     }
@@ -189,7 +190,8 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
           title={t("chat.subchat.withAPassword")}
           onClick={() => {
             onClose();
-            openModal("subchat", { parentId: parent.id });
+            // what was typed in the box carries over, rather than being typed again
+            openModal("subchat", { parentId: parent.id, name: name.trim() });
           }}
           data-testid="subchat-with-password"
         >

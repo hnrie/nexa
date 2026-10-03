@@ -5125,5 +5125,7 @@
   "android.media.cannotPlayVideo": "无法在此播放该视频。",
   "android.media.savedToDownloads": "已保存到“下载”。",
   "android.media.savedToPictures": "已保存到“图片”。",
-  "bugs.context.appAndroid": "Android 应用"
+  "bugs.context.appAndroid": "Android 应用",
+  "whatsNew.r202610028.swipeBody": "在手机上将消息向左滑动，箭头亮起时松手即可回复。",
+  "whatsNew.r202610028.swipeTitle": "滑动回复"
 }
