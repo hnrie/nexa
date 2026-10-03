@@ -9,7 +9,15 @@ private fun pending(title: String) = openSheet("pending", title = title) { Txt(t
 /** Every dialog the shell, the lists and the chat open (ModalHost's kinds), by name. */
 object Dialogs {
     fun createServer() = pending("Create Your Server")
-    fun invite(serverId: String, channelId: String?) = pending("Invite People")
+    /** A link to a server (landing in one of its channels), carrying its key unless told not to. */
+    fun invite(serverId: String, channelId: String?) = open("invite") { layer, close -> InviteSheet(layer, serverId, channelId, close) }
+
+    /**
+     * An invite link opened in the app (`/invite/<code>`): where it leads, with
+     * Join or Open. [hash] is the link's part after `#`, whose key unlocks the
+     * history once joined.
+     */
+    fun openInvite(code: String, hash: String = "") = open("openInvite") { layer, close -> OpenInviteSheet(layer, code, hash, close) }
     fun createChannel(serverId: String, parentId: String?) = open("createChannel") { layer, close -> CreateChannelSheet(layer, serverId, parentId, close) }
     fun createCategory(serverId: String) = open("createCategory") { layer, close -> CreateCategorySheet(layer, serverId, close) }
     fun serverNotifications(serverId: String) = open("serverNotifications") { layer, close -> ServerNotificationsSheet(layer, serverId, close) }

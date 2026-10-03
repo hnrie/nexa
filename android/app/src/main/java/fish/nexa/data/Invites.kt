@@ -58,12 +58,13 @@ object Invites {
 
     data class Preview(
         val code: String,
-        val serverId: String?,
+        /** The server it leads to, or the group (see [group]). */
+        val id: String?,
         val name: String,
         val iconId: String?,
         val bannerId: String?,
         val description: String,
-        val members: Int,
+        val members: Int?,
         val online: Int?,
         val inviter: PublicUser?,
         val group: Boolean,
@@ -79,12 +80,12 @@ object Invites {
         if (server != null) {
             return Preview(
                 code, server.s("id"), server.s("name") ?: "", server.s("icon_id"), server.s("banner_id"), server.s("description") ?: "",
-                server.n("member_count") ?: 0, server.n("online_count"), inviter, group = false,
+                server.n("member_count"), server.n("online_count"), inviter, group = false,
                 channelName = (res["channel"] as? JsonObject)?.s("name"),
             )
         }
         val group = res["group"] as? JsonObject ?: throw IllegalStateException("invite")
-        return Preview(code, null, group.s("name") ?: "", group.s("icon_id"), null, "", group.n("member_count") ?: 0, null, inviter, group = true, channelName = null)
+        return Preview(code, group.s("id"), group.s("name") ?: "", group.s("icon_id"), null, "", group.n("member_count"), null, inviter, group = true, channelName = null)
     }
 
     /** acceptInvite: joins, keeps the link's key and grants it to this account, and says where to go. */
@@ -106,12 +107,19 @@ object Invites {
         return Route.Server(view.id, first?.id)
     }
 
+    /** An invite just made: its code, when it runs out (null for never) and how many times it may be used (0 for no limit). */
+    data class Made(val code: String, val expiresAt: Long?, val maxUses: Int)
+
     /** A new link for a server channel or a group; max age in seconds (0 never), max uses (0 unlimited). */
-    suspend fun create(channelId: String, maxAge: Int, maxUses: Int): String {
+    suspend fun create(channelId: String, maxAge: Int, maxUses: Int): Made {
         val res = Nexa.api.request("POST", "/channels/$channelId/invites", buildJsonObject {
             put("max_age", maxAge)
             put("max_uses", maxUses)
         }) as JsonObject
-        return (res["code"] as JsonPrimitive).content
+        return Made(
+            (res["code"] as JsonPrimitive).content,
+            (res["expires_at"] as? JsonPrimitive)?.content?.toLongOrNull(),
+            (res["max_uses"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0,
+        )
     }
 }

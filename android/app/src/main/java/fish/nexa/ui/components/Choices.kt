@@ -1,6 +1,7 @@
 package fish.nexa.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,38 @@ import fish.nexa.ui.theme.brandGradient
 import fish.nexa.ui.theme.ring
 import fish.nexa.ui.theme.sunken
 import fish.nexa.ui.theme.topEdge
+
+/**
+ * Select.tsx for a longer list: a well like a text field showing the choice,
+ * which opens the choices as a menu sheet with the current one marked.
+ */
+@Composable
+fun <T> SelectField(label: String?, options: List<Pair<T, String>>, selected: T, modifier: Modifier = Modifier, enabled: Boolean = true, onSelect: (T) -> Unit) {
+    val c = Nx.colors
+    val shown = options.firstOrNull { it.first == selected }?.second ?: ""
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (label != null) Txt(label, style = Nx.type.label, color = c.textSubtle)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 44.dp)
+                .alpha(if (enabled) 1f else 0.5f)
+                .sunken(Radii.Sm, c)
+                .border(1.dp, c.borderSubtle, Radii.Sm)
+                .clip(Radii.Sm)
+                .pressable(remember { MutableInteractionSource() }, enabled = enabled, role = Role.DropdownList) {
+                    fish.nexa.ui.layers.openMenu(options.map { (v, text) -> fish.nexa.ui.layers.MenuItem.Action(text, checked = v == selected) { onSelect(v) } }, title = label)
+                }
+                .semantics { contentDescription = if (label != null) "$label: $shown" else shown }
+                .padding(start = 12.dp, end = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Txt(shown, style = Nx.type.input.copy(fontSize = Nx.type.sp(15f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f))
+            fish.nexa.ui.Icon("ChevronDown", c.textMuted, size = 18.dp)
+        }
+    }
+}
 
 /** Toggle.tsx: the words (and what they mean) beside a switch, the whole row its target, a rule under it. */
 @Composable
@@ -69,7 +102,7 @@ fun ChoiceCard(on: Boolean, label: String, description: String?, icon: String? =
                 .size(18.dp)
                 .then(
                     if (on) Modifier.background(brandGradient(c), CircleShape).topEdge(CircleShape, Color.White.copy(alpha = 0.28f))
-                    else Modifier.ring(CircleShape, c.borderStrong, 1.5.dp),
+                    else Modifier.border(1.5.dp, c.borderStrong, CircleShape),
                 ),
             contentAlignment = Alignment.Center,
         ) { if (on) Box(Modifier.size(7.dp).background(c.onBrand, CircleShape)) }
@@ -136,7 +169,7 @@ fun <T> ChoiceList(label: String?, options: List<Pair<T, String>>, selected: T, 
                             .size(18.dp)
                             .then(
                                 if (on) Modifier.background(brandGradient(c), CircleShape).topEdge(CircleShape, Color.White.copy(alpha = 0.28f))
-                                else Modifier.ring(CircleShape, c.borderStrong, 1.5.dp),
+                                else Modifier.border(1.5.dp, c.borderStrong, CircleShape),
                             ),
                         contentAlignment = Alignment.Center,
                     ) {

@@ -301,7 +301,7 @@ class JoinRequests(private val groupId: String) {
         states[userId] = "sending"
         Nexa.scope.launch {
             try {
-                val url = link ?: Invites.url(Invites.create(groupId, 604800, 0), Invites.keyOf(groupId)).also { link = it }
+                val url = link ?: Invites.url(Invites.create(groupId, 604800, 0).code, Invites.keyOf(groupId)).also { link = it }
                 val dm = People.openDm(userId)
                 val groupName = Nexa.channels.get(groupId)?.name?.trim().orEmpty()
                 val literal = groupName.replace(Regex("[\\\\*_~|`<>\\[\\]]")) { "\\" + it.value }
