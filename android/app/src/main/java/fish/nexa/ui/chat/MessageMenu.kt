@@ -32,6 +32,8 @@ import fish.nexa.ui.Time
 import fish.nexa.ui.components.pressable
 import fish.nexa.ui.layers.MenuItem
 import fish.nexa.ui.layers.openMenu
+import fish.nexa.ui.media.ImageTarget
+import fish.nexa.ui.media.imageMenuItems
 import fish.nexa.ui.shell.confirm
 import fish.nexa.ui.t
 import fish.nexa.ui.theme.Nx

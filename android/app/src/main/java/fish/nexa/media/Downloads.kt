@@ -9,11 +9,8 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.content.FileProvider
 import fish.nexa.Nexa
 import fish.nexa.crypto.AttachmentMeta
@@ -121,43 +118,46 @@ object Downloads {
 }
 
 /**
- * Saving from a button: on Android 10 and later straight into Downloads or
- * Pictures; on 9 and older through the system's save sheet. [onDone] gets
- * null on success or the reason it failed.
+ * Saving: on Android 10 and later straight into Downloads or Pictures; on 9
+ * and older through the system's save sheet, opened from the activity the
+ * person is looking at. [onDone] gets null on success, the reason it failed,
+ * or nothing at all when the person backed out of the save sheet.
  */
-class Saver(
-    private val launch: (String, String, suspend (OutputStream) -> Unit, (Throwable?) -> Unit) -> Unit,
-) {
-    fun save(name: String, type: String, write: suspend (OutputStream) -> Unit, onDone: (Throwable?) -> Unit) = launch(name, type, write, onDone)
-}
+object Saving {
+    private var activity: java.lang.ref.WeakReference<androidx.activity.ComponentActivity>? = null
+    private var seq = 0
 
-@Composable
-fun rememberSaver(picture: Boolean = false): Saver {
-    val scope = rememberCoroutineScope()
-    val pending = remember { arrayOfNulls<Pair<suspend (OutputStream) -> Unit, (Throwable?) -> Unit>>(1) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
-        val job = pending[0] ?: return@rememberLauncherForActivityResult
-        pending[0] = null
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val err = runCatching { Downloads.saveInto(uri, job.first, pending = false) }.exceptionOrNull()
-            job.second(err)
+    /** Called from what draws media, so a save always has an activity to open its sheet from. */
+    @Composable
+    fun Track() {
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        androidx.compose.runtime.SideEffect {
+            (ctx as? androidx.activity.ComponentActivity)?.let { if (activity?.get() !== it) activity = java.lang.ref.WeakReference(it) }
         }
     }
-    return remember {
-        Saver { name, type, write, onDone ->
-            if (Build.VERSION.SDK_INT >= 29) {
-                scope.launch {
-                    val err = runCatching {
-                        val uri = withContext(Dispatchers.IO) { Downloads.insert(name, type, picture) } ?: throw java.io.IOException("no room")
-                        Downloads.saveInto(uri, write, pending = true)
-                    }.exceptionOrNull()
-                    onDone(err)
-                }
-            } else {
-                pending[0] = write to onDone
-                picker.launch(name)
+
+    fun save(name: String, type: String, picture: Boolean, write: suspend (OutputStream) -> Unit, onDone: (Throwable?) -> Unit) {
+        if (Build.VERSION.SDK_INT >= 29) {
+            Nexa.scope.launch {
+                val err = runCatching {
+                    val uri = withContext(Dispatchers.IO) { Downloads.insert(name, type, picture) } ?: throw java.io.IOException("no room")
+                    Downloads.saveInto(uri, write, pending = true)
+                }.exceptionOrNull()
+                withContext(Dispatchers.Main) { onDone(err) }
+            }
+            return
+        }
+        val act = activity?.get() ?: return onDone(java.io.IOException("no window to save from"))
+        val key = "nexa-save-${seq++}"
+        var launcher: androidx.activity.result.ActivityResultLauncher<String>? = null
+        launcher = act.activityResultRegistry.register(key, ActivityResultContracts.CreateDocument(type.ifEmpty { "application/octet-stream" })) { uri ->
+            launcher?.unregister()
+            if (uri == null) return@register
+            Nexa.scope.launch {
+                val err = runCatching { Downloads.saveInto(uri, write, pending = false) }.exceptionOrNull()
+                withContext(Dispatchers.Main) { onDone(err) }
             }
         }
+        launcher.launch(name)
     }
 }

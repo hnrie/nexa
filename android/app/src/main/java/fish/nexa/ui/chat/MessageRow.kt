@@ -55,6 +55,9 @@ import fish.nexa.ui.Time
 import fish.nexa.ui.components.Avatar
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
+import fish.nexa.ui.media.Attachments
+import fish.nexa.ui.media.PressedImage
+import fish.nexa.ui.media.UploadCard
 import fish.nexa.ui.shell.Names
 import fish.nexa.ui.shell.openProfile
 import fish.nexa.ui.t
@@ -148,7 +151,7 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                     enabled = cm != null && !ctx.selecting,
                     canReply = cm != null && canSend(ctx),
                     swipe = swipe,
-                    onLongPress = { cm?.let { openMessageMenu(it, ctx) } },
+                    onLongPress = { cm?.let { openMessageMenu(it, ctx, PressedImage.take()) } },
                     onReply = { cm?.let { ChatUi.reply[ctx.channel.id] = ChatUi.Reply(it.id, ping = it.authorId != ctx.meId) } },
                 ),
             ),
@@ -372,8 +375,9 @@ private fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     if (!text.isNullOrEmpty()) MessageText(text, if (failed) c.textDanger else c.text, edited)
     payload?.sticker?.let { StickerView(it) }
     payload?.poll?.let { if (cm != null) PollCard(cm, ctx) }
+    // files on their way up show their progress until the message is in (Sending… once they are up)
     val up = item.pending?.upload
-    if (up != null && !up.done) UploadCard(ctx.channel.id, item.pending, up)
+    if (up != null) UploadCard(ctx.channel.id, item.pending, up)
     else payload?.att?.takeIf { it.isNotEmpty() }?.let { Attachments(it, cm, ctx) }
     if (cm != null && !cm.m.suppressEmbeds) payload?.embeds?.takeIf { it.isNotEmpty() }?.let { Embeds(it, cm, ctx) }
 }

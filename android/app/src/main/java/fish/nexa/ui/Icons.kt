@@ -54,9 +54,10 @@ object Lucide {
 
     fun exists(name: String) = resolve(name) != null
 
-    fun vector(name: String, stroke: Float = 2f): ImageVector? {
+    /** [filled] paints the shapes in too, as lucide-react's fill="currentColor" does (a solid play mark, a starred star). */
+    fun vector(name: String, stroke: Float = 2f, filled: Boolean = false): ImageVector? {
         val file = resolve(name) ?: return null
-        val key = "$file@$stroke"
+        val key = "$file@$stroke${if (filled) "#f" else ""}"
         cache[key]?.let { return it }
         val paths = icons[file] as? JsonArray ?: return null
         val b = ImageVector.Builder(name = file, defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
@@ -64,7 +65,7 @@ object Lucide {
             val d = (p as? JsonPrimitive)?.contentOrNull ?: continue
             b.addPath(
                 pathData = PathParser().parsePathString(d).toNodes(),
-                fill = null,
+                fill = if (filled) SolidColor(Color.Black) else null,
                 stroke = SolidColor(Color.Black),
                 strokeLineWidth = stroke,
                 strokeLineCap = StrokeCap.Round,
@@ -77,8 +78,8 @@ object Lucide {
 
 /** A Lucide icon, tinted. `label` makes it speak to TalkBack; without one it is decoration. */
 @Composable
-fun Icon(name: String, tint: Color, modifier: Modifier = Modifier, size: Dp = 20.dp, stroke: Float = 2f, label: String? = null) {
-    val v = remember(name, stroke) { Lucide.vector(name, stroke) } ?: return
+fun Icon(name: String, tint: Color, modifier: Modifier = Modifier, size: Dp = 20.dp, stroke: Float = 2f, label: String? = null, filled: Boolean = false) {
+    val v = remember(name, stroke, filled) { Lucide.vector(name, stroke, filled) } ?: return
     val painter = rememberVectorPainter(v)
     Image(
         painter = painter,

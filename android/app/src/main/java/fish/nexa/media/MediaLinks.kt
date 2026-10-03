@@ -155,6 +155,7 @@ object MediaLinks {
 /** useMediaSrc: re-read when links are re-signed. Null never loads; "" is still being re-signed. */
 @Composable
 fun mediaSrc(url: String?): String? {
+    // reading the version makes this redraw when a link is re-signed or refused
     @Suppress("UNUSED_VARIABLE") val v = MediaLinks.version
     return MediaLinks.src(url)
 }

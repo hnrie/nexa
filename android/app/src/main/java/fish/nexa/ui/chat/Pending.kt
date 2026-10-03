@@ -15,15 +15,8 @@ import fish.nexa.ui.layers.MenuItem
 import fish.nexa.ui.theme.Nx
 import kotlinx.serialization.json.JsonObject
 
-/** A picture a menu was opened on: what Copy Image and Save Image act on. */
-class ImageTarget(val meta: AttachmentMeta, val cm: ChatMessage?)
-
-fun imageMenuItems(image: ImageTarget): List<MenuItem> = emptyList()
-
 @Composable fun StickerView(sticker: StickerRef) = Txt(fish.nexa.ui.t("chat.messageItem.sticker"), color = Nx.colors.textMuted)
 @Composable fun PollCard(cm: ChatMessage, ctx: ListCtx) = Txt(cm.payload?.poll?.question ?: "", color = Nx.colors.textStrong)
-@Composable fun UploadCard(channelId: String, p: PendingMessage, up: PendingUpload) = Txt("${up.loaded} / ${up.total}", color = Nx.colors.textMuted)
-@Composable fun Attachments(att: List<AttachmentMeta>, cm: ChatMessage?, ctx: ListCtx) { for (a in att) Txt(a.name, color = Nx.colors.link) }
 @Composable fun Embeds(embeds: List<JsonObject>, cm: ChatMessage, ctx: ListCtx) = Unit
 @Composable fun ServerTagChip(tag: WornTag, small: Boolean) = Txt(tag.text, color = Nx.colors.textBrand)
 fun openReactionPicker(cm: ChatMessage, ctx: ListCtx) = Unit

@@ -82,6 +82,8 @@ object Media {
             .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.22).build() }
             .diskCache { DiskCache.Builder().directory(File(context.cacheDir, "pictures").toOkioPath()).maxSizeBytes(256L * 1024 * 1024).build() }
             .build()
+        // every AsyncImage gets these caches and the app's connection, whether or not it names the loader
+        coil3.SingletonImageLoader.setSafe { loader }
     }
 
     // ---- encrypted attachments ----
