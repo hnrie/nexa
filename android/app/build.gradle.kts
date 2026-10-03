@@ -196,6 +196,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.2")
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    // QR codes of safety numbers
+    implementation("com.google.zxing:core:3.5.3")
 
     implementation("io.coil-kt.coil3:coil-compose:3.6.3")
     implementation("io.coil-kt.coil3:coil-gif:3.6.3")

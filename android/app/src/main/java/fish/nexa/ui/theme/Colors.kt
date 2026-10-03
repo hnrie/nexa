@@ -212,6 +212,16 @@ private fun fromOklab(lab: FloatArray, alpha: Float): Color {
     return Color(toSrgb(r).coerceIn(0f, 1f), toSrgb(g).coerceIn(0f, 1f), toSrgb(b).coerceIn(0f, 1f), alpha)
 }
 
+/** `oklch(from c calc(l + dl) calc(c + dc) h)`: lighter or darker, more or less vivid, the same hue. */
+fun adjustOklch(c: Color, dl: Float, dc: Float): Color {
+    val lab = oklab(c)
+    val chroma = kotlin.math.sqrt(lab[1] * lab[1] + lab[2] * lab[2])
+    val hue = kotlin.math.atan2(lab[2], lab[1])
+    val l = (lab[0] + dl).coerceIn(0f, 1f)
+    val ch = (chroma + dc).coerceAtLeast(0f)
+    return fromOklab(floatArrayOf(l, ch * kotlin.math.cos(hue), ch * kotlin.math.sin(hue)), c.alpha)
+}
+
 /** `color-mix(in oklab, a, b t)`: t is the share of b. */
 fun mixOklab(a: Color, b: Color, t: Float): Color {
     val x = oklab(a)
