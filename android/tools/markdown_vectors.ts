@@ -27,8 +27,12 @@ import { runCommand } from "@/components/composer/commands";
 import { rankPeople, recentSpeakers } from "@/components/composer/rankPeople";
 import { unicodeKey, customKey, reactionKey, scoreOf, withUse, rankedKeys, emojiKeysIn, usageFromHistory, sanitizeUsage } from "@/lib/emojiUsage";
 import { popularity } from "@/lib/emojiPopular";
-import { wordsOf, nameMatch, useBoost } from "@/lib/emojiSuggest";
+import { wordsOf, nameMatch, useBoost, suggestEmoji, STARTER_EMOJI, type EmojiCandidate } from "@/lib/emojiSuggest";
 import { appLink, inviteLinksIn, noteLinksIn, profileLinksIn, messageTarget } from "@/lib/appLinks";
+import { loadEmoji, allEmoji, emojiGroups, searchEmoji, withTone, emojiByShortcode, emojiByUnicode, toneOf } from "@/components/pickers/emojiIndex";
+import { emojiToken, emojiReactionKey, searchCustomEmoji } from "@/stores/expressions";
+import { reactionKeyOf } from "@/components/chat/Reactions";
+import { shownInvite, parseInviteFragment } from "@/lib/inviteLink";
 
 const OUT = join(process.cwd(), "../android/app/src/test/resources/web-markdown-vectors.json.gz");
 
@@ -381,6 +385,68 @@ async function main(): Promise<void> {
     const at = { href: here, host: "nexa.fish" };
     return { src, invites: inviteLinksIn(nodes, at), notes: noteLinksIn(nodes, at), profiles: profileLinksIn(nodes, at) };
   });
+  const g = globalThis as unknown as { window?: unknown };
+  const hadWindow = "window" in g;
+  g.window = { location: { origin: "https://nexa.fish" } };
+  const invites = [
+    "https://nexa.fish/invite/abc#k=1.x", "https://nexa.fish/invite/abc/#k", "https://nexa.fish/invite/abc", "https://nexa.fish/invite/a/b#k", "https://evil.example/invite/abc#k",
+    "http://nexa.fish/invite/abc#k", "https://nexa.fish:443/invite/abc#k", "not a url",
+  ].map((url) => ({ url, shown: shownInvite(url) }));
+  if (!hadWindow) delete g.window;
+  const fragments = ["#k=12." + "A".repeat(43), "#x=1&k=3." + "_".repeat(43) + "&y", "#k=1." + "A".repeat(39), "#k=1." + "A".repeat(44), "", "#k=a.B"].map((hash) => {
+    const key = parseInviteFragment(hash);
+    return { hash, key: key ? { epoch: key.epoch, root: Buffer.from(key.root).toString("hex") } : null };
+  });
+
+  // the emoji picker's list, as the web builds it (every picture counts as drawn here)
+  await loadEmoji();
+  const groupsOut = emojiGroups().map((gr) => ({ id: gr.id, size: gr.items.length, head: gr.items.slice(0, 8).map((e) => e.unicode), tail: gr.items.slice(-4).map((e) => e.unicode) }));
+  const sampleUnicodes = ["😀", "👍", "❤️", "🧑‍🤝‍🧑", "👨‍👩‍👧", "🏳️‍🌈", "🇺🇸", "#️⃣", "🫠", "🤌", "👋", "🧔‍♀️"];
+  const entries = sampleUnicodes.map((u) => {
+    const e = emojiByUnicode(u);
+    return e ? { unicode: u, hexcode: e.hexcode, label: e.label, group: e.group, tags: e.tags, shortcodes: e.shortcodes, skins: e.skins ?? null } : { unicode: u, missing: true };
+  });
+  const searches = ["smile", ":heart:", "HEART", "thumbs", "flag", "us", "zzz", "", "  cat ", "face with", "+1", "-1"].map((q) => ({ q, out: searchEmoji(q).map((e) => e.unicode) }));
+  const tones = ["👍", "🧑‍🤝‍🧑", "👋", "😀", "🤝"].flatMap((u) => [0, 1, 3, 5].map((tone) => {
+    const e = emojiByUnicode(u);
+    return { unicode: u, tone, out: e ? withTone(e, tone) : null };
+  }));
+  const byCode = ["smile", "+1", "thumbsup", "heart", "flag-us", "us", "nope", "SMILE"].map((name) => ({ name, unicode: emojiByShortcode(name)?.unicode ?? null }));
+  const toneOfOut = ["1F44D-1F3FB", "1F9D1-1F3FC-200D-1F91D-200D-1F9D1-1F3FF", "1F600", "1f3fd"].map((hex) => ({ hex, tone: toneOf(hex) ?? null }));
+  const popular: Record<string, number> = {};
+  for (const e of allEmoji()) {
+    for (const u of [e.unicode, ...(e.skins ?? []).map((s) => s.unicode)]) if (popularity(u)) popular[u] = popularity(u);
+  }
+  const picker = { count: allEmoji().length, groups: groupsOut, entries, searches, tones, byCode, toneOf: toneOfOut, popular };
+
+  // smart suggestions over the whole list and a few custom emoji
+  const custom = [
+    { id: "e1", server_id: "s1", name: "blob_heart", blob_id: "900", animated: false, creator_id: "u", created_at: 0 },
+    { id: "e2", server_id: "s1", name: "partyBlob", blob_id: "901", animated: true, creator_id: "u", created_at: 0 },
+    { id: "e3", server_id: "s2", name: "heart", blob_id: "902", animated: false, creator_id: "u", created_at: 0 },
+  ];
+  const candidates: EmojiCandidate[] = [
+    ...custom.map((emoji, i) => ({ kind: "customEmoji" as const, emoji, own: i < 2 })),
+    ...allEmoji().map((entry) => ({ kind: "emoji" as const, entry })),
+  ];
+  const sugUsage = { [unicodeKey("💔")]: { s: 4, at: NOW - H }, "c:901": { s: 2, at: NOW }, [unicodeKey("🔥")]: { s: 1, at: NOW - 30 * H } };
+  const suggestions = ["", "h", "hea", "heart", "brok", "fire", "blob", "pb", "us", "smiling face", "xyzzy", "thu", "+1", "flag"].flatMap((query) =>
+    [{ usage: {}, recent: [] as string[] }, { usage: sugUsage, recent: ["😀", "❤️", "🔥"] }].map(({ usage: u, recent: r }, variant) => ({
+      query,
+      variant,
+      out: suggestEmoji({ query, candidates, usage: u, recent: r, now: NOW }).map((s) => ({ kind: s.kind, key: s.kind === "emoji" ? s.entry.unicode : s.emoji.blob_id, name: s.name })),
+    })),
+  );
+
+  // reactions and custom emoji tokens
+  const reactions = {
+    tokens: custom.map((e) => ({ blob: e.blob_id, token: emojiToken(e), key: emojiReactionKey(e) })),
+    picks: [
+      { unicode: "👍" }, { unicode: "<:blob:12>" }, { unicode: "<a:party:13>" }, { unicode: "<:bad name:14>" }, { unicode: "x", custom: custom[1] },
+    ].map((p) => ({ unicode: p.unicode, custom: p.custom ? p.custom.blob_id : null, key: reactionKeyOf(p as Parameters<typeof reactionKeyOf>[0]) })),
+    search: ["blob", "BLOB", ":heart:", "art", "", "party", "zz"].map((q) => ({ q, out: searchCustomEmoji({ s1: custom.slice(0, 2), s2: custom.slice(2) } as never, q).map((e) => e.blob_id) })),
+    starter: STARTER_EMOJI,
+  };
 
   const out = {
     generated: { node: process.versions.node, icu: process.versions.icu, unicode: process.versions.unicode, zone: Intl.DateTimeFormat().resolvedOptions().timeZone, now: NOW },
@@ -411,6 +477,11 @@ async function main(): Promise<void> {
     links,
     targets: targetsOut,
     cards,
+    invites,
+    fragments,
+    picker,
+    suggestions,
+    reactions,
   };
   writeFileSync(OUT, gzipSync(JSON.stringify(out), { level: 9 }));
   console.log("wrote", OUT, corpus.length, "sources");
