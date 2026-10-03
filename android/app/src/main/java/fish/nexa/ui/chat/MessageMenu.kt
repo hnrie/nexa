@@ -128,7 +128,7 @@ fun openMessageMenu(cm: ChatMessage, ctx: ListCtx, image: ImageTarget? = null) {
     val canReactHere = canReact(cm, ctx)
     if (canReactHere) items += MenuItem.Action(t("chat.messageItem.addReaction"), separatorAfter = true) { openReactionPicker(cm, ctx) }
     if (canEdit(cm)) items += MenuItem.Action(t("chat.messageItem.editMessage")) {
-        ChatUi.editing[cm.channelId] = ChatUi.Edit(cm.id, fish.nexa.data.Mentions.humanize(cm.payload?.t ?: ""))
+        ChatUi.editing[cm.channelId] = ChatUi.Edit(cm.id, fish.nexa.data.Mentions.humanizeForEdit(cm.payload?.t ?: "", cm.channelId))
     }
     items += MenuItem.Action(t("chat.messageItem.reply"), separatorAfter = true) { ChatUi.reply[cm.channelId] = ChatUi.Reply(cm.id, ping = true) }
     items += MenuItem.Action(t("chat.messageMenu.copyText"), disabled = cm.payload?.t.isNullOrEmpty()) {
