@@ -77,7 +77,7 @@ fun confirmDeleteChannel(ch: Channel) {
 }
 
 fun confirmLogout() {
-    confirm(t("settings.settings.logOut"), t("settings.settings.areYouSureYouWantTo"), t("settings.settings.logOut")) {
+    confirm(t("settings.settings.logOut"), t("settings.settings.logOutConfirm"), t("settings.settings.logOut")) {
         Nexa.auth.logout()
         Nav.reset()
     }

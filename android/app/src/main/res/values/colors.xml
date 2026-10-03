@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- --brand in web/src/styles/tokens.css; the launcher icon and notifications use it -->
+    <color name="nexa_brand">#8000FF</color>
+</resources>
