@@ -455,12 +455,14 @@ fun DmSidebar() {
         }
     }
 
+    val noteRequests = fish.nexa.notes.Notes.invites.collectAsState().value.size
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             SearchButton()
             LazyColumn(Modifier.fillMaxSize().padding(start = 8.dp, end = 8.dp, top = 4.dp)) {
                 item("friends") { NavRow("Users", t("sidebar.dMSidebar.friends"), route is Route.Friends, requests, t("rail.rail.friendRequestsCount", "count" to requests)) { Nav.go(Route.Friends); Nav.leftOpen = false } }
-                item("notes") { NavRow("NotebookPen", t("notes.title"), route is Route.Notes, 0, null) { Nav.go(Route.Notes()); Nav.leftOpen = false } }
+                // note requests waiting for an answer, counted where the answering is done
+                item("notes") { NavRow("NotebookPen", t("notes.title"), route is Route.Notes, noteRequests, t("notes.requests.count", "count" to noteRequests)) { Nav.go(Route.Notes()); Nav.leftOpen = false } }
                 if (me?.isAdmin == true) item("mod") { NavRow("Shield", t("moderation.navLabel"), route is Route.Admin, 0, null) { Nav.go(Route.Admin); Nav.leftOpen = false } }
                 if (view.pinned.isNotEmpty()) item("pinned-head") { SectionHeader(pinned = true) }
                 rows(view.pinned, Place.PINNED, activeId, activeConvo, nexaOpen, picking, ::openRowMenu, ::tapRow, ::moves)
