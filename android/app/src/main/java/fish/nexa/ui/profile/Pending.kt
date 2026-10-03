@@ -4,4 +4,7 @@ package fish.nexa.ui.profile
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.layers.openSheet
 
-object Profiles { fun open(userId: String) = openSheet("profile", title = "Profile") { Txt(userId) } }
+object Profiles {
+    fun open(userId: String) = openSheet("profile", title = "Profile") { Txt(userId) }
+    fun openByUsername(username: String) = openSheet("profile", title = "Profile") { Txt(username) }
+}

@@ -235,6 +235,20 @@ object Notifier {
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setWhen(lines.last().at)
             .setShowWhen(true)
+        // a DM or group is a conversation the system knows by its shortcut (ranked, shown with its person)
+        if (chan != null && (chan.type == "dm" || chan.type == "group_dm")) runCatching {
+            val name = if (chan.type == "dm") lines.last().author else Names.channel(chan)
+            val intent = Intent(Nexa.app, MainActivity::class.java).apply { action = Intent.ACTION_VIEW; putExtra(EXTRA_PATH, path) }
+            val sc = androidx.core.content.pm.ShortcutInfoCompat.Builder(Nexa.app, "conv-$channelId")
+                .setShortLabel(name.ifBlank { "Nexa" })
+                .setLongLived(true)
+                .setIntent(intent)
+                .setCategories(setOf(fish.nexa.ui.share.Share.SHARE_CATEGORY))
+                .setIcon(IconCompat.createWithResource(Nexa.app, R.mipmap.ic_launcher))
+                .build()
+            androidx.core.content.pm.ShortcutManagerCompat.pushDynamicShortcut(Nexa.app, sc)
+            b.setShortcutId("conv-$channelId")
+        }
         if (pv == "none") {
             b.setContentTitle("Nexa").setContentText(t("notify.newMessage"))
         } else {
@@ -361,6 +375,8 @@ object Notifier {
         installChannels()
         Nexa.session.onMessage = { m, mine, dec -> onMessage(m, mine, dec) }
         Nexa.session.onFriendRequest = { r -> onFriendRequest(r) }
+        // the conversations offered in the system's share sheet, once the account's lists are in
+        Nexa.scope.launch { Nexa.session.ready.collect { if (it) fish.nexa.ui.share.Share.publishShortcuts() } }
         // the open conversation's notification goes as soon as it is opened
         Nexa.scope.launch { Nexa.ui.activeChannel.collect { id -> if (id != null && Nexa.ui.visible.value) clearConversation(id) } }
         Nexa.scope.launch { Nexa.ui.visible.collect { v -> if (v) Nexa.ui.activeChannel.value?.let { clearConversation(it) } } }

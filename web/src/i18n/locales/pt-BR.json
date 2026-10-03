@@ -5034,6 +5034,8 @@
   "android.settings.notifications.testNotification": "Notificação de teste",
   "android.settings.notifications.turnOnFirst": "Ative as notificações primeiro.",
   "android.settings.spellCheckHint": "Seu teclado sublinha as palavras escritas errado enquanto você digita.",
+  "android.share.nothing": "Ainda não há conversas para enviar.",
+  "android.share.title": "Enviar para",
   "keybinds.changeKeybinds": "Mude suas teclas de atalho",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} está tagarelando…",

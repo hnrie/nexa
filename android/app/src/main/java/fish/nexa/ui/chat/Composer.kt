@@ -106,37 +106,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** commands.ts: the slash commands, applied when the message is sent. */
-object Commands {
-    private val KAOMOJI = mapOf("shrug" to "¯\\\\\\_(ツ)_/¯", "tableflip" to "(╯°□°)╯︵ ┻━┻", "unflip" to "┬─┬ ノ( ゜-゜ノ)", "lenny" to "( ͡° ͜ʖ ͡°)")
-
-    fun list() = listOf(
-        "shrug" to t("composer.commands.appendsShrug"),
-        "tableflip" to t("composer.commands.appendsToYourMessage"),
-        "unflip" to t("composer.commands.appendsToYourMessage2"),
-        "lenny" to t("composer.commands.appendsToYourMessage3"),
-        "me" to t("composer.commands.displaysTextWithEmphasis"),
-        "spoiler" to t("composer.commands.marksYourMessageAsASpoiler"),
-    )
-
-    sealed interface Result {
-        data object Text : Result
-        data class Command(val text: String) : Result
-        data class Unknown(val name: String) : Result
-        data class Empty(val name: String) : Result
-    }
-
-    fun run(text: String): Result {
-        val m = Regex("^/(\\w+)(?:\\s+([\\s\\S]*))?$").find(text.trim()) ?: return Result.Text
-        val cmd = m.groupValues[1].lowercase()
-        val rest = m.groupValues[2].trim()
-        KAOMOJI[cmd]?.let { return Result.Command(if (rest.isNotEmpty()) "$rest $it" else it) }
-        if (cmd == "me") return if (rest.isNotEmpty()) Result.Command("*$rest*") else Result.Empty(cmd)
-        if (cmd == "spoiler") return if (rest.isNotEmpty()) Result.Command("||$rest||") else Result.Empty(cmd)
-        return Result.Unknown(m.groupValues[1])
-    }
-}
-
 /** What the caret is right after, for autocomplete (Composer.tsx acToken). */
 data class AcToken(val kind: String, val query: String, val start: Int)
 
@@ -279,6 +248,18 @@ fun Composer(channel: Channel) {
     }
     val slowLeft = ((slowUntil - now) / 1000.0).coerceAtLeast(0.0)
 
+    // words shared from another app go in after what is already there
+    val injected = ChatUi.inject[channelId]
+    LaunchedEffect(injected) {
+        val add = injected ?: return@LaunchedEffect
+        ChatUi.inject.remove(channelId)
+        state.edit {
+            val sep = if (length > 0 && !asCharSequence().endsWith("\n")) "\n" else ""
+            append(sep + add)
+            placeCursorAtEnd()
+        }
+    }
+
     // drafts, typing and autocomplete follow the text
     LaunchedEffect(channelId) {
         snapshotFlow { state.text.toString() to state.selection.end }.distinctUntilChanged().collect { (text, caret) ->
@@ -329,18 +310,18 @@ fun Composer(channel: Channel) {
             Nexa.ui.toast(Send.tooLongMessage(), "error")
             return
         }
-        when (val r = Commands.run(text)) {
-            is Commands.Result.Command -> text = r.text
-            is Commands.Result.Empty -> {
+        when (val r = fish.nexa.ui.markdown.Commands.run(text)) {
+            is fish.nexa.ui.markdown.Commands.Result.Command -> text = r.text
+            is fish.nexa.ui.markdown.Commands.Result.Empty -> {
                 Nexa.ui.toast(t("composer.composer.commandNeedsText", "name" to r.name), "error")
                 return
             }
-            is Commands.Result.Unknown -> if (lastUnknown != text) {
+            is fish.nexa.ui.markdown.Commands.Result.Unknown -> if (lastUnknown != text) {
                 lastUnknown = text
                 Nexa.ui.toast(t("composer.composer.noSuchCommand", "name" to r.name))
                 return
             }
-            Commands.Result.Text -> Unit
+            fish.nexa.ui.markdown.Commands.Result.Text -> Unit
         }
         val files = ChatUi.trays[channelId] ?: emptyList()
         if (text.isBlank() && files.isEmpty()) return
@@ -377,7 +358,7 @@ fun Composer(channel: Channel) {
                 }
                 notice = null
             }) }
-            if ("preview" in stack) PreviewBox(state.text.toString()) { preview = false }
+            if ("preview" in stack) PreviewBox(state.text.toString(), channel.serverId) { preview = false }
             if (reply != null) ReplyBar(channel, reply, topShape("reply"))
             if (tray.isNotEmpty()) Tray(channelId, tray, topShape("tray"))
             val boxShape = if (stack.any { it != "preview" }) RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp) else Radii.Md
@@ -463,25 +444,11 @@ private class ComposerInput(private val onPasteTooLong: (String) -> Unit) : andr
     }
 }
 
-/** lib/zalgo.ts: more than three combining marks stacked on one letter is refused (a toast at most every 2.5 s). */
+/** lib/zalgo.ts: an insertion that would stack more than three marks on a letter is refused, with a toast at most every 2.5 s. */
 object Zalgo {
-    private const val MAX_MARKS = 3
     private var lastToast = 0L
 
-    fun tooStacked(text: String): Boolean {
-        var run = 0
-        var i = 0
-        while (i < text.length) {
-            val cp = text.codePointAt(i)
-            val t = Character.getType(cp)
-            if (t == Character.NON_SPACING_MARK.toInt() || t == Character.ENCLOSING_MARK.toInt()) {
-                run += 1
-                if (run > MAX_MARKS) return true
-            } else run = 0
-            i += Character.charCount(cp)
-        }
-        return false
-    }
+    fun tooStacked(text: String): Boolean = fish.nexa.ui.markdown.Zalgo.has(text)
 
     fun refused() {
         val now = System.currentTimeMillis()
@@ -693,9 +660,11 @@ private fun ReplyBar(channel: Channel, reply: ChatUi.Reply, shape: androidx.comp
                 withStyle(SpanStyle(color = c.text, fontWeight = FontWeight(600))) { append(name) }
                 append(s.substring(at + 1))
             } else append(s)
-            if (target != null) withStyle(SpanStyle(color = c.textMuted)) { append("   " + replyWords(target)) }
         }
-        androidx.compose.foundation.text.BasicText(line, Modifier.weight(1f), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), color = c.textMuted), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.foundation.text.BasicText(line, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), color = c.textMuted), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            if (target != null) ReplyExcerpt(target, channel.serverId, Modifier.weight(1f, fill = false))
+        }
         if (other) {
             Box(
                 Modifier
@@ -845,7 +814,7 @@ private fun NoticeButton(label: String, primary: Boolean, onClick: () -> Unit) {
 
 /** MessagePreview: your words as they will look, which only you can see. */
 @Composable
-private fun PreviewBox(text: String, onHide: () -> Unit) {
+private fun PreviewBox(text: String, serverId: String?, onHide: () -> Unit) {
     val c = Nx.colors
     val me = Nexa.users.me.collectAsState().value ?: return
     val shape = Radii.Md
@@ -867,7 +836,7 @@ private fun PreviewBox(text: String, onHide: () -> Unit) {
             Avatar(me.id, me.name, me.avatarId, 40.dp)
             Column(Modifier.weight(1f)) {
                 Txt(me.name, style = Nx.type.body.copy(fontWeight = FontWeight(500)), color = c.textStrong)
-                MessageText(text, c.text, null)
+                fish.nexa.ui.markdown.MarkdownView(text, fish.nexa.ui.markdown.RenderCtx(serverId = serverId, inert = true, surface = c.bgSurface))
             }
         }
     }
@@ -946,25 +915,6 @@ private fun AcRow(item: AcItem, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** rankPeople.ts: exact name, then starts with, then a word that starts with it, then contains; recent speakers first among equals. */
-private fun rankPeople(q: String, people: List<PublicUser>, nick: (String) -> String, recent: List<String>): List<PublicUser> {
-    fun score(u: PublicUser): Int? {
-        val names = listOf(u.username, u.displayName, nick(u.id)).filter { it.isNotEmpty() }.map { it.lowercase() }
-        if (q.isEmpty()) return 3
-        return when {
-            names.any { it == q } -> 0
-            names.any { it.startsWith(q) } -> 1
-            names.any { n -> n.split(Regex("\\s+")).any { it.startsWith(q) } } -> 2
-            names.any { it.contains(q) } -> 3
-            else -> null
-        }
-    }
-    val order = recent.withIndex().associate { (i, id) -> id to i }
-    return people.mapNotNull { u -> score(u)?.let { u to it } }
-        .sortedWith(compareBy<Pair<PublicUser, Int>>({ it.second }, { order[it.first.id] ?: Int.MAX_VALUE }, { it.first.name.lowercase() }))
-        .map { it.first }
-}
-
 private fun suggestions(channel: Channel, token: AcToken): List<Pair<String, List<AcItem>>> {
     val st = channel.serverId?.let { Nexa.servers.get(it) }
     val q = token.query
@@ -973,8 +923,8 @@ private fun suggestions(channel: Channel, token: AcToken): List<Pair<String, Lis
             val pool = if (st != null) st.members.keys.mapNotNull { Nexa.users.get(it) }
             else channel.recipientIds.mapNotNull { Nexa.users.get(it) }
             val here = Nexa.messages.get(channel.id)
-            val recent = here.ids.takeLast(100).asReversed().mapNotNull { here.byId[it]?.authorId }.filter { it != Nexa.users.meId }.distinct()
-            val people = rankPeople(q, pool, { st?.members?.get(it)?.nickname ?: "" }, recent).take(8)
+            val recent = fish.nexa.ui.markdown.People.recentSpeakers(here.ids.takeLast(100).asReversed().mapNotNull { here.byId[it]?.authorId }, Nexa.users.meId)
+            val people = fish.nexa.ui.markdown.People.rank(q, pool, { fish.nexa.ui.markdown.People.Person(it.id, it.username, it.displayName) }, { st?.members?.get(it)?.nickname ?: "" }, recent, fish.nexa.ui.I18n.locale).take(8)
                 .map { AcItem("user", "@${it.username} ", it.name, it.username, user = it) }
             val everyRole = st != null && Nexa.servers.canI(st, P.MENTION_EVERYONE, channel.id)
             val roles = st?.roles?.values?.filter { it.id != st.server.id && (it.mentionable || everyRole) && it.name.lowercase().contains(q) }
@@ -995,7 +945,7 @@ private fun suggestions(channel: Channel, token: AcToken): List<Pair<String, Lis
             listOf(t("servers.defaults.textChannels") to list)
         }
         "emoji" -> listOf(t("server.emoji.emoji") to emojiSuggestions(channel, q))
-        "command" -> listOf(t("composer.autocomplete.commands") to Commands.list().filter { it.first.startsWith(q) }.map { (name, desc) -> AcItem("command", "/$name ", "/$name", desc) })
+        "command" -> listOf(t("composer.autocomplete.commands") to fish.nexa.ui.markdown.Commands.LIST.filter { it.first.startsWith(q) }.map { (name, desc) -> AcItem("command", "/$name ", "/$name", t(desc)) })
         else -> emptyList()
     }
 }

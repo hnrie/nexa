@@ -5249,6 +5249,8 @@
   "android.settings.notifications.testNotification": "Тестовое уведомление",
   "android.settings.notifications.turnOnFirst": "Сначала включите уведомления.",
   "android.settings.spellCheckHint": "Клавиатура подчёркивает слова с ошибками, пока вы печатаете.",
+  "android.share.nothing": "Пока некуда отправить.",
+  "android.share.title": "Отправить",
   "keybinds.changeKeybinds": "Изменить горячие клавиши",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} болтает…",

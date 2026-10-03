@@ -60,7 +60,7 @@ fun EditMessage(cm: ChatMessage) {
     val c = Nx.colors
     val scope = rememberCoroutineScope()
     val parked = ChatUi.editing[cm.channelId]
-    val original = remember(cm.id) { Mentions.humanize(cm.payload?.t ?: "") }
+    val original = remember(cm.id) { Mentions.humanizeForEdit(cm.payload?.t ?: "", cm.channelId) }
     val state = remember(cm.id) { TextFieldState(parked?.text?.takeIf { parked.messageId == cm.id } ?: original).apply { edit { placeCursorAtEnd() } } }
     var busy by remember { mutableStateOf(false) }
     var held by remember { mutableStateOf<String?>(null) }

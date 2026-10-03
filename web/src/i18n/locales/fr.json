@@ -5033,6 +5033,8 @@
   "android.settings.notifications.testNotification": "Notification de test",
   "android.settings.notifications.turnOnFirst": "Activez d'abord les notifications.",
   "android.settings.spellCheckHint": "Votre clavier souligne les mots mal orthographiés pendant que vous écrivez.",
+  "android.share.nothing": "Aucune conversation où envoyer pour l'instant.",
+  "android.share.title": "Envoyer à",
   "keybinds.changeKeybinds": "Modifier vos raccourcis clavier",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} jacasse…",

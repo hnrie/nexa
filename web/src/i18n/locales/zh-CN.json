@@ -4769,6 +4769,8 @@
   "android.settings.notifications.testNotification": "测试通知",
   "android.settings.notifications.turnOnFirst": "请先开启通知。",
   "android.settings.spellCheckHint": "输入时由键盘在拼写错误的单词下画线。",
+  "android.share.nothing": "还没有可以发送的对话。",
+  "android.share.title": "发送到",
   "keybinds.changeKeybinds": "更改你的按键绑定",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} 正在疯狂输出…",

@@ -22,6 +22,16 @@ sealed interface Route {
     data object Admin : Route
 
     val isHome get() = this is Friends || this is Dm || this is NexaConvo || this is Notes
+
+    /** The web address for this place (without a message to jump to). */
+    fun toPath(): String = when (this) {
+        Friends -> "/channels/@me"
+        is Dm -> "/channels/@me/$channelId"
+        NexaConvo -> "/channels/@me/nexa"
+        is Notes -> if (noteId != null) "/channels/@me/notes/$noteId" else "/channels/@me/notes"
+        is Server -> if (channelId != null) "/channels/$serverId/$channelId" else "/channels/$serverId"
+        Admin -> "/channels/@admin"
+    }
 }
 
 /**
@@ -61,6 +71,15 @@ object Nav {
      */
     fun openPath(path: String): Boolean {
         val parts = path.substringBefore('?').substringBefore('#').trim('/').split('/').filter { it.isNotEmpty() }
+        // an invite link, a profile link
+        if (parts.size == 2 && parts[0] == "invite") {
+            fish.nexa.ui.dialogs.Dialogs.openInvite(parts[1])
+            return true
+        }
+        if (parts.size == 1 && parts[0].startsWith("@") && parts[0].length > 1) {
+            fish.nexa.ui.profile.Profiles.openByUsername(parts[0].substring(1))
+            return true
+        }
         if (parts.firstOrNull() != "channels" || parts.size < 2) return false
         val id = Regex("^\\d{1,20}$")
         val next: Route = when (parts[1]) {
@@ -116,7 +135,27 @@ object Nav {
         prefs().edit().putString("lastChannel:$me:$serverId", channelId).apply()
     }
 
+    /**
+     * Opening the app after it was closed: back where you were, as a phone
+     * app is expected to be, unless a notification or link said where to go.
+     */
+    fun restore() {
+        if (route != Route.Friends || history.isNotEmpty()) return
+        val me = Nexa.users.meId ?: return
+        val path = prefs().getString("last:$me", null) ?: return
+        val parts = path.trim('/').split('/')
+        // only places that still exist
+        val ok = when {
+            parts.size >= 3 && parts[1] == "@me" && parts[2].all { it.isDigit() } -> Nexa.channels.get(parts[2]) != null
+            parts.size >= 2 && parts[1].all { it.isDigit() } -> Nexa.servers.get(parts[1]) != null
+            else -> true
+        }
+        if (ok) openPath(path)
+        history.clear()
+    }
+
     private fun publish() {
+        Nexa.users.meId?.let { prefs().edit().putString("last:$it", route.toPath()).apply() }
         when (val r = route) {
             is Route.Server -> {
                 Nexa.ui.open(r.serverId, r.channelId)

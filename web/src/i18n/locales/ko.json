@@ -4769,6 +4769,8 @@
   "android.settings.notifications.testNotification": "테스트 알림",
   "android.settings.notifications.turnOnFirst": "먼저 알림을 켜 주세요.",
   "android.settings.spellCheckHint": "입력하는 동안 키보드가 맞춤법이 틀린 단어에 밑줄을 긋습니다.",
+  "android.share.nothing": "아직 보낼 수 있는 대화가 없습니다.",
+  "android.share.title": "보낼 곳",
   "keybinds.changeKeybinds": "단축키 변경",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} 님이 수다 떠는 중…",

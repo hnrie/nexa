@@ -4938,6 +4938,8 @@
   "android.settings.notifications.testNotification": "Test Notification",
   "android.settings.notifications.turnOnFirst": "Turn on notifications first.",
   "android.settings.spellCheckHint": "Lets your keyboard underline misspelled words as you type.",
+  "android.share.nothing": "No conversations to send to yet.",
+  "android.share.title": "Send To",
   "keybinds.changeKeybinds": "Change Your Keybinds",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} is yapping…",

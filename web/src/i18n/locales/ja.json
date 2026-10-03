@@ -4769,6 +4769,8 @@
   "android.settings.notifications.testNotification": "テスト通知",
   "android.settings.notifications.turnOnFirst": "先に通知をオンにしてください。",
   "android.settings.spellCheckHint": "入力中にキーボードがつづりの誤りに下線を引きます。",
+  "android.share.nothing": "送信できる会話はまだありません。",
+  "android.share.title": "送信先",
   "keybinds.changeKeybinds": "キー割り当てを変更",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} がおしゃべり中…",

@@ -18,8 +18,11 @@ class NexaApp : Application() {
         Lucide.init(this)
         fish.nexa.media.Media.init(this)
         fish.nexa.media.Twemoji.init(this)
+        fish.nexa.ui.markdown.EmojiAssets.init(this)
         Nexa.auth.captcha = CaptchaHost
         fish.nexa.notify.Notifier.install()
+        // notifications read a message's words as plain text, mentions as names
+        fish.nexa.notify.Notifier.plainText = { src -> fish.nexa.ui.markdown.Markdown.plainText(fish.nexa.ui.markdown.Markdown.parse(src), fish.nexa.ui.chat.AppNames) }
         // signed in: stay connected in the background (Nexa has no push); signed out: stop
         Nexa.scope.launch {
             Nexa.auth.state.collect { s ->

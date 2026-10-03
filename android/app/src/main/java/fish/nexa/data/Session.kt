@@ -436,6 +436,7 @@ class Session(private val nx: Nexa) {
             val res = nx.api.request("POST", "/channels/$channelId/messages/$messageId/ack", if (manual) buildJsonObject { put("manual", true) } else null)
             decode(res, ReadState.serializer())?.let { nx.readStates.apply(it) }
         } catch (e: fish.nexa.net.ApiError) {
+            Log.w(TAG, "ack $channelId/$messageId failed: ${e.status} ${e.code}")
             if (e.isTransient) synchronized(failedAcks) { failedAcks[channelId] = messageId }
         }
     }

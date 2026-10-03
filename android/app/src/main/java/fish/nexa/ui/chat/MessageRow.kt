@@ -334,21 +334,41 @@ private fun ReplyLine(ctx: ListCtx, replyId: String) {
                         who, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)), color = c.text, maxLines = 1,
                         modifier = Modifier.widthIn(max = 160.dp).pressable(remember { MutableInteractionSource() }) { openProfile(original.authorId) },
                     )
-                    Txt(replyWords(original), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                    ReplyExcerpt(original, ctx.server?.server?.id, Modifier.weight(1f, fill = false))
                 }
             }
         }
     }
 }
 
-/** ReplyWords: the original in one line, or what it holds when it has no words. */
+/** ReplyWords as plain text: the original in one line, or what it holds when it has no words. */
 fun replyWords(cm: ChatMessage): String {
     if (cm.error != null) return t("chat.messageItem.encryptedMessage")
     val p = cm.payload
     p?.poll?.let { poll -> return (listOf(poll.question) + poll.answers.map { it.text }).joinToString(" ") }
     val text = p?.t?.takeIf { it.isNotBlank() }
-    if (text != null) return excerptOf(text)
+    if (text != null) return fish.nexa.ui.markdown.Markdown.plainText(fish.nexa.ui.markdown.Markdown.parse(text, inline = true), AppNames).replace(Regex("\\s+"), " ").trim()
     return t("chat.messageItem.clickToSeeAttachment")
+}
+
+/** ReplyWords: the original in one line with its formatting kept but inert (spoilers stay covered). */
+@Composable
+fun ReplyExcerpt(cm: ChatMessage, serverId: String?, modifier: Modifier = Modifier) {
+    val c = Nx.colors
+    val style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f))
+    val text = cm.payload?.t?.takeIf { it.isNotBlank() && cm.error == null && cm.payload.poll == null }
+    if (text != null) fish.nexa.ui.markdown.MarkdownLine(text, c.textMuted, style, modifier, serverId)
+    else Txt(replyWords(cm), style = style, color = c.textMuted, maxLines = 1, modifier = modifier)
+}
+
+/** Names as the app knows them, for plain-text versions of messages (copying, notifications, previews). */
+object AppNames : fish.nexa.ui.markdown.NameLookup {
+    override fun user(id: String): fish.nexa.ui.markdown.UserName? {
+        val u = Nexa.users.get(id) ?: Nexa.users.me.value?.takeIf { it.id == id }?.let { fish.nexa.net.PublicUser(it.id, it.username, it.displayName) } ?: return null
+        return fish.nexa.ui.markdown.UserName(u.displayName, u.username)
+    }
+    override fun channel(id: String): String? = Nexa.channels.get(id)?.name
+    override fun role(id: String): String? = Nexa.servers.byId.value.values.firstNotNullOfOrNull { it.roles[id]?.name }
 }
 
 @Composable
@@ -370,7 +390,10 @@ private fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     val text = payload?.t
     val edited = cm?.m?.editedAt?.let { t("chat.messageItem.edited") }
     if (cm != null && ChatUi.editing[cm.channelId]?.messageId == cm.id) EditMessage(cm)
-    else if (!text.isNullOrEmpty()) MessageText(text, if (failed) c.textDanger else c.text, edited)
+    else if (!text.isNullOrEmpty()) fish.nexa.ui.markdown.MarkdownView(
+        text,
+        fish.nexa.ui.markdown.RenderCtx(serverId = ctx.server?.server?.id, color = if (failed) c.textDanger else null, edited = edited, surface = c.bgRaised),
+    )
     payload?.sticker?.let { StickerView(it) }
     payload?.poll?.let { if (cm != null) PollCard(cm, ctx) }
     val up = item.pending?.upload

@@ -5033,6 +5033,8 @@
   "android.settings.notifications.testNotification": "Notificación de prueba",
   "android.settings.notifications.turnOnFirst": "Activa primero las notificaciones.",
   "android.settings.spellCheckHint": "Tu teclado subraya las palabras mal escritas mientras escribes.",
+  "android.share.nothing": "Todavía no hay conversaciones a las que enviar.",
+  "android.share.title": "Enviar a",
   "keybinds.changeKeybinds": "Cambia tus teclas rápidas",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} está parloteando…",

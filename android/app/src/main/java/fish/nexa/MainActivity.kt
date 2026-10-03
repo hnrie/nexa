@@ -20,23 +20,45 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         lifecycleScope.launch { Nexa.auth.bootstrap() }
         setContent { App() }
-        open(intent)
+        if (!open(intent)) lifecycleScope.launch {
+            Nexa.auth.state.first { it is fish.nexa.data.AuthState.Ready }
+            fish.nexa.ui.nav.Nav.restore()
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         open(intent)
     }
 
-    /** A notification or a link opened the app at a place: go there once signed in. */
-    private fun open(intent: Intent?) {
+    /** A notification, a link or a share opened the app: act on it once signed in. False when it said nothing. */
+    private fun open(intent: Intent?): Boolean {
+        // debug builds only: open a screen directly for checking it (adb shell am start ... --es debug.open whatsnew)
+        if (BuildConfig.DEBUG && intent?.getStringExtra("debug.open") == "whatsnew") {
+            lifecycleScope.launch {
+                Nexa.auth.state.first { it is fish.nexa.data.AuthState.Ready }
+                fish.nexa.ui.WhatsNew.openAll()
+            }
+            return true
+        }
+        fish.nexa.ui.share.Share.from(intent)?.let { incoming ->
+            val direct = fish.nexa.ui.share.Share.channelOf(intent)
+            lifecycleScope.launch {
+                Nexa.auth.state.first { it is fish.nexa.data.AuthState.Ready }
+                if (direct != null && Nexa.channels.get(direct) != null) fish.nexa.ui.share.Share.deliver(incoming, direct)
+                else fish.nexa.ui.share.Share.openPicker(incoming)
+            }
+            return true
+        }
         val path = intent?.getStringExtra(fish.nexa.notify.Notifier.EXTRA_PATH)
-            ?: intent?.data?.takeIf { it.scheme == "https" || it.scheme == "nexa" }?.let { (it.path ?: "") }
-            ?: return
+            ?: intent?.data?.takeIf { it.scheme == "https" }?.path
+            ?: return false
         lifecycleScope.launch {
             Nexa.auth.state.first { it is fish.nexa.data.AuthState.Ready }
             fish.nexa.ui.nav.Nav.openPath(path)
         }
+        return true
     }
 
     override fun onStart() {

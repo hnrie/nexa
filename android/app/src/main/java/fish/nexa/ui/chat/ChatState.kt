@@ -23,6 +23,9 @@ object ChatUi {
     val editing = mutableStateMapOf<String, Edit>()
     val trays = mutableStateMapOf<String, List<Staged>>()
 
+    /** Words to put into a conversation's message box (shared from another app), taken once. */
+    val inject = mutableStateMapOf<String, String>()
+
     /** The conversation whose messages are being picked (selection mode), and the picks. */
     var selecting by mutableStateOf<String?>(null)
     val picked = mutableStateListOf<String>()

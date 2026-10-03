@@ -4938,6 +4938,8 @@
   "android.settings.notifications.testNotification": "परीक्षण सूचना",
   "android.settings.notifications.turnOnFirst": "पहले सूचनाएँ चालू करें।",
   "android.settings.spellCheckHint": "टाइप करते समय आपका कीबोर्ड गलत वर्तनी वाले शब्दों को रेखांकित करता है।",
+  "android.share.nothing": "भेजने के लिए अभी कोई बातचीत नहीं है।",
+  "android.share.title": "इन्हें भेजें",
   "keybinds.changeKeybinds": "अपनी शॉर्टकट कुंजियाँ बदलें",
   "typing.own": "{a} {words}…",
   "typing.presets.yapping": "{a} बक-बक कर रहे हैं…",
