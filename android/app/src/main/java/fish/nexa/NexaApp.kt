@@ -27,6 +27,7 @@ class NexaApp : Application() {
         }
         Nexa.auth.captcha = CaptchaHost
         fish.nexa.notify.Notifier.install()
+        fish.nexa.search.SearchIndex.install()
         // notifications read a message's words as plain text, mentions as names
         fish.nexa.notify.Notifier.plainText = { src -> fish.nexa.ui.markdown.Markdown.plainText(fish.nexa.ui.markdown.Markdown.parse(src), fish.nexa.ui.chat.AppNames) }
         // signed in: stay connected in the background (Nexa has no push); signed out: stop
