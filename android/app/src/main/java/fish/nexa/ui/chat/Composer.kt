@@ -300,31 +300,32 @@ fun Composer(channel: Channel) {
         scope.launch { addFiles(uris.mapNotNull { Staging.stage(it) }) }
     }
 
-    fun send() {
+    /** Sends what the box holds; false when it could not go (slow mode, too long, an unknown command). */
+    fun send(): Boolean {
         if (slowLeft > 0) {
             Nexa.ui.toast(t("composer.composer.slowModeOnSeconds", "seconds" to kotlin.math.ceil(slowLeft).toInt()), "error")
-            return
+            return false
         }
         var text = state.text.toString()
         if (Send.tooLong(text)) {
             Nexa.ui.toast(Send.tooLongMessage(), "error")
-            return
+            return false
         }
         when (val r = fish.nexa.ui.markdown.Commands.run(text)) {
             is fish.nexa.ui.markdown.Commands.Result.Command -> text = r.text
             is fish.nexa.ui.markdown.Commands.Result.Empty -> {
                 Nexa.ui.toast(t("composer.composer.commandNeedsText", "name" to r.name), "error")
-                return
+                return false
             }
             is fish.nexa.ui.markdown.Commands.Result.Unknown -> if (lastUnknown != text) {
                 lastUnknown = text
                 Nexa.ui.toast(t("composer.composer.noSuchCommand", "name" to r.name))
-                return
+                return false
             }
             fish.nexa.ui.markdown.Commands.Result.Text -> Unit
         }
         val files = ChatUi.trays[channelId] ?: emptyList()
-        if (text.isBlank() && files.isEmpty()) return
+        if (text.isBlank() && files.isEmpty()) return false
         val opts = SendOptions(replyTo = reply?.messageId, ping = reply?.ping)
         state.clearText()
         Nexa.settings.setDraft(channelId, "")
@@ -335,6 +336,7 @@ fun Composer(channel: Channel) {
         notice = null
         ChatUi.snapToBottom(channelId)
         if (files.isNotEmpty()) Send.sendWithFiles(channelId, text, files, opts) else Send.sendMessage(channelId, text, opts)
+        return true
     }
 
     val bottomPad = 8.dp
@@ -378,7 +380,18 @@ fun Composer(channel: Channel) {
                 onOptions = {
                     openMenu(
                         listOf(
-                            MenuItem.Action(t("composer.more.formatting")) { openFormattingEditor(channelId, state.text.toString()) { state.setTextAndPlaceCursorAtEnd(it) } },
+                            MenuItem.Action(t("composer.more.formatting")) {
+                                fish.nexa.ui.format.openFormattingEditor(
+                                    state.text.toString(), composerPlaceholder(channel),
+                                    onInsert = { state.setTextAndPlaceCursorAtEnd(it) },
+                                    onSend = { md ->
+                                        val was = state.text.toString()
+                                        state.setTextAndPlaceCursorAtEnd(md)
+                                        send().also { sent -> if (!sent) state.setTextAndPlaceCursorAtEnd(was) }
+                                    },
+                                    canSend = { slowLeft <= 0 },
+                                )
+                            },
                             MenuItem.Action(t("composer.preview.show"), checked = preview, toggle = true) { preview = !preview },
                             MenuItem.Action(t("composer.more.emoji")) { openExpressionPicker(channelId) { token -> insertAtCaret(state, "$token ") } },
                         ),
@@ -556,11 +569,7 @@ private fun ComposerBox(
                 contentAlignment = Alignment.Center,
             ) { Icon("CirclePlus", c.icon, size = 24.dp) }
         }
-        val placeholder = when (channel.type) {
-            "dm" -> t("composer.composer.messageUser", "name" to (Names.otherOf(channel)?.let { Names.shown(it) } ?: ""))
-            "group_dm", "subchat" -> t("composer.composer.messageGroup", "name" to Names.channel(channel))
-            else -> t("composer.composer.messageChannel", "name" to channel.name)
-        }
+        val placeholder = composerPlaceholder(channel)
         Box(Modifier.weight(1f).padding(top = 13.dp, bottom = 13.dp, end = 8.dp)) {
             BasicTextField(
                 state = state,
@@ -1097,4 +1106,11 @@ object NexaRestrictions {
         if (until != null && until <= System.currentTimeMillis()) return null
         return until ?: Long.MAX_VALUE
     }
+}
+
+/** What the message box says while empty: "Message #general", "Message @Alice". */
+fun composerPlaceholder(channel: fish.nexa.net.Channel): String = when (channel.type) {
+    "dm" -> t("composer.composer.messageUser", "name" to (Names.otherOf(channel)?.let { Names.shown(it) } ?: ""))
+    "group_dm", "subchat" -> t("composer.composer.messageGroup", "name" to Names.channel(channel))
+    else -> t("composer.composer.messageChannel", "name" to channel.name)
 }

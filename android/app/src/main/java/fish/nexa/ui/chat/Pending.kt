@@ -37,7 +37,6 @@ fun openReactionPicker(cm: ChatMessage, ctx: ListCtx) = fish.nexa.ui.pickers.Pic
     }),
 )
 
-fun openFormattingEditor(channelId: String, text: String, onInsert: (String) -> Unit) = Unit
 /** The composer's picker: emoji go in at the caret (it stays open); a sticker or GIF goes at once, with the reply waiting. */
 fun openExpressionPicker(channelId: String, onPick: (String) -> Unit) {
     val serverId = fish.nexa.Nexa.channels.get(channelId)?.serverId
