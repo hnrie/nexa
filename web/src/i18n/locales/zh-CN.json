@@ -5105,5 +5105,7 @@
   "whatsNew.r202610028.linksTitle": "聊天中的个人资料链接",
   "whatsNew.r202610028.linksBody": "个人资料链接现在会显示和点击名字时一样的卡片，包括对方正在做什么、第一个小组件和发消息的输入框。打开链接本身仍会显示完整的个人资料。",
   "whatsNew.r202610028.androidTitle": "Android 版 Nexa",
-  "whatsNew.r202610028.androidBody": "Nexa 现在有 Android 手机应用了，支持通知、通话和专为触屏设计的手势。可以在下载页面获取，也可以通过手机上显示的横幅下载。"
+  "whatsNew.r202610028.androidBody": "Nexa 现在有 Android 手机应用了，支持通知、通话和专为触屏设计的手势。可以在下载页面获取，也可以通过手机上显示的横幅下载。",
+  "android.people.switcherNothing": "没有匹配项。换个名字试试。",
+  "android.people.switcherPlaceholder": "搜索用户、对话和服务器"
 }

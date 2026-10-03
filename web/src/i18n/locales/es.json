@@ -5381,5 +5381,7 @@
   "whatsNew.r202610028.linksTitle": "Enlaces de perfil en los chats",
   "whatsNew.r202610028.linksBody": "Un enlace al perfil de alguien ahora muestra la tarjeta que ves al hacer clic en su nombre, con lo que está haciendo, su primer widget y un cuadro para escribirle. Al abrir el enlace sigues viendo su perfil completo.",
   "whatsNew.r202610028.androidTitle": "Nexa para Android",
-  "whatsNew.r202610028.androidBody": "Nexa ya tiene app para teléfonos Android, con notificaciones, llamadas y gestos pensados para la pantalla táctil. Consíguela en la página de descargas o desde el banner en tu teléfono."
+  "whatsNew.r202610028.androidBody": "Nexa ya tiene app para teléfonos Android, con notificaciones, llamadas y gestos pensados para la pantalla táctil. Consíguela en la página de descargas o desde el banner en tu teléfono.",
+  "android.people.switcherNothing": "No hay coincidencias. Prueba con otro nombre.",
+  "android.people.switcherPlaceholder": "Busca personas, conversaciones y servidores"
 }

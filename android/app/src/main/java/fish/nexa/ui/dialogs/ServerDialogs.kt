@@ -1,0 +1,302 @@
+package fish.nexa.ui.dialogs
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
+import fish.nexa.Nexa
+import fish.nexa.data.P
+import fish.nexa.net.Channel
+import fish.nexa.net.Member
+import fish.nexa.ui.Icon
+import fish.nexa.ui.components.ButtonKind
+import fish.nexa.ui.components.ChoiceCard
+import fish.nexa.ui.components.NxButton
+import fish.nexa.ui.components.NxTextField
+import fish.nexa.ui.components.ToggleRow
+import fish.nexa.ui.components.Txt
+import fish.nexa.ui.describeError
+import fish.nexa.ui.layers.Layer
+import fish.nexa.ui.layers.Layers
+import fish.nexa.ui.layers.Sheet
+import fish.nexa.ui.nav.Nav
+import fish.nexa.ui.nav.Route
+import fish.nexa.ui.t
+import fish.nexa.ui.theme.Nx
+import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.put
+
+internal fun open(key: String, content: @Composable (layer: Layer, close: () -> Unit) -> Unit) {
+    lateinit var layer: Layer
+    layer = Layer(key, replaces = key) { close -> content(layer, close) }
+    Layers.open(layer)
+}
+
+/** The two buttons at the foot of most dialogs: Cancel, and the one that does it. */
+@Composable
+internal fun FooterButtons(confirm: String, onConfirm: () -> Unit, close: () -> Unit, enabled: Boolean = true, busy: Boolean = false, danger: Boolean = false) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+        NxButton(t("chat.editMessage.cancel"), close, kind = ButtonKind.GHOST)
+        NxButton(confirm, onConfirm, kind = if (danger) ButtonKind.DANGER else ButtonKind.PRIMARY, enabled = enabled, loading = busy)
+    }
+}
+
+@Composable
+internal fun DialogHint(text: String) = Txt(text, style = Nx.type.bodySmall.copy(lineHeight = Nx.type.sp(19.6f)), color = Nx.colors.textMuted)
+
+// ---------------------------------------------------------------------------
+// ServerProfileModal: a nickname in one server
+
+@Composable
+internal fun ServerProfileSheet(layer: Layer, serverId: String, userId: String?, close: () -> Unit) {
+    val me = Nexa.users.me.collectAsState().value
+    val servers by Nexa.servers.byId.collectAsState()
+    val st = servers[serverId]
+    val target = userId ?: me?.id ?: ""
+    val self = target == me?.id
+    var nick by remember { mutableStateOf(st?.members?.get(target)?.nickname ?: "") }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    fun save(value: String) {
+        busy = true
+        scope.launch {
+            try {
+                val res = Nexa.api.request("PATCH", "/servers/$serverId/members/${if (self) "@me" else target}", Member.serializer(), buildJsonObject {
+                    val v = value.trim()
+                    if (v.isEmpty()) put("nick", JsonNull) else put("nick", v)
+                })
+                Nexa.servers.upsertMember(res)
+                close()
+            } catch (e: Exception) {
+                Nexa.ui.toast(describeError(e, t("modals.serverProfile.couldNotChangeTheNickname")), "error")
+            } finally {
+                busy = false
+            }
+        }
+    }
+    Sheet(layer, title = if (self) t("modals.serverProfile.changeNickname") else t("modals.serverProfile.changeTheirNickname"), maxWidth = 440.dp, footer = {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+            NxButton(t("modals.serverProfile.resetNickname"), { save("") }, kind = ButtonKind.GHOST, enabled = !busy)
+            NxButton(t("chat.editMessage.save"), { save(nick) }, loading = busy)
+        }
+    }) {
+        NxTextField(
+            nick, { nick = it.take(32) },
+            label = t("modals.serverProfile.nickname"),
+            hint = t("modals.serverProfile.howYouAppearIn", "name" to (st?.server?.name ?: t("modals.serverProfile.thisServer"))),
+            placeholder = if (self) me?.displayName else Nexa.users.get(target)?.displayName,
+            imeAction = ImeAction.Done,
+            onIme = { save(nick) },
+            capitalize = true,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ServerNotificationsModal
+
+private fun levels() = listOf(
+    Triple("all", t("server.serverOverview.allMessages"), t("modals.serverNotifications.everyMessageInThisServerNotifies")),
+    Triple("mentions", t("server.serverOverview.onlyMentions"), t("modals.serverNotifications.onlyMessagesThatMentionYouNotify")),
+    Triple("none", t("modals.serverNotifications.nothing"), t("modals.serverNotifications.noNotificationsFromThisServerBut")),
+)
+
+/** Copies the notifications settings with one change, as the web patches them. */
+private fun patchNotifications(change: (MutableMap<String, kotlinx.serialization.json.JsonElement>) -> Unit) {
+    val now = LinkedHashMap(Nexa.settings.notifications)
+    change(now)
+    Nexa.settings.set("notifications", JsonObject(now))
+}
+
+@Composable
+internal fun ServerNotificationsSheet(layer: Layer, serverId: String, close: () -> Unit) {
+    val doc by Nexa.settings.doc.collectAsState()
+    val servers by Nexa.servers.byId.collectAsState()
+    val st = servers[serverId]
+    val notes = doc["notifications"] as? JsonObject ?: Nexa.settings.notifications
+    val muted = (notes["muted"] as? kotlinx.serialization.json.JsonArray)?.any { (it as? JsonPrimitive)?.contentOrNull == serverId } == true
+    val level = ((notes["perChannel"] as? JsonObject)?.get(serverId) as? JsonPrimitive)?.contentOrNull
+        ?: if (st?.server?.defaultNotifications == 1) "mentions" else "all"
+    val name = st?.server?.name ?: ""
+    Sheet(layer, title = t("modals.serverNotifications.notificationSettings"), maxWidth = 440.dp, footer = {
+        NxButton(t("modals.serverNotifications.done"), close, block = true)
+    }) {
+        DialogHint(name)
+        ToggleRow(muted, { on ->
+            patchNotifications { n ->
+                val list = (n["muted"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }?.toMutableList() ?: ArrayList()
+                if (on) { if (serverId !in list) list += serverId } else list.remove(serverId)
+                n["muted"] = kotlinx.serialization.json.JsonArray(list.map { JsonPrimitive(it) })
+            }
+        }, t("modals.serverNotifications.muteName", "name" to name), t("modals.serverNotifications.mutingAServerPreventsUnreadIndicators"))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            for ((v, label, desc) in levels()) ChoiceCard(level == v, label, desc, radioFirst = true) {
+                patchNotifications { n ->
+                    val per = LinkedHashMap((n["perChannel"] as? JsonObject) ?: JsonObject(emptyMap()))
+                    per[serverId] = JsonPrimitive(v)
+                    n["perChannel"] = JsonObject(per)
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CreateChannelModal and CreateCategoryModal
+
+/** A text channel's name as it is typed: lower case, a dash for a space, as the server stores it. */
+fun typedChannelName(value: String): String = value.lowercase().replace(Regex("\\s+"), "-").replace(Regex("-{2,}"), "-")
+
+/** The finished name: as typed, without dashes left hanging at either end. */
+fun channelSlug(name: String): String = typedChannelName(name.trim()).trim('-')
+
+@Composable
+internal fun CreateChannelSheet(layer: Layer, serverId: String, parentId: String?, close: () -> Unit) {
+    val parent = parentId?.let { Nexa.channels.get(it) }
+    var type by remember { mutableStateOf("text") }
+    var name by remember { mutableStateOf("") }
+    var private by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    fun create() {
+        val clean = if (type == "text") channelSlug(name) else name.trim()
+        if (clean.isEmpty() || busy) return
+        busy = true
+        scope.launch {
+            var made: Channel? = null
+            try {
+                val res = Nexa.api.request("POST", "/servers/$serverId/channels", Channel.serializer(), buildJsonObject {
+                    put("type", type)
+                    put("name", clean)
+                    if (parentId != null) put("parent_id", parentId)
+                })
+                made = res
+                Nexa.channels.upsert(listOf(res))
+                if (private) {
+                    // @everyone may not see it, and it gets its own key, so members outside it never hold one
+                    val ow = Nexa.api.request("PUT", "/channels/${res.id}/permissions/$serverId", buildJsonObject {
+                        put("type", "role")
+                        put("allow", "0")
+                        put("deny", P.VIEW_CHANNEL.toString())
+                    }) as? JsonObject
+                    refreshChannels(serverId)
+                    val needsKey = ((ow?.get("key_actions") as? JsonObject)?.get("needs_own_key") as? JsonPrimitive)?.contentOrNull == "true"
+                    if (needsKey) Nexa.keys.ensureConvKey(res.id)
+                    refreshChannels(serverId)
+                }
+                close()
+                Nav.go(Route.Server(serverId, res.id))
+            } catch (e: Exception) {
+                val ch = made
+                if (ch != null && private) {
+                    // it may be open to everyone or lack its own key: taken back down, so nothing is posted where all can read
+                    val gone = runCatching { Nexa.api.request("DELETE", "/channels/${ch.id}") }.isSuccess
+                    if (gone) Nexa.channels.remove(ch.id)
+                    else {
+                        close()
+                        Nav.go(Route.Server(serverId, ch.id))
+                        Nexa.ui.toast(t("modals.createChannel.theChannelWasCreatedButMay"), "error")
+                        return@launch
+                    }
+                }
+                Nexa.ui.toast(describeError(e, t("modals.createChannel.couldNotCreateTheChannel")), "error")
+            } finally {
+                busy = false
+            }
+        }
+    }
+    Sheet(layer, title = t("modals.createChannel.createChannel"), maxWidth = 460.dp, footer = {
+        FooterButtons(t("modals.createChannel.createChannel"), ::create, close, enabled = name.isNotBlank(), busy = busy)
+    }) {
+        if (parent != null) DialogHint(t("modals.createChannel.inCategory", "name" to parent.name))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Txt(t("modals.createChannel.channelType"), style = Nx.type.label, color = Nx.colors.textSubtle)
+            ChoiceCard(type == "text", t("modals.createChannel.text"), t("modals.createChannel.sendMessagesImagesGifsEmojiOpinions"), icon = "Hash") {
+                type = "text"
+                name = typedChannelName(name)
+            }
+            ChoiceCard(type == "voice", t("modals.createChannel.voice"), t("modals.createChannel.hangOutTogetherWithVoiceVideo"), icon = "Volume2") { type = "voice" }
+        }
+        NxTextField(
+            name, { v -> name = (if (type == "text") typedChannelName(v) else v).take(100) },
+            label = t("modals.createChannel.channelName"),
+            required = true,
+            placeholder = t("modals.createChannel.namePlaceholder"),
+            imeAction = ImeAction.Done,
+            onIme = ::create,
+            capitalize = type != "text",
+        )
+        ToggleRow(private, { private = it }, t("modals.createChannel.privateChannel"), t("modals.createChannel.onlySelectedMembersAndRolesWill"))
+        if (private) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon("Lock", Nx.colors.textMuted, size = 12.dp)
+            Txt(t("modals.createChannel.addRolesOrMembersFromThe"), style = Nx.type.hint, color = Nx.colors.textMuted)
+        }
+    }
+}
+
+private suspend fun refreshChannels(serverId: String) {
+    val list = Nexa.api.request("GET", "/servers/$serverId/channels", ListSerializer(Channel.serializer()))
+    Nexa.channels.upsert(list)
+}
+
+@Composable
+internal fun CreateCategorySheet(layer: Layer, serverId: String, close: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    fun create() {
+        if (name.isBlank() || busy) return
+        busy = true
+        scope.launch {
+            try {
+                val ch = Nexa.api.request("POST", "/servers/$serverId/channels", Channel.serializer(), buildJsonObject {
+                    put("type", "category")
+                    put("name", name.trim())
+                })
+                Nexa.channels.upsert(listOf(ch))
+                close()
+            } catch (e: Exception) {
+                Nexa.ui.toast(describeError(e, t("modals.createCategory.couldNotCreateTheCategory")), "error")
+            } finally {
+                busy = false
+            }
+        }
+    }
+    Sheet(layer, title = t("modals.createCategory.createCategory"), maxWidth = 440.dp, footer = {
+        FooterButtons(t("modals.createCategory.createCategory"), ::create, close, enabled = name.isNotBlank(), busy = busy)
+    }) {
+        NxTextField(name, { name = it.take(100) }, label = t("modals.createCategory.categoryName"), required = true, placeholder = t("modals.createCategory.newCategory"), imeAction = ImeAction.Done, onIme = ::create, capitalize = true)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChannelTopicModal
+
+@Composable
+internal fun ChannelTopicSheet(layer: Layer, channelId: String, close: () -> Unit) {
+    val channels by Nexa.channels.byId.collectAsState()
+    val ch = channels[channelId] ?: return
+    Sheet(layer, title = (if (ch.isVoice) "" else "#") + ch.name, maxWidth = 480.dp, footer = {
+        NxButton(t("chat.attachments.close"), close, block = true)
+    }) {
+        fish.nexa.ui.markdown.MarkdownView(ch.topic, fish.nexa.ui.markdown.RenderCtx(serverId = ch.serverId, surface = Nx.colors.bgFloating), Modifier.fillMaxWidth().padding(bottom = 4.dp))
+    }
+}

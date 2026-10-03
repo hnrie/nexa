@@ -232,6 +232,13 @@ fun Composer(channel: Channel) {
     val canAttach = st == null || Nexa.servers.canI(st, P.ATTACH_FILES, channelId)
     val canPoll = st == null || (Nexa.servers.canI(st, P.SEND_MESSAGES, channelId) && Nexa.servers.canI(st, P.CREATE_POLLS, channelId))
     val state = remember(channelId) { TextFieldState(Nexa.settings.draft(channelId)) }
+    val insert = ChatUi.inserts[channelId]
+    LaunchedEffect(insert) {
+        if (insert != null) {
+            insertAtCaret(state, insert)
+            ChatUi.inserts.remove(channelId)
+        }
+    }
     var notice by remember(channelId) { mutableStateOf<Notice?>(null) }
     var preview by remember { mutableStateOf(false) }
     var ac by remember(channelId) { mutableStateOf<AcToken?>(null) }

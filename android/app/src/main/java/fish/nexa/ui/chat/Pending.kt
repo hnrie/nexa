@@ -64,10 +64,5 @@ fun openExpressionPicker(channelId: String, onPick: (String) -> Unit) {
 /** lib/scrubMetadata.ts: removes a photo's or video's metadata (place, camera) before it is sent. */
 object MetadataScrub { fun scrub(file: java.io.File, type: String) = Unit }
 
-fun openChannelTopic(channel: fish.nexa.net.Channel) = Unit
-fun openVerifyKey(userId: String) = Unit
 fun openBugReport(from: String) = Unit
 
-@Composable fun FriendsPage() { androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxSize()) { fish.nexa.ui.shell.PageHeader(fish.nexa.ui.t("sidebar.dMSidebar.friends")) } }
-@Composable fun MemberList(serverId: String, channelId: String?) = Unit
-@Composable fun GroupMemberList(channel: fish.nexa.net.Channel) = Unit

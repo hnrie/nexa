@@ -5280,5 +5280,7 @@
   "whatsNew.r202610028.linksTitle": "Profil-Links im Chat",
   "whatsNew.r202610028.linksBody": "Ein Link zu einem Profil zeigt jetzt die Karte, die du beim Klick auf den Namen bekommst, mit dem, was die Person gerade macht, ihrem ersten Widget und einem Feld, um ihr zu schreiben. Der Link selbst öffnet weiterhin das ganze Profil.",
   "whatsNew.r202610028.androidTitle": "Nexa für Android",
-  "whatsNew.r202610028.androidBody": "Nexa gibt es jetzt als App für Android-Handys, mit Benachrichtigungen, Anrufen und Gesten für den Touchscreen. Du bekommst sie auf der Download-Seite oder über das Banner auf deinem Handy."
+  "whatsNew.r202610028.androidBody": "Nexa gibt es jetzt als App für Android-Handys, mit Benachrichtigungen, Anrufen und Gesten für den Touchscreen. Du bekommst sie auf der Download-Seite oder über das Banner auf deinem Handy.",
+  "android.people.switcherNothing": "Nichts passt. Versuch einen anderen Namen.",
+  "android.people.switcherPlaceholder": "Personen, Unterhaltungen und Server suchen"
 }

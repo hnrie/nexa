@@ -5381,5 +5381,7 @@
   "whatsNew.r202610028.linksTitle": "Les liens de profil dans les discussions",
   "whatsNew.r202610028.linksBody": "Un lien vers le profil de quelqu’un affiche désormais la carte qui s’ouvre quand on clique sur son nom, avec ce qu’il fait, son premier widget et une zone pour lui écrire. Ouvrir le lien affiche toujours son profil complet.",
   "whatsNew.r202610028.androidTitle": "Nexa pour Android",
-  "whatsNew.r202610028.androidBody": "Nexa a maintenant une application pour les téléphones Android, avec les notifications, les appels et des gestes pensés pour le tactile. Téléchargez-la depuis la page de téléchargement, ou depuis la bannière sur votre téléphone."
+  "whatsNew.r202610028.androidBody": "Nexa a maintenant une application pour les téléphones Android, avec les notifications, les appels et des gestes pensés pour le tactile. Téléchargez-la depuis la page de téléchargement, ou depuis la bannière sur votre téléphone.",
+  "android.people.switcherNothing": "Aucun résultat. Essayez un autre nom.",
+  "android.people.switcherPlaceholder": "Rechercher des personnes, des conversations et des serveurs"
 }

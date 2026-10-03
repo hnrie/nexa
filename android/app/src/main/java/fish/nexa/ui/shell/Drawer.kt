@@ -459,34 +459,3 @@ fun copyText(text: String) {
     cm.setPrimaryClip(android.content.ClipData.newPlainText("Nexa", text))
     Nexa.ui.toast(t("chat.groupMemberMenu.copied"))
 }
-
-/** The DM row menu (dmMenu.ts), shared by the DM list and the rail's waiting tiles. */
-fun dmMenu(ch: Channel): List<MenuItem> {
-    val items = ArrayList<MenuItem>()
-    val unread = Unread.isUnread(Nexa.readStates.get(ch.id), ch.lastMessageId)
-    items += MenuItem.Action(t("sidebar.dmMenu.markAsRead"), disabled = !unread, separatorAfter = true) { Unread.markRead(ch.id) }
-    if (ch.type == "group_dm") {
-        items += MenuItem.Action(t("modals.editGroup.editGroup")) { openEditGroup(ch.id) }
-        items += MenuItem.Action(t("chat.chat.invitePeople")) { openGroupInvite(ch.id) }
-    } else {
-        val other = Names.otherOf(ch)
-        items += MenuItem.Action(t("profile.profile.profile")) { other?.let { openProfile(it) } }
-    }
-    val muted = ch.id in Unread.mutedIds()
-    items += MenuItem.Action(if (muted) t("sidebar.dmMenu.unmuteConversation") else t("sidebar.dmMenu.muteConversation"), separatorAfter = true) { Unread.setMuted(ch.id, !muted) }
-    if (ch.type == "group_dm") items += MenuItem.Action(t("chat.groupMemberMenu.leaveGroup"), danger = true) { confirmLeaveGroup(ch.id) }
-    else items += MenuItem.Action(t("sidebar.dMSidebar.closeDm")) { closeDm(ch.id) }
-    if (Nexa.settings.developerMode) items += MenuItem.Action(t("sidebar.dmMenu.copyChannelId")) { copyText(ch.id) }
-    return items
-}
-
-fun closeDm(channelId: String) {
-    Nexa.scope.launch {
-        try {
-            Nexa.api.request("DELETE", "/channels/$channelId")
-            if ((Nav.route as? Route.Dm)?.channelId == channelId) Nav.go(Route.Friends, replace = true)
-        } catch (e: Exception) {
-            Nexa.ui.toast(fish.nexa.ui.describeError(e, t("sidebar.dmMenu.couldNotCloseThatConversation")), "error")
-        }
-    }
-}

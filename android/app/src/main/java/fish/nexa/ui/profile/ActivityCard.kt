@@ -1,0 +1,223 @@
+package fish.nexa.ui.profile
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import fish.nexa.media.Media
+import fish.nexa.Nexa
+import fish.nexa.net.Activity
+import fish.nexa.ui.Icon
+import fish.nexa.ui.components.Txt
+import fish.nexa.ui.components.pressable
+import fish.nexa.ui.t
+import fish.nexa.ui.theme.Nx
+import fish.nexa.ui.theme.Radii
+import fish.nexa.ui.theme.boxShadow
+import fish.nexa.ui.theme.mixOklab
+import fish.nexa.ui.theme.mixSrgb
+import fish.nexa.ui.theme.ring
+import fish.nexa.ui.theme.topEdge
+import kotlinx.coroutines.delay
+
+/** Opens a link from someone's profile or activity in the browser (or the app that owns it). */
+fun openLink(url: String) {
+    try {
+        Nexa.app.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (_: Exception) {
+        Nexa.ui.toast(t("modals.confirm.somethingWentWrong"), "error")
+    }
+}
+
+private fun Modifier.linked(url: String?): Modifier = if (url.isNullOrEmpty()) this else this.pressable(MutableInteractionSource()) { openLink(url) }
+
+/**
+ * ActivityCard: what someone is playing, hearing, watching or streaming, on
+ * a card lit by its own art, with how far along it is.
+ */
+@Composable
+fun ActivityCard(a: Activity) {
+    val c = Nx.colors
+    val timed = a.timestamps?.start != null || a.timestamps?.end != null
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(timed) {
+        while (timed) {
+            delay(1000)
+            now = System.currentTimeMillis()
+        }
+    }
+    val clock = if (timed) Activities.progress(a, now) else null
+    val large = a.assets?.largeImage ?: a.iconUrl
+    val media = a.type == 1 || a.type == 2 || a.type == 3
+    val title = if (media) a.details?.ifEmpty { null } ?: a.name else a.name
+    data class Line(val text: String, val href: String?, val muted: Boolean = false)
+    val lines = ArrayList<Line>()
+    if (media) {
+        a.state?.takeIf { it.isNotEmpty() }?.let { lines += Line(if (a.type == 2) t("activity.activityCard.byArtist", "name" to it) else it, a.stateUrl) }
+        a.assets?.largeText?.takeIf { it.isNotEmpty() }?.let { lines += Line(if (a.type == 2) t("activity.activityCard.onAlbum", "name" to it) else it, a.assets.largeUrl, muted = true) }
+    } else {
+        a.details?.takeIf { it.isNotEmpty() }?.let { lines += Line(it, a.detailsUrl) }
+        val size = a.party?.size
+        val party = if (size != null && size.size >= 2) t("activity.activityCard.partySize", "count" to size[0], "max" to size[1]) else ""
+        val state = listOf(a.state ?: "", party).filter { it.isNotEmpty() }.joinToString(" ")
+        if (state.isNotEmpty()) lines += Line(state, a.stateUrl)
+    }
+    val green = Activities.green(c.isLight)
+    val shape = Radii.Md
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .ring(shape, c.borderSubtle)
+            .background(c.bgSurface.copy(alpha = c.bgSurface.alpha * 0.72f), shape)
+            .topEdge(shape, c.edgeLight),
+    ) {
+        if (large != null) {
+            AsyncImage(
+                large, null, Media.loader,
+                Modifier.matchParentSize().graphicsLayer { alpha = 0.42f; scaleX = 1.8f; scaleY = 1.8f }.blur(34.dp),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (a.type == 2 && clock is Activities.Clock.Progress && clock.fraction < 1f) ActivityBars(green)
+                else Icon(Activities.icon(a.type), if (a.type == 0 || a.type == 2) green else c.textBrand, size = 13.dp)
+                Txt(Activities.heading(a), style = Nx.type.label.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(700)), color = c.textSubtle, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                if (a.source == "discord") Txt(
+                    t("activity.activityCard.fromDiscord"),
+                    style = Nx.type.hint.copy(fontSize = Nx.type.sp(10.5f), fontWeight = FontWeight(650)), color = c.textMuted,
+                    modifier = Modifier.background(c.bgActive, RoundedCornerShape(999.dp)).padding(horizontal = 7.dp, vertical = 1.dp),
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(76.dp)) {
+                    if (large != null) AsyncImage(
+                        large, a.assets?.largeText ?: a.name, Media.loader,
+                        Modifier.size(76.dp).boxShadow(Radii.Sm, 8f, 20f, Color.Black.copy(alpha = 0.55f), spread = -8f).clip(Radii.Sm).background(c.bgActive).linked(a.assets?.largeUrl),
+                        contentScale = ContentScale.Crop,
+                    ) else Box(
+                        Modifier.size(76.dp).clip(Radii.Sm).background(Brush.linearGradient(listOf(mixSrgb(c.bgActive, c.brand, 0.3f), c.bgActive))).topEdge(Radii.Sm, c.edgeLight),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Activities.icon(a.type), c.textSubtle, size = 32.dp) }
+                    a.assets?.smallImage?.let { small ->
+                        AsyncImage(
+                            small, a.assets.smallText ?: "", Media.loader,
+                            Modifier.align(Alignment.BottomEnd).offset(6.dp, 6.dp).size(30.dp).clip(CircleShape).background(Color(10, 6, 20).copy(alpha = 0.6f)).padding(2.dp).clip(CircleShape).linked(a.assets.smallUrl),
+                            contentScale = ContentScale.Crop,
+                        )
+                    }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Txt(title, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(18f)), color = c.textStrong, maxLines = 1, modifier = Modifier.linked(if (media) a.detailsUrl else null))
+                    for (l in lines) Txt(l.text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(18f)), color = if (l.muted) c.textMuted else c.text, maxLines = 1, modifier = Modifier.linked(l.href))
+                    when (clock) {
+                        is Activities.Clock.Remaining -> Txt(t("activity.activityCard.timeLeft", "time" to Activities.clock(clock.remaining)), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), fontFeatureSettings = "tnum"), color = c.textMuted)
+                        is Activities.Clock.Elapsed -> Txt(t("activity.activityCard.timeElapsed", "time" to Activities.clock(clock.elapsed)), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), fontFeatureSettings = "tnum"), color = c.textMuted)
+                        else -> Unit
+                    }
+                }
+            }
+            if (clock is Activities.Clock.Progress) {
+                Row(
+                    Modifier.semantics { contentDescription = t("activity.activityCard.playback") },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    val style = Nx.type.hint.copy(fontFeatureSettings = "tnum")
+                    Txt(Activities.clock(clock.elapsed), style = style, color = c.textMuted)
+                    val width by animateFloatAsState(clock.fraction, tween(1000), label = "bar")
+                    Box(Modifier.weight(1f).height(5.dp).clip(RoundedCornerShape(3.dp)).background(c.textStrong.copy(alpha = 0.14f))) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth(width.coerceIn(0f, 1f))
+                                .fillMaxHeight()
+                                .boxShadow(RoundedCornerShape(3.dp), 0f, 10f, c.brand.copy(alpha = 0.7f))
+                                .background(Brush.horizontalGradient(listOf(mixOklab(c.brand, Color.White, 0.25f), c.brand)), RoundedCornerShape(3.dp)),
+                        )
+                    }
+                    Txt(Activities.clock(clock.total), style = style, color = c.textMuted)
+                }
+            }
+            a.buttons?.takeIf { it.isNotEmpty() }?.let { buttons ->
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (b in buttons) Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 40.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(c.bgSurface)
+                            .border(1.dp, c.border, RoundedCornerShape(999.dp))
+                            .pressable(remember { MutableInteractionSource() }) { openLink(b.url) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { Txt(b.label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.text, maxLines = 1) }
+                }
+            }
+        }
+    }
+}
+
+/** Three green bars that move: a song part way through. */
+@Composable
+private fun ActivityBars(color: Color) {
+    val reduced = Nx.motion.reduced
+    val transition = rememberInfiniteTransition(label = "eq")
+    val specs = listOf(900 to 0.4f, 1100 to 0.85f, 800 to 0.6f)
+    Row(Modifier.width(13.dp).height(11.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
+        for ((ms, base) in specs) {
+            val h by transition.animateFloat(
+                if (reduced) base else 0.3f, if (reduced) base else 1f,
+                infiniteRepeatable(tween(ms), RepeatMode.Reverse), label = "bar",
+            )
+            Box(Modifier.weight(1f).fillMaxHeight(h).background(color, RoundedCornerShape(1.dp)))
+        }
+    }
+}
+
+/** ActivityList: every activity, one card each. */
+@Composable
+fun ActivityList(activities: List<Activity>) {
+    if (activities.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { for (a in activities) ActivityCard(a) }
+}

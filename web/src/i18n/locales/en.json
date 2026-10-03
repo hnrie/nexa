@@ -5280,5 +5280,7 @@
   "whatsNew.r202610028.linksTitle": "Profile Links in Chats",
   "whatsNew.r202610028.linksBody": "A link to someone's profile now shows the card you get by clicking their name, with what they're up to, their first widget and a box to message them. Opening the link itself still shows their whole profile.",
   "whatsNew.r202610028.androidTitle": "Nexa for Android",
-  "whatsNew.r202610028.androidBody": "Nexa now has an app for Android phones, with notifications, calls and gestures made for touch. Get it from the download page, or from the banner on your phone."
+  "whatsNew.r202610028.androidBody": "Nexa now has an app for Android phones, with notifications, calls and gestures made for touch. Get it from the download page, or from the banner on your phone.",
+  "android.people.switcherNothing": "Nothing matches. Try another name.",
+  "android.people.switcherPlaceholder": "Search people, conversations and servers"
 }

@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import fish.nexa.Nexa
 import fish.nexa.net.Gateway
 import fish.nexa.ui.components.Txt
-import fish.nexa.ui.chat.FriendsPage
+import fish.nexa.ui.people.FriendsPage
 import fish.nexa.ui.chat.ServerPage
 import fish.nexa.ui.chat.DmPage
 import fish.nexa.ui.components.pressable
@@ -99,6 +99,8 @@ fun MainShell() {
     LaunchedEffect(Nav.rightOpen) {
         members.animateTo(if (Nav.rightOpen) 1f else 0f, tween(if (reduced) 0 else 250, easing = ease))
     }
+    // a changed identity key is asked about as soon as it is seen (stores/keyAlerts.ts)
+    LaunchedEffect(Unit) { fish.nexa.ui.profile.KeyDialogs.install() }
 
     // Back: the topmost layer, then the member drawer, then the drawer, then history.
     BackHandler(enabled = !Layers.isEmpty || Nav.rightOpen || Nav.leftOpen || Nav.canGoBack) {
