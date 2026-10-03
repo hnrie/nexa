@@ -54,7 +54,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Nexa's own links open here: conversations, messages, invites and profiles. The server
+            <!-- Nexa's own links open here: conversations, messages, invites, profiles and shared notes. The server
                  publishes /.well-known/assetlinks.json for the release key, so Android verifies them. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
@@ -66,6 +66,7 @@
                 <data android:host="chat.evilion.xyz" />
                 <data android:pathPrefix="/channels/" />
                 <data android:pathPrefix="/invite/" />
+                <data android:pathPrefix="/note/" />
                 <data android:pathPattern="/@.*" />
             </intent-filter>
             <!-- sharing into Nexa from other apps: words, links, pictures and files -->

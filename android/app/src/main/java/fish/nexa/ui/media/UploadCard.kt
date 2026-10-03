@@ -27,11 +27,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import fish.nexa.data.PendingMessage
@@ -106,7 +109,7 @@ fun UploadCard(channelId: String, p: PendingMessage, up: PendingUpload) {
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f))
                 Txt(Time.bytes(up.total), style = Nx.type.hint, color = c.textMuted, maxLines = 1)
             }
             Box(
@@ -127,14 +130,14 @@ fun UploadCard(channelId: String, p: PendingMessage, up: PendingUpload) {
                         .then(if (failed) Modifier.background(c.danger, RoundedCornerShape(3.dp)) else Modifier.boxShadow(RoundedCornerShape(3.dp), 0f, 10f, c.brand.copy(alpha = 0.6f)).background(brandGradient(c), RoundedCornerShape(3.dp))),
                 )
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val stats = Nx.type.hint.copy(fontFeatureSettings = "tnum")
+            val stats = Nx.type.hint.copy(fontFeatureSettings = "tnum")
+            SpaceBetween(8.dp) {
                 when {
-                    failed && up.error != null -> Txt(up.error, style = stats, color = c.textDanger, maxLines = 1, modifier = Modifier.weight(1f))
-                    up.done -> Txt(t("messageRow.sending"), style = stats, color = c.textMuted, maxLines = 1, modifier = Modifier.weight(1f))
+                    failed && up.error != null -> Txt(up.error, style = stats, color = c.textDanger, maxLines = 1)
+                    up.done -> Txt(t("messageRow.sending"), style = stats, color = c.textMuted, maxLines = 1)
                     else -> Txt(
                         "$pct%" + if (up.speed > 0) " · " + t("chat.upload.speed", "size" to Time.bytes(up.speed.toLong())) else "",
-                        style = stats, color = c.textMuted, maxLines = 1, modifier = Modifier.weight(1f),
+                        style = stats, color = c.textMuted, maxLines = 1,
                     )
                 }
                 if (going) Txt(t("chat.upload.ofTotal", "sent" to Time.bytes(up.loaded), "total" to Time.bytes(up.total)), style = stats, color = c.textMuted, maxLines = 1)
@@ -155,6 +158,27 @@ fun UploadCard(channelId: String, p: PendingMessage, up: PendingUpload) {
                     Icon("X", if (pressed) c.danger else c.textMuted, size = 16.dp)
                 }
             }
+        }
+    }
+}
+
+/**
+ * Two pieces of text at either end of a line (`justify-content: space-between`);
+ * when both do not fit, each gives up room in proportion to its length, as
+ * flex items shrink, and ends in an ellipsis.
+ */
+@Composable
+private fun SpaceBetween(gap: Dp, content: @Composable () -> Unit) {
+    Layout(content, Modifier.fillMaxWidth()) { measurables, constraints ->
+        val width = constraints.maxWidth
+        val natural = measurables.map { it.maxIntrinsicWidth(constraints.maxHeight) }
+        val room = (width - gap.roundToPx() * (measurables.size - 1).coerceAtLeast(0)).coerceAtLeast(0)
+        val total = natural.sum()
+        val widths = if (total <= room) natural else natural.map { w -> (w - (total - room).toLong() * w / maxOf(1, total)).toInt().coerceAtLeast(0) }
+        val placeables = measurables.mapIndexed { i, m -> m.measure(Constraints(maxWidth = widths[i], maxHeight = constraints.maxHeight)) }
+        layout(width, placeables.maxOfOrNull { it.height } ?: 0) {
+            placeables.firstOrNull()?.placeRelative(0, 0)
+            if (placeables.size > 1) placeables.last().let { it.placeRelative(width - it.width, 0) }
         }
     }
 }

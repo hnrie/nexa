@@ -158,7 +158,9 @@ fun FriendsPage() {
         },
         tab,
     )
-    val alone = rels.isEmpty()
+    // nobody yet, once the session has said so (not while it is still connecting)
+    val ready by Nexa.session.ready.collectAsState()
+    val alone = ready && rels.isEmpty()
     val pendingCount = rels.values.count { it.type == "incoming" }
     val picking = Pick.picking("friends")
     val order = list.map { it.user.id }

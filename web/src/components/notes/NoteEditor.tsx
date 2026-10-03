@@ -121,12 +121,18 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
   // The list beside the note shows what it says as it is written, ahead of
   // the next whole save, which is what tells everyone else's lists.
   const headTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Whether what the list is about to be shown includes words written here, so it says who wrote last. */
+  const headMine = useRef(false);
   const meId = useAuth((a) => a.me?.id ?? null);
-  const showHead = (): void => {
+  const showHead = (mine = true): void => {
+    if (mine) headMine.current = true;
     if (headTimer.current) return;
     headTimer.current = setTimeout(() => {
       headTimer.current = null;
-      if (!gone.current) useNotes.getState().shown(noteId, headOf(session.doc), meId);
+      // someone else's words alone leave the list saying they wrote last
+      const by = headMine.current ? meId : null;
+      headMine.current = false;
+      if (!gone.current) useNotes.getState().shown(noteId, headOf(session.doc), by);
     }, 300);
   };
   useEffect(
@@ -321,7 +327,7 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
         const ctl = bench.ctl.current;
         if (!ctl) return false;
         if (doc.md !== ctl.markdown() && !ctl.reload(doc.md, at?.md)) return false;
-        showHead();
+        showHead(false);
         filesRef.current = doc.files;
         setFiles(doc.files);
         if (doc.title !== titleRef.current) {

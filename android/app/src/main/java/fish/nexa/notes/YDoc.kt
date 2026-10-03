@@ -1,6 +1,10 @@
 package fish.nexa.notes
 
 import fish.nexa.crypto.Bytes
+import fish.nexa.crypto.MessageCrypto
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * The JNI side of a note's CRDT: yrs (android/ydoc), which reads and writes
@@ -34,6 +38,7 @@ object YDoc {
     @JvmStatic external fun nativeSetFiles(h: Long, json: String): ByteArray?
     @JvmStatic external fun nativeMerge(updates: Array<ByteArray>): ByteArray?
     @JvmStatic external fun nativeLength(h: Long, name: String): Int
+    @JvmStatic external fun nativeApplyAll(h: Long, updates: Array<ByteArray>): String?
 
     /** The client id a note gets when first made a document from plain text: the same on every device (ydoc.ts startingClient). */
     fun startingClient(noteId: String, version: Int): Long {
@@ -94,6 +99,28 @@ class NoteDocument private constructor(private var handle: Long) : AutoCloseable
     }
 
     @Synchronized fun apply(update: ByteArray): Boolean = YDoc.nativeApply(h(), update)
+
+    /** One step of what someone else's changes did to a text: kept, put in or taken out, in UTF-16 units. */
+    data class Step(val kind: Char, val n: Int)
+
+    /** What taking in several updates did: how many could be read, and what changed in each text (null: nothing). */
+    data class Applied(val ok: Int, val title: List<Step>?, val md: List<Step>?)
+
+    /** Takes in others' updates in one transaction (ydoc.ts show), saying where in each text they landed. */
+    @Synchronized fun applyAll(updates: List<ByteArray>): Applied {
+        if (updates.isEmpty()) return Applied(0, null, null)
+        val json = YDoc.nativeApplyAll(h(), updates.toTypedArray()) ?: return Applied(0, null, null)
+        val o = MessageCrypto.json.parseToJsonElement(json) as JsonObject
+        fun steps(k: String): List<Step>? = (o[k] as? JsonArray)?.mapNotNull { e ->
+            val pair = e as? JsonArray ?: return@mapNotNull null
+            val kind = (pair.getOrNull(0) as? JsonPrimitive)?.content?.firstOrNull() ?: return@mapNotNull null
+            val n = (pair.getOrNull(1) as? JsonPrimitive)?.content?.toIntOrNull() ?: return@mapNotNull null
+            Step(kind, n)
+        }
+        val ok = (o["ok"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+        return Applied(ok, steps("title"), steps("md"))
+    }
+
     @Synchronized fun encodeState(): ByteArray = YDoc.nativeEncodeState(h()) ?: ByteArray(0)
     @Synchronized fun stateVector(): ByteArray = YDoc.nativeStateVector(h()) ?: ByteArray(0)
     @Synchronized fun diff(stateVector: ByteArray): ByteArray = YDoc.nativeDiff(h(), stateVector) ?: ByteArray(0)

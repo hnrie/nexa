@@ -180,6 +180,7 @@ fun MainShell() {
                     is Route.NexaConvo -> fish.nexa.ui.nexa.NexaPage()
                     is Route.NexaCase -> fish.nexa.ui.nexa.NexaCasePage(route.caseId)
                     is Route.NexaBug -> fish.nexa.ui.nexa.NexaBugPage(route.reportId)
+                    is Route.Notes -> fish.nexa.ui.notes.NotesPage(route)
                     else -> PlaceholderPage(route)
                 }
             }

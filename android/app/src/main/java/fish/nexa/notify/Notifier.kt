@@ -349,6 +349,31 @@ object Notifier {
         }
     }
 
+    /** notify.ts onNoteInvite: someone asking to share a note sounds like a friend request, and notifies while away. */
+    @android.annotation.SuppressLint("MissingPermission")
+    fun onNoteInvite(inv: fish.nexa.notes.NoteInviteRow) {
+        if (Nexa.users.me.value == null || doNotDisturb()) return
+        if (soundsOn()) playSound("friend")
+        if (onScreen() || !enabled()) return
+        val tag = "ec-note-${inv.id}"
+        val name = Names.display(inv.from)
+        Nexa.scope.launch {
+            val b = NotificationCompat.Builder(Nexa.app, CH_REQUESTS)
+                .setSmallIcon(R.drawable.ic_notify)
+                .setColor(0xFF8000FF.toInt())
+                .setSilent(true)
+                .setAutoCancel(true)
+                .setCategory(NotificationCompat.CATEGORY_SOCIAL)
+                .setContentIntent(openIntent("/channels/@me/notes", null))
+            if (preview() == "none") b.setContentTitle("Nexa").setContentText(t("notify.noteInvite"))
+            else {
+                b.setContentTitle(t("notify.noteInvite")).setContentText(t("notify.sharedANote", "name" to name))
+                b.setLargeIcon(avatar(inv.from.id, name, inv.from.avatarId).toIcon(Nexa.app))
+            }
+            runCatching { nm().notify(tag, 1, b.build()) }
+        }
+    }
+
     /** Other alerts (note requests, Nexa notices, bug replies): a sound and, when away, a plain notification. */
     @android.annotation.SuppressLint("MissingPermission")
     fun simple(tag: String, kind: String, sound: String?, title: String, body: String, path: String, viewingPath: Boolean = false) {

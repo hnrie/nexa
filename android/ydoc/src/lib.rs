@@ -11,7 +11,9 @@ use yrs::types::ToJson;
 use yrs::updates::decoder::Decode;
 use yrs::updates::encoder::Encode;
 use yrs::block::ClientID;
-use yrs::{Any, Doc, GetString, Map, MapRef, Number, OffsetKind, Options, ReadTxn, StateVector, Text, TextRef, Transact, Update};
+use std::sync::Arc;
+use yrs::types::{Delta, Observable};
+use yrs::{Any, Doc, GetString, Map, MapRef, Number, OffsetKind, Options, Out, ReadTxn, StateVector, Text, TextRef, Transact, Update};
 
 struct Note {
     doc: Doc,
@@ -260,4 +262,68 @@ pub extern "system" fn Java_fish_nexa_notes_YDoc_nativeLength(mut env: JNIEnv, _
     let n = note(h).lock().unwrap();
     let txn = n.doc.transact();
     n.text(&name).len(&txn) as jint
+}
+
+/// One change to a text, as lengths in UTF-16 code units: kept, put in, taken out.
+fn delta_json(delta: &[Delta]) -> serde_json::Value {
+    let mut out: Vec<serde_json::Value> = Vec::with_capacity(delta.len());
+    for d in delta {
+        let (kind, len) = match d {
+            Delta::Retain(n, _) => ("r", *n as usize),
+            Delta::Deleted(n) => ("d", *n as usize),
+            Delta::Inserted(v, _) => match v {
+                Out::Any(Any::String(s)) => ("i", s.encode_utf16().count()),
+                _ => ("i", 1),
+            },
+        };
+        out.push(serde_json::json!([kind, len]));
+    }
+    serde_json::Value::Array(out)
+}
+
+/// Takes in others' updates in one transaction and says what that did to each
+/// text (ydoc.ts show: what moves the carets), as JSON:
+/// {"title": [["r", n] | ["i", n] | ["d", n], ...] or null, "md": ..., "ok": updates read}.
+#[no_mangle]
+pub extern "system" fn Java_fish_nexa_notes_YDoc_nativeApplyAll(mut env: JNIEnv, _c: JClass, h: jlong, updates: JObjectArray) -> jstring {
+    let count = env.get_array_length(&updates).unwrap_or(0);
+    let mut all: Vec<Vec<u8>> = Vec::with_capacity(count as usize);
+    for i in 0..count {
+        let o = match env.get_object_array_element(&updates, i) {
+            Ok(o) => o,
+            Err(_) => return std::ptr::null_mut(),
+        };
+        let arr = JByteArray::from(o);
+        all.push(env.convert_byte_array(&arr).unwrap_or_default());
+    }
+    let n = note(h).lock().unwrap();
+    let title_delta: Arc<Mutex<Option<serde_json::Value>>> = Arc::new(Mutex::new(None));
+    let md_delta: Arc<Mutex<Option<serde_json::Value>>> = Arc::new(Mutex::new(None));
+    {
+        let t = title_delta.clone();
+        n.title.observe("nexa-show", move |txn, e| {
+            *t.lock().unwrap() = Some(delta_json(e.delta(txn)));
+        });
+        let m = md_delta.clone();
+        n.md.observe("nexa-show", move |txn, e| {
+            *m.lock().unwrap() = Some(delta_json(e.delta(txn)));
+        });
+    }
+    let mut ok = 0;
+    {
+        let mut txn = n.doc.transact_mut();
+        for data in &all {
+            if let Ok(u) = Update::decode_v1(data) {
+                if txn.apply_update(u).is_ok() {
+                    ok += 1;
+                }
+            }
+        }
+    }
+    n.title.unobserve("nexa-show");
+    n.md.unobserve("nexa-show");
+    let title = title_delta.lock().unwrap().take().unwrap_or(serde_json::Value::Null);
+    let md = md_delta.lock().unwrap().take().unwrap_or(serde_json::Value::Null);
+    let s = serde_json::json!({ "ok": ok, "title": title, "md": md }).to_string();
+    env.new_string(s).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut())
 }

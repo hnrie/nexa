@@ -14,6 +14,7 @@ import fish.nexa.ui.markdown.Timestamps
 import fish.nexa.ui.markdown.format.AtomNames
 import fish.nexa.ui.markdown.format.Block
 import fish.nexa.ui.markdown.format.CodeBlock
+import fish.nexa.ui.markdown.format.FileBlock
 import fish.nexa.ui.markdown.format.Flag
 import fish.nexa.ui.markdown.format.FormatMarkdown
 import fish.nexa.ui.markdown.format.FormatModel
@@ -32,6 +33,9 @@ import java.util.Locale
 
 /** One field on the page: a text block, a code block, or a table cell (row, column). */
 data class FieldKey(val id: Int, val cell: Pair<Int, Int>? = null)
+
+/** A field's text as laid out, and how its offsets map to what is drawn (an atom shows its label). */
+class FieldLayout(val text: androidx.compose.ui.text.TextLayoutResult, val transformation: androidx.compose.ui.text.input.VisualTransformation)
 
 /** What the toolbar asks of the surface (surface.ts `Command`). */
 sealed interface Cmd {
@@ -56,7 +60,19 @@ sealed interface Cmd {
     data object Undo : Cmd
     data object Redo : Cmd
     data class Text(val text: String) : Cmd
+    /** A note's file, on a line of its own after the caret's. */
+    data class File(val file: String, val name: String) : Cmd
+    /** How much of the line a note's picture takes, in percent. */
+    data class FileWidth(val id: Int, val width: Int) : Cmd
+    /** Takes a block out: a file, from its own remove button. */
+    data class RemoveBlock(val id: Int) : Cmd
 }
+
+/** A place another copy of a note can find: a block by where it was and what it says (surface.ts PlaceMark). */
+data class PlaceMark(val b: Int, val o: Int, val cell: Pair<Int, Int>?, val k: String)
+
+/** Where someone's selection runs from and to; the same place twice is a caret. */
+data class CursorMark(val a: PlaceMark, val f: PlaceMark)
 
 /** surface.ts `SurfaceState`: what the toolbar shows as on, and what the caret is in. */
 data class SurfaceState(
@@ -92,6 +108,11 @@ object EditorNames : AtomNames, fish.nexa.ui.markdown.NameLookup by AppNames {
 class FormatSurface(
     /** The markdown it opened with: closing with anything else asks first. */
     val initial: String,
+    /** A note's page: files on lines of their own, and as much text as a note holds. */
+    private val files: Boolean = false,
+    private val max: Int = 0,
+    /** Whether the keyboard comes up as it opens (the message editor) or waits to be asked (a note). */
+    focusOnOpen: Boolean = true,
 ) {
     private val labels = FormatMarkdown.Labels(
         names = EditorNames,
@@ -118,6 +139,10 @@ class FormatSurface(
     /** Each field as it last was: its text, selection and the keyboard's composition. */
     val values = mutableStateMapOf<FieldKey, TextFieldValue>()
 
+    /** Where each field is on the screen and how its text is laid out, for carets drawn over the page. */
+    val placed = HashMap<FieldKey, androidx.compose.ui.layout.LayoutCoordinates>()
+    val laidOut = HashMap<FieldKey, FieldLayout>()
+
     /** Where the caret goes after a change that put it in another field; `seq` bumps every time. */
     data class Focus(val key: FieldKey, val seq: Int)
 
@@ -133,14 +158,14 @@ class FormatSurface(
     var onEscape: (() -> Unit)? = null
 
     init {
-        val loaded = FormatMarkdown.fromMarkdown(initial, labels)
-        blocks = loaded.blocks
+        val loaded = FormatMarkdown.fromMarkdown(initial, labels, files, max)
+        blocks = FormatModel.ensureBlock(loaded.blocks)
         simplified = loaded.simplified
         val last = blocks.lastIndex
         sel = FormatModel.caret(last, FormatModel.sizeAt(blocks, Pos(last, 0)))
         sync(force = true)
         // the keyboard comes to the page as it opens, the caret at the end
-        focusCaret()
+        if (focusOnOpen) focusCaret()
     }
 
     fun markdown(): String = FormatMarkdown.toMarkdown(blocks)
@@ -206,6 +231,8 @@ class FormatSurface(
             }
         }
         values.keys.filter { it !in seen }.forEach { values.remove(it) }
+        placed.keys.retainAll(seen)
+        laidOut.keys.retainAll(seen)
     }
 
     /** Puts the keyboard where the caret now is. */
@@ -262,8 +289,18 @@ class FormatSurface(
     // -----------------------------------------------------------------------
     // what the keyboard did
 
+    /** The field the keyboard is in, if it is in this page. */
+    var activeKey by mutableStateOf<FieldKey?>(null)
+        private set
+
+    /** A field let the keyboard go. */
+    fun blurred(key: FieldKey) {
+        if (activeKey == key) activeKey = null
+    }
+
     /** A field took focus: the caret is where that field has it. */
     fun focused(key: FieldKey) {
+        activeKey = key
         val b = indexOf(key)
         if (b < 0) return
         val v = values[key] ?: return
@@ -752,6 +789,287 @@ class FormatSurface(
             Cmd.Undo -> undo()
             Cmd.Redo -> redo()
             is Cmd.Text -> typeText(cmd.text)
+            is Cmd.File -> FormatModel.insertBlock(blocks, s, FileBlock(FormatModel.newId(), null, cmd.file, cmd.name)).let { apply(it.blocks, it.sel) }
+            is Cmd.FileWidth -> {
+                val at = blocks.indexOfFirst { it.id == cmd.id }
+                val file = blocks.getOrNull(at) as? FileBlock ?: return
+                val width = fish.nexa.ui.markdown.Markdown.fileWidth(cmd.width.toDouble())
+                if (width == file.width) return
+                val out = blocks.toMutableList()
+                out[at] = file.copy(width = width)
+                apply(out, sel)
+            }
+            is Cmd.RemoveBlock -> {
+                val at = blocks.indexOfFirst { it.id == cmd.id }
+                if (at < 0) return
+                val out = blocks.toMutableList()
+                out.removeAt(at)
+                // the caret goes where the block was: the start of what took its place, or the end of the line before
+                val next = when {
+                    out.getOrNull(at) != null && !FormatModel.isVoid(out[at]) -> FormatModel.caret(at, 0)
+                    at > 0 -> FormatModel.caret(at - 1, FormatModel.sizeAt(out, Pos(at - 1, 0)))
+                    else -> FormatModel.caret(0, 0)
+                }
+                apply(out, next)
+            }
         }
     }
+
+    // -----------------------------------------------------------------------
+    // a note written together (surface.ts caretMarkdown, placeOf, reload, cursor, locate)
+
+    /** Whether a word is being composed (an input method, dictation): the document is not swapped under it. */
+    val busy: Boolean get() = activeKey?.let { values[it]?.composition } != null
+
+    /** The page changed under the caret without anything being typed (someone else's words came in). */
+    var onReload: (() -> Unit)? = null
+
+    private fun signature(block: Block): String = block.kind + "\u0000" + FormatMarkdown.toMarkdown(listOf(block))
+
+    /** A short hash of what a block says (FNV-1a), to find it again in another copy of the note. */
+    private fun blockKey(block: Block?): String {
+        if (block == null) return ""
+        val text = signature(block)
+        var h = 0x811c9dc5.toInt()
+        for (ch in text) {
+            h = h xor ch.code
+            h *= 0x01000193
+        }
+        return (h.toLong() and 0xffffffffL).toString(36)
+    }
+
+    /** A block's characters as the caret counts them: an atom is one. */
+    private fun counted(block: Block?): String? = when (block) {
+        is CodeBlock -> block.text
+        is TextBlock -> textOf(block.content)
+        else -> null
+    }
+
+    /** Where each line of a text starts. */
+    private fun lineStarts(text: String): IntArray {
+        val out = ArrayList<Int>()
+        out += 0
+        var i = text.indexOf('\n')
+        while (i >= 0) {
+            out += i + 1
+            i = text.indexOf('\n', i + 1)
+        }
+        return out.toIntArray()
+    }
+
+    /**
+     * Where a block's words start on its line of markdown, past what makes the
+     * line a heading, an item, a quote: the line ends with the words, written as
+     * they are, unless a backslash had to be put before something at their start.
+     */
+    private fun contentStart(line: String, block: Block): Int {
+        if (block !is TextBlock) return -1
+        val words = FormatMarkdown.inlineMarkdown(block.content)
+        if (line.endsWith(words)) return line.length - words.length
+        if (words.isNotEmpty() && line.endsWith(words.substring(1))) return maxOf(0, line.length - words.length - 1)
+        return -1
+    }
+
+    /**
+     * Where the caret is, as an offset into the markdown this page writes,
+     * when it can be said exactly: a caret, not a selection, in the text of a
+     * block, with no emoji or mention before it on its line. Null otherwise,
+     * and while the keyboard is elsewhere.
+     */
+    fun caretMarkdown(): Int? {
+        if (busy || activeKey == null) return null
+        val (anchor, focus) = sel
+        if (FormatModel.comparePos(anchor, focus) != 0 || focus.cell != null) return null
+        val block = blocks.getOrNull(focus.b) ?: return null
+        val visible = counted(block) ?: return null
+        val lines = java.util.IdentityHashMap<Block, Int>()
+        val md = FormatMarkdown.toMarkdown(blocks, lines)
+        val line = lines[block] ?: return null
+        val starts = lineStarts(md)
+        if (block is CodeBlock) {
+            // the code starts on the line after its fence, written as it is
+            val at = starts.getOrNull(line + 1) ?: return null
+            return at + minOf(focus.o, block.text.length)
+        }
+        val prefix = visible.substring(0, minOf(focus.o, visible.length))
+        if (ATOM in prefix) return null
+        val from = starts.getOrNull(line) ?: return null
+        val text = md.substring(from, (starts.getOrNull(line + 1) ?: (md.length + 1)) - 1)
+        var i = contentStart(text, block)
+        if (i < 0) return null
+        for (ch in prefix) {
+            while (i < text.length && text[i] != ch) i++
+            if (i >= text.length) return null
+            i++
+        }
+        return from + i
+    }
+
+    /** The place an offset into `markdown` names, when that markdown is what these blocks write. */
+    private fun placeOf(markdown: String, at: Int): Pos? {
+        val lines = java.util.IdentityHashMap<Block, Int>()
+        if (FormatMarkdown.toMarkdown(blocks, lines) != markdown) return null
+        val starts = lineStarts(markdown)
+        // the line the offset is on
+        var lo = 0
+        var hi = starts.size - 1
+        while (lo < hi) {
+            val mid = (lo + hi + 1) shr 1
+            if (starts[mid] <= at) lo = mid else hi = mid - 1
+        }
+        for (b in blocks.indices) {
+            val block = blocks[b]
+            val line = lines[block] ?: continue
+            if (block is CodeBlock) {
+                val first = starts.getOrNull(line + 1)
+                val count = block.text.split('\n').size
+                if (first != null && lo >= line + 1 && lo < line + 1 + count) return Pos(b, maxOf(0, minOf(block.text.length, at - first)))
+                continue
+            }
+            if (line != lo || block !is TextBlock) continue
+            val visible = counted(block) ?: ""
+            val from = starts[line]
+            val text = markdown.substring(from, (starts.getOrNull(line + 1) ?: (markdown.length + 1)) - 1)
+            val start = contentStart(text, block)
+            if (start < 0) return null
+            var j = 0
+            var i = start
+            while (i < at - from && j < visible.length) {
+                if (text[i] == visible[j]) j++
+                i++
+            }
+            return Pos(b, j)
+        }
+        return null
+    }
+
+    /**
+     * Where a place in the old document is in the new one, when someone
+     * else's change replaced it. A place in a block that stayed is the same
+     * place. In a block that changed, it stays with the words around it.
+     */
+    private fun follow(before: List<Block>, next: List<Block>, map: IntArray, p: Pos): Pos {
+        val to = map.getOrNull(p.b) ?: return p
+        if (to >= 0) return p.copy(b = to)
+        // between the nearest blocks that stayed, as far in as it was
+        var above = p.b - 1
+        while (above >= 0 && map[above] < 0) above--
+        var below = p.b + 1
+        while (below < before.size && map[below] < 0) below++
+        val lo = if (above >= 0) map[above] + 1 else 0
+        val hi = if (below < before.size) map[below] - 1 else next.size - 1
+        if (hi < lo) {
+            // the block is gone with nothing in its place: the end of the one before
+            val b = maxOf(0, lo - 1)
+            return Pos(b, if (lo > 0) FormatModel.sizeAt(next, Pos(b, 0)) else 0)
+        }
+        val b = minOf(hi, lo + (p.b - (above + 1)))
+        val was = counted(before[p.b])
+        val now = counted(next.getOrNull(b))
+        if (was == null || now == null || p.cell != null) return Pos(b, 0, if (next.getOrNull(b) is TableBlock) p.cell ?: (0 to 0) else null)
+        var pre = 0
+        while (pre < was.length && pre < now.length && was[pre] == now[pre]) pre++
+        var suf = 0
+        while (suf < was.length - pre && suf < now.length - pre && was[was.length - 1 - suf] == now[now.length - 1 - suf]) suf++
+        if (p.o <= pre) return Pos(b, p.o)
+        if (p.o >= was.length - suf) return Pos(b, now.length - (was.length - p.o))
+        return Pos(b, now.length - suf)
+    }
+
+    /**
+     * Shows other markdown in place of what is here, with the caret kept
+     * where it was as nearly as the new text allows: for a note someone else
+     * changed while it is open. `caretAt`, when the caller knows it, is
+     * exactly where the caret goes, as an offset into the new markdown.
+     * Nothing is done while a word is being composed; the caller tries again.
+     */
+    fun reload(markdown: String, caretAt: Int?): Boolean {
+        if (busy) return false
+        val had = activeKey != null
+        val loaded = FormatMarkdown.fromMarkdown(markdown, labels, files, max)
+        val before = blocks
+        val next = FormatModel.ensureBlock(loaded.blocks).toMutableList()
+        // A block that reads the same as before is the same block: it keeps
+        // its field on the page, so only what someone changed is drawn again.
+        val map = Alignment.of(before.map(::signature), next.map(::signature))
+        map.forEachIndexed { i, j -> if (j >= 0) next[j] = before[i] }
+        // A block that changed keeps the id of the one it took the place of,
+        // so the line being written in stays the field with the keyboard.
+        val used = HashSet<Int>()
+        for (j in map) if (j >= 0) used += next[j].id
+        var i = 0
+        var j = 0
+        while (i <= before.size && j <= next.size) {
+            var ai = i
+            while (ai < before.size && map[ai] < 0) ai++
+            val aj = if (ai < before.size) map[ai] else next.size
+            var a = i
+            var b = j
+            while (a < ai && b < aj) {
+                val old = before[a]
+                if (old::class == next[b]::class && old.id !in used) {
+                    next[b] = next[b].withId(old.id)
+                    used += old.id
+                }
+                a++
+                b++
+            }
+            i = ai + 1
+            j = aj + 1
+        }
+        val moved = { p: Pos -> FormatModel.clampPos(next, follow(before, next, map, p)) }
+        var s = Sel(moved(sel.anchor), moved(sel.focus))
+        // Where the caller says the caret goes, it goes. Without that, someone
+        // else's words put in right where the caret was could land on either
+        // side of it, and the next letter typed would end up among theirs.
+        blocks = next
+        val exact = if (had && caretAt != null) placeOf(markdown, caretAt) else null
+        if (exact != null) s = FormatModel.caret(exact.b, exact.o)
+        sel = s
+        pending = null
+        past.clear()
+        future.clear()
+        canUndo = false
+        canRedo = false
+        stale = null
+        val wasKey = activeKey
+        sync(force = true)
+        // the keyboard follows the caret only when its line is another field now
+        if (had && keyAt(sel.focus) != wasKey) focusCaret()
+        onReload?.invoke()
+        return true
+    }
+
+    /** Where this page's caret and selection are, as places another copy of the note can find. */
+    fun cursor(): CursorMark = CursorMark(mark(sel.anchor), mark(sel.focus))
+
+    private fun mark(p: Pos): PlaceMark = PlaceMark(p.b, p.o, p.cell, blockKey(blocks.getOrNull(p.b)))
+
+    /**
+     * A place from another copy of the note, in this one: the block that says
+     * what it said, nearest where it was, or, when none does (it is the one
+     * being written in), the block in its place.
+     */
+    fun locate(m: PlaceMark): Pos? {
+        if (m.b < 0 || m.o < 0) return null
+        var b = -1
+        if (blockKey(blocks.getOrNull(m.b)) == m.k) b = m.b
+        else {
+            var d = 1
+            while (d < 64 && b < 0) {
+                if (blockKey(blocks.getOrNull(m.b - d)) == m.k) b = m.b - d
+                else if (blockKey(blocks.getOrNull(m.b + d)) == m.k) b = m.b + d
+                d++
+            }
+        }
+        if (b < 0) b = minOf(m.b, blocks.size - 1)
+        val cell = m.cell?.takeIf { it.first >= 0 && it.second >= 0 }
+        return FormatModel.clampPos(blocks, Pos(b, m.o, cell))
+    }
+
+    /** Puts the keyboard in the page, at the caret (a tap on the page below the title). */
+    fun focus() = focusCaret()
+
+    /** The field a place is in, for a cursor drawn over the page. */
+    fun fieldAt(p: Pos): FieldKey? = keyAt(p)
 }

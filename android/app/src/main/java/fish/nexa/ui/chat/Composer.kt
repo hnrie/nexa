@@ -202,7 +202,8 @@ object Staging {
         return Staged("f$seq", out, "message.txt", "text/plain")
     }
 
-    private fun limitText(): String {
+    /** The server's upload limit, as people read sizes. */
+    fun limitText(): String {
         val max = Nexa.auth.instance.value?.maxUploadBytes ?: (100L shl 20)
         val gb = max / (1024.0 * 1024 * 1024)
         return if (gb >= 1) t("composer.composer.gigabytes", "n" to (Math.round(gb * 10) / 10.0)) else t("composer.composer.megabytes", "n" to Math.round(max / (1024.0 * 1024)))

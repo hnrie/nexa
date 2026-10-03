@@ -216,6 +216,8 @@ fun VideoPlayer(
     sizeHint: String? = null,
     eager: Boolean = true,
     onDownload: (() -> Unit)? = null,
+    /** As wide as its line, in its own shape (a note's video). */
+    fill: Boolean = false,
 ) {
     val context = LocalContext.current
     val handle = remember(source) { VideoHandle(source) }
@@ -225,10 +227,8 @@ fun VideoPlayer(
         ?: if (width != null && height != null && width > 0 && height > 0) width to height else null
     val box = Fit.video(shape?.first ?: 640.0, shape?.second ?: 360.0)
     Box(
-        Modifier
-            .padding(top = 4.dp)
-            .width(box.width.dp)
-            .aspectRatio(box.width.toFloat() / box.height)
+        (if (fill) Modifier.fillMaxWidth().aspectRatio(ratioOf(shape?.first, shape?.second))
+        else Modifier.padding(top = 4.dp).width(box.width.dp).aspectRatio(box.width.toFloat() / box.height))
             .clip(Radii.Sm)
             .background(Color.Black),
     ) {
@@ -511,7 +511,7 @@ fun LoopingVideo(url: String, poster: String?) {
 /** An uploaded video: streamed as it decrypts, its first frame and length fetched by themselves when it is small. */
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoAttachment(att: AttachmentMeta) {
+fun VideoAttachment(att: AttachmentMeta, fill: Boolean = false) {
     Saving.Track()
     val download = {
         Saving.save(att.name, att.type, picture = false, write = { out -> Downloads.writeAttachment(att, out) {} }) { err ->
@@ -524,5 +524,6 @@ fun VideoAttachment(att: AttachmentMeta) {
         sizeHint = if (att.size > AUTO_LOAD_MAX) Time.bytes(att.size) else null,
         eager = att.size <= AUTO_LOAD_MAX,
         onDownload = download,
+        fill = fill,
     )
 }

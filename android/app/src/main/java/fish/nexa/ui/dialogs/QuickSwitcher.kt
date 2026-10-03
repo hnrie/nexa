@@ -167,7 +167,12 @@ private fun QuickSwitcherScreen(close: () -> Unit) {
     // a name typed (its start, a word's start, inside it) is where Go takes you
     val first = scored.firstOrNull()?.takeIf { query.isNotEmpty() && it.second >= 50 }?.first
     val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    // straight into the box, with the keyboard up: this screen is for typing
+    LaunchedEffect(Unit) {
+        focus.requestFocus()
+        keyboard?.show()
+    }
     Box(Modifier.fillMaxSize().background(c.bgFloating).semantics { contentDescription = t("sidebar.dMSidebar.findOrStartAConversation") }) {
         Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -238,14 +243,12 @@ private fun PlaceRow(p: Place, active: Boolean) {
             p.kind == "server" -> if (p.avatarId != null) ServerIcon(p.avatarKey, p.label, p.avatarId, 28.dp, radius = 9.dp) else Glyph("Server")
             else -> Avatar(p.avatarKey, p.label, p.avatarId, 28.dp, icon = p.kind == "group")
         }
-        Txt(p.label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(500)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-            Row(Modifier.widthIn(max = 180.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (p.kind == "friend") {
-                    Icon("UserPlus", c.textMuted, size = 14.dp)
-                    Txt(t("search.switcher.startConversation"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
-                } else Txt(p.sub, style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
-            }
+        Txt(p.label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(500)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f))
+        Row(Modifier.widthIn(max = 180.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (p.kind == "friend") {
+                Icon("UserPlus", c.textMuted, size = 14.dp)
+                Txt(t("search.switcher.startConversation"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
+            } else Txt(p.sub, style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
         }
     }
 }

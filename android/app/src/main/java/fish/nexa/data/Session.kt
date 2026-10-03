@@ -306,6 +306,7 @@ class Session(private val nx: Nexa) {
                 NexaInbox.onEvent(e.t, d)
             }
             "nexa_announcement", "nexa_announcement_delete" -> NexaInbox.onEvent(e.t, d)
+            "note_update", "note_delete", "note_invite", "note_invite_delete", "note_presence", "note_cursor", "note_crdt" -> fish.nexa.notes.Notes.onEvent(e.t, d)
             "session_expired" -> onSignedOut?.invoke(d.str("reason") ?: "expired")
             "account_banned" -> onBanned?.invoke()
             else -> Unit // voice signalling, calls, notes and staff events are handled by the modules that listen to `events`
@@ -355,6 +356,9 @@ class Session(private val nx: Nexa) {
             nx.keys.reconcile()
         }
         for (ch in keep) nx.scope.launch { nx.messages.syncGap(ch) }
+        // The notes ride REST. Asked for again on every ready rather than
+        // cleared first: a note open keeps what it has while the list catches up.
+        fish.nexa.notes.Notes.onReady()
         nx.auth.applyLockPolicy()
     }
 

@@ -1,12 +1,14 @@
-// TEMPORARY: each of these is replaced by its real file (the expression picker, panels, profiles, dialogs)
-// before release; tracked in the progress log.
 package fish.nexa.ui.chat
 
-import androidx.compose.runtime.Composable
-import androidx.compose.foundation.layout.fillMaxSize
 import fish.nexa.crypto.StickerRef
 import fish.nexa.data.ChatMessage
 import kotlinx.coroutines.launch
+
+/*
+ * The expression picker as a message and the composer open it
+ * (components/chat/ReactionPicker.tsx, components/composer/ExpressionPicker.tsx):
+ * which tabs show, and what a pick does.
+ */
 
 /** Add Reaction: the emoji tab alone, closing on a pick, which toggles that reaction. */
 fun openReactionPicker(cm: ChatMessage, ctx: ListCtx) = fish.nexa.ui.pickers.Pickers.open(

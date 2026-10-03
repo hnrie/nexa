@@ -292,7 +292,8 @@ export const useNotes = create<NotesState>()((set, get) => ({
     set((s) => {
       const known = s.notes[id];
       if (!known) return s;
-      return { notes: { ...s.notes, [id]: { ...known, head, updatedAt: Math.max(known.updatedAt, Date.now()), editedBy: by ?? known.editedBy } } };
+      // someone else's words keep the time and name their own change gave the note
+      return { notes: { ...s.notes, [id]: { ...known, head, updatedAt: by ? Math.max(known.updatedAt, Date.now()) : known.updatedAt, editedBy: by ?? known.editedBy } } };
     });
   },
 

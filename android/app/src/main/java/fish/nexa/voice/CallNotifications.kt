@@ -210,13 +210,20 @@ internal object CallNotifications {
 
     // --- ringing ----------------------------------------------------------------------
 
+    /** Rings showing as notifications, so a ring is posted once (posting again would alert again). */
+    private val ringsShown = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
     /** A call is ringing here: a notification for someone who is not looking at the app (the app rings itself). */
     fun ring(channelId: String, from: String) {
         if (Nexa.ui.visible.value || doNotDisturb() || !allowed()) return
+        if (!ringsShown.add(channelId)) return
         Nexa.scope.launch(Dispatchers.IO) {
             runCatching { loadAvatar(from) }
             // answered, declined or gone while the picture came
-            if (Voice.ringing.value[channelId] == null || Nexa.ui.visible.value) return@launch
+            if (Voice.ringing.value[channelId] == null || Nexa.ui.visible.value) {
+                ringsShown.remove(channelId)
+                return@launch
+            }
             runCatching { manager().notify(TAG_RING + channelId, 1, incoming(channelId, from)) }.onFailure { Log.w(TAG, "could not show the call", it) }
         }
     }
@@ -250,7 +257,10 @@ internal object CallNotifications {
     }
 
     /** The call was answered, declined or silenced: its notification goes. */
-    fun cancelRing(channelId: String) = runCatching { manager().cancel(TAG_RING + channelId, 1) }
+    fun cancelRing(channelId: String) {
+        ringsShown.remove(channelId)
+        runCatching { manager().cancel(TAG_RING + channelId, 1) }
+    }
 
     /**
      * A call rang here and ended with nobody on this account picking up.

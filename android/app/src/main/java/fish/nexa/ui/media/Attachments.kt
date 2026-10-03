@@ -102,7 +102,7 @@ fun copyOf(att: AttachmentMeta): AttachmentMeta? {
  * (streamed as they decrypt), sounds, and a card for everything else.
  */
 @Composable
-fun Attachments(list: List<AttachmentMeta>, cm: ChatMessage?, ctx: ListCtx?) {
+fun Attachments(list: List<AttachmentMeta>, cm: ChatMessage?, ctx: ListCtx?, fill: Boolean = false) {
     Saving.Track()
     val from = senderName(cm, ctx)
     val pictures = remember(list) { list.filter { it.size <= INLINE_MAX && it.type.startsWith("image/") } }
@@ -119,8 +119,8 @@ fun Attachments(list: List<AttachmentMeta>, cm: ChatMessage?, ctx: ListCtx?) {
             val type = att.type
             val inline = att.size <= INLINE_MAX
             when {
-                inline && type.startsWith("image/") -> if (tiles == null) ImageAttachment(att, cm, tile = null, onOpen = { open(att) })
-                type.startsWith("video/") -> VideoAttachment(att)
+                inline && type.startsWith("image/") -> if (tiles == null) ImageAttachment(att, cm, tile = null, onOpen = { open(att) }, fill = fill)
+                type.startsWith("video/") -> VideoAttachment(att, fill = fill)
                 inline && type.startsWith("audio/") -> AudioAttachment(att)
                 else -> FileCard(att)
             }
@@ -205,7 +205,7 @@ object PressedImage {
  * spoiler until the first tap, the star on GIFs.
  */
 @Composable
-fun ImageAttachment(att: AttachmentMeta, cm: ChatMessage?, tile: Fit.Tile?, onOpen: () -> Unit) {
+fun ImageAttachment(att: AttachmentMeta, cm: ChatMessage?, tile: Fit.Tile?, onOpen: () -> Unit, fill: Boolean = false) {
     val c = Nx.colors
     var copyFailed by remember(att.blobId) { mutableStateOf(false) }
     val copy = remember(att.blobId, copyFailed) { if (copyFailed) null else copyOf(att) }
@@ -215,8 +215,12 @@ fun ImageAttachment(att: AttachmentMeta, cm: ChatMessage?, tile: Fit.Tile?, onOp
     LaunchedEffect(load.error) { if (copy != null && load.error == "decrypt") copyFailed = true }
     var revealed by remember(att.blobId) { mutableStateOf(att.spoiler != true) }
     val fit = Fit.media(att.w, att.h)
-    val frame = if (tile != null) Modifier.fillMaxSize()
-    else Modifier.width(fit.width.dp).aspectRatio(fit.width.toFloat() / fit.height)
+    val frame = when {
+        tile != null -> Modifier.fillMaxSize()
+        // a note's picture takes the whole width its line gives it, in its own shape
+        fill -> Modifier.fillMaxWidth().aspectRatio(ratioOf(att.w, att.h))
+        else -> Modifier.width(fit.width.dp).aspectRatio(fit.width.toFloat() / fit.height)
+    }
     val file = load.file
     Box(
         frame
@@ -248,6 +252,9 @@ fun ImageAttachment(att: AttachmentMeta, cm: ChatMessage?, tile: Fit.Tile?, onOp
         if (!revealed) SpoilerCover { revealed = true }
     }
 }
+
+/** A picture's or video's own shape, width over height, or a usual one when it does not say. */
+fun ratioOf(w: Double?, h: Double?): Float = if (w != null && h != null && w > 0 && h > 0) (w / h).toFloat().coerceIn(0.2f, 5f) else 16f / 9f
 
 /** Whether this phone can blur what is drawn (Android 12 and later); a cover hides the picture entirely where it cannot. */
 val canBlur: Boolean get() = Build.VERSION.SDK_INT >= 31

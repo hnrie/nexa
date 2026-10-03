@@ -396,6 +396,7 @@ class Auth(private val nx: Nexa) {
         nx.users.setMe(null)
         NexaInbox.reset()
         PrivateFiles.clear()
+        fish.nexa.notes.Notes.clear()
     }
 
     fun retryOffline() = nx.scope.launch { bootstrap() }
@@ -451,6 +452,8 @@ class Auth(private val nx: Nexa) {
         if (AppLock.inCall()) nx.session.lockedInCall = true else nx.session.stop()
         nx.keys.reset()
         nx.messages.clear()
+        // notes are opened with keys of their own, which go with the rest
+        fish.nexa.notes.Notes.clear()
         fish.nexa.media.Media.clear()
         nx.scope.launch {
             nx.settings.flush()

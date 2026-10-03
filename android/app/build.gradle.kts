@@ -1,4 +1,6 @@
 import java.util.Properties
+import javax.inject.Inject
+import org.gradle.process.ExecOperations
 
 plugins {
     id("com.android.application")
@@ -56,9 +58,46 @@ val copyWebAssets = tasks.register<CopyWebAssets>("copyWebAssets") {
     legalVersion.set(rootProject.file("../web/src/lib/legal.ts"))
 }
 
+/**
+ * The notes CRDT (android/ydoc): yrs, the Rust port of the Yjs the web keeps
+ * notes in, built with cargo-ndk for each processor the app ships for, so a
+ * phone and a browser editing one note exchange the very same updates.
+ */
+abstract class BuildYdoc : DefaultTask() {
+    @get:InputDirectory abstract val sources: DirectoryProperty
+    @get:InputFile abstract val manifest: RegularFileProperty
+    @get:InputFile abstract val lockfile: RegularFileProperty
+    @get:Input abstract val ndkDir: Property<String>
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+    @get:Inject abstract val exec: ExecOperations
+
+    @TaskAction
+    fun build() {
+        val home = System.getProperty("user.home")
+        val cargoBin = File(home, ".cargo/bin")
+        val cargo = File(cargoBin, "cargo").takeIf { it.exists() }?.path ?: "cargo"
+        val out = outputDir.get().asFile
+        out.deleteRecursively()
+        exec.exec {
+            workingDir = manifest.get().asFile.parentFile
+            environment("ANDROID_NDK_HOME", ndkDir.get())
+            environment("PATH", cargoBin.path + File.pathSeparator + (System.getenv("PATH") ?: ""))
+            commandLine(cargo, "ndk", "-t", "arm64-v8a", "-t", "armeabi-v7a", "-t", "x86_64", "-P", "26", "-o", out.path, "build", "--release")
+        }
+    }
+}
+
+val buildYdoc = tasks.register<BuildYdoc>("buildYdoc") {
+    sources.set(rootProject.file("ydoc/src"))
+    manifest.set(rootProject.file("ydoc/Cargo.toml"))
+    lockfile.set(rootProject.file("ydoc/Cargo.lock"))
+    ndkDir.set(androidComponents.sdkComponents.ndkDirectory.map { it.asFile.path })
+}
+
 androidComponents {
     onVariants { variant ->
         variant.sources.assets?.addGeneratedSourceDirectory(copyWebAssets, CopyWebAssets::outputDir)
+        variant.sources.jniLibs?.addGeneratedSourceDirectory(buildYdoc, BuildYdoc::outputDir)
     }
 }
 
@@ -230,6 +269,7 @@ dependencies {
     implementation("io.github.webrtc-sdk:android:150.7871.01")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("org.json:json:20250517")
     // the ICU the web's own Node was built with, standing in for the phone's android.icu in JVM tests
     testImplementation("com.ibm.icu:icu4j:78.3")

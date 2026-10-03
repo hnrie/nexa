@@ -61,8 +61,9 @@ class MainActivity : ComponentActivity() {
             }
             return true
         }
+        // a shared note's key is the part after the #, which never leaves the device: it comes along
         val path = intent?.getStringExtra(fish.nexa.notify.Notifier.EXTRA_PATH)
-            ?: intent?.data?.takeIf { it.scheme == "https" }?.path
+            ?: intent?.data?.takeIf { it.scheme == "https" }?.let { uri -> uri.path?.let { p -> uri.encodedFragment?.let { "$p#$it" } ?: p } }
             ?: return false
         lifecycleScope.launch {
             Nexa.auth.state.first { it is fish.nexa.data.AuthState.Ready }

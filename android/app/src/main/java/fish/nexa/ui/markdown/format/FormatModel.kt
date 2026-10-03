@@ -126,6 +126,14 @@ sealed class Block {
         is TableBlock -> copy(wrap = w)
         is FileBlock -> copy(wrap = w)
     }
+
+    fun withId(i: Int): Block = when (this) {
+        is TextBlock -> copy(id = i)
+        is CodeBlock -> copy(id = i)
+        is RuleBlock -> copy(id = i)
+        is TableBlock -> copy(id = i)
+        is FileBlock -> copy(id = i)
+    }
 }
 
 data class TextBlock(

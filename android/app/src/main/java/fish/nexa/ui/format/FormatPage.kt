@@ -23,6 +23,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -45,6 +47,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -61,6 +64,7 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.LayoutDirection
@@ -90,6 +94,14 @@ import fish.nexa.ui.theme.Nx
 import fish.nexa.ui.theme.Radii
 import fish.nexa.ui.theme.mixSrgb
 
+/** How a page's lines are set: the message editor's, or a note's longer-form type (Notes.module.css `.surface`). */
+enum class PageLook { CHAT, NOTE }
+
+private val LocalLook = compositionLocalOf { PageLook.CHAT }
+
+/** What draws a note's file where its line is; null draws its name. */
+private val LocalFileSlot = compositionLocalOf<(@Composable (FileBlock) -> Unit)?> { null }
+
 /**
  * The writing page (FormatEditor.module.css `.surface`): the chat's own
  * background and type, so what is written looks as it will when it is sent.
@@ -98,6 +110,41 @@ import fish.nexa.ui.theme.mixSrgb
  */
 @Composable
 fun FormatPage(surface: FormatSurface, placeholder: String, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        FormatBlocks(surface, placeholder, PageLook.CHAT, Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp))
+        // the page goes on below the last line: a tap there writes at the end
+        Spacer(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 160.dp)
+                .pressable(remember { MutableInteractionSource() }) { surface.focusEnd() },
+        )
+    }
+}
+
+/** A note's top and bottom margins for a block, in its own type's em (Notes.module.css). */
+private fun noteMargins(block: Block, prev: Block?): Pair<Float, Float> {
+    val kind = (block as? TextBlock)?.textKind
+    val first = prev == null
+    return when {
+        kind == TextKind.H1 -> (if (first) 0f else 1.1f * 1.55f) to 0.35f * 1.55f
+        kind == TextKind.H2 -> (if (first) 0f else 1f * 1.3f) to 0.3f * 1.3f
+        kind == TextKind.H3 -> (if (first) 0f else 0.9f * 1.1f) to 0.25f * 1.1f
+        kind == TextKind.H4 || kind == TextKind.H5 || kind == TextKind.H6 -> (if (first) 0f else 10f / 16.5f) to 4f / 16.5f
+        block is FileBlock -> 1f to 1f
+        first -> 0f to 0f
+        kind == TextKind.LI && (prev as? TextBlock)?.textKind == TextKind.LI -> 0.12f to 0f
+        else -> 0.4f to 0f
+    }
+}
+
+/**
+ * The page's blocks, without a scroll of their own: the message editor
+ * scrolls them in FormatPage, and a note scrolls them under its title.
+ * `file` draws a note's file where its line is.
+ */
+@Composable
+fun FormatBlocks(surface: FormatSurface, placeholder: String, look: PageLook, modifier: Modifier = Modifier, file: (@Composable (FileBlock) -> Unit)? = null) {
     val blocks = surface.blocks
     // ordered lists count per depth, starting again after anything that is not an item
     val numbers = HashMap<Int, Int>()
@@ -112,24 +159,39 @@ fun FormatPage(surface: FormatSurface, placeholder: String, modifier: Modifier =
             numbers[block.id] = n
         } else counters.clear()
     }
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp)) {
+    // a note's blocks stand apart as a page's paragraphs do, the larger of two margins between them
+    val em = 16.5f
+    fun gap(i: Int): androidx.compose.ui.unit.Dp {
+        if (look != PageLook.NOTE || i == 0) return 0.dp
+        val (top, _) = noteMargins(blocks[i], blocks[i - 1])
+        val (_, bottom) = noteMargins(blocks[i - 1], blocks.getOrNull(i - 2))
+        return (maxOf(top, bottom) * em).dp
+    }
+    CompositionLocalProvider(LocalLook provides look, LocalFileSlot provides file) {
+        Column(modifier.fillMaxWidth()) {
             var i = 0
             while (i < blocks.size) {
                 val wrap = blocks[i].wrap
                 if (wrap == null) {
                     val block = blocks[i]
-                    key(block.id) { BlockView(surface, block, numbers[block.id], first = i == 0, placeholder = placeholder.takeIf { blocks.size == 1 }) }
+                    val top = gap(i)
+                    key(block.id) {
+                        if (top > 0.dp) Spacer(Modifier.height(top))
+                        BlockView(surface, block, numbers[block.id], first = i == 0, placeholder = placeholder.takeIf { blocks.size == 1 })
+                    }
                     i++
                     continue
                 }
                 val start = i
                 while (i < blocks.size && blocks[i].wrap == wrap) i++
                 val run = blocks.subList(start, i)
+                val top = gap(start)
                 key(run.first().id, "wrap") {
+                    if (top > 0.dp) Spacer(Modifier.height(top))
                     WrapBox(wrap) {
                         run.forEachIndexed { k, block ->
                             key(block.id) {
+                                if (k > 0) gap(start + k).takeIf { it > 0.dp }?.let { Spacer(Modifier.height(it)) }
                                 BlockView(
                                     surface, block, numbers[block.id], first = k == 0,
                                     summary = wrap == Wrap.DETAILS && k == 0,
@@ -141,13 +203,6 @@ fun FormatPage(surface: FormatSurface, placeholder: String, modifier: Modifier =
                 }
             }
         }
-        // the page goes on below the last line: a tap there writes at the end
-        Spacer(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 160.dp)
-                .pressable(remember { MutableInteractionSource() }) { surface.focusEnd() },
-        )
     }
 }
 
@@ -203,23 +258,44 @@ private fun BlockView(surface: FormatSurface, block: Block, number: Int?, first:
         is CodeBlock -> CodeBlockView(surface, block)
         is RuleBlock -> Box(Modifier.fillMaxWidth().padding(vertical = 10.dp).height(1.dp).background(Nx.colors.borderStrong))
         is TableBlock -> TableView(surface, block)
-        is FileBlock -> Row(
-            Modifier.padding(vertical = 6.dp).background(Nx.colors.bgSurface, Radii.Xs).padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon("Paperclip", Nx.colors.textMuted, size = 16.dp)
-            Txt(block.name, style = Nx.type.bodySmall, color = Nx.colors.text, maxLines = 1)
+        is FileBlock -> {
+            val slot = LocalFileSlot.current
+            if (slot != null) slot(block)
+            else Row(
+                Modifier.padding(vertical = 6.dp).background(Nx.colors.bgSurface, Radii.Xs).padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon("Paperclip", Nx.colors.textMuted, size = 16.dp)
+                Txt(block.name, style = Nx.type.bodySmall, color = Nx.colors.text, maxLines = 1)
+            }
         }
     }
 }
+
+/** Lines set as CSS sets them: the extra height split evenly above and below the words. */
+private val CENTRED = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None)
 
 /** The type of each kind of line (FormatEditor.module.css `[data-b]`). */
 @Composable
 private fun kindStyle(kind: TextKind): TextStyle {
     val c = Nx.colors
-    val body = Nx.type.body.copy(color = c.text)
     val sp = Nx.type::sp
+    if (LocalLook.current == PageLook.NOTE) {
+        // long-form text: a little more than a message, more air between the lines, set in the middle of each line as CSS sets it
+        val body = Nx.type.body.copy(color = c.text, fontSize = sp(16.5f), lineHeight = sp(28f), lineHeightStyle = CENTRED)
+        return when (kind) {
+            TextKind.H1 -> body.copy(fontSize = sp(25.6f), lineHeight = sp(32f), fontWeight = FontWeight(700), letterSpacing = (-0.012).em)
+            TextKind.H2 -> body.copy(fontSize = sp(21.45f), lineHeight = sp(26.8f), fontWeight = FontWeight(700))
+            TextKind.H3 -> body.copy(fontSize = sp(18.15f), lineHeight = sp(30.9f), fontWeight = FontWeight(700))
+            TextKind.H4 -> body.copy(fontSize = sp(15.5f), lineHeight = sp(26.3f), fontWeight = FontWeight(700))
+            TextKind.H5 -> body.copy(fontSize = sp(14.4f), lineHeight = sp(24.5f), fontWeight = FontWeight(700))
+            TextKind.H6 -> body.copy(fontSize = sp(14.4f), lineHeight = sp(24.5f), fontWeight = FontWeight(600), color = c.textMuted)
+            TextKind.SUBTEXT -> body.copy(fontSize = sp(13.4f), lineHeight = sp(22.8f), color = c.textMuted)
+            else -> body
+        }
+    }
+    val body = Nx.type.body.copy(color = c.text)
     return when (kind) {
         TextKind.H1 -> body.copy(fontSize = sp(24f), lineHeight = sp(30f), fontWeight = FontWeight(700))
         TextKind.H2 -> body.copy(fontSize = sp(20f), lineHeight = sp(25f), fontWeight = FontWeight(700))
@@ -244,13 +320,14 @@ private fun TextBlockView(surface: FormatSurface, block: TextBlock, number: Int?
     val key = FieldKey(block.id)
     var style = kindStyle(block.textKind)
     if (summary) style = style.copy(fontWeight = FontWeight(600))
-    val (top, bottom) = headingGap(block.textKind, first)
+    val (top, bottom) = if (LocalLook.current == PageLook.CHAT) headingGap(block.textKind, first) else 0 to 0
+    val line = with(androidx.compose.ui.platform.LocalDensity.current) { style.lineHeight.toDp() }
     Row(Modifier.fillMaxWidth().padding(top = top.dp, bottom = bottom.dp)) {
         val list = block.list
-        if (block.textKind == TextKind.LI && list != null) ListMarker(surface, block.id, list, number ?: 0)
-        if (summary) Box(Modifier.height(22.dp).padding(end = 6.dp), contentAlignment = Alignment.Center) { Icon("ChevronDown", c.textMuted, size = 14.dp) }
+        if (block.textKind == TextKind.LI && list != null) ListMarker(surface, block.id, list, number ?: 0, line, style)
+        if (summary) Box(Modifier.height(line).padding(end = 6.dp), contentAlignment = Alignment.Center) { Icon("ChevronDown", c.textMuted, size = 14.dp) }
         if (block.textKind == TextKind.NOTE) {
-            Txt("[${block.label ?: ""}] ", style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600), lineHeight = Nx.type.sp(22f)), color = c.link)
+            Txt("[${block.label ?: ""}] ", style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600), lineHeight = style.lineHeight), color = c.link)
         }
         EditField(surface, key, style, block.content, placeholder, Modifier.weight(1f))
     }
@@ -258,10 +335,12 @@ private fun TextBlockView(surface: FormatSurface, block: TextBlock, number: Int?
 
 /** A list's marker in the start padding: a bullet by depth, a number, or a box to tick. */
 @Composable
-private fun ListMarker(surface: FormatSurface, id: Int, list: ListInfo, number: Int) {
+private fun ListMarker(surface: FormatSurface, id: Int, list: ListInfo, number: Int, line: androidx.compose.ui.unit.Dp, style: TextStyle) {
+    // the marker sits in a line of its own as tall as its item's first line, set the same way
+    val mark = Nx.type.body.copy(lineHeight = style.lineHeight, lineHeightStyle = style.lineHeightStyle)
     val c = Nx.colors
     Spacer(Modifier.width((24 * list.indent).dp))
-    Box(Modifier.width(24.dp).height(22.dp), contentAlignment = if (list.ordered && !list.task) Alignment.CenterEnd else Alignment.Center) {
+    Box(Modifier.width(24.dp).height(line), contentAlignment = if (list.ordered && !list.task) Alignment.CenterEnd else Alignment.Center) {
         when {
             list.task -> {
                 val shape = RoundedCornerShape(4.dp)
@@ -283,14 +362,14 @@ private fun ListMarker(surface: FormatSurface, id: Int, list: ListInfo, number: 
                     ) { if (list.checked) Icon("Check", Color.White, size = 11.dp) }
                 }
             }
-            list.ordered -> Txt("$number.", style = Nx.type.body.copy(fontFeatureSettings = "tnum"), color = c.textMuted, modifier = Modifier.padding(end = 6.dp))
+            list.ordered -> Txt("$number.", style = mark.copy(fontSize = style.fontSize, fontFeatureSettings = "tnum"), color = c.textMuted, modifier = Modifier.padding(end = 6.dp))
             else -> {
                 val glyph = when (list.indent % 3) {
                     1 -> "◦"
                     2 -> "▪"
                     else -> "•"
                 }
-                Txt(glyph, style = Nx.type.body.copy(fontSize = if (list.indent % 3 == 2) Nx.type.sp(12f) else Nx.type.sp(16f)), color = c.textMuted)
+                Txt(glyph, style = mark.copy(fontSize = if (list.indent % 3 == 2) Nx.type.sp(12f) else Nx.type.sp(16f)), color = c.textMuted)
             }
         }
     }
@@ -411,7 +490,8 @@ private fun EditField(
         onValueChange = { surface.onValue(key, it) },
         modifier = modifier
             .focusRequester(focus)
-            .onFocusChanged { if (it.isFocused) surface.focused(key) }
+            .onFocusChanged { if (it.isFocused) surface.focused(key) else surface.blurred(key) }
+            .onGloballyPositioned { surface.placed[key] = it }
             .onPreviewKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 val v = surface.values[key] ?: return@onPreviewKeyEvent false
@@ -442,6 +522,7 @@ private fun EditField(
         textStyle = style,
         cursorBrush = SolidColor(c.textBrand),
         visualTransformation = transformation,
+        onTextLayout = { surface.laidOut[key] = FieldLayout(it, transformation) },
         keyboardOptions = KeyboardOptions(capitalization = if (code) KeyboardCapitalization.None else KeyboardCapitalization.Sentences, autoCorrectEnabled = !code),
         decorationBox = { inner ->
             Box {

@@ -55,6 +55,9 @@ object Nav {
 
     val canGoBack get() = history.isNotEmpty()
 
+    /** The page going back leads to, if there is one. */
+    val previous: Route? get() = history.lastOrNull()
+
     fun go(next: Route, keepDrawer: Boolean = false, replace: Boolean = false) {
         val target = resolve(next)
         if (target != route) {
@@ -77,6 +80,11 @@ object Nav {
      */
     fun openPath(path: String): Boolean {
         val parts = path.substringBefore('?').substringBefore('#').trim('/').split('/').filter { it.isNotEmpty() }
+        // a shared note's link: what it leads to, and joining it, with the key from after its #
+        if (parts.size == 2 && parts[0] == "note") {
+            fish.nexa.ui.notes.openNoteLink(parts[1], path.substringAfter('#', ""))
+            return true
+        }
         // an invite link, a profile link
         if (parts.size == 2 && parts[0] == "invite") {
             fish.nexa.ui.dialogs.Dialogs.openInvite(parts[1])

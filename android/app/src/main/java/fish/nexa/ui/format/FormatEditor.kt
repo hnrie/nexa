@@ -85,7 +85,7 @@ import fish.nexa.ui.theme.shadowHigh
 import fish.nexa.ui.theme.topEdge
 import kotlinx.coroutines.launch
 
-private enum class Tray { STYLE, COLOUR, CALLOUT, MORE, LINK }
+internal enum class Tray { STYLE, COLOUR, CALLOUT, MORE, LINK }
 
 private val KINDS = listOf(TextKind.P, TextKind.H1, TextKind.H2, TextKind.H3, TextKind.H4, TextKind.H5, TextKind.H6, TextKind.SUBTEXT)
 private val CALLOUTS = listOf(
@@ -284,7 +284,7 @@ private fun EditorFrame(
     }
 }
 
-private fun Modifier.topHairline(colour: Color): Modifier = drawBehind { drawRect(colour, size = androidx.compose.ui.geometry.Size(size.width, 1.dp.toPx())) }
+internal fun Modifier.topHairline(colour: Color): Modifier = drawBehind { drawRect(colour, size = androidx.compose.ui.geometry.Size(size.width, 1.dp.toPx())) }
 
 /** MessageCounter: how many characters are left, near the limit and past it. */
 @Composable
@@ -350,7 +350,7 @@ private fun DiscardRow(keep: () -> Unit, discard: () -> Unit) {
 // ---------------------------------------------------------------------------
 // the toolbar
 
-private sealed interface Shown {
+internal sealed interface Shown {
     data class Asked(val tray: Tray) : Shown
     data object ListTools : Shown
     data object CodeTools : Shown
@@ -359,7 +359,7 @@ private sealed interface Shown {
 }
 
 /** What the tray shows: what was asked for, or what the caret is in. */
-private fun trayShown(tray: Tray?, s: SurfaceState): Shown? = when {
+internal fun trayShown(tray: Tray?, s: SurfaceState): Shown? = when {
     tray != null -> Shown.Asked(tray)
     s.table != null -> Shown.TableTools
     s.kind == "code" -> Shown.CodeTools
@@ -369,7 +369,7 @@ private fun trayShown(tray: Tray?, s: SurfaceState): Shown? = when {
 }
 
 @Composable
-private fun Toolbar(s: SurfaceState, tray: Tray?, toggle: (Tray) -> Unit, surface: FormatSurface, modifier: Modifier) {
+internal fun Toolbar(s: SurfaceState, tray: Tray?, toggle: (Tray) -> Unit, surface: FormatSurface, modifier: Modifier, lead: (@Composable () -> Unit)? = null) {
     val c = Nx.colors
     val marks = s.marks
     val inCode = s.kind == "code"
@@ -388,6 +388,11 @@ private fun Toolbar(s: SurfaceState, tray: Tray?, toggle: (Tray) -> Unit, surfac
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        // first, so they never scroll out of sight along with the rest
+        if (lead != null) {
+            lead()
+            Divider()
+        }
         Tool("Undo2", t("composer.format.undo"), enabled = s.canUndo, mirror = true) { run(Cmd.Undo) }
         Tool("Redo2", t("composer.format.redo"), enabled = s.canRedo, mirror = true) { run(Cmd.Redo) }
         Divider()
@@ -469,6 +474,10 @@ private fun Tool(
     }
 }
 
+/** A tool of the editor's own, before the formatting ones (a note's Add Picture and Attach File). */
+@Composable
+internal fun ToolButton(icon: String, label: String, onClick: () -> Unit) = Tool(icon, label, onClick = onClick)
+
 @Composable
 private fun swatchColour(token: String): Color {
     val c = Nx.colors
@@ -481,7 +490,7 @@ private fun swatchColour(token: String): Color {
 // trays
 
 @Composable
-private fun TrayBody(shown: Shown, s: SurfaceState, surface: FormatSurface, setTray: (Tray?) -> Unit) {
+internal fun TrayBody(shown: Shown, s: SurfaceState, surface: FormatSurface, setTray: (Tray?) -> Unit) {
     fun run(cmd: Cmd) = surface.command(cmd)
     val inCode = s.kind == "code"
     val marks = s.marks

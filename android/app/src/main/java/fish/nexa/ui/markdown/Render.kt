@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -105,6 +106,14 @@ data class RenderCtx(
     val edited: String? = null,
     /** What the words sit on, for coloured text to keep its contrast. */
     val surface: Color? = null,
+    /** A note: files on lines of their own (drawn by `renderFile`), as much text as a note holds, and its longer-form type. */
+    val files: Boolean = false,
+    val max: Int = 0,
+    val renderFile: (@Composable (id: String, name: String, width: Int?) -> Unit)? = null,
+    val bodyPx: Float = 16f,
+    val bodyLine: Float = 22f,
+    /** Space between the top-level blocks (a note's paragraphs stand a little apart). */
+    val gap: Dp = 0.dp,
 )
 
 /**
@@ -115,7 +124,7 @@ data class RenderCtx(
  */
 @Composable
 fun MarkdownView(source: String, ctx: RenderCtx, modifier: Modifier = Modifier) {
-    val nodes = remember(source) { Markdown.parse(source) }
+    val nodes = remember(source, ctx.files, ctx.max) { Markdown.parse(source, files = ctx.files, max = ctx.max) }
     val jumbo = remember(nodes) { Markdown.isEmojiOnly(nodes) }
     Column(modifier) { Blocks(nodes, ctx, jumbo, top = true, edited = ctx.edited) }
 }
@@ -162,6 +171,7 @@ private fun Blocks(nodes: List<Node>, ctx: RenderCtx, jumbo: Boolean, top: Boole
     blocks.forEachIndexed { i, b ->
         val first = top && i == 0
         val last = i == blocks.lastIndex
+        if (top && i > 0 && ctx.gap > 0.dp) Spacer(Modifier.height(ctx.gap))
         Block(b, ctx, jumbo, first, if (last && lastParagraph) edited else null)
     }
     if (edited != null && !lastParagraph) Txt(edited, style = Nx.type.hint.copy(fontSize = Nx.type.sp(10f)), color = Nx.colors.textMuted)
@@ -170,7 +180,7 @@ private fun Blocks(nodes: List<Node>, ctx: RenderCtx, jumbo: Boolean, top: Boole
 @Composable
 private fun Block(b: Node, ctx: RenderCtx, jumbo: Boolean, first: Boolean, edited: String?) {
     val c = Nx.colors
-    val base = Nx.type.body.copy(color = ctx.color ?: c.text)
+    val base = Nx.type.body.copy(color = ctx.color ?: c.text, fontSize = Nx.type.sp(ctx.bodyPx), lineHeight = Nx.type.sp(ctx.bodyLine))
     when (b) {
         is Node.Paragraph -> InlineText(b.children, ctx, base, jumbo, edited = edited)
         is Node.Heading -> {
@@ -181,7 +191,7 @@ private fun Block(b: Node, ctx: RenderCtx, jumbo: Boolean, first: Boolean, edite
                 4 -> Triple(0.9375f, 12, 4)
                 else -> Triple(0.875f, 12, 4)
             }
-            val px = 16f * size
+            val px = ctx.bodyPx * size
             val style = base.copy(
                 fontSize = Nx.type.sp(px), lineHeight = Nx.type.sp(px * 1.25f), fontWeight = FontWeight(if (b.level == 6) 600 else 700),
                 color = if (b.level == 6) c.textMuted else (ctx.color ?: c.textStrong),
@@ -203,7 +213,7 @@ private fun Block(b: Node, ctx: RenderCtx, jumbo: Boolean, first: Boolean, edite
         is Node.Alert -> AlertView(b, ctx)
         is Node.Details -> DetailsView(b, ctx)
         is Node.Footnotes -> FootnotesView(b, ctx)
-        is Node.File -> InlineText(listOf(Node.Text(b.name)), ctx, base, false)
+        is Node.File -> ctx.renderFile?.invoke(b.id, b.name, b.width) ?: InlineText(listOf(Node.Text(b.name)), ctx, base, false)
         else -> InlineText(listOf(b), ctx, base, jumbo, edited = edited)
     }
 }
@@ -348,7 +358,7 @@ private class Builder(
             is AppLinks.AppLink.Route -> Nav.openPath(app.path)
             is AppLinks.AppLink.Invite -> fish.nexa.ui.dialogs.Dialogs.openInvite(app.code)
             is AppLinks.AppLink.Profile -> fish.nexa.ui.profile.Profiles.openByUsername(app.username)
-            is AppLinks.AppLink.Note -> Nav.go(Route.Notes())
+            is AppLinks.AppLink.Note -> fish.nexa.ui.notes.openNoteLink(app.token, app.hash)
             null -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }
     }
