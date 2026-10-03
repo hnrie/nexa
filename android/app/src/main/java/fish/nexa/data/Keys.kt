@@ -436,13 +436,13 @@ class KeyManager(
         putGrantsFor(conv, epoch, root, userIds)
     }
 
-    /** On every ready: hand out what members lack, rotate what waited for a holder. */
-    suspend fun reconcile() {
+    /** On every ready: hand out what members lack, rotate what waited for a holder. False when the server could not be asked. */
+    suspend fun reconcile(): Boolean {
         val needs = try {
             api.get("/keys/needs", ListSerializer(KeyNeed.serializer()))
         } catch (e: Exception) {
             Log.w(TAG, "could not ask what needs granting", e)
-            return
+            return false
         }
         for (n in needs) {
             if (ring.get(n.convId, n.epoch) == null) continue
@@ -453,6 +453,7 @@ class KeyManager(
                 Log.w(TAG, "could not reconcile ${n.convId}", e)
             }
         }
+        return true
     }
 
     suspend fun rotate(conv: String, reason: String?) {
