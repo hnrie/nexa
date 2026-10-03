@@ -3,10 +3,14 @@ package fish.nexa.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +47,8 @@ fun <T> TabStrip(
     label: String,
     modifier: Modifier = Modifier,
     tabHeight: Dp = 38.dp,
+    /** A number beside a tab's name (the Mutuals tab's count). */
+    count: (T) -> Int? = { null },
     onSelect: (T) -> Unit,
 ) {
     val c = Nx.colors
@@ -58,7 +64,7 @@ fun <T> TabStrip(
         val narrow = maxWidth < 420.dp
         Box(Modifier.horizontalScroll(rememberScrollState()).padding(3.dp)) {
             ShareRow(inner, gap = 2.dp) {
-                for ((key, text) in tabs) StripTab(text, key == selected, tabHeight, if (narrow) 8.dp else 12.dp) { onSelect(key) }
+                for ((key, text) in tabs) StripTab(text, key == selected, tabHeight, if (narrow) 8.dp else 12.dp, count(key)) { onSelect(key) }
             }
         }
     }
@@ -90,7 +96,7 @@ private fun ShareRow(fill: Dp, gap: Dp, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun StripTab(text: String, on: Boolean, height: Dp, pad: Dp, onClick: () -> Unit) {
+private fun StripTab(text: String, on: Boolean, height: Dp, pad: Dp, count: Int?, onClick: () -> Unit) {
     val c = Nx.colors
     val shape = RoundedCornerShape(9.dp)
     Box(
@@ -103,6 +109,14 @@ private fun StripTab(text: String, on: Boolean, height: Dp, pad: Dp, onClick: ()
             .padding(horizontal = pad),
         contentAlignment = Alignment.Center,
     ) {
-        Txt(text, style = Nx.type.button.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(600)), color = if (on) c.textStrong else c.textMuted, maxLines = 1)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Txt(text, style = Nx.type.button.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(600)), color = if (on) c.textStrong else c.textMuted, maxLines = 1)
+            if (count != null) Box(
+                Modifier.heightIn(min = 18.dp).widthIn(min = 18.dp).background(c.bgActive, RoundedCornerShape(9.dp)).padding(horizontal = 5.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Txt(java.text.NumberFormat.getIntegerInstance(fish.nexa.ui.I18n.locale).format(count), style = Nx.type.hint.copy(fontSize = Nx.type.sp(11.5f), fontWeight = FontWeight(700), fontFeatureSettings = "tnum"), color = c.textSubtle, maxLines = 1)
+            }
+        }
     }
 }
