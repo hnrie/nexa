@@ -124,6 +124,8 @@ func (s *Server) widgetRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /media/game/{cover}", s.handleGameCover)
 	mux.Handle("GET /api/v1/music/search", s.userLimited(s.limMusic, s.handleMusicSearch))
 	mux.HandleFunc("GET /media/music/{kind}/{art}", s.handleMusicArt)
+	// a song's thirty seconds, played on a profile; a play asks for a few ranges of it
+	mux.Handle("GET /media/music/preview/{id}", ipLimited(s.limPreview, s.handleMusicPreview))
 }
 
 // line is a single line of someone's own words, cleaned, at most max runes.
@@ -668,6 +670,68 @@ func (s *Server) handleMusicArt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	serveKept(w, r, path)
+}
+
+// byteRange is the one kind of Range a preview passes on to Deezer: a single span of bytes.
+var byteRange = regexp.MustCompile(`^bytes=\d{0,12}-\d{0,12}$`)
+
+// maxSongPreview is more than thirty seconds of any song Deezer has.
+const maxSongPreview = 4 << 20
+
+// handleMusicPreview passes on thirty seconds of a song from Deezer as the
+// listener's player asks for it, ranges included (Safari plays nothing
+// without them), so the listener never contacts Deezer. None of it is kept,
+// here or by any cache on the way: Deezer's terms forbid keeping its audio.
+func (s *Server) handleMusicPreview(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !s.Music.On() || !music.IDPattern.MatchString(id) {
+		http.NotFound(w, r)
+		return
+	}
+	span := r.Header.Get("Range")
+	if !byteRange.MatchString(span) {
+		span = ""
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	res, err := s.Music.OpenPreview(ctx, id, span)
+	if err != nil {
+		if errors.Is(err, music.ErrUnknown) {
+			http.NotFound(w, r)
+			return
+		}
+		if r.Context().Err() == nil {
+			s.Log.Warn("deezer preview", "err", err)
+		}
+		http.Error(w, "could not fetch the preview", http.StatusBadGateway)
+		return
+	}
+	defer res.Body.Close()
+	h := w.Header()
+	h.Set("Cache-Control", "no-store")
+	h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	h.Set("X-Content-Type-Options", "nosniff")
+	switch {
+	case res.StatusCode == http.StatusRequestedRangeNotSatisfiable:
+		h.Set("Content-Range", res.Header.Get("Content-Range"))
+		w.WriteHeader(res.StatusCode)
+		return
+	case res.StatusCode == http.StatusNotFound:
+		http.NotFound(w, r)
+		return
+	case (res.StatusCode != http.StatusOK && res.StatusCode != http.StatusPartialContent) || !strings.HasPrefix(res.Header.Get("Content-Type"), "audio/"):
+		s.Log.Warn("deezer preview", "status", res.StatusCode, "type", res.Header.Get("Content-Type"))
+		http.Error(w, "could not fetch the preview", http.StatusBadGateway)
+		return
+	}
+	h.Set("Content-Type", res.Header.Get("Content-Type"))
+	for _, k := range []string{"Content-Length", "Content-Range", "Accept-Ranges"} {
+		if v := res.Header.Get(k); v != "" {
+			h.Set(k, v)
+		}
+	}
+	w.WriteHeader(res.StatusCode)
+	_, _ = io.Copy(w, io.LimitReader(res.Body, maxSongPreview))
 }
 
 // fetchLimited counts a picture this server has yet to fetch from IGDB or

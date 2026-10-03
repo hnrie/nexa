@@ -5313,5 +5313,12 @@
   "widgets.music.ep": "EP",
   "widgets.music.compilation": "Compilation",
   "whatsNew.r202610026.musicTitle": "De la musique sur votre profil",
-  "whatsNew.r202610026.musicBody": "Montrez vos artistes, albums et chansons préférés, et retrouvez-les comme vous vous en souvenez : tapez une chanson pour trouver son artiste, ou un album pour trouver ses chansons. Ajoutez-les dans Réglages, Profils."
+  "whatsNew.r202610026.musicBody": "Montrez vos artistes, albums et chansons préférés, et retrouvez-les comme vous vous en souvenez : tapez une chanson pour trouver son artiste, ou un album pour trouver ses chansons. Ajoutez-les dans Réglages, Profils.",
+  "widgets.music.play": "Écouter {name}",
+  "widgets.music.pause": "Mettre {name} en pause",
+  "widgets.music.openNamed": "Ouvrir {name} sur Deezer",
+  "widgets.music.noPreview": "Cette chanson n’a pas d’extrait.",
+  "widgets.music.previewFailed": "Impossible de lire l’extrait. Réessayez dans un instant.",
+  "whatsNew.r202610027.previewsTitle": "Des extraits des chansons",
+  "whatsNew.r202610027.previewsBody": "Appuyez sur une chanson dans les Chansons préférées de quelqu’un pour en écouter 30 secondes sur place. La flèche à côté ouvre la chanson entière sur Deezer."
 }

@@ -5037,5 +5037,12 @@
   "widgets.music.ep": "EP",
   "widgets.music.compilation": "合辑",
   "whatsNew.r202610026.musicTitle": "在个人资料中展示音乐",
-  "whatsNew.r202610026.musicBody": "展示你最爱的艺人、专辑和歌曲，按你记得的方式搜索：输入歌名能找到演唱者，输入专辑名能找到其中的歌曲。可在“设置”的“个人资料”中添加。"
+  "whatsNew.r202610026.musicBody": "展示你最爱的艺人、专辑和歌曲，按你记得的方式搜索：输入歌名能找到演唱者，输入专辑名能找到其中的歌曲。可在“设置”的“个人资料”中添加。",
+  "widgets.music.play": "播放 {name}",
+  "widgets.music.pause": "暂停 {name}",
+  "widgets.music.openNamed": "在 Deezer 上打开 {name}",
+  "widgets.music.noPreview": "这首歌没有试听片段。",
+  "widgets.music.previewFailed": "无法播放试听片段。请稍后再试。",
+  "whatsNew.r202610027.previewsTitle": "歌曲试听",
+  "whatsNew.r202610027.previewsBody": "在别人的“最爱的歌曲”中点一首歌，就能当场试听 30 秒。旁边的箭头可以在 Deezer 上打开整首歌。"
 }

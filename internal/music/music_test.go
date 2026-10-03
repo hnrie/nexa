@@ -1,8 +1,10 @@
 package music
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 const (
@@ -79,7 +82,14 @@ type fakeDeezer struct {
 	mu       sync.Mutex
 	asked    map[string]int
 	pictures atomic.Int32
+	// previews counts what was asked of the preview server; refuseOnce has it
+	// turn the first signature away, as Deezer does one that ran out
+	previews   atomic.Int32
+	refuseOnce atomic.Bool
 }
+
+// song is thirty seconds of an mp3, near enough.
+var song = append([]byte("ID3\x04"), bytes.Repeat([]byte{0xff, 0xfb, 0x90, 0x64}, 250)...)
 
 func newFake(t *testing.T) *fakeDeezer {
 	f := &fakeDeezer{asked: map[string]int{}}
@@ -97,6 +107,19 @@ func newFake(t *testing.T) *fakeDeezer {
 		f.mu.Lock()
 		f.asked[key]++
 		f.mu.Unlock()
+		// songs whose preview is wherever this fake is, signed for fifteen minutes
+		signed := fmt.Sprintf("%s/preview/song.mp3?hdnea=exp=%d~acl=/preview/song.mp3*~hmac=ab12", f.ts.URL, time.Now().Add(15*time.Minute).Unix())
+		switch key {
+		case "/track/777":
+			_, _ = io.WriteString(w, `{"id":777,"title":"Karma Police","duration":264,"preview":"`+signed+`","artist":{"id":399,"name":"Radiohead"}}`)
+			return
+		case "/track/778":
+			_, _ = io.WriteString(w, `{"id":778,"title":"No Preview","preview":"","artist":{"id":1,"name":"Someone"}}`)
+			return
+		case "/track/779":
+			_, _ = io.WriteString(w, `{"id":779,"title":"Elsewhere","preview":"https://example.com/song.mp3","artist":{"id":1,"name":"Someone"}}`)
+			return
+		}
 		body, ok := answers[key]
 		if !ok {
 			body = `{"error":{"type":"DataException","message":"no data","code":800}}`
@@ -116,7 +139,17 @@ func newFake(t *testing.T) *fakeDeezer {
 		}
 		_, _ = w.Write([]byte("\xff\xd8\xff\xe0 a jpeg, near enough"))
 	})
-	f.ts = httptest.NewServer(mux)
+	mux.HandleFunc("GET /preview/song.mp3", func(w http.ResponseWriter, r *http.Request) {
+		f.previews.Add(1)
+		if !strings.Contains(r.URL.RawQuery, "hmac=ab12") || f.refuseOnce.CompareAndSwap(true, false) {
+			http.Error(w, "signature", http.StatusForbidden)
+			return
+		}
+		w.Header().Set("Content-Type", "audio/mpeg")
+		http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(song))
+	})
+	// over TLS, as Deezer is: a preview anywhere but https is refused
+	f.ts = httptest.NewTLSServer(mux)
 	t.Cleanup(f.ts.Close)
 	return f
 }
@@ -131,6 +164,8 @@ func (f *fakeDeezer) client(t *testing.T) *Client {
 	c := New(t.TempDir())
 	c.API = f.ts.URL + "/api"
 	c.Images = f.ts.URL + "/images"
+	c.PreviewHost = "127.0.0.1"
+	c.HTTP.Transport = f.ts.Client().Transport
 	return c
 }
 
@@ -357,5 +392,49 @@ func TestFoldAndMatch(t *testing.T) {
 		if got := match(c.q, c.name); got != c.want {
 			t.Errorf("match(%q, %q) = %v, want %v", c.q, c.name, got, c.want)
 		}
+	}
+}
+
+func TestPreviewsArePassedOnAsAsked(t *testing.T) {
+	f := newFake(t)
+	c := f.client(t)
+	ctx := context.Background()
+	read := func(id, span string) (int, string, []byte) {
+		t.Helper()
+		res, err := c.OpenPreview(ctx, id, span)
+		if err != nil {
+			t.Fatalf("%s %q: %v", id, span, err)
+		}
+		defer res.Body.Close()
+		body, _ := io.ReadAll(res.Body)
+		return res.StatusCode, res.Header.Get("Content-Range"), body
+	}
+	// the two bytes Safari asks for first, then the whole of it
+	if code, span, body := read("777", "bytes=0-1"); code != 206 || span != fmt.Sprintf("bytes 0-1/%d", len(song)) || string(body) != "ID" {
+		t.Errorf("range: %d %q %q", code, span, body)
+	}
+	if code, _, body := read("777", ""); code != 200 || !bytes.Equal(body, song) {
+		t.Errorf("whole: %d %d bytes", code, len(body))
+	}
+	// one lookup while its signature lasts
+	if n := f.times("/track/777"); n != 1 {
+		t.Errorf("looked up %d times", n)
+	}
+	// a signature turned away is asked for again, once
+	f.refuseOnce.Store(true)
+	if code, _, body := read("777", ""); code != 200 || len(body) != len(song) {
+		t.Errorf("after a refusal: %d %d", code, len(body))
+	}
+	if n := f.times("/track/777"); n != 2 {
+		t.Errorf("looked up %d times after a refusal", n)
+	}
+	// a song with no preview, or one somewhere other than Deezer, has none here
+	for _, id := range []string{"778", "779", "123", "../etc"} {
+		if _, err := c.OpenPreview(ctx, id, ""); !errors.Is(err, ErrUnknown) {
+			t.Errorf("%s: %v", id, err)
+		}
+	}
+	if f.previews.Load() != 4 {
+		t.Errorf("preview server asked %d times", f.previews.Load())
 	}
 }

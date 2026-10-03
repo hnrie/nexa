@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"evilion.xyz/chat/internal/games"
 	"evilion.xyz/chat/internal/ids"
@@ -287,6 +288,68 @@ func TestMusicWidgetsTakeWhatDeezerSays(t *testing.T) {
 	for _, bad := range []string{"/media/music/avatar/" + art, "/media/music/cover/nothex"} {
 		if res, _ := do(t, ts, "GET", bad, "", nil); res.StatusCode != 404 {
 			t.Errorf("%s: %d", bad, res.StatusCode)
+		}
+	}
+}
+
+// A song's preview comes through this server, ranges and all, and nothing
+// on the way may keep it.
+func TestSongPreviewsComeThroughNexa(t *testing.T) {
+	srv, ts := newTestServer(t)
+	song := append([]byte("ID3\x04"), bytes.Repeat([]byte{0xff, 0xfb, 0x90, 0x64}, 250)...)
+	mux := http.NewServeMux()
+	var fake *httptest.Server
+	mux.HandleFunc("GET /track/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if r.PathValue("id") != "777" {
+			_, _ = io.WriteString(w, `{"id":778,"title":"No Preview","preview":""}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"id":777,"title":"Karma Police","preview":"`+fake.URL+`/preview/song.mp3?hdnea=exp=9999999999~hmac=ab12"}`)
+	})
+	mux.HandleFunc("GET /preview/song.mp3", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "audio/mpeg")
+		w.Header().Set("Cache-Control", "public, max-age=12521824")
+		w.Header().Set("X-Deezer-Client-Ip", "203.0.113.9")
+		http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(song))
+	})
+	fake = httptest.NewTLSServer(mux)
+	defer fake.Close()
+	srv.Music = music.New(t.TempDir())
+	srv.Music.API, srv.Music.PreviewHost = fake.URL, "127.0.0.1"
+	srv.Music.HTTP.Transport = fake.Client().Transport
+
+	get := func(path, span string) (*http.Response, []byte) {
+		t.Helper()
+		req, _ := http.NewRequest("GET", ts.URL+path, nil)
+		if span != "" {
+			req.Header.Set("Range", span)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		body, _ := io.ReadAll(res.Body)
+		return res, body
+	}
+	// anyone who can see a profile can play it, signed in or not
+	res, body := get("/media/music/preview/777", "bytes=0-1")
+	if res.StatusCode != 206 || string(body) != "ID" || res.Header.Get("Content-Range") != "bytes 0-1/1004" || res.Header.Get("Content-Type") != "audio/mpeg" {
+		t.Fatalf("range: %d %q %v", res.StatusCode, body, res.Header)
+	}
+	if res.Header.Get("Cache-Control") != "no-store" || res.Header.Get("X-Deezer-Client-Ip") != "" {
+		t.Errorf("headers passed on: %v", res.Header)
+	}
+	if res, body := get("/media/music/preview/777", ""); res.StatusCode != 200 || !bytes.Equal(body, song) || res.Header.Get("Accept-Ranges") != "bytes" {
+		t.Errorf("whole: %d %d %v", res.StatusCode, len(body), res.Header)
+	}
+	// a range that is not one span of bytes is left out, and the whole of it comes
+	if res, body := get("/media/music/preview/777", "bytes=0-1, 5-9"); res.StatusCode != 200 || len(body) != len(song) {
+		t.Errorf("odd range: %d %d", res.StatusCode, len(body))
+	}
+	for _, path := range []string{"/media/music/preview/778", "/media/music/preview/nope"} {
+		if res, _ := get(path, ""); res.StatusCode != 404 {
+			t.Errorf("%s: %d", path, res.StatusCode)
 		}
 	}
 }

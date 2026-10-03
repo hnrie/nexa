@@ -5037,5 +5037,12 @@
   "widgets.music.ep": "EP",
   "widgets.music.compilation": "コンピレーション",
   "whatsNew.r202610026.musicTitle": "プロフィールに音楽を",
-  "whatsNew.r202610026.musicBody": "お気に入りのアーティスト、アルバム、曲を紹介できます。覚えているとおりに探せて、曲名を入れれば歌っている人が、アルバム名を入れれば収録曲が見つかります。設定の「プロフィール」で追加してください。"
+  "whatsNew.r202610026.musicBody": "お気に入りのアーティスト、アルバム、曲を紹介できます。覚えているとおりに探せて、曲名を入れれば歌っている人が、アルバム名を入れれば収録曲が見つかります。設定の「プロフィール」で追加してください。",
+  "widgets.music.play": "{name}を再生",
+  "widgets.music.pause": "{name}を一時停止",
+  "widgets.music.openNamed": "{name}をDeezerで開く",
+  "widgets.music.noPreview": "この曲には試聴がありません。",
+  "widgets.music.previewFailed": "試聴を再生できませんでした。少ししてからもう一度試してください。",
+  "whatsNew.r202610027.previewsTitle": "曲の試聴",
+  "whatsNew.r202610027.previewsBody": "誰かの「お気に入りの曲」で曲を押すと、その場で30秒試聴できます。横の矢印から曲全体をDeezerで開けます。"
 }

@@ -108,6 +108,8 @@ type Server struct {
 	limTag *ratelimit.Limiter
 	// limMusic paces someone's music searches, which share what Deezer allows this server
 	limMusic *ratelimit.Limiter
+	// limPreview paces the song previews an address plays, each a lookup on Deezer and half a megabyte through WARP
+	limPreview *ratelimit.Limiter
 
 	// handoffs are sealed sign-ins on their way from a moved address to Nexa's own (handoff.go)
 	handoffs handoffStore
@@ -280,6 +282,8 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limTag: ratelimit.New(ratelimit.Every(20, time.Hour), 10, 2*time.Hour),
 		// a search as someone types, a few for each thing they add
 		limMusic: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
+		// a play is a few requests (Safari asks for two bytes first), a song every few seconds at most
+		limPreview: ratelimit.New(ratelimit.Every(240, time.Minute), 60, 10*time.Minute),
 	}
 }
 
@@ -292,7 +296,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"upload": s.limUpload, "unfurl": s.limUnfurl, "proxy": s.limProxy, "youtube": s.limYouTube, "refresh": s.limRefresh, "voice": s.limVoice,
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
 		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile,
-		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord, "server-tag": s.limTag, "music-search": s.limMusic,
+		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord, "server-tag": s.limTag, "music-search": s.limMusic, "music-preview": s.limPreview,
 		"note": s.limNote, "note-save": s.limNoteSave, "note-update": s.limNoteUpdate, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,
 	}
 }

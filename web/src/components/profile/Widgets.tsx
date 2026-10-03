@@ -1,9 +1,10 @@
-import { ArrowDown, ArrowUp, ExternalLink, LayoutGrid, Pencil, Pin, Plus, Trash2 } from "lucide-react";
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, ArrowUpRight, ExternalLink, LayoutGrid, LoaderCircle, Pause, Pencil, Pin, Play, Plus, Trash2 } from "lucide-react";
+import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
 import { Tooltip } from "@/components/common/Tooltip";
 import { avatarColor, initials } from "@/lib/avatarColor";
 import { gamePicture, isGameWidget, isMusicWidget, linkHost, MAX_WIDGETS, musicLink, musicPicture, songLength, widgetImageUrl, type CardWidget, type GameWidget, type MusicWidget, type MusicWidgetType, type Widget, type WidgetGame, type WidgetMusic } from "@/lib/widgets";
 import { t } from "@/i18n";
+import { stopPreview, togglePreview, usePreview } from "./previews";
 import s from "./Widgets.module.css";
 
 type Variant = "modal" | "panel";
@@ -281,13 +282,30 @@ function Albums({ w, variant, onShowAll }: { w: MusicWidget; variant: Variant; o
   );
 }
 
+/** How far through its thirty seconds the song playing is, as a line along its row. */
+function Played() {
+  const progress = usePreview((p) => p.progress);
+  return (
+    <span className={s.played} aria-hidden="true">
+      <span style={{ transform: `scaleX(${progress})` }} />
+    </span>
+  );
+}
+
 /**
  * Favourite Songs: a tracklist, numbered in the order they were put, with
  * each song's length. One column shows five (four beside a chat); a wide one
- * sets them all in two, down the first and on down the second.
+ * sets them all in two, down the first and on down the second. Pressing a
+ * song found on Deezer plays thirty seconds of it (previews.ts), its number
+ * turning to bars while it plays; the arrow at its end opens it on Deezer.
  */
 function Songs({ w, variant, onShowAll }: { w: MusicWidget; variant: Variant; onShowAll?: (() => void) | undefined }) {
   const [all, setAll] = useState(false);
+  const owner = useId();
+  const playing = usePreview((p) => p.id);
+  const state = usePreview((p) => p.state);
+  // a preview stops with the list that started it (a profile closed)
+  useEffect(() => () => stopPreview(owner), [owner]);
   const n = w.music.length;
   const cap = variant === "panel" ? 4 : 5;
   const two = variant === "modal" && n > cap;
@@ -295,19 +313,52 @@ function Songs({ w, variant, onShowAll }: { w: MusicWidget; variant: Variant; on
     <section className={[s.widget, s.shelfWrap].join(" ")} data-testid="widget-songs">
       <MusicHead w={w} />
       <ol className={s.tracks} role="list" aria-label={widgetTitle(w)} data-two={two || undefined} data-all={all || undefined} style={{ "--rows": Math.ceil(n / 2) } as CSSProperties}>
-        {w.music.map((m, i) => (
-          <li key={`${m.id ?? m.name}-${i}`} data-past={i >= cap || undefined}>
-            <Linked type="songs" item={m} className={s.track}>
-              <span className={s.trackNo} aria-hidden="true">{(i + 1).toLocaleString()}</span>
+        {w.music.map((m, i) => {
+          const on = !!m.id && playing === m.id;
+          const link = musicLink("songs", m);
+          const body = (
+            <>
+              <span className={s.trackNo} aria-hidden="true">
+                <span className={s.trackNum}>{(i + 1).toLocaleString()}</span>
+                {m.id ? (
+                  <span className={s.trackCue}>
+                    {on && state === "loading" ? <LoaderCircle size={15} className={s.spin} /> : on && state === "playing" ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
+                  </span>
+                ) : null}
+                {on && state === "playing" ? (
+                  <span className={s.eq}>
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                ) : null}
+              </span>
               <MusicArt type="songs" item={m} css={40} className={s.trackArt} />
               <span className={s.trackText}>
                 <span className={s.trackName} dir="auto">{m.name}</span>
                 {m.by ? <span className={s.trackBy} dir="auto">{m.by}</span> : null}
               </span>
               {m.duration ? <span className={s.trackLen}>{songLength(m.duration)}</span> : null}
-            </Linked>
-          </li>
-        ))}
+              {on ? <Played /> : null}
+            </>
+          );
+          return (
+            <li key={`${m.id ?? m.name}-${i}`} className={s.trackRow} data-past={i >= cap || undefined} data-state={on ? state : undefined}>
+              {m.id ? (
+                <button type="button" className={s.track} onClick={() => togglePreview(m, owner)} aria-label={t(on && state !== "paused" ? "widgets.music.pause" : "widgets.music.play", { name: m.name })} data-testid="song-preview">
+                  {body}
+                </button>
+              ) : (
+                <span className={s.track}>{body}</span>
+              )}
+              {link ? (
+                <a className={s.trackOut} href={link} target="_blank" rel="noopener noreferrer" aria-label={t("widgets.music.openNamed", { name: m.name })} title={t("widgets.music.onDeezer")} data-testid="music-link">
+                  <ArrowUpRight size={16} aria-hidden="true" />
+                </a>
+              ) : null}
+            </li>
+          );
+        })}
       </ol>
       {n > cap ? <MoreMusic all={all} setAll={setAll} onShowAll={onShowAll} className={two ? s.moreNarrow : undefined} /> : null}
     </section>

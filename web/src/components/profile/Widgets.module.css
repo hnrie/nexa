@@ -263,16 +263,62 @@ a.album:hover { text-decoration: none; }
 /*
  * Favourite Songs: a row a song. One column shows the first five (four beside
  * a chat) with the rest a press away; a wide card has room for all of them in
- * two columns, read down the first and on down the second.
+ * two columns, read down the first and on down the second. Pressing a row
+ * plays thirty seconds of the song: its number gives way to play and pause,
+ * and to three bars while it plays, and a line along its foot fills as it
+ * goes. The arrow that opens it on Deezer waits at the row's end.
  */
 .tracks { display: flex; flex-direction: column; gap: 2px; margin: 0 -6px; padding: 0; list-style: none; }
 .tracks:not([data-all]) > li[data-past] { display: none; }
-.track { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 50px; padding: 4px 6px; border-radius: 9px; color: inherit; transition: background var(--transition); }
-a.track:hover { text-decoration: none; }
+.trackRow { position: relative; display: flex; align-items: center; min-width: 0; }
+.track { position: relative; flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 50px; padding: 4px 6px; border-radius: 9px; color: inherit; text-align: start; transition: background var(--transition); }
+button.track:focus-visible { outline-offset: -2px; }
 @media (hover: hover) {
-  a.track:hover { background: var(--profile-chip); }
+  button.track:hover { background: var(--profile-chip); }
 }
-.trackNo { flex: none; min-width: 1.3em; text-align: end; font-size: 13px; font-weight: 650; line-height: 1; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.trackNo { position: relative; flex: none; display: grid; justify-items: end; align-items: center; min-width: 1.3em; height: 18px; font-size: 13px; font-weight: 650; line-height: 1; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.trackNo > * { grid-area: 1 / 1; }
+.trackCue, .eq { display: none; }
+.trackCue { align-items: center; color: var(--text-strong); }
+@media (hover: hover) {
+  button.track:is(:hover, :focus-visible) .trackNum { visibility: hidden; }
+  button.track:is(:hover, :focus-visible) .trackCue { display: flex; }
+  .trackRow[data-state="playing"] button.track:is(:hover, :focus-visible) .eq { display: none; }
+}
+.trackRow[data-state] .trackNum { visibility: hidden; }
+.trackRow[data-state="loading"] .trackCue, .trackRow[data-state="paused"] .trackCue { display: flex; }
+.trackRow[data-state="playing"] .eq { display: flex; }
+.trackRow[data-state] .trackName, .trackRow[data-state] .trackCue { color: var(--text-brand); }
+/* three bars rising and falling out of step, still where motion is turned down */
+.eq { align-items: flex-end; gap: 2px; height: 12px; }
+.eq i { display: block; width: 3px; height: 100%; border-radius: 1px; background: var(--text-brand); transform-origin: bottom; animation: eq 820ms ease-in-out -420ms infinite alternate; }
+.eq i:nth-child(2) { animation-duration: 640ms; animation-delay: -120ms; }
+.eq i:nth-child(3) { animation-duration: 940ms; animation-delay: -620ms; }
+@keyframes eq {
+  from { transform: scaleY(0.3); }
+  to { transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .eq i { animation: none; }
+  .eq i:nth-child(1) { transform: scaleY(0.55); }
+  .eq i:nth-child(3) { transform: scaleY(0.75); }
+}
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+/* how much of the preview has played, along the foot of its row */
+.played { position: absolute; inset-inline: 10px; bottom: 2px; height: 2px; border-radius: 1px; overflow: hidden; background: color-mix(in srgb, var(--text-brand) 22%, transparent); pointer-events: none; }
+.played > span { display: block; height: 100%; background: var(--text-brand); transform-origin: left; transition: transform 250ms linear; }
+[dir="rtl"] .played > span { transform-origin: right; }
+.trackOut { flex: none; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 8px; color: var(--text-muted); transition: color var(--transition), background var(--transition), opacity var(--transition); }
+.trackOut:hover { color: var(--text-strong); background: var(--profile-chip-hover); text-decoration: none; }
+/* with a pointer, the arrow waits over the song's length until its row is pointed at */
+@media (hover: hover) {
+  .trackOut { position: absolute; inset-inline-end: 4px; top: 50%; translate: 0 -50%; opacity: 0; pointer-events: none; }
+  .trackRow:hover .trackOut, .trackOut:focus-visible { opacity: 1; pointer-events: auto; }
+  .trackRow:hover .trackLen, .trackRow:has(.trackOut:focus-visible) .trackLen { visibility: hidden; }
+}
 .trackArt { width: 40px; border-radius: 5px; }
 .trackText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .trackName, .trackBy { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -281,7 +327,7 @@ a.track:hover { text-decoration: none; }
 .trackLen { flex: none; font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 @container (min-width: 480px) {
   .tracks[data-two] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), auto); grid-auto-flow: column; gap: 2px 14px; }
-  .tracks[data-two] > li[data-past] { display: block; }
+  .tracks[data-two] > li[data-past] { display: flex; }
   .moreNarrow { display: none; }
 }
 

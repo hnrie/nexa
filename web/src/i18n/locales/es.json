@@ -5313,5 +5313,12 @@
   "widgets.music.ep": "EP",
   "widgets.music.compilation": "Recopilatorio",
   "whatsNew.r202610026.musicTitle": "Música en tu perfil",
-  "whatsNew.r202610026.musicBody": "Muestra tus artistas, álbumes y canciones favoritos y encuéntralos como los recuerdes: escribe una canción para encontrar a quien la hizo, o un álbum para encontrar sus canciones. Añádelos en Ajustes, Perfiles."
+  "whatsNew.r202610026.musicBody": "Muestra tus artistas, álbumes y canciones favoritos y encuéntralos como los recuerdes: escribe una canción para encontrar a quien la hizo, o un álbum para encontrar sus canciones. Añádelos en Ajustes, Perfiles.",
+  "widgets.music.play": "Reproducir {name}",
+  "widgets.music.pause": "Pausar {name}",
+  "widgets.music.openNamed": "Abrir {name} en Deezer",
+  "widgets.music.noPreview": "Esta canción no tiene vista previa.",
+  "widgets.music.previewFailed": "No se pudo reproducir la vista previa. Inténtalo de nuevo en un momento.",
+  "whatsNew.r202610027.previewsTitle": "Vistas previas de canciones",
+  "whatsNew.r202610027.previewsBody": "Pulsa una canción en las Canciones favoritas de alguien para escuchar 30 segundos ahí mismo. La flecha de al lado abre la canción completa en Deezer."
 }

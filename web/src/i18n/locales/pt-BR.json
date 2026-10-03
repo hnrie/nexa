@@ -5314,5 +5314,12 @@
   "widgets.music.ep": "EP",
   "widgets.music.compilation": "Coletânea",
   "whatsNew.r202610026.musicTitle": "Música no seu perfil",
-  "whatsNew.r202610026.musicBody": "Mostre seus artistas, álbuns e músicas favoritos e encontre-os do jeito que você lembra: digite uma música para achar quem a fez, ou um álbum para achar as músicas dele. Adicione em Configurações, Perfis."
+  "whatsNew.r202610026.musicBody": "Mostre seus artistas, álbuns e músicas favoritos e encontre-os do jeito que você lembra: digite uma música para achar quem a fez, ou um álbum para achar as músicas dele. Adicione em Configurações, Perfis.",
+  "widgets.music.play": "Tocar {name}",
+  "widgets.music.pause": "Pausar {name}",
+  "widgets.music.openNamed": "Abrir {name} no Deezer",
+  "widgets.music.noPreview": "Esta música não tem prévia.",
+  "widgets.music.previewFailed": "Não foi possível tocar a prévia. Tente de novo em instantes.",
+  "whatsNew.r202610027.previewsTitle": "Prévias de músicas",
+  "whatsNew.r202610027.previewsBody": "Toque em uma música nas Músicas favoritas de alguém para ouvir 30 segundos dela ali mesmo. A seta ao lado abre a música inteira no Deezer."
 }

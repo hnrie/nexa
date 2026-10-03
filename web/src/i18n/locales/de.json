@@ -5212,5 +5212,12 @@
   "widgets.music.ep": "EP",
   "widgets.music.compilation": "Compilation",
   "whatsNew.r202610026.musicTitle": "Musik auf deinem Profil",
-  "whatsNew.r202610026.musicBody": "Zeig deine Lieblingskünstler, -alben und -songs und finde sie so, wie du sie im Kopf hast: Gib einen Song ein, um zu finden, wer ihn gemacht hat, oder ein Album, um seine Songs zu finden. Füge sie unter Einstellungen, Profile hinzu."
+  "whatsNew.r202610026.musicBody": "Zeig deine Lieblingskünstler, -alben und -songs und finde sie so, wie du sie im Kopf hast: Gib einen Song ein, um zu finden, wer ihn gemacht hat, oder ein Album, um seine Songs zu finden. Füge sie unter Einstellungen, Profile hinzu.",
+  "widgets.music.play": "{name} abspielen",
+  "widgets.music.pause": "{name} pausieren",
+  "widgets.music.openNamed": "{name} auf Deezer öffnen",
+  "widgets.music.noPreview": "Für diesen Song gibt es keine Hörprobe.",
+  "widgets.music.previewFailed": "Die Hörprobe ließ sich nicht abspielen. Versuch es gleich noch einmal.",
+  "whatsNew.r202610027.previewsTitle": "Hörproben von Songs",
+  "whatsNew.r202610027.previewsBody": "Drück auf einen Song in den Lieblingssongs von jemandem, um 30 Sekunden davon direkt dort zu hören. Der Pfeil daneben öffnet den ganzen Song auf Deezer."
 }

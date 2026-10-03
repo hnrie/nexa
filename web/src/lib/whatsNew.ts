@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { AudioLines, BadgeCheck, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, FolderPlus, Gamepad2, Globe, Headphones, House, IdCard, ImagePlus, Images, Keyboard, LayoutGrid, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessagesSquare, MousePointerClick, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Puzzle, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, Tag, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
+import { AudioLines, BadgeCheck, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, FolderPlus, Gamepad2, Globe, Headphones, House, IdCard, ImagePlus, Images, Keyboard, LayoutGrid, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessagesSquare, MousePointerClick, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, Tag, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,10 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-10-02.7",
+    items: [{ icon: Play, title: "whatsNew.r202610027.previewsTitle", body: "whatsNew.r202610027.previewsBody" }],
+  },
   {
     id: "2026-10-02.6",
     items: [{ icon: Music, title: "whatsNew.r202610026.musicTitle", body: "whatsNew.r202610026.musicBody" }],

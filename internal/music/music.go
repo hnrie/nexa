@@ -1,9 +1,11 @@
 // Package music finds the artists, albums and songs people put on their
-// profile, in Deezer's catalogue (https://developers.deezer.com/api), and
-// keeps their pictures. Searches go from this server and the pictures are
-// fetched once and kept here, so nobody using Nexa contacts Deezer
-// themselves. Deezer's API needs no key; its terms keep it to non-commercial
-// use, and the app credits it under the music search.
+// profile, in Deezer's catalogue (https://developers.deezer.com/api), keeps
+// their pictures and passes on the thirty seconds of each song Deezer lets
+// anyone hear. Searches go from this server, the pictures are fetched once
+// and kept here, and the previews come through it as they are played, so
+// nobody using Nexa contacts Deezer themselves. Deezer's API needs no key;
+// its terms keep it to non-commercial use and forbid keeping its audio, and
+// the app credits it under the music search.
 //
 // A search finds more than names (rank.go): a song's title finds who made it
 // and the album it is on, and an album's title finds its songs and its
@@ -80,6 +82,8 @@ var (
 	artInURL = regexp.MustCompile(`/images/(?:artist|cover)/([0-9a-f]{32})/`)
 	// a version of a song that is the song, cleaned up: "Dreams (2004 Remaster)" is "Dreams"
 	remaster = regexp.MustCompile(`(?i)remaster`)
+	// when Deezer's signature on a preview's address runs out
+	signedUntil = regexp.MustCompile(`(?:^|[~&?])exp=(\d{9,12})`)
 )
 
 const (
@@ -88,6 +92,9 @@ const (
 	maxArtSize  = 2 << 20
 	listSize    = 25
 	maxAnswered = 20
+	// Deezer signs a preview's address for fifteen minutes; one is kept for
+	// less, and never past its signature
+	previewTTL = 12 * time.Minute
 )
 
 // ArtSizes are the sizes a picture is kept at, square: "s" for rows and
@@ -104,13 +111,17 @@ type Client struct {
 	HTTP   *http.Client
 	API    string
 	Images string
-	Log    *slog.Logger
+	// PreviewHost is the host Deezer serves previews from, or one it ends
+	// in; no other address a lookup gives is ever fetched.
+	PreviewHost string
+	Log         *slog.Logger
 
 	limit *rate.Limiter
 
-	mu      sync.Mutex
-	answers map[string]answer
-	known   map[string]Item
+	mu       sync.Mutex
+	answers  map[string]answer
+	known    map[string]Item
+	previews map[string]signed
 
 	artMu    sync.Mutex
 	inFlight map[string]chan struct{}
@@ -122,6 +133,12 @@ type answer struct {
 	list any
 }
 
+// signed is where a song's preview is, until its signature runs out.
+type signed struct {
+	url   string
+	until time.Time
+}
+
 // New is a client keeping pictures in dir.
 func New(dir string) *Client {
 	return &Client{
@@ -131,13 +148,15 @@ func New(dir string) *Client {
 			// a picture Deezer does not have is a redirect to a stand-in, which is not the picture
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},
-		API:    "https://api.deezer.com",
-		Images: "https://cdn-images.dzcdn.net/images",
-		Log:    slog.Default(),
+		API:         "https://api.deezer.com",
+		Images:      "https://cdn-images.dzcdn.net/images",
+		PreviewHost: "dzcdn.net",
+		Log:         slog.Default(),
 		// Deezer lets a caller make fifty requests every five seconds
 		limit:    rate.NewLimiter(8, 8),
 		answers:  map[string]answer{},
 		known:    map[string]Item{},
+		previews: map[string]signed{},
 		inFlight: map[string]chan struct{}{},
 	}
 }
@@ -173,6 +192,7 @@ type (
 		Title    string    `json:"title"`
 		Short    string    `json:"title_short"`
 		Version  string    `json:"title_version"`
+		Preview  string    `json:"preview"`
 		Duration int       `json:"duration"`
 		Rank     int64     `json:"rank"`
 		MD5      string    `json:"md5_image"`
@@ -403,6 +423,74 @@ func (c *Client) Kept(kind, art, size string) (string, bool) {
 		return path, true
 	}
 	return "", false
+}
+
+// previewURL is where Deezer has thirty seconds of a song, asked for again
+// when the one kept has run out or was refused (fresh). ErrUnknown is a song
+// with none, or one whose preview is anywhere but Deezer's own.
+func (c *Client) previewURL(ctx context.Context, id string, fresh bool) (string, error) {
+	if !IDPattern.MatchString(id) {
+		return "", ErrUnknown
+	}
+	c.mu.Lock()
+	p, ok := c.previews[id]
+	c.mu.Unlock()
+	if ok && !fresh && time.Now().Before(p.until) {
+		return p.url, nil
+	}
+	var t dzTrack
+	if err := c.get(ctx, "/track/"+id, nil, &t); err != nil {
+		return "", err
+	}
+	u, err := url.Parse(t.Preview)
+	if t.Preview == "" || err != nil || u.Scheme != "https" || !(u.Hostname() == c.PreviewHost || strings.HasSuffix(u.Hostname(), "."+c.PreviewHost)) {
+		return "", ErrUnknown
+	}
+	until := time.Now().Add(previewTTL)
+	if m := signedUntil.FindStringSubmatch(u.RawQuery); m != nil {
+		if exp, err := strconv.ParseInt(m[1], 10, 64); err == nil && time.Unix(exp, 0).Add(-time.Minute).Before(until) {
+			until = time.Unix(exp, 0).Add(-time.Minute)
+		}
+	}
+	c.mu.Lock()
+	if len(c.previews) > maxCached {
+		c.previews = map[string]signed{}
+	}
+	c.previews[id] = signed{url: t.Preview, until: until}
+	c.mu.Unlock()
+	return t.Preview, nil
+}
+
+// OpenPreview asks Deezer for a song's preview, or the part of it a byte
+// range names, to be passed on as it comes. Nothing of it is kept: Deezer's
+// terms forbid keeping its audio. The caller closes the body.
+func (c *Client) OpenPreview(ctx context.Context, id, byteRange string) (*http.Response, error) {
+	// no time limit of its own: a listener reads at their own pace, and the request's context ends it
+	stream := &http.Client{Transport: c.HTTP.Transport, CheckRedirect: c.HTTP.CheckRedirect}
+	for attempt := 0; attempt < 2; attempt++ {
+		u, err := c.previewURL(ctx, id, attempt > 0)
+		if err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+		if byteRange != "" {
+			req.Header.Set("Range", byteRange)
+		}
+		res, err := stream.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		// a signature that ran out early is refused; a fresh one is asked for once
+		if (res.StatusCode == http.StatusForbidden || res.StatusCode == http.StatusGone) && attempt == 0 {
+			res.Body.Close()
+			continue
+		}
+		return res, nil
+	}
+	return nil, errors.New("music: Deezer refused the preview twice")
 }
 
 // ArtFile is a picture kept at a size ("s" or "l"), fetched the first time it
