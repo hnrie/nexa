@@ -10,6 +10,7 @@ import { api } from "@/api/client";
 import type { ServerTag } from "@/api/types";
 import { P } from "./perms";
 import type { ServerState } from "@/stores/servers";
+import { hasZalgo } from "@/lib/zalgo";
 
 /** The badges every server can use, in the order the picker shows them; the names are the server's (tagIcons). */
 export const TAG_ICONS: [string, LucideIcon][] = [
@@ -51,6 +52,9 @@ const SYMBOLS = "!?.-_+&#@$%*~^=:'";
  * letters or digits in any script, with the marks that belong to them, or a
  * few symbols, and no spaces. `count` is how many it has.
  */
+/** A tag's most letters (internal/api/server_tags.go maxTagLetters): what still sits beside a name on a phone. */
+export const MAX_TAG_LETTERS = 8;
+
 export function readTagText(raw: string): { text: string; count: number; ok: boolean } {
   const text = raw.trim();
   let count = 0;
@@ -61,7 +65,7 @@ export function readTagText(raw: string): { text: string; count: number; ok: boo
     } else if (SYMBOLS.includes(ch)) count++;
     else return { text, count, ok: false };
   }
-  return { text, count, ok: count >= 1 && count <= 4 && [...text].length <= 16 };
+  return { text, count, ok: count >= 1 && count <= MAX_TAG_LETTERS && [...text].length <= MAX_TAG_LETTERS * 4 && !hasZalgo(text) };
 }
 
 /** Whether the account may wear this server's tag: in it, and holding one of the roles when it is kept to some. */

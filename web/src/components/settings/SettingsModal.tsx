@@ -159,7 +159,7 @@ export default function SettingsModal({ onClose, page: initial, packId, modalId,
   };
 
   const body =
-    page === "profiles" ? <ProfilePage /> :
+    page === "profiles" ? <ProfilePage anchor={anchor} /> :
     page === "privacy" ? <PrivacyPage /> :
     page === "data" ? <DataPage onDeleteAccount={() => go({ page: "account", label: "", anchor: "deleteAccount" })} /> :
     page === "activity" ? <ActivityPage /> :

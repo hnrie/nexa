@@ -294,16 +294,24 @@ func (s *Store) UpdateProfile(ctx context.Context, id ids.ID, p ProfilePatch) er
 	query := `UPDATE users SET ` + strings.Join(sets, ", ") + ` WHERE id = ?`
 	var res sql.Result
 	var err error
-	if p.Username != nil {
-		// a name a moderator took off an account is taken for good, and the
-		// check shares a transaction with the write so nothing slips between
+	if p.Username != nil || p.TypingStyle != nil {
+		// A name a moderator took off an account is taken for good, and the
+		// check shares a transaction with the write so nothing slips between.
+		// A typing style's pictures are held for as long as it names them.
 		err = s.Tx(ctx, func(tx *db.Tx) error {
-			held, err := usernameHeldTx(ctx, tx, *p.Username)
-			if err != nil {
-				return err
+			if p.Username != nil {
+				held, err := usernameHeldTx(ctx, tx, *p.Username)
+				if err != nil {
+					return err
+				}
+				if held {
+					return ErrUsernameTaken
+				}
 			}
-			if held {
-				return ErrUsernameTaken
+			if p.TypingStyle != nil {
+				if err := swapTypingImagesTx(ctx, tx, id, *p.TypingStyle); err != nil {
+					return err
+				}
 			}
 			res, err = tx.ExecContext(ctx, query, args...)
 			return err
@@ -432,6 +440,10 @@ func (s *Store) DeleteAccount(ctx context.Context, id ids.ID) error {
 			if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - 1")+` WHERE id = ?`, int64(img)); err != nil {
 				return err
 			}
+		}
+		// and the pictures of their typing style
+		if err := swapTypingImagesTx(ctx, tx, id, ""); err != nil && !errors.Is(err, ErrNotFound) {
+			return err
 		}
 		res, err := tx.ExecContext(ctx, `UPDATE users SET username = ?, display_name = 'Deleted User', auth_hash = '!', enc_private_key = ?, enc_private_key_recovery = NULL, recovery_auth_hash = NULL, avatar_id = NULL, banner_id = NULL, about_me = '', pronouns = '', status_text = '', status_emoji = '', typing_style = '', tag_server_id = NULL, tag_text = '', tag_badge = '', tag_color = NULL, widgets = '', signup_invite = NULL, flags = flags | ?, updated_at = ? WHERE id = ?`, anon, []byte{}, FlagDeleted, nowMs(), int64(id))
 		if err != nil {

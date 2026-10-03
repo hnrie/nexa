@@ -1,5 +1,5 @@
-import { Bookmark, Gamepad2, GripVertical, Heart, ImagePlus, Library, LoaderCircle, MoreHorizontal, PanelTop, Plus, Search, Check, X, type LucideIcon } from "lucide-react";
-import { useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { Bookmark, Gamepad2, GripVertical, Heart, ImagePlus, Library, LoaderCircle, PanelTop, Plus, Search, Check, X, type LucideIcon } from "lucide-react";
+import { useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { users as usersApi } from "@/api/users";
 import { Button } from "@/components/common/Button";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
@@ -7,9 +7,9 @@ import { Modal } from "@/components/common/Modal";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
 import { GameCover, ProfileWidgets, widgetTitle } from "@/components/profile/Widgets";
 import { useReorder } from "@/hooks/useReorder";
-import { Tr, formatList, t } from "@/i18n";
+import { Tr, t } from "@/i18n";
 import { describeError } from "@/lib/errors";
-import { LIMITS, MAX_CARDS, MAX_WIDGETS, MOST_GAMES, WIDGET_TYPES, isGameWidget, newWidgetId, widgetImageUrl, type CardWidget, type GameWidget, type Widget, type WidgetGame, type WidgetStat, type WidgetType } from "@/lib/widgets";
+import { LIMITS, MAX_CARDS, MOST_GAMES, WIDGET_TYPES, widgetImageUrl, type CardWidget, type GameWidget, type Widget, type WidgetGame, type WidgetStat, type WidgetType } from "@/lib/widgets";
 import { useUI } from "@/stores/ui";
 import s from "./WidgetsEditor.module.css";
 
@@ -17,12 +17,6 @@ const KIND_ICONS: Record<WidgetType, LucideIcon> = { favorite: Heart, playing: G
 const IMAGE_TYPES = "image/png,image/jpeg,image/gif,image/webp";
 /** What a dragged row carries, so a drop from anywhere else is ignored. */
 const ROW_DRAG = "application/x-nexa-widget";
-
-/** What a row in the list is called: a games widget's kind, or a card's own title. */
-function rowTitle(w: Widget | undefined): string {
-  if (!w) return "";
-  return isGameWidget(w) ? widgetTitle(w) : w.title;
-}
 
 /**
  * Drag a row of a list over the others, with where it would land: the row
@@ -95,121 +89,8 @@ function moved<T>(items: T[], keyOf: (item: T) => string, key: string, delta: nu
   return next;
 }
 
-/** What a row leads with: a fan of a games widget's boxes, a card's picture, or its kind's icon. */
-function RowLead({ w }: { w: Widget }) {
-  let lead;
-  if (isGameWidget(w)) {
-    lead = (
-      <span className={s.fan}>
-        {w.games.slice(0, 3).map((g, i) => <GameCover key={i} game={g} css={30} />)}
-      </span>
-    );
-  } else if (w.image) {
-    lead = <img className={s.thumb} src={widgetImageUrl(w.image, 40)} alt="" draggable={false} />;
-  } else {
-    const Icon = KIND_ICONS.custom;
-    lead = <span className={s.icon}><Icon size={20} /></span>;
-  }
-  // every row's titles start at the same place, whatever it leads with
-  return <span className={s.lead} aria-hidden="true">{lead}</span>;
-}
-
-/**
- * Settings, Profiles: the widgets on the profile. Rows in the order the
- * profile shows them, dragged (or moved with Alt and an arrow, or from a
- * row's menu) into another; each opens to be changed. Changes are part of
- * the page's unsaved ones, saved with the rest.
- */
-export function WidgetsEditor({ value, onChange }: { value: Widget[]; onChange: (next: Widget[]) => void }) {
-  const openContextMenu = useUI((u) => u.openContextMenu);
-  const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<{ widget: Widget; isNew: boolean } | null>(null);
-  const keyOf = (w: Widget) => w.id;
-  const drag = useRowDrag(value, keyOf, onChange);
-  const reorder = useReorder({
-    ids: value.map(keyOf),
-    move: (id, delta) => {
-      const next = moved(value, keyOf, id, delta);
-      if (next) onChange(next);
-      return !!next;
-    },
-    name: (id) => rowTitle(value.find((w) => w.id === id)),
-  });
-  const full = value.length >= MAX_WIDGETS;
-
-  const remove = (id: string) => onChange(value.filter((w) => w.id !== id));
-  const menu = (e: MouseEvent<HTMLElement>, w: Widget, fromButton: boolean) => {
-    e.preventDefault();
-    const r = e.currentTarget.getBoundingClientRect();
-    openContextMenu({
-      x: fromButton ? r.left : e.clientX,
-      y: fromButton ? r.bottom + 4 : e.clientY,
-      items: [
-        { id: "edit", label: t("pickers.stickerPicker.edit"), onSelect: () => setEditing({ widget: w, isNew: false }), separatorAfter: true },
-        ...reorder.menuItems(w.id),
-        { id: "remove", label: t("widgets.remove"), danger: true, onSelect: () => remove(w.id) },
-      ],
-    });
-  };
-  const start = (type: WidgetType) => {
-    setAdding(false);
-    const id = newWidgetId();
-    setEditing({ widget: type === "custom" ? { id, type, title: "" } : { id, type, games: [] }, isNew: true });
-  };
-  const done = (w: Widget) => {
-    if (!editing) return;
-    onChange(editing.isNew ? [...value, w] : value.map((x) => (x.id === w.id ? w : x)));
-    setEditing(null);
-  };
-
-  return (
-    <div data-testid="widgets-editor">
-      {value.length ? (
-        <ul className={s.list} aria-label={t("widgets.title")}>
-          {value.map((w) => (
-            <li
-              key={w.id}
-              className={s.row}
-              data-reorder-id={w.id}
-              data-testid={`widget-row-${w.type}`}
-              onKeyDown={reorder.onKeyDown(w.id)}
-              onContextMenu={(e) => menu(e, w, false)}
-              {...drag.row(w.id)}
-              {...drag.grip(w.id)}
-            >
-              <span className={s.grip} aria-hidden="true"><GripVertical size={16} /></span>
-              <button className={s.main} onClick={() => setEditing({ widget: w, isNew: false })}>
-                <RowLead w={w} />
-                <span className={s.rowText}>
-                  <span className={s.rowTitle} dir="auto">{rowTitle(w)}</span>
-                  <span className={s.rowSub} dir="auto">{isGameWidget(w) ? formatList(w.games.map((g) => g.name)) : t("widgets.type.custom")}</span>
-                </span>
-              </button>
-              <button className={s.moreBtn} aria-label={t("widgets.optionsFor", { name: rowTitle(w) })} aria-haspopup="menu" onClick={(e) => menu(e, w, true)}>
-                <MoreHorizontal size={18} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {reorder.live}
-      <div className={s.foot}>
-        <Button size="sm" onClick={() => setAdding(true)} disabled={full} data-testid="widget-add">
-          <Plus size={16} aria-hidden="true" /> {t("widgets.addOne")}
-        </Button>
-        {value.length ? <span className={s.count}>{full ? t("widgets.full") : t("widgets.used", { count: value.length, max: MAX_WIDGETS })}</span> : null}
-      </div>
-      {value.length > 1 ? <p className={s.small}>{reorder.hint}</p> : null}
-
-      {adding ? <AddWidgetDialog widgets={value} onPick={start} onClose={() => setAdding(false)} /> : null}
-      {editing && isGameWidget(editing.widget) ? <GameWidgetDialog initial={editing.widget} onDone={done} onClose={() => setEditing(null)} /> : null}
-      {editing && !isGameWidget(editing.widget) ? <CardDialog initial={editing.widget} isNew={editing.isNew} onDone={done} onClose={() => setEditing(null)} /> : null}
-    </div>
-  );
-}
-
 /** Add a Widget: the five kinds, each with what it shows, and why one cannot be added. */
-function AddWidgetDialog({ widgets, onPick, onClose }: { widgets: Widget[]; onPick: (type: WidgetType) => void; onClose: () => void }) {
+export function AddWidgetDialog({ widgets, onPick, onClose }: { widgets: Widget[]; onPick: (type: WidgetType) => void; onClose: () => void }) {
   const cards = widgets.filter((w) => w.type === "custom").length;
   return (
     <Modal open onClose={onClose} title={t("widgets.addOne")} width={480}>
@@ -250,7 +131,7 @@ const TAG_SUGGESTIONS = ["casual", "competitive", "coop", "solo", "ranked", "wit
  * the games chosen, in order, with how each is played (Playing Now) or why
  * it is the one (Favourite Game).
  */
-function GameWidgetDialog({ initial, onDone, onClose }: { initial: GameWidget; onDone: (w: GameWidget) => void; onClose: () => void }) {
+export function GameWidgetDialog({ initial, onDone, onClose }: { initial: GameWidget; onDone: (w: GameWidget) => void; onClose: () => void }) {
   const toast = useUI((u) => u.toast);
   const most = MOST_GAMES[initial.type];
   const single = most === 1;
@@ -599,7 +480,7 @@ function linkProblem(raw: string): string | null {
  * title, a few words, up to six stats and a link, and the card as the
  * profile will show it.
  */
-function CardDialog({ initial, isNew, onDone, onClose }: { initial: CardWidget; isNew: boolean; onDone: (w: CardWidget) => void; onClose: () => void }) {
+export function CardDialog({ initial, isNew, onDone, onClose }: { initial: CardWidget; isNew: boolean; onDone: (w: CardWidget) => void; onClose: () => void }) {
   const toast = useUI((u) => u.toast);
   const [title, setTitle] = useState(initial.title);
   const [text, setText] = useState(initial.text ?? "");

@@ -76,31 +76,55 @@ export function ServerTagChooser() {
       </div>
       {open ? (
         <Modal open onClose={() => setOpen(false)} title={t("serverTag.choose.dialogTitle")} width={480}>
-          <ul className={s.list}>
-            {tagged.map((st) => {
-              const tag = st.server.tag!;
-              const can = canWearTag(st);
-              const wearing = worn?.server_id === st.server.id;
-              const icon = iconUrl(st.server.icon_id, 40);
-              return (
-                <li key={st.server.id} className={s.row} data-testid={`tag-row-${st.server.id}`}>
-                  {icon ? <img className={s.icon} src={icon} alt="" draggable={false} /> : <span className={s.icon} data-initials>{initials(st.server.name)}</span>}
-                  <span className={s.rowText}>
-                    <span className={s.rowName} dir="auto">{st.server.name}</span>
-                    {!can ? <span className={s.rowNote}>{t("serverTag.keptToRoles")}</span> : null}
-                  </span>
-                  <ServerTagChip tag={tag} open={false} />
-                  {wearing ? (
-                    <span className={s.wearing}>{t("serverTag.choose.wearing")}</span>
-                  ) : (
-                    <Button size="sm" variant="secondary" disabled={!can} loading={busy === st.server.id} onClick={() => void wear(st.server.id, tag.text)}>{t("serverTag.wear")}</Button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <ServerTagList onWorn={() => setOpen(false)} />
         </Modal>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The servers with a tag the account could wear, each with its tag and the
+ * way to put it on (or the word that it is on already), for the chooser
+ * dialog and the profile designer.
+ */
+export function ServerTagList({ onWorn }: { onWorn?: () => void }) {
+  const me = useAuth((a) => a.me);
+  const servers = useServers((x) => x.byId);
+  const order = useServers((x) => x.order);
+  const [busy, setBusy] = useState<string | null>(null);
+  const worn = me?.server_tag ?? null;
+  const tagged = order.map((id) => servers[id]).filter((st): st is NonNullable<typeof st> => !!st?.server.tag);
+  const wear = async (id: string, text: string) => {
+    setBusy(id);
+    const ok = await wearServerTag(id, text);
+    setBusy(null);
+    if (ok) onWorn?.();
+  };
+  if (!tagged.length) return <p className={s.none}>{t("serverTag.choose.noneToWear")}</p>;
+  return (
+    <ul className={s.list}>
+      {tagged.map((st) => {
+        const tag = st.server.tag!;
+        const can = canWearTag(st);
+        const wearing = worn?.server_id === st.server.id;
+        const icon = iconUrl(st.server.icon_id, 40);
+        return (
+          <li key={st.server.id} className={s.row} data-testid={`tag-row-${st.server.id}`}>
+            {icon ? <img className={s.icon} src={icon} alt="" draggable={false} /> : <span className={s.icon} data-initials>{initials(st.server.name)}</span>}
+            <span className={s.rowText}>
+              <span className={s.rowName} dir="auto">{st.server.name}</span>
+              {!can ? <span className={s.rowNote}>{t("serverTag.keptToRoles")}</span> : null}
+            </span>
+            <ServerTagChip tag={tag} open={false} />
+            {wearing ? (
+              <span className={s.wearing}>{t("serverTag.choose.wearing")}</span>
+            ) : (
+              <Button size="sm" variant="secondary" disabled={!can} loading={busy === st.server.id} onClick={() => void wear(st.server.id, tag.text)}>{t("serverTag.wear")}</Button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

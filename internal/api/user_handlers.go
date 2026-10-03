@@ -242,6 +242,10 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Store.UpdateProfile(r.Context(), u.ID, p); err != nil {
+		if errors.Is(err, store.ErrTypingImageGone) {
+			bad("invalid_typing_style", "One of your typing pictures has gone. Put it up again.")
+			return
+		}
 		WriteError(w, err)
 		return
 	}

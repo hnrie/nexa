@@ -17,13 +17,25 @@ import (
 // isolates and the direction marks — go too: in a name or a status they only
 // serve to make text read differently from how it was written. Line and
 // paragraph separators become plain line breaks.
+//
+// Zalgo is cut back too: past MaxStackedMarks of the general-purpose
+// combining marks on one letter, the rest are dropped (see ZalgoMark).
 func CleanText(s string, max int) (out string, ok bool) {
 	if !utf8.ValidString(s) {
 		return "", false
 	}
 	var b strings.Builder
 	b.Grow(len(s))
+	stacked := 0
 	for _, r := range s {
+		if ZalgoMark(r) {
+			stacked++
+			if stacked > MaxStackedMarks {
+				continue
+			}
+		} else {
+			stacked = 0
+		}
 		switch {
 		case r == '\n' || r == '\t':
 			b.WriteRune(r)
@@ -36,6 +48,22 @@ func CleanText(s string, max int) (out string, ok bool) {
 	}
 	out = strings.TrimSpace(b.String())
 	return out, utf8.RuneCountInString(out) <= max
+}
+
+// MaxStackedMarks is how many of the general-purpose combining marks one
+// letter may carry. Vietnamese and every accented Latin, Greek or Cyrillic
+// letter needs at most two; zalgo piles on dozens, which climb out of a line
+// and over everything near it. The web app refuses typing a fourth
+// (web/src/lib/zalgo.ts); this drops one that comes another way.
+const MaxStackedMarks = 3
+
+// ZalgoMark says whether r is one of the combining marks zalgo is made of:
+// the general-purpose blocks any letter can take, not the marks of a script
+// of its own (Hebrew points, Arabic vowels, Indic signs, Thai tones), which
+// stack as their languages need.
+func ZalgoMark(r rune) bool {
+	return (r >= 0x0300 && r <= 0x036F) || (r >= 0x0483 && r <= 0x0489) || (r >= 0x1AB0 && r <= 0x1AFF) ||
+		(r >= 0x1DC0 && r <= 0x1DFF) || (r >= 0x20D0 && r <= 0x20FF) || (r >= 0xFE20 && r <= 0xFE2F)
 }
 
 func isBidiControl(r rune) bool {

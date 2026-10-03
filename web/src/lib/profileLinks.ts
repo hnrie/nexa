@@ -127,7 +127,7 @@ export async function openProfileLink(username: string): Promise<void> {
   await loadSharedProfile(name);
   const entry = useSharedProfiles.getState().byName[name];
   const ui = useUI.getState();
-  if (entry?.status === "ready") ui.openModal("profile", { userId: entry.user.id });
+  if (entry?.status === "ready") ui.openModal("profile", { userId: entry.user.id, full: true });
   else if (entry?.status === "missing") ui.toast(t("profileLink.missingToast"), "error");
   else ui.toast(t("profileLink.couldNotLoadToast"), "error");
 }

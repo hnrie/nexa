@@ -63,7 +63,7 @@ function ProfileLinkPage({ username }: { username: string }) {
   useEffect(() => {
     if (!userId) return;
     nav("/channels/@me", { replace: true });
-    useUI.getState().openModal("profile", { userId });
+    useUI.getState().openModal("profile", { userId, full: true });
   }, [userId, nav]);
 
   if (status === "locked") return <LockPage />;

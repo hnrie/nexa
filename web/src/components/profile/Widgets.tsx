@@ -1,12 +1,50 @@
-import { ExternalLink, LayoutGrid } from "lucide-react";
-import { useState, type CSSProperties } from "react";
+import { ArrowDown, ArrowUp, ExternalLink, LayoutGrid, Pencil, Pin, Plus, Trash2 } from "lucide-react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { Tooltip } from "@/components/common/Tooltip";
 import { avatarColor } from "@/lib/avatarColor";
-import { gamePicture, isGameWidget, linkHost, widgetImageUrl, type CardWidget, type GameWidget, type Widget, type WidgetGame } from "@/lib/widgets";
+import { gamePicture, isGameWidget, linkHost, MAX_WIDGETS, widgetImageUrl, type CardWidget, type GameWidget, type Widget, type WidgetGame } from "@/lib/widgets";
 import { t } from "@/i18n";
 import s from "./Widgets.module.css";
 
 type Variant = "modal" | "panel";
+
+/**
+ * The widgets as the profile designer draws them (Settings, Profiles): each
+ * with its tools (change it, move it, take it off, put it on the profile
+ * card) and, after them, the way to add another.
+ */
+export interface WidgetDesign {
+  edit: (id: string) => void;
+  move: (id: string, delta: number) => void;
+  remove: (id: string) => void;
+  /** Puts a widget first, which is the one the profile card shows. */
+  feature: (id: string) => void;
+  add: () => void;
+}
+
+/** One widget in the designer: pressing it changes it, and its tools sit along its top. */
+function Designed({ w, index, count, design, children }: { w: Widget; index: number; count: number; design: WidgetDesign; children: ReactNode }) {
+  const name = isGameWidget(w) ? widgetTitle(w) : w.title;
+  return (
+    <div className={s.designed} data-first={index === 0 || undefined} data-testid={`designed-${w.type}`}>
+      {children}
+      <button type="button" className={s.designSpot} aria-label={t("designer.widget.edit", { name })} onClick={() => design.edit(w.id)} />
+      <div className={s.tools} role="toolbar" aria-label={t("designer.widget.tools", { name })}>
+        {index === 0 ? (
+          <span className={s.onCard}><Pin size={12} aria-hidden="true" /> {t("designer.widget.onCard")}</span>
+        ) : (
+          <button type="button" className={s.toolText} onClick={() => design.feature(w.id)}>
+            <Pin size={12} aria-hidden="true" /> {t("designer.widget.showOnCard")}
+          </button>
+        )}
+        <button type="button" className={s.tool} aria-label={t("designer.widget.editShort")} title={t("designer.widget.editShort")} onClick={() => design.edit(w.id)}><Pencil size={14} /></button>
+        <button type="button" className={s.tool} aria-label={t("reorder.moveUp")} title={t("reorder.moveUp")} disabled={index === 0} onClick={() => design.move(w.id, -1)}><ArrowUp size={14} /></button>
+        <button type="button" className={s.tool} aria-label={t("reorder.moveDown")} title={t("reorder.moveDown")} disabled={index === count - 1} onClick={() => design.move(w.id, 1)}><ArrowDown size={14} /></button>
+        <button type="button" className={s.tool} data-danger="" aria-label={t("widgets.remove")} title={t("widgets.remove")} onClick={() => design.remove(w.id)}><Trash2 size={14} /></button>
+      </div>
+    </div>
+  );
+}
 
 /** What each kind of games widget is called, on a profile and in the editor. */
 export function widgetTitle(w: Pick<Widget, "type">): string {
@@ -87,8 +125,8 @@ function Playing({ w }: { w: GameWidget }) {
 
 function Shelf({ w, variant, onShowAll }: { w: GameWidget; variant: Variant; onShowAll?: (() => void) | undefined }) {
   const [all, setAll] = useState(false);
-  // two rows of boxes on the full profile, one in the preview; the rest wait behind Show All
-  const most = variant === "panel" ? 4 : 12;
+  // two rows of boxes on the full profile, one row where the rest are on the full profile (onShowAll)
+  const most = variant === "panel" ? 4 : onShowAll ? 6 : 12;
   const shown = all ? w.games : w.games.slice(0, most);
   const title = widgetTitle(w);
   return (
@@ -164,7 +202,7 @@ function Card({ w, variant }: { w: CardWidget; variant: Variant }) {
  * the way to Settings. `onShowAll` sends a shelf's Show All somewhere else
  * (the full profile) instead of opening it where it is.
  */
-export function ProfileWidgets({ widgets, variant, onAdd, onShowAll }: { widgets: Widget[]; variant: Variant; onAdd?: (() => void) | undefined; onShowAll?: (() => void) | undefined }) {
+export function ProfileWidgets({ widgets, variant, onAdd, onShowAll, design }: { widgets: Widget[]; variant: Variant; onAdd?: (() => void) | undefined; onShowAll?: (() => void) | undefined; design?: WidgetDesign | undefined }) {
   if (widgets.length === 0) {
     if (!onAdd) return null;
     return (
@@ -176,14 +214,26 @@ export function ProfileWidgets({ widgets, variant, onAdd, onShowAll }: { widgets
       </div>
     );
   }
+  const draw = (w: Widget) => {
+    if (!isGameWidget(w)) return <Card key={w.id} w={w} variant={variant} />;
+    if (w.type === "favorite") return <Favorite key={w.id} w={w} variant={variant} />;
+    if (w.type === "playing") return <Playing key={w.id} w={w} />;
+    return <Shelf key={w.id} w={w} variant={variant} onShowAll={onShowAll} />;
+  };
   return (
     <div className={s.board} data-variant={variant} data-testid="profile-widgets">
-      {widgets.map((w) => {
-        if (!isGameWidget(w)) return <Card key={w.id} w={w} variant={variant} />;
-        if (w.type === "favorite") return <Favorite key={w.id} w={w} variant={variant} />;
-        if (w.type === "playing") return <Playing key={w.id} w={w} />;
-        return <Shelf key={w.id} w={w} variant={variant} onShowAll={onShowAll} />;
-      })}
+      {design
+        ? widgets.map((w, i) => (
+            <Designed key={w.id} w={w} index={i} count={widgets.length} design={design}>
+              {draw(w)}
+            </Designed>
+          ))
+        : widgets.map(draw)}
+      {design && widgets.length < MAX_WIDGETS ? (
+        <button type="button" className={s.addTile} onClick={design.add} data-testid="designer-add-widget">
+          <Plus size={16} aria-hidden="true" /> {t("widgets.addOne")}
+        </button>
+      ) : null}
     </div>
   );
 }

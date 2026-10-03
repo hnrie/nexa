@@ -1,0 +1,125 @@
+/*
+ * Settings, Profiles: the profile designer. The profile sits on a stage lit
+ * in its own colour (the theme, or the banner's or picture's), which follows
+ * it as the colours change; that glow is the one bold thing on the page, and
+ * everything around it is the settings' own quiet chrome: the Friends page's
+ * sunken tab strip for the views, raised chips for the parts, and popovers on
+ * the floating panel the app's menus use.
+ */
+.intro { margin: -12px 0 18px; font-size: 14.5px; line-height: 1.45; color: var(--text-muted); max-width: 62ch; }
+
+.toolbar { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+.views { align-self: flex-start; display: inline-flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--bg-input); box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 45%, transparent), inset 0 0 0 1px var(--border-subtle); }
+.viewBtn { height: 32px; padding: 0 14px; border-radius: 9px; color: var(--text-muted); font-size: 14.5px; font-weight: 600; white-space: nowrap; transition: background-color var(--transition), color var(--transition), box-shadow var(--transition); }
+.viewBtn:hover { color: var(--text-strong); }
+.viewBtn[data-selected="true"] { background: var(--sheen), var(--bg-surface); color: var(--text-strong); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-low); }
+.viewBtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+/* every part of a profile, for anyone who would rather pick from a list than find it on the profile */
+.parts { display: flex; flex-wrap: wrap; gap: 6px; }
+.part { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: var(--radius-pill); background: var(--sheen), var(--bg-surface); color: var(--text-subtle); font-size: 13.5px; font-weight: 600; white-space: nowrap; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); transition: color var(--transition), box-shadow var(--transition), transform 90ms var(--ease-out); }
+.part svg { color: var(--text-muted); transition: color var(--transition); }
+.part:hover { color: var(--text-strong); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px color-mix(in srgb, var(--brand) 55%, transparent); }
+.part:hover svg { color: var(--text-brand); }
+.part:active { transform: scale(0.97); }
+.part:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; padding: 10px 14px; border-radius: var(--radius-md); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); font-size: 14px; color: var(--text-muted); }
+
+/* the stage: the profile as others see it, lit in its own colour */
+.stage {
+  --profile-max-h: 700px;
+  position: relative;
+  container-type: inline-size;
+  padding: 28px;
+  border-radius: var(--radius-xl);
+  background: radial-gradient(75% 65% at 50% -12%, color-mix(in srgb, var(--glow) 30%, transparent), transparent 72%), radial-gradient(45% 40% at 92% 108%, color-mix(in srgb, var(--glow) 14%, transparent), transparent 70%), color-mix(in oklab, var(--bg-base) 72%, var(--bg-raised));
+  box-shadow: inset 0 0 0 1px var(--border-subtle), inset 0 2px 8px color-mix(in srgb, var(--shade) 28%, transparent);
+}
+[data-theme="light"] .stage { background: radial-gradient(75% 65% at 50% -12%, color-mix(in srgb, var(--glow) 20%, transparent), transparent 72%), radial-gradient(45% 40% at 92% 108%, color-mix(in srgb, var(--glow) 10%, transparent), transparent 70%), color-mix(in oklab, var(--bg-base) 60%, var(--bg-raised)); }
+.frame { max-width: 940px; margin-inline: auto; }
+.caption { margin: 10px 4px 0; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
+/* as the designer opens, every part it can change is outlined once, so nobody has to guess */
+.stage[data-intro] [data-spot] { animation: hello 1.7s var(--ease-out) 200ms 1 both; }
+@keyframes hello {
+  0% { outline-color: transparent; }
+  30% { outline-color: color-mix(in srgb, var(--profile-accent) 85%, #fff); }
+  100% { outline-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage[data-intro] [data-spot] { animation: none; }
+}
+
+/* the profile card a name opens, and which widget it shows */
+.cardView { display: grid; grid-template-columns: minmax(0, 600px) minmax(220px, 280px); justify-content: center; align-items: start; gap: 24px; }
+.cardFrame { min-width: 0; width: 100%; max-width: 600px; justify-self: center; }
+.aside { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: var(--radius-md); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); }
+.asideTitle { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-strong); }
+.asideTitle svg { color: var(--text-brand); }
+.asideText { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--text-muted); }
+.choices { display: flex; flex-direction: column; gap: 2px; margin-inline: -6px; }
+.choice { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 6px 8px; border-radius: 10px; text-align: start; font-size: 14px; font-weight: 600; color: var(--text); transition: background-color var(--transition), color var(--transition); }
+.choice:hover { background: var(--bg-hover); color: var(--text-strong); }
+.choice[aria-checked="true"] { background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--text-strong); }
+.choice:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.choiceDot { flex: none; width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--border-strong); transition: box-shadow var(--transition), background-color var(--transition); }
+.choice[aria-checked="true"] .choiceDot { background: var(--brand); box-shadow: inset 0 0 0 4px var(--bg-surface), 0 0 0 2px var(--brand); }
+.choiceText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* a conversation as others see it, and the typing line's own tools beside it */
+.chatView { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); align-items: start; gap: 20px; }
+.chat { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border-radius: var(--radius-lg); background: var(--bg-raised); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium); }
+.chatHead { display: flex; align-items: center; height: 48px; padding: 0 16px; font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--text-strong); box-shadow: 0 1px 0 var(--border-subtle); }
+.chatBody { display: flex; flex-direction: column; gap: 18px; padding: 18px 16px 6px; }
+.msg { display: flex; gap: 14px; min-width: 0; }
+.msgMain { min-width: 0; flex: 1; }
+.msgHead { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.msgName { font-size: 16px; font-weight: 650; color: var(--text-strong); overflow-wrap: anywhere; }
+.msgTime { font-size: 12px; color: var(--text-muted); }
+.msgText { margin: 3px 0 0; font-size: 15.5px; line-height: 1.375; color: var(--text); }
+.chatTyping { display: flex; align-items: center; min-height: 30px; padding: 4px 16px 0; font-size: 13px; color: var(--text-subtle); }
+.chatComposer { display: flex; align-items: center; height: 44px; margin: 6px 16px 16px; padding: 0 14px; border-radius: var(--radius-md); background: var(--bg-input); box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 40%, transparent), inset 0 0 0 1px var(--border-subtle); font-size: 15px; color: var(--text-placeholder); }
+.typingPanel { min-width: 0; padding: 18px; border-radius: var(--radius-lg); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); }
+.panelTitle { margin: 0 0 4px; font-size: 15.5px; font-weight: 700; color: var(--text-strong); }
+.panelHint { margin: 0 0 14px; font-size: 13.5px; line-height: 1.45; color: var(--text-muted); }
+
+@container (max-width: 860px) {
+  .cardView { grid-template-columns: minmax(0, 1fr); }
+  .chatView { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* what changes a part, beside it */
+.pop.pop { width: 348px; max-width: calc(100vw - 16px); }
+.popHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 12px 0 16px; }
+.popTitle { margin: 0; font-size: 15px; font-weight: 700; color: var(--text-strong); }
+.popClose { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); transition: background var(--transition), color var(--transition); }
+.popClose:hover { background: var(--bg-hover); color: var(--text-strong); }
+.popBody { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 16px; }
+.popRow { display: flex; align-items: center; gap: 14px; }
+.popBtns { display: flex; flex-wrap: wrap; gap: 8px; }
+.popHint { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-muted); }
+.popLink { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 650; color: var(--text-brand); }
+.popLink:hover { text-decoration: underline; }
+.bannerThumb { aspect-ratio: 5 / 2; border-radius: var(--radius-md); background-size: cover; background-position: center; box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.colours { display: flex; flex-direction: column; gap: 10px; }
+
+/* words written where they are shown, in the profile's own type */
+.nameInput { width: 100%; min-width: 0; margin: 0 -6px; padding: 0 6px; border: 0; border-radius: 8px; font: inherit; letter-spacing: inherit; color: inherit; background: color-mix(in srgb, var(--bg-input) 75%, transparent); box-shadow: inset 0 -2px 0 var(--profile-accent); outline: none; }
+.pronounsInput { width: 15ch; min-width: 0; height: 24px; padding: 0 6px; border: 0; border-radius: 6px; font: inherit; color: var(--text-strong); background: color-mix(in srgb, var(--bg-input) 80%, transparent); box-shadow: inset 0 -2px 0 var(--profile-accent); outline: none; }
+.aboutEdit { display: flex; flex-direction: column; gap: 8px; }
+.aboutFoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.count { font-size: 12.5px; color: var(--text-muted); }
+
+.uploading { display: inline-flex; align-items: center; gap: 6px; margin: 8px 4px 0; font-size: 13px; color: var(--text-muted); }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 767px) {
+  .intro { margin-top: -8px; }
+  /* the parts go sideways on a phone, under a thumb, rather than stacking down the page */
+  .parts { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -16px; padding: 2px 16px; }
+  .parts::-webkit-scrollbar { display: none; }
+  .views { align-self: stretch; }
+  .viewBtn { flex: 1; padding: 0 8px; }
+  .stage { padding: 10px; border-radius: var(--radius-lg); }
+}

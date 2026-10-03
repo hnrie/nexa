@@ -40,3 +40,28 @@ func TestSkeletonSeesThroughDisguises(t *testing.T) {
 		t.Error("different names share a skeleton")
 	}
 }
+
+func TestCleanTextCutsZalgoBack(t *testing.T) {
+	zalgo := "H̵̡̛̤̺̖e̵͙͊́l̴̙̓l̷̨̇o̶̘͝"
+	got, ok := CleanText(zalgo, 100)
+	if !ok {
+		t.Fatal("refused")
+	}
+	run := 0
+	for _, r := range got {
+		if ZalgoMark(r) {
+			run++
+			if run > MaxStackedMarks {
+				t.Fatalf("more than %d marks on a letter left in %q", MaxStackedMarks, got)
+			}
+		} else {
+			run = 0
+		}
+	}
+	// what languages need stays as written: Vietnamese, accents, and the marks of scripts of their own
+	for _, keep := range []string{"Tiếng Việt", "ệ", "café", "שָׁלוֹם", "مُحَمَّد", "हिंदी", "ภาษาไทย", "1️⃣"} {
+		if out, _ := CleanText(keep, 100); out != keep {
+			t.Errorf("%q became %q", keep, out)
+		}
+	}
+}

@@ -1,6 +1,10 @@
-import { Dices, Plus, RotateCcw, X } from "lucide-react";
-import { useState } from "react";
+import { Dices, LoaderCircle, Plus, RotateCcw, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { users as usersApi } from "@/api/users";
 import { Button } from "@/components/common/Button";
+import { ImageCropModal } from "@/components/common/ImageCropModal";
+import { describeError } from "@/lib/errors";
+import { useUI } from "@/stores/ui";
 import { TextInput } from "@/components/common/TextInput";
 import { StyledTyping, TypingEmoji } from "@/components/chat/TypingLine";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
@@ -17,12 +21,22 @@ function tidy(style: TypingStyle): TypingStyle | null {
 
 /**
  * Settings, Profiles: how "is typing…" looks for you to everyone else. The
- * preview is the foot of a conversation as they see it; under it, up to
- * three emoji (the first one picked fills all three, to start from a whole
- * set), how they move, and the words after your name.
+ * preview is the foot of a conversation as they see it (left out where the
+ * page shows the conversation itself); under it, up to three emoji or
+ * pictures of your own (the first one picked fills all three, to start from a
+ * whole set), how they move, and the words after your name.
  */
-export function TypingStyleEditor({ value, onChange, name }: { value: TypingStyle | null; onChange: (v: TypingStyle | null) => void; name: string }) {
+export function TypingStyleEditor({ value, onChange, name, preview = true }: { value: TypingStyle | null; onChange: (v: TypingStyle | null) => void; name: string; preview?: boolean }) {
+  const openContextMenu = useUI((u) => u.openContextMenu);
+  const toast = useUI((u) => u.toast);
   const [picker, setPicker] = useState<{ slot: number; at: DOMRect } | null>(null);
+  const [crop, setCrop] = useState<{ file: File; slot: number } | null>(null);
+  const [uploading, setUploading] = useState<number | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const pictureSlot = useRef(0);
+  // a picture is put up before it goes in, and the style may have changed meanwhile
+  const latest = useRef(value);
+  latest.current = value;
   // "Your Own" chosen before anything is written in it
   const [ownOpen, setOwnOpen] = useState(!!value?.words);
   const style: TypingStyle = value ?? { emoji: [], motion: "wave" };
@@ -34,29 +48,80 @@ export function TypingStyleEditor({ value, onChange, name }: { value: TypingStyl
     onChange(tidy(next));
   };
   const pickEmoji = (slot: number, token: string) => {
+    const now: TypingStyle = latest.current ?? { emoji: [], motion: "wave" };
     // the first emoji fills every slot, so there is a whole set to change from
-    const emoji = style.emoji.length === 0 ? Array.from({ length: MAX_TYPING_EMOJI }, () => token) : style.emoji.map((e, i) => (i === slot ? token : e));
-    if (slot >= style.emoji.length && style.emoji.length > 0) emoji.push(token);
-    change({ emoji: emoji.slice(0, MAX_TYPING_EMOJI) });
+    const emoji = now.emoji.length === 0 ? Array.from({ length: MAX_TYPING_EMOJI }, () => token) : now.emoji.map((e, i) => (i === slot ? token : e));
+    if (slot >= now.emoji.length && now.emoji.length > 0) emoji.push(token);
+    const next: TypingStyle = { ...now, emoji: emoji.slice(0, MAX_TYPING_EMOJI) };
+    if (!next.words) delete next.words;
+    if (!next.preset || next.words) delete next.preset;
+    onChange(tidy(next));
+  };
+  // a slot takes an emoji (one of the app's, or a server's or pack's) or a picture of one's own
+  const openSlot = (i: number, el: HTMLElement) => {
+    const token = style.emoji[i];
+    const slot = token ? i : Math.min(i, style.emoji.length);
+    const at = el.getBoundingClientRect();
+    openContextMenu({
+      x: at.left,
+      y: at.bottom + 4,
+      items: [
+        { id: "emoji", label: t("typing.editor.pickEmoji"), onSelect: () => setPicker({ slot, at }) },
+        {
+          id: "picture",
+          label: t("typing.editor.usePicture"),
+          onSelect: () => {
+            pictureSlot.current = slot;
+            fileRef.current?.click();
+          },
+        },
+        ...(token ? [{ id: "remove", label: t("typing.editor.removeItem"), danger: true, onSelect: () => removeEmoji(i) }] : []),
+      ],
+    });
+  };
+  const upload = async (slot: number, file: Blob, area: { x: number; y: number; w: number; h: number } | null) => {
+    setUploading(slot);
+    try {
+      const res = await usersApi.uploadTypingImage(file, area);
+      pickEmoji(slot, `img:${res.id}`);
+    } catch (err) {
+      toast(describeError(err, t("composer.composer.uploadFailed")), "error");
+    } finally {
+      setUploading(null);
+    }
   };
   const removeEmoji = (slot: number) => change({ emoji: style.emoji.filter((_, i) => i !== slot) });
   const noEmoji = style.emoji.length === 0;
 
   return (
     <div className={s.wrap}>
-      <div className={s.stage} aria-hidden="true" data-testid="typing-preview">
-        <div className={s.ghost}>
-          <span className={s.ghostAvatar} />
-          <span className={s.ghostLines}><i /><i /></span>
+      {preview ? (
+        <div className={s.stage} aria-hidden="true" data-testid="typing-preview">
+          <div className={s.ghost}>
+            <span className={s.ghostAvatar} />
+            <span className={s.ghostLines}><i /><i /></span>
+          </div>
+          <div className={s.line}>
+            <StyledTyping style={value} name={name} />
+          </div>
+          <div className={s.composer}>{t("typing.editor.composer")}</div>
         </div>
-        <div className={s.line}>
-          <StyledTyping style={value} name={name} />
-        </div>
-        <div className={s.composer}>{t("typing.editor.composer")}</div>
-      </div>
+      ) : null}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) setCrop({ file: f, slot: pictureSlot.current });
+          e.target.value = "";
+        }}
+      />
 
       <div>
         <p className={s.label} id="typing-emoji-label">{t("typing.editor.emoji")}</p>
+        <p className={s.sub}>{t("typing.editor.emojiHint")}</p>
         <div className={s.slots} role="group" aria-labelledby="typing-emoji-label">
           {Array.from({ length: MAX_TYPING_EMOJI }, (_, i) => {
             const token = style.emoji[i];
@@ -70,10 +135,13 @@ export function TypingStyleEditor({ value, onChange, name }: { value: TypingStyl
                   data-open={open || undefined}
                   data-picker-toggle={open || undefined}
                   aria-label={token ? t("typing.editor.changeEmoji", { n: i + 1 }) : t("typing.editor.chooseEmoji", { n: i + 1 })}
-                  onClick={(e) => setPicker(open ? null : { slot: token ? i : Math.min(i, style.emoji.length), at: e.currentTarget.getBoundingClientRect() })}
+                  aria-haspopup="menu"
+                  aria-busy={uploading === i || undefined}
+                  disabled={uploading !== null}
+                  onClick={(e) => (open ? setPicker(null) : openSlot(i, e.currentTarget))}
                   data-testid={`typing-slot-${i}`}
                 >
-                  {token ? <TypingEmoji token={token} className={s.slotGlyph} /> : <Plus size={20} aria-hidden="true" />}
+                  {uploading === i ? <LoaderCircle size={20} className={s.spin} aria-hidden="true" /> : token ? <TypingEmoji token={token} className={s.slotGlyph} /> : <Plus size={20} aria-hidden="true" />}
                 </button>
                 {token ? (
                   <button type="button" className={s.slotClear} aria-label={t("typing.editor.removeEmoji", { n: i + 1 })} onClick={() => removeEmoji(i)}>
@@ -138,6 +206,21 @@ export function TypingStyleEditor({ value, onChange, name }: { value: TypingStyl
         ) : null}
       </div>
 
+      {crop ? (
+        <ImageCropModal
+          file={crop.file}
+          aspect={1}
+          maxSize={96}
+          serverCrop
+          title={t("widgets.card.cropTitle")}
+          onClose={() => setCrop(null)}
+          onDone={({ blob, crop: area }) => {
+            const slot = crop.slot;
+            setCrop(null);
+            void upload(slot, blob, area ?? null);
+          }}
+        />
+      ) : null}
       {picker ? (
         <ExpressionPicker
           anchor={picker.at}

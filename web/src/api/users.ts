@@ -56,6 +56,11 @@ export const users = {
   setWidgets(widgets: unknown[]): Promise<{ widgets: unknown }> {
     return api.request("PUT", "/users/@me/widgets", { widgets });
   },
+  /** A picture for a typing style, sent whole with the part framed; the server cuts it square and small (moving ones keep moving). */
+  uploadTypingImage(file: Blob, crop: { x: number; y: number; w: number; h: number } | null): Promise<{ id: Snowflake; animated: boolean }> {
+    const q = new URLSearchParams(crop ? { x: String(Math.round(crop.x)), y: String(Math.round(crop.y)), w: String(Math.round(crop.w)), h: String(Math.round(crop.h)) } : {});
+    return api.upload(`/users/@me/typing/image${q.size ? `?${q.toString()}` : ""}`, file, { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" } });
+  },
   /** A picture for a widget, sent whole with the part framed; the server cuts it in this shape. */
   uploadWidgetImage(file: Blob, crop: { x: number; y: number; w: number; h: number } | null, shape: "wide" | "square" | "cover"): Promise<{ id: Snowflake; shape: string }> {
     const q = new URLSearchParams({ shape, ...(crop ? { x: String(crop.x), y: String(crop.y), w: String(crop.w), h: String(crop.h) } : {}) });

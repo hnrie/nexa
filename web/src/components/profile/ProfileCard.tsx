@@ -1,6 +1,6 @@
 import { NexaProfile } from "@/components/nexa/NexaProfile";
 import { isSystemAccount } from "@/lib/moderation";
-import { Link2, LoaderCircle, MessageCircle, MoreHorizontal, NotebookPen, Pencil, UserPlus, X } from "lucide-react";
+import { Link2, LoaderCircle, MessageCircle, MoreHorizontal, NotebookPen, Pencil, Plus, UserPlus, X } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -14,7 +14,7 @@ import { ActivityList } from "@/components/activity/ActivityCard";
 import { Avatar } from "@/components/common/Avatar";
 import { AdminBadge, OwnerBadge } from "@/components/common/OwnerBadge";
 import { ServerTagChip } from "@/components/servertag/ServerTagChip";
-import { ProfileWidgets } from "./Widgets";
+import { ProfileWidgets, type WidgetDesign } from "./Widgets";
 import { readWidgets, type Widget } from "@/lib/widgets";
 import { isOwner } from "@/lib/owner";
 import { Tooltip } from "@/components/common/Tooltip";
@@ -46,8 +46,13 @@ const dateOf = formatShortDate;
 
 interface Props {
   userId: string;
-  /** The full profile in a dialog, or the preview in the column beside a DM. */
-  variant: "modal" | "panel";
+  /**
+   * The full profile ("modal": two columns with tabs, or one on a phone);
+   * the preview in the column beside a DM ("panel"); or the profile a name
+   * or a picture opens ("mini"): the card on its own in a dialog, with the
+   * way to the full one.
+   */
+  variant: "modal" | "panel" | "mini";
   onClose?: () => void;
   /** Settings' live preview: unsaved changes over the account's own profile, with nothing to click. */
   preview?: Partial<PublicUser>;
@@ -64,6 +69,8 @@ interface Props {
   visitor?: { user: PublicUser; widgets?: unknown; actions: ReactNode };
   /** The full profile's tab to open on, when it is opened for one thing (all their widgets, what you have in common). */
   initialTab?: ProfileTab | undefined;
+  /** Drawn in the profile designer, every part editable (with preview). */
+  design?: ProfileDesign | undefined;
 }
 
 /** The server whose page is open, which a profile opened from it belongs to. */
@@ -137,6 +144,32 @@ function BannerButton({ label, onClick, children, testId, busy }: { label: strin
   );
 }
 
+/** A part of a profile the profile designer (Settings, Profiles) changes when it is pressed. */
+export type ProfilePart = "banner" | "avatar" | "name" | "pronouns" | "tag" | "status" | "about";
+
+/**
+ * The profile as the profile designer draws it: every part a button that
+ * opens what changes it, the ones being written drawn as their editors, and
+ * each empty part showing what it could hold.
+ */
+export interface ProfileDesign {
+  /** Opens what changes a part, beside the part pressed. */
+  edit: (part: ProfilePart, anchor: HTMLElement) => void;
+  /** Parts being written where they are: the editor drawn in each one's place. */
+  inline?: Partial<Record<"name" | "pronouns" | "about", ReactNode>>;
+  /** The Widgets tab's tools. */
+  widgets?: WidgetDesign;
+}
+
+/** A part of the profile the designer changes: an outline and a label on hover or focus (always on a touch screen). */
+function Spot({ design, part, label, round }: { design: ProfileDesign; part: ProfilePart; label: string; round?: boolean }) {
+  return (
+    <button type="button" className={s.spot} data-round={round || undefined} data-spot={part} aria-label={label} onClick={(e) => design.edit(part, e.currentTarget)}>
+      <span className={s.spotLabel} aria-hidden="true"><Pencil size={11} /><span className={s.spotText}>{label}</span></span>
+    </button>
+  );
+}
+
 /** The parts of the full profile behind its tabs. "about" is a tab only where the card is too narrow for two columns. */
 export type ProfileTab = "about" | "widgets" | "activity" | "mutuals";
 
@@ -174,7 +207,7 @@ function useNarrow(el: HTMLElement | null, on: boolean): boolean {
  * an About tab. A profile with two theme colours is a gradient from top to
  * bottom, with its text and buttons turned to read on it.
  */
-export function ProfileCard({ userId, variant, onClose, preview, previewWidgets, serverId, visitor, initialTab }: Props) {
+export function ProfileCard({ userId, variant, onClose, preview, previewWidgets, serverId, visitor, initialTab, design }: Props) {
   const nav = useNavigate();
   const inServer = useServerInView(serverId);
   const me = useAuth((a) => a.me);
@@ -208,8 +241,11 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const isMe = !visitor && me?.id === userId;
   const base: PublicUser | undefined = visitor ? visitor.user : isMe && me ? me : stored;
   const user: PublicUser | undefined = base ? { ...base, ...preview } : undefined;
+  // the preview and the mini profile are one column, with one widget and the way to the rest
+  const compact = variant !== "modal";
   const panel = variant === "panel";
-  const narrow = useNarrow(cardEl, !panel);
+  const mini = variant === "mini";
+  const narrow = useNarrow(cardEl, !compact);
   const visitorWidgets = visitor?.widgets;
   const shownWidgets = useMemo(() => previewWidgets ?? (visitor ? readWidgets(visitorWidgets) : widgets), [previewWidgets, visitor, visitorWidgets, widgets]);
 
@@ -241,14 +277,14 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const about = user?.about_me ?? "";
   useLayoutEffect(() => {
     const el = bioRef.current;
-    if (!panel || !el) return;
+    if (!compact || !el) return;
     const measure = () => setBioClamped(el.scrollHeight > el.clientHeight + 1);
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [panel, about]);
+  }, [compact, about]);
 
   useEffect(() => {
     if (noteOpen) noteRef.current?.focus();
@@ -262,14 +298,14 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
 
   if (!user) return null;
   // the system account is not a person, and says so
-  if (isSystemAccount(user.flags)) return <NexaProfile variant={variant} onClose={onClose} />;
+  if (isSystemAccount(user.flags)) return <NexaProfile variant={panel ? "panel" : "modal"} onClose={onClose} />;
   // a visitor sees nothing of where someone is right now
   const st = visitor ? null : preview ? "online" : statusOf(presence);
   const cs = visitor ? null : preview ? (user.status_text || user.status_emoji ? { text: user.status_text, emoji: user.status_emoji } : null) : customStatus(presence);
   const activities = preview || visitor ? [] : activitiesOf(presence);
   const theme = profileThemeOf(user.accent_color, user.accent_color_2);
   // the left card of the full profile is about as wide as the preview
-  const banner = bannerUrl(user.banner_id, panel || !narrow ? 340 : 600);
+  const banner = bannerUrl(user.banner_id, panel || (!compact && !narrow) ? 340 : 600);
   const friend = !visitor && rel?.type === "friend";
   const interactive = !preview && !visitor;
   const avatarSize = panel ? 80 : 120;
@@ -304,7 +340,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const more = (e: MouseEvent<HTMLButtonElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const items: ContextMenuItem[] = [];
-    if (panel) items.push({ id: "full", label: t("profile.profileCard.viewFullProfile"), onSelect: () => openModal("profile", { userId }), separatorAfter: true });
+    if (compact) items.push({ id: "full", label: t("profile.profileCard.viewFullProfile"), onSelect: () => viewFull(), separatorAfter: true });
     if (friend) {
       items.push({ id: "nick", label: rel.nickname ? t("profile.profileCard.editFriendNickname") : t("profile.profileCard.addFriendNickname"), onSelect: () => void editNickname() });
       // asked first, as the friends list asks: neither is quick to take back
@@ -327,7 +363,8 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const shownName = friend && rel.nickname ? rel.nickname : user.display_name;
   const mutualServers = mutual.servers.filter((id) => servers[id]);
   const mutualCount = mutual.friends.length + mutualServers.length;
-  const viewFull = (tab?: ProfileTab) => openModal("profile", tab ? { userId, tab } : { userId });
+  // the whole profile, in place of the mini one (a profile dialog replaces the one open)
+  const viewFull = (tab?: ProfileTab) => openModal("profile", { userId, full: true, ...(tab ? { tab } : {}) });
   const buttons = interactive && !panel;
   const copyLink = () => copyProfileLink(user.username);
   const editWidgets = () => {
@@ -338,7 +375,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   // The full profile's tabs: About only where the card is one column, What
   // They Are Doing for anyone with an account, and What You Have in Common
   // once there is something.
-  const tabs: { id: ProfileTab; label: string; count?: number }[] = panel
+  const tabs: { id: ProfileTab; label: string; count?: number }[] = compact
     ? []
     : [
         ...(narrow ? [{ id: "about" as const, label: t("profile.tabs.about") }] : []),
@@ -346,8 +383,8 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
         ...(visitor ? [] : [{ id: "activity" as const, label: t("profile.tabs.activity") }]),
         ...(interactive && !isMe && mutualCount > 0 ? [{ id: "mutuals" as const, label: t("profile.tabs.mutuals"), count: mutualCount }] : []),
       ];
-  // until one is picked: About on a phone, or the first of the rest with something in it
-  const fallback: ProfileTab = narrow ? "about" : shownWidgets.length ? "widgets" : activities.length ? "activity" : tabs.some((x) => x.id === "mutuals") ? "mutuals" : "widgets";
+  // until one is picked: Widgets, or About on a phone, where it holds what the left card shows
+  const fallback: ProfileTab = narrow ? "about" : "widgets";
   const tab: ProfileTab = chosenTab && tabs.some((x) => x.id === chosenTab) ? chosenTab : fallback;
   const pickTab = (next: ProfileTab) => {
     setChosenTab(next);
@@ -381,6 +418,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const top = (
     <div className={s.top}>
       <div className={s.banner} style={bannerStyle} />
+      {design ? <Spot design={design} part="banner" label={user.banner_id ? t("designer.spot.banner") : t("designer.spot.addBanner")} /> : null}
       <div className={s.bannerBtns}>
         {!interactive ? null : panel ? (
           isMe ? (
@@ -399,7 +437,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
               <BannerButton label={t("chat.chat.more")} onClick={more} testId="profile-more"><MoreHorizontal size={18} /></BannerButton>
             </>
           )
-        ) : onClose && narrow ? (
+        ) : onClose && (mini || narrow) ? (
           // two columns put the close button at the dialog's corner, beside the tabs
           <BannerButton label={t("chat.attachments.close")} onClick={onClose}><X size={18} /></BannerButton>
         ) : null}
@@ -412,6 +450,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
         ) : (
           <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={avatarSize} status={st} dotSize={26} />
         )}
+        {design ? <Spot design={design} part="avatar" label={t("designer.spot.avatar")} round /> : null}
       </div>
       {cs ? (
         <div className={s.bubble} data-testid="profile-status">
@@ -421,7 +460,15 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
               {cs.emoji ? <Twemoji text={cs.emoji} className={s.bubbleEmoji} /> : null}
               {cs.text}
             </span>
+            {design ? <Spot design={design} part="status" label={t("designer.spot.status")} /> : null}
           </div>
+        </div>
+      ) : design ? (
+        // in the designer, an empty status is a bubble waiting to be filled
+        <div className={s.bubble}>
+          <button type="button" className={[s.bubbleText, s.ghostBubble].join(" ")} data-spot="status" onClick={(e) => design.edit("status", e.currentTarget)}>
+            <Plus size={14} aria-hidden="true" /> {t("designer.ghost.status")}
+          </button>
         </div>
       ) : null}
     </div>
@@ -432,10 +479,24 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
       <div className={s.ident}>
         <div className={s.nameRow}>
           <h2 className={s.display}>
-            {panel ? <button className={s.displayBtn} onClick={() => viewFull()} data-testid="profile-name">{shownName}</button> : shownName}
+            {design?.inline?.name ?? (panel ? <button className={s.displayBtn} onClick={() => viewFull()} data-testid="profile-name">{shownName}</button> : shownName)}
+            {design && !design.inline?.name ? <Spot design={design} part="name" label={t("designer.spot.name")} /> : null}
           </h2>
           {/* the server tag they wear, which opens the server it is from (not for a visitor, who has no account to ask with) */}
-          {user.server_tag ? <ServerTagChip tag={user.server_tag} size="lg" open={interactive} /> : null}
+          {user.server_tag ? (
+            design ? (
+              <span className={s.spotWrap}>
+                <ServerTagChip tag={user.server_tag} size="lg" open={false} />
+                <Spot design={design} part="tag" label={t("designer.spot.tag")} />
+              </span>
+            ) : (
+              <ServerTagChip tag={user.server_tag} size="lg" open={interactive} />
+            )
+          ) : design ? (
+            <button type="button" className={s.ghostChip} data-spot="tag" onClick={(e) => design.edit("tag", e.currentTarget)}>
+              <Plus size={12} aria-hidden="true" /> {t("designer.ghost.tag")}
+            </button>
+          ) : null}
           {interactive && !isMe ? (
             <Tooltip text={note ? t("profile.profileCard.editNote") : t("profile.profileCard.addNote")} side="top">
               <button className={s.noteBtn} aria-label={note ? t("profile.profileCard.editNote2") : t("profile.profileCard.addNote2")} onClick={() => setNoteOpen((v) => !v)} data-testid="profile-note-toggle">
@@ -453,12 +514,31 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
             </>
           ) : null}
           <span>{user.username}</span>
-          {user.pronouns ? (
+          {design?.inline?.pronouns ? (
             <>
               <span className={s.sep} aria-hidden="true">·</span>
-              <Tooltip text={t("settings.profile.pronouns")} side="top">
-                <span className={s.pronouns} data-testid="profile-pronouns">{user.pronouns}</span>
-              </Tooltip>
+              {design.inline.pronouns}
+            </>
+          ) : user.pronouns ? (
+            <>
+              <span className={s.sep} aria-hidden="true">·</span>
+              {design ? (
+                <span className={s.spotWrap}>
+                  <span className={s.pronouns} data-testid="profile-pronouns">{user.pronouns}</span>
+                  <Spot design={design} part="pronouns" label={t("designer.spot.pronouns")} />
+                </span>
+              ) : (
+                <Tooltip text={t("settings.profile.pronouns")} side="top">
+                  <span className={s.pronouns} data-testid="profile-pronouns">{user.pronouns}</span>
+                </Tooltip>
+              )}
+            </>
+          ) : design ? (
+            <>
+              <span className={s.sep} aria-hidden="true">·</span>
+              <button type="button" className={s.ghostInline} data-spot="pronouns" onClick={(e) => design.edit("pronouns", e.currentTarget)}>
+                {t("designer.ghost.pronouns")}
+              </button>
             </>
           ) : null}
           {isOwner(user.id) ? <OwnerBadge /> : user.flags & 1 ? <AdminBadge /> : null}
@@ -491,7 +571,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
 
       {/* what you have in common: the full profile's Mutuals tab, from the preview by way of the full profile */}
       {interactive && !isMe && mutualCount > 0 ? (
-        <button className={s.mutualRow} onClick={() => (panel ? viewFull("mutuals") : pickTab("mutuals"))} data-testid="profile-mutual">
+        <button className={s.mutualRow} onClick={() => (compact ? viewFull("mutuals") : pickTab("mutuals"))} data-testid="profile-mutual">
           {mutual.friends.length > 0 ? (
             <span className={s.stack} aria-hidden="true">
               {mutual.friends.slice(0, 3).map((id) => (
@@ -523,13 +603,24 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
         />
       </div>
     ) : null;
-  const aboutSection = user.about_me ? (
+  const aboutSection = design?.inline?.about ? (
     <div className={s.section}>
       <h3>{t("settings.profile.aboutMe")}</h3>
-      <div ref={bioRef} className={s.about} data-clamp={panel || undefined} data-overflow={(panel && bioClamped) || undefined}>
+      {design.inline.about}
+    </div>
+  ) : design && !user.about_me ? (
+    <button type="button" className={[s.section, s.ghostSection].join(" ")} data-spot="about" onClick={(e) => design.edit("about", e.currentTarget)}>
+      <span className={s.ghostTitle}>{t("settings.profile.aboutMe")}</span>
+      <span className={s.ghostText}>{t("designer.ghost.about")}</span>
+    </button>
+  ) : user.about_me ? (
+    <div className={[s.section, design ? s.spotWrap : ""].join(" ")}>
+      {design ? <Spot design={design} part="about" label={t("designer.spot.about")} /> : null}
+      <h3>{t("settings.profile.aboutMe")}</h3>
+      <div ref={bioRef} className={s.about} data-clamp={compact || undefined} data-overflow={(compact && bioClamped) || undefined}>
         <Markdown source={user.about_me} ctx={ctx} />
       </div>
-      {panel && bioClamped && interactive ? (
+      {compact && bioClamped && interactive ? (
         <button className={s.moreLink} onClick={() => viewFull()} data-testid="view-full-bio">{t("profile.profileCard.viewFullBio")}</button>
       ) : null}
     </div>
@@ -558,11 +649,22 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
     </>
   );
 
-  if (panel) {
-    // the preview: one widget, the first they put, and the way to the rest
+  if (compact) {
+    // The preview, and the mini profile a name opens (drawn as the profile
+    // dialog always was): one widget, the first they put, and the way to the
+    // rest, which is the whole profile.
     const first = shownWidgets.slice(0, 1);
     return (
-      <div className={s.card} data-variant={variant} data-themed={theme?.text} data-tinted={!theme && tint ? "" : undefined} style={cardStyle} data-testid={`profile-${variant}`}>
+      <div
+        className={s.card}
+        data-variant={mini ? "modal" : variant}
+        data-layout={mini ? "mini" : undefined}
+        data-design={design ? "" : undefined}
+        data-themed={theme?.text}
+        data-tinted={!theme && tint ? "" : undefined}
+        style={cardStyle}
+        data-testid={mini ? "profile-modal" : `profile-${variant}`}
+      >
         {top}
         <div className={s.info}>
           {identity}
@@ -572,7 +674,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
             {aboutSection}
             {first.length ? (
               <div className={s.section}>
-                <ProfileWidgets widgets={first} variant="panel" onShowAll={interactive ? () => viewFull("widgets") : undefined} />
+                <ProfileWidgets widgets={first} variant={mini ? "modal" : "panel"} onShowAll={interactive ? () => viewFull("widgets") : undefined} />
                 {interactive && shownWidgets.length > 1 ? (
                   <button className={s.moreLink} onClick={() => viewFull("widgets")} data-testid="view-all-widgets">{t("profile.tabs.viewAllWidgets", { count: shownWidgets.length })}</button>
                 ) : null}
@@ -630,8 +732,8 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
             <button className={s.panelBtn} onClick={editWidgets} data-testid="profile-edit-widgets"><Pencil size={14} aria-hidden="true" /> {t("profile.tabs.editWidgets")}</button>
           </div>
         ) : null}
-        <ProfileWidgets widgets={shownWidgets} variant="modal" onAdd={isMe && buttons ? editWidgets : undefined} />
-        {!shownWidgets.length && !(isMe && buttons) ? <p className={s.emptyTab}>{t("profile.tabs.noWidgets", { name: shownName })}</p> : null}
+        <ProfileWidgets widgets={shownWidgets} variant="modal" onAdd={design?.widgets ? design.widgets.add : isMe && buttons ? editWidgets : undefined} design={design?.widgets} />
+        {!shownWidgets.length && !design && !(isMe && buttons) ? <p className={s.emptyTab}>{t("profile.tabs.noWidgets", { name: shownName })}</p> : null}
       </div>
     );
   } else if (tab === "activity") {
@@ -687,6 +789,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
       className={s.card}
       data-variant={variant}
       data-layout={narrow ? "narrow" : "wide"}
+      data-design={design ? "" : undefined}
       data-themed={theme?.text}
       data-tinted={!theme && tint ? "" : undefined}
       style={cardStyle}

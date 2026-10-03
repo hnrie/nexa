@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"evilion.xyz/chat/internal/textutil"
 	"image"
 	"io"
 	"net/http"
@@ -32,6 +33,8 @@ const (
 	// a tag's badge picture is shown small and kept small
 	tagBadgeSide = 96
 	maxTagRoles  = 25
+	// a tag's letters: short enough to sit beside a name on a phone
+	maxTagLetters = 8
 )
 
 // The badges every server can use without putting up a picture of its own,
@@ -53,31 +56,34 @@ func (s *Server) serverTagRoutes(mux *http.ServeMux) {
 	mux.Handle("DELETE /api/v1/users/@me/server-tag", s.authed(s.handleTakeOffTag))
 }
 
-// cleanTagText checks a tag's letters: one to four of them, letters and
-// digits in any script with the marks that belong to them, or a few
-// symbols. No spaces, emoji or anything that could pass for something else.
+// cleanTagText checks a tag's letters: one to maxTagLetters of them, letters
+// and digits of any script (a letter's marks count with it, three at most, so
+// no zalgo), and a few symbols, with no spaces.
 func cleanTagText(raw string) (string, bool) {
 	text := strings.TrimSpace(raw)
-	if !utf8.ValidString(text) || utf8.RuneCountInString(text) > 16 {
+	if !utf8.ValidString(text) || utf8.RuneCountInString(text) > maxTagLetters*4 {
 		return "", false
 	}
-	n := 0
+	n, marks := 0, 0
 	for _, r := range text {
 		switch {
 		case unicode.IsLetter(r) || unicode.IsDigit(r):
 			n++
+			marks = 0
 		case unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Mc, r):
 			// a mark belongs to the letter before it and is not one of its own
-			if n == 0 {
+			marks++
+			if n == 0 || (textutil.ZalgoMark(r) && marks > textutil.MaxStackedMarks) {
 				return "", false
 			}
 		case strings.ContainsRune("!?.-_+&#@$%*~^=:'", r):
 			n++
+			marks = 0
 		default:
 			return "", false
 		}
 	}
-	return text, n >= 1 && n <= 4
+	return text, n >= 1 && n <= maxTagLetters
 }
 
 // canWearTag says whether uid may wear srv's tag: a member, and when the tag
@@ -242,7 +248,7 @@ func (s *Server) handleServerTagPut(w http.ResponseWriter, r *http.Request) {
 	bad := func(code, msg string) { WriteError(w, E(http.StatusBadRequest, code, msg)) }
 	text, ok := cleanTagText(req.Text)
 	if !ok {
-		bad("invalid_tag", "A tag is one to four letters, numbers or symbols, with no spaces.")
+		bad("invalid_tag", "A tag is one to eight letters, numbers or symbols, with no spaces.")
 		return
 	}
 	if req.Color != nil && (*req.Color < 0 || *req.Color > 0xFFFFFF) {

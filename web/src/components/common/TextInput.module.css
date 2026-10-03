@@ -17,6 +17,9 @@
 @supports (appearance: base-select) {
   select.input, select.input::picker(select) { appearance: base-select; }
   select.input { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  /* the chosen option on one line, cut short rather than spilling out of the box (Select.tsx gives it the button) */
+  select.input > button { all: unset; display: flex; align-items: center; flex: 1; min-width: 0; }
+  select.input selectedcontent { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   select.input:hover { border-color: var(--border); }
   select.input::picker-icon { color: var(--text-muted); transition: rotate var(--transition); }
   select.input:open::picker-icon { rotate: 180deg; }

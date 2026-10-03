@@ -4,13 +4,15 @@ import { Button } from "@/components/common/Button";
 import { Popout } from "@/components/common/Popout";
 import { Twemoji } from "@/components/common/Twemoji";
 import { t, Tr } from "@/i18n";
-import { customEmoji, typingWordsKey, type TypingStyle } from "@/lib/typingStyle";
+import { customEmoji, typingImage, typingImageUrl, typingWordsKey, type TypingStyle } from "@/lib/typingStyle";
 import { useUI } from "@/stores/ui";
 import c from "./Chat.module.css";
 import s from "./Typing.module.css";
 
-/** One emoji of a typing style: an emoji itself, or a server or pack emoji's picture. */
+/** One emoji of a typing style: an emoji itself, a server or pack emoji's picture, or a picture of the person's own. */
 export function TypingEmoji({ token, className }: { token: string; className?: string }) {
+  const image = typingImage(token);
+  if (image) return <img className={className} src={typingImageUrl(image, 32)} alt="" draggable={false} />;
   const custom = customEmoji(token);
   if (custom) return <img className={className} src={emojiUrl(custom.id, custom.animated, 32)} alt={`:${custom.name}:`} draggable={false} />;
   return <Twemoji text={token} className={className} fallbackClassName={className} />;

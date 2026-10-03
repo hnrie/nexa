@@ -121,3 +121,25 @@
 .emptyText { flex: 1 1 200px; margin: 0; font-size: 14px; line-height: 1.4; color: var(--text-subtle); }
 .emptyBtn { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: var(--radius-pill); background: var(--profile-chip); color: var(--text-strong); font-size: 13.5px; font-weight: 650; box-shadow: inset 0 1px 0 var(--edge-light); transition: background var(--transition); }
 .emptyBtn:hover { background: var(--profile-chip-hover); }
+
+/* the widgets in the profile designer: each with its tools along its top, and pressing it changes it */
+.designed { position: relative; padding-top: 32px; }
+.designSpot { position: absolute; inset: 26px -6px -6px; z-index: 1; border-radius: 12px; outline: 1.5px dashed transparent; cursor: pointer; transition: outline-color var(--transition), background-color var(--transition); }
+.designSpot:hover, .designSpot:focus-visible { outline-color: color-mix(in srgb, var(--profile-accent) 80%, #fff); background: color-mix(in srgb, var(--profile-accent) 7%, transparent); }
+.tools { position: absolute; top: 0; inset-inline: 0; z-index: 2; display: flex; align-items: center; gap: 4px; }
+.onCard, .toolText { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; margin-inline-end: auto; border-radius: var(--radius-pill); font-size: 12px; font-weight: 650; white-space: nowrap; }
+/* the first widget is the one the profile card shows */
+.onCard { background: color-mix(in srgb, var(--profile-accent) 26%, transparent); color: var(--text-strong); }
+.toolText { color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--border-subtle); transition: color var(--transition), box-shadow var(--transition); }
+.toolText:hover, .toolText:focus-visible { color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--border); }
+.tool { flex: none; width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); background: var(--profile-chip); transition: color var(--transition), background var(--transition); }
+.tool:hover:not(:disabled), .tool:focus-visible { color: var(--text-strong); background: var(--profile-chip-hover); }
+.tool:disabled { opacity: 0.35; cursor: default; }
+.tool[data-danger]:hover:not(:disabled) { color: var(--text-danger); }
+@media (pointer: coarse) {
+  .tool { width: 32px; height: 32px; }
+  .designed { padding-top: 38px; }
+  .designSpot { inset-block-start: 32px; }
+}
+.addTile { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; border-radius: var(--radius-sm); border: 1.5px dashed color-mix(in srgb, var(--text-muted) 55%, transparent); color: var(--text-subtle); font-size: 14px; font-weight: 650; transition: border-color var(--transition), color var(--transition), background-color var(--transition); }
+.addTile:hover, .addTile:focus-visible { border-color: var(--profile-accent); color: var(--text-strong); background: color-mix(in srgb, var(--profile-accent) 6%, transparent); }

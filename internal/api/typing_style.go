@@ -1,15 +1,23 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
+	"net/http"
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"evilion.xyz/chat/internal/auth"
+	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/media"
 )
 
 // A typing style is how "is typing…" looks for someone to everyone else: up
-// to three emoji that move together, how they move, and the words after the
-// name, one of a few the app offers in every language or the person's own.
+// to three emoji (or server emoji, or pictures of their own, moving ones too)
+// that move together, how they move, and the words after the name, one of a
+// few the app offers in every language or the person's own.
 // It is public, like the rest of a profile, and only shows while someone is
 // the one person typing.
 type typingStyle struct {
@@ -23,7 +31,13 @@ const (
 	maxTypingEmoji = 3
 	// own words follow the name on one short line, under the message box
 	maxTypingWords = 32
+	// a picture of someone's own is drawn about as big as an emoji, at most
+	// twice over for a sharp screen and the larger card the line opens
+	typingImageSide = 96
 )
+
+// a picture put up for a typing style (handleTypingImage), by its id
+var typingImageToken = regexp.MustCompile(`^img:[0-9]{1,20}$`)
 
 // The words the app offers, by the key each language has them under
 // (typing.presets.<key> in web/src/i18n/locales).
@@ -54,6 +68,13 @@ func cleanTypingStyle(raw json.RawMessage) (string, string) {
 	}
 	for _, e := range in.Emoji {
 		e = strings.TrimSpace(e)
+		if typingImageToken.MatchString(e) {
+			if _, err := ids.Parse(strings.TrimPrefix(e, "img:")); err != nil {
+				return "", "That picture has gone. Put it up again."
+			}
+			out.Emoji = append(out.Emoji, e)
+			continue
+		}
 		if !utf8.ValidString(e) || !(isEmoji(e) || customEmojiToken.MatchString(e)) {
 			return "", "Each emoji in a typing style must be one emoji."
 		}
@@ -103,4 +124,41 @@ func typingStyleText(raw string) string {
 		parts = append(parts, "("+st.Preset+")")
 	}
 	return strings.Join(parts, " ")
+}
+
+func (s *Server) typingRoutes(mux *http.ServeMux) {
+	mux.Handle("POST /api/v1/users/@me/typing/image", s.userLimited(s.limUpload, s.handleTypingImage))
+}
+
+// handleTypingImage takes a picture for a typing style with the part framed
+// (x, y, w and h in its own pixels; the middle when left out), cuts it square
+// here and keeps it small. A moving picture stays moving. It is held for a
+// day: saving a typing style that names it keeps it.
+func (s *Server) handleTypingImage(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	lim := s.limitsFor("typing")
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, lim.MaxBytes+1))
+	if err != nil || int64(len(data)) > lim.MaxBytes {
+		WriteError(w, media.ErrTooLarge)
+		return
+	}
+	if width, height, err := media.ImageDims(bytes.NewReader(data)); err != nil {
+		WriteError(w, media.ErrUnsupported)
+		return
+	} else if err := lim.Check(width, height); err != nil {
+		WriteError(w, err)
+		return
+	}
+	out, _, err := media.Crop(data, media.CropSpec{Rect: cropFromQuery(r), MaxW: typingImageSide, MaxH: typingImageSide})
+	if err != nil {
+		WriteError(w, cropError(err))
+		return
+	}
+	b, err := s.Media.PutPublic(r.Context(), "typing", bytes.NewReader(out), media.Limits{MaxBytes: int64(len(out)) + 1, MaxW: typingImageSide, MaxH: typingImageSide}, me.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	s.releaseBlob(r.Context(), b.ID)
+	WriteJSON(w, http.StatusOK, map[string]any{"id": b.ID, "animated": b.Animated})
 }

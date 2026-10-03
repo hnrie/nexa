@@ -711,6 +711,12 @@ func (s *Store) ModResetFields(ctx context.Context, c *ModCase, f ModFieldReset,
 				return ErrUsernameTaken
 			}
 		}
+		// the pictures a typing style names, given back with it
+		if f.TypingStyle {
+			if err := swapTypingImagesTx(ctx, tx, c.UserID, ""); err != nil {
+				return err
+			}
+		}
 		// the pictures the widgets name, given back once the widgets are gone
 		var widgets string
 		if f.Widgets {

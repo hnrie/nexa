@@ -5,6 +5,8 @@ import App from "./App";
 import { installCrashReporting } from "./lib/crashReport";
 import { loadCaptchaConfig } from "./lib/captcha";
 import { installLongPress } from "./lib/longPress";
+import { installZalgoGuard } from "./lib/zalgo";
+import { refuseZalgo } from "./lib/zalgoNotice";
 import { installTextMenu } from "./lib/textMenu";
 import { installKeyboardInset } from "./lib/keyboardInset";
 import { applyRememberedAppearance } from "./lib/theme";
@@ -46,6 +48,8 @@ function start(): void {
 
   installCrashReporting();
   installLongPress();
+  // no zalgo in any text box: what would pile marks onto a letter does not go in
+  installZalgoGuard(refuseZalgo);
   // a text box's right-click menu on a computer: spellings, the clipboard, formatting
   installTextMenu();
   // whether the actions bots abuse need a captcha here, known before anyone signs in

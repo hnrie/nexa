@@ -78,7 +78,7 @@ function ProfileCardView({ user }: { user: PublicUser }) {
   const [bannerFailed, setBannerFailed] = useState(false);
   const banner = bannerFailed ? null : bannerUrl(user.banner_id, 480);
   const name = user.display_name || user.username;
-  const open = () => useUI.getState().openModal("profile", { userId: user.id });
+  const open = () => useUI.getState().openModal("profile", { userId: user.id, full: true });
   return (
     <div className={v.view} data-variant="card" role="group" aria-label={t("profileLink.cardLabel", { name })} data-testid="profile-card" data-profile-state="ready">
       {banner ? (

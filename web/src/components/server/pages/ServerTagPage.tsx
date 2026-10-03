@@ -10,7 +10,7 @@ import { ServerTagChip, forgetTagPreview } from "@/components/servertag/ServerTa
 import st from "@/components/settings/Settings.module.css";
 import { t } from "@/i18n";
 import { describeError } from "@/lib/errors";
-import { DEFAULT_TAG_BADGE, readTagText, tagColorCss, tagImageUrl, TAG_ICONS } from "@/lib/serverTags";
+import { DEFAULT_TAG_BADGE, MAX_TAG_LETTERS, readTagText, tagColorCss, tagImageUrl, TAG_ICONS } from "@/lib/serverTags";
 import { useAuth } from "@/stores/auth";
 import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
@@ -124,7 +124,7 @@ export default function ServerTagPage({ serverId }: { serverId: string }) {
       <div className={st.twoCol}>
         <div className={st.form}>
           <Field label={t("serverTag.page.tagLabel")} hint={lettersChange ? t("serverTag.page.lettersChange") : t("serverTag.page.tagHint")} error={draft.text && !letters.ok ? t("serverTag.page.tagHint") : null}>
-            <TextInput value={draft.text} maxLength={16} onChange={(e) => set({ text: e.target.value.replace(/\s/g, "") })} placeholder={t("serverTag.page.tagPlaceholder")} spellCheck={false} autoComplete="off" data-testid="tag-text" />
+            <TextInput value={draft.text} maxLength={MAX_TAG_LETTERS * 4} onChange={(e) => set({ text: e.target.value.replace(/\s/g, "") })} placeholder={t("serverTag.page.tagPlaceholder")} spellCheck={false} autoComplete="off" data-testid="tag-text" />
           </Field>
 
           <div>

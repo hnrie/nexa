@@ -45,7 +45,8 @@ func TestServerTagsAreWornAndKeptInStep(t *testing.T) {
 	}
 	for _, bad := range []map[string]any{
 		{"text": "", "badge": "icon:fish"},
-		{"text": "TOOLONG", "badge": "icon:fish"},
+		{"text": "MUCHTOOLONG", "badge": "icon:fish"},
+		{"text": "Z\u0301\u0302\u0303\u0304", "badge": "icon:fish"},
 		{"text": "A B", "badge": "icon:fish"},
 		{"text": "FISH", "badge": "icon:kraken"},
 		{"text": "FISH", "badge": "image:12345"},
@@ -70,8 +71,11 @@ func TestServerTagsAreWornAndKeptInStep(t *testing.T) {
 	if res, body := setTag(t, ts, owner, sid, map[string]any{"text": "हिंदी", "badge": "icon:fish"}); res.StatusCode != 200 {
 		t.Errorf("two letters with their marks: %d %v", res.StatusCode, body)
 	}
-	if res, body := setTag(t, ts, owner, sid, map[string]any{"text": "ABCDE", "badge": "icon:fish"}); res.StatusCode != 400 {
-		t.Errorf("five letters: %d %v", res.StatusCode, body)
+	if res, body := setTag(t, ts, owner, sid, map[string]any{"text": "ABCDEFGH", "badge": "icon:fish"}); res.StatusCode != 200 {
+		t.Errorf("eight letters: %d %v", res.StatusCode, body)
+	}
+	if res, body := setTag(t, ts, owner, sid, map[string]any{"text": "ABCDEFGHI", "badge": "icon:fish"}); res.StatusCode != 400 {
+		t.Errorf("nine letters: %d %v", res.StatusCode, body)
 	}
 	if res, body := setTag(t, ts, owner, sid, map[string]any{"text": "FISH", "badge": "icon:fish", "color": 0x3d9e60}); res.StatusCode != 200 {
 		t.Fatalf("set again: %d %v", res.StatusCode, body)

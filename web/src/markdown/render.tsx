@@ -12,6 +12,7 @@ import { FALLBACK_SURFACE, paintColor, subscribeTheme, surfaceOf, themeVersion, 
 import { alertTitle, parse, plainText } from "./parse";
 
 import { t } from "@/i18n";
+import { clampZalgo } from "@/lib/zalgo";
 // ---------------------------------------------------------------------------
 // React renderer for the markdown AST.
 //
@@ -130,7 +131,8 @@ export function RenderNodes(props: { nodes: Node[]; ctx: RenderCtx; jumbo?: bool
 function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
   switch (node.type) {
     case "text":
-      return node.text;
+      // zalgo sent from before it was refused, or by something that skipped the app, is cut back to fit its line
+      return clampZalgo(node.text);
     case "br":
       return <br />;
     case "strong":

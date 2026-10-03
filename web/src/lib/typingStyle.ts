@@ -5,12 +5,14 @@
  * has, or the person's own. It shows only while one person is typing; with
  * several, the line goes back to naming them all.
  */
+import { api } from "@/api/client";
+import { mediaSize } from "@/api/users";
 import { t } from "@/i18n";
 
 export type TypingMotion = "wave" | "pulse" | "wiggle" | "still";
 
 export interface TypingStyle {
-  /** Up to three: an emoji itself, or a server or pack emoji as messages write it, <:name:id>. */
+  /** Up to three: an emoji itself, a server or pack emoji as messages write it (<:name:id>), or a picture of the person's own (img:<id>). */
   emoji: string[];
   motion: TypingMotion;
   /** One of TYPING_PRESETS, said in the reader's language. */
@@ -26,6 +28,18 @@ export const MAX_TYPING_EMOJI = 3;
 export const MAX_TYPING_WORDS = 32;
 
 const CUSTOM = /^<(a?):([A-Za-z0-9_]{1,32}):(\d{1,20})>$/;
+
+const IMAGE = /^img:(\d{1,20})$/;
+
+/** A picture of the person's own from its token ("img:<id>"), or null for an emoji. */
+export function typingImage(token: string): string | null {
+  return IMAGE.exec(token)?.[1] ?? null;
+}
+
+/** A typing picture's address at a size (internal/api/typing_style.go keeps them small). */
+export function typingImageUrl(id: string, css: number): string {
+  return `${api.baseUrl}/media/typing/${id}?size=${mediaSize(css)}`;
+}
 
 /** A server or pack emoji from its token, or null for an emoji that is itself. */
 export function customEmoji(token: string): { id: string; name: string; animated: boolean } | null {
@@ -58,10 +72,12 @@ export function typingWordsKey(style: TypingStyle | null): { key: string; words?
   return { key: "chat.typingBar.oneTyping" };
 }
 
-/** A typing style as one line of text for the staff: its emoji (a custom one as :name:), then its words. */
+/** A typing style as one line of text for the staff: its emoji (a custom one as :name:, a picture as one), then its words. */
 export function typingStyleText(style: TypingStyle | null): string {
   if (!style) return "";
   const emoji = style.emoji.map((e) => {
+    // a picture of their own reads as one; its id says nothing
+    if (typingImage(e)) return "🖼️";
     const custom = customEmoji(e);
     return custom ? `:${custom.name}:` : e;
   });

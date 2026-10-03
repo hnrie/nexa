@@ -50,6 +50,9 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   delete: Trash2,
 };
 
+/** Pages that need more than the reading width a settings page usually has. */
+const WIDE_PAGES = new Set(["profiles"]);
+
 /** The picture a settings page is shown with, wherever it is listed (Settings' search, say). */
 export function navIconOf(id: string): LucideIcon | undefined {
   return NAV_ICONS[id];
@@ -279,7 +282,8 @@ export function SettingsLayer({
       ) : null}
       {onList ? null : (
         <div ref={scroller} className={s.contentWrap} {...(mobile ? swipeBack : {})}>
-          <div className={s.content}>{children}</div>
+          {/* the page as wide as it needs: the profile designer shows a whole profile beside its tools */}
+          <div className={s.content} data-wide={WIDE_PAGES.has(page) || undefined}>{children}</div>
           {mobile ? null : (
             <div className={s.closeCol}>
               {close}

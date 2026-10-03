@@ -76,3 +76,8 @@
 
 .own { margin-top: 8px; max-width: 360px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* what a slot can hold, under the slots' label */
+.sub { margin: -4px 0 10px; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
+.spin { animation: typingSpin 0.9s linear infinite; }
+@keyframes typingSpin { to { transform: rotate(360deg); } }
