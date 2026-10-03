@@ -430,6 +430,18 @@ class KeyManager(
         return job.await()
     }
 
+    /**
+     * Takes a root this device was handed outside the grant system (an invite
+     * link's key): keeps it, saves it, and grants it to this account so its
+     * other devices get it too (lib/joinInvite.ts).
+     */
+    suspend fun adopt(conv: String, epoch: Int, root: ByteArray) {
+        if (ring.get(conv, epoch) != null) return
+        ring.set(conv, epoch, root)
+        saveRoots()
+        userId?.let { grantTo(conv, epoch, listOf(it)) }
+    }
+
     suspend fun grantTo(conv: String, epoch: Int, userIds: List<String>) {
         val root = ring.get(conv, epoch) ?: return
         if (userIds.isEmpty()) return
