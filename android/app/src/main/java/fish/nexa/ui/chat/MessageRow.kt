@@ -372,7 +372,7 @@ object AppNames : fish.nexa.ui.markdown.NameLookup {
 }
 
 @Composable
-private fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
+internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     val c = Nx.colors
     val cm = item.cm
     val payload = cm?.payload ?: item.pending?.payload

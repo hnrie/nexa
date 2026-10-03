@@ -68,7 +68,6 @@ object MetadataScrub { fun scrub(file: java.io.File, type: String) = Unit }
 fun openChannelTopic(channel: fish.nexa.net.Channel) = Unit
 fun openVerifyKey(userId: String) = Unit
 fun openBugReport(from: String) = Unit
-@Composable fun ChatPanels(channel: fish.nexa.net.Channel) = Unit
 
 @Composable fun FriendsPage() { androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxSize()) { fish.nexa.ui.shell.PageHeader(fish.nexa.ui.t("sidebar.dMSidebar.friends")) } }
 @Composable fun MemberList(serverId: String, channelId: String?) = Unit

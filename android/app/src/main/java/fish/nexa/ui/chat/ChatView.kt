@@ -15,13 +15,16 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +34,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.Layout
 import fish.nexa.Nexa
 import fish.nexa.data.KeyPins
 import fish.nexa.net.Channel
@@ -70,12 +75,31 @@ fun ChatView(channelId: String) {
         Nexa.ui.open(channel.serverId, channelId)
         onDispose { ChatUi.leftConversation(channelId) }
     }
+    // a subchat with a password stays shut until this sign-in has typed it
+    var unlocked by remember(channelId, channel.locked) { mutableStateOf(!channel.locked || SubchatLocks.isOpen(channelId)) }
+    var lockFailed by remember(channelId) { mutableStateOf(false) }
+    var recheck by remember(channelId) { mutableIntStateOf(0) }
+    val ready by Nexa.session.ready.collectAsState()
+    LaunchedEffect(channelId, channel.locked, recheck) {
+        if (!channel.locked) return@LaunchedEffect
+        lockFailed = false
+        val open = SubchatLocks.check(channelId)
+        if (open == null) lockFailed = true else unlocked = open
+    }
+    // a check that never got an answer is asked again once the connection is back
+    LaunchedEffect(ready, lockFailed) { if (ready && lockFailed) recheck += 1 }
     Column(Modifier.fillMaxSize()) {
         ChatHeader(channel)
         Box(Modifier.weight(1f).fillMaxWidth()) {
             Column(Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
-                MessageList(channel, Modifier.weight(1f))
-                ComposerSlot(channel)
+                if (channel.locked && !unlocked) LockedSubchat(channel, lockFailed, onRecheck = { recheck += 1 }) {
+                    // a message that came in while it was shut left the list thinking it could not load
+                    Nexa.messages.clearChannel(channelId)
+                    unlocked = true
+                } else {
+                    MessageList(channel, Modifier.weight(1f))
+                    ComposerSlot(channel)
+                }
             }
             ChatPanels(channel)
         }
@@ -135,19 +159,21 @@ fun ChatHeader(channel: Channel) {
             }
             "subchat" -> {
                 Icon("MessageCircle", c.textMuted, size = 22.dp)
-                Txt(channel.name, style = nameStyle, color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                channel.parentId?.let { pid ->
-                    val parent = Nexa.channels.get(pid)
-                    Row(
-                        Modifier
-                            .padding(start = 8.dp)
-                            .widthIn(max = 140.dp)
-                            .pressable(remember { MutableInteractionSource() }) { Nav.go(Route.Dm(pid)) },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Icon("ChevronLeft", c.textMuted, size = 14.dp)
-                        Txt(t("chat.chatView.inConversation", "name" to (parent?.let { Names.channel(it) } ?: "")), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
+                // the name keeps its room; the way back to the conversation gives way first (`.hParent`)
+                ShrinkPair(Modifier.weight(1f)) {
+                    Txt(channel.name, style = nameStyle, color = c.textStrong, maxLines = 1)
+                    channel.parentId?.let { pid ->
+                        val parent = Nexa.channels.get(pid)
+                        Row(
+                            Modifier
+                                .padding(start = 8.dp)
+                                .pressable(remember { MutableInteractionSource() }) { Nav.go(Route.Dm(pid)) },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon("ChevronLeft", c.textMuted, size = 14.dp)
+                            Txt(t("chat.chatView.inConversation", "name" to (parent?.let { Names.channel(it) } ?: "")), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
+                        }
                     }
                 }
             }
@@ -165,7 +191,7 @@ fun ChatHeader(channel: Channel) {
                 }
             }
         }
-        Spacer(Modifier.weight(1f))
+        if (channel.type != "subchat") Spacer(Modifier.weight(1f))
         if (channel.serverId == null) {
             HeaderButton("Phone", t("chat.chat.startVoiceCall")) { fish.nexa.voice.Calls.join(callChannelOf(channel)) }
             HeaderButton("Video", t("chat.chat.startVideoCall")) { fish.nexa.voice.Calls.join(callChannelOf(channel), video = true) }
@@ -243,4 +269,36 @@ private fun openMoreMenu(channel: Channel) {
     if (!server && fish.nexa.voice.Calls.inCallOf(callChannelOf(channel))) items += MenuItem.Action(t("chat.chat.inviteGuestsToCall")) { fish.nexa.voice.Calls.openGuestLink(callChannelOf(channel)) }
     if (!server) items += MenuItem.Action(t("bugs.report")) { openBugReport(if (channel.type == "dm") "dm" else "group") }
     openMenu(items, title = t("chat.chat.more"), haptic = false)
+}
+
+/**
+ * Two things side by side that share what room there is the way CSS flex
+ * shrinking shares it: the second gives way four times as fast as the first
+ * and never takes more than 40% (Chat.module.css `.hParent`).
+ */
+@Composable
+private fun ShrinkPair(modifier: Modifier, content: @Composable () -> Unit) {
+    Layout(content, modifier) { measurables, constraints ->
+        val w = constraints.maxWidth
+        val first = measurables.getOrNull(0)
+        val second = measurables.getOrNull(1)
+        val h = constraints.maxHeight
+        val a = first?.maxIntrinsicWidth(h) ?: 0
+        val b = minOf(second?.maxIntrinsicWidth(h) ?: 0, (w * 0.4f).toInt())
+        var aw = a
+        var bw = b
+        val over = a + b - w
+        if (over > 0) {
+            val share = a + 4f * b
+            aw = (a - over * (a / share)).toInt().coerceAtLeast(0)
+            bw = (w - aw).coerceAtLeast(0)
+        }
+        val pa = first?.measure(Constraints(maxWidth = aw, maxHeight = h))
+        val pb = second?.measure(Constraints(maxWidth = bw, maxHeight = h))
+        val height = maxOf(pa?.height ?: 0, pb?.height ?: 0)
+        layout(w, height) {
+            pa?.placeRelative(0, (height - pa.height) / 2)
+            pb?.placeRelative(pa?.width ?: 0, (height - pb.height) / 2)
+        }
+    }
 }

@@ -46,7 +46,7 @@ import fish.nexa.ui.Icon
 import fish.nexa.ui.components.ButtonKind
 import fish.nexa.ui.components.NxButton
 import fish.nexa.ui.components.NxTextField
-import fish.nexa.ui.components.NxToggle
+import fish.nexa.ui.components.ToggleLine
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
 import fish.nexa.ui.layers.MenuItem
@@ -131,7 +131,7 @@ fun openCreatePoll(channelId: String) {
                 Txt(t("poll.create.duration"), style = Nx.type.label, color = c.textSubtle)
                 DurationField(hours) { picked -> hours = picked }
             }
-            NxToggle(multi, { multi = it }, label = t("poll.create.multiselect"))
+            ToggleLine(t("poll.create.multiselect"), multi, { multi = it })
         }
     }
 }
