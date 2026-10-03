@@ -44,6 +44,13 @@ func TestLoadDefaults(t *testing.T) {
 	if err != nil || own.DesktopDir != "/srv/releases" {
 		t.Errorf("DESKTOP_DIR: %v %q", err, own.DesktopDir)
 	}
+	// the Android builds live in the repository, beside the code that serves them, wherever the data is
+	if c.AndroidDir != filepath.Join("downloads", "android") || moved.AndroidDir != filepath.Join("downloads", "android") {
+		t.Errorf("AndroidDir = %q, with DATA_DIR %q", c.AndroidDir, moved.AndroidDir)
+	}
+	if apk, err := Load(func(k string) string { return map[string]string{"ANDROID_DIR": "/srv/apk"}[k] }); err != nil || apk.AndroidDir != "/srv/apk" {
+		t.Errorf("ANDROID_DIR: %v %q", err, apk.AndroidDir)
+	}
 	both, err := Load(func(k string) string {
 		return map[string]string{"REALTIME_APP_ID": "app", "REALTIME_APP_SECRET": "secret", "REALTIME_MONTHLY_GB": "250"}[k]
 	})
