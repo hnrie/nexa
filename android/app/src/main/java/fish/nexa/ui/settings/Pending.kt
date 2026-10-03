@@ -1,7 +1,10 @@
-// TEMPORARY: replaced by the real settings screens before release.
+// TEMPORARY: pages still being written in this branch; each is replaced by its own file before it is merged.
 package fish.nexa.ui.settings
 
-import fish.nexa.ui.components.Txt
-import fish.nexa.ui.layers.openSheet
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.runtime.Composable
+import fish.nexa.ui.t
 
-object Settings { fun open(page: String? = null, section: String? = null) = openSheet("settings", title = "User Settings") { Txt("User Settings") } }
+@Composable fun ProfilesPage() = PageTitle(t("settings.profile.profiles"))
+@Composable fun BoxScope.ProfilesSaveBar() = Unit
+

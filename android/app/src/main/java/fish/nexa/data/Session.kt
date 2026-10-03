@@ -85,6 +85,9 @@ class Session(private val nx: Nexa) {
     var onSignedOut: ((reason: String) -> Unit)? = null
     var onBanned: (() -> Unit)? = null
 
+    /** Locked during a call: the connection stays for the call, and only its events are taken (applyLockedEvent). */
+    @Volatile var lockedInCall = false
+
     /** Alerts (notify.ts dispatchHooks): a message that arrived, a friend request that came in. */
     var onMessage: ((Message, Boolean, ChatMessage) -> Unit)? = null
     var onFriendRequest: ((Relationship) -> Unit)? = null
@@ -97,8 +100,10 @@ class Session(private val nx: Nexa) {
         consumer = nx.scope.launch {
             for (e in q) {
                 if (gen != generation) break
+                if (lockedInCall && e.t !in LOCKED_EVENTS) continue
                 try {
-                    apply(e)
+                    if (lockedInCall && e.t == "ready") decode(e.d, ReadyPayload.serializer())?.let { nx.voiceStates.replaceAll(it.voiceStates) }
+                    else apply(e)
                 } catch (ex: Exception) {
                     Log.w(TAG, "event ${e.t} failed", ex)
                 }
@@ -129,6 +134,7 @@ class Session(private val nx: Nexa) {
         typingSweeper?.cancel()
         queue.close()
         _ready.value = false
+        lockedInCall = false
     }
 
     fun wake() = gateway?.wake()
@@ -341,6 +347,7 @@ class Session(private val nx: Nexa) {
             nx.keys.reconcile()
         }
         for (ch in keep) nx.scope.launch { nx.messages.syncGap(ch) }
+        nx.auth.applyLockPolicy()
     }
 
     fun mentionsMe(m: Message, meId: String): Boolean {
@@ -494,5 +501,8 @@ class Session(private val nx: Nexa) {
 
     companion object {
         private const val TAG = "NexaSession"
+
+        /** What a locked app still takes from its connection: the call, and being signed out or banned. */
+        private val LOCKED_EVENTS = setOf("ready", "voice_state", "voice_signal", "voice_error", "voice_resumed", "call_end", "session_expired", "account_banned")
     }
 }

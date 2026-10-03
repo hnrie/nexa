@@ -19,11 +19,16 @@ import fish.nexa.net.MeUser
 import fish.nexa.net.RecoverBegin
 import fish.nexa.net.RegisterRequest
 import fish.nexa.net.wireJson
+import fish.nexa.ui.ReadableError
+import fish.nexa.ui.t
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -36,6 +41,11 @@ sealed interface AuthState {
     data object Anonymous : AuthState
     /** Signed in on this device, but the identity key is not here: the password opens it. */
     data class Locked(val me: MeUser) : AuthState
+    /**
+     * The passcode is needed: this device has one, or (adopting) the account
+     * has one this device has not taken on yet.
+     */
+    data class PinLocked(val me: MeUser, val adopting: Boolean) : AuthState
     /** The server could not be reached; the token is kept and the check retried. */
     data class Offline(val message: String) : AuthState
     data class Ready(val me: MeUser) : AuthState
@@ -67,6 +77,7 @@ class Auth(private val nx: Nexa) {
             if (_state.value is AuthState.Ready) nx.scope.launch { signOutLocally("expired") }
         }
         nx.session.onSignedOut = { reason -> nx.scope.launch { signOutLocally(reason) } }
+        LockTimers.install()
     }
 
     suspend fun loadInstance(): InstanceInfo? = try {
@@ -105,7 +116,7 @@ class Auth(private val nx: Nexa) {
      * once signed in.
      */
     suspend fun bootstrap() {
-        if (_state.value is AuthState.Ready || !booting.tryLock()) return
+        if (_state.value is AuthState.Ready || _state.value is AuthState.PinLocked || !booting.tryLock()) return
         try {
             bootstrapOnce()
         } finally {
@@ -134,6 +145,11 @@ class Auth(private val nx: Nexa) {
             }
             return
         }
+        // with a passcode, every start opens on the passcode screen
+        if (AppLock.has(me.id)) {
+            _state.value = AuthState.PinLocked(me, adopting = false)
+            return
+        }
         val identity = loadIdentity(me.id)
         if (identity == null) {
             _state.value = AuthState.Locked(me)
@@ -151,12 +167,16 @@ class Auth(private val nx: Nexa) {
         return Identity(pub, priv)
     }
 
-    private fun saveIdentity(userId: String, id: Identity) = nx.secure.put("identity-$userId", Bytes.concat(id.publicKey, id.privateKey))
+    /** Keeps the identity on the device, never while a passcode guards it. */
+    private fun saveIdentity(userId: String, id: Identity) {
+        if (AppLock.has(userId)) return
+        nx.secure.put("identity-$userId", Bytes.concat(id.publicKey, id.privateKey))
+    }
 
     private fun begin(me: MeUser, identity: Identity) {
         nx.users.setMe(me)
         nx.misc.nexa.value = me.nexa
-        nx.keys.init(me.id, identity, persist = true)
+        nx.keys.init(me.id, identity, persist = !AppLock.has(me.id))
         nx.settings.key = Kdf.settingsKey(identity.privateKey)
         _state.value = AuthState.Ready(me)
         nx.session.start()
@@ -364,12 +384,199 @@ class Auth(private val nx: Nexa) {
         if (uid != null) {
             nx.secure.delete("identity-$uid")
             nx.secure.delete("roots-$uid")
+            AppLock.clear(uid)
         }
+        adoptIdentity = null
+        pendingPolicy = null
         nx.keys.reset()
         nx.users.setMe(null)
     }
 
     fun retryOffline() = nx.scope.launch { bootstrap() }
+
+    // ---- account changes that need the password again (Settings → My Account) ----
+
+    /** A new recovery key; the old one stops working at once. Returns the new one, to be shown once. */
+    suspend fun newRecoveryKey(password: String): String {
+        val identity = nx.keys.identity ?: throw IllegalStateException("locked")
+        val authKey = currentAuthKey(password)
+        val (rec, display) = Kdf.newRecoveryKey()
+        nx.api.request("POST", "/auth/recovery", buildJsonObject {
+            put("auth_key", Bytes.b64(authKey))
+            put("recovery_auth_key", Bytes.b64(Kdf.recoveryAuthKey(rec)))
+            put("enc_private_key_recovery", Bytes.b64(Keys.wrapPrivateKey(identity.privateKey, Kdf.recoveryEncKey(rec))))
+        })
+        nx.users.me.value?.let { nx.users.setMe(it.copy(hasRecovery = true)) }
+        return display
+    }
+
+    /** Deletes the account for good, then signs out here. A purge that finishes later still signs out. */
+    suspend fun deleteAccount(password: String) {
+        val authKey = currentAuthKey(password)
+        try {
+            nx.api.request("POST", "/users/@me/delete", buildJsonObject { put("auth_key", Bytes.b64(authKey)) })
+        } catch (e: ApiError) {
+            if (e.code != "delete_incomplete") throw e
+            nx.ui.toast(e.message ?: "", "info")
+        }
+        logout()
+    }
+
+    // ---- the passcode (stores/auth.ts: setPasscode, removePasscode, lockApp, requirePasscode, unlockWithPasscode) ----
+
+    /** While a device takes on the account's passcode: the identity it keeps meanwhile, and the policy. */
+    private var adoptIdentity: Identity? = null
+    private var pendingPolicy: LockPolicy? = null
+
+    /** Locks now, if this device has a passcode: everything readable leaves memory until it is typed. */
+    fun lockApp() {
+        val s = _state.value as? AuthState.Ready ?: return
+        if (!AppLock.has(s.me.id)) return
+        _state.value = AuthState.PinLocked(s.me, adopting = false)
+        lockSession()
+    }
+
+    /**
+     * What locking forgets: keys, messages, decrypted pictures and the
+     * settings (saved sealed first). The connection closes too, unless a call
+     * is on: then it stays, for the call's own events only.
+     */
+    private fun lockSession() {
+        if (AppLock.inCall()) nx.session.lockedInCall = true else nx.session.stop()
+        nx.keys.reset()
+        nx.messages.clear()
+        fish.nexa.media.Media.clear()
+        nx.scope.launch {
+            nx.settings.flush()
+            if (_state.value is AuthState.PinLocked) nx.settings.reset()
+        }
+    }
+
+    /** The passcode screen: opens this device, or (adopting) takes the account's passcode on here. */
+    suspend fun unlockWithPasscode(passcode: String) {
+        val s = _state.value as? AuthState.PinLocked ?: return
+        if (s.adopting) {
+            val identity = adoptIdentity ?: throw ReadableError(t("appLock.thisDeviceHasNoPasscode"))
+            val policy = pendingPolicy ?: throw ReadableError(t("appLock.thisDeviceHasNoPasscode"))
+            withContext(Dispatchers.Default) { AppLock.adopt(s.me.id, identity, passcode, policy) }
+            forgetStored(s.me.id)
+            adoptIdentity = null
+            pendingPolicy = null
+            resume(s.me, identity)
+            return
+        }
+        val identity = withContext(Dispatchers.Default) { AppLock.unlock(s.me.id, passcode) }
+        resume(s.me, identity)
+    }
+
+    /** A fingerprint or face opened the identity: as good as the passcode. */
+    fun unlockWithBiometric(identity: Identity) {
+        val s = _state.value as? AuthState.PinLocked ?: return
+        if (s.adopting) return
+        AppLock.succeeded(s.me.id)
+        resume(s.me, identity)
+    }
+
+    /** Unlocked: the keys come back, and a fresh ready brings the rest. */
+    private fun resume(me: MeUser, identity: Identity) {
+        if (_state.value !is AuthState.PinLocked) return
+        val inCall = nx.session.lockedInCall
+        nx.session.lockedInCall = false
+        begin(me, identity)
+        if (inCall) nx.session.restart()
+        LockTimers.activity()
+        LockTimers.rearm()
+    }
+
+    /** The plain identity and the cached conversation keys go from the device: the passcode guards them now. */
+    private fun forgetStored(userId: String) {
+        nx.secure.delete("identity-$userId")
+        nx.secure.delete("roots-$userId")
+        nx.keys.persistRoots = false
+    }
+
+    /** Saves the settings now, once more after half a second; false when that failed both times. */
+    private suspend fun saveSettingsNow(): Boolean {
+        if (nx.settings.flush()) return true
+        delay(500)
+        return nx.settings.flush()
+    }
+
+    /** A passcode for this account, set here. Every device asks for it; a change needs no old one. */
+    suspend fun setPasscode(passcode: String) {
+        val me = (_state.value as? AuthState.Ready)?.me ?: throw ReadableError(t("auth.unlockYourKeysFirst"))
+        val identity = nx.keys.identity ?: throw ReadableError(t("auth.unlockYourKeysFirst"))
+        val previous = AppLock.load(me.id)
+        val previousPolicy = nx.settings.doc.value["appLock"] ?: JsonNull
+        val policy = withContext(Dispatchers.Default) { AppLock.enable(me.id, identity, passcode, previous?.timings ?: LockTimings()) }
+        forgetStored(me.id)
+        LockTimers.rearm()
+        nx.settings.set("appLock", AppLock.policyJson(policy))
+        if (saveSettingsNow()) return
+        if (previous != null) AppLock.save(me.id, previous) else {
+            AppLock.clear(me.id)
+            saveIdentity(me.id, identity)
+            nx.keys.persistRoots = true
+        }
+        nx.settings.set("appLock", previousPolicy)
+        LockTimers.rearm()
+        throw ReadableError(t("auth.couldNotSaveThatToYour"))
+    }
+
+    /** No passcode any more, on this device or the account's others. */
+    suspend fun removePasscode() {
+        val me = (_state.value as? AuthState.Ready)?.me ?: return
+        val identity = nx.keys.identity ?: throw ReadableError(t("auth.unlockYourKeysFirst"))
+        val previous = AppLock.load(me.id)
+        val previousPolicy = nx.settings.doc.value["appLock"] ?: JsonNull
+        AppLock.clear(me.id, biometric = false)
+        LockTimers.rearm()
+        saveIdentity(me.id, identity)
+        nx.keys.persistRoots = true
+        nx.settings.set("appLock", JsonNull)
+        if (saveSettingsNow()) {
+            BiometricLock.forget(me.id)
+            return
+        }
+        previous?.let { AppLock.save(me.id, it) }
+        nx.settings.set("appLock", previousPolicy)
+        forgetStored(me.id)
+        LockTimers.rearm()
+        throw ReadableError(t("auth.couldNotSaveThatToYour"))
+    }
+
+    /** This device's lock timings; the account's policy takes them too, for devices that adopt it later. */
+    fun setLockTimings(timings: LockTimings) {
+        val me = nx.users.meId ?: return
+        AppLock.patch(me, timings) ?: return
+        LockTimers.rearm()
+        (nx.settings.doc.value["appLock"] as? JsonObject)?.let { nx.settings.set("appLock", AppLock.policyWithTimings(it, timings)) }
+    }
+
+    /**
+     * Run at every ready once the settings are in (applyLockPolicy): an
+     * account passcode this device lacks is asked for before going on; a
+     * passcode removed elsewhere is removed here.
+     */
+    fun applyLockPolicy() {
+        val s = _state.value as? AuthState.Ready ?: return
+        if (!nx.settings.loaded.value) return
+        val doc = nx.settings.doc.value
+        val has = AppLock.has(s.me.id)
+        if (AppLock.policySet(doc) && !has) {
+            val policy = AppLock.policyOf(doc) ?: return
+            adoptIdentity = nx.keys.identity ?: return
+            pendingPolicy = policy
+            _state.value = AuthState.PinLocked(s.me, adopting = true)
+            lockSession()
+        } else if (!AppLock.policySet(doc) && has) {
+            val identity = nx.keys.identity ?: return
+            AppLock.clear(s.me.id)
+            saveIdentity(s.me.id, identity)
+            nx.keys.persistRoots = true
+            LockTimers.rearm()
+        }
+    }
 
     companion object {
         private const val TAG = "NexaAuth"

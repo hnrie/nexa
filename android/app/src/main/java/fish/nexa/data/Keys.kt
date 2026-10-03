@@ -96,6 +96,7 @@ class KeyPins(private val store: SecureStore) {
     @Synchronized fun pinned(userId: String): String? = keys[userId]
     @Synchronized fun learnedThisSession(userId: String) = userId in fresh
     @Synchronized fun since(): Long = since
+    @Synchronized fun count(): Int = keys.size
 
     @Synchronized fun check(userId: String, pub: String?): Verdict {
         if (pub.isNullOrEmpty() || account == null) return Verdict.UNKNOWN
