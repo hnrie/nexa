@@ -17,7 +17,9 @@ committing it and pulling it on the server is the whole release:
   # then, on the server:
   git pull
 
-It never touches web/dist or bin/, so it publishes nothing by itself.
+It never touches web/dist or bin/. A chatd running from this same checkout
+offers the new APKs as soon as the script finishes; any other one, once the
+folder is pulled there.
 
   --skip-build      publish the APKs already in android/app/build/outputs/apk/release
   --from DIR        publish the release APKs in DIR instead (implies --skip-build)

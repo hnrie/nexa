@@ -3,7 +3,7 @@ NODE_BIN ?= /usr/local/lib/nodejs/current/bin
 VERSION ?= $(shell git describe --always --dirty 2>/dev/null || echo dev)
 export PATH := $(NODE_BIN):$(PATH)
 
-.PHONY: build web server test test-go test-web test-desktop desktop publish-desktop licenses run clean clean-deploy
+.PHONY: build web server test test-go test-web test-desktop desktop publish-desktop publish-android licenses run clean clean-deploy
 
 # A build runs the typechecker (inside the web build) but not the test
 # suites unless asked with `make build TEST=1`. The suites are timing
@@ -54,6 +54,11 @@ desktop: test-desktop
 # copies desktop/dist into DESKTOP_DIR, where chatd serves downloads and updates
 publish-desktop:
 	python3 tools/publish_desktop.py desktop/dist
+
+# builds the Android app's release APKs into downloads/android, ready to commit
+# (needs android/keystore.properties; see downloads/android/README.md)
+publish-android:
+	python3 tools/android_release.py
 
 # what Settings → Licenses shows, read back out of the lockfiles. Run it after any
 # dependency changes, in any of the three builds.
