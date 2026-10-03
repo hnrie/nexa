@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -165,7 +166,7 @@ private fun fieldRows(fields: List<fish.nexa.data.HookEmbedField>, thumbnail: Bo
 private fun RichEmbeds(hook: HookContent, from: String) {
     val shown = remember(hook) { mergeGalleries(hook.embeds) }
     if (shown.isEmpty()) return
-    Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         for (s in shown) if (s.embed.type != "poll_result") RichEmbed(hook, s.embed, s.images, from)
     }
 }
@@ -181,7 +182,7 @@ private fun RichEmbed(hook: HookContent, embed: HookEmbed, all: List<HookMedia>,
     val rows = remember(embed, thumbnail != null) { fieldRows(embed.fields, thumbnail != null) }
     val viewer = (images + listOfNotNull(thumbnail)).map { lightboxItem(hook, it).copy(from = from) }
     val shape = Radii.Md
-    Row(
+    Box(
         Modifier
             .widthIn(max = 520.dp)
             .shadowLow(shape, c)
@@ -190,47 +191,50 @@ private fun RichEmbed(hook: HookContent, embed: HookEmbed, all: List<HookMedia>,
             .background(c.embedBg)
             .background(sheen(c))
             .topEdge(shape, c.edgeLight)
-            .height(IntrinsicSize.Min),
+            .startBar(embed.color?.let { rgbColor(it) } ?: c.borderStrong),
     ) {
-        Box(Modifier.width(4.dp).fillMaxHeight().background(embed.color?.let { rgbColor(it) } ?: c.borderStrong))
-        Row(Modifier.padding(start = 12.dp, end = 16.dp, top = 2.dp, bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                embed.author?.let { a ->
-                    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val icon = hookSrc(hook, a.iconBlobId, a.proxyIconUrl)
-                        if (icon != null && icon != "") AsyncImage(icon, null, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.size(24.dp).clip(CircleShape))
-                        Txt(
-                            a.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong,
-                            modifier = if (a.url != null) Modifier.pressable(remember { MutableInteractionSource() }) { openExternal(a.url) } else Modifier,
-                        )
+        // as wide as its widest part (up to the card's limit), like the web's shrink-to-fit grid
+        Column(Modifier.width(IntrinsicSize.Max).padding(start = 12.dp, end = 16.dp, top = 2.dp, bottom = 16.dp)) {
+            // the thumbnail sits at the top end beside the words; the picture and the footer run the full width below
+            val head = embed.author != null || embed.title != null || embed.description != null || rows.isNotEmpty()
+            if (head || thumbnail != null) Row(Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    embed.author?.let { a ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            val icon = hookSrc(hook, a.iconBlobId, a.proxyIconUrl)
+                            if (icon != null && icon != "") AsyncImage(icon, null, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.size(24.dp).clip(CircleShape))
+                            Txt(
+                                a.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong,
+                                modifier = if (a.url != null) Modifier.pressable(remember { MutableInteractionSource() }) { openExternal(a.url) } else Modifier,
+                            )
+                        }
+                    }
+                    embed.title?.let { title ->
+                        Box(if (embed.url != null) Modifier.pressable(remember { MutableInteractionSource() }) { openExternal(embed.url) } else Modifier) {
+                            MessageText(title, if (embed.url != null) c.link else c.textStrong, null)
+                        }
+                    }
+                    embed.description?.let { MessageText(it, c.text, null) }
+                    for (row in rows) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (f in row) Column(Modifier.weight(1f)) {
+                            Txt(f.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong)
+                            MessageText(f.value, c.text, null)
+                        }
                     }
                 }
-                if (embed.author == null) Box(Modifier.height(6.dp))
-                embed.title?.let { title ->
-                    Box(if (embed.url != null) Modifier.pressable(remember { MutableInteractionSource() }) { openExternal(embed.url) } else Modifier) {
-                        MessageText(title, if (embed.url != null) c.link else c.textStrong, null)
-                    }
-                }
-                embed.description?.let { MessageText(it, c.text, null) }
-                for (row in rows) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (f in row) Column(Modifier.weight(1f)) {
-                        Txt(f.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong)
-                        MessageText(f.value, c.text, null)
-                    }
-                }
-                if (images.size == 1) EmbedImage(hook, images[0], thumb = false) { openLightbox(viewer, 0) }
-                else if (images.size > 1) EmbedGallery(hook, images) { i -> openLightbox(viewer, i) }
-                if (embed.footer != null || embed.timestamp != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val icon = hookSrc(hook, embed.footer?.iconBlobId, embed.footer?.proxyIconUrl)
-                        if (icon != null && icon != "") AsyncImage(icon, null, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.size(20.dp).clip(CircleShape))
-                        val parts = listOfNotNull(embed.footer?.text, embed.timestamp?.let { Time.timestamp(it) })
-                        Txt(parts.joinToString(" • "), style = Nx.type.hint.copy(lineHeight = Nx.type.sp(16f), fontWeight = FontWeight(500)), color = c.textMuted)
-                    }
+                if (thumbnail != null) Box(Modifier.padding(start = 16.dp, top = 8.dp)) {
+                    EmbedImage(hook, thumbnail, thumb = true) { openLightbox(viewer, images.size) }
                 }
             }
-            if (thumbnail != null) Box(Modifier.padding(top = 16.dp)) {
-                EmbedImage(hook, thumbnail, thumb = true) { openLightbox(viewer, images.size) }
+            if (images.size == 1) EmbedImage(hook, images[0], thumb = false) { openLightbox(viewer, 0) }
+            else if (images.size > 1) EmbedGallery(hook, images) { i -> openLightbox(viewer, i) }
+            if (embed.footer != null || embed.timestamp != null) {
+                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val icon = hookSrc(hook, embed.footer?.iconBlobId, embed.footer?.proxyIconUrl)
+                    if (icon != null && icon != "") AsyncImage(icon, null, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.size(20.dp).clip(CircleShape))
+                    val parts = listOfNotNull(embed.footer?.text, embed.timestamp?.let { Time.timestamp(it) })
+                    Txt(parts.joinToString(" • "), style = Nx.type.hint.copy(lineHeight = Nx.type.sp(16f), fontWeight = FontWeight(500)), color = c.textMuted)
+                }
             }
         }
     }
@@ -240,17 +244,19 @@ private fun RichEmbed(hook: HookContent, embed: HookEmbed, all: List<HookMedia>,
 private fun EmbedImage(hook: HookContent, m: HookMedia, thumb: Boolean, onOpen: () -> Unit) {
     val c = Nx.colors
     val src = hookSrc(hook, m.blobId, m.proxyUrl) ?: return
-    val box = if (thumb) Fit.Box(64, 64) else Fit.within(m.width, m.height, 400, 300)
+    // a thumbnail is held within 64 dp on a phone (80 on the web), a picture within 400 by 300, both kept whole
+    val box = if (thumb) Fit.within(m.width, m.height, 64, 64) else Fit.within(m.width, m.height, 400, 300)
+    val fallback = if (thumb) 64.dp else 80.dp
     Box(
         Modifier
-            .padding(top = if (thumb) 0.dp else 8.dp)
-            .then(if (box != null) Modifier.width(box.width.dp).aspectRatio(box.width.toFloat() / box.height) else Modifier.size(80.dp))
+            .padding(top = if (thumb) 0.dp else 16.dp)
+            .then(if (box != null) Modifier.width(box.width.dp).aspectRatio(box.width.toFloat() / box.height) else Modifier.size(fallback))
             .clip(Radii.Xs)
             .background(c.bgInput)
             .pressable(remember { MutableInteractionSource() }, onClick = onOpen)
             .semantics { contentDescription = m.description ?: t("webhook.openImage") },
     ) {
-        if (src != "") AsyncImage(src, m.description, imageLoader = Media.loader, contentScale = if (thumb) ContentScale.Crop else ContentScale.Fit, modifier = Modifier.fillMaxSize())
+        if (src != "") AsyncImage(src, m.description, imageLoader = Media.loader, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
     }
 }
 
@@ -261,12 +267,12 @@ private fun EmbedGallery(hook: HookContent, images: List<HookMedia>, onOpen: (In
     @Composable
     fun cell(i: Int, modifier: Modifier) {
         val src = hookSrc(hook, images[i].blobId, images[i].proxyUrl)
-        Box(modifier.clip(Radii.Xs).background(c.bgInput).pressable(remember { MutableInteractionSource() }) { onOpen(i) }) {
+        Box(modifier.clipToBounds().background(c.bgInput).pressable(remember { MutableInteractionSource() }) { onOpen(i) }) {
             if (src != null && src != "") AsyncImage(src, images[i].description, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
     }
     val gap = 4.dp
-    Column(Modifier.padding(top = 8.dp).widthIn(max = 400.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(gap)) {
+    Column(Modifier.padding(top = 16.dp).width(400.dp).clip(Radii.Xs), verticalArrangement = Arrangement.spacedBy(gap)) {
         if (images.size == 3) Row(Modifier.fillMaxWidth().aspectRatio(1f), horizontalArrangement = Arrangement.spacedBy(gap)) {
             cell(0, Modifier.weight(1f).fillMaxHeight())
             Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
@@ -289,7 +295,7 @@ private fun HookPart(c: HookComponent, hook: HookContent, from: String) {
         Hooks.C_BUTTON -> LinkButton(c)
         Hooks.C_TEXT -> c.content?.let { MessageText(it, Nx.colors.text, null) }
         Hooks.C_SECTION -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) { for (x in c.components) HookPart(x, hook, from) }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { for (x in c.components) HookPart(x, hook, from) }
             c.accessory?.let { acc ->
                 if (acc.type == Hooks.C_THUMBNAIL && acc.media != null) Thumbnail(hook, acc)
                 else if (acc.type == Hooks.C_BUTTON) LinkButton(acc)
@@ -313,25 +319,22 @@ private fun Container(c: HookComponent, hook: HookContent, from: String) {
     val colors = Nx.colors
     var revealed by remember(c) { mutableStateOf(false) }
     val hidden = c.spoiler && !revealed
-    Row(
+    Box(
         Modifier
             .fillMaxWidth()
             .border(1.dp, colors.borderSubtle, Radii.Sm)
             .clip(Radii.Sm)
             .background(colors.embedBg)
-            .height(IntrinsicSize.Min),
+            .then(c.accentColor?.let { Modifier.startBar(rgbColor(it)) } ?: Modifier),
     ) {
-        c.accentColor?.let { Box(Modifier.width(4.dp).fillMaxHeight().background(rgbColor(it))) }
-        Box(Modifier.weight(1f)) {
-            Column(
-                Modifier.fillMaxWidth().padding(16.dp).then(if (hidden && canBlur) Modifier.blur(24.dp) else Modifier),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (!hidden || canBlur) for (x in c.components) HookPart(x, hook, from)
-                else Box(Modifier.fillMaxWidth().height(64.dp))
-            }
-            if (hidden) SpoilerCover(13f) { revealed = true }
+        Column(
+            Modifier.fillMaxWidth().padding(16.dp).then(if (hidden && canBlur) Modifier.blur(24.dp) else Modifier),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (!hidden || canBlur) for (x in c.components) HookPart(x, hook, from)
+            else Box(Modifier.fillMaxWidth().height(64.dp))
         }
+        if (hidden) SpoilerCover(13f) { revealed = true }
     }
 }
 
@@ -352,7 +355,7 @@ private fun LinkButton(b: HookComponent) {
     val pressed by interaction.collectIsPressedAsState()
     Row(
         Modifier
-            .heightIn(min = 40.dp)
+            .heightIn(min = 32.dp)
             .widthIn(min = 60.dp)
             .clip(Radii.Sm)
             .background(if (pressed) c.bgActive else c.bgSurface)
@@ -387,7 +390,7 @@ private fun Thumbnail(hook: HookContent, c: HookComponent) {
             .pressable(remember { MutableInteractionSource() }) { if (spoiler) revealed = true else openLightbox(listOf(lightboxItem(hook, media)), 0) }
             .semantics { contentDescription = if (spoiler) t("render.spoilerHidden") else c.description ?: t("webhook.openImage") },
     ) {
-        if (src != "" && (!spoiler || canBlur)) AsyncImage(src, c.description, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().then(if (spoiler) Modifier.blur(44.dp) else Modifier))
+        if (src != "" && (!spoiler || canBlur)) AsyncImage(src, c.description, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().then(if (spoiler) Modifier.spoilerBlur() else Modifier))
         if (spoiler) HookSpoilerLabel(Modifier.align(Alignment.Center))
     }
 }
@@ -427,7 +430,7 @@ private fun Gallery(hook: HookContent, all: HookComponent, from: String) {
         }
         Box(
             modifier
-                .clip(Radii.Xs)
+                .clipToBounds()
                 .background(colors.bgInput)
                 .pressable(remember { MutableInteractionSource() }) {
                     if (spoiler) revealed[i] = true
@@ -435,7 +438,7 @@ private fun Gallery(hook: HookContent, all: HookComponent, from: String) {
                 }
                 .semantics { contentDescription = if (spoiler) t("render.spoilerHidden") else it.description ?: t("webhook.openImage") },
         ) {
-            if (src != "" && (!spoiler || canBlur)) AsyncImage(src, it.description, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().then(if (spoiler) Modifier.blur(44.dp) else Modifier))
+            if (src != "" && (!spoiler || canBlur)) AsyncImage(src, it.description, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().then(if (spoiler) Modifier.spoilerBlur() else Modifier))
             if (spoiler) HookSpoilerLabel(Modifier.align(Alignment.Center))
         }
     }

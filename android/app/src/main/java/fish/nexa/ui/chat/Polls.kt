@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -200,14 +201,17 @@ fun PollView(poll: PollShape, tally: PollTally?, channelId: String, messageId: S
             Txt(t("poll.votes", "count" to (tally?.totalVoters ?: 0)), style = foot, color = c.textMuted)
             Txt("•", style = foot, color = c.textMuted)
             Txt(if (closed) t("poll.closed") else if (expiry > 0) timeLeft(expiry, now) else "", style = foot, color = c.textMuted)
-            Box(Modifier.weight(1f))
-            when {
-                closed || readOnly -> Unit
-                voted -> PollLink(t("poll.removeVote"), enabled = !busy) { send(emptyList()) }
-                peek -> PollLink(t("poll.backToVoting")) { peek = false }
-                else -> {
-                    PollLink(t("poll.showResults")) { peek = true }
-                    NxButton(t("poll.vote"), { send(picked.toList()) }, size = ButtonSize.SM, enabled = picked.isNotEmpty(), loading = busy)
+            // the actions keep together at the end of the line, or of a line of their own when they do not fit
+            if (!closed && !readOnly) Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                Row(Modifier.width(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    when {
+                        voted -> PollLink(t("poll.removeVote"), enabled = !busy) { send(emptyList()) }
+                        peek -> PollLink(t("poll.backToVoting")) { peek = false }
+                        else -> {
+                            PollLink(t("poll.showResults")) { peek = true }
+                            NxButton(t("poll.vote"), { send(picked.toList()) }, size = ButtonSize.SM, enabled = picked.isNotEmpty(), loading = busy)
+                        }
+                    }
                 }
             }
         }
@@ -217,7 +221,7 @@ fun PollView(poll: PollShape, tally: PollTally?, channelId: String, messageId: S
 @Composable
 private fun PollLink(label: String, enabled: Boolean = true, onClick: () -> Unit) {
     Txt(
-        label, style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = Nx.colors.link,
+        label, style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = Nx.colors.textSubtle,
         modifier = Modifier.pressable(remember { MutableInteractionSource() }, enabled = enabled, onClick = onClick).padding(vertical = 8.dp, horizontal = 2.dp),
     )
 }

@@ -33,8 +33,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -218,7 +220,7 @@ fun ImageAttachment(att: AttachmentMeta, cm: ChatMessage?, tile: Fit.Tile?, onOp
     val file = load.file
     Box(
         frame
-            .then(if (tile == null) Modifier.ring(Radii.Md, c.borderSubtle).clip(Radii.Md) else Modifier)
+            .then(if (tile == null) Modifier.ring(Radii.Md, c.borderSubtle).clip(Radii.Md) else Modifier.clipToBounds())
             .background(c.bgInput)
             .loadPriority(load, shown.blobId)
             .pointerInput(att.blobId, revealed, file) {
@@ -237,7 +239,7 @@ fun ImageAttachment(att: AttachmentMeta, cm: ChatMessage?, tile: Fit.Tile?, onOp
                 file, att.alt ?: att.name,
                 imageLoader = Media.loader,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().then(if (!revealed) Modifier.blur(44.dp) else Modifier),
+                modifier = Modifier.fillMaxSize().then(if (!revealed) Modifier.spoilerBlur() else Modifier),
             )
         } else {
             Placeholder(load, att, auto, revealed, what = "image")
@@ -249,6 +251,12 @@ fun ImageAttachment(att: AttachmentMeta, cm: ChatMessage?, tile: Fit.Tile?, onOp
 
 /** Whether this phone can blur what is drawn (Android 12 and later); a cover hides the picture entirely where it cannot. */
 val canBlur: Boolean get() = Build.VERSION.SDK_INT >= 31
+
+/**
+ * A spoiler's blur, fading at the edges into the frame behind it as the web's
+ * `filter: blur()` does; the frame clips it to its own bounds.
+ */
+fun Modifier.spoilerBlur(radius: Dp = 44.dp): Modifier = blur(radius, BlurredEdgeTreatment.Unbounded)
 
 /** What an empty frame says while its picture comes: decrypting, a button for a big one, or why it failed. */
 @Composable

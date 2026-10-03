@@ -6,10 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -44,6 +45,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import coil3.compose.AsyncImage
@@ -70,6 +73,15 @@ import fish.nexa.ui.theme.topEdge
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.net.URLDecoder
+
+/**
+ * A card's bar of colour down its start edge (an embed's or a box's accent),
+ * drawn rather than laid out so the card is exactly as tall as what it holds.
+ */
+fun Modifier.startBar(color: Color, width: Dp = 4.dp): Modifier = drawBehind {
+    val w = width.toPx()
+    drawRect(color, topLeft = Offset(if (layoutDirection == LayoutDirection.Rtl) size.width - w else 0f, 0f), size = Size(w, size.height))
+}.padding(start = width)
 
 /** The previews of a message's links, as the row calls for them. */
 @Composable
@@ -232,7 +244,7 @@ private fun LinkCard(e: Unfurl, from: String) {
     val big = e.image != null && (e.imageLayout == "large" || (e.imageLayout != "thumbnail" && (e.imageW ?: 0.0) >= 400))
     val bar = e.color?.let { parseHex(it) } ?: c.brand
     val shape = Radii.Md
-    Row(
+    Box(
         Modifier
             .widthIn(max = 516.dp)
             .shadowLow(shape, c)
@@ -241,9 +253,8 @@ private fun LinkCard(e: Unfurl, from: String) {
             .background(c.embedBg)
             .background(sheen(c))
             .topEdge(shape, c.edgeLight)
-            .height(IntrinsicSize.Min),
+            .startBar(bar),
     ) {
-        Box(Modifier.width(4.dp).fillMaxHeight().background(bar))
         Column(Modifier.padding(start = 13.dp, end = 16.dp, top = 10.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {

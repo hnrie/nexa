@@ -44,7 +44,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -297,11 +296,11 @@ private fun BoxScope.PlayerBody(
     ) {
         if (player != null) ContentFrame(
             player,
-            Modifier.fillMaxSize().then(if (!revealed && canBlur) Modifier.blur(44.dp) else Modifier),
+            Modifier.fillMaxSize().then(if (!revealed && canBlur) Modifier.spoilerBlur() else Modifier),
             surfaceType = SURFACE_TYPE_TEXTURE_VIEW,
             contentScale = ContentScale.Fit,
         )
-        else if (poster != null && (revealed || canBlur)) AsyncImage(poster, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().then(if (!revealed) Modifier.blur(44.dp) else Modifier))
+        else if (poster != null && (revealed || canBlur)) AsyncImage(poster, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().then(if (!revealed) Modifier.spoilerBlur() else Modifier))
     }
     if (!revealed) {
         SpoilerCover(13.5f) { revealed = true }
