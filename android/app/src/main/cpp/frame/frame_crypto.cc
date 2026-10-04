@@ -1,5 +1,6 @@
 // Sealing and opening call frames, in the format web/src/voice/frameCrypto.ts
-// describes: clear header | AES-256-GCM ciphertext and tag | iv (12) | key index (1).
+// describes: clear header | AES-256-GCM ciphertext and tag | iv (12) | key index (1),
+// and an H.264 frame sealed where it lies (sealed_frame.h).
 //
 // libwebrtc hands every encoded frame to a sender's encryptor before it is
 // packetised, and every assembled frame to a receiver's decryptor before it
@@ -21,6 +22,7 @@
 #include <shared_mutex>
 
 #include "aes_gcm.h"
+#include "h264.h"
 #include "sealed_frame.h"
 #include "webrtc_abi.h"
 
@@ -30,6 +32,34 @@ namespace {
 void RandomBytes(uint8_t* out, size_t len) {
   arc4random_buf(out, len);
 }
+
+// IVs have no zero byte in them (frameCrypto.ts nextCounter): two zeros and a
+// one would be a start code, which in a sealed H.264 frame would split it in
+// the packetiser. So a salt is drawn again where it has a zero, and the
+// counter runs through the numbers whose four bytes are 1 to 255.
+constexpr uint64_t kFirstCounter = 0x01010101u;
+constexpr uint64_t kMaxCounter = 0xffffffffu;
+
+void NewSalt(uint8_t* salt) {
+  RandomBytes(salt, kSaltLen);
+  for (size_t i = 0; i < kSaltLen; i++) {
+    while (salt[i] == 0) RandomBytes(salt + i, 1);
+  }
+}
+
+uint64_t NextCounter(uint64_t n) {
+  uint64_t next = n + 1;
+  // a byte that rolled over to zero becomes 1 (the byte above it was carried into already)
+  for (int shift = 0; shift < 32; shift += 8) {
+    if (((next >> shift) & 0xff) == 0) next += uint64_t(1) << shift;
+  }
+  return next;
+}
+
+// How many ivs an H.264 frame is sealed with before it is given up: one that
+// comes out holding a start code (about once in 16 million sealed bytes) is
+// sealed again with the next.
+constexpr int kH264Tries = 10;
 
 // How libwebrtc calls these objects. This SDK's libwebrtc is built the way
 // Chrome is, and on arm64 Chrome compiles C++ with relative vtables (clang's
@@ -173,7 +203,7 @@ const int32_t* DecryptorVtable();
 class Encryptor final : public RefCounted<webrtc::FrameEncryptorInterface> {
  public:
   explicit Encryptor(KeySetPtr keys) : keys_(std::move(keys)) {
-    RandomBytes(salt_, kSaltLen);
+    NewSalt(salt_);
     facade.vtable = RelativeVtables() ? EncryptorVtable() : nullptr;
     facade.self = this;
   }
@@ -194,30 +224,23 @@ class Encryptor final : public RefCounted<webrtc::FrameEncryptorInterface> {
       *bytes_written = 0;
       return 0;
     }
-    if (encrypted_frame.size() < len + kFrameOverhead) return -1;
-
-    // 8 random bytes chosen per sender, then a counter: never the same iv
-    // twice under one key. Receivers read the iv out of the frame, so how it
-    // is put together is the sender's business.
-    std::lock_guard<std::mutex> lock(iv_mu_);
-    if (counter_ == 0xffffffffu) {
-      RandomBytes(salt_, kSaltLen);
-      counter_ = 0;
-    }
-    uint8_t iv[kIvLen];
-    memcpy(iv, salt_, kSaltLen);
-    const uint32_t counter = counter_++;
-    iv[8] = uint8_t(counter >> 24);
-    iv[9] = uint8_t(counter >> 16);
-    iv[10] = uint8_t(counter >> 8);
-    iv[11] = uint8_t(counter);
-
     const bool video = media_type == webrtc::MEDIA_TYPE_VIDEO;
+    const bool h264 = video && IsAnnexB(data, len);
+    if (encrypted_frame.size() < (h264 ? MaxSealedH264(len) : len + kFrameOverhead)) return -1;
+
+    std::lock_guard<std::mutex> lock(iv_mu_);
+    *bytes_written = 0;
     const bool ok = keys_->WithSending([&](const AesGcm& cipher, int index) {
-      *bytes_written = SealFrame(cipher, index, iv, video, data, len, encrypted_frame.data());
+      if (!h264) {
+        *bytes_written = SealFrame(cipher, index, NextIv().data(), video, data, len, encrypted_frame.data());
+        return;
+      }
+      for (int tries = 0; tries < kH264Tries && *bytes_written == 0; tries++) {
+        *bytes_written = SealH264Frame(cipher, index, NextIv().data(), data, len, encrypted_frame.data());
+      }
     });
     // no key, nothing sent: never in the clear, never under another call's key
-    if (!ok) {
+    if (!ok || *bytes_written == 0) {
       keys_->dropped.fetch_add(1, std::memory_order_relaxed);
       return -1;
     }
@@ -225,15 +248,35 @@ class Encryptor final : public RefCounted<webrtc::FrameEncryptorInterface> {
     return 0;
   }
 
-  size_t GetMaxCiphertextByteSize(webrtc::MediaType /*media_type*/, size_t frame_size) override {
-    return frame_size + kFrameOverhead;
+  size_t GetMaxCiphertextByteSize(webrtc::MediaType media_type, size_t frame_size) override {
+    // an H.264 frame can grow by its start codes
+    return media_type == webrtc::MEDIA_TYPE_VIDEO ? std::max(frame_size + kFrameOverhead, MaxSealedH264(frame_size))
+                                                  : frame_size + kFrameOverhead;
   }
 
  private:
+  // 8 random bytes chosen per sender, then a counter: never the same iv twice
+  // under one key. Receivers read the iv out of the frame, so how it is put
+  // together is the sender's business. Called with iv_mu_ held.
+  std::array<uint8_t, kIvLen> NextIv() {
+    if (counter_ > kMaxCounter) {
+      NewSalt(salt_);
+      counter_ = kFirstCounter;
+    }
+    std::array<uint8_t, kIvLen> iv{};
+    memcpy(iv.data(), salt_, kSaltLen);
+    iv[8] = uint8_t(counter_ >> 24);
+    iv[9] = uint8_t(counter_ >> 16);
+    iv[10] = uint8_t(counter_ >> 8);
+    iv[11] = uint8_t(counter_);
+    counter_ = NextCounter(counter_);
+    return iv;
+  }
+
   KeySetPtr keys_;
   std::mutex iv_mu_;
   uint8_t salt_[kSaltLen] = {};
-  uint32_t counter_ = 0;
+  uint64_t counter_ = kFirstCounter;
 };
 
 class Decryptor final : public RefCounted<webrtc::FrameDecryptorInterface> {
@@ -261,10 +304,34 @@ class Decryptor final : public RefCounted<webrtc::FrameDecryptorInterface> {
     if (index < 0 || frame.size() < len - kTrailer - kTagLen) return Fail(len, index, false);
 
     long written = -1;
-    const bool held = keys_->With(index, [&](const AesGcm& cipher) { written = OpenFrame(cipher, video, data, len, frame.data()); });
+    const bool h264 = video && IsAnnexB(data, len);
+    const bool held = keys_->With(index, [&](const AesGcm& cipher) {
+      written = h264 ? OpenH264Frame(cipher, data, len, frame.data()) : OpenFrame(cipher, video, data, len, frame.data());
+    });
     if (written <= 0) return Fail(len, index, held);
 
-    if (video) {
+    if (h264) {
+      // frameSize.ts: an SPS sets the picture, which none of a frame's SPSs
+      // may take over the cap; the frames after it are that size
+      bool seen = false;
+      bool over = false;
+      for (const Nalu& n : NaluIndices(frame.data(), size_t(written))) {
+        if (n.end <= n.payload || (frame.data()[n.payload] & 0x1f) != kNaluSps) continue;
+        int width = 0, height = 0;
+        // an SPS no decoder can read starts nothing
+        if (!SpsSize(frame.data(), n, &width, &height)) return Fail();
+        seen = true;
+        if (!FitsVideoCap(width, height)) over = true;
+      }
+      if (seen) {
+        blocked_.store(over, std::memory_order_relaxed);
+        too_large_.store(over, std::memory_order_relaxed);
+      }
+      if (blocked_.load(std::memory_order_relaxed)) {
+        if (over) keys_->oversize.fetch_add(1, std::memory_order_relaxed);
+        return Fail();
+      }
+    } else if (video) {
       // frameSize.ts: a key frame over the cap is never decoded, nor anything
       // after it until a key frame within the cap comes along
       int width = 0, height = 0;
@@ -520,8 +587,11 @@ JNIEXPORT jbyteArray JNICALL Java_fish_nexa_voice_FrameCryptoNative_nativeSealFo
   const jsize len = env->GetArrayLength(j_plain);
   std::unique_ptr<uint8_t[]> plain(new uint8_t[len > 0 ? len : 1]);
   env->GetByteArrayRegion(j_plain, 0, len, reinterpret_cast<jbyte*>(plain.get()));
-  std::unique_ptr<uint8_t[]> out(new uint8_t[len + nexa::kFrameOverhead]);
-  const size_t n = nexa::SealFrame(cipher, index, iv, video == JNI_TRUE, plain.get(), size_t(len), out.get());
+  const bool h264 = video == JNI_TRUE && nexa::IsAnnexB(plain.get(), size_t(len));
+  std::unique_ptr<uint8_t[]> out(new uint8_t[h264 ? nexa::MaxSealedH264(size_t(len)) : len + nexa::kFrameOverhead]);
+  const size_t n = h264 ? nexa::SealH264Frame(cipher, index, iv, plain.get(), size_t(len), out.get())
+                        : nexa::SealFrame(cipher, index, iv, video == JNI_TRUE, plain.get(), size_t(len), out.get());
+  if (h264 && n == 0) return nullptr;
   jbyteArray arr = env->NewByteArray(jsize(n));
   if (arr != nullptr) env->SetByteArrayRegion(arr, 0, jsize(n), reinterpret_cast<jbyte*>(out.get()));
   return arr;
@@ -537,7 +607,9 @@ JNIEXPORT jbyteArray JNICALL Java_fish_nexa_voice_FrameCryptoNative_nativeOpenFo
   std::unique_ptr<uint8_t[]> sealed(new uint8_t[len > 0 ? len : 1]);
   env->GetByteArrayRegion(j_sealed, 0, len, reinterpret_cast<jbyte*>(sealed.get()));
   std::unique_ptr<uint8_t[]> out(new uint8_t[len > 0 ? len : 1]);
-  const long n = nexa::OpenFrame(cipher, video == JNI_TRUE, sealed.get(), size_t(len), out.get());
+  const long n = video == JNI_TRUE && nexa::IsAnnexB(sealed.get(), size_t(len))
+      ? nexa::OpenH264Frame(cipher, sealed.get(), size_t(len), out.get())
+      : nexa::OpenFrame(cipher, video == JNI_TRUE, sealed.get(), size_t(len), out.get());
   if (n < 0) return nullptr;
   jbyteArray arr = env->NewByteArray(jsize(n));
   if (arr != nullptr) env->SetByteArrayRegion(arr, 0, jsize(n), reinterpret_cast<jbyte*>(out.get()));

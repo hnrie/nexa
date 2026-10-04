@@ -5438,5 +5438,7 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Si Nexa y est déjà activé, la permission désigne encore une ancienne copie de l’application. Choisissez Réinitialiser la permission, puis réactivez Nexa.",
   "desktop.displayPicker.theOldPermissionIsCleared": "L’ancienne permission est effacée.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Activez Nexa dans Enregistrement de l’écran. macOS propose de rouvrir Nexa. Sinon, redémarrez-le ici.",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS n’a pas réinitialisé la permission. Retirez Nexa d’Enregistrement de l’écran avec le bouton moins, rajoutez-le et redémarrez."
+  "desktop.displayPicker.couldNotResetThePermission": "macOS n’a pas réinitialisé la permission. Retirez Nexa d’Enregistrement de l’écran avec le bouton moins, rajoutez-le et redémarrez.",
+  "whatsNew.r20261004.phoneShareTitle": "Partage d’écran plus fluide depuis le téléphone",
+  "whatsNew.r20261004.phoneShareBody": "L’app Android partage désormais votre écran avec l’encodeur vidéo de votre téléphone, pour une image fluide et nette même quand ça bouge."
 }

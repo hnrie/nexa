@@ -7,6 +7,12 @@
 // The clear header is what packetisers and the SFU read (Opus's TOC byte,
 // VP8's payload header) and is authenticated as additional data, so it cannot
 // be altered either.
+//
+// An H.264 frame is read at more places than its start (h264.h), so it is
+// sealed where it lies: every NAL unit after a 4-byte start code, its
+// readable part as it was and the rest sealed, all under one AES-GCM
+// operation whose additional data is the readable parts joined, then the tag,
+// the iv and the key index after the last unit.
 #ifndef NEXA_SEALED_FRAME_H_
 #define NEXA_SEALED_FRAME_H_
 
@@ -50,6 +56,25 @@ int FrameKeyIndex(const uint8_t* data, size_t len);
 // Opens a sealed frame into `out`, which needs room for `len` bytes. Returns
 // the plaintext length; -1 if the frame was altered or is malformed.
 long OpenFrame(const AesGcm& cipher, bool video, const uint8_t* data, size_t len, uint8_t* out);
+
+// What sealing adds after an H.264 frame's last NAL unit: the tag, the iv and the key index.
+constexpr size_t kH264Trailer = kTagLen + kIvLen + 1;
+
+// The most an H.264 frame of `len` bytes can take once sealed: every start
+// code made 4 bytes long (one byte more at most for every 3 of the frame),
+// then the trailer.
+size_t MaxSealedH264(size_t len);
+
+// Seals an H.264 frame into `out`, which needs MaxSealedH264(len) bytes.
+// Returns how many bytes were written; 0 when it is not a frame this can
+// seal, or when the sealed bytes happen to hold a start code, which would
+// split a NAL unit in the packetiser: then seal again with the next iv.
+size_t SealH264Frame(const AesGcm& cipher, int key_index, const uint8_t iv[kIvLen], const uint8_t* data, size_t len,
+                     uint8_t* out);
+
+// Opens a sealed H.264 frame into `out`, which needs room for `len` bytes.
+// Returns the plaintext length; -1 if the frame was altered or is malformed.
+long OpenH264Frame(const AesGcm& cipher, const uint8_t* data, size_t len, uint8_t* out);
 
 }  // namespace nexa
 

@@ -663,8 +663,10 @@ internal object Engine {
                     capture.release()
                     return@launch
                 }
+                // the capturer leaves the frame rate to the screen (60, 90 or 120 a second): the share keeps to the one asked for
+                capture.source.adaptOutputFormat(w, h, fps)
                 s.screen = capture
-                s.transport.setLocalScreen(capture.track, VideoCap.shareBitrate(res, fps))
+                s.transport.setLocalScreen(capture.track, VideoCap.shareBitrate(res, fps), fps)
                 Voice.update { it.copy(localScreen = capture.track) }
                 Calls.sendState(s.channelId)
                 CallService.update()
@@ -678,7 +680,7 @@ internal object Engine {
         val s = session ?: return
         val cap = s.screen ?: return
         s.screen = null
-        s.transport.setLocalScreen(null, 0)
+        s.transport.setLocalScreen(null, 0, 0)
         Voice.update { it.copy(localScreen = null, focused = if (it.focused == "${me()}:screen") null else it.focused) }
         cap.release()
         Calls.sendState(s.channelId)

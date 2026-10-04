@@ -5439,5 +5439,7 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Se o Nexa já estiver ativado lá, a permissão ainda aponta para uma cópia antiga do app. Escolha Redefinir Permissão e ative o Nexa de novo.",
   "desktop.displayPicker.theOldPermissionIsCleared": "A permissão antiga foi apagada.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Ative o Nexa em Gravação de Tela. O macOS oferece reabrir o Nexa; se não oferecer, reinicie o app aqui.",
-  "desktop.displayPicker.couldNotResetThePermission": "O macOS não redefiniu a permissão. Remova o Nexa de Gravação de Tela com o botão de menos, adicione de novo e reinicie."
+  "desktop.displayPicker.couldNotResetThePermission": "O macOS não redefiniu a permissão. Remova o Nexa de Gravação de Tela com o botão de menos, adicione de novo e reinicie.",
+  "whatsNew.r20261004.phoneShareTitle": "Compartilhamento de Tela Mais Suave no Celular",
+  "whatsNew.r20261004.phoneShareBody": "O app para Android agora compartilha sua tela com o codificador de vídeo do próprio celular, então a imagem fica suave e nítida mesmo com movimento."
 }

@@ -90,6 +90,11 @@ class SfuTransport(
     private var videoTrack: VideoTrack? = null
     private var screenTrack: VideoTrack? = null
     private var screenBitrate = 5_000_000
+    private var screenFps = 30
+    /** Whether the screen's transceiver was published in H.264 (preferH264) rather than VP8. */
+    private var screenH264 = false
+    /** A republishScreen waiting its turn (done, too, when a reconnect skipped it). */
+    private var republishing: Job? = null
     private val senders = HashMap<PubKind, RtpTransceiver>()
     private val encryptors = HashMap<PubKind, NativeFrameEncryptor>()
     private val published = HashSet<PubKind>()
@@ -196,7 +201,7 @@ class SfuTransport(
         val mid = transceiver.mid
         val p = mid?.let { byMid[it] }
         val video = p?.kind?.video ?: (transceiver.mediaType == MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO)
-        if (video) VideoCap.preferVp8(transceiver, sending = false)
+        if (video) VideoCap.acceptCallVideo(transceiver)
         val decryptor = crypto.decryptor() ?: return
         transceiver.receiver.setFrameDecryptor(decryptor)
         if (p == null) {
@@ -560,7 +565,10 @@ class SfuTransport(
             val track = trackFor(kind)
             val tr = if (track != null) of.addTransceiver(track, init)
             else of.addTransceiver(if (kind.video) MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO else MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO, init)
-            if (kind.video) VideoCap.preferVp8(tr, sending = true)
+            if (kind == PubKind.SCREEN) {
+                screenH264 = wantsH264() && VideoCap.preferH264(tr)
+                if (!screenH264) VideoCap.preferVp8(tr, sending = true)
+            } else if (kind.video) VideoCap.preferVp8(tr, sending = true)
             val encryptor = crypto.encryptor()
             if (encryptor == null) {
                 runCatching { tr.stop() }
@@ -569,7 +577,7 @@ class SfuTransport(
             tr.sender.setFrameEncryptor(encryptor)
             encryptors[kind] = encryptor
             if (kind == PubKind.VIDEO) VideoCap.capSender(tr.sender, VideoCap.CAMERA_BPS)
-            if (kind == PubKind.SCREEN) VideoCap.capSender(tr.sender, screenBitrate)
+            if (kind == PubKind.SCREEN) VideoCap.capSender(tr.sender, screenBitrate, fps = screenFps, degradation = VideoCap.shareDegradation(screenFps))
             senders[kind] = tr
             added += kind
         }
@@ -601,6 +609,52 @@ class SfuTransport(
         if (failed > 0) throw IllegalStateException("the call service refused $failed track(s)")
     }
 
+    /**
+     * Whether the screen goes out in H.264: this phone's hardware encoder can
+     * make it, and everyone else in the call said they can watch it (an older
+     * app cannot, and gets VP8).
+     */
+    private fun wantsH264(): Boolean =
+        VideoCap.sendsH264 && roster.values.all { it.userId == meId || it.codecs?.contains("h264") == true }
+
+    /**
+     * The share published again, in the codec the call can watch now. One at a
+     * time: it reads the call as it is when its turn comes, and looks again
+     * once it is done, so states arriving together cost one change, not one each.
+     */
+    private fun republishScreen() {
+        if (sessionId == null || republishing?.isActive == true) return
+        Log.i(TAG, "the share goes out again in ${if (wantsH264()) "H.264" else "VP8"}")
+        republishing = enqueue {
+            unpublishNow(PubKind.SCREEN)
+            if (screenTrack != null) publishNow(listOf(PubKind.SCREEN))
+            republishing = null
+            if (screenTrack != null && senders[PubKind.SCREEN] != null && wantsH264() != screenH264) republishScreen()
+            scheduleSync()
+        }
+    }
+
+    /** Takes a published track back from the SFU; publishing it again gives it a new name everyone pulls afresh. */
+    private suspend fun unpublishNow(kind: PubKind) {
+        val session = sessionId ?: return
+        val tr = senders.remove(kind) ?: return
+        published -= kind
+        encryptors.remove(kind)?.release()
+        val mid = tr.mid
+        runCatching { tr.stop() }
+        if (mid == null) return
+        val of = pc
+        val offer = WebRtc.createOffer(of)
+        live(of)
+        WebRtc.setLocal(of, offer)
+        live(of)
+        val res = VoiceApi.sfuClose(session, listOf(mid), of.localDescription ?: offer)
+        live(of)
+        val answer = res.answer?.toWebRtc() ?: throw IllegalStateException("no answer to closing a track")
+        WebRtc.setRemote(of, Sdp.tunedRemote(answer))
+        live(of)
+    }
+
     override fun setLocalAudio(track: AudioTrack?) {
         audioTrack = track
         val tr = senders[PubKind.AUDIO]
@@ -616,13 +670,19 @@ class SfuTransport(
         else if (track != null) publish(listOf(PubKind.VIDEO))
     }
 
-    override fun setLocalScreen(track: VideoTrack?, bitrate: Int) {
+    override fun setLocalScreen(track: VideoTrack?, bitrate: Int, fps: Int) {
         screenTrack = track
         screenBitrate = VideoCap.clampShareBitrate(bitrate)
+        if (fps > 0) screenFps = fps
         val tr = senders[PubKind.SCREEN]
+        // a share starting on a transceiver of the other codec is published again in the one the call can watch
+        if (tr != null && track != null && wantsH264() != screenH264) {
+            republishScreen()
+            return
+        }
         if (tr != null) {
             runCatching { tr.sender.setTrack(track, false) }
-            if (track != null) VideoCap.capSender(tr.sender, screenBitrate)
+            if (track != null) VideoCap.capSender(tr.sender, screenBitrate, fps = screenFps, degradation = VideoCap.shareDegradation(screenFps))
         } else if (track != null) publish(listOf(PubKind.SCREEN))
     }
 
@@ -662,6 +722,8 @@ class SfuTransport(
 
     override fun setRoster(states: List<VoiceState>) {
         roster = states.filter { it.channelId == channelId }.associateBy { it.userId }
+        // someone who cannot watch H.264 came in, or the last of them left: the share changes codec
+        if (screenTrack != null && senders[PubKind.SCREEN] != null && wantsH264() != screenH264) republishScreen()
         // a camera turned on or off shows at once: its track stays pulled either way
         present()
         scheduleSync()

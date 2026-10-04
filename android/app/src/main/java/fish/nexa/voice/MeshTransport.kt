@@ -75,6 +75,7 @@ class MeshTransport(
     private val videoStreamId = UUID.randomUUID().toString()
     private var screenStreamId = UUID.randomUUID().toString()
     private var screenBitrate = 5_000_000
+    private var screenFps = 30
     private val early = HashMap<String, MutableList<JsonObject>>()
     private val upBefore = HashSet<String>()
     private var lastConnection: CallConnection? = null
@@ -95,10 +96,11 @@ class MeshTransport(
         for (p in peers.values) syncSenders(p)
     }
 
-    override fun setLocalScreen(track: VideoTrack?, bitrate: Int) {
+    override fun setLocalScreen(track: VideoTrack?, bitrate: Int, fps: Int) {
         if (track != null && screen == null) screenStreamId = UUID.randomUUID().toString()
         screen = track
         screenBitrate = VideoCap.clampShareBitrate(bitrate)
+        if (fps > 0) screenFps = fps
         for (p in peers.values) syncSenders(p)
     }
 
@@ -477,7 +479,7 @@ class MeshTransport(
         if (sc != null && peer.screenSenders.isEmpty()) {
             runCatching { pc.addTrack(sc, listOf(screenStreamId)) }.getOrNull()?.let { s ->
                 transceiverOf(pc, s)?.let { VideoCap.preferVp8(it, sending = true) }
-                VideoCap.capSender(s, screenBitrate)
+                VideoCap.capSender(s, screenBitrate, fps = screenFps, degradation = VideoCap.shareDegradation(screenFps))
                 peer.screenSenders += s
             }
         }

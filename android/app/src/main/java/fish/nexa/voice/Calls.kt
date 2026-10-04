@@ -150,6 +150,8 @@ object Calls {
             put("video", st.localVideo != null)
             put("streaming", st.localScreen != null)
             if (channelId != null) put("sfu", Engine.throughSfu())
+            // what it can watch besides VP8: a phone shares its screen in H.264 only when everyone can
+            if (channelId != null && VideoCap.receivesH264) put("codecs", kotlinx.serialization.json.buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive("h264")) })
             if (resume) put("resume", true)
             if (resume && sfuSession != null) put("sfu_session", sfuSession)
         })

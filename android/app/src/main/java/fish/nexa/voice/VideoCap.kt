@@ -3,6 +3,7 @@ package fish.nexa.voice
 import android.util.Log
 import org.webrtc.MediaStreamTrack
 import org.webrtc.RtpCapabilities
+import org.webrtc.RtpParameters
 import org.webrtc.RtpSender
 import org.webrtc.RtpTransceiver
 import kotlin.math.max
@@ -47,6 +48,22 @@ object VideoCap {
     private val sendVp8 by lazy { runCatching { vp8Of(WebRtc.factory.getRtpSenderCapabilities(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO)) }.getOrNull() }
     private val receiveVp8 by lazy { runCatching { vp8Of(WebRtc.factory.getRtpReceiverCapabilities(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO)) }.getOrNull() }
 
+    private fun h264Of(caps: RtpCapabilities?): List<RtpCapabilities.CodecCapability>? =
+        caps?.codecs?.filter { it.name.equals("H264", true) }?.takeIf { it.isNotEmpty() }
+
+    private val sendH264 by lazy { runCatching { h264Of(WebRtc.factory.getRtpSenderCapabilities(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO)) }.getOrNull() }
+    private val receiveH264 by lazy { runCatching { h264Of(WebRtc.factory.getRtpReceiverCapabilities(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO)) }.getOrNull() }
+
+    /**
+     * Whether this phone can share its screen in H.264: libwebrtc offers
+     * H.264 only from a hardware encoder, which keeps up with a phone's
+     * screen where VP8 in software cannot.
+     */
+    val sendsH264: Boolean get() = sendH264 != null
+
+    /** Whether this phone can watch a share in H.264, which the call is told (Calls.sendState). */
+    val receivesH264: Boolean get() = receiveH264 != null
+
     /**
      * VP8 and its retransmissions only, on a video transceiver. True when the
      * preference took: the frame crypto keeps VP8's header readable, and a
@@ -61,14 +78,46 @@ object VideoCap {
         return false
     }
 
-    /** A sender's single encoding: this bitrate, at most 60 fps, scaled down under the size cap. */
-    fun capSender(sender: RtpSender, maxBitrate: Int, width: Int = 0, height: Int = 0) {
+    /**
+     * H.264 and its retransmissions only, for a screen share everyone in the
+     * call can watch in it (SfuTransport): the phone's hardware encoder keeps
+     * a sharp 60 fps where VP8 in software cannot. The frame crypto seals
+     * H.264 so its NAL units stay where the packetiser looks for them.
+     */
+    fun preferH264(tr: RtpTransceiver): Boolean {
+        val h264 = sendH264 ?: return false
+        val rtx = sendVp8?.filter { it.name.equals("rtx", true) }.orEmpty()
+        // packetisation mode 1 first: its frames are split across packets rather than kept small
+        val list = h264.sortedBy { if (it.parameters["packetization-mode"] == "1") 0 else 1 } + rtx
+        return runCatching { tr.setCodecPreferences(list).isSuccess }.getOrDefault(false)
+    }
+
+    /**
+     * What a receiving transceiver takes: VP8, and H.264 from a phone sharing
+     * its screen, both read by the frame crypto and the size cap before
+     * anything is decoded, and nothing else. VP8 first, so it is the one used
+     * where a sender offers both.
+     */
+    fun acceptCallVideo(tr: RtpTransceiver): Boolean {
+        val vp8 = receiveVp8 ?: sendVp8 ?: return false
+        val list = vp8.filter { it.name.equals("VP8", true) } + receiveH264.orEmpty() + vp8.filter { it.name.equals("rtx", true) }
+        if (runCatching { tr.setCodecPreferences(list).isSuccess }.getOrDefault(false)) return true
+        return preferVp8(tr, sending = false)
+    }
+
+    /**
+     * A sender's single encoding: this bitrate, at most `fps` (never above
+     * 60), scaled down under the size cap, and what it gives up first when
+     * the phone or the connection cannot keep up.
+     */
+    fun capSender(sender: RtpSender, maxBitrate: Int, width: Int = 0, height: Int = 0, fps: Int = FPS, degradation: RtpParameters.DegradationPreference? = null) {
         try {
             val params = sender.parameters ?: return
             if (params.encodings.isEmpty()) return
+            if (degradation != null) params.degradationPreference = degradation
             val enc = params.encodings[0]
             if (maxBitrate > 0) enc.maxBitrateBps = maxBitrate
-            enc.maxFramerate = min(FPS, enc.maxFramerate?.takeIf { it > 0 } ?: FPS)
+            enc.maxFramerate = min(FPS, fps)
             enc.scaleResolutionDownBy = if (width > 0 && height > 0) scaleFor(width, height) else max(1.0, enc.scaleResolutionDownBy ?: 1.0)
             if (!sender.setParameters(params)) {
                 // a sender that refuses the frame rate or the scale still takes the bitrate
@@ -108,4 +157,13 @@ object VideoCap {
     }
 
     fun clampShareBitrate(bps: Int): Int = if (bps <= 0) 5_000_000 else bps.coerceIn(MIN_SHARE_BPS, MAX_SHARE_BPS)
+
+    /**
+     * What a share gives up first when the connection or the encoder cannot
+     * keep up, as the web's content hint decides it (media.ts getScreen):
+     * whoever picked 60 fps wants motion kept, anything slower is usually text
+     * and keeps its sharpness.
+     */
+    fun shareDegradation(fps: Int): RtpParameters.DegradationPreference =
+        if (fps >= 60) RtpParameters.DegradationPreference.MAINTAIN_FRAMERATE else RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
 }

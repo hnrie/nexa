@@ -15,6 +15,9 @@
                 <action android:name="fish.nexa.debug.SEAL" />
                 <action android:name="fish.nexa.debug.WRONGKEY" />
                 <action android:name="fish.nexa.debug.RTP" />
+                <action android:name="fish.nexa.debug.SHARE" />
+                <action android:name="fish.nexa.debug.UNSHARE" />
+                <action android:name="fish.nexa.debug.SOFTAVC" />
             </intent-filter>
         </receiver>
     </application>

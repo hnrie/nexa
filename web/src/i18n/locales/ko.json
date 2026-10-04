@@ -5162,5 +5162,7 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "그곳에서 Nexa가 이미 켜져 있다면, 권한이 아직 예전 앱 사본을 가리키고 있습니다. 권한 재설정을 선택한 다음 Nexa를 다시 켜세요.",
   "desktop.displayPicker.theOldPermissionIsCleared": "예전 권한을 지웠습니다.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "화면 기록에서 Nexa를 켜세요. macOS가 Nexa를 다시 열도록 안내합니다. 안내가 없으면 여기서 다시 시작하세요.",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS가 권한을 재설정하지 않았습니다. 화면 기록에서 빼기 버튼으로 Nexa를 지운 뒤 다시 추가하고 재시작하세요."
+  "desktop.displayPicker.couldNotResetThePermission": "macOS가 권한을 재설정하지 않았습니다. 화면 기록에서 빼기 버튼으로 Nexa를 지운 뒤 다시 추가하고 재시작하세요.",
+  "whatsNew.r20261004.phoneShareTitle": "더 매끄러워진 휴대폰 화면 공유",
+  "whatsNew.r20261004.phoneShareBody": "Android 앱이 이제 휴대폰에 내장된 비디오 인코더로 화면을 공유해서, 움직임이 많아도 화면이 매끄럽고 선명하게 보입니다."
 }

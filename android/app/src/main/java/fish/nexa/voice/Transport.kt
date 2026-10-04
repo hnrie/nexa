@@ -31,7 +31,7 @@ interface VoiceTransport {
     /** The voice to send: one track for the whole call, silenced with `enabled`, never taken away between phrases. */
     fun setLocalAudio(track: AudioTrack?)
     fun setLocalVideo(track: VideoTrack?)
-    fun setLocalScreen(track: VideoTrack?, bitrate: Int)
+    fun setLocalScreen(track: VideoTrack?, bitrate: Int, fps: Int)
     fun addPeer(userId: String)
     fun removePeer(userId: String)
     fun peerIds(): List<String>

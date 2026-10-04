@@ -5337,5 +5337,7 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "If Nexa is already on there, the permission still points to an older copy of the app. Choose Reset Permission, then turn Nexa on again.",
   "desktop.displayPicker.theOldPermissionIsCleared": "The old permission is cleared.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Turn Nexa on in Screen Recording. macOS offers to reopen Nexa; if it doesn't, restart it here.",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS didn't reset the permission. Remove Nexa from Screen Recording with the minus button, add it again, and restart."
+  "desktop.displayPicker.couldNotResetThePermission": "macOS didn't reset the permission. Remove Nexa from Screen Recording with the minus button, add it again, and restart.",
+  "whatsNew.r20261004.phoneShareTitle": "Smoother Screen Sharing From Phones",
+  "whatsNew.r20261004.phoneShareBody": "Sharing your screen from the Android app now uses your phone's own video encoder, so the picture stays smooth and sharp while things move."
 }

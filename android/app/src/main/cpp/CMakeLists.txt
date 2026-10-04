@@ -5,6 +5,7 @@ project(nexanative C CXX)
 add_library(nexa_native SHARED
     frame/aes_gcm.cc
     frame/sealed_frame.cc
+    frame/h264.cc
     frame/frame_crypto.cc
     denoise_jni.cc
     rnnoise/denoise.c

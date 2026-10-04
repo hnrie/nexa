@@ -48,6 +48,13 @@ object WebRtc {
     lateinit var adm: JavaAudioDeviceModule
         private set
 
+    /**
+     * Debug builds only: encoders to use in place of the phone's own, set
+     * before the first call (CallTestHooks SOFTAVC), so an emulator, which
+     * has no hardware encoder, can share its screen in H.264 as a phone does.
+     */
+    @Volatile var testEncoders: ((EglBase.Context) -> org.webrtc.VideoEncoderFactory)? = null
+
     val factory: PeerConnectionFactory by lazy {
         PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(app).createInitializationOptions())
         adm = JavaAudioDeviceModule.builder(app)
@@ -72,7 +79,7 @@ object WebRtc {
         PeerConnectionFactory.builder()
             .setAudioDeviceModule(adm)
             .setAudioProcessingFactory(processing)
-            .setVideoEncoderFactory(DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true))
+            .setVideoEncoderFactory(testEncoders?.invoke(eglBase.eglBaseContext) ?: DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true))
             .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBase.eglBaseContext))
             .createPeerConnectionFactory()
     }

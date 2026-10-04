@@ -5337,5 +5337,7 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Wenn Nexa dort schon eingeschaltet ist, zeigt die Berechtigung noch auf eine ältere Kopie der App. Wähle „Berechtigung zurücksetzen“ und schalte Nexa dann wieder ein.",
   "desktop.displayPicker.theOldPermissionIsCleared": "Die alte Berechtigung ist gelöscht.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Schalte Nexa unter Bildschirmaufnahme ein. macOS bietet an, Nexa neu zu öffnen; wenn nicht, starte es hier neu.",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS hat die Berechtigung nicht zurückgesetzt. Entferne Nexa unter Bildschirmaufnahme mit dem Minus-Knopf, füge es wieder hinzu und starte neu."
+  "desktop.displayPicker.couldNotResetThePermission": "macOS hat die Berechtigung nicht zurückgesetzt. Entferne Nexa unter Bildschirmaufnahme mit dem Minus-Knopf, füge es wieder hinzu und starte neu.",
+  "whatsNew.r20261004.phoneShareTitle": "Flüssigere Bildschirmfreigabe vom Handy",
+  "whatsNew.r20261004.phoneShareBody": "Die Android-App teilt deinen Bildschirm jetzt mit dem Video-Encoder deines Handys, damit das Bild flüssig und scharf bleibt, auch wenn sich viel bewegt."
 }

@@ -21,6 +21,9 @@ import org.json.JSONObject
  *   am broadcast -a fish.nexa.debug.SEAL                     (the frame crypto against the web's vectors)
  *   am broadcast -a fish.nexa.debug.WRONGKEY --ez on true    (this call's frames sealed and opened with wrong keys)
  *   am broadcast -a fish.nexa.debug.RTP                      (the SFU connection's media stats, logged)
+ *   am broadcast -a fish.nexa.debug.SHARE --es res 1080p --ei fps 30   (the phone asks, then the screen is shared)
+ *   am broadcast -a fish.nexa.debug.UNSHARE
+ *   am broadcast -a fish.nexa.debug.SOFTAVC                  (before the first call: H.264 from the software encoder, as a phone's hardware would)
  */
 class CallTestHooks : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -29,6 +32,15 @@ class CallTestHooks : BroadcastReceiver() {
             "fish.nexa.debug.LEAVE" -> Calls.leave()
             "fish.nexa.debug.TONE" -> Denoise.tone = intent.getIntExtra("mode", 0)
             "fish.nexa.debug.CAMERA" -> Calls.toggleCamera()
+            "fish.nexa.debug.SHARE" -> Nexa.scope.launch {
+                val permission = ScreenConsent.ask() ?: return@launch
+                Calls.startScreenShare(permission, intent.getStringExtra("res") ?: "1080p", intent.getIntExtra("fps", 30))
+            }
+            "fish.nexa.debug.UNSHARE" -> Calls.stopScreenShare()
+            "fish.nexa.debug.SOFTAVC" -> {
+                WebRtc.testEncoders = { egl -> org.webrtc.SoftAvcForTests.factory(egl) }
+                Log.i(TAG, "softavc on (for calls made after the app started, before any other)")
+            }
             "fish.nexa.debug.WATCH" -> intent.getStringExtra("user")?.let { Calls.setWatching(it, intent.getBooleanExtra("on", true)) }
             "fish.nexa.debug.STATS" -> {
                 val nonce = intent.getStringExtra("nonce")
@@ -83,8 +95,17 @@ class CallTestHooks : BroadcastReceiver() {
         val keep = setOf("media-source", "outbound-rtp", "inbound-rtp", "codec")
         val fields = setOf("kind", "audioLevel", "totalAudioEnergy", "totalSamplesDuration", "packetsSent", "bytesSent", "packetsReceived",
             "bytesReceived", "framesEncoded", "framesDecoded", "frameWidth", "frameHeight", "framesPerSecond", "mimeType", "sdpFmtpLine",
-            "concealedSamples", "totalSamplesReceived", "targetBitrate", "encoderImplementation", "decoderImplementation", "mid", "qualityLimitationReason")
+            "concealedSamples", "totalSamplesReceived", "targetBitrate", "encoderImplementation", "decoderImplementation", "mid", "qualityLimitationReason",
+            "qualityLimitationDurations", "totalEncodeTime", "framesSent", "hugeFramesSent", "keyFramesEncoded", "frames", "width", "height",
+            "totalPacketSendDelay", "pliCount", "nackCount", "retransmittedPacketsSent", "powerEfficientEncoder", "scalabilityMode")
         val out = JSONArray()
+        val sendersField = SfuTransport::class.java.getDeclaredField("senders").apply { isAccessible = true }
+        for ((kind, tr) in sendersField.get(t) as Map<*, *>) {
+            val p = runCatching { (tr as org.webrtc.RtpTransceiver).sender.parameters }.getOrNull() ?: continue
+            val e = p.encodings.firstOrNull()
+            out.put(JSONObject().put("type", "sender").put("kind", kind.toString()).put("degradation", p.degradationPreference?.name)
+                .put("maxFramerate", e?.maxFramerate).put("maxBitrate", e?.maxBitrateBps).put("scaleDown", e?.scaleResolutionDownBy))
+        }
         for (st in report.statsMap.values) {
             if (st.type !in keep) continue
             val o = JSONObject().put("type", st.type)
@@ -117,12 +138,21 @@ class CallTestHooks : BroadcastReceiver() {
             Triple(true, "5042009d012a80026801deadbeef0102", "5042009d012a80026801d9d98246838a0127617ebb177e00781ad16ae0ffb006a0a1a2a3a4a5a6a70102030405"),
             Triple(true, "310500aabbccdd", "310500adcff074e5f5692de90bf624c640c6ec3cf8370fa0a1a2a3a4a5a6a70102030405"),
             Triple(false, "78", "78651dfd182da1ad3472a408ee907eacd0a0a1a2a3a4a5a6a70102030405"),
+            // H.264 (web/src/voice/h264.test.ts): an SPS, a PPS behind a 3-byte start code, an IDR slice and a P slice
+            Triple(
+                true,
+                "000000016742c00ad902c4ec0440000003004000000503c48992" + "00000168ce3c80" + "0000000165888400a1b2c3d4e5f60718293a4b5c6d7e8f" + "000001419a0210deadbeefcafe",
+                "000000016742c00ad902c4ec0440000003004000000503c48992" + "0000000168ce3c80" + "0000000165888407d58e6a566d4037423db470141ffdc4" +
+                    "00000001419aadd620d77c434e73" + "e8d7635e59436cecf3bc6bd775f9b66a" + "a0a1a2a3a4a5a6a701020304" + "05",
+            ),
         )
         var ok = 0
         for ((video, plain, sealed) in cases) {
             val mine = FrameCryptoNative.nativeSealForTest(key, 261 and 0xff, iv, video, unhex(plain))
             val opened = FrameCryptoNative.nativeOpenForTest(key, video, unhex(sealed))
-            if (mine != null && hex(mine) == sealed && opened != null && hex(opened) == plain) ok++
+            // an opened H.264 frame has every start code 4 bytes long, as a receiver's depacketizer writes them
+            val reopened = if (plain.startsWith("000000016742")) plain.replace("00000168ce3c80", "0000000168ce3c80").replace("000001419a", "00000001419a") else plain
+            if (mine != null && hex(mine) == sealed && opened != null && hex(opened) == reopened) ok++
         }
         val voiceKey = hex(fish.nexa.crypto.Conv.voiceFrameKey(unhex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), "1234567890123456789"))
         return "$ok/${cases.size} frames match; voiceFrameKey ${if (voiceKey == "b12789f29993834f2127e2379c3be51b0351a9ddae44147d3570de350a7cccb9") "matches" else "DIFFERS $voiceKey"}"

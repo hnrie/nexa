@@ -371,6 +371,8 @@ data class VoiceState(
     @SerialName("server_deaf") val serverDeaf: Boolean = false,
     @SerialName("joined_at") val joinedAt: Long = 0,
     val media: Map<String, String>? = null,
+    /** The video codecs besides VP8 the participant's device can watch: "h264" for a phone's screen share. */
+    val codecs: List<String>? = null,
     val user: CallUser? = null,
     val guest: GuestEpoch? = null,
     val reason: String? = null,
