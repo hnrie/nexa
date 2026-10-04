@@ -181,7 +181,7 @@ object AppUpdate {
         val digest = MessageDigest.getInstance("SHA-256")
         Nexa.api.await(Nexa.api.transfer.newCall(req)).use { res ->
             if (!res.isSuccessful) return@withContext null
-            val body = res.body ?: return@withContext null
+            val body = res.body
             val total = body.contentLength().takeIf { it > 0 } ?: file.size
             var done = 0L
             body.byteStream().use { input ->
