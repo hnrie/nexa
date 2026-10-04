@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -95,11 +96,14 @@ private fun TagBadge(badge: String, size: Int, tint: androidx.compose.ui.graphic
 
 /**
  * ServerTagChip: the tag a person wears beside their name, in the tag's own
- * colour mixed toward the theme so it reads on every panel. A tap shows the
- * server it is from and what can be done: wear it, go there, or join.
+ * colour mixed toward the theme so it reads on every panel. With `open` (a
+ * message's author, a profile) a tap shows the server it is from and what can
+ * be done: wear it, go there, or join. In a list it is only a label: a tap
+ * there is meant for the row, and one that landed on the tag would open
+ * something else.
  */
 @Composable
-fun ServerTagChip(tag: WornTag, small: Boolean = false, size: String = if (small) "sm" else "md", open: Boolean = true) {
+fun ServerTagChip(tag: WornTag, small: Boolean = false, size: String = if (small) "sm" else "md", open: Boolean = false) {
     val c = Nx.colors
     val s = SIZES.getValue(size)
     val color = tag.color?.let { rgbColor(it) } ?: c.brand
@@ -109,7 +113,8 @@ fun ServerTagChip(tag: WornTag, small: Boolean = false, size: String = if (small
     Row(
         Modifier
             .anchor(ref)
-            .height(s.height.dp)
+            // as tall as its words when the phone's text is set large
+            .heightIn(min = s.height.dp)
             .ring(shape, color.copy(alpha = 0.42f), 1.dp)
             .background(color.copy(alpha = 0.20f), shape)
             .then(if (open && tag.serverId.isNotEmpty()) Modifier.pressable(remember { MutableInteractionSource() }) { openTagPopout(tag, ref) } else Modifier)
@@ -187,7 +192,7 @@ private fun openTagPopout(tag: WornTag, ref: AnchorRef) {
                 p == null -> Txt(t("serverTag.gone"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, modifier = Modifier.padding(16.dp))
                 else -> InviteCardView(
                     p.target,
-                    lead = { ServerTagChip(p.tag, size = "lg", open = false) },
+                    lead = { ServerTagChip(p.tag, size = "lg") },
                     action = {
                         when {
                             p.member && p.canWear != false && !wearing -> NxButton(t("serverTag.wear"), { wear(true) }, size = ButtonSize.SM, loading = busy)

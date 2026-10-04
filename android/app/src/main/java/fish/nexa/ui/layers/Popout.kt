@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
@@ -80,7 +81,8 @@ private fun PopoutCard(layer: Layer, anchor: Rect, width: Dp, close: () -> Unit,
         val above = top - gap - size.height >= margin + with(density) { 24.dp.roundToPx() }
         val y = if (above) top - gap - size.height else minOf(bottom + gap, screenH - size.height - margin)
         val x = (anchor.left - origin.x).roundToInt().coerceIn(margin, maxOf(margin, screenW - size.width - margin))
-        val shape = Radii.Sm
+        // the web's popout: medium corners, and nothing inside drawn past them (a banner across its top)
+        val shape = Radii.Md
         Box(
             Modifier
                 .offset { IntOffset(x, y) }
@@ -97,6 +99,7 @@ private fun PopoutCard(layer: Layer, anchor: Rect, width: Dp, close: () -> Unit,
                 .ring(shape, c.borderSubtle)
                 .background(c.bgFloating, shape)
                 .topEdge(shape, c.edgeLight)
+                .clip(shape)
                 // taps inside the card stay inside it
                 .pressable(remember { MutableInteractionSource() }) {},
         ) {

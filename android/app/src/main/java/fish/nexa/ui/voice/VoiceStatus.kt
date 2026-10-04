@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -412,7 +413,7 @@ fun CallLine(cm: ChatMessage, modifier: Modifier = Modifier) {
                 parts.getOrNull(1)?.takeIf { it.isNotEmpty() }?.let { Txt(it, style = words, color = c.text) }
             }
             detail?.let {
-                Box(Modifier.height(22.dp).ring(RoundedCornerShape(11.dp), c.borderSubtle).background(c.bgSurface, RoundedCornerShape(11.dp)).padding(horizontal = 9.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.heightIn(min = 22.dp).ring(RoundedCornerShape(11.dp), c.borderSubtle).background(c.bgSurface, RoundedCornerShape(11.dp)).padding(horizontal = 9.dp), contentAlignment = Alignment.Center) {
                     Txt(it, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = if (tone == "talked") mixOklab(c.text, c.positive, 0.7f) else c.textMuted, maxLines = 1)
                 }
             }
@@ -422,7 +423,7 @@ fun CallLine(cm: ChatMessage, modifier: Modifier = Modifier) {
                 val pressed by interaction.collectIsPressedAsState()
                 Row(
                     Modifier
-                        .height(40.dp)
+                        .heightIn(min = 40.dp)
                         .ring(RoundedCornerShape(14.dp), if (pressed) Color.Transparent else c.borderSubtle)
                         .background(if (pressed) c.positive else c.bgSurface, RoundedCornerShape(14.dp))
                         .clip(RoundedCornerShape(14.dp))

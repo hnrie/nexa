@@ -422,7 +422,7 @@ private fun Identity(user: PublicUser, rel: Relationship?, full: Boolean, theme:
                 )
             }
             val tag = user.serverTag
-            if (tag != null) Spotted(design, ProfilePart.TAG, t("designer.spot.tag"), kind = SpotKind.WORD) { fish.nexa.ui.chat.ServerTagChip(tag, small = false) }
+            if (tag != null) Spotted(design, ProfilePart.TAG, t("designer.spot.tag"), kind = SpotKind.WORD) { fish.nexa.ui.chat.ServerTagChip(tag, small = false, open = design == null) }
             else if (design != null) GhostChip(design)
             if (onNote != null) Box(
                 Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).pressable(remember { MutableInteractionSource() }, onClick = onNote).semantics { contentDescription = noteLabel },

@@ -281,7 +281,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           </button>
           <div className={s.headerRow} id={whoId}>
             <button type="button" className={s.author} data-author={msg.author_id} data-webhook={msg.webhook_id} style={color ? { color } : undefined} onClick={profile} dir="auto" aria-haspopup={hook ? "dialog" : undefined}>{name}</button>
-            {hook ? <HookTags /> : <UserTag userId={msg.author_id} />}
+            {hook ? <HookTags /> : <UserTag userId={msg.author_id} open />}
             <HeaderTime at={msg.created_at} />
           </div>
           {hookCard && hook && msg.webhook_id ? <HookPopout hook={hook} webhookId={msg.webhook_id} anchor={hookCard} onClose={closeHookCard} /> : null}

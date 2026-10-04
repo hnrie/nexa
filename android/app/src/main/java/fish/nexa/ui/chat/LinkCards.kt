@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -242,21 +243,23 @@ fun InviteCardView(target: InviteTarget, lead: (@Composable () -> Unit)?, action
     }
 }
 
+/** The online and member counts: each kept whole on one line, the second going under the first when they do not fit side by side (Invite.module.css .counts). */
 @Composable
 private fun InviteCounts(target: InviteTarget) {
     val c = Nx.colors
     if (target.online == null && target.members == null) return
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    val style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18f))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         target.online?.let { n ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.size(8.dp).ring(CircleShape, c.statusOnline.copy(alpha = 0.22f), 3.dp).background(c.statusOnline, CircleShape))
-                Txt(t("invite.onlineCount", "count" to n), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18f)), color = c.textMuted)
+                Txt(t("invite.onlineCount", "count" to n), style = style, color = c.textMuted, maxLines = 1)
             }
         }
         target.members?.let { n ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.size(8.dp).background(c.statusOffline, CircleShape))
-                Txt(if (target.kind == "group") t("invite.inThisGroupCount", "count" to n) else t("invite.membersCount", "count" to n), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18f)), color = c.textMuted)
+                Txt(if (target.kind == "group") t("invite.inThisGroupCount", "count" to n) else t("invite.membersCount", "count" to n), style = style, color = c.textMuted, maxLines = 1)
             }
         }
     }

@@ -297,7 +297,7 @@ private fun MessageHeader(item: MsgItem, ctx: ListCtx) {
             modifier = Modifier.weight(1f, fill = false).pressable(remember { MutableInteractionSource() }, onClick = open),
         )
         if (hookId != null) fish.nexa.ui.media.HookTags(open)
-        else user?.serverTag?.takeIf { it.text.isNotEmpty() }?.let { ServerTagChip(it, small = false) }
+        else user?.serverTag?.takeIf { it.text.isNotEmpty() }?.let { ServerTagChip(it, small = false, open = true) }
         HeaderTime(item.createdAt)
     }
 }

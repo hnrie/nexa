@@ -756,7 +756,7 @@ private fun PreviewMessage(id: String, name: String, avatarId: String?, tag: Wor
         Column(Modifier.weight(1f)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                 Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1)
-                if (tag != null) ServerTagChip(tag, small = false, open = false)
+                if (tag != null) ServerTagChip(tag, small = false)
                 Txt(time, style = Nx.type.timestamp, color = c.textMuted, maxLines = 1)
             }
             Txt(text, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(21.3f)), color = c.text, modifier = Modifier.padding(top = 3.dp))
@@ -941,7 +941,7 @@ private fun ServerTagList(onWorn: () -> Unit) {
                     Txt(st.server.name, style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
                     if (!can) Txt(t("serverTag.keptToRoles"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted)
                 }
-                ServerTagChip(WornTag(st.server.id, tag.text, tag.badge, tag.color), small = false, open = false)
+                ServerTagChip(WornTag(st.server.id, tag.text, tag.badge, tag.color), small = false)
                 if (wearing) Txt(t("serverTag.choose.wearing"), style = Nx.type.label.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = c.textMuted, maxLines = 1, modifier = Modifier.padding(horizontal = 8.dp))
                 else NxButton(t("serverTag.wear"), {
                     busy = st.server.id
