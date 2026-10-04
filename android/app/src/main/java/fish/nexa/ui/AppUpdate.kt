@@ -82,9 +82,11 @@ object AppUpdate {
         Nexa.scope.launch {
             val rel = runCatching { wireJson.decodeFromJsonElement(Release.serializer(), Nexa.api.get("/android/latest")) }.getOrNull() ?: return@launch
             if (rel.versionCode <= BuildConfig.VERSION_CODE || rel.versionCode == putOff || pick(rel) == null) return@launch
-            // offered once nothing else is open over the app
-            while (!Layers.isEmpty) delay(1000)
-            withContext(Dispatchers.Main) { offer(rel) }
+            // offered once the Terms are agreed and nothing else is open over the app, checked where layers open so nothing slips in between
+            withContext(Dispatchers.Main) {
+                while (!Layers.isEmpty || Nexa.users.me.value?.let { fish.nexa.ui.legal.Legal.accepted(it.id) } != true) delay(1000)
+                offer(rel)
+            }
         }
     }
 
