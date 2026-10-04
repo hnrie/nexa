@@ -53,10 +53,11 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
     val nameStyle = SpanStyle(color = c.textStrong, fontWeight = FontWeight(500))
     val linkStyle = TextLinkStyles(SpanStyle(color = c.link))
     // a closed poll's question and answers: from the list, or fetched when the list does not hold the poll (usePollOf.ts)
-    val held = if (m.type == "system_poll_result") m.replyToId?.let { Nexa.messages.get(ctx.channel.id).byId[it]?.payload?.poll } else null
+    val personPoll = m.type == "system_poll_result" && m.webhookId == null
+    val held = if (personPoll) m.replyToId?.let { Nexa.messages.get(ctx.channel.id).byId[it]?.payload?.poll } else null
     val fetched by produceState<PollPayload?>(null, m.replyToId, held == null) {
         val id = m.replyToId
-        if (m.type == "system_poll_result" && held == null && id != null) value = FetchedPolls.load(ctx.channel.id, id)
+        if (personPoll && held == null && id != null) value = FetchedPolls.load(ctx.channel.id, id)
     }
     val poll = held ?: fetched
 
@@ -93,7 +94,11 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
         else fill(t("chat.systemMessage.madeOwner"), mapOf("actor" to person(actor), "target" to person(target)))
         "system_pin" -> fill(t("chat.systemMessage.pinned"), mapOf("actor" to person(actor), "message" to jumpLink(t("chat.systemMessage.aMessage"), m.replyToId)))
         "system_join" -> fill(t("chat.systemMessage.joined"), mapOf("actor" to person(actor)))
-        "system_poll_result" -> pollResult(cm, poll, ::fill, person(actor), jumpLink(t("chat.systemMessage.viewPoll"), m.replyToId))
+        // a poll's closing line speaks for whoever asked: the webhook that posted it, or the person
+        "system_poll_result" -> if (m.webhookId != null) {
+            val hook = fish.nexa.data.Hooks.of(cm.hook)
+            hookPollResult(hook, ::fill, hook?.let { h -> { withStyle(nameStyle) { append(h.name) } } } ?: person(actor), jumpLink(t("chat.systemMessage.viewPoll"), m.replyToId))
+        } else pollResult(cm, poll, ::fill, person(actor), jumpLink(t("chat.systemMessage.viewPoll"), m.replyToId))
         else -> fill(t("chat.systemMessage.didSomething"), mapOf("actor" to person(actor)))
     }
     val full = buildAnnotatedString {
@@ -141,6 +146,18 @@ private object FetchedPolls {
     }
 }
 
+/** The sentence after "…has closed.": nobody voted, a tie, or who won. A winner whose words cannot be read goes unsaid. */
+private fun verdictText(total: Int, victor: Int, votes: Int, answer: String?): String = when {
+    total == 0 -> t("chat.systemMessage.pollNoVotes")
+    victor == 0 -> t("chat.systemMessage.pollTie")
+    answer == null -> ""
+    else -> t("chat.systemMessage.pollWinner", "answer" to answer, "percent" to Math.round(votes * 100.0 / total))
+}
+
+/**
+ * How a person's poll went. Its line carries only numbers, since the server
+ * never saw what the poll asked; the words come from the poll's own message.
+ */
 private fun pollResult(
     cm: ChatMessage,
     poll: PollPayload?,
@@ -148,24 +165,41 @@ private fun pollResult(
     actor: AnnotatedString.Builder.() -> Unit,
     view: AnnotatedString.Builder.() -> Unit,
 ): AnnotatedString {
-    val outcome = cm.m.pollResult
     val question = poll?.question
     val head = if (question != null) fill(t("chat.systemMessage.pollClosed"), mapOf("actor" to actor, "question" to { withStyle(SpanStyle(fontWeight = FontWeight(600))) { append(question) } }))
     else fill(t("chat.systemMessage.pollClosedUntitled"), mapOf("actor" to actor))
-    val result = when {
-        outcome == null || outcome.totalVotes == 0 -> t("chat.systemMessage.pollNoVotes")
-        outcome.victorAnswerId == 0 -> t("chat.systemMessage.pollTie")
-        else -> {
-            val answer = poll?.answers?.getOrNull(outcome.victorAnswerId - 1)?.text ?: ""
-            val pct = if (outcome.totalVotes > 0) Math.round(outcome.victorAnswerVotes * 100.0 / outcome.totalVotes) else 0
-            t("chat.systemMessage.pollWinner", "answer" to answer, "percent" to pct)
-        }
+    val outcome = cm.m.pollResult?.let { o ->
+        val a = poll?.answers?.getOrNull(o.victorAnswerId - 1)
+        verdictText(o.totalVotes, o.victorAnswerId, o.victorAnswerVotes, a?.let { if (it.emoji != null && it.emoji.id == null) "${it.emoji.name} ${it.text}".trim() else it.text })
+    } ?: ""
+    return closedLine(head, outcome, view)
+}
+
+/** How a webhook's poll went, from the result its closing carries (the poll_result embed). */
+private fun hookPollResult(
+    hook: fish.nexa.data.HookContent?,
+    fill: (String, Map<String, AnnotatedString.Builder.() -> Unit>) -> AnnotatedString,
+    actor: AnnotatedString.Builder.() -> Unit,
+    view: AnnotatedString.Builder.() -> Unit,
+): AnnotatedString {
+    val fields = hook?.embeds?.firstOrNull { it.type == "poll_result" }?.fields.orEmpty().associate { it.name to it.value }
+    val question = fields["poll_question_text"] ?: ""
+    val total = fields["total_votes"]?.toIntOrNull() ?: 0
+    val votes = fields["victor_answer_votes"]?.toIntOrNull() ?: 0
+    val winner = fields["victor_answer_text"]
+    val emoji = fields["victor_answer_emoji_name"]
+    val head = fill(t("chat.systemMessage.pollClosed"), mapOf("actor" to actor, "question" to { withStyle(SpanStyle(fontWeight = FontWeight(600))) { append(question) } }))
+    val outcome = when {
+        total == 0 -> verdictText(0, 0, 0, null)
+        winner != null -> verdictText(total, 1, votes, if (emoji != null) "$emoji $winner" else winner)
+        else -> verdictText(total, 0, 0, null)
     }
-    return buildAnnotatedString {
-        append(head)
-        append(" ")
-        append(result)
-        append(" ")
-        view()
-    }
+    return closedLine(head, outcome, view)
+}
+
+private fun closedLine(head: AnnotatedString, outcome: String, view: AnnotatedString.Builder.() -> Unit) = buildAnnotatedString {
+    append(head)
+    if (outcome.isNotEmpty()) append(" $outcome")
+    append(" ")
+    view()
 }

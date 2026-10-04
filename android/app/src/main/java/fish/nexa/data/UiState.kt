@@ -24,6 +24,12 @@ class UiState {
     val activeServer: StateFlow<String?> = _activeServer
     private val _visible = MutableStateFlow(false)
     val visible: StateFlow<Boolean> = _visible
+    private val _online = MutableStateFlow(true)
+    /**
+     * Whether the phone has a network at all. Android knows the moment it
+     * goes; the socket only finds out when a heartbeat goes unanswered.
+     */
+    val online: StateFlow<Boolean> = _online
     private val atBottom = HashMap<String, Boolean>()
 
     private val _toasts = MutableStateFlow<List<Toast>>(emptyList())
@@ -41,6 +47,10 @@ class UiState {
 
     fun setVisible(v: Boolean) {
         _visible.value = v
+    }
+
+    fun setOnline(v: Boolean) {
+        _online.value = v
     }
 
     @Synchronized fun setAtBottom(channelId: String, v: Boolean) {

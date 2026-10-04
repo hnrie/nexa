@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- the app's own updates: a newer build from the download page, handed to Android's installer -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- the microphone test in Voice & Video -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
@@ -103,7 +105,8 @@
             </intent-filter>
         </receiver>
 
-        <!-- Copy Image hands other apps a picture from the private cache through this, read-only, one at a time -->
+        <!-- Copy Image hands other apps a picture from the private cache through this, read-only, one at a time,
+             and an update hands Android's installer the build it downloaded -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

@@ -5402,6 +5402,9 @@
   "android.media.cannotPlayVideo": "Este vídeo não pode ser reproduzido aqui.",
   "android.media.savedToDownloads": "Salvo em Downloads.",
   "android.media.savedToPictures": "Salvo em Imagens.",
+  "android.update.allowInstalls": "Permita que o Nexa instale apps na tela que acabou de abrir, depois volte e toque em Atualizar.",
+  "android.update.body": "Saiu uma nova versão do app para Android. Atualizar faz o download e depois o Android pede para você instalar.",
+  "android.update.failed": "Não foi possível baixar a nova versão. Tente de novo em instantes.",
   "bugs.context.appAndroid": "App para Android",
   "whatsNew.r202610028.swipeBody": "No celular, deslize uma mensagem para a esquerda e solte quando a seta acender para respondê-la.",
   "whatsNew.r202610028.swipeTitle": "Deslize para responder"

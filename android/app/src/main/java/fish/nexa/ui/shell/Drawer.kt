@@ -46,6 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import fish.nexa.Nexa
+import fish.nexa.data.Ids
+import fish.nexa.data.NexaInbox
 import fish.nexa.data.P
 import fish.nexa.net.Channel
 import fish.nexa.ui.Icon
@@ -193,6 +195,9 @@ private fun RailItem(
     }
 }
 
+/** One conversation waiting under home: a DM or group, or Nexa's own (no channel). */
+private class Waiting(val channel: fish.nexa.net.Channel?, val count: Int, val at: Long)
+
 @Composable
 fun Rail(modifier: Modifier = Modifier) {
     val c = Nx.colors
@@ -203,8 +208,7 @@ fun Rail(modifier: Modifier = Modifier) {
     val rels by Nexa.relationships.byId.collectAsState()
     val doc by Nexa.settings.doc.collectAsState()
     val me by Nexa.users.me.collectAsState()
-    // read so the rail redraws when read marks or its layout change
-    @Suppress("UNUSED_VARIABLE") val touch = reads.size + doc.size
+    val nexaStanding by NexaInbox.standing.collectAsState()
     val route = Nav.route
     val requests = rels.values.count { it.type == "incoming" }
     val home = route.isHome
@@ -212,11 +216,20 @@ fun Rail(modifier: Modifier = Modifier) {
         RailLayout.resolve(doc["rail"], order, (doc["serverPositions"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } ?: emptyList())
     }
     val openDm = (route as? Route.Dm)?.channelId
-    val waiting = channels.values
-        .filter { (it.type == "dm" || it.type == "group_dm") && it.id != openDm && Unread.conversationCount(it) > 0 }
-        .sortedByDescending { it.lastMessageId ?: it.id }
-        .take(10)
-    val muted = Unread.mutedIds()
+    val nexaOpen = route is Route.NexaConvo
+    // conversations with messages waiting stand under home, newest first; what Nexa sent waits with them,
+    // and once its conversation is closed only something new counts (keyed on the read marks, so the rail redraws with them)
+    val waiting = remember(channels, reads, doc, openDm, nexaOpen, nexaStanding) {
+        buildList {
+            for (ch in channels.values) {
+                if ((ch.type != "dm" && ch.type != "group_dm") || ch.id == openDm) continue
+                val n = Unread.conversationCount(ch)
+                if (n > 0) add(Waiting(ch, n, Ids.createdAt(ch.lastMessageId ?: ch.id)))
+            }
+            if (nexaStanding != null && !nexaOpen && NexaInbox.listed() && NexaInbox.unread() > 0) add(Waiting(null, NexaInbox.unread(), NexaInbox.latest()))
+        }.sortedByDescending { it.at }.take(10)
+    }
+    val muted = remember(doc) { Unread.mutedIds() }
     Column(
         modifier.verticalScroll(rememberScrollState()).padding(top = 10.dp, bottom = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -232,17 +245,26 @@ fun Rail(modifier: Modifier = Modifier) {
                 Icon("Shield", if (route is Route.Admin) c.onBrand else c.textSubtle, size = 24.dp)
             }
         }
-        for (ch in waiting) {
-            val count = Unread.conversationCount(ch)
+        for (w in waiting) {
+            val ch = w.channel
+            val what = if (w.count > 99) t("rail.rail.moreThan99Unread") else t("rail.rail.unreadMessagesCount", "count" to w.count)
+            if (ch == null) {
+                RailItem(
+                    label = t("rail.rail.channelUnread", "name" to "Nexa", "what" to what),
+                    selected = false, unread = true, badge = w.count, picture = true, circle = true,
+                    onLongClick = { openMenu(nexaMenu(null, select = false), "Nexa") },
+                    onClick = { Nav.go(Route.NexaConvo) },
+                ) { fish.nexa.ui.profile.NexaAvatar(48.dp) }
+                continue
+            }
             RailItem(
-                label = t("rail.rail.channelUnread", "name" to Names.channel(ch), "what" to if (count > 99) t("rail.rail.moreThan99Unread") else t("rail.rail.unreadMessagesCount", "count" to count)),
-                selected = false, unread = true, badge = count, picture = true, circle = true,
+                label = t("rail.rail.channelUnread", "name" to Names.channel(ch), "what" to what),
+                selected = false, unread = true, badge = w.count, picture = true, circle = true,
                 onLongClick = { openMenu(dmMenu(ch)) },
                 onClick = { Nav.go(Route.Dm(ch.id)) },
             ) { ConversationAvatar(ch, 48.dp) }
         }
         Box(Modifier.size(28.dp, 2.dp).background(c.border, RoundedCornerShape(1.dp)))
-        fun entries(list: List<RailLayout.Entry>) = list
         for ((i, list) in listOf(layout.pinned, layout.rest).withIndex()) {
             if (i == 1 && layout.pinned.isNotEmpty() && layout.rest.isNotEmpty()) {
                 Row(Modifier.size(40.dp, 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -251,7 +273,7 @@ fun Rail(modifier: Modifier = Modifier) {
                     Box(Modifier.weight(1f).height(2.dp).background(c.border, RoundedCornerShape(1.dp)))
                 }
             }
-            for (e in entries(list)) {
+            for (e in list) {
                 when (e) {
                     is RailLayout.Entry.ServerEntry -> servers[e.id]?.let { st ->
                         val selected = (route as? Route.Server)?.serverId == e.id

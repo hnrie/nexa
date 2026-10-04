@@ -5910,6 +5910,9 @@
   "android.media.cannotPlayVideo": "لا يمكن تشغيل هذا الفيديو هنا.",
   "android.media.savedToDownloads": "تم الحفظ في التنزيلات.",
   "android.media.savedToPictures": "تم الحفظ في الصور.",
+  "android.update.allowInstalls": "اسمح لـ Nexa بتثبيت التطبيقات في الشاشة التي فُتحت للتو، ثم عُد واضغط تحديث.",
+  "android.update.body": "صدر إصدار جديد من تطبيق أندرويد. يقوم زر تحديث بتنزيله، ثم يطلب منك أندرويد تثبيته.",
+  "android.update.failed": "تعذّر تنزيل الإصدار الجديد. حاول مرة أخرى بعد قليل.",
   "bugs.context.appAndroid": "تطبيق Android",
   "whatsNew.r202610028.swipeBody": "على الهاتف، اسحب الرسالة إلى اليمين واتركها عندما يضيء السهم للرد عليها.",
   "whatsNew.r202610028.swipeTitle": "اسحب للرد"

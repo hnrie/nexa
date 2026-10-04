@@ -237,6 +237,19 @@ fun Composer(channel: Channel) {
     val c = Nx.colors
     val channelId = channel.id
     val scope = rememberCoroutineScope()
+    // the previews of the links sent from this box, fetched by this device so recipients never fetch the address
+    val previews = remember(channelId) {
+        fish.nexa.ui.markdown.LinkPreviews<kotlinx.serialization.json.JsonObject>(
+            Nexa.scope,
+            Nexa.api.baseUrl,
+            fetch = { url ->
+                val res = Nexa.api.get("/unfurl?url=" + java.net.URLEncoder.encode(url, "UTF-8")) as? kotlinx.serialization.json.JsonObject
+                res?.takeIf { (it["url"] as? kotlinx.serialization.json.JsonPrimitive)?.isString == true }
+            },
+            urlOf = { (it["url"] as kotlinx.serialization.json.JsonPrimitive).content },
+            withUrl = { o, url -> kotlinx.serialization.json.JsonObject(o + ("url" to kotlinx.serialization.json.JsonPrimitive(url))) },
+        )
+    }
     val st = channel.serverId?.let { Nexa.servers.get(it) }
     val canWrite = st == null || Nexa.servers.canI(st, P.SEND_MESSAGES, channelId)
     val canAttach = st == null || Nexa.servers.canI(st, P.ATTACH_FILES, channelId)
@@ -348,7 +361,13 @@ fun Composer(channel: Channel) {
         }
         val files = ChatUi.trays[channelId] ?: emptyList()
         if (text.isBlank() && files.isEmpty()) return false
-        val opts = SendOptions(replyTo = reply?.messageId, ping = reply?.ping)
+        // previews are asked for when the message is sent, never while it is typed, and only if the setting allows
+        val urls = if (Nexa.settings.linkPreviews) fish.nexa.data.Mentions.urls(text) else emptyList()
+        val opts = SendOptions(
+            replyTo = reply?.messageId,
+            ping = reply?.ping,
+            embedsLater = if (urls.isEmpty()) null else ({ previews.embedsFor(urls, if (urls.any { fish.nexa.ui.markdown.PostLinks.isPostLink(it) }) PREVIEW_WAIT_POST else PREVIEW_WAIT) }),
+        )
         state.clearText()
         Nexa.settings.setDraft(channelId, "")
         TypingSender.stop(channelId)
@@ -692,7 +711,8 @@ private fun ReplyBar(channel: Channel, reply: ChatUi.Reply, shape: androidx.comp
     val ease = Nx.motion.easeOut
     LaunchedEffect(reply.messageId) { enter.animateTo(1f, tween(180, easing = ease)) }
     val authorId = target?.authorId
-    val name = authorId?.let { Names.member(channel.serverId, it) } ?: ""
+    // a webhook's message is named by the webhook
+    val name = fish.nexa.data.Hooks.of(target?.hook)?.name ?: authorId?.let { Names.member(channel.serverId, it) } ?: ""
     val other = authorId != null && authorId != Nexa.users.meId && target.m.webhookId == null
     Row(
         Modifier
@@ -1156,3 +1176,7 @@ fun messageKeyboard(): androidx.compose.foundation.text.KeyboardOptions {
     val spell = (doc["spellcheck"] as? kotlinx.serialization.json.JsonPrimitive)?.booleanOrNull != false
     return androidx.compose.foundation.text.KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences, autoCorrectEnabled = spell)
 }
+
+/** How long Send waits for a link's card, and longer for a social post's, which the server reads from more places. */
+private const val PREVIEW_WAIT = 1500L
+private const val PREVIEW_WAIT_POST = 5000L

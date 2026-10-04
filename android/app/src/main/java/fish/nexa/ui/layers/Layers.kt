@@ -292,12 +292,14 @@ fun openSheet(
     title: String? = null,
     replaces: String? = null,
     canClose: () -> Boolean = { true },
+    /** Without a title, a card that needs no close button of its own (it goes with a swipe or a tap outside). */
+    closeButton: Boolean = true,
     footer: (@Composable (close: () -> Unit) -> Unit)? = null,
     content: @Composable ColumnScope.(close: () -> Unit) -> Unit,
 ) {
     lateinit var layer: Layer
     layer = Layer(key, replaces, canClose) { close ->
-        Sheet(layer, title = title, footer = footer?.let { f -> { f(close) } }) { content(close) }
+        Sheet(layer, title = title, footer = footer?.let { f -> { f(close) } }, closeButton = closeButton) { content(close) }
     }
     Layers.open(layer)
 }

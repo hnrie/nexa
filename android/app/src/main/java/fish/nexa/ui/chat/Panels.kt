@@ -227,12 +227,21 @@ private fun PinCard(cm: ChatMessage, ctx: ListCtx) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            val name = Names.member(sid, cm.authorId)
-            Avatar(cm.authorId, name, Nexa.users.get(cm.authorId)?.avatarId, 40.dp, modifier = Modifier.pressable(remember { MutableInteractionSource() }) { openProfile(cm.authorId) })
+            // a webhook's pin goes by the name and picture it was sent with
+            val hook = fish.nexa.data.Hooks.of(cm.hook)
+            val hookId = cm.m.webhookId?.takeIf { hook != null }
+            val name = hook?.name ?: Names.member(sid, cm.authorId)
+            if (hook != null && hookId != null) fish.nexa.ui.media.HookAvatar(hook, hookId, 40.dp)
+            else Avatar(cm.authorId, name, Nexa.users.get(cm.authorId)?.avatarId, 40.dp, modifier = Modifier.pressable(remember { MutableInteractionSource() }) { openProfile(cm.authorId) })
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val color = ctx.server?.let { Nexa.servers.memberColor(it, cm.authorId) }?.let { Color(0xFF000000 or it) } ?: c.textStrong
-                    Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = color, maxLines = 1, modifier = Modifier.weight(1f, fill = false).pressable(remember { MutableInteractionSource() }) { openProfile(cm.authorId) })
+                    if (hook != null && hookId != null) {
+                        Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                        fish.nexa.ui.media.HookTags { fish.nexa.ui.media.openHookCard(hook, hookId) }
+                    } else {
+                        val color = ctx.server?.let { Nexa.servers.memberColor(it, cm.authorId) }?.let { Color(0xFF000000 or it) } ?: c.textStrong
+                        Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = color, maxLines = 1, modifier = Modifier.weight(1f, fill = false).pressable(remember { MutableInteractionSource() }) { openProfile(cm.authorId) })
+                    }
                     Txt(Time.timestamp(cm.m.createdAt), style = Nx.type.timestamp, color = c.textMuted, maxLines = 1)
                 }
                 if (Nexa.relationships.isBlocked(cm.authorId)) Txt(t("people.blocked.replyPreview"), style = Nx.type.body.copy(fontStyle = FontStyle.Italic), color = c.textMuted)

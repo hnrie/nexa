@@ -67,7 +67,9 @@ class Gateway(
         ws?.cancel()
         ready = false
         connectingSince = SystemClock.elapsedRealtime()
-        _state.value = State(Status.CONNECTING)
+        // a refusal for too many connections stays named while the next try is on its way
+        val last = _state.value
+        _state.value = if (last.closeCode == CLOSE_TOO_MANY) State(Status.CONNECTING, closeCode = last.closeCode, closeReason = last.closeReason) else State(Status.CONNECTING)
         lateinit var socket: WebSocket
         socket = api.http.newWebSocket(Request.Builder().url(gatewayUrl()).build(), object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) = synchronized(lock) {
@@ -150,7 +152,7 @@ class Gateway(
         connectTimer?.cancel()
         _state.value = State(Status.CLOSED, closeCode = code, closeReason = reason)
         var delayMs = min(MAX_BACKOFF_MS.toDouble(), 1000 * 1.7.pow(attempt)) + Random.nextDouble() * 500
-        if (code == 4009) {
+        if (code == CLOSE_TOO_MANY) {
             delayMs = min(MAX_CROWDED_BACKOFF_MS.toDouble(), CROWDED_BACKOFF_MS * 2.0.pow(crowded)) + Random.nextDouble() * 5000
             crowded++
         } else if (code == 4008) {
@@ -260,6 +262,8 @@ class Gateway(
     val isReady get() = _state.value.ready
 
     companion object {
+        /** The server refused: too many connections from this network or account, or it is full (internal/gateway/hub.go). */
+        const val CLOSE_TOO_MANY = 4009
         const val HEARTBEAT_MS = 25_000L
         const val ACK_TIMEOUT_MS = 8_000L
         const val READY_ACK_TIMEOUT_MS = 90_000L

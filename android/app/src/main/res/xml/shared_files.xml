@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Only the folder Copy Image writes its one shared picture to: nothing else in the cache can be named. -->
+<!-- Only the folder Copy Image writes its one shared picture to, and the one an update is downloaded into:
+     nothing else in the cache can be named. -->
 <paths>
     <cache-path name="shared" path="shared/" />
+    <cache-path name="updates" path="updates/" />
 </paths>

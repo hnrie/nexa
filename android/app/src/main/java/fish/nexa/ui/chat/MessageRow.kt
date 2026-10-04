@@ -180,6 +180,9 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
         Box(Modifier.graphicsLayer { translationX = swipe.offset.value }) {
             if (ctx.selecting) PickCircle(picked, canPick, top = if (reply != null) 35.dp else if (start) 11.dp else 3.dp)
             if (start && !ctx.compact) {
+                // a webhook's message goes by the name and picture it was sent with, and a tap says what the sender is
+                val hook = fish.nexa.data.Hooks.of(item.cm?.hook)
+                val hookId = item.cm?.m?.webhookId
                 val authorName = Names.member(ctx.server?.server?.id, item.authorId)
                 val user = if (item.authorId == ctx.meId) Nexa.users.me.value?.let { fish.nexa.net.PublicUser(it.id, it.username, it.displayName, it.avatarId) } else Nexa.users.get(item.authorId)
                 val interaction = remember { MutableInteractionSource() }
@@ -188,9 +191,10 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                     Modifier
                         .padding(start = avatarStart, top = if (reply != null) 26.dp else 2.dp)
                         .graphicsLayer { val s = if (pressed) 0.95f else 1f; scaleX = s; scaleY = s }
-                        .pressable(interaction) { openProfile(item.authorId) },
+                        .pressable(interaction) { if (hook != null && hookId != null) fish.nexa.ui.media.openHookCard(hook, hookId) else openProfile(item.authorId) },
                 ) {
-                    Avatar(item.authorId, authorName, user?.avatarId, 40.dp)
+                    if (hook != null && hookId != null) fish.nexa.ui.media.HookAvatar(hook, hookId, 40.dp)
+                    else Avatar(item.authorId, authorName, user?.avatarId, 40.dp)
                 }
             }
             Column(
@@ -273,9 +277,13 @@ private fun HeaderTime(ms: Long) {
 private fun MessageHeader(item: MsgItem, ctx: ListCtx) {
     val c = Nx.colors
     val sid = ctx.server?.server?.id
-    val name = Names.member(sid, item.authorId)
-    val color = ctx.server?.let { Nexa.servers.memberColor(it, item.authorId) }?.let { Color(0xFF000000 or it) } ?: c.textStrong
+    val hook = fish.nexa.data.Hooks.of(item.cm?.hook)
+    val hookId = item.cm?.m?.webhookId?.takeIf { hook != null }
+    val name = hook?.name ?: Names.member(sid, item.authorId)
+    // a webhook has no roles, so no role colour
+    val color = if (hookId != null) c.textStrong else ctx.server?.let { Nexa.servers.memberColor(it, item.authorId) }?.let { Color(0xFF000000 or it) } ?: c.textStrong
     val user = Nexa.users.get(item.authorId)
+    val open = { if (hook != null && hookId != null) fish.nexa.ui.media.openHookCard(hook, hookId) else openProfile(item.authorId) }
     Row(
         Modifier.fillMaxWidth().heightIn(min = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -286,9 +294,10 @@ private fun MessageHeader(item: MsgItem, ctx: ListCtx) {
             style = Nx.type.body.copy(fontWeight = FontWeight(650)),
             color = color,
             maxLines = 1,
-            modifier = Modifier.weight(1f, fill = false).pressable(remember { MutableInteractionSource() }) { openProfile(item.authorId) },
+            modifier = Modifier.weight(1f, fill = false).pressable(remember { MutableInteractionSource() }, onClick = open),
         )
-        user?.serverTag?.takeIf { it.text.isNotEmpty() }?.let { ServerTagChip(it, small = false) }
+        if (hookId != null) fish.nexa.ui.media.HookTags(open)
+        else user?.serverTag?.takeIf { it.text.isNotEmpty() }?.let { ServerTagChip(it, small = false) }
         HeaderTime(item.createdAt)
     }
 }
@@ -336,11 +345,17 @@ private fun ReplyLine(ctx: ListCtx, replyId: String) {
                 if (blocked) {
                     Txt(t("people.blocked.replyPreview"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
                 } else {
-                    val who = Names.member(ctx.server?.server?.id, original.authorId)
-                    Avatar(original.authorId, who, Nexa.users.get(original.authorId)?.avatarId, 16.dp)
+                    val hook = fish.nexa.data.Hooks.of(original.hook)
+                    val hookId = original.m.webhookId?.takeIf { hook != null }
+                    val who = hook?.name ?: Names.member(ctx.server?.server?.id, original.authorId)
+                    if (hook != null && hookId != null) fish.nexa.ui.media.HookAvatar(hook, hookId, 16.dp)
+                    else Avatar(original.authorId, who, Nexa.users.get(original.authorId)?.avatarId, 16.dp)
                     Txt(
                         who, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)), color = c.text, maxLines = 1,
-                        modifier = Modifier.widthIn(max = 160.dp).pressable(remember { MutableInteractionSource() }) { openProfile(original.authorId) },
+                        // a webhook has no profile; its message is where to go
+                        modifier = Modifier.widthIn(max = 160.dp).pressable(remember { MutableInteractionSource() }) {
+                            if (hookId != null) ChatUi.jumpTo(ctx.channel.id, replyId) else openProfile(original.authorId)
+                        },
                     )
                     ReplyExcerpt(original, ctx.server?.server?.id, Modifier.weight(1f, fill = false))
                 }

@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -110,6 +111,8 @@ private fun CenterDialog(
                 .ring(shape, c.panelEdge)
                 .background(c.bgFloating, shape)
                 .topEdge(shape, c.edgeLight)
+                // the footer's own tint keeps to the card's rounded corners
+                .clip(shape)
                 // taps on the card stay on the card
                 .pressable(remember { MutableInteractionSource() }) {},
         ) {

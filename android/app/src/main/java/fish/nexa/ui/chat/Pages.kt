@@ -34,15 +34,85 @@ import fish.nexa.ui.shell.PageHeader
 import fish.nexa.ui.t
 import fish.nexa.ui.theme.Nx
 
-/** ServerPage.tsx: the open channel of a server, or a note that it has none you can read. */
+/** GET /servers/{id}: the server and the people in it. */
+@kotlinx.serialization.Serializable
+private class ServerFetched(val server: fish.nexa.net.ServerView, val users: List<fish.nexa.net.PublicUser> = emptyList())
+
+/**
+ * ServerPage.tsx: the open channel of a server. One this device has not
+ * loaded yet (a link, a notification, one just joined elsewhere) is fetched
+ * once; one that was on screen and then went away (kicked, banned, deleted,
+ * left on another device) sends you home. A link to a channel that is gone
+ * opens the server's first text channel, and one to a category opens the server.
+ */
 @Composable
 fun ServerPage(route: Route.Server) {
+    val servers by Nexa.servers.byId.collectAsState()
     val channels by Nexa.channels.byId.collectAsState()
+    val known = servers[route.serverId] != null
     val ch = route.channelId?.let { channels[it] }
+    // which server was seen, not merely that one was: following a link from one server to another keeps this page
+    var seen by remember { mutableStateOf<String?>(null) }
+    var failed by remember(route.serverId) { mutableStateOf(false) }
+    var attempt by remember(route.serverId) { mutableIntStateOf(0) }
+    LaunchedEffect(known, route.serverId) {
+        if (known) seen = route.serverId
+        else if (seen == route.serverId) Nav.go(Route.Friends, replace = true)
+    }
+    LaunchedEffect(route.serverId, known, attempt) {
+        if (known || seen == route.serverId) return@LaunchedEffect
+        failed = false
+        try {
+            val got = Nexa.api.get("/servers/${route.serverId}", ServerFetched.serializer())
+            Nexa.session.putServer(got.server, got.users)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: ApiError) {
+            // gone is not the same as a request that failed: only gone goes home
+            if (e.status == 403 || e.status == 404) {
+                Nexa.ui.toast(t(if (e.status == 403) "server.youAreNoLongerInThatServer" else "server.thatServerIsGone"), "error")
+                Nav.go(Route.Friends, replace = true)
+            } else failed = true
+        } catch (_: Exception) {
+            failed = true
+        }
+    }
+    val first = if (known && (ch == null || ch.serverId != route.serverId)) Nav.firstTextChannel(route.serverId) else null
+    LaunchedEffect(known, ch?.id, ch?.type, first) {
+        when {
+            !known -> Unit
+            // a channel that is gone (or never named) gives way to the first text channel
+            ch == null && first != null -> Nav.go(Route.Server(route.serverId, first), replace = true)
+            ch?.isCategory == true -> Nav.go(Route.Server(route.serverId), replace = true)
+        }
+    }
     // a link to a message: open there
     LaunchedEffect(route) { if (ch != null && route.jumpTo != null) ChatUi.jumpTo(ch.id, route.jumpTo) }
     when {
-        ch == null -> NoChannel(route.serverId)
+        !known && failed -> Column(Modifier.fillMaxSize()) {
+            PageHeader("")
+            Column(
+                Modifier.fillMaxWidth().weight(1f).padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Txt(t("server.thatServerCouldNotBeOpened"), style = Nx.type.heading, color = Nx.colors.textStrong, align = TextAlign.Center)
+                Txt(t("server.theRequestDidNotGetThrough"), style = Nx.type.body, color = Nx.colors.textMuted, align = TextAlign.Center, modifier = Modifier.widthIn(max = 420.dp))
+                NxButton(t("chat.messageList.tryAgain"), { attempt += 1 }, kind = ButtonKind.SECONDARY)
+            }
+        }
+        !known -> Column(Modifier.fillMaxSize()) {
+            PageHeader("")
+            Column(
+                Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Spinner(size = 40.dp)
+                Txt(t("server.openingServer"), style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = Nx.colors.textMuted)
+            }
+        }
+        ch == null || ch.serverId != route.serverId || ch.isCategory -> NoChannel(route.serverId)
         ch.type == "voice" -> fish.nexa.ui.voice.VoiceChannelPage(ch)
         else -> ChatView(ch.id)
     }

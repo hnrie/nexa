@@ -5125,6 +5125,9 @@
   "android.media.cannotPlayVideo": "无法在此播放该视频。",
   "android.media.savedToDownloads": "已保存到“下载”。",
   "android.media.savedToPictures": "已保存到“图片”。",
+  "android.update.allowInstalls": "请在刚打开的页面中允许 Nexa 安装应用，然后返回并点按“更新”。",
+  "android.update.body": "Android 应用发布了新版本。点按“更新”会下载它，然后 Android 会询问是否安装。",
+  "android.update.failed": "无法下载新版本。请稍后再试。",
   "bugs.context.appAndroid": "Android 应用",
   "whatsNew.r202610028.swipeBody": "在手机上将消息向左滑动，箭头亮起时松手即可回复。",
   "whatsNew.r202610028.swipeTitle": "滑动回复"

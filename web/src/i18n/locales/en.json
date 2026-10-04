@@ -5300,6 +5300,9 @@
   "android.media.cannotPlayVideo": "This video cannot be played here.",
   "android.media.savedToDownloads": "Saved to Downloads.",
   "android.media.savedToPictures": "Saved to Pictures.",
+  "android.update.allowInstalls": "Let Nexa install apps on the screen that just opened, then come back and press Update.",
+  "android.update.body": "A new version of the Android app is out. Update downloads it, then Android asks you to install it.",
+  "android.update.failed": "The new version could not be downloaded. Try again in a moment.",
   "bugs.context.appAndroid": "Android app",
   "whatsNew.r202610028.swipeBody": "On a phone, swipe a message to the left and let go when the arrow lights up to reply to it.",
   "whatsNew.r202610028.swipeTitle": "Swipe to Reply"

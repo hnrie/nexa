@@ -5300,6 +5300,9 @@
   "android.media.cannotPlayVideo": "Dieses Video kann hier nicht abgespielt werden.",
   "android.media.savedToDownloads": "In Downloads gespeichert.",
   "android.media.savedToPictures": "In Bilder gespeichert.",
+  "android.update.allowInstalls": "Erlaube Nexa auf dem gerade geöffneten Bildschirm, Apps zu installieren, und tippe dann wieder auf Aktualisieren.",
+  "android.update.body": "Eine neue Version der Android-App ist erschienen. Aktualisieren lädt sie herunter, dann fragt Android, ob du sie installieren möchtest.",
+  "android.update.failed": "Die neue Version konnte nicht heruntergeladen werden. Versuch es gleich noch einmal.",
   "bugs.context.appAndroid": "Android-App",
   "whatsNew.r202610028.swipeBody": "Wische auf dem Handy eine Nachricht nach links und lass los, sobald der Pfeil aufleuchtet, um darauf zu antworten.",
   "whatsNew.r202610028.swipeTitle": "Zum Antworten wischen"

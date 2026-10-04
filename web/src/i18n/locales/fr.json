@@ -5401,6 +5401,9 @@
   "android.media.cannotPlayVideo": "Cette vidéo ne peut pas être lue ici.",
   "android.media.savedToDownloads": "Enregistré dans Téléchargements.",
   "android.media.savedToPictures": "Enregistré dans Images.",
+  "android.update.allowInstalls": "Autorisez Nexa à installer des applications sur l'écran qui vient de s'ouvrir, puis revenez et appuyez sur Mettre à jour.",
+  "android.update.body": "Une nouvelle version de l'application Android est sortie. Mettre à jour la télécharge, puis Android vous demande de l'installer.",
+  "android.update.failed": "Impossible de télécharger la nouvelle version. Réessayez dans un instant.",
   "bugs.context.appAndroid": "Application Android",
   "whatsNew.r202610028.swipeBody": "Sur téléphone, faites glisser un message vers la gauche et relâchez quand la flèche s'allume pour y répondre.",
   "whatsNew.r202610028.swipeTitle": "Glisser pour répondre"

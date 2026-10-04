@@ -114,6 +114,8 @@ data class RenderCtx(
     val bodyLine: Float = 22f,
     /** Space between the top-level blocks (a note's paragraphs stand a little apart). */
     val gap: Dp = 0.dp,
+    /** The words' weight when it is not the usual (an embed's title). */
+    val weight: FontWeight? = null,
 )
 
 /**
@@ -180,7 +182,7 @@ private fun Blocks(nodes: List<Node>, ctx: RenderCtx, jumbo: Boolean, top: Boole
 @Composable
 private fun Block(b: Node, ctx: RenderCtx, jumbo: Boolean, first: Boolean, edited: String?) {
     val c = Nx.colors
-    val base = Nx.type.body.copy(color = ctx.color ?: c.text, fontSize = Nx.type.sp(ctx.bodyPx), lineHeight = Nx.type.sp(ctx.bodyLine))
+    val base = Nx.type.body.copy(color = ctx.color ?: c.text, fontSize = Nx.type.sp(ctx.bodyPx), lineHeight = Nx.type.sp(ctx.bodyLine)).let { if (ctx.weight != null) it.copy(fontWeight = ctx.weight) else it }
     when (b) {
         is Node.Paragraph -> InlineText(b.children, ctx, base, jumbo, edited = edited)
         is Node.Heading -> {

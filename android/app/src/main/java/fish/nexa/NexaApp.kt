@@ -48,14 +48,25 @@ class NexaApp : Application() {
         watchNetwork()
     }
 
-    /** When the network comes back: retry signing in if that failed offline, and reconnect at once. */
+    /**
+     * Says at once when the phone loses its network (the banner), and when it
+     * comes back retries signing in if that failed offline, and reconnects.
+     */
     private fun watchNetwork() {
         val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        Nexa.ui.setOnline(cm.activeNetwork != null)
         runCatching {
             cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
+                    Nexa.ui.setOnline(true)
                     if (Nexa.auth.state.value is AuthState.Offline) Nexa.scope.launch { Nexa.auth.bootstrap() }
                     else Nexa.session.wake()
+                }
+
+                override fun onLost(network: Network) {
+                    // moving from Wi-Fi to mobile data is not going offline
+                    val now = cm.activeNetwork
+                    Nexa.ui.setOnline(now != null && now != network)
                 }
             })
         }

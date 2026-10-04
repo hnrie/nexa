@@ -259,10 +259,11 @@ fun dmMenu(ch: Channel, moves: List<MenuItem.Action> = emptyList(), select: Bool
     return items
 }
 
-private fun nexaMenu(moves: List<MenuItem.Action>, select: Boolean): List<MenuItem> = buildList {
+/** Nexa's menu; without `moves` (the rail) it has no arranging. */
+internal fun nexaMenu(moves: List<MenuItem.Action>?, select: Boolean): List<MenuItem> = buildList {
     add(MenuItem.Action(t("sidebar.dmMenu.markAsRead"), disabled = NexaInbox.unread() == 0, separatorAfter = !select) { NexaInbox.markSeen() })
     if (select) add(MenuItem.Action(t("pick.select"), separatorAfter = true) { Pick.start("dms", DmLayout.NEXA_ID) })
-    addAll(DmArrange.arrangeItems(DmLayout.NEXA_ID, moves))
+    if (moves != null) addAll(DmArrange.arrangeItems(DmLayout.NEXA_ID, moves))
     add(MenuItem.Action(t("sidebar.dMSidebar.closeDm")) { closeNexa() })
 }
 

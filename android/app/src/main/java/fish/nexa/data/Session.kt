@@ -221,11 +221,7 @@ class Session(private val nx: Nexa) {
             "group_add_notice" -> decode(d, GroupAddNotice.serializer())?.let { n -> nx.misc.groupAddNotices.update { it.put(n.channelId, n) } }
             "group_add_notice_delete" -> d.str("channel_id")?.let { id -> nx.misc.groupAddNotices.update { it.remove(id) } }
             "server_create" -> decode(d, ServerView.serializer())?.let { v ->
-                val users = ((d as? JsonObject)?.get("users") as? JsonArray)?.let { decode(it, ListSerializer(PublicUser.serializer())) } ?: emptyList()
-                judgeAll(users)
-                nx.users.upsert(users)
-                nx.channels.upsert(v.channels)
-                nx.servers.put(v)
+                putServer(v, ((d as? JsonObject)?.get("users") as? JsonArray)?.let { decode(it, ListSerializer(PublicUser.serializer())) } ?: emptyList())
             }
             "server_update" -> decode(d, Server.serializer())?.let { nx.servers.setServer(it) }
             "server_delete" -> {
@@ -313,6 +309,14 @@ class Session(private val nx: Nexa) {
             }
             else -> Unit // voice signalling, calls, notes and staff events are handled by the modules that listen to `events`
         }
+    }
+
+    /** A whole server and the people in it, as server_create brings one and GET /servers/{id} answers. */
+    fun putServer(v: ServerView, users: List<PublicUser>) {
+        judgeAll(users)
+        nx.users.upsert(users)
+        nx.channels.upsert(v.channels)
+        nx.servers.put(v)
     }
 
     private fun judgeAll(users: Collection<PublicUser>) {

@@ -5300,6 +5300,9 @@
   "android.media.cannotPlayVideo": "यह वीडियो यहाँ नहीं चल सकता।",
   "android.media.savedToDownloads": "डाउनलोड में सहेजा गया।",
   "android.media.savedToPictures": "चित्रों में सहेजा गया।",
+  "android.update.allowInstalls": "अभी खुली स्क्रीन पर Nexa को ऐप इंस्टॉल करने दें, फिर वापस आकर अपडेट करें दबाएँ।",
+  "android.update.body": "Android ऐप का नया संस्करण आ गया है। अपडेट करें इसे डाउनलोड करता है, फिर Android आपसे इसे इंस्टॉल करने को कहता है।",
+  "android.update.failed": "नया संस्करण डाउनलोड नहीं हो सका। थोड़ी देर में फिर कोशिश करें।",
   "bugs.context.appAndroid": "Android ऐप",
   "whatsNew.r202610028.swipeBody": "फ़ोन पर किसी संदेश का जवाब देने के लिए उसे बाईं ओर स्वाइप करें और तीर के चमकते ही छोड़ दें।",
   "whatsNew.r202610028.swipeTitle": "जवाब देने के लिए स्वाइप करें"

@@ -239,16 +239,27 @@ fun MainShell() {
 @Composable
 private fun ConnectionBanner() {
     val c = Nx.colors
+    val online by Nexa.ui.online.collectAsState()
     val stateFlow = Nexa.session.gatewayState ?: return
     val state by stateFlow.collectAsState()
-    val (bg, fg, text) = when (state.status) {
-        Gateway.Status.CONNECTING -> Triple(c.warning, c.onWarning, t("shell.requireAuth.connecting"))
-        Gateway.Status.CLOSED -> Triple(c.dangerHover, c.onDanger, t("shell.appShell.disconnectedReconnecting"))
+    // the server's reason for refusing names which limit it was (gateway/session.ts connectionNote)
+    val note = if (state.closeCode == Gateway.CLOSE_TOO_MANY) {
+        val reason = state.closeReason.orEmpty()
+        when {
+            "address" in reason -> t("gateway.tooManyFromThisNetwork")
+            "limit" in reason -> t("gateway.serverIsFull")
+            else -> t("gateway.tooManyForThisAccount")
+        }
+    } else null
+    val (bg, fg, text) = when {
+        !online -> Triple(c.dangerHover, c.onDanger, t("shell.appShell.offline"))
+        state.status == Gateway.Status.CONNECTING -> Triple(c.warning, c.onWarning, note ?: t("shell.requireAuth.connecting"))
+        state.status == Gateway.Status.CLOSED -> Triple(c.dangerHover, c.onDanger, note ?: t("shell.appShell.disconnectedReconnecting"))
         else -> return
     }
-    if (state.status == Gateway.Status.CONNECTING && !Nexa.session.ready.value) return
+    if (online && state.status == Gateway.Status.CONNECTING && note == null && !Nexa.session.ready.value) return
     Box(Modifier.fillMaxWidth().background(bg).padding(horizontal = 12.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
-        Txt(text, style = Nx.type.label.copy(fontSize = Nx.type.sp(13f)), color = fg)
+        Txt(text, style = Nx.type.label.copy(fontSize = Nx.type.sp(13f)), color = fg, align = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 

@@ -5623,6 +5623,9 @@
   "android.media.cannotPlayVideo": "Это видео нельзя воспроизвести здесь.",
   "android.media.savedToDownloads": "Сохранено в «Загрузки».",
   "android.media.savedToPictures": "Сохранено в «Изображения».",
+  "android.update.allowInstalls": "Разрешите Nexa устанавливать приложения на открывшемся экране, затем вернитесь и нажмите «Обновить».",
+  "android.update.body": "Вышла новая версия приложения для Android. Кнопка «Обновить» скачает её, а затем Android предложит её установить.",
+  "android.update.failed": "Не удалось скачать новую версию. Попробуйте ещё раз чуть позже.",
   "bugs.context.appAndroid": "Приложение для Android",
   "whatsNew.r202610028.swipeBody": "На телефоне смахните сообщение влево и отпустите, когда загорится стрелка, чтобы ответить на него.",
   "whatsNew.r202610028.swipeTitle": "Ответ свайпом"

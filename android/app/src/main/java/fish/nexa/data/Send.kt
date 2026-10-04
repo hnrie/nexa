@@ -66,6 +66,12 @@ data class SendOptions(
     val ping: Boolean? = null,
     val attachments: List<Uploaded>? = null,
     val embeds: List<JsonObject>? = null,
+    /**
+     * Link previews still on their way (components/composer/linkPreviews.ts):
+     * made by the sender, so recipients never fetch the address, waited for
+     * just before the message is sealed, and sealed inside it.
+     */
+    val embedsLater: (suspend () -> List<JsonObject>)? = null,
     val sticker: StickerRef? = null,
     val flags: Long = 0,
     val replaces: String? = null,
@@ -270,7 +276,15 @@ object Send {
     }
 
     private suspend fun deliver(channelId: String, meId: String, w: Written, tmp: String, nonce: String, opts: SendOptions) {
-        val payload = w.payload
+        var payload = w.payload
+        opts.embedsLater?.let { later ->
+            val found = runCatching { later() }.getOrDefault(emptyList())
+            if (found.isNotEmpty()) {
+                payload = payload.copy(embeds = payload.embeds.orEmpty() + found)
+                // kept on the pending row too, so a retry still carries them
+                Nexa.messages.updatePending(channelId, tmp) { it.copy(payload = payload) }
+            }
+        }
         try {
             val conv = Nexa.channels.convFor(channelId)
             val (epoch, _) = Nexa.keys.ensureConvKey(conv) ?: throw IllegalStateException("waiting_for_key")

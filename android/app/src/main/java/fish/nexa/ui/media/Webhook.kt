@@ -210,14 +210,15 @@ private fun RichEmbed(hook: HookContent, embed: HookEmbed, all: List<HookMedia>,
                     }
                     embed.title?.let { title ->
                         Box(if (embed.url != null) Modifier.pressable(remember { MutableInteractionSource() }) { openExternal(embed.url) } else Modifier) {
-                            fish.nexa.ui.markdown.MarkdownView(title, fish.nexa.ui.markdown.RenderCtx(color = if (embed.url != null) c.link else c.textStrong))
+                            fish.nexa.ui.markdown.MarkdownView(title, fish.nexa.ui.markdown.RenderCtx(color = if (embed.url != null) c.link else c.textStrong, bodyPx = 16f, bodyLine = 22f, weight = FontWeight(600)))
                         }
                     }
-                    embed.description?.let { fish.nexa.ui.markdown.MarkdownView(it, fish.nexa.ui.markdown.RenderCtx(color = c.text)) }
+                    // an embed's words are a size down from a message's (Webhook.module.css .grid)
+                    embed.description?.let { fish.nexa.ui.markdown.MarkdownView(it, fish.nexa.ui.markdown.RenderCtx(color = c.text, bodyPx = 14f, bodyLine = 18f)) }
                     for (row in rows) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         for (f in row) Column(Modifier.weight(1f)) {
                             Txt(f.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong)
-                            fish.nexa.ui.markdown.MarkdownView(f.value, fish.nexa.ui.markdown.RenderCtx(color = c.text))
+                            fish.nexa.ui.markdown.MarkdownView(f.value, fish.nexa.ui.markdown.RenderCtx(color = c.text, bodyPx = 14f, bodyLine = 18f))
                         }
                     }
                 }
@@ -292,7 +293,7 @@ private fun HookPart(c: HookComponent, hook: HookContent, from: String) {
             for (b in c.components) if (b.type == Hooks.C_BUTTON) LinkButton(b)
         }
         Hooks.C_BUTTON -> LinkButton(c)
-        Hooks.C_TEXT -> c.content?.let { fish.nexa.ui.markdown.MarkdownView(it, fish.nexa.ui.markdown.RenderCtx(color = Nx.colors.text)) }
+        Hooks.C_TEXT -> c.content?.let { fish.nexa.ui.markdown.MarkdownView(it, fish.nexa.ui.markdown.RenderCtx(color = Nx.colors.text, bodyPx = 14f, bodyLine = 18f)) }
         Hooks.C_SECTION -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { for (x in c.components) HookPart(x, hook, from) }
             c.accessory?.let { acc ->
