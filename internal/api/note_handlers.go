@@ -598,6 +598,10 @@ func (s *Server) handleNoteMemberRemove(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	s.Bcast.EmitUsers([]ids.ID{uid}, "note_delete", map[string]any{"id": id})
+	// whoever has it open sees them leave it at once: their own app can no longer say so
+	if members, err := s.Store.NoteMemberIDs(r.Context(), id); err == nil && len(members) > 0 {
+		s.Bcast.EmitUsers(members, "note_presence", map[string]any{"id": id, "user_id": uid, "here": false, "hello": false})
+	}
 	// removed: says the note's key should be changed, which the owner's app does
 	s.emitNote(r, id, map[string]any{"members": true, "removed": true})
 	w.WriteHeader(http.StatusNoContent)

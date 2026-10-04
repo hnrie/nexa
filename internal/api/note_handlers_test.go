@@ -234,6 +234,7 @@ func TestNoteMembersAndRoles(t *testing.T) {
 	id := newNote(t, ts, alice)
 	_, inv := do(t, ts, "POST", "/api/v1/notes/"+id+"/invites", alice, map[string]any{"user_id": bobID, "role": store.NoteViewer, "key_sealed": sealedKey})
 	do(t, ts, "POST", "/api/v1/note-invites/"+inv["id"].(string)+"/accept", bob, nil)
+	gwA := connectGW(t, ts, alice)
 	gwB := connectGW(t, ts, bob)
 
 	// a viewer reads and cannot write
@@ -274,6 +275,10 @@ func TestNoteMembersAndRoles(t *testing.T) {
 	}
 	if ev := gwB.next("note_delete", 2*time.Second); ev == nil || ev["id"] != id {
 		t.Errorf("note_delete to the one removed: %v", ev)
+	}
+	// and whoever has it open sees them leave it, which their own app can no longer say
+	if ev := gwA.nextWhere("note_presence", 2*time.Second, func(d map[string]any) bool { return d["user_id"] == bobID }); ev == nil || ev["id"] != id || ev["here"] != false || ev["hello"] != false {
+		t.Errorf("note_presence for the one removed: %v", ev)
 	}
 	if res, _ := do(t, ts, "GET", "/api/v1/notes/"+id, bob, nil); res.StatusCode != http.StatusNotFound {
 		t.Errorf("a removed member read the note: %d", res.StatusCode)
