@@ -92,6 +92,33 @@ sealed interface ListRow {
     data object TopLoader : ListRow { override val key = "top-loader" }
     data object TopError : ListRow { override val key = "top-error" }
     data object BottomLoader : ListRow { override val key = "bottom-loader" }
+    /** Nexa's note to someone a friend put in this group: drawn among the messages, not one of them. */
+    data class Notice(val notice: fish.nexa.net.GroupAddNotice) : ListRow { override val key = "group-add-notice" }
+}
+
+/** Where Nexa's note about an add goes (lib/groupAdd.ts noticeSpot). */
+private sealed interface NoticeSpot {
+    data object Start : NoticeSpot
+    data object End : NoticeSpot
+    data class After(val id: String) : NoticeSpot
+}
+
+/**
+ * Just after the line that says this account was added, when it is loaded;
+ * else at the very start of a conversation that began after the add; else at
+ * the end once the newest messages are in. An earlier add line is from a time
+ * they were added before, left, and were added again.
+ */
+private fun noticeSpot(state: ChannelMessages, notice: fish.nexa.net.GroupAddNotice, meId: String): NoticeSpot? {
+    for (id in state.ids) {
+        val m = state.byId[id]?.m ?: continue
+        if (m.type == "system_member_add" && m.authorId == notice.addedBy && meId in m.mentions && m.createdAt >= notice.addedAt - 1000) return NoticeSpot.After(id)
+    }
+    if (!state.hasOlder) {
+        val first = state.ids.firstNotNullOfOrNull { state.byId[it] }
+        if (first == null || first.m.createdAt >= notice.addedAt) return NoticeSpot.Start
+    }
+    return if (state.hasNewer) null else NoticeSpot.End
 }
 
 private const val GROUP_MS = 7 * 60 * 1000L
@@ -132,12 +159,23 @@ private fun buildRows(
     blockedShown: Set<String>,
     hideBlocked: Boolean,
     hideBlockedReplies: Boolean,
+    notice: fish.nexa.net.GroupAddNotice?,
 ): List<ListRow> {
     val out = ArrayList<ListRow>()
     if (state.loaded && !state.hasOlder) out += ListRow.Start
     else if (state.failed > 0 && !state.loaded) out += ListRow.TopError
     else out += ListRow.TopLoader
     var prev: Prev? = null
+    // Nexa's note about who added this account, where noticeSpot says; whatever follows it starts a group of its own
+    val spot = if (notice != null && state.loaded) noticeSpot(state, notice, meId) else null
+    var noticePlaced = false
+    fun placeNotice() {
+        if (notice == null || noticePlaced) return
+        out += ListRow.Notice(notice)
+        noticePlaced = true
+        prev = null
+    }
+    if (spot == NoticeSpot.Start) placeNotice()
     var lastDay: Long? = null
     var newPlaced = newAfter == null
     var run: ArrayList<MsgItem>? = null
@@ -169,6 +207,7 @@ private fun buildRows(
             closeRun()
             out += ListRow.System(id, cm)
             prev = Prev(m.authorId, at, true, null)
+            if (spot == NoticeSpot.After(id)) placeNotice()
             continue
         }
         if (blocked) {
@@ -191,8 +230,11 @@ private fun buildRows(
         val mentioned = m.authorId != meId && mentionsMe(m, meId)
         out += ListRow.Msg(MsgItem(id, cm, groupStart = start, mentionsMe = mentioned))
         prev = Prev(m.authorId, at, m.type == "system_call", hook)
+        if (spot == NoticeSpot.After(id)) placeNotice()
     }
     closeRun()
+    // at the end, or there after all when the line it follows is not shown
+    if (spot == NoticeSpot.End || (spot != null && !noticePlaced && !state.hasNewer)) placeNotice()
     if (!state.hasNewer) {
         for (p in state.pending) {
             if (lastDay == null || !sameDay(lastDay, p.createdAt)) {
@@ -245,8 +287,10 @@ fun MessageList(channel: Channel, modifier: Modifier = Modifier) {
     }
 
     val blockedShown = remember(channelId) { mutableStateMapOf<String, Boolean>() }
-    val rows = remember(state, meId, newAfter, blockedShown.toMap(), doc, rels) {
-        buildRows(state, meId, newAfter, blockedShown.filterValues { it }.keys, Nexa.settings.hideBlockedMessages, Nexa.settings.hideBlockedReplies)
+    val notices by Nexa.misc.groupAddNotices.collectAsState()
+    val notice = notices[channelId]
+    val rows = remember(state, meId, newAfter, blockedShown.toMap(), doc, rels, notice) {
+        buildRows(state, meId, newAfter, blockedShown.filterValues { it }.keys, Nexa.settings.hideBlockedMessages, Nexa.settings.hideBlockedReplies, notice)
     }
     val reversed = remember(rows) { rows.asReversed() }
     val latestRows by androidx.compose.runtime.rememberUpdatedState(reversed)
@@ -380,6 +424,7 @@ fun MessageList(channel: Channel, modifier: Modifier = Modifier) {
                     ListRow.TopLoader -> Loader()
                     ListRow.TopError -> LoadError { scope.launch { Nexa.messages.loadInitial(channelId) } }
                     ListRow.BottomLoader -> Loader()
+                    is ListRow.Notice -> GroupAddNoticeRow(row.notice)
                 }
             }
         }

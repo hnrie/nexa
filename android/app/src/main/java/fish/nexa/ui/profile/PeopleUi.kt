@@ -166,7 +166,7 @@ fun relationshipMenuItems(userId: String): List<MenuItem.Action> {
  * (which are the account's choices for everyone blocked).
  */
 fun openBlockDialog(userId: String) {
-    val user = Nexa.users.get(userId) ?: return
+    val user = Nexa.users.get(userId) ?: Nexa.relationships.byId.value[userId]?.user ?: return
     lateinit var layer: Layer
     layer = Layer("block") { close -> BlockSheet(layer, user, close) }
     Layers.open(layer)

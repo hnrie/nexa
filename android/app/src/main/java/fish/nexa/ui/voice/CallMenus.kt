@@ -47,7 +47,6 @@ import fish.nexa.ui.layers.MenuItem
 import fish.nexa.ui.layers.openMenu
 import fish.nexa.ui.layers.openSheet
 import fish.nexa.ui.shell.openProfile
-import fish.nexa.ui.shell.openSettings
 import fish.nexa.ui.t
 import fish.nexa.ui.theme.Nx
 import fish.nexa.ui.theme.Radii
@@ -129,7 +128,7 @@ fun openMicMenu() {
     val noise = noiseItems()
     items += noise.dropLast(1)
     items += (noise.last() as MenuItem.Action).copy(separatorAfter = true)
-    items += MenuItem.Action(t("voice.deviceMenus.voiceSettings")) { openSettings() }
+    items += MenuItem.Action(t("voice.deviceMenus.voiceSettings")) { fish.nexa.ui.settings.Settings.open("voice") }
     openMenu(items, title = t("voice.voice.microphoneOptions"))
 }
 
@@ -140,11 +139,13 @@ fun openCameraMenu() {
     items += MenuItem.Heading(t("settings.voice.camera"))
     if (count == 0) items += MenuItem.Action(t("voice.deviceMenus.noCameraFound"), disabled = true) {}
     else {
-        val front = Voice.state.value.localFront
-        items += MenuItem.Action(t("android.call.frontCamera"), checked = front) { if (!front) Calls.flipCamera() }
-        items += MenuItem.Action(t("android.call.backCamera"), checked = !front, separatorAfter = true) { if (front) Calls.flipCamera() }
+        // the side in use, or the one the camera will open on
+        val v = Voice.state.value
+        val front = if (v.localVideo != null) v.localFront else fish.nexa.ui.settings.VoiceLocalSettings.frontCamera
+        items += MenuItem.Action(t("android.call.frontCamera"), checked = front) { Calls.setCameraFront(true) }
+        items += MenuItem.Action(t("android.call.backCamera"), checked = !front, separatorAfter = true) { Calls.setCameraFront(false) }
     }
-    items += MenuItem.Action(t("voice.deviceMenus.videoSettings")) { openSettings() }
+    items += MenuItem.Action(t("voice.deviceMenus.videoSettings")) { fish.nexa.ui.settings.Settings.open("voice") }
     openMenu(items, title = t("voice.voice.cameraOptions"))
 }
 

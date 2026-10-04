@@ -94,11 +94,11 @@ object Notifier {
         )
     }
 
-    /** The system lets this app post (Android 13 asks), and the account wants app notifications. */
+    /** The system lets this app post (Android 13 asks), and the account wants notifications in the Android app (its own switch, not the desktop app's). */
     fun enabled(): Boolean {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(Nexa.app, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false
         if (!nm().areNotificationsEnabled()) return false
-        return (Nexa.settings.notifications["app"] as? JsonPrimitive)?.booleanOrNull != false
+        return (Nexa.settings.notifications["android"] as? JsonPrimitive)?.booleanOrNull != false
     }
 
     private fun soundsOn() = (Nexa.settings.notifications["sounds"] as? JsonPrimitive)?.booleanOrNull != false

@@ -66,7 +66,7 @@ internal object Engine {
         var micTrack: AudioTrack? = null
         var micSerial = 0
         var camera: Capture? = null
-        var cameraFront = true
+        var cameraFront = fish.nexa.ui.settings.VoiceLocalSettings.frontCamera
         var screen: Capture? = null
         var cameraPending = false
         var screenPending = false
@@ -561,8 +561,25 @@ internal object Engine {
         }
     }
 
-    /** Turns the camera round; the other side sees the picture change without renegotiating. */
-    fun flipCamera() {
+    /**
+     * Picks which way the camera faces: turned round live when it is on (the
+     * other side sees the picture change without renegotiating), and kept for
+     * the next time it is turned on either way.
+     */
+    fun setCameraFront(front: Boolean) {
+        val s = session
+        if (s?.camera != null) {
+            if (s.cameraFront != front) flipCamera()
+            return
+        }
+        fish.nexa.ui.settings.VoiceLocalSettings.frontCamera = front
+        if (s != null) {
+            s.cameraFront = front
+            Voice.update { it.copy(localFront = front) }
+        }
+    }
+
+    private fun flipCamera() {
         val s = session ?: return
         val cam = s.camera ?: return
         val capturer = cam.capturer as? CameraVideoCapturer ?: return
@@ -579,6 +596,7 @@ internal object Engine {
                 scope.launch {
                     s.cameraPending = false
                     s.cameraFront = isFrontCamera
+                    fish.nexa.ui.settings.VoiceLocalSettings.frontCamera = isFrontCamera
                     if (session === s) Voice.update { it.copy(localFront = isFrontCamera) }
                 }
             }

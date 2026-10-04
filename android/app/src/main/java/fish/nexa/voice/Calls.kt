@@ -500,7 +500,8 @@ object Calls {
     // --- in the call ---------------------------------------------------------------------
 
     fun toggleCamera() = scope.launch { Engine.toggleCamera() }
-    fun flipCamera() = scope.launch { Engine.flipCamera() }
+    fun flipCamera() = scope.launch { Engine.setCameraFront(!Voice.state.value.localFront) }
+    fun setCameraFront(front: Boolean) = scope.launch { Engine.setCameraFront(front) }
     fun retryMic() = scope.launch { Engine.retryMic() }
     fun holdToTalk(on: Boolean) = scope.launch { Engine.setPttHeld(on) }
     fun stopScreenShare() = scope.launch { Engine.stopScreen() }

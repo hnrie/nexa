@@ -270,6 +270,8 @@ class Session(private val nx: Nexa) {
                 judgeAll(listOf(r.user))
                 val was = nx.relationships.typeOf(r.user.id)
                 nx.relationships.set(r)
+                // a stranger's request is the only place their name comes from, and Block needs it
+                nx.users.upsert(listOf(r.user))
                 if (r.type == "incoming" && was != "incoming") onFriendRequest?.invoke(r)
             }
             "relationship_remove" -> d.str("user_id")?.let { nx.relationships.remove(it) }

@@ -129,7 +129,8 @@ fun ChatHeader(channel: Channel) {
         NavButton()
         val nameStyle = Nx.type.headerTitle.copy(fontSize = Nx.type.sp(16.5f), fontWeight = FontWeight(660))
         when (channel.type) {
-            "dm" -> {
+            // the title takes all the room the buttons leave; a long name gives way before they do
+            "dm" -> Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 val other = Names.otherOf(channel)
                 if (other != null) {
                     val presence by Nexa.presence.byId.collectAsState()
@@ -142,12 +143,11 @@ fun ChatHeader(channel: Channel) {
                     KeyChip(other)
                 }
             }
-            "group_dm" -> {
+            "group_dm" -> Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 val interaction = remember { MutableInteractionSource() }
                 val pressed by interaction.collectIsPressedAsState()
                 Row(
                     Modifier
-                        .weight(1f, fill = false)
                         .clip(Radii.Sm)
                         .background(if (pressed) c.bgHover else Color.Transparent)
                         .pressable(interaction) { openEditGroup(channel.id) }
@@ -182,7 +182,7 @@ fun ChatHeader(channel: Channel) {
                     }
                 }
             }
-            else -> {
+            else -> Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 ChannelGlyph(channel, 22.dp, c.textMuted)
                 Txt(channel.name, style = nameStyle, color = c.textStrong, maxLines = 1, modifier = Modifier.padding(start = 2.dp))
                 if (channel.topic.isNotBlank()) {
@@ -196,7 +196,6 @@ fun ChatHeader(channel: Channel) {
                 }
             }
         }
-        if (channel.type != "subchat") Spacer(Modifier.weight(1f))
         if (channel.serverId == null) {
             HeaderButton("Phone", t("chat.chat.startVoiceCall")) { fish.nexa.voice.Calls.join(callChannelOf(channel)) }
             HeaderButton("Video", t("chat.chat.startVideoCall")) { fish.nexa.voice.Calls.join(callChannelOf(channel), video = true) }

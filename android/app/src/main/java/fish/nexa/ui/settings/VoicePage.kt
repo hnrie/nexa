@@ -82,6 +82,11 @@ object VoiceLocalSettings {
         get() = prefs().getBoolean("callSpeaker", true)
         set(v) = prefs().edit().putBoolean("callSpeaker", v).apply()
 
+    /** Which way the camera faces when it is turned on, kept as last chosen (the web keeps its camera's id). */
+    var frontCamera: Boolean
+        get() = prefs().getBoolean("cameraFront", true)
+        set(v) = prefs().edit().putBoolean("cameraFront", v).apply()
+
     /** Set by the call engine, so a volume changed here reaches a call that is on. */
     var onVolume: ((userId: String, pct: Int) -> Unit)? = null
 

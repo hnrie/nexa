@@ -305,17 +305,18 @@ fun NotificationsPage(openPage: (String, String?) -> Unit) {
     var background by remember { mutableStateOf(Background.enabled) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         tick++
-        if (granted) patchNested("notifications", mapOf("app" to JsonPrimitive(true)))
+        if (granted) patchNested("notifications", mapOf("android" to JsonPrimitive(true)))
     }
 
     PageTitle(t("settings.notifications.notifications"))
-    val on = n.bool("app", true) && allowed
+    // the Android app's own switch: "app" is the desktop app's, and one must not silence the other
+    val on = n.bool("android", true) && allowed
     ToggleRow(
         t("android.settings.notifications.show"),
         on,
         { want ->
-            if (!want) patchNested("notifications", mapOf("app" to JsonPrimitive(false)))
-            else if (allowed) patchNested("notifications", mapOf("app" to JsonPrimitive(true)))
+            if (!want) patchNested("notifications", mapOf("android" to JsonPrimitive(false)))
+            else if (allowed) patchNested("notifications", mapOf("android" to JsonPrimitive(true)))
             else if (Build.VERSION.SDK_INT >= 33 && !Nexa.app.getSharedPreferences("notify", 0).getBoolean("denied", false)) {
                 Nexa.app.getSharedPreferences("notify", 0).edit().putBoolean("denied", true).apply()
                 ask.launch(Manifest.permission.POST_NOTIFICATIONS)

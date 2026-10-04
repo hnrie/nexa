@@ -40,6 +40,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.offset
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -106,6 +108,18 @@ fun Txt(
         maxLines = maxLines,
         overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis,
     )
+}
+
+/**
+ * A finger-sized target around small words without moving the line they sit
+ * on (the web's padding with a negative margin): the padding inside it is
+ * pressable, but the layout only counts the words. Put it before the padding.
+ */
+fun Modifier.touchOutset(horizontal: Dp, vertical: Dp): Modifier = this.layout { measurable, constraints ->
+    val h = horizontal.roundToPx()
+    val v = vertical.roundToPx()
+    val p = measurable.measure(constraints.offset(2 * h, 2 * v))
+    layout(maxOf(0, p.width - 2 * h), maxOf(0, p.height - 2 * v)) { p.place(-h, -v) }
 }
 
 /**
@@ -469,7 +483,7 @@ fun NxSlider(
         modifier
             .fillMaxWidth()
             .height(32.dp)
-            .androidx_onSize { width = it }
+            .onSizeChanged { width = it.width.toFloat() }
             .pointerInputDrag(onDrag = { x -> onChange(at(x)) }, onEnd = { onDone?.invoke() })
             .semantics {
                 if (label != null) contentDescription = label
@@ -489,8 +503,6 @@ fun NxSlider(
         )
     }
 }
-
-private fun Modifier.androidx_onSize(fn: (Float) -> Unit): Modifier = this.then(Modifier.onSizeChanged { fn(it.width.toFloat()) })
 
 private fun Modifier.pointerInputDrag(onDrag: (Float) -> Unit, onEnd: () -> Unit): Modifier = this.then(
     Modifier.pointerInput(Unit) {
