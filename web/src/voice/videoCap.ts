@@ -57,12 +57,9 @@ export function safeAspect(width: number, height: number): number | null {
 }
 
 /**
- * Calls carry VP8 and nothing else: the frame encryption keeps VP8's payload
- * header readable (H.264's is laid out differently), and VP8's keyframe header
- * is the one frameSize.ts reads before anything is decoded. Asking for it on a
- * receiving transceiver too means a sender cannot slip another codec past that
- * check: a track offered in nothing else is turned down. True when the
- * browser took the list.
+ * What a call sends: VP8, whose payload header the frame encryption keeps
+ * readable and whose keyframe header frameSize.ts reads before anything is
+ * decoded. True when the browser took the list.
  */
 export function preferVp8(tr: RTCRtpTransceiver): boolean {
   if (typeof tr.setCodecPreferences !== "function") return false;
@@ -77,6 +74,36 @@ export function preferVp8(tr: RTCRtpTransceiver): boolean {
     }
   }
   return false;
+}
+
+/**
+ * What a call takes in: VP8, and H.264, which a phone shares its screen in
+ * with its hardware encoder (h264.ts). The frame encryption and the size
+ * check read both before anything is decoded, and asking for them alone on a
+ * receiving transceiver means a sender cannot slip another codec past that
+ * check: a track offered in nothing else is turned down. VP8 comes first, so
+ * where a sender offers both, it is the one used. True when the browser took
+ * the list.
+ */
+export function acceptCallVideo(tr: RTCRtpTransceiver): boolean {
+  if (typeof tr.setCodecPreferences !== "function") return false;
+  const rank = (c: RTCRtpCodec) => (/^video\/vp8$/i.test(c.mimeType) ? 0 : /^video\/h264$/i.test(c.mimeType) ? 1 : 2);
+  for (const caps of [RTCRtpReceiver.getCapabilities?.("video"), RTCRtpSender.getCapabilities?.("video")]) {
+    const list = caps?.codecs.filter((c) => /^video\/(vp8|h264|rtx)$/i.test(c.mimeType)) ?? [];
+    if (!list.some((c) => rank(c) === 0)) continue;
+    try {
+      tr.setCodecPreferences([...list].sort((a, b) => rank(a) - rank(b)));
+      return true;
+    } catch {
+      /* this list is not the one the browser checks against; try the other */
+    }
+  }
+  return false;
+}
+
+/** Whether this browser can take a phone's H.264 screen share (acceptCallVideo), which the call is told. */
+export function canReceiveH264(): boolean {
+  return !!RTCRtpReceiver.getCapabilities?.("video")?.codecs.some((c) => /^video\/h264$/i.test(c.mimeType));
 }
 
 /**

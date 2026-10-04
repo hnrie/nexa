@@ -1,4 +1,5 @@
-import { SizeGuard, VP8, vp8Header } from "./frameSize";
+import { H264, SizeGuard, VP8, vp8Header } from "./frameSize";
+import { BASELINE_SPS_176x144 } from "./h264.fixture";
 
 /** A VP8 keyframe as an encoder writes it: frame tag (keyframe, shown), start code, 14-bit width and height, then data. */
 function vp8Key(width: number, height: number, body = 40, scaleBits = 0): Uint8Array {
@@ -134,14 +135,41 @@ describe("the size guard", () => {
   });
 
   it("treats frames of another codec as the guard was told to, and drops them while blocked", () => {
-    const h264 = new Uint8Array([0, 0, 0, 1, 0x67, 0x42, 0xc0, 0x1f, 0xda, 0x01, 0x40]);
+    const vp9 = new Uint8Array([0x82, 0x49, 0x83, 0x42, 0x00, 0x13, 0xf0]);
     const sfu = new SizeGuard("drop");
-    expect(sfu.check(h264, "video/H264")).toBe("drop");
+    expect(sfu.check(vp9, "video/VP9")).toBe("drop");
     expect(sfu.check(vp8Inter(), "video/AV1")).toBe("drop");
     const mesh = new SizeGuard("pass");
-    expect(mesh.check(h264, "video/H264")).toBe("pass");
+    expect(mesh.check(vp9, "video/VP9")).toBe("pass");
     expect(mesh.check(vp8Key(16383, 16383), "video/VP8")).toBe("drop");
-    expect(mesh.check(h264, "video/H264")).toBe("drop");
+    expect(mesh.check(vp9, "video/VP9")).toBe("drop");
+  });
+
+  it("reads H.264's picture from its SPS, and holds it to the cap like VP8's", () => {
+    // 8208 x 16 (libx264, baseline): one side over the cap
+    const wide = Uint8Array.from("000000016742c033d9000807b011000003000100000300020f183248".match(/../g)!, (h) => parseInt(h, 16));
+    const slice = new Uint8Array([0, 0, 0, 1, 0x41, 0x9a, 0x02, 0x10, 0x55]);
+    const frame = (sps: Uint8Array) => {
+      const out = new Uint8Array(sps.length + slice.length);
+      out.set(sps);
+      out.set(slice, sps.length);
+      return out;
+    };
+    for (const g of [new SizeGuard("drop"), new SizeGuard("pass")]) {
+      expect(g.check(frame(BASELINE_SPS_176x144), H264)).toBe("pass");
+      expect(g.size).toEqual({ width: 176, height: 144 });
+      expect(g.check(slice, H264)).toBe("pass");
+      expect(g.check(frame(wide), "video/H264")).toBe("drop");
+      expect(g.size).toEqual({ width: 8208, height: 16 });
+      expect(g.blocked).toBe(true);
+      expect(g.check(slice, H264)).toBe("drop");
+      // an SPS no decoder can read changes nothing
+      expect(g.check(BASELINE_SPS_176x144.subarray(0, 8), H264)).toBe("drop");
+      expect(g.blocked).toBe(true);
+      expect(g.check(frame(BASELINE_SPS_176x144), H264)).toBe("pass");
+      expect(g.blocked).toBe(false);
+      expect(g.check(slice, H264)).toBe("pass");
+    }
   });
 
   it("reads the MIME type whatever its case", () => {
@@ -150,17 +178,17 @@ describe("the size guard", () => {
     expect(g.blocked).toBe(true);
   });
 
-  it("with no codec known, checks what reads as VP8 and treats the rest as another codec", () => {
-    const sfu = new SizeGuard("drop");
-    expect(sfu.check(vp8Key(1920, 1080))).toBe("pass");
-    expect(sfu.check(vp8Inter())).toBe("pass");
-    expect(sfu.check(new Uint8Array([0, 0, 0, 1, 0x67, 0x42, 0, 0x1f, 0, 0, 0]))).toBe("drop");
-    expect(sfu.check(vp8Key(10000, 10000))).toBe("drop");
-    expect(sfu.blocked).toBe(true);
-    const mesh = new SizeGuard("pass");
-    expect(mesh.check(new Uint8Array([0, 0, 0, 1, 0x67, 0x42, 0, 0x1f, 0, 0, 0]))).toBe("pass");
-    expect(mesh.check(vp8Key(10000, 10000))).toBe("drop");
-    expect(mesh.check(new Uint8Array([0, 0, 0, 1, 0x65, 0x88]))).toBe("drop");
+  it("with no codec known, reads what opens with a start code as H.264 and the rest as VP8", () => {
+    for (const g of [new SizeGuard("drop"), new SizeGuard("pass")]) {
+      expect(g.check(vp8Key(1920, 1080))).toBe("pass");
+      expect(g.check(vp8Inter())).toBe("pass");
+      expect(g.check(BASELINE_SPS_176x144)).toBe("pass");
+      expect(g.size).toEqual({ width: 176, height: 144 });
+      // an SPS cut short
+      expect(g.check(new Uint8Array([0, 0, 0, 1, 0x67, 0x42, 0, 0x1f, 0, 0, 0]))).toBe("drop");
+      expect(g.check(vp8Key(10000, 10000))).toBe("drop");
+      expect(g.check(new Uint8Array([0, 0, 0, 1, 0x65, 0x88]))).toBe("drop");
+    }
   });
 
   it("never throws, whatever it is given", () => {

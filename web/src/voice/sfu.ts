@@ -15,8 +15,7 @@ import { tunedRemote } from "./opus";
 import { Playback } from "./playback";
 import { MAX_SHARE_BPS, MIN_SHARE_BPS } from "./shareQuality";
 import type { SignalPayload, TransportEvents, VoiceTransport } from "./transport";
-import { VP8 } from "./frameSize";
-import { capSender, clampBitrate, preferVp8, recapSender } from "./videoCap";
+import { acceptCallVideo, capSender, clampBitrate, preferVp8, recapSender } from "./videoCap";
 
 import { t as tr_ } from "@/i18n";
 import { RecentLoss, type LossTotals } from "./recentLoss";
@@ -941,14 +940,14 @@ export class SfuTransport implements VoiceTransport {
     const p = mid ? this.byMid.get(mid) : undefined;
     const cryptoId = `${mid ?? "-"}#${++this.receiverSeq}`;
     const kind = p ? media(p.kind) : e.track.kind === "video" ? "video" : "audio";
-    // The answer to this offer takes VP8 or nothing: the worker reads VP8's
-    // header to keep oversized pictures from the decoder, so a publisher
-    // cannot get another codec past it. Every Nexa client publishes VP8.
-    const vp8 = kind === "video" && preferVp8(e.transceiver);
+    // The answer to this offer takes VP8 or H.264 (a phone's screen share)
+    // and nothing else: the worker reads both to keep oversized pictures from
+    // the decoder, so a publisher cannot get another codec past it.
+    if (kind === "video") acceptCallVideo(e.transceiver);
     try {
       // Every receiver gets its transform at once, even one this call does not know: Chromium lets
       // frames skip a receiver that has none for good, and the mid may be handed out again later.
-      this.crypto.protectReceiver(e.receiver, kind, cryptoId, vp8 ? VP8 : undefined);
+      this.crypto.protectReceiver(e.receiver, kind, cryptoId);
     } catch (err) {
       // a track that cannot be opened is not played: what arrives is sealed
       console.warn("voice: cannot decrypt a pulled track", err);

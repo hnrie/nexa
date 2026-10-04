@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -543,5 +544,69 @@ func TestCallSummary(t *testing.T) {
 		if m["id"] == mid && (m["ciphertext"] == nil || m["edited_at"] != nil || m["key_conv_id"] != dm) {
 			t.Errorf("the stored line: %v", m)
 		}
+	}
+}
+
+func TestVoiceStateCodecs(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, idA := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	view := createServer(t, ts, tokA, "Voice")
+	general := channelNamed(view, "general")["id"].(string)
+	voiceCh := channelNamed(view, "General")["id"].(string)
+	join(t, ts, tokB, inviteFor(t, ts, tokA, general))
+	ga := connectGW(t, ts, tokA)
+	gb := connectGW(t, ts, tokB)
+
+	// what a device can watch besides VP8 reaches the others, known codecs only and once each
+	ga.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "codecs": []string{"h264", "vp9", "h264", "x"}})
+	ev := gb.next("voice_state", 3*time.Second)
+	if ev == nil || ev["user_id"] != idA || fmt.Sprint(ev["codecs"]) != "[h264]" {
+		t.Fatalf("join with codecs: %v", ev)
+	}
+	ga.next("voice_state", 3*time.Second)
+	// a device that names none has none, and the field is left out
+	gb.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	ev = ga.next("voice_state", 3*time.Second)
+	if ev == nil || ev["user_id"] != idB {
+		t.Fatalf("bob join: %v", ev)
+	}
+	if _, has := ev["codecs"]; has {
+		t.Errorf("codecs on a device that named none: %v", ev)
+	}
+	gb.next("voice_state", 3*time.Second)
+	// every state a device sends says it again: a toggle without them clears them
+	ga.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "self_mute": true})
+	ev = gb.next("voice_state", 3*time.Second)
+	if _, has := ev["codecs"]; ev == nil || has || ev["self_mute"] != true {
+		t.Errorf("mute without codecs: %v", ev)
+	}
+	ga.next("voice_state", 3*time.Second)
+	// and the call's roster carries them
+	ga.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "codecs": []string{"h264"}})
+	gb.next("voice_state", 3*time.Second)
+	ga.next("voice_state", 3*time.Second)
+	res, err := http.NewRequest("GET", ts.URL+"/api/v1/channels/"+voiceCh+"/voice", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Header.Set("Authorization", "Bearer "+tokB)
+	resp, err := http.DefaultClient.Do(res)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var roster []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&roster); err != nil {
+		t.Fatalf("roster: %v", err)
+	}
+	found := false
+	for _, st := range roster {
+		if st["user_id"] == idA {
+			found = fmt.Sprint(st["codecs"]) == "[h264]"
+		}
+	}
+	if !found {
+		t.Errorf("roster without alice's codecs: %v", roster)
 	}
 }

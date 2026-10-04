@@ -26,6 +26,7 @@ import { useVoiceLocal } from "@/stores/voiceLocal";
 import { closeRingNotice, missedNotice, ringNotice } from "./callNotice";
 import { allDeclined, callDeclined, callEnded, callLine, callStarted, callTimedOut, callsAfterReady, installCallRecord } from "./callRecord";
 import { audioContext, resumeAudio } from "./media";
+import { canReceiveH264 } from "./videoCap";
 
 import { t as tr_ } from "@/i18n";
 
@@ -205,6 +206,8 @@ export function sendState(channelId: string | null, resume = false, sfuSession?:
     streaming: !!st.localScreen,
     // how this device connects, so the server can turn away a page set up for the other kind
     ...(channelId ? { sfu: !!engine?.throughSfu() } : {}),
+    // what it can watch besides VP8: a phone shares its screen in H.264 only when everyone can
+    ...(channelId && canReceiveH264() ? { codecs: ["h264"] } : {}),
     ...(resume ? { resume: true } : {}),
     ...(resume && sfuSession ? { sfu_session: sfuSession } : {}),
   });

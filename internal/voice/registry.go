@@ -43,6 +43,9 @@ type State struct {
 	// timer ends the call only if it is still detached from the drop that
 	// set it, not from a later one it would cut short.
 	Detached uint64 `json:"-"`
+	// Codecs are the video codecs besides VP8 the device can watch ("h264"):
+	// a phone shares its screen in H.264 only when everyone in the call can.
+	Codecs []string `json:"-"`
 	// Name and AvatarID are how the participant looked on joining, for the
 	// guests in the call, who are told nothing else about anyone.
 	Name     string  `json:"-"`

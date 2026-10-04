@@ -311,6 +311,12 @@ export interface VoiceState {
    * screen, screen_audio) with a tag that changes when that track is published again.
    */
   media?: Partial<Record<"audio" | "video" | "screen" | "screen_audio", string>>;
+  /**
+   * The video codecs besides VP8 this participant's device can watch in a
+   * call: "h264" for a phone's screen share, which is sent in H.264 only when
+   * everyone in the call can.
+   */
+  codecs?: string[];
   /** Enough of the participant to show them in the call; all a guest ever learns about anyone. */
   user?: CallUser;
   /** Set for someone in through a guest link, with the key epoch their link carried. */

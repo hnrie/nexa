@@ -5,19 +5,19 @@
  * never sees it. Playback goes through WebAudio so per-user volume can exceed
  * 100 % and the output device can be chosen.
  *
- * Video is VP8 both ways, and where the browser allows it every received
- * video frame is held to the size cap (frameSize.ts) before it is decoded,
- * as frames through the SFU are once opened.
+ * Video goes out in VP8 and comes in as VP8 or H.264 (a phone's screen
+ * share), and where the browser allows it every received video frame is held
+ * to the size cap (frameSize.ts) before it is decoded, as frames through the
+ * SFU are once opened.
  */
 import type { VoiceState } from "@/api/types";
 import { FrameCrypto } from "./e2ee";
-import { VP8 } from "./frameSize";
 import { tunedRemote } from "./opus";
 import { Playback } from "./playback";
 import { MAX_SHARE_BPS, MIN_SHARE_BPS } from "./shareQuality";
 import type { MediaKind, SignalPayload, TransportEvents, VoiceTransport } from "./transport";
 import { RecentLoss, type LossTotals } from "./recentLoss";
-import { capSender, clampBitrate, preferVp8, recapSender } from "./videoCap";
+import { acceptCallVideo, capSender, clampBitrate, preferVp8, recapSender } from "./videoCap";
 
 export type { MediaKind, SignalPayload, TransportEvents } from "./transport";
 
@@ -502,16 +502,16 @@ export class MeshTransport implements VoiceTransport {
   /**
    * Holds a received video track to the size cap before it is decoded. This
    * runs while the offer or answer carrying it is applied, before any of its
-   * frames can arrive, and asks for VP8 alone first so the answer this device
-   * gives takes nothing the check cannot read.
+   * frames can arrive, and asks for VP8 and H.264 alone first so the answer
+   * this device gives takes nothing the check cannot read.
    */
   private inspect(peer: Peer, e: RTCTrackEvent): void {
-    const vp8 = preferVp8(e.transceiver);
+    acceptCallVideo(e.transceiver);
     if (this.checkedReceivers.has(e.receiver)) return;
     try {
       this.inspector ??= FrameCrypto.scriptTransform() ? this.newInspector() : null;
       const id = `${peer.userId}#${++this.receiverSeq}`;
-      if (!this.inspector?.inspectReceiver(e.receiver, id, vp8 ? VP8 : undefined)) return;
+      if (!this.inspector?.inspectReceiver(e.receiver, id)) return;
       this.checkedReceivers.add(e.receiver);
       const stream = e.streams[0] ?? new MediaStream([e.track]);
       this.inspected.set(id, { userId: peer.userId, stream, over: false });

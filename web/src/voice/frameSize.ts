@@ -5,20 +5,23 @@
  * client could otherwise send a keyframe that claims 16383x16383 and make
  * every browser in the call allocate gigabytes for it.
  *
- * Calls carry VP8 and nothing else (preferVp8 in videoCap.ts, for sending and
- * receiving alike), so VP8's keyframe header is the one read here: a 3-byte
- * frame tag whose lowest bit is 0 on a keyframe, the start code 9d 01 2a, then
- * the width and the height, 14 bits each (the top two bits of each are a
- * scaling hint decoders leave alone). Inter frames declare no size: they are
- * decoded at the size of the keyframe before them. So once a keyframe is over
- * the cap, everything after it is dropped as well, until a keyframe within
- * the cap starts the picture again.
+ * Calls carry VP8, and H.264 from phones sharing their screens (videoCap.ts
+ * acceptCallVideo). VP8's keyframe header is a 3-byte frame tag whose lowest
+ * bit is 0 on a keyframe, the start code 9d 01 2a, then the width and the
+ * height, 14 bits each (the top two bits of each are a scaling hint decoders
+ * leave alone). H.264's picture is set by its SPS (h264.ts spsSize), which
+ * comes with every keyframe. Other frames declare no size: they are decoded
+ * at the size set before them. So once a picture is over the cap, everything
+ * after it is dropped as well, until a keyframe within the cap starts the
+ * picture again.
  *
  * Nothing here throws on any input.
  */
+import { isAnnexB, NALU_SPS, naluIndices, spsSize } from "./h264";
 import { fitsCap, type PictureSize } from "./videoCap";
 
 export const VP8 = "video/vp8";
+export const H264 = "video/h264";
 
 /**
  * What a VP8 frame says about itself: an inter frame (or an empty one), which
@@ -69,6 +72,7 @@ export class SizeGuard {
 
   private decide(data: Uint8Array, codec?: string): Verdict {
     const known = codec === undefined ? undefined : codec.toLowerCase();
+    if (known === H264 || (known === undefined && isAnnexB(data))) return this.h264(data);
     if (known !== undefined && known !== VP8) return this.blocked ? "drop" : this.foreign;
     const head = vp8Header(data);
     if (!head.key) return this.blocked ? "drop" : "pass";
@@ -80,6 +84,23 @@ export class SizeGuard {
     }
     this.size = head.size;
     this.blocked = !fitsCap(head.size.width, head.size.height);
+    return this.blocked ? "drop" : "pass";
+  }
+
+  /** An H.264 frame: an SPS in it sets the picture, which none of its SPSs may take over the cap. */
+  private h264(data: Uint8Array): Verdict {
+    let over = false;
+    let seen = false;
+    for (const nalu of naluIndices(data)) {
+      if (nalu.end <= nalu.payload || (data[nalu.payload]! & 0x1f) !== NALU_SPS) continue;
+      const size = spsSize(data, nalu);
+      // an SPS no decoder can read starts nothing
+      if (!size) return "drop";
+      seen = true;
+      this.size = size;
+      if (!fitsCap(size.width, size.height)) over = true;
+    }
+    if (seen) this.blocked = over;
     return this.blocked ? "drop" : "pass";
   }
 }

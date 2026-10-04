@@ -1,5 +1,5 @@
 import { channelKey, voiceFrameKey } from "@/crypto/conv";
-import { clearBytes, frameIv, importFrameKey, openFrame, sealFrame } from "./frameCrypto";
+import { FIRST_FRAME_COUNTER, MAX_FRAME_COUNTER, clearBytes, frameIv, importFrameKey, newSalt, nextCounter, openFrame, sealFrame } from "./frameCrypto";
 
 const raw = (n: number) => new Uint8Array(32).fill(n);
 const frame = (len: number) => Uint8Array.from({ length: len }, (_, i) => (i * 37) & 0xff);
@@ -48,6 +48,22 @@ describe("frame encryption", () => {
     expect(a.subarray(0, 8)).toEqual(salt);
     expect(a).not.toEqual(b);
     expect(frameIv(salt, 0xffffffff).subarray(8)).toEqual(new Uint8Array([255, 255, 255, 255]));
+  });
+
+  it("makes ivs with no zero byte in them, so a sealed H.264 frame never gets a start code from one", () => {
+    for (let i = 0; i < 50; i++) expect([...newSalt()]).not.toContain(0);
+    const bytes = (n: number) => [...frameIv(new Uint8Array(8).fill(1), n).subarray(8)];
+    let n = FIRST_FRAME_COUNTER;
+    for (let i = 0; i < 70_000; i++) {
+      const next = nextCounter(n);
+      expect(next).toBeGreaterThan(n);
+      n = next;
+    }
+    expect(bytes(n)).not.toContain(0);
+    // carried over a byte that rolls round, and past the last one when the counter has run out
+    expect(nextCounter(0x010101ff)).toBe(0x01010201);
+    expect(nextCounter(0x01ffffff)).toBe(0x02010101);
+    expect(nextCounter(MAX_FRAME_COUNTER)).toBeGreaterThan(MAX_FRAME_COUNTER);
   });
 
   it("derives the call key apart from the message key", () => {

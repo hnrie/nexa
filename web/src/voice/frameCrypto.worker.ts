@@ -9,8 +9,9 @@
  * (frameSize.ts) before the browser decodes it. Peer to peer, where nothing is
  * sealed, video receivers come through here for that check alone ("inspect").
  */
-import { MAX_FRAME_COUNTER, SALT_BYTES, clearBytes, frameIv, importFrameKey, openFrame, sealFrame, type FrameKind } from "./frameCrypto";
-import { SizeGuard } from "./frameSize";
+import { FIRST_FRAME_COUNTER, MAX_FRAME_COUNTER, clearBytes, frameIv, importFrameKey, newSalt, nextCounter, openFrame, openH264Frame, sealFrame, sealH264Frame, type FrameKind } from "./frameCrypto";
+import { H264, SizeGuard } from "./frameSize";
+import { isAnnexB } from "./h264";
 import { CopyHistory, Mender, unwrapCopies, wrapCopies, type Mended } from "./redundancy";
 
 type Op = "encrypt" | "decrypt" | "inspect";
@@ -87,8 +88,8 @@ interface WorkerScope {
 const scope = self as unknown as WorkerScope;
 const keys = new Map<number, CryptoKey>();
 let sendIndex = -1;
-let salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
-let counter = 0;
+let salt = newSalt();
+let counter = FIRST_FRAME_COUNTER;
 const stats: FrameCryptoStats = { type: "stats", sealed: 0, opened: 0, dropped: 0, recovered: 0, oversize: 0 };
 /** How many earlier frames each outgoing voice frame carries copies of (0 to 2); the page sets it from how lossy the call is. */
 let redundancy = 0;
@@ -101,6 +102,24 @@ let keysReady: Promise<void> = Promise.resolve();
 const HOLD_MS = 80;
 /** How long a receiver's size verdict has to settle before the page is told. */
 const SIZE_REPORT_MS = 300;
+/**
+ * How many ivs an H.264 frame is sealed with before it is given up: one that
+ * comes out holding a start code is sealed again with the next. Sealed bytes
+ * hold 00 00 01 about once in 16 million, so a 150 KB keyframe needs a
+ * second go about once in a hundred, and a tenth go practically never.
+ */
+const H264_TRIES = 10;
+
+/** The next iv this sender seals with, a new salt when the counter has run out. */
+function nextIv(): Uint8Array {
+  if (counter > MAX_FRAME_COUNTER) {
+    salt = newSalt();
+    counter = FIRST_FRAME_COUNTER;
+  }
+  const iv = frameIv(salt, counter);
+  counter = nextCounter(counter);
+  return iv;
+}
 
 /** The codec a received frame is in, as the browser reports it; undefined where it does not. */
 function mimeOf(frame: EncodedFrame): string | undefined {
@@ -110,6 +129,12 @@ function mimeOf(frame: EncodedFrame): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** Whether a video frame is H.264: as the browser names its codec, or the receiver's own, or from its first bytes. */
+function isH264(frame: EncodedFrame, data: Uint8Array, codec: string | undefined): boolean {
+  const named = (mimeOf(frame) ?? codec)?.toLowerCase();
+  return named === undefined ? isAnnexB(data) : named === H264;
 }
 
 function passOn(controller: TransformStreamDefaultController<EncodedFrame>, frames: Mended<EncodedFrame>[]): void {
@@ -123,7 +148,7 @@ function transformer({ op, kind, id, voice = false, codec }: StreamOptions): Tra
   // what this receiver has reported so far: any frame at all, and one that opened
   let reportedFrame = false;
   let reportedOpened = false;
-  // received video is held to the size cap; through the SFU only VP8 is ever sent, peer to peer another codec is let be
+  // received video is held to the size cap; through the SFU only VP8 and H.264 are sent, peer to peer another codec is let be
   const guard = kind === "video" && op !== "encrypt" ? new SizeGuard(op === "inspect" ? "pass" : "drop") : null;
   let toldOver = false;
   let sizeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -175,20 +200,26 @@ function transformer({ op, kind, id, voice = false, codec }: StreamOptions): Tra
             stats.dropped++;
             return;
           }
-          if (counter > MAX_FRAME_COUNTER) {
-            salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
-            counter = 0;
-          }
           let plain: Uint8Array = data;
           const ts = history ? frame.getMetadata?.().rtpTimestamp : undefined;
           if (history && ts !== undefined) {
             const copies = history.take(ts, data);
             if (redundancy > 0) plain = wrapCopies(data, copies.slice(0, redundancy)) ?? data;
           }
-          frame.data = (await sealFrame(key, sendIndex, frameIv(salt, counter++), plain, clear)).buffer as ArrayBuffer;
+          if (kind === "video" && isH264(frame, plain, codec)) {
+            let sealed: Uint8Array | null = null;
+            for (let tries = 0; !sealed && tries < H264_TRIES; tries++) sealed = await sealH264Frame(key, sendIndex, nextIv(), plain);
+            if (!sealed) {
+              stats.dropped++;
+              return;
+            }
+            frame.data = sealed.buffer as ArrayBuffer;
+          } else {
+            frame.data = (await sealFrame(key, sendIndex, nextIv(), plain, clear)).buffer as ArrayBuffer;
+          }
           stats.sealed++;
         } else {
-          const opened = await openFrame(keys, data, clear);
+          const opened = kind === "video" && isH264(frame, data, codec) ? await openH264Frame(keys, data) : await openFrame(keys, data, clear);
           if (id !== undefined && (!reportedFrame || (opened && !reportedOpened))) {
             reportedFrame = true;
             if (opened) reportedOpened = true;

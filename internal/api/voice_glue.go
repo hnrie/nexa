@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	urlpkg "net/url"
+	"slices"
 	"time"
 
 	"evilion.xyz/chat/internal/auth"
@@ -45,6 +46,9 @@ type voiceStatePayload struct {
 	// Media maps the kinds this participant publishes through the SFU to a
 	// tag that changes whenever that track is published again.
 	Media map[string]string `json:"media,omitempty"`
+	// Codecs are the video codecs besides VP8 the participant's device can
+	// watch, so a phone knows when it may share its screen in H.264.
+	Codecs []string `json:"codecs,omitempty"`
 	// User is enough of the participant to show them in the call. Guests are
 	// told nothing else about anyone, and nobody else knows a guest otherwise.
 	User *callUser `json:"user,omitempty"`
@@ -69,7 +73,7 @@ type guestMark struct {
 
 func statePayload(st voice.State) voiceStatePayload {
 	ch := st.ChannelID
-	out := voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, JoinedAt: st.JoinedAt, Media: st.Tracks.Tags(),
+	out := voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, JoinedAt: st.JoinedAt, Media: st.Tracks.Tags(), Codecs: st.Codecs,
 		User: &callUser{ID: st.UserID, DisplayName: st.Name, AvatarID: st.AvatarID}}
 	if st.Guest {
 		out.User.Flags = store.FlagGuest
@@ -218,6 +222,20 @@ type voiceStateReq struct {
 	// SFUSession, with Resume, is the SFU session the device still holds: the
 	// proof that it is the device whose call waits for it after a reconnect.
 	SFUSession string `json:"sfu_session"`
+	// Codecs are the video codecs besides VP8 the device can watch.
+	Codecs []string `json:"codecs"`
+}
+
+// callCodecs keeps, once each, the codecs a device says it can watch that
+// calls know of: H.264, which phones share their screens in.
+func callCodecs(in []string) []string {
+	var out []string
+	for _, c := range in {
+		if c == "h264" && !slices.Contains(out, c) {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 type voiceSignalReq struct {
@@ -296,6 +314,7 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 					// removes. What Resume gave us is the last real thing.
 					if fresh, ok := s.Voice.Update(me.ID, func(x *voice.State) {
 						x.SelfMute, x.SelfDeaf, x.Video, x.Streaming = req.SelfMute, req.SelfDeaf, req.Video, req.Streaming
+						x.Codecs = callCodecs(req.Codecs)
 					}); ok {
 						st = fresh
 					}
@@ -315,7 +334,7 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 				keep = true
 			}
 		}
-		next := voice.State{UserID: me.ID, ChannelID: ch.ID, SessionID: c.SessionID(), ConnID: c.ID(), SelfMute: req.SelfMute, SelfDeaf: req.SelfDeaf, Video: req.Video, Streaming: req.Streaming, Suppress: !p.Has(perms.Speak), Name: me.DisplayName, AvatarID: me.AvatarID}
+		next := voice.State{UserID: me.ID, ChannelID: ch.ID, SessionID: c.SessionID(), ConnID: c.ID(), SelfMute: req.SelfMute, SelfDeaf: req.SelfDeaf, Video: req.Video, Streaming: req.Streaming, Suppress: !p.Has(perms.Speak), Name: me.DisplayName, AvatarID: me.AvatarID, Codecs: callCodecs(req.Codecs)}
 		if guest != nil {
 			next.Guest, next.GuestEpoch = true, guest.Epoch
 		}
