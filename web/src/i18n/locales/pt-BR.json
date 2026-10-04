@@ -5433,5 +5433,11 @@
   "whatsNew.r20261004.wholeStatusBody": "Um status longo aparece cortado ao lado da foto no perfil. Passe o mouse por cima ou toque nele para ler tudo.",
   "stickerPack.loading": "Carregando o pacote",
   "whatsNew.r20261004.packCardsTitle": "Cartões de pacotes nas conversas",
-  "whatsNew.r20261004.packCardsBody": "Um link para um pacote de figurinhas ou emojis agora mostra o pacote abaixo da mensagem, com parte do que tem nele e um botão para adicioná-lo."
+  "whatsNew.r20261004.packCardsBody": "Um link para um pacote de figurinhas ou emojis agora mostra o pacote abaixo da mensagem, com parte do que tem nele e um botão para adicioná-lo.",
+  "desktop.displayPicker.resetPermission": "Redefinir Permissão",
+  "desktop.displayPicker.chooseResetPermissionThenTurn": "Escolha Redefinir Permissão e ative o Nexa de novo em Gravação de Tela.",
+  "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Se o Nexa já estiver ativado lá, a permissão ainda aponta para uma cópia antiga do app. Escolha Redefinir Permissão e ative o Nexa de novo.",
+  "desktop.displayPicker.theOldPermissionIsCleared": "A permissão antiga foi apagada.",
+  "desktop.displayPicker.turnNexaOnInScreenRecording": "Ative o Nexa em Gravação de Tela. O macOS oferece reabrir o Nexa; se não oferecer, reinicie o app aqui.",
+  "desktop.displayPicker.couldNotResetThePermission": "O macOS não redefiniu a permissão. Remova o Nexa de Gravação de Tela com o botão de menos, adicione de novo e reinicie."
 }

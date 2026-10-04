@@ -140,6 +140,7 @@ export const IPC = {
   shareAudioFailed: "display:share-audio-failed",
   screenAccess: "display:screen-access",
   openScreenSettings: "display:open-screen-settings",
+  resetScreenAccess: "display:reset-screen-access",
   restartApp: "app:restart",
   windowState: "app:window-state",
   paste: "app:paste",

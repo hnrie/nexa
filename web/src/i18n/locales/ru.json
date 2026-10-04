@@ -5654,5 +5654,11 @@
   "whatsNew.r20261004.wholeStatusBody": "Длинный статус в профиле обрезается рядом с аватаркой. Наведите на него курсор или нажмите, чтобы прочитать полностью.",
   "stickerPack.loading": "Загрузка набора",
   "whatsNew.r20261004.packCardsTitle": "Карточки наборов в чатах",
-  "whatsNew.r20261004.packCardsBody": "Ссылка на набор стикеров или эмодзи теперь показывает сам набор под сообщением: часть его содержимого и кнопку, чтобы добавить его."
+  "whatsNew.r20261004.packCardsBody": "Ссылка на набор стикеров или эмодзи теперь показывает сам набор под сообщением: часть его содержимого и кнопку, чтобы добавить его.",
+  "desktop.displayPicker.resetPermission": "Сбросить разрешение",
+  "desktop.displayPicker.chooseResetPermissionThenTurn": "Нажмите «Сбросить разрешение», затем снова включите Nexa в «Записи экрана».",
+  "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Если Nexa там уже включён, разрешение всё ещё указывает на старую копию приложения. Нажмите «Сбросить разрешение», затем снова включите Nexa.",
+  "desktop.displayPicker.theOldPermissionIsCleared": "Старое разрешение удалено.",
+  "desktop.displayPicker.turnNexaOnInScreenRecording": "Включите Nexa в «Записи экрана». macOS предложит заново открыть Nexa; если не предложит, перезапустите приложение здесь.",
+  "desktop.displayPicker.couldNotResetThePermission": "macOS не сбросила разрешение. Удалите Nexa из «Записи экрана» кнопкой «минус», добавьте снова и перезапустите."
 }

@@ -5941,5 +5941,11 @@
   "whatsNew.r20261004.wholeStatusBody": "تُختصر الحالة الطويلة بجانب الصورة في الملف الشخصي. مرّر المؤشر فوقها أو انقر عليها لقراءتها كاملة.",
   "stickerPack.loading": "جارٍ تحميل الحزمة",
   "whatsNew.r20261004.packCardsTitle": "بطاقات الحزم في المحادثات",
-  "whatsNew.r20261004.packCardsBody": "يعرض رابط حزمة الملصقات أو الرموز التعبيرية الآن الحزمة أسفل الرسالة، مع بعض محتواها وزر لإضافتها."
+  "whatsNew.r20261004.packCardsBody": "يعرض رابط حزمة الملصقات أو الرموز التعبيرية الآن الحزمة أسفل الرسالة، مع بعض محتواها وزر لإضافتها.",
+  "desktop.displayPicker.resetPermission": "إعادة ضبط الإذن",
+  "desktop.displayPicker.chooseResetPermissionThenTurn": "اختر «إعادة ضبط الإذن»، ثم فعّل Nexa من جديد في تسجيل الشاشة.",
+  "desktop.displayPicker.ifNexaIsAlreadyOnThere": "إن كان Nexa مفعّلًا هناك أصلًا، فالإذن ما زال يشير إلى نسخة أقدم من التطبيق. اختر «إعادة ضبط الإذن»، ثم فعّل Nexa من جديد.",
+  "desktop.displayPicker.theOldPermissionIsCleared": "مُسح الإذن القديم.",
+  "desktop.displayPicker.turnNexaOnInScreenRecording": "فعّل Nexa في تسجيل الشاشة. سيعرض macOS إعادة فتح Nexa، وإن لم يفعل فأعد تشغيله من هنا.",
+  "desktop.displayPicker.couldNotResetThePermission": "لم يُعِد macOS ضبط الإذن. أزل Nexa من تسجيل الشاشة بزر الناقص، ثم أضفه من جديد وأعد التشغيل."
 }

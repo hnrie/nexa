@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { DisplaySourceRequest } from "@/lib/desktopBridge";
-import { DisplayPicker } from "./DisplayPicker";
+import type { DisplaySourceRequest, EvilionDesktop } from "@/lib/desktopBridge";
+import { useUI } from "@/stores/ui";
+import { DisplayPicker, ScreenPermission } from "./DisplayPicker";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  delete (window as Window & { evilionDesktop?: EvilionDesktop }).evilionDesktop;
+});
 
 const request: DisplaySourceRequest = {
   requestId: "r1",
@@ -57,5 +61,55 @@ describe("DisplayPicker", () => {
     fireEvent.click(tabs()[1]!);
     fireEvent.keyDown(screen.getAllByRole("radio")[1]!, { key: "Enter" });
     expect(onChoose).toHaveBeenCalledWith("window:2", false);
+  });
+});
+
+describe("ScreenPermission", () => {
+  /** A desktop app with what the dialog uses; the app after 1.2.2 can also reset the permission. */
+  function app(reset?: () => Promise<boolean>) {
+    const bridge = { openScreenSettings: vi.fn(async () => {}), restartApp: vi.fn(async () => {}), ...(reset ? { resetScreenAccess: vi.fn(reset) } : {}) };
+    (window as Window & { evilionDesktop?: unknown }).evilionDesktop = bridge;
+    return bridge;
+  }
+  const button = (id: string) => screen.queryByTestId(id);
+
+  it("resets a permission left by an older copy, then says what is left to do", async () => {
+    const bridge = app(async () => true);
+    render(<ScreenPermission stale onClose={vi.fn()} />);
+    expect(screen.getByText(/Choose Reset Permission/)).toBeTruthy();
+    expect(button("restart-for-screen")).toBeNull();
+    await act(async () => fireEvent.click(button("reset-screen-access")!));
+    expect(bridge.resetScreenAccess).toHaveBeenCalledOnce();
+    expect(screen.getByText("The old permission is cleared.")).toBeTruthy();
+    expect(button("reset-screen-access")).toBeNull();
+    fireEvent.click(button("restart-for-screen")!);
+    expect(bridge.restartApp).toHaveBeenCalledOnce();
+  });
+
+  it("gives the steps to do it by hand when macOS will not reset it", async () => {
+    useUI.setState({ toasts: [] });
+    app(async () => false);
+    render(<ScreenPermission stale onClose={vi.fn()} />);
+    await act(async () => fireEvent.click(button("reset-screen-access")!));
+    expect(useUI.getState().toasts.map((x) => [x.text, x.kind])).toEqual([[expect.stringContaining("with the minus button"), "error"]]);
+    expect(button("reset-screen-access")).toBeTruthy();
+  });
+
+  it("offers the reset beside Open Settings when macOS simply says no", () => {
+    const bridge = app(async () => true);
+    render(<ScreenPermission stale={false} onClose={vi.fn()} />);
+    expect(screen.getByText(/If Nexa is already on there/)).toBeTruthy();
+    fireEvent.click(button("open-screen-settings")!);
+    expect(bridge.openScreenSettings).toHaveBeenCalledOnce();
+    expect(button("reset-screen-access")).toBeTruthy();
+  });
+
+  it("leaves an app that cannot reset with Open Settings, Restart and the steps by hand", () => {
+    app();
+    render(<ScreenPermission stale onClose={vi.fn()} />);
+    expect(button("reset-screen-access")).toBeNull();
+    expect(button("open-screen-settings")).toBeTruthy();
+    expect(button("restart-for-screen")).toBeTruthy();
+    expect(screen.getByText(/remove Nexa with the minus button/)).toBeTruthy();
   });
 });

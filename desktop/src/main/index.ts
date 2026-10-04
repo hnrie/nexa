@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { IPC, type DesktopSettings, type Identity, type WindowState } from "../shared/bridge";
 import { BASE, ORIGIN, isAppUrl } from "./config";
-import { chooseDisplaySource, handleDisplayMedia, lockPermissions, openScreenSettings, restartApp, screenAccess, shareAudioFailed } from "./permissions";
+import { chooseDisplaySource, handleDisplayMedia, lockPermissions, openScreenSettings, resetScreenAccess, restartApp, screenAccess, shareAudioFailed } from "./permissions";
 import { RpcService } from "./rpc/service";
 import { PasteGate } from "./pasteGate";
 import { applyShortcuts, cleanRequests } from "./shortcuts";
@@ -228,6 +228,7 @@ function registerIpc(): void {
   handle(IPC.shareAudioFailed, () => shareAudioFailed(log));
   handle(IPC.screenAccess, () => screenAccess());
   handle(IPC.openScreenSettings, () => openScreenSettings());
+  handle(IPC.resetScreenAccess, () => resetScreenAccess());
   handle(IPC.restartApp, () => restartApp());
   // Paste from the page's right-click menu on text, into what the page has
   // focused, as the app's own menu does it: only straight after a right click

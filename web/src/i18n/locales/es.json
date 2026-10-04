@@ -5432,5 +5432,11 @@
   "whatsNew.r20261004.wholeStatusBody": "Un estado largo se recorta junto a la foto en el perfil. Pasa el cursor por encima o tócalo para leerlo entero.",
   "stickerPack.loading": "Cargando el paquete",
   "whatsNew.r20261004.packCardsTitle": "Tarjetas de paquetes en los chats",
-  "whatsNew.r20261004.packCardsBody": "Un enlace a un paquete de stickers o emojis ahora muestra el paquete debajo del mensaje, con parte de su contenido y un botón para añadirlo."
+  "whatsNew.r20261004.packCardsBody": "Un enlace a un paquete de stickers o emojis ahora muestra el paquete debajo del mensaje, con parte de su contenido y un botón para añadirlo.",
+  "desktop.displayPicker.resetPermission": "Restablecer permiso",
+  "desktop.displayPicker.chooseResetPermissionThenTurn": "Elige Restablecer permiso y vuelve a activar Nexa en Grabación de pantalla.",
+  "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Si Nexa ya está activado ahí, el permiso sigue apuntando a una copia anterior de la aplicación. Elige Restablecer permiso y vuelve a activar Nexa.",
+  "desktop.displayPicker.theOldPermissionIsCleared": "El permiso antiguo se ha borrado.",
+  "desktop.displayPicker.turnNexaOnInScreenRecording": "Activa Nexa en Grabación de pantalla. macOS ofrecerá volver a abrir Nexa; si no lo hace, reinícialo aquí.",
+  "desktop.displayPicker.couldNotResetThePermission": "macOS no restableció el permiso. Quita Nexa de Grabación de pantalla con el botón menos, vuelve a añadirlo y reinicia."
 }

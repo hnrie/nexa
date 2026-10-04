@@ -4,8 +4,11 @@
  * system asks the person the first time the microphone or camera is wanted.
  */
 import { app, desktopCapturer, session, shell, systemPreferences, type BrowserWindow, type DesktopCapturerSource } from "electron";
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import { IPC, type DisplaySourceRequest } from "../shared/bridge";
 import { WINDOWS_PROCESS_LOOPBACK_BUILD, windowAudioDevice } from "./appAudio";
 import { isAppUrl, originOf, ORIGIN } from "./config";
@@ -101,7 +104,8 @@ export function shareAudioFailed(log: Log): boolean {
  * update, or a new build in the same place, can leave an entry that reads as
  * granted in System Settings while the recording it allows is the old one:
  * the app is asked again, granting changes nothing, and only removing the
- * entry and adding it back (or restarting after granting) puts it right.
+ * entry (resetScreenAccess) and switching the app on again, or restarting
+ * after granting, puts it right.
  *
  * Asking the system for its answer is not enough on its own, because the
  * stale case answers "granted". A capture with nothing in it is the tell: the
@@ -127,6 +131,34 @@ export async function screenAccess(): Promise<ScreenAccess> {
     captured = false;
   }
   return { status, usable: captured, stale: status === "granted" && !captured };
+}
+
+/** The identifier macOS knows this copy of the app by, from its Info.plist as electron-builder writes it (XML). */
+function bundleId(): string | null {
+  try {
+    const plist = fs.readFileSync(path.resolve(app.getPath("exe"), "..", "..", "Info.plist"), "utf8");
+    return /<key>CFBundleIdentifier<\/key>\s*<string>([^<]+)<\/string>/.exec(plist)?.[1]?.trim() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Has macOS forget its decision about this app recording the screen, for the
+ * stale case above: the entry reads as on in System Settings but belongs to
+ * an older copy of the app. Asking again then puts Nexa back in the list, and
+ * System Settings opens there for the person to switch it on. Returns whether
+ * macOS took the reset.
+ */
+export async function resetScreenAccess(): Promise<boolean> {
+  if (process.platform !== "darwin") return false;
+  const id = bundleId();
+  if (!id) return false;
+  const reset = await new Promise<boolean>((resolve) => execFile("/usr/bin/tccutil", ["reset", "ScreenCapture", id], { timeout: 10_000 }, (err) => resolve(!err)));
+  if (!reset) return false;
+  await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } }).catch(() => []);
+  openScreenSettings();
+  return true;
 }
 
 /** Opens the Screen Recording list in System Settings. */

@@ -5331,5 +5331,11 @@
   "whatsNew.r20261004.wholeStatusBody": "लंबी स्थिति प्रोफ़ाइल में तस्वीर के पास छोटी दिखती है। पूरी पढ़ने के लिए उस पर माउस ले जाएँ या टैप करें।",
   "stickerPack.loading": "पैक लोड हो रहा है",
   "whatsNew.r20261004.packCardsTitle": "चैट में पैक कार्ड",
-  "whatsNew.r20261004.packCardsBody": "स्टिकर या इमोजी पैक का लिंक अब संदेश के नीचे पैक दिखाता है, उसमें की कुछ चीज़ों और उसे जोड़ने के बटन के साथ।"
+  "whatsNew.r20261004.packCardsBody": "स्टिकर या इमोजी पैक का लिंक अब संदेश के नीचे पैक दिखाता है, उसमें की कुछ चीज़ों और उसे जोड़ने के बटन के साथ।",
+  "desktop.displayPicker.resetPermission": "अनुमति रीसेट करें",
+  "desktop.displayPicker.chooseResetPermissionThenTurn": "अनुमति रीसेट करें चुनें, फिर Screen Recording में Nexa को दोबारा चालू करें।",
+  "desktop.displayPicker.ifNexaIsAlreadyOnThere": "अगर वहाँ Nexa पहले से चालू है, तो अनुमति अब भी ऐप की पुरानी प्रति की ओर इशारा करती है। अनुमति रीसेट करें चुनें, फिर Nexa को दोबारा चालू करें।",
+  "desktop.displayPicker.theOldPermissionIsCleared": "पुरानी अनुमति हटा दी गई है।",
+  "desktop.displayPicker.turnNexaOnInScreenRecording": "Screen Recording में Nexa को चालू करें। macOS, Nexa को फिर से खोलने का विकल्प देगा; अगर न दे, तो यहाँ से उसे दोबारा शुरू करें।",
+  "desktop.displayPicker.couldNotResetThePermission": "macOS ने अनुमति रीसेट नहीं की। माइनस बटन से Nexa को Screen Recording से हटाएँ, फिर से जोड़ें और दोबारा शुरू करें।"
 }

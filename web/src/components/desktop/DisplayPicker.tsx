@@ -1,9 +1,10 @@
-import { ExternalLink, Monitor, MonitorUp, RotateCw, ShieldAlert } from "lucide-react";
+import { ExternalLink, Monitor, MonitorUp, RotateCcw, RotateCw, ShieldAlert } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import type { DisplaySourceRequest } from "@/lib/desktopBridge";
 import { desktopBridge } from "@/lib/desktopBridge";
+import { useUI } from "@/stores/ui";
 import { shareAudioRequested } from "@/voice/media";
 import s from "./Desktop.module.css";
 
@@ -23,45 +24,72 @@ export function DisplayPicker({ request, onChoose }: { request: DisplaySourceReq
  * What to do when the computer will not let the app record the screen. macOS
  * keeps that decision itself, and an update can leave one that reads as
  * granted while the recording it allows is an older copy of the app — the
- * settings look right and nothing is captured. A restart picks up a fresh
- * decision; where it does not, taking the app out of the list and putting it
- * back writes a new one.
+ * settings look right and nothing is captured. The app can have macOS forget
+ * that decision, after which switching Nexa on again writes a new one; an
+ * older app can only suggest a restart, or taking it out of the list and
+ * putting it back.
  */
 export function ScreenPermission({ stale, onClose }: { stale: boolean; onClose: () => void }) {
   const bridge = desktopBridge();
+  const toast = useUI((u) => u.toast);
+  const [step, setStep] = useState<"ask" | "resetting" | "reset">("ask");
+  const canReset = !!bridge?.resetScreenAccess;
+  const reset = async () => {
+    setStep("resetting");
+    const done = await bridge?.resetScreenAccess?.().catch(() => false);
+    setStep(done ? "reset" : "ask");
+    if (!done) toast(t("desktop.displayPicker.couldNotResetThePermission"), "error");
+  };
+  const openSettings = (primary: boolean) => (bridge?.openScreenSettings ? (
+    <Button variant={primary ? "primary" : "secondary"} onClick={() => void bridge.openScreenSettings?.()} data-testid="open-screen-settings"><ExternalLink size={16} /> {t("desktop.displayPicker.openSettings")}</Button>
+  ) : null);
+  const restart = (primary: boolean) => (bridge?.restartApp ? (
+    <Button variant={primary ? "primary" : "secondary"} onClick={() => void bridge.restartApp?.()} data-testid="restart-for-screen"><RotateCw size={16} /> {t("desktop.displayPicker.restartNexa")}</Button>
+  ) : null);
+  const resetButton = (primary: boolean) => (
+    <Button variant={primary ? "primary" : "secondary"} loading={step === "resetting"} onClick={() => void reset()} data-testid="reset-screen-access"><RotateCcw size={16} /> {t("desktop.displayPicker.resetPermission")}</Button>
+  );
+  const close = <Button variant="ghost" onClick={onClose}>{t("chat.attachments.close")}</Button>;
+  let body: React.ReactNode;
+  let actions: React.ReactNode;
+  if (canReset && step === "reset") {
+    body = <p><b>{t("desktop.displayPicker.theOldPermissionIsCleared")}</b> {t("desktop.displayPicker.turnNexaOnInScreenRecording")}</p>;
+    actions = <>{close}{openSettings(false)}{restart(true)}</>;
+  } else if (canReset && stale) {
+    body = (
+      <>
+        <p><b>{t("desktop.displayPicker.screenRecordingIsSwitchedOnFor")}</b> {t("desktop.displayPicker.thatHappensAfterAnUpdateThe")}</p>
+        <p>{t("desktop.displayPicker.chooseResetPermissionThenTurn")}</p>
+      </>
+    );
+    actions = <>{close}{resetButton(true)}</>;
+  } else if (canReset) {
+    body = (
+      <>
+        <p><b>{t("desktop.displayPicker.nexaNeedsPermissionToRecordThe")}</b> {t("desktop.displayPicker.openPrivacyAmpSecurityScreenRecording")}</p>
+        <p>{t("desktop.displayPicker.ifNexaIsAlreadyOnThere")}</p>
+      </>
+    );
+    actions = <>{close}{resetButton(false)}{openSettings(true)}</>;
+  } else {
+    body = stale ? (
+      <>
+        <p><b>{t("desktop.displayPicker.screenRecordingIsSwitchedOnFor")}</b> {t("desktop.displayPicker.thatHappensAfterAnUpdateThe")}</p>
+        <p>{t("desktop.displayPicker.restartingUsuallySettlesItIfIt")}</p>
+      </>
+    ) : (
+      <>
+        <p><b>{t("desktop.displayPicker.nexaNeedsPermissionToRecordThe")}</b> {t("desktop.displayPicker.openPrivacyAmpSecurityScreenRecording")}</p>
+        <p>{t("desktop.displayPicker.macosOnlyHandsThePermissionOver")}</p>
+      </>
+    );
+    actions = <>{close}{openSettings(false)}{restart(true)}</>;
+  }
   return (
-    <Modal
-      open
-      onClose={onClose}
-      title={t("desktop.displayPicker.thisComputerIsNotSharingThe")}
-      width={520}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>{t("chat.attachments.close")}</Button>
-          {bridge?.openScreenSettings ? (
-            <Button variant="secondary" onClick={() => void bridge.openScreenSettings?.()} data-testid="open-screen-settings"><ExternalLink size={16} /> {t("desktop.displayPicker.openSettings")}</Button>
-          ) : null}
-          {bridge?.restartApp ? (
-            <Button onClick={() => void bridge.restartApp?.()} data-testid="restart-for-screen"><RotateCw size={16} /> {t("desktop.displayPicker.restartNexa")}</Button>
-          ) : null}
-        </>
-      }
-    >
+    <Modal open onClose={onClose} title={t("desktop.displayPicker.thisComputerIsNotSharingThe")} width={520} footer={actions}>
       <div className={s.permission}>
         <span className={s.permissionIcon}><ShieldAlert size={22} /></span>
-        <div>
-          {stale ? (
-            <>
-              <p><b>{t("desktop.displayPicker.screenRecordingIsSwitchedOnFor")}</b> {t("desktop.displayPicker.thatHappensAfterAnUpdateThe")}</p>
-              <p>{t("desktop.displayPicker.restartingUsuallySettlesItIfIt")}</p>
-            </>
-          ) : (
-            <>
-              <p><b>{t("desktop.displayPicker.nexaNeedsPermissionToRecordThe")}</b> {t("desktop.displayPicker.openPrivacyAmpSecurityScreenRecording")}</p>
-              <p>{t("desktop.displayPicker.macosOnlyHandsThePermissionOver")}</p>
-            </>
-          )}
-        </div>
+        <div>{body}</div>
       </div>
     </Modal>
   );

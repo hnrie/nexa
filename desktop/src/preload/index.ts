@@ -60,6 +60,7 @@ if (origin && location.origin === origin) {
     shareAudioFailed: (): Promise<boolean> => ipcRenderer.invoke(IPC.shareAudioFailed),
     screenAccess: (): Promise<{ status: string; usable: boolean; stale: boolean }> => ipcRenderer.invoke(IPC.screenAccess),
     openScreenSettings: (): Promise<void> => ipcRenderer.invoke(IPC.openScreenSettings),
+    resetScreenAccess: (): Promise<boolean> => ipcRenderer.invoke(IPC.resetScreenAccess),
     restartApp: (): Promise<void> => ipcRenderer.invoke(IPC.restartApp),
     onWindowState: listen<WindowState>(IPC.windowState),
     // the page's own right-click menu pastes through the app, which alone may read the clipboard (main/pasteGate.ts)

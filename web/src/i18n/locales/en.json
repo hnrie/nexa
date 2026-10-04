@@ -5331,5 +5331,11 @@
   "whatsNew.r20261004.wholeStatusBody": "A long status is cut short beside someone's picture on their profile. Hover over it or tap it to read every word.",
   "stickerPack.loading": "Loading the pack",
   "whatsNew.r20261004.packCardsTitle": "Pack Cards in Chats",
-  "whatsNew.r20261004.packCardsBody": "A link to a sticker or emoji pack now shows the pack under the message, with some of what is in it and a button to add it."
+  "whatsNew.r20261004.packCardsBody": "A link to a sticker or emoji pack now shows the pack under the message, with some of what is in it and a button to add it.",
+  "desktop.displayPicker.resetPermission": "Reset Permission",
+  "desktop.displayPicker.chooseResetPermissionThenTurn": "Choose Reset Permission, then turn Nexa on again in Screen Recording.",
+  "desktop.displayPicker.ifNexaIsAlreadyOnThere": "If Nexa is already on there, the permission still points to an older copy of the app. Choose Reset Permission, then turn Nexa on again.",
+  "desktop.displayPicker.theOldPermissionIsCleared": "The old permission is cleared.",
+  "desktop.displayPicker.turnNexaOnInScreenRecording": "Turn Nexa on in Screen Recording. macOS offers to reopen Nexa; if it doesn't, restart it here.",
+  "desktop.displayPicker.couldNotResetThePermission": "macOS didn't reset the permission. Remove Nexa from Screen Recording with the minus button, add it again, and restart."
 }

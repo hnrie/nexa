@@ -5331,5 +5331,11 @@
   "whatsNew.r20261004.wholeStatusBody": "Ein langer Status wird neben dem Bild im Profil gekürzt. Fahr mit der Maus darüber oder tipp darauf, um alles zu lesen.",
   "stickerPack.loading": "Paket wird geladen",
   "whatsNew.r20261004.packCardsTitle": "Paketkarten im Chat",
-  "whatsNew.r20261004.packCardsBody": "Ein Link zu einem Sticker- oder Emoji-Paket zeigt das Paket jetzt unter der Nachricht, mit einem Teil des Inhalts und einem Knopf zum Hinzufügen."
+  "whatsNew.r20261004.packCardsBody": "Ein Link zu einem Sticker- oder Emoji-Paket zeigt das Paket jetzt unter der Nachricht, mit einem Teil des Inhalts und einem Knopf zum Hinzufügen.",
+  "desktop.displayPicker.resetPermission": "Berechtigung zurücksetzen",
+  "desktop.displayPicker.chooseResetPermissionThenTurn": "Wähle „Berechtigung zurücksetzen“ und schalte Nexa dann unter Bildschirmaufnahme wieder ein.",
+  "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Wenn Nexa dort schon eingeschaltet ist, zeigt die Berechtigung noch auf eine ältere Kopie der App. Wähle „Berechtigung zurücksetzen“ und schalte Nexa dann wieder ein.",
+  "desktop.displayPicker.theOldPermissionIsCleared": "Die alte Berechtigung ist gelöscht.",
+  "desktop.displayPicker.turnNexaOnInScreenRecording": "Schalte Nexa unter Bildschirmaufnahme ein. macOS bietet an, Nexa neu zu öffnen; wenn nicht, starte es hier neu.",
+  "desktop.displayPicker.couldNotResetThePermission": "macOS hat die Berechtigung nicht zurückgesetzt. Entferne Nexa unter Bildschirmaufnahme mit dem Minus-Knopf, füge es wieder hinzu und starte neu."
 }

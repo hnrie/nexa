@@ -185,6 +185,12 @@ export interface EvilionDesktop {
   /** Whether this computer will really let the app record the screen (macOS keeps a decision that can go stale). */
   screenAccess?(): Promise<{ status: string; usable: boolean; stale: boolean }>;
   openScreenSettings?(): Promise<void>;
+  /**
+   * Has macOS forget its screen recording decision for the app, then asks
+   * again and opens Screen Recording in System Settings; true when macOS took
+   * the reset (the app after 1.2.2).
+   */
+  resetScreenAccess?(): Promise<boolean>;
   restartApp?(): Promise<void>;
   onWindowState?(cb: (state: WindowState) => void): () => void;
   /**

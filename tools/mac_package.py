@@ -13,7 +13,9 @@ disk image needs hdiutil. So for each dist/mac*/Nexa.app this:
   Mach-O's pages against its CodeDirectory, each bundle's Info.plist and seal
   against their slots, and every file, link and nested bundle against
   _CodeSignature/CodeResources. A bundle that fails is one macOS calls
-  "damaged", so nothing is packed from it;
+  "damaged", so nothing is packed from it. The app must also be known by its
+  bundle identifier rather than by the hash of the build, or macOS forgets
+  what people allowed it (screen recording, the microphone) at every update;
 - zips it with its symlinks kept (zip -y) for the updater, which unpacks it
   with ditto (desktop/src/main/update/mac.ts), and checks the unzipped copy;
 - makes the disk image people download: an HFS+ volume holding the app and a
@@ -36,6 +38,7 @@ EMBEDDED_SIGNATURE, CODE_DIRECTORY = 0xFADE0CC0, 0xFADE0C02
 # where a superblob keeps CodeDirectories: the first, and the alternates beside it
 CD_SLOTS = {0, 0x1000, 0x1001, 0x1002, 0x1003, 0x1004}
 LINKER_SIGNED = 0x20000
+REQUIREMENTS, REQUIREMENT, DESIGNATED = 0xFADE0C01, 0xFADE0C00, 3
 ALGO = {1: "sha1", 2: "sha256", 3: "sha256", 4: "sha384"}
 SLOT_NAMES = {1: "Info.plist", 2: "requirements", 3: "sealed resources", 5: "entitlements", 7: "DER entitlements"}
 
@@ -96,24 +99,49 @@ def embedded_info_plist(s: bytes) -> bytes | None:
     return None
 
 
+def signature(path: Path, s: bytes) -> tuple[int, dict[int, bytes]]:
+    """Where a slice's signature starts, and the blobs in it by slot."""
+    sig = next((struct.unpack("<II", body[8:16]) for cmd, body in load_commands(s) if cmd == LC_CODE_SIGNATURE), None)
+    if sig is None:
+        raise Damaged(f"{path}: not signed")
+    off, size = sig
+    blob = s[off : off + size]
+    magic, _, count = struct.unpack(">III", blob[:12])
+    if magic != EMBEDDED_SIGNATURE:
+        raise Damaged(f"{path}: no signature where the Mach-O says it is")
+    blobs = {}
+    for i in range(count):
+        kind, at = struct.unpack(">II", blob[12 + i * 8 : 20 + i * 8])
+        blobs[kind] = blob[at : at + struct.unpack(">I", blob[at + 4 : at + 8])[0]]
+    return off, blobs
+
+
+def designated_requirement(path: Path, s: bytes) -> bytes | None:
+    """The compiled designated requirement a slice's signature names, if it names one."""
+    reqs = signature(path, s)[1].get(2)
+    if not reqs or struct.unpack(">I", reqs[:4])[0] != REQUIREMENTS:
+        return None
+    for i in range(struct.unpack(">I", reqs[8:12])[0]):
+        kind, at = struct.unpack(">II", reqs[12 + i * 8 : 20 + i * 8])
+        if kind == DESIGNATED:
+            return reqs[at : at + struct.unpack(">I", reqs[at + 4 : at + 8])[0]]
+    return None
+
+
+def identifier_requirement(identifier: str) -> bytes:
+    """`identifier "<id>"` compiled as a code requirement, as desktop/sign-mac.cjs signs the app with."""
+    raw = identifier.encode()
+    body = struct.pack(">III", 1, 2, len(raw)) + raw + bytes(-len(raw) % 4)
+    return struct.pack(">II", REQUIREMENT, 8 + len(body)) + body
+
+
 def check_macho(path: Path, info: bytes | None = None, resources: bytes | None = None) -> bytes:
     """Checks every slice's signature against the file; returns the cdhash of the first."""
     cdhash = b""
     for s in slices(path.read_bytes()):
         if s[:4] not in MACHO:
             raise Damaged(f"{path}: a slice that is not a Mach-O")
-        sig = next((struct.unpack("<II", body[8:16]) for cmd, body in load_commands(s) if cmd == LC_CODE_SIGNATURE), None)
-        if sig is None:
-            raise Damaged(f"{path}: not signed")
-        off, size = sig
-        blob = s[off : off + size]
-        magic, _, count = struct.unpack(">III", blob[:12])
-        if magic != EMBEDDED_SIGNATURE:
-            raise Damaged(f"{path}: no signature where the Mach-O says it is")
-        blobs = {}
-        for i in range(count):
-            kind, at = struct.unpack(">II", blob[12 + i * 8 : 20 + i * 8])
-            blobs[kind] = blob[at : at + struct.unpack(">I", blob[at + 4 : at + 8])[0]]
+        off, blobs = signature(path, s)
         cds = [blobs[k] for k in sorted(blobs) if k in CD_SLOTS]
         if not cds:
             raise Damaged(f"{path}: no CodeDirectory")
@@ -227,9 +255,20 @@ def check_bundle(bundle: Path, checked: set[Path]) -> bytes:
 
 
 def check_app(app: Path) -> None:
-    """The whole app: its seal, its nested bundles, and every other Mach-O in it signed on its own."""
+    """
+    The whole app: its seal, its nested bundles, every other Mach-O in it
+    signed on its own, and the app known by its identifier. macOS keeps what a
+    person allowed an app against its designated requirement, and an ad hoc
+    signature's own is the hash of that one build, which every update changes.
+    """
     checked: set[Path] = set()
     check_bundle(app, checked)
+    info = plistlib.loads((app / "Contents" / "Info.plist").read_bytes())
+    exe = app / "Contents" / "MacOS" / info["CFBundleExecutable"]
+    want = identifier_requirement(info["CFBundleIdentifier"])
+    for s in slices(exe.read_bytes()):
+        if designated_requirement(exe, s) != want:
+            raise Damaged(f"{exe}: not signed to be known by its identifier, so macOS would forget what people allowed it at every update")
     for dirpath, _, filenames in os.walk(app):
         for name in filenames:
             p = Path(dirpath) / name

@@ -5432,5 +5432,11 @@
   "whatsNew.r20261004.wholeStatusBody": "Un long statut est raccourci à côté de la photo sur le profil. Survole-le ou touche-le pour le lire en entier.",
   "stickerPack.loading": "Chargement du pack",
   "whatsNew.r20261004.packCardsTitle": "Cartes de packs dans les discussions",
-  "whatsNew.r20261004.packCardsBody": "Un lien vers un pack de stickers ou d'emojis affiche maintenant le pack sous le message, avec une partie de son contenu et un bouton pour l'ajouter."
+  "whatsNew.r20261004.packCardsBody": "Un lien vers un pack de stickers ou d'emojis affiche maintenant le pack sous le message, avec une partie de son contenu et un bouton pour l'ajouter.",
+  "desktop.displayPicker.resetPermission": "Réinitialiser la permission",
+  "desktop.displayPicker.chooseResetPermissionThenTurn": "Choisissez Réinitialiser la permission, puis réactivez Nexa dans Enregistrement de l’écran.",
+  "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Si Nexa y est déjà activé, la permission désigne encore une ancienne copie de l’application. Choisissez Réinitialiser la permission, puis réactivez Nexa.",
+  "desktop.displayPicker.theOldPermissionIsCleared": "L’ancienne permission est effacée.",
+  "desktop.displayPicker.turnNexaOnInScreenRecording": "Activez Nexa dans Enregistrement de l’écran. macOS propose de rouvrir Nexa. Sinon, redémarrez-le ici.",
+  "desktop.displayPicker.couldNotResetThePermission": "macOS n’a pas réinitialisé la permission. Retirez Nexa d’Enregistrement de l’écran avec le bouton moins, rajoutez-le et redémarrez."
 }
