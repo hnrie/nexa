@@ -508,3 +508,60 @@ func TestRoleMentionsAreHeldToWhoMayMakeThem(t *testing.T) {
 		t.Errorf("alice's role mentions: %v, want %s", got, closed)
 	}
 }
+
+// A reply comes with the message it answers, wherever that is in the
+// conversation, and with null once that has been deleted; a reader can also
+// ask for particular messages by id, and what is missing from the answer is gone.
+func TestRepliesCarryTheirOriginal(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	_, body := do(t, ts, "POST", "/api/v1/users/@me/channels", tokA, map[string]any{"recipient_ids": []string{idB}})
+	dm := body["id"].(string)
+	createEpoch(t, ts, tokA, dm)
+	_, body = sendMsg(t, ts, tokA, dm, dm, 0, "the original", "", nil)
+	orig := body["id"].(string)
+	_, body = sendMsg(t, ts, tokB, dm, dm, 0, "doomed", "", nil)
+	doomed := body["id"].(string)
+	res, body := sendMsg(t, ts, tokB, dm, dm, 0, "a reply", "", map[string]any{"reply_to_id": orig})
+	if res.StatusCode != 201 {
+		t.Fatalf("reply: %d %v", res.StatusCode, body)
+	}
+	ref, _ := body["referenced_message"].(map[string]any)
+	if ref == nil || ref["id"] != orig || ref["ciphertext"] == nil {
+		t.Fatalf("the reply as sent has no original: %v", body["referenced_message"])
+	}
+	reply := body["id"].(string)
+	_, body = sendMsg(t, ts, tokA, dm, dm, 0, "a reply to what goes", "", map[string]any{"reply_to_id": doomed})
+	toDoomed := body["id"].(string)
+	if res, _ := do(t, ts, "DELETE", "/api/v1/channels/"+dm+"/messages/"+doomed, tokB, nil); res.StatusCode != 204 {
+		t.Fatalf("delete: %d", res.StatusCode)
+	}
+	// a page that starts after the original still carries it
+	_, body = do(t, ts, "GET", "/api/v1/channels/"+dm+"/messages?after="+orig, tokA, nil)
+	byID := map[string]map[string]any{}
+	for _, v := range body["_list"].([]any) {
+		m := v.(map[string]any)
+		byID[m["id"].(string)] = m
+	}
+	if r, _ := byID[reply]["referenced_message"].(map[string]any); r == nil || r["id"] != orig {
+		t.Errorf("listed reply without its original: %v", byID[reply])
+	}
+	if v, ok := byID[toDoomed]["referenced_message"]; !ok || v != nil {
+		t.Errorf("a reply to a deleted message should carry null, got %v (present %v)", v, ok)
+	}
+	if _, ok := byID[orig]; ok {
+		t.Error("after= returned the original itself")
+	}
+	// by id: what exists comes back, what was deleted does not
+	_, body = do(t, ts, "GET", "/api/v1/channels/"+dm+"/messages?ids="+orig+","+doomed, tokA, nil)
+	list := body["_list"].([]any)
+	if len(list) != 1 || list[0].(map[string]any)["id"] != orig {
+		t.Errorf("lookup by id: %v", list)
+	}
+	// someone outside the conversation learns nothing
+	tokC, _ := register(t, ts, "carol")
+	if res, _ := do(t, ts, "GET", "/api/v1/channels/"+dm+"/messages?ids="+orig, tokC, nil); res.StatusCode != 404 {
+		t.Errorf("an outsider's lookup: %d", res.StatusCode)
+	}
+}

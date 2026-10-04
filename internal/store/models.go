@@ -441,6 +441,12 @@ type Message struct {
 	// is kept where a webhook's words are (messages.plain): the server wrote
 	// it, so there is nothing to seal.
 	PollResult *PollOutcome `json:"poll_result,omitempty"`
+	// Referenced is the message a reply (or a pin's or a poll's notice)
+	// points at, as it is now, sealed as it was sent: readers quote it from
+	// this rather than from whatever part of the conversation they happen to
+	// have loaded. The JSON null says it has been deleted. Absent on a message
+	// that points at nothing, and wherever WithReferences was not asked.
+	Referenced json.RawMessage `json:"referenced_message,omitempty"`
 }
 
 // PollOutcome is how a person's poll went, as the line that closes it carries

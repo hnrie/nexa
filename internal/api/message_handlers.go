@@ -301,6 +301,24 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 		id, _ := ids.Parse(v)
 		return id
 	}
+	// ?ids= asks for particular messages, as a reader quoting replies does
+	// for originals it has not loaded; what is missing from the answer is gone
+	if raw := r.URL.Query().Get("ids"); raw != "" {
+		var want []ids.ID
+		for _, part := range strings.Split(raw, ",") {
+			if id, err := ids.Parse(strings.TrimSpace(part)); err == nil {
+				want = append(want, id)
+			}
+		}
+		list, err := s.Store.MessagesByIDs(r.Context(), ch.ID, dedupeIDs(want, maxLookupIDs), me.ID)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		s.withRefs(r.Context(), me.ID, list...)
+		WriteJSON(w, http.StatusOK, list)
+		return
+	}
 	q.Before, q.After, q.Around = get("before"), get("after"), get("around")
 	if l := r.URL.Query().Get("limit"); l != "" {
 		q.Limit, _ = strconv.Atoi(l)
@@ -310,7 +328,19 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	s.withRefs(r.Context(), me.ID, list...)
 	WriteJSON(w, http.StatusOK, list)
+}
+
+// maxLookupIDs is the most messages one ?ids= lookup answers.
+const maxLookupIDs = 100
+
+// withRefs fills in the messages that msgs reply to (store.WithReferences).
+// A failure leaves them unfilled, which readers take as "look it up".
+func (s *Server) withRefs(ctx context.Context, viewer ids.ID, msgs ...*store.Message) {
+	if err := s.Store.WithReferences(ctx, msgs, viewer); err != nil {
+		s.Log.Warn("message references", "err", err)
+	}
 }
 
 func (s *Server) handleMessageGet(w http.ResponseWriter, r *http.Request) {
@@ -328,6 +358,7 @@ func (s *Server) handleMessageGet(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrNotFound)
 		return
 	}
+	s.withRefs(r.Context(), me.ID, m)
 	WriteJSON(w, http.StatusOK, m)
 }
 
@@ -470,6 +501,7 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	s.withRefs(ctx, me.ID, full)
 	s.Bcast.EmitChannel(ch.ID, "message_create", full)
 	s.Bcast.KeysMaybeNeeded(env.Conv)
 	WriteJSON(w, http.StatusCreated, full)
@@ -554,8 +586,10 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 	// goes along: an edit can add or take away a mention an unread badge
 	// counted, and a reader who never loaded the message cannot tell which.
 	if shared, err := s.Store.MessageByID(r.Context(), mid, 0); err == nil {
+		s.withRefs(r.Context(), 0, shared)
 		s.Bcast.EmitChannel(ch.ID, "message_update", messageUpdateEvent{shared, mentionsBefore{m.Mentions, m.MentionRoles, m.MentionEveryone}})
 	}
+	s.withRefs(r.Context(), me.ID, updated)
 	WriteJSON(w, http.StatusOK, updated)
 }
 

@@ -147,6 +147,13 @@
 .replyName:hover { text-decoration: underline; }
 .replyText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; unicode-bidi: plaintext; text-align: start; color: inherit; }
 .replyLine:hover .replyText { color: var(--text); }
+/* the original on its way: a bar where its words will be, quiet, and still while motion is reduced */
+.replySkeleton { width: min(220px, 50%); height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--bg-hover), color-mix(in srgb, var(--bg-hover) 40%, transparent), var(--bg-hover)); background-size: 200% 100%; animation: replyShimmer 1.4s ease-in-out infinite; }
+@keyframes replyShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .replySkeleton { animation: none; } }
+.replyGone { font-style: italic; cursor: default; }
+.replyLine[data-state="deleted"] { cursor: default; }
+.replyLine[data-state="deleted"]:hover .replyText { color: inherit; }
 /* The toolbar stays inside the row it belongs to. Hanging it into the gap
    above put it over the message before, which is worse than covering the
    empty right-hand end of this one. */

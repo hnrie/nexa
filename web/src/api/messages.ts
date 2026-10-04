@@ -22,6 +22,10 @@ export const messages = {
       ...(opts?.signal ? { signal: opts.signal } : {}),
     });
   },
+  /** Particular messages of a channel, up to 100; the ones missing from the answer are gone. */
+  byIds(channelId: Snowflake, ids: Snowflake[]): Promise<Message[]> {
+    return api.request<Message[]>("GET", `/channels/${channelId}/messages`, undefined, { query: { ids: ids.join(",") } });
+  },
   get(channelId: Snowflake, mid: Snowflake): Promise<Message> {
     return api.request<Message>("GET", `/channels/${channelId}/messages/${mid}`);
   },

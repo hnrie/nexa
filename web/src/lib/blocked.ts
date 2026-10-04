@@ -18,7 +18,7 @@
  */
 import { useMemo } from "react";
 import type { Relationship } from "@/api/types";
-import { useMessages } from "@/stores/messages";
+import { heldMessage } from "@/stores/messages";
 import { useRelationships } from "@/stores/relationships";
 import { useSettings, type Settings } from "@/stores/settings";
 
@@ -103,7 +103,7 @@ export function isQuiet(m: MessageLike, rules: BlockRules, authorOf?: AuthorOf):
   return rules.blocked.has(m.author_id) || messageFate(m, rules, authorOf) === "hide";
 }
 
-/** Who wrote a message in a channel, from the messages loaded on this device. */
+/** Who wrote a message in a channel, from the messages this device holds (loaded, or quoted by a reply). */
 export function loadedAuthorOf(channelId: string): AuthorOf {
-  return (id) => useMessages.getState().channels[channelId]?.byId[id]?.author_id;
+  return (id) => heldMessage(channelId, id)?.author_id;
 }

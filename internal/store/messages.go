@@ -255,6 +255,81 @@ func (s *Store) Messages(ctx context.Context, chID ids.ID, q MessageQuery, forUs
 	return list, nil
 }
 
+// maxLookup is the most messages one MessagesByIDs call reads.
+const maxLookup = 100
+
+// MessagesByIDs loads the listed messages of one channel, ascending by id.
+// Ids that are gone, or belong to another channel, are left out, so what is
+// missing from the answer has been deleted.
+func (s *Store) MessagesByIDs(ctx context.Context, chID ids.ID, list []ids.ID, forUser ids.ID) ([]*Message, error) {
+	if len(list) > maxLookup {
+		list = list[:maxLookup]
+	}
+	if len(list) == 0 {
+		return []*Message{}, nil
+	}
+	args := append([]any{int64(chID)}, idArgs(list)...)
+	out, err := s.queryMessages(ctx, `SELECT `+messageCols+` FROM messages WHERE channel_id = ? AND id IN (`+placeholders(len(list))+`) ORDER BY id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	if out == nil {
+		out = []*Message{}
+	}
+	if err := s.hydrate(ctx, out, forUser); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// WithReferences fills in Referenced on every message in msgs that points at
+// another: the message it answers as it is now, or null when that has been
+// deleted. A message only ever points within its own channel; one pointing
+// anywhere else is treated as pointing at nothing that exists.
+func (s *Store) WithReferences(ctx context.Context, msgs []*Message, forUser ids.ID) error {
+	byChannel := map[ids.ID][]ids.ID{}
+	seen := map[ids.ID]bool{}
+	for _, m := range msgs {
+		if m == nil || m.ReplyToID == nil || seen[*m.ReplyToID] {
+			continue
+		}
+		seen[*m.ReplyToID] = true
+		byChannel[m.ChannelID] = append(byChannel[m.ChannelID], *m.ReplyToID)
+	}
+	if len(byChannel) == 0 {
+		return nil
+	}
+	found := map[ids.ID][]byte{}
+	for chID, want := range byChannel {
+		for len(want) > 0 {
+			n := min(len(want), maxLookup)
+			list, err := s.MessagesByIDs(ctx, chID, want[:n], forUser)
+			if err != nil {
+				return err
+			}
+			for _, t := range list {
+				b, err := json.Marshal(t)
+				if err != nil {
+					return err
+				}
+				found[t.ID] = b
+			}
+			want = want[n:]
+		}
+	}
+	for _, m := range msgs {
+		if m == nil || m.ReplyToID == nil {
+			continue
+		}
+		if b, ok := found[*m.ReplyToID]; ok {
+			m.Referenced = b
+		} else {
+			m.Referenced = json.RawMessage("null")
+		}
+	}
+	return nil
+}
+
 // hydrate fills attachments and reaction summaries for msgs.
 func (s *Store) hydrate(ctx context.Context, msgs []*Message, forUser ids.ID) error {
 	if len(msgs) == 0 {

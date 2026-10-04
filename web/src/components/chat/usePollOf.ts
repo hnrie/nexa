@@ -4,6 +4,7 @@ import { messages as messagesApi } from "@/api/messages";
 import type { PollPayload } from "@/crypto/message";
 import { decryptForStore } from "@/lib/decrypt";
 import { useMessages } from "@/stores/messages";
+import { useReplyTargets } from "@/stores/replyTargets";
 
 /** Polls read from messages the list does not hold, by message id, each fetched once. */
 const fetched = new Map<string, Promise<PollPayload | null>>();
@@ -46,7 +47,13 @@ export function forgetFetchedPolls(): void {
  * poll cannot be read.
  */
 export function usePollOf(channelId: string, messageId: string | null): PollPayload | null | undefined {
-  const inList = useMessages((m) => (messageId ? m.channels[channelId]?.byId[messageId]?.payload?.poll : undefined));
+  const loadedPoll = useMessages((m) => (messageId ? m.channels[channelId]?.byId[messageId]?.payload?.poll : undefined));
+  // the server sends the poll's message along with its closing line (stores/replyTargets)
+  const keptPoll = useReplyTargets((r) => {
+    const m = messageId ? r.byId[messageId] : undefined;
+    return typeof m === "object" ? m.payload?.poll : undefined;
+  });
+  const inList = loadedPoll ?? keptPoll;
   const [loaded, setLoaded] = useState<{ id: string; poll: PollPayload | null } | null>(null);
   useEffect(() => {
     if (!messageId || inList) return;

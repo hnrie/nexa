@@ -5,6 +5,7 @@ import { ApiError } from "@/api/client";
 import { logoutHooks, useAuth } from "@/stores/auth";
 import { useKeys } from "@/stores/keys";
 import { useMessages } from "@/stores/messages";
+import { useReplyTargets } from "@/stores/replyTargets";
 import { useNotes } from "@/stores/notes";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
@@ -198,6 +199,7 @@ function forgetReadable(): void {
   // Without the keys nothing decrypted should stay readable either; unlocking
   // loads the conversations again.
   useMessages.getState().clearAll();
+  useReplyTargets.getState().clear();
   // notes are opened with keys of their own, which go with the rest
   useNotes.getState().clear();
   clearMediaCache();
@@ -262,6 +264,7 @@ export async function endSession(): Promise<void> {
   useUploads.getState().clear();
   forgetSends();
   useMessages.setState({ channels: {} });
+  useReplyTargets.getState().clear();
   // polls read for their closing lines were this account's to read
   forgetFetchedPolls();
   forgetUnsentAcks();

@@ -58,6 +58,8 @@ func (s *Server) systemMessage(r *http.Request, ch *store.Channel, actor ids.ID,
 	m.MentionRoles = []ids.ID{}
 	m.Attachments = []store.Attachment{}
 	m.Reactions = []store.ReactionSummary{}
+	// a pin's notice quotes what was pinned
+	s.withRefs(r.Context(), 0, m)
 	s.Bcast.EmitChannel(ch.ID, "message_create", m)
 }
 
@@ -616,6 +618,7 @@ func (s *Server) handlePins(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	s.withRefs(r.Context(), me.ID, list...)
 	WriteJSON(w, http.StatusOK, list)
 }
 

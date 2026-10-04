@@ -13,7 +13,12 @@ interface Entry {
   refs: number;
 }
 
-const BUDGET = 200 * 1024 * 1024;
+/**
+ * How much decrypted media is kept for reuse once nothing on screen shows it.
+ * A phone (an iPhone above all) gives a tab a fraction of a computer's
+ * memory, and the decoded pictures count against it as well.
+ */
+const BUDGET = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? 64 * 1024 * 1024 : 200 * 1024 * 1024;
 
 /**
  * The largest attachment that is ever opened inside the page. Playing or

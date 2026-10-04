@@ -77,6 +77,8 @@ let seq = 0;
 const waiting = new Map<number, (reply: { wrong?: string[]; words?: string[] }) => void>();
 /** Every word asked about, and whether it is spelled right. */
 const verdicts = new Map<string, boolean>();
+/** How many words' answers are kept. */
+const VERDICTS_MAX = 5000;
 const learnt = new Set<() => void>();
 
 function boot(): Worker {
@@ -119,6 +121,8 @@ export async function misspelled(words: string[]): Promise<Set<string>> {
   if (fresh.length) {
     const wrong = new Set((await ask({ type: "check", words: fresh })).wrong ?? []);
     for (const w of fresh) verdicts.set(w, !wrong.has(w));
+    // every word ever typed would otherwise stay; the oldest answers go first and are asked again if needed
+    while (verdicts.size > VERDICTS_MAX) verdicts.delete(verdicts.keys().next().value as string);
   }
   return new Set(words.filter((w) => verdicts.get(w) === false));
 }

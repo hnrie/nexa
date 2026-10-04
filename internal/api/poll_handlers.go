@@ -193,6 +193,8 @@ func (s *Server) closePolls(ctx context.Context) {
 			continue
 		}
 		if full, err := s.Store.MessageByID(ctx, line.ID, 0); err == nil {
+			// the line answers the poll, which readers may not have loaded
+			s.withRefs(ctx, 0, full)
 			s.Bcast.EmitChannel(d.ChannelID, "message_create", full)
 		}
 	}

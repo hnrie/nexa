@@ -5,6 +5,7 @@ import type { Message, PollTally, ReactionSummary } from "@/api/types";
 import type { MessagePayload } from "@/crypto/message";
 import { decryptForStore, type DecryptedMessage, type DecryptError } from "@/lib/decrypt";
 import { compareIds } from "@/lib/ids";
+import { ingestReferences, useReplyTargets } from "./replyTargets";
 
 /** Authors of loaded history may no longer be members or friends; fetch the ones the users store lacks. */
 function resolveAuthors(msgs: { author_id: string; mentions?: string[] }[]): void {
@@ -73,6 +74,35 @@ const PAGE = 50;
 // older end of a very long reading session is left as it was.
 const REFRESH_PAGES = 10;
 
+/**
+ * The most messages a conversation keeps loaded while it is open, around
+ * where the reader is. Scrolling through history adds a page at a time, and
+ * once the list is longer than this the end farthest from the reader is let
+ * go (it loads again on the way back). Kept whole, scrolling far up a long
+ * conversation full of pictures held thousands of rows in the page, and a
+ * phone slowed until it could not be used.
+ */
+export const WINDOW = 250;
+/**
+ * How long a list may grow before it is cut back to WINDOW. The list does the
+ * cutting when it is still (MessageList), never under a moving finger, so
+ * past this no more pages are loaded until it has.
+ */
+export const WINDOW_CAP = WINDOW + 3 * PAGE;
+
+/**
+ * Conversations with a list on screen, by how many. Live messages for any
+ * other conversation keep only its newest few, however long it was open
+ * before: a busy channel looked at once used to collect every message sent
+ * in it for as long as the app stayed connected.
+ */
+const openLists = new Map<string, number>();
+
+/** Whether a conversation has a list showing it. */
+export function isOpenList(channelId: string): boolean {
+  return (openLists.get(channelId) ?? 0) > 0;
+}
+
 const emptyChannel = (): ChannelMessages => ({ ids: [], byId: {}, hasOlder: true, hasNewer: false, loading: false, loaded: false, failed: 0, pending: [] });
 
 // A load started before its channel was cleared or sent back to the present
@@ -122,6 +152,19 @@ interface MessagesState {
   loadNewer: (channelId: string) => Promise<void>;
   /** Drops a list that stops short of the newest message so the newest page loads again. Unsent messages stay. */
   returnToPresent: (channelId: string) => void;
+  /**
+   * A list showing this conversation came on screen; the function it returns
+   * is for when it goes. When the last one goes the conversation is cut back
+   * to its newest page, or forgotten if it stopped short of the present.
+   */
+  open: (channelId: string) => () => void;
+  /**
+   * Cuts a list longer than WINDOW back to WINDOW messages around `anchor`
+   * (the message being read; the newest when absent), marking either end
+   * that lost messages as having more to load. Does nothing while a page is
+   * loading, which would land next to messages that are no longer there.
+   */
+  trimAround: (channelId: string, anchor: string | null) => void;
   /**
    * Forgets the first-page loads that failed, so the list asks again at once
    * instead of after its pause: the server refused them for a reason that has
@@ -174,7 +217,30 @@ function keepNewest(c: ChannelMessages, n: number): ChannelMessages {
   const drop = c.ids.slice(0, c.ids.length - n);
   const byId = { ...c.byId };
   for (const id of drop) delete byId[id];
-  return { ...c, ids: c.ids.slice(-n), byId };
+  // what went is older history again, to be loaded when it is scrolled to
+  return { ...c, ids: c.ids.slice(-n), byId, hasOlder: true };
+}
+
+/** Keeps ids[lo, hi) of a list, marking either end that lost messages as having more to load. */
+function keepRange(c: ChannelMessages, lo: number, hi: number): ChannelMessages {
+  if (lo <= 0 && hi >= c.ids.length) return c;
+  const ids = c.ids.slice(lo, hi);
+  const byId: Record<string, DecryptedMessage> = {};
+  for (const id of ids) {
+    const m = c.byId[id];
+    if (m) byId[id] = m;
+  }
+  return { ...c, ids, byId, hasOlder: c.hasOlder || lo > 0, hasNewer: c.hasNewer || hi < c.ids.length };
+}
+
+/** A list as live messages leave it: whole while it is on screen, its newest few otherwise. */
+function bounded(channelId: string, c: ChannelMessages): ChannelMessages {
+  return isOpenList(channelId) ? c : keepNewest(c, UNOPENED_KEEP);
+}
+
+/** Takes the originals the server sent along with these messages' replies (stores/replyTargets). */
+function sawReferences(msgs: readonly DecryptedMessage[]): void {
+  if (msgs.some((m) => m.reply_to_id && m.referenced_message !== undefined)) void ingestReferences(msgs);
 }
 
 function arrived(c: ChannelMessages, msgs: DecryptedMessage[]): ChannelMessages {
@@ -219,20 +285,25 @@ export const useMessages = create<MessagesState>()((set, get) => ({
   insert: (channelId, msgs) => {
     if (msgs.length === 0) return;
     resolveAuthors(msgs);
-    set((s) => withChannel(s, channelId, (c) => (c.loaded ? arrived(c, msgs) : keepNewest(arrived(c, msgs), UNOPENED_KEEP))));
+    sawReferences(msgs);
+    set((s) => withChannel(s, channelId, (c) => bounded(channelId, arrived(c, msgs))));
   },
   settle: (channelId, msgs, drop) => {
     resolveAuthors(msgs);
+    sawReferences(msgs);
     set((s) =>
       withChannel(s, channelId, (c) => {
         const kept = c.pending.filter((p) => (drop.tmpId ? p.tmpId !== drop.tmpId : true) && (drop.nonce ? p.nonce !== drop.nonce : true));
-        const next = arrived(c, msgs);
+        const next = bounded(channelId, arrived(c, msgs));
         return kept.length === c.pending.length ? next : { ...next, pending: kept };
       }),
     );
   },
 
-  update: (channelId, msg) =>
+  update: (channelId, msg) => {
+    // a quoted original follows its edits, loaded here or not
+    useReplyTargets.getState().refresh(msg);
+    sawReferences([msg]);
     set((s) =>
       withChannel(s, channelId, (c) => {
         const prev = c.byId[msg.id];
@@ -248,9 +319,12 @@ export const useMessages = create<MessagesState>()((set, get) => ({
         }
         return { ...c, byId: { ...c.byId, [msg.id]: next } };
       }),
-    ),
+    );
+  },
   remove: (channelId, id) => get().removeMany(channelId, [id]),
-  removeMany: (channelId, ids) =>
+  removeMany: (channelId, ids) => {
+    // replies to what went say it was deleted, wherever they are
+    useReplyTargets.getState().markDeleted(ids);
     set((s) =>
       withChannel(s, channelId, (c) => {
         const drop = new Set(ids);
@@ -259,7 +333,8 @@ export const useMessages = create<MessagesState>()((set, get) => ({
         for (const id of ids) delete byId[id];
         return { ...c, byId, ids: c.ids.filter((id) => !drop.has(id)) };
       }),
-    ),
+    );
+  },
   setReaction: (channelId, messageId, emoji, _userId, add, isMe) =>
     set((s) =>
       withChannel(s, channelId, (c) => {
@@ -385,6 +460,50 @@ export const useMessages = create<MessagesState>()((set, get) => ({
     nextGeneration(channelId);
     set((s) => withChannel(s, channelId, (c) => ({ ...emptyChannel(), pending: c.pending })));
   },
+  open: (channelId) => {
+    openLists.set(channelId, (openLists.get(channelId) ?? 0) + 1);
+    let closed = false;
+    return () => {
+      if (closed) return;
+      closed = true;
+      const left = (openLists.get(channelId) ?? 1) - 1;
+      if (left > 0) {
+        openLists.set(channelId, left);
+        return;
+      }
+      openLists.delete(channelId);
+      const c = get().channels[channelId];
+      if (!c) return;
+      if (c.hasNewer || c.loading) {
+        // A stretch of the past, or a page still on its way: next time the
+        // conversation opens at its newest messages, as it would after a
+        // reconnect. Whatever is being sent stays, upload and all.
+        nextGeneration(channelId);
+        set((s) => {
+          const channels = { ...s.channels };
+          const cur = channels[channelId];
+          if (cur?.pending.length) channels[channelId] = { ...emptyChannel(), pending: cur.pending };
+          else delete channels[channelId];
+          return { channels };
+        });
+        return;
+      }
+      // the newest page stays, to show at once if it is opened again
+      set((s) => withChannel(s, channelId, (cur) => keepNewest(cur, PAGE)));
+    };
+  },
+  trimAround: (channelId, anchor) =>
+    set((s) =>
+      withChannel(s, channelId, (c) => {
+        if (c.loading || c.ids.length <= WINDOW) return c;
+        const n = c.ids.length;
+        const found = anchor ? c.ids.indexOf(anchor) : -1;
+        const at = found >= 0 ? found : n - 1;
+        // the reader in the middle of what stays, or as near it as the ends allow
+        const lo = Math.min(Math.max(0, at - Math.floor(WINDOW / 2)), n - WINDOW);
+        return keepRange(c, lo, lo + WINDOW);
+      }),
+    ),
   forgetFailures: (channelId) => set((s) => (s.channels[channelId]?.failed ? withChannel(s, channelId, (c) => ({ ...c, failed: 0 })) : {})),
   loadInitial: async (channelId) => {
     const cur = get().channels[channelId];
@@ -396,6 +515,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
       const decrypted = await Promise.all(page.map(decryptForStore));
       if (generation(channelId) !== gen) return;
       resolveAuthors(decrypted);
+      sawReferences(decrypted);
       set((s) => withChannel(s, channelId, (c) => ({ ...put(c, decrypted), loaded: true, loading: false, failed: 0, hasOlder: page.length >= PAGE, hasNewer: false })));
       sawPage(channelId, decrypted);
     } catch {
@@ -448,6 +568,8 @@ export const useMessages = create<MessagesState>()((set, get) => ({
         const known = get().channels[channelId]?.byId ?? {};
         const fresh = await Promise.all(page.filter((m) => known[m.id]).map((m) => refreshed(known[m.id]!, m)));
         if (generation(channelId) !== gen) return;
+        // what the kept replies answer may have changed while away, or gone
+        void ingestReferences(page);
         const upto = before;
         // A short page reaches the start of the channel, so everything below it is covered too.
         const floor = page.length >= PAGE ? page[0]!.id : null;
@@ -479,7 +601,8 @@ export const useMessages = create<MessagesState>()((set, get) => ({
   },
   loadOlder: async (channelId) => {
     const cur = get().channels[channelId];
-    if (!cur || cur.loading || !cur.hasOlder) return;
+    // a list at its cap waits to be cut back (trimAround) before it grows again
+    if (!cur || cur.loading || !cur.hasOlder || cur.ids.length >= WINDOW_CAP) return;
     const oldest = cur.ids[0];
     if (!oldest) return get().loadInitial(channelId);
     const gen = generation(channelId);
@@ -498,7 +621,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
   loadNewer: async (channelId) => {
     const cur = get().channels[channelId];
     const newest = cur?.ids[cur.ids.length - 1];
-    if (!cur || cur.loading || !cur.hasNewer || !newest) return;
+    if (!cur || cur.loading || !cur.hasNewer || !newest || cur.ids.length >= WINDOW_CAP) return;
     const gen = generation(channelId);
     get().setLoading(channelId, true);
     try {
@@ -506,6 +629,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
       const decrypted = await Promise.all(page.map(decryptForStore));
       if (generation(channelId) !== gen) return;
       resolveAuthors(decrypted);
+      sawReferences(decrypted);
       set((s) => withChannel(s, channelId, (c) => ({ ...put(c, decrypted), hasNewer: page.length >= PAGE })));
       sawPage(channelId, decrypted);
     } finally {
@@ -520,6 +644,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
       const decrypted = await Promise.all(page.map(decryptForStore));
       if (generation(channelId) !== gen) return;
       resolveAuthors(decrypted);
+      sawReferences(decrypted);
       sawPage(channelId, decrypted);
       // The server sends up to half a page from before the target and the rest
       // from the target on; a short side means that end of the channel is in the page.
@@ -592,6 +717,17 @@ export const useMessages = create<MessagesState>()((set, get) => ({
     });
   },
 }));
+
+/**
+ * A message this device holds: in its conversation's loaded stretch, or kept
+ * as the original some reply quotes (stores/replyTargets).
+ */
+export function heldMessage(channelId: string, id: string): DecryptedMessage | undefined {
+  const loaded = useMessages.getState().channels[channelId]?.byId[id];
+  if (loaded) return loaded;
+  const kept = useReplyTargets.getState().byId[id];
+  return typeof kept === "object" && kept.channel_id === channelId ? kept : undefined;
+}
 
 export function convOf(msg: Message): string | null {
   return msg.key_conv_id;

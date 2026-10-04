@@ -13,6 +13,7 @@ import { closePins, openPins } from "@/lib/keyPins";
 import { clearKeyring, ring } from "@/lib/keyring";
 import { judgeKey, useKeyAlerts } from "./keyAlerts";
 import { useMessages } from "./messages";
+import { redecryptReplyTargets } from "./replyTargets";
 import { useUsers } from "./users";
 
 interface KeysState {
@@ -232,6 +233,7 @@ export const useKeys = create<KeysState>()((set, get) => ({
         return { waiting };
       });
       await useMessages.getState().redecrypt((m) => m.decryptError === "no_key" && !!m.key_conv_id && set_.has(m.key_conv_id));
+      await redecryptReplyTargets((m) => m.decryptError === "no_key" && !!m.key_conv_id && set_.has(m.key_conv_id));
     }
     return changed;
   },

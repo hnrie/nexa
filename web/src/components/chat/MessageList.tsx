@@ -9,13 +9,14 @@ import { setReadingPresent } from "@/lib/readPosition";
 import { interactedWithin, onInteraction } from "@/lib/interaction";
 import { formatDateDivider, formatTime, sameDay } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
-import { useMessages, type DecryptedMessage, type PendingMessage } from "@/stores/messages";
+import { WINDOW, WINDOW_CAP, useMessages, type DecryptedMessage, type PendingMessage } from "@/stores/messages";
 import { useReadStates } from "@/stores/readStates";
 import { useSelection } from "@/stores/selection";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { installSwipeReply } from "@/lib/swipeReply";
 import { useUsers } from "@/stores/users";
+import { useReplyTargets, type ReplyTarget } from "@/stores/replyTargets";
 import { useChannels } from "@/stores/channels";
 import { MessageItem } from "./MessageItem";
 import { GroupAlone } from "./GroupAlone";
@@ -80,6 +81,13 @@ function useReadStatesKnown(): boolean {
 
 /** How soon after a click or a key leaving a conversation counts as having read it. */
 const LEAVE_MS = 3000;
+
+/**
+ * How long the list has to be still before a long one is cut back to the
+ * messages around the reader (stores/messages WINDOW): never under a finger
+ * or a fling, where a scroll position written from here can be thrown away.
+ */
+const REST_MS = 300;
 
 /** A row of the list and how far its top sat below the top of the box. */
 type Anchor = { id: string; top: number };
@@ -175,6 +183,12 @@ function keepReading(el: HTMLElement, a: Reading): boolean {
   return true;
 }
 
+/** Who wrote a kept original (stores/replyTargets), when there is one. */
+function keptAuthor(kept: Record<string, ReplyTarget> | null, id: string): string | undefined {
+  const m = kept?.[id];
+  return typeof m === "object" ? m.author_id : undefined;
+}
+
 function shouldGroup(prev: DecryptedMessage | undefined, cur: DecryptedMessage): boolean {
   if (!prev) return false;
   if (prev.author_id !== cur.author_id) return false;
@@ -232,6 +246,14 @@ export function MessageList({ channel }: { channel: Channel }) {
   /** The row at the top of the view, and how far down it sat, as picking began or ended. */
   const pickAnchor = useRef<{ id: string; top: number } | null>(null);
   const atBottom = useRef(true);
+  // While this list is up the conversation keeps what it loads; when it goes,
+  // the conversation is cut back to its newest page (stores/messages).
+  useEffect(() => useMessages.getState().open(channel.id), [channel.id]);
+  /** A finger on the list, on every browser (the `touching` hold below is Chrome's alone). */
+  const fingerDown = useRef(false);
+  /** When the list last scrolled, to tell a list at rest from one still moving. */
+  const lastScroll = useRef(0);
+  const trimTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // on a touch screen, a message swiped against the reading direction is replied to
   useEffect(() => {
     const el = scrollRef.current;
@@ -319,7 +341,12 @@ export function MessageList({ channel }: { channel: Channel }) {
   }, [allIds, held]);
   // a page of history is in and waits for the list to stop: the loader at the top says more is coming
   const heldAbove = ids.length > 0 && ids[0] !== allIds[0];
+  // so does a list at its longest, waiting to be cut back before it loads more
+  const capped = allIds.length >= WINDOW_CAP;
   const byId = state?.byId ?? {};
+  // whose a reply's original was, for hiding replies to someone blocked, also
+  // from the originals the server sent along (stores/replyTargets)
+  const kept = useReplyTargets((r) => (blockRules.hideReplies ? r.byId : null));
   const pending = state?.pending ?? [];
   const hasOlder = state?.hasOlder ?? true;
   const hasNewer = state?.hasNewer ?? false;
@@ -352,7 +379,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     // leave no trace at all (lib/blocked.ts). Dates and grouping are worked out
     // from what is left, so a hidden message leaves no gap, no lone date line
     // and no break in the run of messages around it.
-    const authorOf: AuthorOf = (mid) => byId[mid]?.author_id;
+    const authorOf: AuthorOf = (mid) => byId[mid]?.author_id ?? keptAuthor(kept, mid);
     let run: BlockedRow | null = null;
     // Nexa's note about who added this account goes where noticeSpot says,
     // and whatever follows it starts a run of its own, with a name
@@ -409,9 +436,9 @@ export function MessageList({ channel }: { channel: Channel }) {
     }
     return out;
     // loaded, readKnown and lastRead are listed so the rows are built again when the unread point is captured or moves
-  }, [ids, byId, pending, me?.id, loaded, readKnown, lastRead, blockRules, openRuns, addNotice, hasOlder, hasNewer]);
+  }, [ids, byId, kept, pending, me?.id, loaded, readKnown, lastRead, blockRules, openRuns, addNotice, hasOlder, hasNewer]);
   /** Whether a message stays quiet here: from someone blocked, or hidden for answering them. */
-  const quiet = useCallback((m: DecryptedMessage | undefined) => !!m && isQuiet(m, blockRules, (mid) => byId[mid]?.author_id), [blockRules, byId]);
+  const quiet = useCallback((m: DecryptedMessage | undefined) => !!m && isQuiet(m, blockRules, (mid) => byId[mid]?.author_id ?? keptAuthor(kept, mid)), [blockRules, byId, kept]);
 
   const newest = ids[ids.length - 1];
   const prevNewest = useRef<string | undefined>(undefined);
@@ -568,9 +595,64 @@ export function MessageList({ channel }: { channel: Channel }) {
     rows[i]!.scrollIntoView({ block: "nearest" });
   };
 
+  /**
+   * Cuts a long list back to the messages around the reader once it is still
+   * (stores/messages trimAround), then looks again for a page to load, which
+   * a list at its cap was waiting for. The row being read stays where it is:
+   * what goes from below it is taken off the scroll position as the rows
+   * change (holdReading), and what goes from above it moves nothing.
+   */
+  const scheduleTrim = useCallback(() => {
+    if (trimTimer.current) clearTimeout(trimTimer.current);
+    const check = () => {
+      trimTimer.current = null;
+      const el = scrollRef.current;
+      const st = useMessages.getState().channels[channel.id];
+      if (!el || !st || st.ids.length <= WINDOW) return;
+      if (fingerDown.current || touching.current || st.loading || performance.now() - lastScroll.current < REST_MS) {
+        trimTimer.current = setTimeout(check, REST_MS);
+        return;
+      }
+      const anchor = atBottom.current ? null : (reading.current?.id ?? readReading(el)?.id ?? null);
+      useMessages.getState().trimAround(channel.id, anchor);
+      requestAnimationFrame(() => onScrollNow.current());
+    };
+    trimTimer.current = setTimeout(check, REST_MS);
+  }, [channel.id]);
+  useEffect(
+    () => () => {
+      if (trimTimer.current) clearTimeout(trimTimer.current);
+    },
+    [],
+  );
+  // messages arriving while the reader sits still (a busy channel at the bottom) grow it too
+  useEffect(() => {
+    if (allIds.length > WINDOW) scheduleTrim();
+  }, [allIds.length, scheduleTrim]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const down = () => {
+      fingerDown.current = true;
+    };
+    const up = (e: TouchEvent) => {
+      if ((e.touches?.length ?? 0) === 0) fingerDown.current = false;
+    };
+    el.addEventListener("touchstart", down, { passive: true });
+    el.addEventListener("touchend", up, { passive: true });
+    el.addEventListener("touchcancel", up, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", down);
+      el.removeEventListener("touchend", up);
+      el.removeEventListener("touchcancel", up);
+    };
+  }, [channel.id]);
+
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
+    lastScroll.current = performance.now();
+    if (allIds.length > WINDOW) scheduleTrim();
     const dist = fromBottom(el);
     // The end of a list that stops short of the present is not the bottom:
     // nothing should stick to it or be marked read from it.
@@ -606,7 +688,9 @@ export function MessageList({ channel }: { channel: Channel }) {
         .catch(() => {})
         .finally(() => setNewerBusy(false));
     }
-  }, [channel.id, hasOlder, hasNewer, loading, loaded, ids.length, heldAbove, loadOlder, loadNewer]);
+  }, [channel.id, hasOlder, hasNewer, loading, loaded, ids.length, allIds.length, heldAbove, loadOlder, loadNewer, scheduleTrim]);
+  const onScrollNow = useRef(onScroll);
+  onScrollNow.current = onScroll;
 
   // A finger down holds the rows that are there (see `touching`); they go once
   // the last finger is up and the list has stopped: at once if it never
@@ -721,7 +805,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     // left out entirely is not there to go to, which is said rather than
     // searched for and then called missing.
     const wanted = byId[jumpTo.messageId];
-    const fate = wanted ? messageFate(wanted, blockRules, (mid) => byId[mid]?.author_id) : "show";
+    const fate = wanted ? messageFate(wanted, blockRules, (mid) => byId[mid]?.author_id ?? keptAuthor(kept, mid)) : "show";
     if (fate === "hide") {
       setJumpTo(null);
       useUI.getState().toast(t("people.blocked.jumpHidden"), "info");
@@ -765,7 +849,7 @@ export function MessageList({ channel }: { channel: Channel }) {
       triedAround.current = jumpTo.messageId;
       void useMessages.getState().loadAround(channel.id, jumpTo.messageId).catch(() => {});
     }
-  }, [jumpTo, channel.id, rows, loading, setJumpTo, dropReading, byId, blockRules]);
+  }, [jumpTo, channel.id, rows, loading, setJumpTo, dropReading, byId, kept, blockRules]);
 
   // "3 new messages since 4:32 PM": what came in below the reader since the news began
   const newSince = (): string => {
@@ -905,8 +989,8 @@ export function MessageList({ channel }: { channel: Channel }) {
             </div>
           ) : (
             // one height, spinning or not: a page asked for moves nothing before it lands
-            <div className={s.loader} data-busy={(loading && !newerBusy) || !loaded || heldAbove || undefined}>
-              {(loading && !newerBusy) || !loaded || heldAbove ? <Spinner size={24} /> : null}
+            <div className={s.loader} data-busy={(loading && !newerBusy) || !loaded || heldAbove || capped || undefined}>
+              {(loading && !newerBusy) || !loaded || heldAbove || capped ? <Spinner size={24} /> : null}
             </div>
           )}
           <RenderCtxProvider value={renderCtx}>

@@ -92,6 +92,8 @@ function usableAsIs(url: string): boolean {
 // --- signing again ------------------------------------------------------------
 
 const renewed = new Map<string, string>();
+/** How many renewed or refused links are remembered at most. */
+const LINKS_MAX = 2000;
 /** Links the server would not sign: not its own, and that does not change. */
 const refused = new Set<string>();
 /** Links whose request did not get through, and when; they wait, then are asked for again. */
@@ -129,6 +131,9 @@ async function flush(): Promise<void> {
       failed.delete(url);
       if (typeof fresh === "string" && isProxied(fresh)) renewed.set(url, fresh);
       else refused.add(url);
+      // a long session sees links without end; past a few thousand the oldest are asked about again if they come back
+      while (renewed.size > LINKS_MAX) renewed.delete(renewed.keys().next().value as string);
+      while (refused.size > LINKS_MAX) refused.delete(refused.values().next().value as string);
     }
   } catch {
     // Offline or rate limited: the links wait, still loading, and are asked for

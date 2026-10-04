@@ -493,6 +493,12 @@ export interface Message {
   poll_results?: PollTally;
   /** On the line that closes a person's poll: how it went, in numbers (the words are sealed in the poll's message). */
   poll_result?: PollOutcome;
+  /**
+   * What a reply (or a pin's or a poll's notice) points at, sent along by the
+   * server: the original as it is now, or null when it has been deleted.
+   * Absent when the server did not say (stores/replyTargets fetches it then).
+   */
+  referenced_message?: Message | null;
 }
 
 export const MSG_FLAG_PINNED = 1;

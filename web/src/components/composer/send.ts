@@ -11,7 +11,7 @@ import { channelKeyFor } from "@/lib/keyring";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useKeys } from "@/stores/keys";
-import { useMessages, type PendingMessage, type PendingUpload } from "@/stores/messages";
+import { heldMessage, useMessages, type PendingMessage, type PendingUpload } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { useSlowmode } from "@/stores/slowmode";
@@ -423,7 +423,7 @@ export function sendErrorText(err: unknown): string | null {
 }
 
 function replyAuthor(channelId: string, messageId: string): string | undefined {
-  const m = useMessages.getState().channels[channelId]?.byId[messageId];
+  const m = heldMessage(channelId, messageId);
   // a webhook's message has nobody behind it to ping
   return m?.webhook_id ? undefined : m?.author_id;
 }

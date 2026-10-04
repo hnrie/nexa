@@ -14,6 +14,7 @@ import { memberColor, useServers } from "@/stores/servers";
 import { useChannels } from "@/stores/channels";
 import { openProfilePopout } from "@/stores/profilePopout";
 import { useRelationships } from "@/stores/relationships";
+import { ingestReferences, requestReplyTarget, retryReplyTarget, usedReplyTarget, useReplyTargets } from "@/stores/replyTargets";
 import { mentionsMe } from "@/lib/mentionsMe";
 import { useShiftHeld } from "@/hooks/useShiftHeld";
 import { stickerUrl } from "@/api/users";
@@ -70,7 +71,13 @@ interface Props {
  * rest of the line goes to the message too, for a pointer.
  */
 function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
-  const target = useMessages((m) => (msg.reply_to_id ? m.channels[msg.channel_id]?.byId[msg.reply_to_id] : undefined));
+  const inList = useMessages((m) => (msg.reply_to_id ? m.channels[msg.channel_id]?.byId[msg.reply_to_id] : undefined));
+  // most originals are not in the stretch that is loaded: the server sends
+  // them along, and anything it did not is fetched (stores/replyTargets)
+  const kept = useReplyTargets((r) => (msg.reply_to_id && !inList ? r.byId[msg.reply_to_id] : undefined));
+  const target = inList ?? (typeof kept === "object" && kept.channel_id === msg.channel_id ? kept : undefined);
+  const deleted = !target && (kept === "deleted" || (kept === undefined && msg.referenced_message === null));
+  const failed = !target && kept === "failed";
   const avatarId = useUsers((u) => (target ? (u.byId[target.author_id]?.avatar_id ?? null) : null));
   const shownName = useShownName(msg.channel_id, target?.hook ? undefined : target?.author_id);
   const name = target?.hook ? target.hook.name : shownName;
@@ -81,16 +88,40 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   const hook = target?.hook;
   // its words with their formatting, parsed when the quoted message changes, not on every render of the row
   const words = useReplyWords(target);
-  if (!msg.reply_to_id) return null;
-  const replyTo = msg.reply_to_id;
+  const replyId = msg.reply_to_id;
+  useEffect(() => {
+    if (!replyId || inList) return;
+    if (typeof kept === "object") {
+      usedReplyTarget(replyId);
+      return;
+    }
+    if (kept !== undefined || msg.referenced_message === null) return;
+    // sent along but not kept (yet, or any more): opened here, without asking anyone
+    if (msg.referenced_message) void ingestReferences([msg]);
+    else requestReplyTarget(msg.channel_id, replyId);
+  }, [replyId, inList, kept, msg]);
+  if (!replyId) return null;
   // Jumping works whether or not the original is loaded: the list fetches the
-  // page around it, and says so if it really is gone. Only the newest page is
-  // loaded when a conversation opens, so most replies point past it.
-  const jump = () => setJumpTo({ channelId: msg.channel_id, messageId: replyTo });
-  if (!target) {
+  // page around it, and says so if it really is gone.
+  const jump = () => setJumpTo({ channelId: msg.channel_id, messageId: replyId });
+  if (deleted) {
+    return (
+      <div className={s.replyLine} data-state="deleted">
+        <span className={[s.replyText, s.replyGone].join(" ")}>{t("chat.messageItem.originalDeleted")}</span>
+      </div>
+    );
+  }
+  if (failed) {
     return (
       <div className={s.replyLine}>
-        <button type="button" className={s.replyText} onClick={jump} title={t("chat.messageItem.goToOriginal")}>{t("chat.messageItem.originalMessageWasDeletedOrIs")}</button>
+        <button type="button" className={s.replyText} onClick={() => retryReplyTarget(msg.channel_id, replyId)} title={t("chat.messageList.tryAgain")}>{t("chat.messageItem.originalFailed")}</button>
+      </div>
+    );
+  }
+  if (!target) {
+    return (
+      <div className={s.replyLine} aria-busy="true" aria-label={t("chat.messageItem.originalLoading")} onClick={jump}>
+        <span className={s.replySkeleton} aria-hidden="true" />
       </div>
     );
   }

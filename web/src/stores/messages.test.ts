@@ -1,7 +1,8 @@
 import type { MockInstance } from "vitest";
 import { messages as messagesApi, type HistoryQuery } from "@/api/messages";
 import { users as usersApi } from "@/api/users";
-import { useMessages, type DecryptedMessage } from "./messages";
+import { WINDOW, WINDOW_CAP, useMessages, type DecryptedMessage } from "./messages";
+import { useReplyTargets } from "./replyTargets";
 
 function msg(id: string, channel = "c1"): DecryptedMessage {
   return {
@@ -136,13 +137,21 @@ describe("messages store loading", () => {
     return history.slice(-limit);
   }
 
+  // the conversation is on screen, as it is whenever the app loads its history
+  let close: () => void = () => {};
   beforeEach(() => {
-    useMessages.getState().clearAll();
+    // unsent messages outlive clearAll, and would leak from one test into the next
+    useMessages.setState({ channels: {} });
+    useReplyTargets.getState().clear();
     history = range(1, 300);
     vi.spyOn(usersApi, "get").mockRejectedValue(new Error("offline"));
     list = vi.spyOn(messagesApi, "list").mockImplementation(async (_c, q) => serve(q));
+    close = useMessages.getState().open("c1");
   });
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    close();
+    vi.restoreAllMocks();
+  });
 
   it("counts a failed first load instead of throwing, and clears the count on success", async () => {
     list.mockRejectedValueOnce(new Error("offline"));
@@ -223,5 +232,86 @@ describe("messages store loading", () => {
     expect(chan().byId["270"]?.reactions).toEqual([{ emoji: "🎉", count: 1, me: false }]);
     // unchanged messages keep their object, so their rows do not render again
     expect(chan().byId["290"]).toBe(kept);
+  });
+
+  it("cuts a long list back around the reader once it is still, and loads no more at its cap", async () => {
+    history = range(1, 1000);
+    const s = useMessages.getState();
+    await s.loadInitial("c1");
+    for (let i = 0; i < 20 && chan().ids.length < WINDOW_CAP; i++) await s.loadOlder("c1");
+    expect(ids().length).toBe(WINDOW_CAP);
+    // at the cap the list waits to be cut back before it grows again
+    const asked = list.mock.calls.length;
+    await s.loadOlder("c1");
+    expect(list.mock.calls.length).toBe(asked);
+    // the reader is near the top: what goes is the newest end, which loads again on the way back
+    const top = ids()[10]!;
+    s.trimAround("c1", top);
+    expect(ids().length).toBe(WINDOW);
+    expect(ids()[0]).toBe(String(1000 - WINDOW_CAP + 1));
+    expect(chan()).toMatchObject({ hasOlder: true, hasNewer: true });
+    // back down, the oldest end goes instead, and the reader stays inside what is kept
+    for (let i = 0; i < 20 && chan().hasNewer; i++) {
+      await s.loadNewer("c1");
+      s.trimAround("c1", ids()[ids().length - 1]!);
+      expect(ids().length).toBeLessThanOrEqual(WINDOW_CAP);
+    }
+    expect(chan().hasNewer).toBe(false);
+    expect(ids()[ids().length - 1]).toBe("1000");
+    expect(ids().length).toBeLessThanOrEqual(WINDOW);
+  });
+
+  it("does not cut a list while a page is on its way", async () => {
+    history = range(1, 1000);
+    const s = useMessages.getState();
+    await s.loadInitial("c1");
+    for (let i = 0; i < 6; i++) await s.loadOlder("c1");
+    const before = ids().length;
+    s.setLoading("c1", true);
+    s.trimAround("c1", null);
+    expect(ids().length).toBe(before);
+    s.setLoading("c1", false);
+    s.trimAround("c1", null);
+    expect(ids().length).toBe(WINDOW);
+    // with nobody reading anywhere in particular, the newest stay
+    expect(ids()[ids().length - 1]).toBe("1000");
+    expect(chan().hasNewer).toBe(false);
+  });
+
+  it("cuts a conversation back to its newest page when its list goes, and forgets one left in the past", async () => {
+    const s = useMessages.getState();
+    await s.loadInitial("c1");
+    await s.loadOlder("c1");
+    await s.loadOlder("c1");
+    expect(ids().length).toBe(150);
+    close();
+    close = () => {};
+    expect(ids()).toEqual(idsOf(251, 300));
+    expect(chan()).toMatchObject({ loaded: true, hasOlder: true });
+    // live messages for a conversation nobody is looking at keep only the newest few
+    for (let i = 301; i <= 400; i++) s.insert("c1", [msg(String(i))]);
+    expect(ids()).toEqual(idsOf(351, 400));
+    // a stretch of the past is forgotten when it goes, but not what is being sent
+    close = s.open("c1");
+    await s.loadAround("c1", "100");
+    expect(chan().hasNewer).toBe(true);
+    s.addPending({ tmpId: "t1", nonce: "n1", channelId: "c1", authorId: "me", payload: { t: "hi" }, createdAt: 1, status: "sending" });
+    close();
+    close = () => {};
+    expect(chan()).toMatchObject({ ids: [], loaded: false, hasNewer: false });
+    expect(chan().pending).toHaveLength(1);
+  });
+
+  it("keeps the originals replies point at, and says when one was deleted", async () => {
+    const s = useMessages.getState();
+    const original = msg("7");
+    s.insert("c1", [{ ...msg("301"), type: "reply", reply_to_id: "7", referenced_message: original }, { ...msg("302"), type: "reply", reply_to_id: "8", referenced_message: null }]);
+    await vi.waitFor(() => expect(typeof useReplyTargets.getState().byId["7"]).toBe("object"));
+    expect(useReplyTargets.getState().byId["8"]).toBe("deleted");
+    // an edit to a kept original replaces it; a deletion marks it
+    s.update("c1", { ...msg("7"), edited_at: 3 });
+    expect((useReplyTargets.getState().byId["7"] as DecryptedMessage).edited_at).toBe(3);
+    s.remove("c1", "7");
+    expect(useReplyTargets.getState().byId["7"]).toBe("deleted");
   });
 });

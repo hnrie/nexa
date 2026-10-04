@@ -37,6 +37,14 @@ export function dominantColor(data: ArrayLike<number>): string | null {
 }
 
 const known = new Map<string, string | null>();
+/** How many pictures' colours are remembered: the oldest go first, so scrolling past thousands of them stays light. */
+const KNOWN_MAX = 500;
+
+function remember(url: string, color: string | null): void {
+  known.delete(url);
+  known.set(url, color);
+  while (known.size > KNOWN_MAX) known.delete(known.keys().next().value as string);
+}
 
 /**
  * The main colour of a picture at `url`, once it has loaded; null until
@@ -72,11 +80,11 @@ export function useDominantColor(url: string | null): string | null {
       } catch {
         /* a picture the page may not read: the default colour stays */
       }
-      known.set(url, found);
+      remember(url, found);
       if (alive) setColor(found);
     };
     img.onerror = () => {
-      known.set(url, null);
+      remember(url, null);
       if (alive) setColor(null);
     };
     img.src = url;
