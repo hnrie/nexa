@@ -21,7 +21,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * screen while it is shared, and phone call), with the call's ongoing
  * notification, a CallStyle one where the phone has it: mute and hang up from
  * the shade. Its types are worked out from the call each time, never from
- * whatever a caller happened to pass.
+ * whatever a caller happened to pass. The call outlives the app's window:
+ * swiped away from the recents, it goes on, and its notification brings the
+ * call back or ends it.
  */
 class CallService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
@@ -62,12 +64,6 @@ class CallService : Service() {
         if (screen) t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
         if (phone) t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
         return t
-    }
-
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        // swiped away from the recents: the call ends rather than going on unseen
-        Calls.leave(true)
-        stopSelf()
     }
 
     companion object {
