@@ -174,7 +174,7 @@ private fun ColourSheet(layer: Layer, title: String, start: Long, onPick: (Long)
                         sat = hsv[1]
                         value = hsv[2]
                     }
-                }, mono = true, error = if (parseHex(hex) == null) t("android.server.hexHint") else null)
+                }, mono = true, error = if (parseHex(hex) == null) t("composer.format.colourHexInvalid") else null)
             }
         }
     }

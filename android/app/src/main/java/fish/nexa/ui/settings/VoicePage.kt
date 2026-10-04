@@ -119,17 +119,17 @@ private fun outputs(context: Context): List<Output> {
     val am = context.getSystemService(AudioManager::class.java) ?: return emptyList()
     val devices = runCatching { am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).toList() }.getOrDefault(emptyList())
     val list = ArrayList<Output>()
-    list += Output("speaker", t("android.settings.voice.speaker"))
+    list += Output("speaker", t("android.call.speaker"))
     if (devices.any { it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE } || context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)) {
-        list += Output("earpiece", t("android.settings.voice.earpiece"))
+        list += Output("earpiece", t("android.call.earpiece"))
     }
     for (d in devices) {
         val name = d.productName?.toString().orEmpty()
         when (d.type) {
             AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_USB_HEADSET ->
-                list += Output("wired", t("android.settings.voice.wired"))
+                list += Output("wired", t("android.call.headphones"))
             AudioDeviceInfo.TYPE_BLUETOOTH_SCO, AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ->
-                list += Output("bluetooth", name.ifBlank { t("android.settings.voice.bluetooth") })
+                list += Output("bluetooth", name.ifBlank { t("android.call.bluetooth") })
         }
     }
     return list.distinctBy { it.kind + it.name }
@@ -232,7 +232,7 @@ private fun MicTest(voice: JsonObject, inputVolume: Int, noise: String) {
     var error by remember { mutableStateOf<String?>(null) }
     var diag by remember { mutableStateOf<String?>(null) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        if (ok) want = true else error = t("android.settings.voice.micPermission")
+        if (ok) want = true else error = t("android.call.micBlocked")
     }
     val echo = voice.voiceBool("echoCancellation", true)
     val gain = voice.voiceBool("autoGain", true)

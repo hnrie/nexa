@@ -70,7 +70,7 @@ private fun readCatalogue(): Catalogue {
 }
 
 private fun partName(part: String) = when (part) {
-    "android" -> t("android.settings.licenses.androidApp")
+    "android" -> t("shell.downloadBanner.androidApp")
     "server" -> t("settings.licenses.server")
     "assets" -> t("settings.licenses.fontsAndArtwork")
     "web" -> t("settings.licenses.webApp")
