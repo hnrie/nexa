@@ -1,10 +1,8 @@
 package fish.nexa.ui.profile
 
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.runtime.Composable
@@ -34,6 +32,7 @@ import fish.nexa.media.TwemojiImage
 import fish.nexa.net.Activity
 import fish.nexa.net.Presence
 import fish.nexa.ui.Icon
+import fish.nexa.ui.components.ScrollingText
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.t
 import fish.nexa.ui.theme.Nx
@@ -171,9 +170,9 @@ fun StatusEmojiImage(emoji: String, size: Dp, modifier: Modifier = Modifier) {
 }
 
 /**
- * StatusLine: under a name, the custom status (its emoji in Twemoji and its
- * words), or else the first activity's name in bold beside its kind; running
- * as a marquee when it does not fit (still with reduced motion).
+ * StatusLine: under a name, the custom status (its emoji and its words), or
+ * else the first activity's name in bold beside its kind; when it does not
+ * fit it slides across to its end and back, as the web's does (ScrollingText).
  */
 @Composable
 fun StatusLine(userId: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
@@ -184,7 +183,6 @@ fun StatusLine(userId: String, style: TextStyle, color: Color, modifier: Modifie
     val act = acts.firstOrNull()
     if (custom == null && act == null) return
     val c = Nx.colors
-    val reduced = Nx.motion.reduced
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         if (act != null) ActivityIcon(act, more = maxOf(0, acts.size - 1))
         val text = buildAnnotatedString {
@@ -201,13 +199,7 @@ fun StatusLine(userId: String, style: TextStyle, color: Color, modifier: Modifie
         val inline = if (custom?.emoji?.isNotEmpty() == true) mapOf(
             "emoji" to InlineTextContent(Placeholder(1.15.em, 1.15.em, PlaceholderVerticalAlign.Center)) { StatusEmojiImage(custom.emoji, (style.fontSize.value * 1.15f).dp) },
         ) else emptyMap()
-        BasicText(
-            text,
-            Modifier.then(if (reduced) Modifier else Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1500, repeatDelayMillis = 2000)),
-            style = style.copy(color = color),
-            maxLines = 1,
-            inlineContent = inline,
-        )
+        ScrollingText(text, style.copy(color = color), Modifier.weight(1f, fill = false), inline)
     }
 }
 
