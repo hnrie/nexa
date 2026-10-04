@@ -118,6 +118,18 @@ fun TypingBar(channel: Channel) {
     }
 }
 
+/** TypingLine.tsx StyledTyping: one person typing the way their style says, or with the plain dots and words without one. */
+@Composable
+fun StyledTyping(style: TypingStyle?, name: String) {
+    val c = Nx.colors
+    val textStyle = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), color = c.textSubtle)
+    val bold = SpanStyle(fontWeight = FontWeight(600), color = c.text)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (style != null && style.emoji.isNotEmpty()) TypingEmoji(style, 18.dp, big = false) else TypingDots()
+        TypingWords(style ?: TypingStyle(emptyList(), "wave"), name, textStyle, bold, wrap = true)
+    }
+}
+
 /** Puts the names (marked with \u0000 … \u0001 while translating) in bold. */
 private fun boldNames(s: String, bold: SpanStyle) = buildAnnotatedString {
     var i = 0

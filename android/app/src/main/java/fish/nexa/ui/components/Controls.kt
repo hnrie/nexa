@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import fish.nexa.ui.settings.keptAboveSaveBar
 import androidx.compose.ui.unit.offset
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.alpha
@@ -332,6 +333,7 @@ fun NxTextField(
         Box(
             Modifier
                 .fillMaxWidth()
+                .keptAboveSaveBar(value, focused)
                 .then(if (focused && error == null) Modifier.ringGlow(shape, c) else Modifier)
                 .sunken(shape, c)
                 .border(1.dp, edge, shape)

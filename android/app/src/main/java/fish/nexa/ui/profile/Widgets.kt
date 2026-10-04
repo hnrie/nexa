@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,11 +83,14 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 
 /** lib/widgets.ts: what people put on their profiles, read as safely as the web reads it. */
 object Widgets {
+    /** The most widgets a profile holds (lib/widgets.ts MAX_WIDGETS). */
+    const val MAX = 8
     data class Game(val id: String?, val name: String, val cover: String?, val image: String?, val tags: List<String>)
     data class Music(val id: String?, val name: String, val by: String?, val art: String?, val image: String?, val duration: Int?)
     data class Stat(val label: String, val value: String)
@@ -150,7 +154,51 @@ object Widgets {
                 }
             }
         }
-        return out.take(8)
+        return out.take(MAX)
+    }
+
+    /** A widget as PUT /users/@me/widgets takes it (lib/widgets.ts); the server cleans what it keeps. */
+    fun toJson(w: Widget): JsonObject = buildJsonObject {
+        put("id", JsonPrimitive(w.id))
+        put("type", JsonPrimitive(w.type))
+        when (w) {
+            is GameWidget -> {
+                put("games", JsonArray(w.games.map { g ->
+                    buildJsonObject {
+                        g.id?.let { put("id", JsonPrimitive(it)) }
+                        put("name", JsonPrimitive(g.name))
+                        g.cover?.let { put("cover", JsonPrimitive(it)) }
+                        g.image?.let { put("image", JsonPrimitive(it)) }
+                        if (g.tags.isNotEmpty()) put("tags", JsonArray(g.tags.map { JsonPrimitive(it) }))
+                    }
+                }))
+                w.note?.takeIf { it.isNotBlank() }?.let { put("note", JsonPrimitive(it)) }
+            }
+            is MusicWidget -> put("music", JsonArray(w.music.map { m ->
+                buildJsonObject {
+                    m.id?.let { put("id", JsonPrimitive(it)) }
+                    put("name", JsonPrimitive(m.name))
+                    m.by?.let { put("by", JsonPrimitive(it)) }
+                    m.art?.let { put("art", JsonPrimitive(it)) }
+                    m.image?.let { put("image", JsonPrimitive(it)) }
+                    m.duration?.let { put("duration", JsonPrimitive(it)) }
+                }
+            }))
+            is CardWidget -> {
+                put("title", JsonPrimitive(w.title))
+                w.image?.let { put("image", JsonPrimitive(it)); put("shape", JsonPrimitive(w.shape ?: "wide")) }
+                w.text?.takeIf { it.isNotBlank() }?.let { put("text", JsonPrimitive(it)) }
+                if (w.stats.isNotEmpty()) put("stats", JsonArray(w.stats.map { st ->
+                    buildJsonObject { put("label", JsonPrimitive(st.label)); put("value", JsonPrimitive(st.value)) }
+                }))
+                w.link?.let { url ->
+                    put("link", buildJsonObject {
+                        put("url", JsonPrimitive(url))
+                        w.linkLabel?.let { put("label", JsonPrimitive(it)) }
+                    })
+                }
+            }
+        }
     }
 
     fun title(type: String) = when (type) {
@@ -287,7 +335,7 @@ object SongPreviews {
 
 /** The board: every widget in order, as the full profile shows them. */
 @Composable
-fun ProfileWidgets(widgets: List<Widgets.Widget>, onAdd: (() -> Unit)? = null, onShowAll: (() -> Unit)? = null) {
+fun ProfileWidgets(widgets: List<Widgets.Widget>, onAdd: (() -> Unit)? = null, onShowAll: (() -> Unit)? = null, design: WidgetDesign? = null) {
     val c = Nx.colors
     if (widgets.isEmpty()) {
         if (onAdd == null) return
@@ -302,21 +350,101 @@ fun ProfileWidgets(widgets: List<Widgets.Widget>, onAdd: (() -> Unit)? = null, o
         }
         return
     }
-    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        for (w in widgets) when (w) {
-            is Widgets.MusicWidget -> when (w.type) {
-                "artists" -> Artists(w, onShowAll)
-                "albums" -> Albums(w, onShowAll)
-                else -> Songs(w, onShowAll)
-            }
-            is Widgets.CardWidget -> CardWidget(w)
-            is Widgets.GameWidget -> when (w.type) {
-                "favorite" -> Favorite(w)
-                "playing" -> Playing(w)
-                else -> Shelf(w, onShowAll)
-            }
+    @Composable
+    fun draw(w: Widgets.Widget) = when (w) {
+        is Widgets.MusicWidget -> when (w.type) {
+            "artists" -> Artists(w, onShowAll)
+            "albums" -> Albums(w, onShowAll)
+            else -> Songs(w, onShowAll)
+        }
+        is Widgets.CardWidget -> CardWidget(w)
+        is Widgets.GameWidget -> when (w.type) {
+            "favorite" -> Favorite(w)
+            "playing" -> Playing(w)
+            else -> Shelf(w, onShowAll)
         }
     }
+    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        if (design == null) for (w in widgets) draw(w)
+        else {
+            widgets.forEachIndexed { i, w -> key(w.id) { Designed(w, i, widgets.size, design) { draw(w) } } }
+            if (widgets.size < Widgets.MAX) AddWidgetTile(design.add)
+        }
+    }
+}
+
+/** One widget in the designer: pressing it changes it, and its tools sit along its top. */
+@Composable
+private fun Designed(w: Widgets.Widget, index: Int, count: Int, design: WidgetDesign, content: @Composable () -> Unit) {
+    val c = Nx.colors
+    val p = LocalProfile.current
+    val name = Widgets.name(w)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            Modifier.fillMaxWidth().semantics { contentDescription = t("designer.widget.tools", "name" to name) },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            val pill = RoundedCornerShape(999.dp)
+            val small = Nx.type.label.copy(fontSize = Nx.type.sp(12f), fontWeight = FontWeight(650))
+            if (index == 0) Row(
+                Modifier.height(24.dp).background(p.accent.copy(alpha = 0.26f), pill).padding(horizontal = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Icon("Pin", c.textStrong, size = 12.dp)
+                Txt(t("designer.widget.onCard"), style = small, color = c.textStrong, maxLines = 1)
+            } else {
+                val interaction = remember { MutableInteractionSource() }
+                val pressed by interaction.collectIsPressedAsState()
+                Row(
+                    Modifier.height(24.dp).border(1.dp, if (pressed) c.border else c.borderSubtle, pill).clip(pill).pressable(interaction) { design.feature(w.id) }.padding(horizontal = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Icon("Pin", if (pressed) c.textStrong else c.textMuted, size = 12.dp)
+                    Txt(t("designer.widget.showOnCard"), style = small, color = if (pressed) c.textStrong else c.textMuted, maxLines = 1)
+                }
+            }
+            Box(Modifier.weight(1f))
+            WidgetTool("Pencil", t("designer.widget.editShort")) { design.edit(w.id) }
+            WidgetTool("ArrowUp", t("reorder.moveUp"), enabled = index > 0) { design.move(w.id, -1) }
+            WidgetTool("ArrowDown", t("reorder.moveDown"), enabled = index < count - 1) { design.move(w.id, 1) }
+            WidgetTool("Trash2", t("widgets.remove"), danger = true) { design.remove(w.id) }
+        }
+        // the widget itself changes it when pressed, in the designer
+        Box {
+            content()
+            val interaction = remember { MutableInteractionSource() }
+            val pressed by interaction.collectIsPressedAsState()
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(if (pressed) p.accent.copy(alpha = 0.07f) else Color.Transparent, RoundedCornerShape(12.dp))
+                    .pressable(interaction) { design.edit(w.id) }
+                    .semantics { contentDescription = t("designer.widget.edit", "name" to name) },
+            )
+        }
+    }
+}
+
+/** A tool beside a widget in the designer: its chip colour, 32 dp to touch. */
+@Composable
+private fun WidgetTool(icon: String, label: String, enabled: Boolean = true, danger: Boolean = false, onClick: () -> Unit) {
+    val c = Nx.colors
+    val p = LocalProfile.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Box(
+        Modifier
+            .size(32.dp)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.35f }
+            .background(if (pressed) p.chipHover else p.chip, RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(8.dp))
+            .pressable(interaction, enabled = enabled, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, if (pressed && danger) c.textDanger else if (pressed) c.textStrong else c.textMuted, size = 14.dp) }
 }
 
 @Composable

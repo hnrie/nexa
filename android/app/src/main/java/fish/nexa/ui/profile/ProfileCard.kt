@@ -259,7 +259,7 @@ private fun BannerButton(icon: String, label: String, busy: Boolean = false, ico
 
 /** A custom status: a thought bubble beside the avatar, across the banner's edge. */
 @Composable
-private fun StatusBubble(custom: Presences.Custom, lines: Int, modifier: Modifier) {
+private fun StatusBubble(custom: Presences.Custom, lines: Int, modifier: Modifier, design: ProfileDesign? = null) {
     val c = Nx.colors
     val p = LocalProfile.current
     val reduced = Nx.motion.reduced
@@ -291,19 +291,21 @@ private fun StatusBubble(custom: Presences.Custom, lines: Int, modifier: Modifie
             // the two small rounds that make it a thought
             Box(Modifier.offset((-13).dp, (-14).dp).size(5.dp).boxShadow(CircleShape, 2f, 6f, c.shadeAt(0.3f)).background(p.bubble, CircleShape))
             Box(Modifier.offset((-6).dp, (-8).dp).size(10.dp).boxShadow(CircleShape, 2f, 6f, c.shadeAt(0.3f)).background(p.bubble, CircleShape))
-            BasicText(
-                text,
-                Modifier
-                    .boxShadow(bubble, 6f, 18f, c.shadeAt(0.6f), spread = -6f)
-                    .ring(bubble, c.borderSubtle)
-                    .background(p.bubble, bubble)
-                    .topEdge(bubble, c.edgeLight)
-                    .padding(horizontal = 13.dp, vertical = 8.dp),
-                style = style.copy(color = c.textStrong),
-                maxLines = lines,
-                overflow = TextOverflow.Ellipsis,
-                inlineContent = inline,
-            )
+            Spotted(design, ProfilePart.STATUS, t("designer.spot.status")) {
+                BasicText(
+                    text,
+                    Modifier
+                        .boxShadow(bubble, 6f, 18f, c.shadeAt(0.6f), spread = -6f)
+                        .ring(bubble, c.borderSubtle)
+                        .background(p.bubble, bubble)
+                        .topEdge(bubble, c.edgeLight)
+                        .padding(horizontal = 13.dp, vertical = 8.dp),
+                    style = style.copy(color = c.textStrong),
+                    maxLines = lines,
+                    overflow = TextOverflow.Ellipsis,
+                    inlineContent = inline,
+                )
+            }
         }
     }
 }
@@ -325,28 +327,39 @@ private fun ProfileTop(
     statusLines: Int,
     bannerCss: Int,
     onAvatar: (() -> Unit)?,
+    design: ProfileDesign? = null,
     buttons: @Composable RowScope.() -> Unit,
 ) {
     val c = Nx.colors
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val bannerH = maxWidth * (6f / 17f)
         Box(Modifier.fillMaxWidth().height(bannerH + av * 0.4f)) {
-            Banner(user, theme, bannerCss, avLeft + av / 2, bannerH - av * 0.1f, av / 2 + ring, Modifier.fillMaxWidth().height(bannerH))
-            Row(Modifier.align(Alignment.TopEnd).padding(top = 7.dp, end = 7.dp), content = buttons)
-            Box(
-                Modifier
-                    .padding(start = avLeft)
-                    .offset(y = bannerH - av * 0.6f)
-                    .boxShadow(CircleShape, 8f, 16f, c.shadeAt(0.55f))
-                    .then(
-                        if (onAvatar != null) Modifier.clip(CircleShape).pressable(remember { MutableInteractionSource() }, onClick = onAvatar)
-                            .semantics { contentDescription = t("profile.profileCard.viewFullProfileOf", "name" to Names.display(user)) }
-                        else Modifier,
-                    ),
+            Spotted(
+                design, ProfilePart.BANNER, if (user.bannerId != null) t("designer.spot.banner") else t("designer.spot.addBanner"),
+                Modifier.fillMaxWidth().height(bannerH), kind = SpotKind.BANNER,
             ) {
-                Avatar(user.id, Names.display(user), user.avatarId, av, status = status, dot = dot)
+                Banner(user, theme, bannerCss, avLeft + av / 2, bannerH - av * 0.1f, av / 2 + ring, Modifier.fillMaxSize())
             }
-            if (custom != null) StatusBubble(custom, statusLines, Modifier.padding(start = avLeft + av + 14.dp, end = 16.dp).offset(y = bannerH - 18.dp))
+            Row(Modifier.align(Alignment.TopEnd).padding(top = 7.dp, end = 7.dp), content = buttons)
+            Box(Modifier.padding(start = avLeft).offset(y = bannerH - av * 0.6f)) {
+                Spotted(design, ProfilePart.AVATAR, t("designer.spot.avatar"), kind = SpotKind.ROUND) {
+                    Box(
+                        Modifier
+                            .boxShadow(CircleShape, 8f, 16f, c.shadeAt(0.55f))
+                            .then(
+                                if (onAvatar != null) Modifier.clip(CircleShape).pressable(remember { MutableInteractionSource() }, onClick = onAvatar)
+                                    .semantics { contentDescription = t("profile.profileCard.viewFullProfileOf", "name" to Names.display(user)) }
+                                else Modifier,
+                            ),
+                    ) {
+                        Avatar(user.id, Names.display(user), user.avatarId, av, status = status, dot = dot)
+                    }
+                }
+            }
+            val bubbleAt = Modifier.padding(start = avLeft + av + 14.dp, end = 16.dp).offset(y = bannerH - 18.dp)
+            // in the designer, an empty status is a bubble waiting to be filled
+            if (custom != null) StatusBubble(custom, statusLines, bubbleAt, design)
+            else if (design != null) GhostBubble(design, bubbleAt)
         }
     }
 }
@@ -382,7 +395,7 @@ private fun StaffBadge(userId: String, flags: Long) {
 
 /** Their name (a nickname you gave first), their tag, the note button; then username, pronouns and staff badge. */
 @Composable
-private fun Identity(user: PublicUser, rel: Relationship?, full: Boolean, theme: ProfileTheme.Theme?, onName: (() -> Unit)?, onNote: (() -> Unit)?, noteLabel: String) {
+private fun Identity(user: PublicUser, rel: Relationship?, full: Boolean, theme: ProfileTheme.Theme?, onName: (() -> Unit)?, onNote: (() -> Unit)?, noteLabel: String, design: ProfileDesign? = null) {
     val c = Nx.colors
     val friend = rel?.type == "friend"
     val nick = if (friend) rel?.nickname?.takeIf { it.isNotBlank() } else null
@@ -390,22 +403,27 @@ private fun Identity(user: PublicUser, rel: Relationship?, full: Boolean, theme:
     val shadow = themedShadow(theme)
     Column {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Txt(
-                shownName,
-                style = Nx.type.name.copy(
-                    fontSize = Nx.type.sp(if (full) 28f else 20f),
-                    lineHeight = Nx.type.sp(if (full) 30.8f else 23f),
-                    fontWeight = FontWeight(700),
-                    letterSpacing = (-0.01).em,
-                    shadow = shadow,
-                ),
-                color = c.textStrong,
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .semantics { heading() }
-                    .then(if (onName != null) Modifier.clip(Radii.Xs).pressable(remember { MutableInteractionSource() }, onClick = onName) else Modifier),
-            )
-            user.serverTag?.let { fish.nexa.ui.chat.ServerTagChip(it, small = false) }
+            val nameEditor = design?.name
+            if (nameEditor != null) Box(Modifier.weight(1f, fill = false)) { nameEditor() }
+            else Spotted(design, ProfilePart.NAME, t("designer.spot.name"), Modifier.weight(1f, fill = false)) {
+                Txt(
+                    shownName,
+                    style = Nx.type.name.copy(
+                        fontSize = Nx.type.sp(if (full) 28f else 20f),
+                        lineHeight = Nx.type.sp(if (full) 30.8f else 23f),
+                        fontWeight = FontWeight(700),
+                        letterSpacing = (-0.01).em,
+                        shadow = shadow,
+                    ),
+                    color = c.textStrong,
+                    modifier = Modifier
+                        .semantics { heading() }
+                        .then(if (onName != null) Modifier.clip(Radii.Xs).pressable(remember { MutableInteractionSource() }, onClick = onName) else Modifier),
+                )
+            }
+            val tag = user.serverTag
+            if (tag != null) Spotted(design, ProfilePart.TAG, t("designer.spot.tag"), kind = SpotKind.WORD) { fish.nexa.ui.chat.ServerTagChip(tag, small = false) }
+            else if (design != null) GhostChip(design)
             if (onNote != null) Box(
                 Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).pressable(remember { MutableInteractionSource() }, onClick = onNote).semantics { contentDescription = noteLabel },
                 contentAlignment = Alignment.Center,
@@ -429,9 +447,18 @@ private fun Identity(user: PublicUser, rel: Relationship?, full: Boolean, theme:
                 Txt("·", style = line, color = c.textMuted)
             }
             Txt(user.username, style = line, color = c.textSubtle)
-            if (user.pronouns.isNotBlank()) {
+            val pronounsEditor = design?.pronouns
+            if (pronounsEditor != null) {
                 Txt("·", style = line, color = c.textMuted)
-                Txt(user.pronouns, style = line, color = c.textSubtle, modifier = Modifier.semantics { contentDescription = "${t("settings.profile.pronouns")}: ${user.pronouns}" })
+                pronounsEditor()
+            } else if (user.pronouns.isNotBlank()) {
+                Txt("·", style = line, color = c.textMuted)
+                Spotted(design, ProfilePart.PRONOUNS, t("designer.spot.pronouns"), kind = SpotKind.WORD) {
+                    Txt(user.pronouns, style = line, color = c.textSubtle, modifier = Modifier.semantics { contentDescription = "${t("settings.profile.pronouns")}: ${user.pronouns}" })
+                }
+            } else if (design != null) {
+                Txt("·", style = line, color = c.textMuted)
+                GhostInline(design, line)
             }
             StaffBadge(user.id, user.flags)
         }
@@ -661,6 +688,23 @@ private fun AboutSection(about: String, clamp: Dp?, heading: Boolean, onMore: ((
     }
 }
 
+/** About Me in the designer: written in place, a dashed section waiting to be written, or the words with a spot on them. */
+@Composable
+private fun DesignedAbout(user: PublicUser, design: ProfileDesign, clamp: Dp?) {
+    val editor = design.about
+    when {
+        editor != null -> Column {
+            SectionTitle(t("settings.profile.aboutMe"))
+            editor()
+        }
+        user.aboutMe.isBlank() -> GhostSection(design)
+        // a section's pencil sits small at its foot on a touch screen, as the short words' do (`.spotWrap`)
+        else -> Spotted(design, ProfilePart.ABOUT, t("designer.spot.about"), Modifier.fillMaxWidth(), kind = SpotKind.WORD) {
+            AboutSection(user.aboutMe, clamp = clamp, heading = clamp == null, onMore = null)
+        }
+    }
+}
+
 /** A role in its colour: a dot and the name, and (where it may be taken off) an x. */
 @Composable
 private fun RoleChip(name: String, color: Long, busy: Boolean, onRemove: (() -> Unit)?, removeLabel: String) {
@@ -779,10 +823,10 @@ private fun ServerRoles(serverId: String, userId: String, popout: Boolean) {
 
 /** What is known of them: roles here, the key, when they joined and when you became friends. */
 @Composable
-private fun Facts(user: PublicUser, rel: Relationship?, isMe: Boolean, serverId: String?) {
+private fun Facts(user: PublicUser, rel: Relationship?, isMe: Boolean, serverId: String?, interactive: Boolean = true) {
     val c = Nx.colors
     if (serverId != null) ServerRoles(serverId, user.id, popout = false)
-    if (user.publicKey.isNotEmpty()) Column {
+    if (user.publicKey.isNotEmpty() && interactive) Column {
         SectionTitle(t("encryption.encryptionKey"))
         KeyStatusChip(user.id)
     }
@@ -930,19 +974,21 @@ private fun editOwnProfile(anchor: String? = null) = fish.nexa.ui.settings.Setti
  * message them. Everything else is on the full profile.
  */
 @Composable
-fun ProfilePopoutCard(user: PublicUser, serverId: String?, close: () -> Unit) {
+fun ProfilePopoutCard(user: PublicUser, serverId: String?, close: () -> Unit, design: ProfileDesign? = null, previewWidgets: List<Widgets.Widget>? = null) {
     val look = rememberProfileLook(user)
     val extras = rememberProfileExtras(user.id)
     val rels by Nexa.relationships.byId.collectAsState()
     val presence by Nexa.presence.byId.collectAsState()
     val servers by Nexa.servers.byId.collectAsState()
     val doc by Nexa.settings.doc.collectAsState()
-    val rel = rels[user.id]
+    val rel = if (design != null) null else rels[user.id]
     val isMe = user.id == Nexa.users.meId
     val pres = presence[user.id]
-    val status = if (isMe) pres?.status ?: "online" else pres?.status ?: "offline"
-    val custom = Presences.customStatus(pres)
-    val activities = Presences.activitiesOf(pres)
+    // the designer's preview: online, the status as set, nothing being done, nothing to press but its parts
+    val status = if (design != null) "online" else if (isMe) pres?.status ?: "online" else pres?.status ?: "offline"
+    val custom = if (design != null) previewStatus(user) else Presences.customStatus(pres)
+    val activities = if (design != null) emptyList() else Presences.activitiesOf(pres)
+    val widgets = previewWidgets ?: extras.widgets
     val note = ((doc["userNotes"] as? JsonObject)?.get(user.id) as? JsonPrimitive)?.contentOrNull ?: ""
     var noteOpen by remember { mutableStateOf(false) }
     val busy = People.isBusy(user.id)
@@ -954,37 +1000,46 @@ fun ProfilePopoutCard(user: PublicUser, serverId: String?, close: () -> Unit) {
             ProfileTop(
                 user, look.theme, av = 80.dp, ring = 5.dp, avLeft = 14.dp, dot = 18.dp,
                 status = status, custom = custom, statusLines = 2, bannerCss = 600,
-                onAvatar = { viewFull() },
+                onAvatar = if (design != null) null else ({ viewFull() }),
+                design = design,
             ) {
-                if (isMe) BannerButton("Pencil", t("profile.profileCard.editProfile"), iconSize = 16.dp) { close(); editOwnProfile() }
-                else if (rel == null) BannerButton("UserPlus", if (busy) t("people.request.sending") else t("profile.profileCard.addFriend"), busy = busy) { Nexa.scope.launch { People.sendRequest(user) } }
-                BannerButton("Maximize2", t("profile.profileCard.viewFullProfile"), iconSize = 16.dp) { viewFull() }
-                if (!isMe) BannerButton("MoreHorizontal", t("chat.chat.more")) { openProfileMenu(user, popout = true) { viewFull() } }
+                if (design == null) {
+                    if (isMe) BannerButton("Pencil", t("profile.profileCard.editProfile"), iconSize = 16.dp) { close(); editOwnProfile() }
+                    else if (rel == null) BannerButton("UserPlus", if (busy) t("people.request.sending") else t("profile.profileCard.addFriend"), busy = busy) { Nexa.scope.launch { People.sendRequest(user) } }
+                    BannerButton("Maximize2", t("profile.profileCard.viewFullProfile"), iconSize = 16.dp) { viewFull() }
+                    if (!isMe) BannerButton("MoreHorizontal", t("chat.chat.more")) { openProfileMenu(user, popout = true) { viewFull() } }
+                }
             }
             Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Identity(
                     user, rel, full = false, theme = look.theme,
-                    onName = { viewFull() },
-                    onNote = if (isMe) null else ({ noteOpen = !noteOpen }),
+                    onName = if (design != null) null else ({ viewFull() }),
+                    onNote = if (isMe || design != null) null else ({ noteOpen = !noteOpen }),
                     noteLabel = if (note.isNotEmpty()) t("profile.profileCard.editNote2") else t("profile.profileCard.addNote2"),
+                    design = design,
                 )
                 if (!isMe) RelationshipBar(user, rel)
                 if (!isMe && extras.mutualFriends.size + mutualServers.size > 0) MutualRow(extras.mutualFriends, mutualServers.size) { viewFull(ProfileTab.MUTUALS) }
                 val noteShown = !isMe && (noteOpen || note.isNotEmpty())
-                if (noteShown || user.aboutMe.isNotBlank() || activities.isNotEmpty() || extras.widgets.isNotEmpty() || inServer != null) {
+                if (noteShown || user.aboutMe.isNotBlank() || design != null || activities.isNotEmpty() || widgets.isNotEmpty() || inServer != null) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (noteShown) NoteSection(user.id, focus = noteOpen) { noteOpen = false }
-                        if (user.aboutMe.isNotBlank()) AboutSection(user.aboutMe, clamp = 62.dp, heading = false) { viewFull() }
+                        if (design != null) DesignedAbout(user, design, clamp = 62.dp)
+                        else if (user.aboutMe.isNotBlank()) AboutSection(user.aboutMe, clamp = 62.dp, heading = false) { viewFull() }
                         if (activities.isNotEmpty()) ActivityList(activities)
-                        if (extras.widgets.isNotEmpty()) WidgetPeek(extras.widgets) { viewFull(ProfileTab.WIDGETS) }
-                        if (inServer != null) ServerRoles(inServer, user.id, popout = true)
+                        if (widgets.isNotEmpty()) WidgetPeek(widgets, if (design != null) null else ({ viewFull(ProfileTab.WIDGETS) }))
+                        if (inServer != null && design == null) ServerRoles(inServer, user.id, popout = true)
                     }
                 }
-                if (!isMe && rel?.type != "blocked") MessageBox(user, onSent = close)
+                if (!isMe && rel?.type != "blocked" && design == null) MessageBox(user, onSent = close)
             }
         }
     }
 }
+
+/** The status the designer's preview shows: the one set on the account. */
+private fun previewStatus(user: PublicUser): Presences.Custom? =
+    if (user.statusText.isNotBlank() || user.statusEmoji.isNotBlank()) Presences.Custom(user.statusText, user.statusEmoji) else null
 
 /** The full profile's main button: the accent made into light, as the web's .primary. */
 @Composable
@@ -1097,10 +1152,22 @@ private fun ListItem(onClick: () -> Unit, picture: @Composable () -> Unit, name:
  * The full profile, as a phone holds it: one column, the person at the top,
  * then the tabs, which stay at the top of the sheet as it scrolls, so another
  * tab is a tap away however far down one has been read. About holds what the
- * computer's left card says.
+ * computer's left card says. [embedded] draws it as a card inside a page that
+ * scrolls itself (the profile designer), with [design] making its parts
+ * pressable and [previewWidgets] the widgets as they are being edited.
  */
 @Composable
-fun FullProfileCard(user: PublicUser, initialTab: ProfileTab?, serverId: String?, close: () -> Unit) {
+fun FullProfileCard(
+    user: PublicUser,
+    initialTab: ProfileTab?,
+    serverId: String?,
+    close: () -> Unit,
+    design: ProfileDesign? = null,
+    previewWidgets: List<Widgets.Widget>? = null,
+    embedded: Boolean = false,
+    /** Changed to show [initialTab] again on a card already drawn (the designer's parts). */
+    tabNonce: Int = 0,
+) {
     val look = rememberProfileLook(user)
     val extras = rememberProfileExtras(user.id)
     val rels by Nexa.relationships.byId.collectAsState()
@@ -1108,18 +1175,20 @@ fun FullProfileCard(user: PublicUser, initialTab: ProfileTab?, serverId: String?
     val servers by Nexa.servers.byId.collectAsState()
     val users by Nexa.users.byId.collectAsState()
     val doc by Nexa.settings.doc.collectAsState()
-    val rel = rels[user.id]
+    val preview = design != null
+    val rel = if (preview) null else rels[user.id]
     val isMe = user.id == Nexa.users.meId
     val pres = presence[user.id]
-    val status = if (isMe) pres?.status ?: "online" else pres?.status ?: "offline"
-    val custom = Presences.customStatus(pres)
-    val activities = Presences.activitiesOf(pres)
+    val status = if (preview) "online" else if (isMe) pres?.status ?: "online" else pres?.status ?: "offline"
+    val custom = if (preview) previewStatus(user) else Presences.customStatus(pres)
+    val activities = if (preview) emptyList() else Presences.activitiesOf(pres)
+    val widgets = previewWidgets ?: extras.widgets
     val note = ((doc["userNotes"] as? JsonObject)?.get(user.id) as? JsonPrimitive)?.contentOrNull ?: ""
     var noteOpen by remember { mutableStateOf(false) }
     val busy = People.isBusy(user.id)
-    val inServer = serverId?.takeIf { servers[it] != null }
+    val inServer = if (preview) null else serverId?.takeIf { servers[it] != null }
     val mutualServers = extras.mutualServers.filter { servers[it] != null }
-    val mutualCount = extras.mutualFriends.size + mutualServers.size
+    val mutualCount = if (preview) 0 else extras.mutualFriends.size + mutualServers.size
     val friend = rel?.type == "friend"
     val shownName = (if (friend) rel?.nickname?.takeIf { it.isNotBlank() } else null) ?: Names.display(user)
     val tabs = buildList {
@@ -1128,7 +1197,7 @@ fun FullProfileCard(user: PublicUser, initialTab: ProfileTab?, serverId: String?
         add(ProfileTab.ACTIVITY)
         if (!isMe && mutualCount > 0) add(ProfileTab.MUTUALS)
     }
-    var chosen by remember(user.id) { mutableStateOf(initialTab) }
+    var chosen by remember(user.id, tabNonce) { mutableStateOf(initialTab) }
     val tab = chosen?.takeIf { it in tabs } ?: ProfileTab.ABOUT
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
@@ -1136,96 +1205,116 @@ fun FullProfileCard(user: PublicUser, initialTab: ProfileTab?, serverId: String?
     fun pick(next: ProfileTab) {
         chosen = next
         // the tabs may be scrolled out of sight by the time something below picks one
-        if (scroll.value > tabsTop) scope.launch { scroll.animateScrollTo(tabsTop) }
+        if (!embedded && scroll.value > tabsTop) scope.launch { scroll.animateScrollTo(tabsTop) }
     }
     fun message() = openDmWith(user.id) { close() }
     fun editWidgets() {
         close()
         editOwnProfile("widgets")
     }
-    ProfileColors(look) {
+
+    @Composable
+    fun Body(tabsModifier: Modifier) {
         val c = Nx.colors
         val p = LocalProfile.current
-        BoxWithConstraints(Modifier.fillMaxSize()) {
+        ProfileTop(
+            user, look.theme, av = 120.dp, ring = 7.dp, avLeft = 24.dp, dot = 26.dp,
+            status = status, custom = custom, statusLines = 3, bannerCss = 600, onAvatar = null,
+            design = design,
+        ) {
+            if (!embedded) BannerButton("X", t("chat.attachments.close")) { close() }
+        }
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Identity(
+                user, rel, full = true, theme = look.theme, onName = null,
+                onNote = if (isMe || preview) null else ({
+                    noteOpen = !noteOpen
+                    if (noteOpen) pick(ProfileTab.ABOUT)
+                }),
+                noteLabel = if (note.isNotEmpty()) t("profile.profileCard.editNote2") else t("profile.profileCard.addNote2"),
+                design = design,
+            )
+            if (!isMe) RelationshipBar(user, rel)
+            if (!preview) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+                when {
+                    isMe -> PrimaryPill("Pencil", t("profile.profileCard.editProfile")) { close(); editOwnProfile() }
+                    rel?.type == "blocked" -> Unit
+                    rel != null -> PrimaryPill("MessageCircle", t("profile.profileCard.message")) { message() }
+                    else -> PrimaryPill("UserPlus", if (busy) t("people.request.sending") else t("profile.profileCard.addFriend"), busy = busy) {
+                        Nexa.scope.launch { People.sendRequest(user) }
+                    }
+                }
+                if (!isMe && rel == null) RoundAction("MessageCircle", t("profile.profileCard.message")) { message() }
+                RoundAction("Link2", t("profileLink.copy")) { ProfileLinks.copy(user.username) }
+                if (!isMe) RoundAction("MoreHorizontal", t("chat.chat.more")) { openProfileMenu(user, popout = false) {} }
+            }
+            if (!isMe && mutualCount > 0) MutualRow(extras.mutualFriends, mutualServers.size) { pick(ProfileTab.MUTUALS) }
+        }
+        TabsBar(tabs, tab, mutualCount, look.theme != null, tabsModifier) { pick(it) }
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 20.dp)) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .ring(Radii.Md, c.borderSubtle)
+                    .background(p.sheet, Radii.Md)
+                    .topEdge(Radii.Md, c.edgeLight)
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                when (tab) {
+                    ProfileTab.ABOUT -> {
+                        if (!isMe && !preview && (noteOpen || note.isNotEmpty())) NoteSection(user.id, focus = noteOpen) { noteOpen = false }
+                        if (design != null) DesignedAbout(user, design, clamp = null)
+                        else if (user.aboutMe.isNotBlank()) AboutSection(user.aboutMe, clamp = null, heading = true, onMore = null)
+                        Facts(user, rel, isMe, inServer, interactive = !preview)
+                    }
+                    ProfileTab.WIDGETS -> {
+                        if (isMe && !preview && widgets.isNotEmpty()) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Txt(t("profile.tabs.yourWidgets"), style = Nx.type.label.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(700)), color = c.textMuted, modifier = Modifier.semantics { heading() })
+                            ChipButton("Pencil", t("profile.tabs.editWidgets")) { editWidgets() }
+                        }
+                        val tools = design?.widgets
+                        ProfileWidgets(widgets, onAdd = tools?.add ?: if (isMe && !preview) ({ editWidgets() }) else null, design = tools)
+                        if (widgets.isEmpty() && !isMe) EmptyTab(t("profile.tabs.noWidgets", "name" to shownName))
+                    }
+                    ProfileTab.ACTIVITY -> {
+                        if (activities.isNotEmpty()) ActivityList(activities)
+                        else EmptyTab(if (isMe) t("profile.tabs.noActivityOwn") else t("profile.tabs.noActivity", "name" to shownName))
+                    }
+                    ProfileTab.MUTUALS -> {
+                        if (extras.mutualFriends.isNotEmpty()) Column {
+                            SectionTitle(t("profile.profileCard.mutualFriendsCount", "count" to extras.mutualFriends.size))
+                            for (id in extras.mutualFriends) ListItem({ Profiles.openFull(id) }, { Avatar(id, Names.display(users[id]), users[id]?.avatarId, 32.dp) }, Names.display(users[id]))
+                        }
+                        if (mutualServers.isNotEmpty()) Column {
+                            SectionTitle(t("profile.profileCard.mutualServersCount", "count" to mutualServers.size))
+                            for (id in mutualServers) {
+                                val sv = servers[id]?.server ?: continue
+                                ListItem({ close(); Nav.go(Route.Server(id)) }, { ServerIcon(id, sv.name, sv.iconId, 32.dp, radius = 10.dp) }, sv.name)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    ProfileColors(look) {
+        if (embedded) {
+            val c = Nx.colors
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .boxShadow(Radii.Lg, 12f, 32f, c.shadeAt(0.6f), spread = -12f)
+                    .ring(Radii.Lg, c.borderSubtle)
+                    .clip(Radii.Lg)
+                    .profileBackground(look),
+            ) { Body(Modifier) }
+        } else BoxWithConstraints(Modifier.fillMaxSize()) {
             val viewport = maxHeight
             Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
                 Column(Modifier.fillMaxWidth().heightIn(min = viewport).profileBackground(look)) {
-                    ProfileTop(
-                        user, look.theme, av = 120.dp, ring = 7.dp, avLeft = 24.dp, dot = 26.dp,
-                        status = status, custom = custom, statusLines = 3, bannerCss = 600, onAvatar = null,
-                    ) {
-                        BannerButton("X", t("chat.attachments.close")) { close() }
-                    }
-                    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Identity(
-                            user, rel, full = true, theme = look.theme, onName = null,
-                            onNote = if (isMe) null else ({
-                                noteOpen = !noteOpen
-                                if (noteOpen) pick(ProfileTab.ABOUT)
-                            }),
-                            noteLabel = if (note.isNotEmpty()) t("profile.profileCard.editNote2") else t("profile.profileCard.addNote2"),
-                        )
-                        if (!isMe) RelationshipBar(user, rel)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-                            when {
-                                isMe -> PrimaryPill("Pencil", t("profile.profileCard.editProfile")) { close(); editOwnProfile() }
-                                rel?.type == "blocked" -> Unit
-                                rel != null -> PrimaryPill("MessageCircle", t("profile.profileCard.message")) { message() }
-                                else -> PrimaryPill("UserPlus", if (busy) t("people.request.sending") else t("profile.profileCard.addFriend"), busy = busy) {
-                                    Nexa.scope.launch { People.sendRequest(user) }
-                                }
-                            }
-                            if (!isMe && rel == null) RoundAction("MessageCircle", t("profile.profileCard.message")) { message() }
-                            RoundAction("Link2", t("profileLink.copy")) { ProfileLinks.copy(user.username) }
-                            if (!isMe) RoundAction("MoreHorizontal", t("chat.chat.more")) { openProfileMenu(user, popout = false) {} }
-                        }
-                        if (!isMe && mutualCount > 0) MutualRow(extras.mutualFriends, mutualServers.size) { pick(ProfileTab.MUTUALS) }
-                    }
-                    TabsBar(tabs, tab, mutualCount, look.theme != null, Modifier.onGloballyPositioned { tabsTop = it.positionInParent().y.toInt() }) { pick(it) }
-                    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 20.dp)) {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .ring(Radii.Md, c.borderSubtle)
-                                .background(p.sheet, Radii.Md)
-                                .topEdge(Radii.Md, c.edgeLight)
-                                .padding(horizontal = 18.dp, vertical = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(18.dp),
-                        ) {
-                            when (tab) {
-                                ProfileTab.ABOUT -> {
-                                    if (!isMe && (noteOpen || note.isNotEmpty())) NoteSection(user.id, focus = noteOpen) { noteOpen = false }
-                                    if (user.aboutMe.isNotBlank()) AboutSection(user.aboutMe, clamp = null, heading = true, onMore = null)
-                                    Facts(user, rel, isMe, inServer)
-                                }
-                                ProfileTab.WIDGETS -> {
-                                    if (isMe && extras.widgets.isNotEmpty()) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Txt(t("profile.tabs.yourWidgets"), style = Nx.type.label.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(700)), color = c.textMuted, modifier = Modifier.semantics { heading() })
-                                        ChipButton("Pencil", t("profile.tabs.editWidgets")) { editWidgets() }
-                                    }
-                                    ProfileWidgets(extras.widgets, onAdd = if (isMe) ({ editWidgets() }) else null)
-                                    if (extras.widgets.isEmpty() && !isMe) EmptyTab(t("profile.tabs.noWidgets", "name" to shownName))
-                                }
-                                ProfileTab.ACTIVITY -> {
-                                    if (activities.isNotEmpty()) ActivityList(activities)
-                                    else EmptyTab(if (isMe) t("profile.tabs.noActivityOwn") else t("profile.tabs.noActivity", "name" to shownName))
-                                }
-                                ProfileTab.MUTUALS -> {
-                                    if (extras.mutualFriends.isNotEmpty()) Column {
-                                        SectionTitle(t("profile.profileCard.mutualFriendsCount", "count" to extras.mutualFriends.size))
-                                        for (id in extras.mutualFriends) ListItem({ Profiles.openFull(id) }, { Avatar(id, Names.display(users[id]), users[id]?.avatarId, 32.dp) }, Names.display(users[id]))
-                                    }
-                                    if (mutualServers.isNotEmpty()) Column {
-                                        SectionTitle(t("profile.profileCard.mutualServersCount", "count" to mutualServers.size))
-                                        for (id in mutualServers) {
-                                            val s = servers[id]?.server ?: continue
-                                            ListItem({ close(); Nav.go(Route.Server(id)) }, { ServerIcon(id, s.name, s.iconId, 32.dp, radius = 10.dp) }, s.name)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    Body(Modifier.onGloballyPositioned { tabsTop = it.positionInParent().y.toInt() })
                 }
             }
             // stuck to the top once scrolled past

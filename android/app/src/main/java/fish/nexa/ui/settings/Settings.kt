@@ -579,7 +579,7 @@ private fun PageView(
                             .onGloballyPositioned { host.content = it }
                             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
                     ) {
-                        SettingsPageContent(id, openPage)
+                        SettingsPageContent(id, anchor, openPage)
                     }
                     // pages with a save bar draw it over the bottom of the page
                     PageOverlay(id)
@@ -591,10 +591,10 @@ private fun PageView(
 
 /** What each page id draws. */
 @Composable
-private fun SettingsPageContent(id: String, openPage: (String, String?) -> Unit) {
+private fun SettingsPageContent(id: String, anchor: String?, openPage: (String, String?) -> Unit) {
     when (id) {
         "account" -> AccountPage(openPage)
-        "profiles" -> ProfilesPage()
+        "profiles" -> ProfilesPage(anchor)
         "security" -> SecurityPage()
         "devices" -> DevicesPage()
         "privacy" -> PrivacyPage()

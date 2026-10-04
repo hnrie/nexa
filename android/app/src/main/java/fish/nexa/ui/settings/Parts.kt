@@ -29,6 +29,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -503,6 +505,28 @@ fun SettingsSeparator() {
  * while their form differs from what is saved. Leaving is refused instead:
  * the save bar shakes and turns red.
  */
+/**
+ * Keeps something being typed in on screen: brought into view as it changes,
+ * with room below it for the save bar while the bar shows (the bar comes up
+ * over the page after the first key, right where the keyboard leaves the field).
+ */
+@Composable
+fun Modifier.keptAboveSaveBar(key: Any?, active: Boolean): Modifier {
+    val bring = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+    var size by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+    val room = with(androidx.compose.ui.platform.LocalDensity.current) { 96.dp.toPx() }
+    val bar = Unsaved.blocking
+    LaunchedEffect(key, active, bar) {
+        if (!active) return@LaunchedEffect
+        // after the keyboard and the bar have taken their places
+        kotlinx.coroutines.delay(120)
+        bring.bringIntoView(androidx.compose.ui.geometry.Rect(0f, 0f, size.width.toFloat(), size.height + if (bar) room else 0f))
+    }
+    return this
+        .bringIntoViewRequester(bring)
+        .onSizeChanged { size = it }
+}
+
 object Unsaved {
     /** The forms holding the settings open right now. */
     val holds = mutableStateListOf<Any>()
