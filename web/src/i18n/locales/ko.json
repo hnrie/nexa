@@ -5151,7 +5151,10 @@
   "whatsNew.r202610028.swipeBody": "휴대폰에서 메시지를 왼쪽으로 밀고 화살표가 밝아지면 손을 떼면 답장할 수 있어요.",
   "whatsNew.r202610028.swipeTitle": "밀어서 답장",
   "whatsNew.r20261004.statusEmojiTitle": "상태에 맞춤 이모지",
-  "whatsNew.r20261004.statusEmojiBody": "이제 서버 고유 이모지와 팩의 이모지까지, 사용할 수 있는 이모지라면 무엇이든 상태에 넣을 수 있어요. 구석에 있는 내 이름을 누르고 맞춤 상태 설정을 고르세요.",
+  "whatsNew.r20261004.statusEmojiBody": "이제 서버 고유 이모지와 팩의 이모지까지, 사용할 수 있는 이모지라면 무엇이든 상태에 넣을 수 있어요. 사이드바 아래쪽의 내 이름에서 맞춤 상태 설정을 고르세요.",
   "whatsNew.r20261004.wholeStatusTitle": "상태 전체 보기",
-  "whatsNew.r20261004.wholeStatusBody": "긴 상태는 프로필 사진 옆에서 잘려 보여요. 마우스를 올리거나 탭하면 전부 읽을 수 있어요."
+  "whatsNew.r20261004.wholeStatusBody": "긴 상태는 프로필 사진 옆에서 잘려 보여요. 마우스를 올리거나 탭하면 전부 읽을 수 있어요.",
+  "stickerPack.loading": "팩을 불러오는 중",
+  "whatsNew.r20261004.packCardsTitle": "채팅 속 팩 카드",
+  "whatsNew.r20261004.packCardsBody": "스티커나 이모지 팩 링크를 보내면 이제 메시지 아래에 팩이 보여요. 팩에 든 것 일부와 추가 버튼이 함께 나와요."
 }

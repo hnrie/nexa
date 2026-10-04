@@ -50,6 +50,8 @@ import fish.nexa.media.Media
 import fish.nexa.media.Unfurl
 import fish.nexa.net.ApiError
 import fish.nexa.net.PublicUser
+import fish.nexa.net.Sticker
+import fish.nexa.net.StickerPack
 import fish.nexa.ui.Icon
 import fish.nexa.ui.components.AvatarColor
 import fish.nexa.ui.components.Avatar
@@ -72,11 +74,13 @@ import java.net.URI
 
 private const val MAX_INVITE_CARDS = 3
 private const val MAX_PROFILE_CARDS = 3
+private const val MAX_PACK_CARDS = 3
 
-/** Nexa's own addresses a message can link to (lib/appLinks.ts appLink): invites and profiles. */
+/** Nexa's own addresses a message can link to (lib/appLinks.ts appLink): invites, profiles, and sticker and emoji packs. */
 sealed interface AppLink {
     data class Invite(val code: String, val hash: String, val url: String) : AppLink
     data class Profile(val username: String, val url: String) : AppLink
+    data class Pack(val id: String, val url: String) : AppLink
 }
 
 private fun ownHosts(): Set<String> = listOfNotNull(
@@ -93,6 +97,7 @@ private fun Modifier.overlapAbove(by: Dp): Modifier = layout { measurable, const
 
 private val INVITE_PATH = Regex("^/invite/([A-Za-z0-9_-]{1,64})/?$")
 private val PROFILE_PATH = Regex("^/@([A-Za-z0-9_.]{2,32})/?$")
+private val PACK_PATH = Regex("^/stickers/pack/(\\d{1,20})/?$")
 
 fun appLink(href: String): AppLink? = runCatching {
     val u = URI(href)
@@ -101,6 +106,7 @@ fun appLink(href: String): AppLink? = runCatching {
     val path = u.path ?: ""
     PROFILE_PATH.find(path)?.let { return AppLink.Profile(it.groupValues[1].lowercase(), href) }
     INVITE_PATH.find(path)?.let { return AppLink.Invite(it.groupValues[1], u.rawFragment?.let { f -> "#$f" } ?: "", href) }
+    PACK_PATH.find(path)?.let { return AppLink.Pack(it.groupValues[1], href) }
     null
 }.getOrNull()
 
@@ -433,3 +439,180 @@ private fun ProfileSkeleton() {
         }
     }
 }
+
+// ---- sticker and emoji packs (components/chat/PackCards.tsx) ----
+
+/** The packs links lead to, as the server last said (lib/packLinks.ts), kept a few minutes. */
+private object SharedPacks {
+    sealed interface Entry {
+        data object Loading : Entry
+        data class Ready(val pack: StickerPack, val at: Long) : Entry
+        /** private, or gone */
+        data class Missing(val at: Long) : Entry
+        data class Failed(val at: Long) : Entry
+    }
+
+    private const val FRESH_MS = 5 * 60_000L
+    private const val RETRY_MS = 30_000L
+
+    val byId = mutableStateMapOf<String, Entry>()
+    private val inflight = HashSet<String>()
+
+    fun load(id: String, force: Boolean = false) {
+        synchronized(inflight) { if (id in inflight) return }
+        val cur = byId[id]
+        val now = System.currentTimeMillis()
+        val due = when (cur) {
+            null -> true
+            Entry.Loading -> false
+            is Entry.Ready -> now - cur.at > FRESH_MS
+            is Entry.Missing -> now - cur.at > FRESH_MS
+            is Entry.Failed -> now - cur.at > RETRY_MS
+        }
+        if (!force && !due) return
+        // what was shown stays while it is asked again
+        if (cur !is Entry.Ready) byId[id] = Entry.Loading
+        synchronized(inflight) { inflight += id }
+        Nexa.scope.launch {
+            try {
+                byId[id] = Entry.Ready(Nexa.api.get("/stickers/packs/$id", StickerPack.serializer()), System.currentTimeMillis())
+            } catch (e: Exception) {
+                byId[id] = if (e is ApiError && e.status == 404) Entry.Missing(System.currentTimeMillis()) else Entry.Failed(System.currentTimeMillis())
+            } finally {
+                synchronized(inflight) { inflight -= id }
+            }
+        }
+    }
+}
+
+/** Up to three cards under a message for the sticker and emoji packs it links to. */
+@Composable
+fun PackCards(text: String?) {
+    val ids = remember(text) {
+        val out = ArrayList<String>()
+        for (url in cardLinksIn(text ?: "")) {
+            val l = appLink(url) as? AppLink.Pack ?: continue
+            if (l.id !in out) out += l.id
+            if (out.size >= MAX_PACK_CARDS) break
+        }
+        out
+    }
+    if (ids.isEmpty()) return
+    Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (id in ids) PackLinkCard(id)
+    }
+}
+
+@Composable
+private fun PackLinkCard(id: String) {
+    LaunchedEffect(id) { SharedPacks.load(id) }
+    when (val entry = SharedPacks.byId[id]) {
+        is SharedPacks.Entry.Missing -> GoneCard("PackageX", t("stickerPack.packUnavailable"), t("stickerPack.thisPackIsPrivate"))
+        is SharedPacks.Entry.Failed -> GoneCard("PackageX", t("stickerPack.packUnavailable"), t("stickerPack.couldNotLoadThePack")) {
+            NxButton(t("invite.tryAgain"), { SharedPacks.load(id, force = true) }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "RotateCw")
+        }
+        is SharedPacks.Entry.Ready -> PackCard(entry.pack)
+        else -> PackSkeleton()
+    }
+}
+
+/** How many of a pack's stickers or emoji a card shows. */
+private const val PACK_SHOWN = 8
+
+/** One of a pack's stickers or emoji, still: the card is a preview, not a place for them to play. */
+@Composable
+private fun PackItem(s: Sticker, emoji: Boolean, size: Dp, modifier: Modifier = Modifier) {
+    val density = LocalDensity.current.density
+    val moving = s.animated || s.format == "tgs" || s.format == "webm"
+    val url = if (emoji) Media.emojiUrl(s.blobId, size.value.toInt(), density, still = moving) else Media.stickerUrl(s.blobId, size.value.toInt(), density) + if (moving) "&still=1" else ""
+    AsyncImage(url, null, imageLoader = Media.loader, contentScale = ContentScale.Fit, modifier = modifier.size(size))
+}
+
+/**
+ * PackCards.tsx: the invite card's frame and type with no band. The pack's
+ * cover leads, then what kind of pack it is, its name and how many it holds,
+ * the button beside them (add it, or open the packs this account has), and a
+ * row of the first few of what is in it.
+ */
+@Composable
+private fun PackCard(pack: StickerPack) {
+    val c = Nx.colors
+    val shape = Radii.Lg
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    val emoji = pack.kind == "emoji"
+    val cover = pack.stickers.firstOrNull { it.id == pack.coverStickerId } ?: pack.stickers.firstOrNull()
+    val added = pack.installed || pack.ownerUserId == Nexa.users.meId
+    val open = { fish.nexa.ui.settings.Settings.open("stickers") }
+    Column(
+        Modifier.widthIn(max = 432.dp).fillMaxWidth().shadowMedium(shape, c).ring(shape, c.borderSubtle).clip(shape).background(c.embedBg).topEdge(shape, c.edgeLight)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(
+                Modifier.size(56.dp).clip(RoundedCornerShape(17.dp)).background(c.bgActive).ring(RoundedCornerShape(17.dp), c.borderSubtle),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (cover != null) PackItem(cover, emoji, if (emoji) 32.dp else 56.dp)
+                else Txt(pack.name.take(1).uppercase(), style = Nx.type.body.copy(fontSize = Nx.type.sp(22f), fontWeight = FontWeight(700)), color = c.textStrong)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Txt(if (emoji) t("stickerPack.emojiPack") else t("stickerPack.stickerPack"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
+                Txt(pack.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(16.5f), fontWeight = FontWeight(680), lineHeight = Nx.type.sp(21.45f)), color = c.textStrong)
+                Txt(
+                    if (emoji) t("server.packEditor.emojiCount", "count" to pack.stickers.size) else t("server.packEditor.stickerCount", "count" to pack.stickers.size),
+                    style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18f)), color = c.textMuted, maxLines = 1,
+                )
+            }
+            if (added) NxButton(t("chat.embeds.open"), open, kind = ButtonKind.SECONDARY, size = ButtonSize.SM)
+            else NxButton(t("stickerPack.installPack"), {
+                busy = true
+                scope.launch {
+                    try {
+                        val res = Nexa.api.request("PUT", "/stickers/packs/${pack.id}/install", StickerPack.serializer())
+                        Nexa.expressions.upsertPack(res)
+                        SharedPacks.byId[pack.id] = SharedPacks.Entry.Ready(res, System.currentTimeMillis())
+                    } catch (e: Exception) {
+                        Nexa.ui.toast((e as? ApiError)?.message?.takeIf { it.isNotBlank() } ?: t("server.packEditor.couldNotChangeThePack"), "error")
+                    } finally {
+                        busy = false
+                    }
+                }
+            }, size = ButtonSize.SM, loading = busy)
+        }
+        if (pack.description.isNotBlank()) Txt(pack.description, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(19.6f)), color = c.text, maxLines = 2)
+        val shown = pack.stickers.take(PACK_SHOWN)
+        if (shown.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            val box = if (emoji) 36.dp else 44.dp
+            // color-mix(var(--bg-active) 70%, transparent): the tint's own alpha, at 70%
+            for (s in shown) Box(Modifier.size(box).clip(RoundedCornerShape(if (emoji) 9.dp else 10.dp)).background(c.bgActive.copy(alpha = c.bgActive.alpha * 0.7f)), contentAlignment = Alignment.Center) {
+                PackItem(s, emoji, if (emoji) 24.dp else box)
+            }
+            val more = pack.stickers.size - shown.size
+            if (more > 0) Box(Modifier.height(box).padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
+                Txt("+$more", style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = c.textMuted)
+            }
+        }
+    }
+}
+
+/** A pack card's frame while the server is asked: the cover and two lines, quiet. */
+@Composable
+private fun PackSkeleton() {
+    val c = Nx.colors
+    val shape = Radii.Lg
+    Row(
+        Modifier.widthIn(max = 432.dp).fillMaxWidth().shadowMedium(shape, c).ring(shape, c.borderSubtle).clip(shape).background(c.embedBg).padding(16.dp)
+            .semantics { contentDescription = t("stickerPack.loading") },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(Modifier.size(56.dp).background(c.bgActive, RoundedCornerShape(17.dp)))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.width(150.dp).height(16.dp).background(c.bgActive, RoundedCornerShape(6.dp)))
+            Box(Modifier.width(100.dp).height(12.dp).background(c.bgActive, RoundedCornerShape(6.dp)))
+        }
+    }
+}
+

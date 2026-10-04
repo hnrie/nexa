@@ -5427,7 +5427,10 @@
   "whatsNew.r202610028.swipeBody": "En el móvil, desliza un mensaje hacia la izquierda y suéltalo cuando se ilumine la flecha para responderlo.",
   "whatsNew.r202610028.swipeTitle": "Desliza para responder",
   "whatsNew.r20261004.statusEmojiTitle": "Emojis personalizados en tu estado",
-  "whatsNew.r20261004.statusEmojiBody": "Tu estado puede mostrar cualquier emoji que puedas usar, incluidos los propios de un servidor y los de tus paquetes. Haz clic en tu nombre en la esquina y elige Poner un estado personalizado.",
+  "whatsNew.r20261004.statusEmojiBody": "Tu estado puede mostrar cualquier emoji que puedas usar, incluidos los propios de un servidor y los de tus paquetes. Elige Poner un estado personalizado en tu nombre, abajo en la barra lateral.",
   "whatsNew.r20261004.wholeStatusTitle": "Lee un estado completo",
-  "whatsNew.r20261004.wholeStatusBody": "Un estado largo se recorta junto a la foto en el perfil. Pasa el cursor por encima o tócalo para leerlo entero."
+  "whatsNew.r20261004.wholeStatusBody": "Un estado largo se recorta junto a la foto en el perfil. Pasa el cursor por encima o tócalo para leerlo entero.",
+  "stickerPack.loading": "Cargando el paquete",
+  "whatsNew.r20261004.packCardsTitle": "Tarjetas de paquetes en los chats",
+  "whatsNew.r20261004.packCardsBody": "Un enlace a un paquete de stickers o emojis ahora muestra el paquete debajo del mensaje, con parte de su contenido y un botón para añadirlo."
 }

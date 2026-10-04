@@ -5326,7 +5326,10 @@
   "whatsNew.r202610028.swipeBody": "On a phone, swipe a message to the left and let go when the arrow lights up to reply to it.",
   "whatsNew.r202610028.swipeTitle": "Swipe to Reply",
   "whatsNew.r20261004.statusEmojiTitle": "Custom Emoji in Your Status",
-  "whatsNew.r20261004.statusEmojiBody": "Your status can show any emoji you can use, including a server's own and the ones in your packs. Click your name in the corner and choose Set a Custom Status.",
+  "whatsNew.r20261004.statusEmojiBody": "Your status can show any emoji you can use, including a server's own and the ones in your packs. Choose Set a Custom Status under your name at the bottom of the sidebar.",
   "whatsNew.r20261004.wholeStatusTitle": "Read a Whole Status",
-  "whatsNew.r20261004.wholeStatusBody": "A long status is cut short beside someone's picture on their profile. Hover over it or tap it to read every word."
+  "whatsNew.r20261004.wholeStatusBody": "A long status is cut short beside someone's picture on their profile. Hover over it or tap it to read every word.",
+  "stickerPack.loading": "Loading the pack",
+  "whatsNew.r20261004.packCardsTitle": "Pack Cards in Chats",
+  "whatsNew.r20261004.packCardsBody": "A link to a sticker or emoji pack now shows the pack under the message, with some of what is in it and a button to add it."
 }

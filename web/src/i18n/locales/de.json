@@ -5326,7 +5326,10 @@
   "whatsNew.r202610028.swipeBody": "Wische auf dem Handy eine Nachricht nach links und lass los, sobald der Pfeil aufleuchtet, um darauf zu antworten.",
   "whatsNew.r202610028.swipeTitle": "Zum Antworten wischen",
   "whatsNew.r20261004.statusEmojiTitle": "Eigene Emojis im Status",
-  "whatsNew.r20261004.statusEmojiBody": "Dein Status kann jedes Emoji zeigen, das du benutzen darfst, auch die eigenen eines Servers und die aus deinen Paketen. Klick unten auf deinen Namen und wähle „Eigenen Status setzen“.",
+  "whatsNew.r20261004.statusEmojiBody": "Dein Status kann jedes Emoji zeigen, das du benutzen darfst, auch die eigenen eines Servers und die aus deinen Paketen. Wähle „Eigenen Status setzen“ unter deinem Namen unten in der Seitenleiste.",
   "whatsNew.r20261004.wholeStatusTitle": "Den ganzen Status lesen",
-  "whatsNew.r20261004.wholeStatusBody": "Ein langer Status wird neben dem Bild im Profil gekürzt. Fahr mit der Maus darüber oder tipp darauf, um alles zu lesen."
+  "whatsNew.r20261004.wholeStatusBody": "Ein langer Status wird neben dem Bild im Profil gekürzt. Fahr mit der Maus darüber oder tipp darauf, um alles zu lesen.",
+  "stickerPack.loading": "Paket wird geladen",
+  "whatsNew.r20261004.packCardsTitle": "Paketkarten im Chat",
+  "whatsNew.r20261004.packCardsBody": "Ein Link zu einem Sticker- oder Emoji-Paket zeigt das Paket jetzt unter der Nachricht, mit einem Teil des Inhalts und einem Knopf zum Hinzufügen."
 }

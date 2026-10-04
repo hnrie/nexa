@@ -430,7 +430,7 @@ internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     else payload?.att?.takeIf { it.isNotEmpty() }?.let { Attachments(it, cm, ctx) }
     if (cm != null && embeds != null) Embeds(embeds, cm, ctx)
     if (cm?.hook != null) HookBody(cm, ctx)
-    // cards for the Nexa invites and profiles the message links to (none once its embeds were removed)
+    // cards for the Nexa invites, profiles, notes and packs the message links to (none once its embeds were removed)
     if (cm != null && !cm.m.suppressEmbeds) {
         val sealed = remember(embeds, cm.hook) {
             (embeds ?: fish.nexa.data.Hooks.of(cm.hook)?.linkEmbeds?.takeIf { it.isNotEmpty() })?.mapNotNull { Unfurl.of(it) } ?: emptyList()
@@ -438,6 +438,7 @@ internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
         InviteCards(payload?.t, sealed)
         ProfileCards(payload?.t, sealed)
         fish.nexa.ui.notes.NoteCards(payload?.t)
+        PackCards(payload?.t)
     }
 }
 

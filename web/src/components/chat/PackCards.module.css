@@ -1,0 +1,23 @@
+/*
+ * A sticker or emoji pack link in a message (PackCards.tsx): the invite
+ * card's frame and type, with no band. The pack's cover leads, then what kind
+ * of pack it is, its name and how many it holds, the button beside them, and
+ * a row of the first few of what is in it.
+ */
+.cards { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 4px; max-width: 100%; }
+.cards > * { max-width: 100%; }
+.head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; column-gap: 14px; padding: var(--pad) var(--pad) 0; }
+.card[data-loading="true"] .head { padding-bottom: var(--pad); }
+.cover { flex: none; display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; padding: 0; border-radius: 17px; background: var(--bg-active); overflow: hidden; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); }
+.cover:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.cover > :is(img, video, svg, div) { width: 100%; height: 100%; object-fit: contain; }
+/* an emoji is small: drawn at the size it is meant for, in the middle */
+.card[data-kind="emoji"] .cover > :is(img, video, svg, div) { width: 32px; height: 32px; }
+.initial { font-size: 22px; font-weight: 700; color: var(--text-strong); }
+.desc { margin: 10px var(--pad) 0; }
+.strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 12px var(--pad) var(--pad); }
+.item { flex: none; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 10px; background: color-mix(in srgb, var(--bg-active) 70%, transparent); overflow: hidden; }
+.card[data-kind="emoji"] .item { width: 36px; height: 36px; border-radius: 9px; }
+.itemImg { width: 100%; height: 100%; object-fit: contain; }
+.card[data-kind="emoji"] .itemImg { width: 24px; height: 24px; }
+.more { padding-inline: 4px; font-size: 13px; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }

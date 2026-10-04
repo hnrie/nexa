@@ -5427,7 +5427,10 @@
   "whatsNew.r202610028.swipeBody": "Sur téléphone, faites glisser un message vers la gauche et relâchez quand la flèche s'allume pour y répondre.",
   "whatsNew.r202610028.swipeTitle": "Glisser pour répondre",
   "whatsNew.r20261004.statusEmojiTitle": "Emojis personnalisés dans ton statut",
-  "whatsNew.r20261004.statusEmojiBody": "Ton statut peut afficher n'importe quel emoji que tu peux utiliser, y compris ceux d'un serveur et ceux de tes packs. Clique sur ton nom dans le coin et choisis Définir un statut personnalisé.",
+  "whatsNew.r20261004.statusEmojiBody": "Ton statut peut afficher n'importe quel emoji que tu peux utiliser, y compris ceux d'un serveur et ceux de tes packs. Choisis Définir un statut personnalisé sous ton nom, en bas de la barre latérale.",
   "whatsNew.r20261004.wholeStatusTitle": "Lire un statut en entier",
-  "whatsNew.r20261004.wholeStatusBody": "Un long statut est raccourci à côté de la photo sur le profil. Survole-le ou touche-le pour le lire en entier."
+  "whatsNew.r20261004.wholeStatusBody": "Un long statut est raccourci à côté de la photo sur le profil. Survole-le ou touche-le pour le lire en entier.",
+  "stickerPack.loading": "Chargement du pack",
+  "whatsNew.r20261004.packCardsTitle": "Cartes de packs dans les discussions",
+  "whatsNew.r20261004.packCardsBody": "Un lien vers un pack de stickers ou d'emojis affiche maintenant le pack sous le message, avec une partie de son contenu et un bouton pour l'ajouter."
 }

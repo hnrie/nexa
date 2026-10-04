@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { appLink, inviteLinksIn, isNoteLink, messageTarget, noteLinksIn, profileLinksIn, setPublicUrl, shareOrigin } from "./appLinks";
+import { appLink, inviteLinksIn, isNoteLink, messageTarget, noteLinksIn, packLinksIn, profileLinksIn, setPublicUrl, shareOrigin } from "./appLinks";
 import { parse } from "@/markdown/parse";
 
 const here = { href: "https://chat.evilion.xyz/channels/1/2", host: "chat.evilion.xyz" };
@@ -154,5 +154,17 @@ describe("profileLinksIn", () => {
   it("stops at three", () => {
     const nodes = parse(["a1", "b2", "c3", "d4"].map((n) => `https://chat.evilion.xyz/@user${n}`).join(" "));
     expect(profileLinksIn(nodes, here)).toHaveLength(3);
+  });
+});
+
+describe("packLinksIn", () => {
+  it("finds each sticker or emoji pack link once, in order, and none in code, written as <url> or on another site", () => {
+    const nodes = parse("look https://chat.evilion.xyz/stickers/pack/123 and /stickers/pack/123/ `https://chat.evilion.xyz/stickers/pack/5` <https://chat.evilion.xyz/stickers/pack/6> https://elsewhere.example/stickers/pack/7 https://chat.evilion.xyz/stickers/pack/456");
+    expect(packLinksIn(nodes, here).map((l) => l.id)).toEqual(["123", "456"]);
+  });
+
+  it("stops at three", () => {
+    const nodes = parse([1, 2, 3, 4].map((n) => `https://chat.evilion.xyz/stickers/pack/${n}`).join(" "));
+    expect(packLinksIn(nodes, here)).toHaveLength(3);
   });
 });

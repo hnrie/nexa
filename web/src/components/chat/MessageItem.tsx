@@ -25,6 +25,7 @@ import { Attachments } from "./Attachments";
 import { UploadCard } from "./UploadCard";
 import { Embeds } from "./Embeds";
 import { InviteCards } from "./InviteCards";
+import { PackCards } from "./PackCards";
 import { ProfileCards } from "./ProfileCards";
 import { NoteCards } from "@/components/notes/NoteCards";
 import { MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
@@ -337,6 +338,7 @@ export function MessageBody({ msg, name, id, pending, upload }: { msg: Decrypted
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <InviteCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <ProfileCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <NoteCards nodes={nodes} />}
+      {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <PackCards nodes={nodes} />}
       {pending === "failed" ? (
         <div className={s.failedRow}>
           <span>{t("chat.messageItem.messageFailedToSend")}</span>

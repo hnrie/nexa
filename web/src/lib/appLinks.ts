@@ -57,6 +57,8 @@ const INVITE_PATH = /^\/invite\/([A-Za-z0-9_-]{1,64})\/?$/;
 /** A note's share link (crypto/notes.ts): its token, and its key after the #. */
 const NOTE_PATH = /^\/note\/([A-Za-z0-9_-]{16,128})\/?$/;
 const MESSAGE_PATH = /^\/channels\/(@me|\d+)\/(\d+)\/(\d+)\/?$/;
+/** A sticker or emoji pack's page (pages/StickerPackPage), which the app opens as one of its routes. */
+const PACK_PATH = /^\/stickers\/pack\/(\d{1,20})\/?$/;
 /** A profile link (lib/profileLinks): an @ and a username, which may have dots in it like a file's name. */
 const PROFILE_PATH = /^\/@([A-Za-z0-9_.]{2,32})\/?$/;
 
@@ -108,10 +110,11 @@ export function messageTarget(path: string): { channelId: string; messageId: str
   return m ? { channelId: m[2]!, messageId: m[3]! } : null;
 }
 
-/** How many invite cards one message shows at most, how many note cards, and how many profile cards. */
+/** How many invite cards one message shows at most, how many note cards, profile cards and pack cards. */
 export const MAX_INVITE_CARDS = 3;
 export const MAX_NOTE_CARDS = 3;
 export const MAX_PROFILE_CARDS = 3;
+export const MAX_PACK_CARDS = 3;
 
 /** A note's share link found in a message: its token, the key in its fragment, and the link as written. */
 export interface NoteLinkRef {
@@ -197,3 +200,26 @@ export function profileLinksIn(nodes: unknown, here: Here = window.location): Pr
   });
   return out;
 }
+
+/** A sticker or emoji pack link found in a message: which pack, and the link as written. */
+export interface PackLinkRef {
+  id: string;
+  url: string;
+}
+
+/** The sticker and emoji packs a message links to, in order and each once. */
+export function packLinksIn(nodes: unknown, here: Here = window.location): PackLinkRef[] {
+  const out: PackLinkRef[] = [];
+  const seen = new Set<string>();
+  eachLink(nodes, (url) => {
+    const link = appLink(url, here);
+    const m = link?.kind === "route" ? PACK_PATH.exec(link.path.split(/[?#]/)[0]!) : null;
+    if (m && !seen.has(m[1]!)) {
+      seen.add(m[1]!);
+      out.push({ id: m[1]!, url });
+    }
+    return out.length < MAX_PACK_CARDS;
+  });
+  return out;
+}
+

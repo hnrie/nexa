@@ -30,6 +30,7 @@ export const RELEASES: Release[] = [
     items: [
       { icon: Smile, title: "whatsNew.r20261004.statusEmojiTitle", body: "whatsNew.r20261004.statusEmojiBody" },
       { icon: MessageSquareText, title: "whatsNew.r20261004.wholeStatusTitle", body: "whatsNew.r20261004.wholeStatusBody" },
+      { icon: Sticker, title: "whatsNew.r20261004.packCardsTitle", body: "whatsNew.r20261004.packCardsBody" },
     ],
   },
   {
