@@ -5429,7 +5429,5 @@
   "whatsNew.r20261004.statusEmojiTitle": "Emojis personalizados en tu estado",
   "whatsNew.r20261004.statusEmojiBody": "Tu estado puede mostrar cualquier emoji que puedas usar, incluidos los propios de un servidor y los de tus paquetes. Haz clic en tu nombre en la esquina y elige Poner un estado personalizado.",
   "whatsNew.r20261004.wholeStatusTitle": "Lee un estado completo",
-  "whatsNew.r20261004.wholeStatusBody": "Un estado largo se recorta junto a la foto en el perfil. Pasa el cursor por encima o tócalo para leerlo entero.",
-  "whatsNew.r20261004.callsTitle": "Las llamadas siguen en Android",
-  "whatsNew.r20261004.callsBody": "Cerrar la app de Android ya no termina tu llamada. Su notificación te devuelve a la llamada o la cuelga."
+  "whatsNew.r20261004.wholeStatusBody": "Un estado largo se recorta junto a la foto en el perfil. Pasa el cursor por encima o tócalo para leerlo entero."
 }
