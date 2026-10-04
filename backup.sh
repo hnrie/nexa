@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
-# Backs up everything a restore needs, and says what it wrote or why it could
-# not:
+# Backs up everything in data/ that a restore needs, and says what it wrote or
+# why it could not:
 #   - the database: a consistent copy taken with SQLite's online backup, safe
 #     while chatd is running, checked before it counts;
 #   - server.secret: the key every two-factor secret is sealed with. A restore
 #     without it locks every account that has two-factor sign-in on out for
 #     good, backup codes included — it is the one file here nothing can rebuild;
-#   - the uploaded files (media/, less its scratch space and the resized copies
-#     chatd makes again on demand).
+#   - everything else in data/: the uploaded files (less media/tmp, uploads
+#     still arriving, and media/variants, the resized copies chatd makes again
+#     on demand), the desktop app's downloads, and the game and music pictures.
 #
-#   bash backup.sh                     backup/chat-STAMP.db, secret-STAMP, media-STAMP.tgz
-#   KEEP=10 bash backup.sh             keep the newest ten of each (default 5)
+#   bash backup.sh                     backup/chat-STAMP.db, secret-STAMP, files-STAMP.tgz
 #   BACKUP_DIR=/mnt/other bash backup.sh
 #
-# backup/ is on the same disk as the live data, so it covers a bad deploy or a
-# mistake, not a dead disk: copy it somewhere else too. Older backups are only
-# deleted after a new one has been written in full.
+# Only the newest backup is kept: once a new one has been written in full,
+# every older one in the backup folder is deleted, and a run that fails part
+# way deletes nothing. backup/ is on the same disk as the live data, so it
+# covers a bad deploy or a mistake, not a dead disk: copy it somewhere else too.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 umask 077
@@ -33,8 +34,6 @@ env_get() {
 DATA_DIR="$(env_get DATA_DIR ./data)"
 DATABASE_URL="$(env_get DATABASE_URL '')"
 BACKUP_DIR="${BACKUP_DIR:-backup}"
-KEEP="${KEEP:-5}"
-case "$KEEP" in '' | *[!0-9]* | 0) die "KEEP must be a whole number of backups to keep, at least 1" ;; esac
 
 [ -z "$DATABASE_URL" ] || die "DATABASE_URL is set, so the database lives in Postgres; back that up with pg_dump. This script copies SQLite only."
 command -v sqlite3 >/dev/null || die "sqlite3 not found"
@@ -48,14 +47,14 @@ mkdir -p "$BACKUP_DIR"
 stamp="$(date +%Y%m%d-%H%M%S)"
 db="$BACKUP_DIR/chat-$stamp.db"
 secret="$BACKUP_DIR/secret-$stamp"
-media="$BACKUP_DIR/media-$stamp.tgz"
-for f in "$db" "$secret" "$media"; do
+files="$BACKUP_DIR/files-$stamp.tgz"
+for f in "$db" "$secret" "$files"; do
   [ ! -e "$f" ] || die "$f exists already; run again in a second"
 done
 # A backup that stops half way, for whatever reason, leaves nothing behind
 # that looks like one.
 complete=0
-trap '[ "$complete" = 1 ] || rm -f "$db" "$secret" "$media"' EXIT
+trap '[ "$complete" = 1 ] || rm -f "$db" "$secret" "$files"' EXIT
 
 sqlite3 "$DATA_DIR/chat.db" ".backup '$db'"
 check="$(sqlite3 "$db" 'PRAGMA quick_check;')"
@@ -64,10 +63,13 @@ check="$(sqlite3 "$db" 'PRAGMA quick_check;')"
 cp "$DATA_DIR/server.secret" "$secret"
 cmp -s "$DATA_DIR/server.secret" "$secret" || die "the copy of server.secret does not match the original"
 
-# tmp/ holds uploads still arriving and variants/ holds resized copies chatd
-# makes again whenever they are missing; neither is needed to restore.
+# The database and the secret are copied above, the live files of the database
+# could be torn mid-write, and media/tmp and media/variants are not needed to
+# restore (uploads still arriving, and resized copies chatd makes again).
 set +e
-tar czf "$media" -C "$DATA_DIR" --exclude=media/tmp --exclude=media/variants media
+tar czf "$files" -C "$DATA_DIR" \
+  --exclude=./chat.db --exclude=./chat.db-wal --exclude=./chat.db-shm --exclude=./server.secret \
+  --exclude=./media/tmp --exclude=./media/variants .
 status=$?
 set -e
 if [ "$status" -ne 0 ]; then
@@ -79,20 +81,19 @@ if [ "$status" -ne 0 ]; then
     die "tar failed (status $status); nothing was kept from this run"
   fi
 fi
-gzip -t "$media" || die "the media archive does not read back"
+gzip -t "$files" || die "the archive of data/ does not read back"
 complete=1
 
-# Only now that a whole backup exists: keep the newest $KEEP of each kind. The
-# names sort by time, so no clock or file date is trusted here.
-prune() {
-  find "$BACKUP_DIR" -maxdepth 1 -type f -name "$1" | sort -r | tail -n "+$((KEEP + 1))" | while IFS= read -r old; do
-    rm -f -- "$old"
-  done
-}
-prune 'chat-[0-9]*.db'
-prune 'secret-[0-9]*'
-prune 'media-[0-9]*.tgz'
+# Only now that a whole backup exists: every older one goes, so the backup
+# folder only ever holds the newest. media-*.tgz is what the uploads archive
+# was called before it held the rest of data/ too. Anything not named like a
+# backup this script writes is left alone.
+for old in "$BACKUP_DIR"/chat-[0-9]*.db "$BACKUP_DIR"/secret-[0-9]* "$BACKUP_DIR"/files-[0-9]*.tgz "$BACKUP_DIR"/media-[0-9]*.tgz; do
+  [ -f "$old" ] || continue
+  case "$old" in "$db" | "$secret" | "$files") continue ;; esac
+  rm -f -- "$old"
+done
 
 echo "backup written:"
-du -h "$db" "$secret" "$media"
-echo "keeping the newest $KEEP of each in $BACKUP_DIR/, which is on the same disk as the data: copy it somewhere else too."
+du -h "$db" "$secret" "$files"
+echo "older backups in $BACKUP_DIR/ were deleted. It is on the same disk as the data: copy it somewhere else too."

@@ -1,98 +1,141 @@
 NEXA - PRIVACY POLICY
 Site: nexa.fish (also at mathtest.lol, and formerly chat.evilion.xyz)
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-10-01
+Effective: 2026-10-04
 
 This policy lists exactly what Nexa holds. It is written against the
 actual database, so if something is not listed here, there is no place
-for it and nothing to hand over.
+for it and nothing to hand over. It also names every outside service
+Nexa uses and what each one gets (section 6), and explains your rights
+under data protection law, including the GDPR (sections 9 to 11).
 
 1. THE SHORT VERSION
 
-- Your messages, files, and calls are encrypted end to end. Nobody who
-  runs Nexa can read them, and nobody monitors what you do in a chat.
+- Your messages, files, notes, and calls are encrypted end to end.
+  Nobody who runs Nexa can read them, and nobody monitors what you do
+  in a chat. The one exception is messages that programs post through
+  a server's webhooks, which the app marks.
 - What the owner and staff can see is your public profile, what
   servers show everyone, public images, the delivery details the
-  server needs (who sent what, where, and when), and moderation
-  records: the actions taken on an account or a server, and the case
-  threads with Nexa that go with them.
+  server needs (who sent what, where, and when), bug reports you send,
+  and moderation records: the actions taken on an account or a server,
+  and the case threads with Nexa that go with them.
+- Nexa uses a few outside services, listed in section 6 with what
+  each one gets. Cloudflare carries all traffic to and from Nexa, runs
+  the captcha, and relays calls. None of them can read your messages.
 - Links you share are previewed by the server through Cloudflare, so
   the sites never see your address, and YouTube videos play through
   the server, so YouTube never learns who is watching.
 - No email, no phone number, no real name, no payment details, no
   location, no contacts, no analytics, and no push tokens are ever
   collected.
+- You can export your data, correct it, or delete your account
+  yourself, and you can object or complain (section 11).
 
 2. WHAT IS ENCRYPTED (NOBODY WHO RUNS NEXA CAN READ IT)
 
-- Message text and edits. Stored only as ciphertext.
+- Message text and edits. Stored only as ciphertext. The one
+  exception is a message a program posts through a server's webhook:
+  it reaches the server readable and is stored as it came (section
+  3d), and the app marks it as not end-to-end encrypted.
 - File contents, file names, file types, dimensions, and per file
   keys (the key travels inside the encrypted message).
 - Call audio and video. Calls are not recorded and are never written
   to disk.
-- Your settings (themes, notification choices, mutes). Only the size,
-  the version number, and the last written time can be seen.
+- Notes, with their earlier versions and their files, and the note
+  you can add to a friend request.
+- Your settings (themes, notification choices, mutes, sound packs,
+  message drafts, and recent searches), and the recordings in your
+  sound packs. Only the size, the version number, and the last
+  written time of your settings, and the size of each recording, can
+  be seen.
 - Your password and recovery key. Your password never leaves your
-  device; your browser only sends a derived check value. Your recovery
-  key is shown once in your browser and never stored anywhere.
+  device; your browser or app only sends a derived check value. Your
+  recovery key is shown once on your device and never stored anywhere.
 - Your private identity key and your conversation keys. Your private
   key sits on the server only wrapped by your password or recovery
   key. Conversation keys sit on the server only sealed separately to
-  each member. Nobody who runs Nexa holds a usable key of any kind.
-  There is no spare key, no master key, and no escrow.
+  each member. Nobody who runs Nexa holds a key that can open any of
+  this. There is no spare key, no master key, and no escrow.
 
-There is no setting, admin action, or software change that would
-decrypt content already sent, and no way to deliver future content in
+There is no setting or admin action that decrypts content already
+sent, and nothing in the software that hands over future content in
 readable form.
 
 3. WHAT THE OWNER AND STAFF CAN SEE
 
 a) Profile information (public by design, typed by you): username,
    display name, profile picture and banner, about me, pronouns,
-   accent colors, custom status and expiry, presence preference, DM
-   privacy setting, per server nicknames and pictures, account ID,
-   creation and last change times, and admin and disabled flags. None
-   of this is identity checked. Servers are public in the same way: a
-   server's name, icon, banner, and description, its owner, and when
-   it was made. Staff see these with how many members and channels a
-   server has (the numbers, not the channels), but never what is said
-   inside it.
+   accent colors, custom status and expiry, how your typing indicator
+   looks, the server tag you wear, your profile widgets (the games and
+   music you show, and the cards you make), presence preference, DM
+   privacy setting, whether friends can add you to group chats, per
+   server nicknames and pictures, account ID, creation and last change
+   times, and admin and disabled flags. None of this is identity
+   checked. Servers are public in the same way: a server's name, icon,
+   banner, description, and tag, its owner, and when it was made.
+   Staff see these with how many members and channels a server has
+   (the numbers, not the channels), but never what is said inside it.
 
-b) Public images (stored as uploaded, can be handed over if ordered):
-   profile pictures, banners, server icons and banners, custom emoji,
-   stickers.
+b) Public images (stored readable, can be handed over if ordered):
+   profile pictures, banners, server icons and banners, group chat
+   pictures, server tag badges, custom emoji and stickers (with their
+   names, and the names and descriptions of their packs), the pictures
+   on profile widgets and typing indicators, and webhook pictures.
 
 c) Delivery details (needed to send and notify, not content): message
    ID, channel, author, type, timestamps, edit time, reply target,
    mentions (user, role, and everyone flags are kept outside the
    ciphertext so the server knows who to notify), file presence and
-   sizes, reaction values and counts, pins, read positions, and poll
-   vote positions (not the question or option text, which is
-   encrypted).
+   sizes, reactions (who reacted, with which emoji), pins, read
+   positions, poll vote positions (not the question or option text,
+   which is encrypted), and the line a call leaves in a direct message
+   or group chat, which shows who started the call and when (whether
+   anyone answered, and for how long, is encrypted inside it).
 
 d) Membership and structure (typed by users, stored as typed):
-   friends, requests, and blocks, server memberships and roles, DM and
-   group participants, channel names, topics, and structure, invite
-   codes you made (uses and expiry, but not who used them), bans, and
-   per community audit log entries.
+   friends, requests, and blocks, the private nicknames you give your
+   friends, server memberships and roles, DM and group participants,
+   channel and group chat names, topics, and structure, invite codes
+   you made (uses and expiry, but not who used them; when signing up
+   needs an invite, the one each account signed up with is noted),
+   bans, per community audit log entries, who can read and write each
+   note, invitations to notes, when each version of a note was saved,
+   and a server's webhooks (their names, pictures, and who made them).
+   A message a webhook posts is stored readable, as it arrived, with
+   any files that came with it.
 
-e) Sessions: one entry per signed in device. That is the session ID,
-   the IP address noted once at sign in (never updated), the browser
-   or app description, and the sign in and last active times. Staff
-   see when an account was last active in the moderation panel.
-   Entries are deleted on sign out or expiry. This is the only place
-   an IP address is written. A locked subchat also notes which
-   sessions typed its password (the password itself is not kept; it
-   only unlocks the screen, and messages stay encrypted under the
-   conversation key). Guest call links belong to the link, not to
-   your account.
+e) Sessions and guest entries (the only places an IP address is
+   written): one entry per signed in device, with the session ID, the
+   IP address noted once at sign in (never updated), the browser or
+   app description, and the sign in and last active times. You can
+   see your own, and sign any of them out, in Settings → Devices.
+   Staff see when an account was last active in the moderation panel.
+   Entries are deleted on sign out or after 90 days without use. A
+   locked subchat also notes which sessions typed its password (the
+   password itself is not kept; it only unlocks the screen, and
+   messages stay encrypted under the conversation key).
+   - Guest entries: someone who joins a call through a guest link gets
+     an entry with the name they typed, the call, the IP address they
+     joined from, and when they joined. Nobody sees that address in
+     the app. The entry is deleted when they leave or are removed,
+     when the link is revoked, after about two minutes without a
+     connection, or 12 hours after they joined, whichever comes first.
+   - In memory only: to limit how often an address can sign in,
+     connect, and make other requests, the server counts requests by
+     IP address in memory, never on disk, and forgets each address
+     within a few hours of its last request. The captcha also sends
+     your address to Cloudflare (section 6).
 
 f) Login checks (values not handed over, listed to close the point):
    the password check value, the password stretching salt and
    settings, your public key, your wrapped private key (cannot be
    opened without your password), and the wrapped recovery copy with
-   its check value. None of these is a password, and none can be
-   turned into one.
+   its check value. With two-factor sign in on, also its secret,
+   sealed with a key only the server has (the server needs it to check
+   your codes), and your backup codes as keyed hashes, with when each
+   was used. None of these is a password, and none can be turned into
+   one.
 
 g) Moderation records (not end-to-end encrypted, kept as the record
    of how Nexa is moderated):
@@ -111,39 +154,52 @@ g) Moderation records (not end-to-end encrypted, kept as the record
    - Held usernames: a username reset by staff stays attached to its
      account, so it still signs that account in, and nobody else can
      register it.
+   - Fingerprints of pictures staff removed, so the same picture
+     cannot be put back.
    - Announcements from Nexa, with who wrote them.
    - Whether you have seen each notice, and how far you have read
      your messages from Nexa.
 
 h) Day to day running: unfinished upload progress (expected and
-   received sizes), crash reports (error kind, code location, app
-   version, and message, never any chat or file content), one site
-   wide monthly data total for calls (not per account), and server
-   request logs (page, result, size, and duration, with no IP
-   address recorded there).
+   received sizes), which sticker packs you installed and which
+   stickers you used last, crash reports from the web app (the account
+   it came from, the error and where in the code it happened, the app
+   version, the page it happened on, and the browser description; they
+   are built from the error, not from your chats or files), bug reports
+   you send (what you write, the screenshots or recordings you add, the
+   device details if you choose to include them, and the thread with
+   staff, none of it end-to-end encrypted), one site wide monthly data
+   total for calls (not per account), and server request logs (page,
+   result, size, and duration, with no IP address recorded there).
 
 i) Activity and a linked Discord account (optional): what the
    desktop app or a linked Discord account says you are doing, such
    as a game or a song, goes to the people who can see your status
    while it lasts and is kept in memory only, never written down. If
-   you link a Discord account (Settings, Activity), Nexa keeps its
+   you link a Discord account (Settings → Activity), Nexa keeps its
    Discord ID, username, display name, and picture, when you linked
-   it, whether it is in the small Discord server Nexa's bot reads
-   activity in, and Discord's sign in tokens for it, sealed with a key
-   only the server has, so the bot can add it back to that server.
-   Unlinking deletes all of it at once.
+   it, which kinds of activity you chose to show, whether it is in the
+   small Discord server Nexa's bot reads activity in, and Discord's
+   sign in tokens for it, sealed with a key only the server has, so
+   the bot can add it back to that server. Unlinking deletes all of it
+   at once.
 
 4. WHAT IS NEVER COLLECTED
 
 No email address. No phone number. No legal name, birth date, age, or
 ID documents. No payment details. No registration IP or last known IP
-field beyond the per session sign in IP above. No IP or access
-history. No online time history. No call records (who called whom,
-for how long). No device or advertising IDs and no push tokens. No
-location. No address book imports. No search words, link clicks,
-analytics, or tracking of any kind. No drafts, backups, or unsent
-copies. Search runs on your device, using messages it already
-decrypted.
+field beyond the sign in and guest entries above. No IP or access
+history. No online time history. No call records beyond the line in
+3c: who joined a call, and for how long, is held in memory while the
+call lasts and otherwise exists only inside that line's encrypted
+summary. No device or advertising IDs and no push tokens. No location.
+No address book imports. No link clicks, analytics, or tracking of any
+kind. No record of what you search for: message search runs on your
+device, using messages it already decrypted, and GIF, game, and music
+searches pass through the server to the services in section 6, with
+recent results kept in memory (GIFs for two minutes, games and music
+for a day) and nothing saying who searched. No readable drafts or
+unsent copies: drafts live only inside your encrypted settings.
 
 5. WHO SEES WHAT
 
@@ -153,58 +209,138 @@ decrypted.
 - The owner and the staff they appoint see sections 3a to 3i. Staff
   use a moderation panel that shows public profiles, what servers
   show everyone, when accounts were last active, moderation cases and
-  their threads, the log, and announcements. It shows nothing that is
-  encrypted, because nothing here can decrypt it.
-- Link previews, pictures linked from elsewhere, and YouTube videos
-  are fetched by the Nexa server, not by your device, and the server
-  fetches them through Cloudflare's WARP network. The sites see a
-  Cloudflare address, never yours and never the server's, and nothing
-  from your device reaches them. A YouTube video plays in YouTube's
-  own player, loaded through the server the same way, in a frame that
-  cannot reach anything else in the app: YouTube is told the video is
-  shown on the Nexa address you are using, as any site that shows one
-  says, but not who is watching, and it gets no cookies. Nothing ties a fetch to who
+  their threads, the log, announcements, and bug reports. It shows
+  nothing that is encrypted, because nothing here can decrypt it.
+- Link previews, pictures and videos linked from elsewhere, GIFs, and
+  YouTube videos are fetched by the Nexa server, not by your device,
+  and the server fetches them through Cloudflare's WARP network. The
+  sites see a Cloudflare address, never yours and never the server's,
+  and your device never connects to them. A YouTube video plays in
+  YouTube's own player, loaded through the server the same way, in a
+  frame that cannot reach anything else in the app: YouTube is told
+  the video is shown on the Nexa address you are using, as any site
+  that shows one says, and gets your browser's description, but not
+  who is watching, and it gets no cookies. Nothing ties a fetch to who
   asked for it, and a preview is kept in memory for at most an hour so
-  the same link is not fetched twice.
-- No third parties, no advertisers, and no analytics companies.
-  Nothing is sold or shared, except as forced by a valid legal order
-  (see Terms section 5), and even then only what exists above.
-  Encrypted content still cannot be handed over.
-- Linking a Discord account is up to you. When you do, Discord knows
-  your Discord account was linked to Nexa and added to Nexa's
-  activity server, and Nexa's bot reads your Discord presence there.
-  Discord's own privacy policy covers what Discord keeps.
+  the same link is not fetched twice. In a chat, a link is only
+  previewed when you send it, and you can turn previews off in
+  Settings → Chat.
+- A theme, plugin, or stylesheet you add from a link, and any fonts or
+  stylesheets your own custom CSS loads, come straight from the site
+  that hosts them: your device fetches them when you add them and
+  again from time to time to keep them up to date, so that site sees
+  your IP address, as it would if you visited it.
+- Nothing is sold, and nothing is shared with advertisers or
+  analytics companies. The only outside services are the ones in
+  section 6, and each gets only what its job needs. Beyond them,
+  nothing is handed over except as forced by a valid legal order (see
+  Terms section 5), and even then only what exists above. Encrypted
+  content still cannot be handed over.
 
-6. HOW LONG THINGS ARE KEPT
+6. SERVICE PROVIDERS
+
+These are the outside services Nexa uses. Each gets only what its job
+needs, and none of them can read your messages, files, notes, or
+calls.
+
+- Cloudflare, for the network. Every connection to Nexa reaches the
+  server through Cloudflare's network (a Cloudflare Tunnel), so
+  Cloudflare handles your IP address and every request your device
+  makes. Your messages, files, notes, and calls are already encrypted
+  when they pass through it. Why: so the server is never reachable
+  directly from the internet.
+- Cloudflare Turnstile, for the captcha when you sign up, sign in,
+  recover an account, send a friend request, invite someone to a
+  note, create or join a server, or join a call as a guest. Your
+  browser or app loads it from challenges.cloudflare.com, and the
+  server sends Cloudflare your IP address with its answer to check
+  it. Why: to stop bots from making accounts, guessing passwords, and
+  sending spam.
+- Cloudflare Realtime, for calls. It relays call audio and video, so
+  your device connects to it and it sees your IP address, and the
+  server labels your connection with your account ID when it sets the
+  call up. Calls stay end-to-end encrypted, so Cloudflare cannot hear
+  or see them. Why: so calls work between any two networks.
+- Cloudflare WARP, for fetching things from other sites. Link
+  previews, pictures and videos linked from elsewhere, GIFs, YouTube
+  videos, and game and music searches go out through it, so
+  Cloudflare sees which sites are contacted, and those sites see a
+  Cloudflare address instead of the server's. Why: so the sites
+  people link never learn where the server is.
+- Klipy, for GIF search. The server sends it the words you search for
+  (or asks for trending GIFs) and nothing about you: Klipy sees the
+  server's address, not yours. The GIFs themselves load through the
+  server and WARP, never from Klipy to your device.
+- IGDB, for the games on profile widgets. The server sends it the
+  words you search for and asks it about the games people show,
+  through WARP, and keeps the game covers it shows.
+- Deezer, for the music on profile widgets. The server sends it the
+  words you search for and asks it about the songs, albums, and
+  artists people show, through WARP. It keeps their pictures, and
+  streams song previews through itself without keeping them.
+- Telegram, for importing a Telegram sticker set. The server asks
+  Telegram's Bot API for the set by its name and downloads its
+  stickers. Telegram learns the set's name and nothing about you.
+- Discord, only if you link a Discord account, or play games that
+  report to Discord while the desktop app runs. Linking takes you to
+  Discord to approve it, and then Discord knows your Discord account
+  was linked to Nexa: Nexa's bot adds it to a small Discord server and
+  reads your Discord presence there. The server also asks Discord,
+  through WARP, for the public name and pictures of the games an
+  activity names. On the desktop app, what games tell Discord passes
+  through Nexa to Discord when Discord is running, as it would without
+  Nexa. Discord's own privacy policy covers what Discord keeps.
+
+7. HOW LONG THINGS ARE KEPT
 
 - Sessions: until you sign out, or after 90 days without use.
+- Guest entries: until the guest leaves or is removed, the link is
+  revoked, about two minutes pass without a connection, or 12 hours
+  after they joined, whichever comes first. Guest links: until they
+  are revoked, or once they have expired and nobody who joined
+  through them is left.
+- IP addresses counted in memory: a few hours after the last request.
 - Messages and files: until they are deleted: by their author, by a
   conversation or server owner, with the author's account, or, in a
   direct message, with the account of the person on the other side
   when they delete it themselves.
+- Notes, with their earlier versions: until their owner deletes them
+  or their owner's account.
 - Unfinished uploads, and files nothing points at any more: removed
   after a day.
-- Crash reports: only the newest 500 are kept.
+- Link previews: in memory for up to an hour. GIF search results: in
+  memory for two minutes. Game and music search results: in memory
+  for a day.
+- Crash reports: only about the newest 500 are kept.
+- Bug reports and their threads: until your account is deleted.
 - A linked Discord account: until you unlink it or delete your
   account.
-- Moderation cases, case threads, held usernames, and the moderation
-  log: kept as the moderation record, including after an account is
-  deleted.
-- Backups, if kept for disaster recovery, hold the same encrypted
-  content under the same limits.
+- Moderation cases, case threads, held usernames, fingerprints of
+  removed pictures, and the moderation log: kept as the moderation
+  record, including after an account is deleted.
+- Backups: a copy of everything the server stores, made from time to
+  time (usually before an update) and kept on the same machine.
+  Making a new backup deletes the one before, so only the newest
+  exists, and something deleted from Nexa stays in it until the next
+  backup replaces it. It holds the same encrypted content as the
+  server, under the same encryption.
 
-7. DELETION
+8. DELETION
 
 - Deleted messages, files, and accounts are removed from the
-  database. No trash bin or archive is kept.
+  database. No trash bin or archive is kept; only the newest backup
+  (section 7) holds a copy until the next one replaces it.
 - Deleting your own account deletes everything it made: your messages
   everywhere, the files you uploaded, your reactions, votes, and
-  packs, the servers and group chats you own (for everyone in them),
-  and your direct message conversations, for both people in them. Its
-  profile is overwritten, and its sessions, relationships, settings,
-  keys, second factor, linked Discord account, and crash reports are
-  deleted. An empty stand-in named Deleted User is all that is left,
-  and nobody can sign in as it.
+  packs, the notes you own, your bug reports and sound recordings, the
+  invite and guest links you made, the servers and group chats you own
+  (for everyone in them), and your direct message conversations, for
+  both people in them. Its profile is overwritten, and its sessions,
+  relationships, settings, keys, second factor, linked Discord
+  account, and crash reports are deleted. What is left is a stand-in
+  named Deleted User, with the account ID, when it was made, its
+  public key, and its color and privacy choices, which nobody can
+  sign in as.
 - When someone you have a direct message conversation with deletes
   their own account, that conversation is deleted for you too.
 - When staff delete an account, everything it posted and uploaded is
@@ -213,13 +349,87 @@ decrypted.
   stay for the people on the other side, without its messages. The
   moderation case, its thread, and the log entry stay.
 
-8. CONTACT
+9. WHO IS RESPONSIBLE, AND WHERE YOUR DATA IS
+
+The controller of your personal data, who decides how it is used, is
+the owner of Nexa (nora), in Alaska, United States.
+
+  Contact the owner (nora) here: evilionx3@proton.me
+
+Nexa's server, and everything it stores, its backup included, is in
+Alaska, United States. If you use Nexa from the European Union, the
+European Economic Area, the United Kingdom, or Switzerland, what you
+send it goes to the United States, and so does what Cloudflare and
+Discord get (section 6). Cloudflare and Discord are US companies
+certified under the EU-U.S. Data Privacy Framework, which the European
+Commission has found gives adequate protection, and under its UK
+extension and the Swiss-U.S. framework. Both also use the Commission's
+standard contractual clauses. The other services in section 6 get
+only search words or a sticker set's name, never anything that says
+who you are.
+
+10. WHY YOUR DATA IS USED (LEGAL BASES)
+
+Data protection law, including the GDPR, needs a reason for each use
+of your data. These are Nexa's:
+
+- To run Nexa for you, as the Terms describe (a contract with you):
+  your account and profile, delivering messages, files, notes, and
+  calls, servers and group chats, link previews, GIF, game, and music
+  search, the features you choose to use, such as a linked Discord
+  account or a sticker import, and answering your bug reports.
+- To keep Nexa secure and working (legitimate interests, Nexa's and
+  every member's): the captcha, rate limits, the IP addresses in
+  section 3e, crash reports, and backups.
+- To enforce the rules (legitimate interests): moderation cases and
+  their threads, the moderation log, held usernames, and fingerprints
+  of removed pictures. They are kept after an account is deleted so
+  that what was done, by whom, and why stays on record, and so a name
+  or picture that was taken down stays down.
+- To follow the law (a legal obligation): answering a valid legal
+  order, as Terms section 5 explains.
+
+11. YOUR RIGHTS
+
+Under the GDPR you have these rights, and this is how to use them:
+
+- Access and portability: Settings → Your Data → Export My Data
+  downloads your profile, settings, friends, servers, channels, and
+  every message you hold keys for, decrypted on your device, as one
+  file you can take elsewhere. Settings → Devices lists your sign ins
+  with their IP addresses. For anything the export leaves out, such
+  as your moderation cases or bug reports, contact the owner.
+- Correction: change your profile at any time in Settings. For
+  anything you cannot change yourself, contact the owner.
+- Erasure: delete your messages and files yourself, or your whole
+  account in Settings → My Account → Delete Account (section 8 says
+  what that removes). Moderation records stay, for the reasons in
+  section 10.
+- Restriction and objection: you can ask for your data to be used
+  less while something is being checked, and object to any use based
+  on legitimate interests (section 10). Contact the owner to do
+  either.
+- Changing your mind: unlink Discord in Settings → Activity, turn
+  link previews off in Settings → Chat, or remove a theme or plugin
+  you added, at any time.
+- Complaints: you can complain to the data protection authority where
+  you live or work, or where you think the problem happened.
+
+12. MINIMUM AGE
+
+You must be at least 13 years old to create an account, or older where
+the law where you live requires it (Terms section 2). Nexa never asks
+your age, so agreeing to the Terms is how you confirm it. If you think
+someone under that age has an account, contact the owner.
+
+13. CONTACT
 
   Contact the owner (nora) here: evilionx3@proton.me
   In the app: message @nora
 
-Please include the account name and the legal basis for any formal
-request. Replies list exactly the rows held, with times in UTC
-alongside the stored values. Nothing is guessed or filled in.
+For a request about your own data, say which account it is about.
+Legal requests should also give their legal basis. Replies list
+exactly the rows held, with times in UTC alongside the stored values.
+Nothing is guessed or filled in.
 
 END OF POLICY

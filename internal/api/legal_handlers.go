@@ -590,8 +590,12 @@ func legalMessages(d *legalDoc, rec *store.AccountRecord) {
 	d.note("to know who to notify without being able to read what it is notifying them")
 	d.note("about; it is one of the few things about a message that is legible here.")
 	d.blank()
-	d.note("A deleted message is deleted: the row goes, and no copy, tombstone or archive")
-	d.note("of it is kept. The counts above are of messages that exist now.")
+	d.note("Starting a call in a direct message or group writes one row here, a line")
+	d.note("naming who started it and when; calls this account started are counted above.")
+	d.blank()
+	d.note("A deleted message is deleted: the row goes, and no tombstone or archive of it")
+	d.note("is kept; the one database backup holds a copy until the next replaces it. The")
+	d.note("counts above are of messages that exist now.")
 	d.blank()
 	if len(rec.PerChannel) > 0 {
 		d.note("By channel, most active first:")
@@ -900,6 +904,9 @@ func legalUnavailable(d *legalDoc) {
 		"  the password never reaches the server — the browser sends a verifier derived",
 		"  from it. There is no setting, no administrative action and no software change",
 		"  available to the operator that would decrypt message content already sent.",
+		"  The one exception is a message a program posts through a community's webhook:",
+		"  it arrives readable, is stored as it came, and belongs to the webhook rather",
+		"  than to any person's account.",
 	)
 	d.para(
 		"  ATTACHMENT CONTENT.",
@@ -926,10 +933,12 @@ func legalUnavailable(d *legalDoc) {
 	d.para(
 		"  DELETED CONTENT.",
 		"  A deleted message, conversation, file or account is removed from the database.",
-		"  No tombstone, archive or recycle bin is kept for any of them. Deleting an",
-		"  account overwrites its profile columns in place and deletes its sessions,",
-		"  relationships, settings, key grants and second-factor rows; what that account",
-		"  wrote stays, still encrypted, attributed to a deleted user.",
+		"  No tombstone, archive or recycle bin is kept for any of them. The one backup",
+		"  of the database, made from time to time and deleted when the next is made,",
+		"  holds a copy until then. Deleting an account deletes everything it wrote and",
+		"  uploaded, overwrites its profile columns in place, and deletes its sessions,",
+		"  relationships, settings, key grants and second-factor rows; a stand-in row",
+		"  keeps its account id, so the moderation record still points at it.",
 	)
 }
 
@@ -938,9 +947,9 @@ func legalNotCollected(d *legalDoc) {
 	d.para(
 		"  A law-enforcement request commonly asks for the categories below. None of",
 		"  them is withheld: no column exists for any of them anywhere in Nexa's",
-		"  schema, so there is nothing to search, preserve or produce. They",
-		"  are listed rather than omitted so that the point does not have to be raised",
-		"  a second time.",
+		"  schema, apart from what each item says, so there is nothing to search,",
+		"  preserve or produce. They are listed rather than omitted so that the point",
+		"  does not have to be raised a second time.",
 	)
 	d.item("Email address. Registration asks for a username, a display name and a")
 	d.cont("password. No email address is collected, at registration or afterwards,")
@@ -951,22 +960,30 @@ func legalNotCollected(d *legalDoc) {
 	d.cont("document. Nothing about an account is verified by anybody.")
 	d.item("Payment, billing or subscription records. Nexa charges nothing,")
 	d.cont("has no payment processor and holds no financial data.")
-	d.item("A registration-IP or last-known-IP field. Addresses are written in exactly")
-	d.cont("one place, the session row, which is above. The address on a session is")
-	d.cont("written when the session is created and is never updated, so there is no")
-	d.cont("record of the account's current or most recent address as such.")
+	d.item("A registration-IP or last-known-IP field. For an account, addresses are")
+	d.cont("written in exactly one place, the session row, which is above. The address")
+	d.cont("on a session is written when the session is created and is never updated,")
+	d.cont("so there is no record of the account's current or most recent address as")
+	d.cont("such. The only other address Nexa writes is a guest's, for someone who")
+	d.cont("joined a call through a link without an account (see PROVENANCE).")
 	d.item("An IP or access history. The server's own request log records the method,")
 	d.cont("the path, the status, the size and the duration of each request and does")
-	d.cont("not record the address it came from. Any reverse proxy or network")
-	d.cont("provider in front of Nexa keeps its own logs under its own")
-	d.cont("retention; those are not Nexa's records and are not read here.")
+	d.cont("not record the address it came from. Rate limits count requests by")
+	d.cont("address in memory only and forget each address within hours. Cloudflare,")
+	d.cont("whose network carries all traffic to Nexa, keeps its own logs under its")
+	d.cont("own retention; those are not Nexa's records and are not read here.")
 	d.item("Presence, online-time, last-seen or typing history. Who is online is held")
 	d.cont("in memory for as long as a connection lasts and is never written down.")
 	d.cont("The session's last-activity time above is the nearest thing that exists.")
-	d.item("Call records. Who was in a call, with whom, and for how long is held in")
-	d.cont("memory for the life of the call and is not written to any table. The only")
-	d.cont("figure kept is one Nexa-wide monthly byte total for capacity")
-	d.cont("planning, which is not attributed to any account.")
+	d.item("Call records. Who was in a call, and for how long, is held in memory for")
+	d.cont("the life of the call and is not written to any table. Starting a call in a")
+	d.cont("direct message or group writes one line to the messages table naming who")
+	d.cont("started it and when (see MESSAGE METADATA); whether anyone answered, and")
+	d.cont("for how long, is sealed inside that line. The only other figure kept is")
+	d.cont("one Nexa-wide monthly byte total for capacity planning, not attributed to")
+	d.cont("any account. Calls are relayed by Cloudflare Realtime, which is given the")
+	d.cont("account id as the label of each connection; Cloudflare's records of those")
+	d.cont("connections are its own, not Nexa's, and are not read here.")
 	d.item("Device identifiers, advertising identifiers, or push-notification tokens.")
 	d.cont("Notifications are delivered over the connection the app already holds")
 	d.cont("open; no push service is used and no device token is stored.")
@@ -977,9 +994,12 @@ func legalNotCollected(d *legalDoc) {
 	d.cont("device; the relationship rows above were each created by hand.")
 	d.item("Search queries, link clicks, analytics, telemetry or behavioural profiles.")
 	d.cont("Search runs in the account's own client against messages it has already")
-	d.cont("decrypted, and the query is never sent to the server.")
-	d.item("Message content backups, drafts or undelivered copies. A message exists")
-	d.cont("once, encrypted, in the messages table.")
+	d.cont("decrypted, and the query is never sent to the server. GIF, game and music")
+	d.cont("searches pass through the server to the providers the Privacy Policy names")
+	d.cont("and are not recorded against any account.")
+	d.item("Drafts or undelivered copies. A message exists once, encrypted, in the")
+	d.cont("messages table. Drafts exist only inside the account's encrypted settings")
+	d.cont("(user_settings), which the server cannot read.")
 	d.blank()
 }
 

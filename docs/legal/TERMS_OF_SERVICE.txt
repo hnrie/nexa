@@ -1,7 +1,7 @@
 NEXA - TERMS OF SERVICE
 Site: nexa.fish (also at mathtest.lol, and formerly chat.evilion.xyz)
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-10-01
+Effective: 2026-10-04
 
 These Terms are the agreement between you and the owner of Nexa.
 They are short on purpose and written in plain language. The Privacy
@@ -18,7 +18,8 @@ The owner and a team of moderators (called staff in these Terms) keep
 Nexa running. Staff only ever work with the small part of Nexa that is
 not encrypted: public profiles, what servers show everyone (their
 names, icons, banners, and descriptions), community membership,
-moderation cases, and the delivery details the server needs to work.
+moderation cases, bug reports, and the delivery details the server
+needs to work.
 
 2. YOUR ACCOUNT
 
@@ -40,16 +41,18 @@ moderation cases, and the delivery details the server needs to work.
 
 3. ENCRYPTION AND PRIVACY
 
-- Message text, file contents and names, call audio and video, and
-  your settings are encrypted before they leave your device. The
-  server stores only ciphertext it cannot read.
+- Message text, file contents and names, notes, call audio and
+  video, and your settings are encrypted before they leave your
+  device. The server stores only ciphertext it cannot read.
 - Nobody who runs Nexa holds a key to any of it. There is no admin
   panel, setting, or software switch that decrypts content already
-  sent, and no way to intercept future content in readable form.
+  sent, and nothing in the software that intercepts future content
+  in readable form.
 - A few things are not end-to-end encrypted, because Nexa itself
-  has to read them: your public profile, moderation cases and
-  the threads that go with them, and announcements from Nexa. Section
-  6 explains them.
+  has to read them: your public profile, moderation cases and the
+  threads that go with them, announcements from Nexa, bug reports
+  you send, and messages that programs post through a server's
+  webhooks. The Privacy Policy explains each of them.
 - The Privacy Policy lists exactly what is stored and who can see it.
 
 4. THE RULES
@@ -163,7 +166,7 @@ here has a way to read them.
   (for everyone in them), and your direct message conversations, for
   both people in them. Its profile is overwritten, and its sessions,
   relationships, settings, keys, and second factor are deleted. What
-  is left is an empty stand-in named Deleted User, which nobody can
+  is left is a stand-in named Deleted User, which nobody can
   sign in as.
 - So when someone you have a direct message conversation with deletes
   their own account, that conversation is deleted for you too.

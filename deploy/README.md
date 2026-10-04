@@ -32,7 +32,7 @@ journalctl -u xyz.evilion.chat -f                       # the log
 sudo systemctl restart xyz.evilion.chat                 # restart
 sudo systemctl stop xyz.evilion.chat                    # stop (start brings it back)
 make build && sudo systemctl restart xyz.evilion.chat   # update
-bash backup.sh                                          # database, server secret and uploads
+bash backup.sh                                          # all of data/, keeping only the newest backup
 ```
 
 On macOS (launchd):
@@ -104,13 +104,17 @@ printed before the log is open, and a crash's stack trace — goes to
   restored without it signs nobody with two-factor sign-in in again, backup codes
   included, and chatd refuses to start on such a database instead of making a
   new secret that could never open theirs;
-- `media-STAMP.tgz`, every uploaded file.
+- `files-STAMP.tgz`, the rest of `data/`: every uploaded file, the desktop
+  app's downloads, and the game and music pictures (not `media/tmp`, uploads
+  still arriving, or `media/variants`, resized copies chatd makes again).
 
 It fails loudly, and keeps nothing from the run, when any part could not be
-written. After a whole backup it deletes all but the newest five of each kind
-(`KEEP=10 bash backup.sh` keeps ten). `backup/` is on the same disk as the data,
-so it covers a bad deploy or a mistake, not a dead disk: copy it somewhere else
-as well (`BACKUP_DIR=/mnt/elsewhere bash backup.sh` writes there directly).
+written. Only the newest backup is kept: after a whole backup it deletes every
+older one in `backup/` (including `media-STAMP.tgz` files from before the
+archive held all of `data/`), and leaves anything else there alone. `backup/`
+is on the same disk as the data, so it covers a bad deploy or a mistake, not a
+dead disk: copy it somewhere else as well (`BACKUP_DIR=/mnt/elsewhere bash
+backup.sh` writes there directly).
 `chatd.env` holds Nexa's settings and keys (Cloudflare, Klipy,
 Turnstile); keep a copy of it somewhere safe too.
 
@@ -122,7 +126,7 @@ To restore, with chatd stopped:
 ```
 cp backup/chat-STAMP.db data/chat.db && rm -f data/chat.db-wal data/chat.db-shm
 cp backup/secret-STAMP data/server.secret && chmod 600 data/server.secret
-tar xzf backup/media-STAMP.tgz -C data
+tar xzf backup/files-STAMP.tgz -C data
 ```
 
 then start chatd. If `server.secret` is really gone for good, the accounts that
