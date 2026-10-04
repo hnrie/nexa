@@ -208,6 +208,9 @@ internal object CallNotifications {
 
     fun cancelOngoing() = runCatching { manager().cancel(CallService.NOTIFICATION_ID) }
 
+    /** The ongoing call's notification drawn again (muted, who the call is with), its service left as it is. */
+    fun refreshOngoing(context: Context) = runCatching { manager().notify(CallService.NOTIFICATION_ID, ongoing(context)) }
+
     // --- ringing ----------------------------------------------------------------------
 
     /** Rings showing as notifications, so a ring is posted once (posting again would alert again). */

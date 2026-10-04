@@ -28,6 +28,7 @@ class CallService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            foreground = null
             stopSelf()
             ready.complete(false)
             return START_NOT_STICKY
@@ -44,11 +45,13 @@ class CallService : Service() {
                     startForeground(NOTIFICATION_ID, notification, types(camera, screen, phone = false))
                 }
             } else startForeground(NOTIFICATION_ID, notification)
+            foreground = Types(camera, screen)
             ready.complete(true)
         } catch (e: Exception) {
             Log.w(TAG, "could not keep the call in the foreground", e)
             ready.complete(false)
-            stopSelf()
+            // a call already held in the foreground stays so, with what it had: only one that never got there stops
+            if (foreground == null) stopSelf()
         }
         return START_NOT_STICKY
     }
@@ -62,6 +65,12 @@ class CallService : Service() {
         if (screen) t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
         if (phone) t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
         return t
+    }
+
+    override fun onDestroy() {
+        // gone (stopped, or ended by the system): the next change to the call starts it again
+        foreground = null
+        super.onDestroy()
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -80,6 +89,12 @@ class CallService : Service() {
         @Volatile private var running = false
         @Volatile private var ready = CompletableDeferred<Boolean>()
 
+        /** The camera and the screen, as the service holds the foreground for them. */
+        private data class Types(val camera: Boolean, val screen: Boolean)
+
+        /** What the service holds the foreground with, once it does; null while it does not. */
+        @Volatile private var foreground: Types? = null
+
         /** Brings the service in step with the call: started while in or joining one, gone otherwise. */
         fun update(camera: Boolean? = null, screen: Boolean? = null) {
             val st = Voice.state.value
@@ -90,13 +105,23 @@ class CallService : Service() {
                     running = false
                     runCatching { context.startService(Intent(context, CallService::class.java).setAction(ACTION_STOP)) }
                 }
+                foreground = null
                 CallNotifications.cancelOngoing()
                 return
             }
             val s = Engine.current()
+            val want = Types(camera ?: (s?.camera != null), screen ?: (s?.screen != null))
+            // Held in the foreground already with what the call needs: only its notification changes (muted, who
+            // it is with). Starting the service again would be asked of Android from wherever the app is, and with
+            // the app minimized a phone refuses it, or starts it again without the microphone.
+            if (running && foreground == want) {
+                CallNotifications.refreshOngoing(context)
+                ready = CompletableDeferred(true)
+                return
+            }
             val intent = Intent(context, CallService::class.java)
-                .putExtra(EXTRA_CAMERA, camera ?: (s?.camera != null))
-                .putExtra(EXTRA_SCREEN, screen ?: (s?.screen != null))
+                .putExtra(EXTRA_CAMERA, want.camera)
+                .putExtra(EXTRA_SCREEN, want.screen)
             ready = CompletableDeferred()
             running = true
             runCatching { ContextCompat.startForegroundService(context, intent) }.onFailure { Log.w(TAG, "could not start the call service", it) }
