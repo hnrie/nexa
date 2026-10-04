@@ -42,6 +42,8 @@ import fish.nexa.ui.layers.Layers
 import fish.nexa.ui.layers.Sheet
 import fish.nexa.ui.nav.Nav
 import fish.nexa.ui.nav.Route
+import fish.nexa.ui.profile.StatusLine
+import fish.nexa.ui.profile.hasStatusLine
 import fish.nexa.ui.t
 import fish.nexa.ui.theme.Nx
 import fish.nexa.ui.theme.Radii
@@ -89,7 +91,10 @@ fun UserPanel() {
             Avatar(user.id, user.name, user.avatarId, 32.dp, status = status, speaking = fish.nexa.voice.Speaking.isSpeaking(user.id))
             Column(Modifier.weight(1f)) {
                 Txt(user.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1)
-                Txt(customStatus(user.id) ?: presenceWord(status), style = Nx.type.hint.copy(lineHeight = Nx.type.sp(14.4f)), color = c.textMuted, maxLines = 1)
+                // UserPanel.tsx: what they wrote or are doing, with its emoji drawn, else where they are
+                val sub = Nx.type.hint.copy(lineHeight = Nx.type.sp(14.4f))
+                if (hasStatusLine(user.id)) StatusLine(user.id, sub, c.textMuted)
+                else Txt(presenceWord(status), style = sub, color = c.textMuted, maxLines = 1)
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {

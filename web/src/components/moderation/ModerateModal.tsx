@@ -2,6 +2,7 @@ import { ArrowLeft, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { moderation as modApi, type ActionRequest, type ModAction, type ModMembership, type ModUser, type PurgeCounts, type ResetField, type StaffCase } from "@/api/moderation";
 import { bannerUrl } from "@/api/users";
+import { statusEmojiText } from "@/components/activity/StatusEmoji";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
@@ -179,7 +180,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
     display_name: user.display_name,
     about_me: user.about_me,
     pronouns: user.pronouns,
-    status: [user.status_emoji, user.status_text].filter(Boolean).join(" "),
+    status: [statusEmojiText(user.status_emoji), user.status_text].filter(Boolean).join(" "),
     // without the list, the server says whether there are any
     nicknames: nicknamed ? nicknamed.map((x) => `${x.name}: ${x.nickname}`).join(", ") : t("moderation.form.everyServer"),
     typing_style: typingStyleText(readTypingStyle(user.typing_style)),

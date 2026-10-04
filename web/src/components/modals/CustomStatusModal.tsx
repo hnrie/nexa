@@ -1,9 +1,9 @@
 import { SmilePlus, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { StatusEmoji } from "@/components/activity/StatusEmoji";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Field, TextInput } from "@/components/common/TextInput";
-import { Twemoji } from "@/components/common/Twemoji";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { gateway } from "@/gateway/session";
 import { useAuth } from "@/stores/auth";
@@ -74,7 +74,7 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
                 data-testid="status-emoji"
                 data-picker-toggle={picker ? true : undefined}
               >
-                {emoji ? <Twemoji text={emoji} className={s.emojiImg} title="" /> : <SmilePlus size={20} />}
+                {emoji ? <StatusEmoji emoji={emoji} className={s.emojiImg} title="" /> : <SmilePlus size={20} />}
               </button>
               {emoji ? (
                 <button type="button" className={s.emojiClear} aria-label={tr_("modals.customStatus.removeTheEmoji")} onClick={() => setEmoji("")}><X size={12} /></button>
@@ -90,8 +90,8 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
             anchor={picker}
             onClose={() => setPicker(null)}
             onEmoji={(e) => {
-              // a custom emoji is a server picture; a status can only carry text
-              if (!e.custom) setEmoji(e.unicode);
+              // a server's or a pack's own emoji goes as its token, which every app draws as its picture
+              setEmoji(e.unicode);
               setPicker(null);
             }}
           />

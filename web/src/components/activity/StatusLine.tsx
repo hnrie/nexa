@@ -10,11 +10,11 @@
  * reading is usually the part that got cut.
  */
 import { Gamepad2, Music, Radio, Trophy, Tv } from "lucide-react";
-import { Twemoji } from "@/components/common/Twemoji";
 import { ScrollingText } from "@/components/common/ScrollingText";
 import type { Activity } from "@/api/types";
 import { activityParts, isSpotify } from "@/lib/activity";
 import s from "./Activity.module.css";
+import { StatusEmoji } from "./StatusEmoji";
 
 import { t } from "@/i18n";
 const ICON: Record<number, typeof Music> = { 0: Gamepad2, 1: Radio, 2: Music, 3: Tv, 5: Trophy };
@@ -62,7 +62,7 @@ export function StatusLine({
       <ScrollingText className={s.statusText}>
         {words ? (
           <>
-            {status?.emoji ? <Twemoji text={status.emoji} className={s.statusEmoji} /> : null}
+            {status?.emoji ? <StatusEmoji emoji={status.emoji} className={s.statusEmoji} /> : null}
             {status?.text}
           </>
         ) : parts ? (

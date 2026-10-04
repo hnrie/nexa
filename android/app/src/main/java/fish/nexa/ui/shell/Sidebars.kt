@@ -345,20 +345,3 @@ private fun channelMenu(serverId: String, ch: Channel): List<MenuItem> {
     return items
 }
 
-/** A person's custom status as shown (hidden once it expires, and while they are offline or invisible). */
-fun customStatus(userId: String): String? {
-    val p = Nexa.presence.byId.value[userId]
-    if (p == null || p.status == "offline" || p.status == "invisible") return null
-    if (p.statusExpiresAt != null && p.statusExpiresAt < System.currentTimeMillis()) return null
-    val text = listOf(p.statusEmoji, p.statusText).filter { it.isNotBlank() }.joinToString(" ")
-    if (text.isNotBlank()) return text
-    return p.activities?.firstOrNull()?.let { a ->
-        when (a.type) {
-            2 -> t("activity.listeningToName", "name" to a.name)
-            3 -> t("activity.watchingName", "name" to a.name)
-            5 -> t("activity.competingInName", "name" to a.name)
-            1 -> t("activity.streamingName", "name" to a.name)
-            else -> t("activity.playingName", "name" to a.name)
-        }
-    }
-}

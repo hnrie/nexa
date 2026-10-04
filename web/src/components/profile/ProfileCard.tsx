@@ -1,7 +1,7 @@
 import { NexaProfile } from "@/components/nexa/NexaProfile";
 import { isSystemAccount } from "@/lib/moderation";
 import { Link2, LoaderCircle, Maximize2, MessageCircle, MoreHorizontal, NotebookPen, Pencil, Plus, SendHorizontal, UserPlus, X } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { dmOpenError } from "@/lib/errors";
@@ -11,6 +11,7 @@ import { confirmRemoveFriend, openBlockDialog, sendFriendRequest, unblockUser, u
 import type { PublicUser } from "@/api/types";
 import { avatarUrl, bannerUrl, iconUrl, users as usersApi } from "@/api/users";
 import { ActivityList } from "@/components/activity/ActivityCard";
+import { StatusEmoji } from "@/components/activity/StatusEmoji";
 import { Avatar } from "@/components/common/Avatar";
 import { AdminBadge, OwnerBadge } from "@/components/common/OwnerBadge";
 import { ServerTagChip } from "@/components/servertag/ServerTagChip";
@@ -18,7 +19,6 @@ import { ProfileWidgets, WidgetPeek, type WidgetDesign } from "./Widgets";
 import { readWidgets, type Widget } from "@/lib/widgets";
 import { isOwner } from "@/lib/owner";
 import { Tooltip } from "@/components/common/Tooltip";
-import { Twemoji } from "@/components/common/Twemoji";
 import { promptFields } from "@/components/modals/PromptModal";
 import { KeyStatusChip } from "./KeyVerify";
 import { RelationshipBar, relationshipLine } from "./RelationshipBar";
@@ -302,6 +302,71 @@ const TWO_COLUMNS = 700;
  * card itself: a dialog on a desktop, a phone's sheet and the page a profile
  * link opens all hold it at different widths.
  */
+/**
+ * A custom status in a thought bubble beside the avatar. A long one is cut to
+ * a few lines there, and opens to every word on a hover, a press or a key.
+ */
+function StatusBubble({ status, design }: { status: { text: string; emoji: string }; design: ProfileDesign | undefined }) {
+  const words = useRef<HTMLSpanElement>(null);
+  const [cut, setCut] = useState(false);
+  const [open, setOpen] = useState(false);
+  const mouse = useRef(false);
+  // measured again whenever the bubble's size settles (a card that opens grows into its width)
+  useLayoutEffect(() => {
+    const el = words.current;
+    if (!el || open) return;
+    const measure = () => setCut(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [status.text, status.emoji, open]);
+  const opens = cut && !design;
+  return (
+    <div className={s.bubble} data-open={open || undefined} data-testid="profile-status">
+      <div
+        className={s.bubbleText}
+        {...(opens
+          ? {
+              role: "button",
+              tabIndex: 0,
+              "aria-expanded": open,
+              onPointerEnter: (e: PointerEvent) => {
+                mouse.current = e.pointerType === "mouse";
+                if (mouse.current) setOpen(true);
+              },
+              onPointerLeave: (e: PointerEvent) => {
+                if (e.pointerType === "mouse") setOpen(false);
+              },
+              // a mouse opened it on the way in; a finger opens and closes it
+              onClick: () => {
+                if (!mouse.current) setOpen((o) => !o);
+              },
+              onBlur: () => setOpen(false),
+              onKeyDown: (e: KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setOpen((o) => !o);
+                } else if (e.key === "Escape" && open) {
+                  e.stopPropagation();
+                  setOpen(false);
+                }
+              },
+            }
+          : {})}
+      >
+        {/* one inline run, so the emoji stays on the text's first line and the clamp counts lines */}
+        <span ref={words} className={s.bubbleWords}>
+          {status.emoji ? <StatusEmoji emoji={status.emoji} className={s.bubbleEmoji} /> : null}
+          {status.text}
+        </span>
+        {design ? <Spot design={design} part="status" label={t("designer.spot.status")} /> : null}
+      </div>
+    </div>
+  );
+}
+
 function useNarrow(el: HTMLElement | null, on: boolean): boolean {
   const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < TWO_COLUMNS + 64);
   useLayoutEffect(() => {
@@ -591,16 +656,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
         {design ? <Spot design={design} part="avatar" label={t("designer.spot.avatar")} round /> : null}
       </div>
       {cs ? (
-        <div className={s.bubble} data-testid="profile-status">
-          <div className={s.bubbleText}>
-            {/* one inline run, so the emoji stays on the text's first line and the clamp counts lines */}
-            <span>
-              {cs.emoji ? <Twemoji text={cs.emoji} className={s.bubbleEmoji} /> : null}
-              {cs.text}
-            </span>
-            {design ? <Spot design={design} part="status" label={t("designer.spot.status")} /> : null}
-          </div>
-        </div>
+        <StatusBubble status={cs} design={design} />
       ) : design ? (
         // in the designer, an empty status is a bubble waiting to be filled
         <div className={s.bubble}>

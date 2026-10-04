@@ -5426,5 +5426,11 @@
   "android.update.failed": "Não foi possível baixar a nova versão. Tente de novo em instantes.",
   "bugs.context.appAndroid": "App para Android",
   "whatsNew.r202610028.swipeBody": "No celular, deslize uma mensagem para a esquerda e solte quando a seta acender para respondê-la.",
-  "whatsNew.r202610028.swipeTitle": "Deslize para responder"
+  "whatsNew.r202610028.swipeTitle": "Deslize para responder",
+  "whatsNew.r20261004.statusEmojiTitle": "Emojis personalizados no seu status",
+  "whatsNew.r20261004.statusEmojiBody": "Seu status pode mostrar qualquer emoji que você pode usar, incluindo os de um servidor e os dos seus pacotes. Clique no seu nome no canto e escolha Definir um status personalizado.",
+  "whatsNew.r20261004.wholeStatusTitle": "Leia um status inteiro",
+  "whatsNew.r20261004.wholeStatusBody": "Um status longo aparece cortado ao lado da foto no perfil. Passe o mouse por cima ou toque nele para ler tudo.",
+  "whatsNew.r20261004.callsTitle": "As chamadas continuam no Android",
+  "whatsNew.r20261004.callsBody": "Fechar o app Android não encerra mais a sua chamada. A notificação dela traz a chamada de volta ou desliga."
 }

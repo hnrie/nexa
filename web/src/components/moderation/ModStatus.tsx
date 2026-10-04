@@ -1,8 +1,8 @@
 import type { ModUser } from "@/api/moderation";
 import type { Activity, Presence } from "@/api/types";
+import { StatusEmoji } from "@/components/activity/StatusEmoji";
 import { ActivityIcon } from "@/components/activity/StatusLine";
 import { statusLabel } from "@/components/common/Avatar";
-import { Twemoji } from "@/components/common/Twemoji";
 import { activityLine, isSpotify } from "@/lib/activity";
 import { activitiesOf, customStatus } from "@/stores/presence";
 import m from "./Moderation.module.css";
@@ -37,7 +37,7 @@ export function StatusSummary({ st, compact = false }: { st: ModStatus; compact?
       </span>
       {st.custom ? (
         <span className={m.custom} title={[st.custom.emoji, st.custom.text].filter(Boolean).join(" ")} data-testid="mod-custom-status">
-          {st.custom.emoji ? <Twemoji text={st.custom.emoji} className={m.customEmoji} /> : null}
+          {st.custom.emoji ? <StatusEmoji emoji={st.custom.emoji} className={m.customEmoji} /> : null}
           <span className={m.customText}>{st.custom.text}</span>
         </span>
       ) : null}

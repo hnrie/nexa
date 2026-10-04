@@ -3,6 +3,7 @@ package fish.nexa.ui.profile
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
@@ -12,6 +13,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.Placeholder
@@ -21,9 +24,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import coil3.compose.AsyncImage
 import fish.nexa.Nexa
+import fish.nexa.media.Media
 import fish.nexa.media.TwemojiImage
 import fish.nexa.net.Activity
 import fish.nexa.net.Presence
@@ -31,6 +37,7 @@ import fish.nexa.ui.Icon
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.t
 import fish.nexa.ui.theme.Nx
+import kotlin.math.roundToInt
 
 /** stores/presence.ts: what of someone's presence others can see (nothing while offline or invisible). */
 object Presences {
@@ -142,6 +149,27 @@ fun ActivityIcon(a: Activity, more: Int = 0, size: androidx.compose.ui.unit.Dp =
     }
 }
 
+/** A custom emoji as a status carries it: the token a message writes it as (`<:name:id>`, `<a:name:id>` when it moves). */
+private val CUSTOM_STATUS_EMOJI = Regex("^<(a?):(\\w+):(\\d+)>$")
+
+/** A status's emoji as words, for what reads the screen aloud: a custom one by its :name: (StatusEmoji.tsx statusEmojiText). */
+fun statusEmojiText(emoji: String): String = CUSTOM_STATUS_EMOJI.matchEntire(emoji)?.let { ":" + it.groupValues[2] + ":" } ?: emoji
+
+/** A status's emoji: a standard one drawn as Twemoji, a server's or a pack's own as its picture (StatusEmoji.tsx). */
+@Composable
+fun StatusEmojiImage(emoji: String, size: Dp, modifier: Modifier = Modifier) {
+    val m = CUSTOM_STATUS_EMOJI.matchEntire(emoji)
+    if (m == null) {
+        TwemojiImage(emoji, size, modifier)
+        return
+    }
+    val density = LocalDensity.current.density
+    AsyncImage(
+        Media.emojiUrl(m.groupValues[3], size.value.roundToInt(), density, still = m.groupValues[1] != "a"), ":" + m.groupValues[2] + ":",
+        imageLoader = Media.loader, contentScale = ContentScale.Fit, modifier = modifier.size(size),
+    )
+}
+
 /**
  * StatusLine: under a name, the custom status (its emoji in Twemoji and its
  * words), or else the first activity's name in bold beside its kind; running
@@ -162,7 +190,7 @@ fun StatusLine(userId: String, style: TextStyle, color: Color, modifier: Modifie
         val text = buildAnnotatedString {
             if (custom != null && (custom.text.isNotEmpty() || custom.emoji.isNotEmpty())) {
                 if (custom.emoji.isNotEmpty()) {
-                    appendInlineContent("emoji", custom.emoji)
+                    appendInlineContent("emoji", statusEmojiText(custom.emoji))
                     append(" ")
                 }
                 append(custom.text)
@@ -171,7 +199,7 @@ fun StatusLine(userId: String, style: TextStyle, color: Color, modifier: Modifie
             }
         }
         val inline = if (custom?.emoji?.isNotEmpty() == true) mapOf(
-            "emoji" to InlineTextContent(Placeholder(1.15.em, 1.15.em, PlaceholderVerticalAlign.Center)) { TwemojiImage(custom.emoji, (style.fontSize.value * 1.15f).dp) },
+            "emoji" to InlineTextContent(Placeholder(1.15.em, 1.15.em, PlaceholderVerticalAlign.Center)) { StatusEmojiImage(custom.emoji, (style.fontSize.value * 1.15f).dp) },
         ) else emptyMap()
         BasicText(
             text,

@@ -69,7 +69,9 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.collapse
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.expand
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -84,6 +86,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
 import fish.nexa.Nexa
 import fish.nexa.data.P
@@ -91,7 +94,6 @@ import fish.nexa.data.People
 import fish.nexa.data.Perms
 import fish.nexa.data.Send
 import fish.nexa.media.Media
-import fish.nexa.media.TwemojiImage
 import fish.nexa.net.Member
 import fish.nexa.net.PublicUser
 import fish.nexa.net.Relationship
@@ -257,9 +259,13 @@ private fun BannerButton(icon: String, label: String, busy: Boolean = false, ico
     }
 }
 
-/** A custom status: a thought bubble beside the avatar, across the banner's edge. */
+/**
+ * A custom status: a thought bubble beside the avatar, across the banner's
+ * edge. A long one is cut to `lines` there, and a tap opens it to every word
+ * (`open`, which the card lifts over what is below it).
+ */
 @Composable
-private fun StatusBubble(custom: Presences.Custom, lines: Int, modifier: Modifier, design: ProfileDesign? = null) {
+private fun StatusBubble(custom: Presences.Custom, lines: Int, modifier: Modifier, design: ProfileDesign? = null, open: Boolean = false, onOpen: (Boolean) -> Unit = {}) {
     val c = Nx.colors
     val p = LocalProfile.current
     val reduced = Nx.motion.reduced
@@ -268,13 +274,13 @@ private fun StatusBubble(custom: Presences.Custom, lines: Int, modifier: Modifie
     LaunchedEffect(Unit) { if (!reduced) shown.animateTo(1f, tween(360, delayMillis = 80, easing = spring)) }
     val style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(18f), fontWeight = FontWeight(500))
     val text = buildAnnotatedString {
-        if (custom.emoji.isNotEmpty()) appendInlineContent("emoji", custom.emoji)
+        if (custom.emoji.isNotEmpty()) appendInlineContent("emoji", statusEmojiText(custom.emoji))
         append(custom.text)
     }
     // an 18 px emoji and 6 px after it, at 14 px text
     val inline = if (custom.emoji.isEmpty()) emptyMap() else mapOf(
         "emoji" to InlineTextContent(Placeholder((24f / 14f).em, (18f / 14f).em, PlaceholderVerticalAlign.Center)) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { TwemojiImage(custom.emoji, 18.dp) }
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { StatusEmojiImage(custom.emoji, 18.dp) }
         },
     )
     val bubble = RoundedCornerShape(18.dp)
@@ -292,18 +298,25 @@ private fun StatusBubble(custom: Presences.Custom, lines: Int, modifier: Modifie
             Box(Modifier.offset((-13).dp, (-14).dp).size(5.dp).boxShadow(CircleShape, 2f, 6f, c.shadeAt(0.3f)).background(p.bubble, CircleShape))
             Box(Modifier.offset((-6).dp, (-8).dp).size(10.dp).boxShadow(CircleShape, 2f, 6f, c.shadeAt(0.3f)).background(p.bubble, CircleShape))
             Spotted(design, ProfilePart.STATUS, t("designer.spot.status")) {
+                var cut by remember(custom) { mutableStateOf(false) }
                 BasicText(
                     text,
                     Modifier
+                        .then(
+                            if (design == null && (cut || open)) Modifier.clip(bubble).pressable(remember { MutableInteractionSource() }) { onOpen(!open) }
+                                .semantics { if (open) collapse { onOpen(false); true } else expand { onOpen(true); true } }
+                            else Modifier,
+                        )
                         .boxShadow(bubble, 6f, 18f, c.shadeAt(0.6f), spread = -6f)
                         .ring(bubble, c.borderSubtle)
                         .background(p.bubble, bubble)
                         .topEdge(bubble, c.edgeLight)
                         .padding(horizontal = 13.dp, vertical = 8.dp),
                     style = style.copy(color = c.textStrong),
-                    maxLines = lines,
+                    maxLines = if (open) Int.MAX_VALUE else lines,
                     overflow = TextOverflow.Ellipsis,
                     inlineContent = inline,
+                    onTextLayout = { if (!open) cut = it.hasVisualOverflow },
                 )
             }
         }
@@ -331,7 +344,9 @@ private fun ProfileTop(
     buttons: @Composable RowScope.() -> Unit,
 ) {
     val c = Nx.colors
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    var statusOpen by remember(custom) { mutableStateOf(false) }
+    // an opened status runs over what is below the banner: drawn after it, and touched first
+    BoxWithConstraints(Modifier.fillMaxWidth().zIndex(if (statusOpen) 1f else 0f)) {
         val bannerH = maxWidth * (6f / 17f)
         Box(Modifier.fillMaxWidth().height(bannerH + av * 0.4f)) {
             Spotted(
@@ -358,7 +373,7 @@ private fun ProfileTop(
             }
             val bubbleAt = Modifier.padding(start = avLeft + av + 14.dp, end = 16.dp).offset(y = bannerH - 18.dp)
             // in the designer, an empty status is a bubble waiting to be filled
-            if (custom != null) StatusBubble(custom, statusLines, bubbleAt, design)
+            if (custom != null) StatusBubble(custom, statusLines, bubbleAt, design, statusOpen) { statusOpen = it }
             else if (design != null) GhostBubble(design, bubbleAt)
         }
     }

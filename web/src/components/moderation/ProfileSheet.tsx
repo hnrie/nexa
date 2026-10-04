@@ -2,9 +2,9 @@ import { CalendarDays, ChevronRight, Clock, Copy, Crown, Eraser, ImageOff, Shiel
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { ModMembership, ModPack, ModUser, ResetField } from "@/api/moderation";
 import { bannerUrl } from "@/api/users";
+import { StatusEmoji, statusEmojiText } from "@/components/activity/StatusEmoji";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
-import { Twemoji } from "@/components/common/Twemoji";
 import { profileTheme } from "@/lib/avatarColor";
 import { copyAndSay } from "@/lib/copyText";
 import { useRenderCtx } from "@/lib/markdownCtx";
@@ -62,7 +62,7 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
   const blocked = deleted ? t("moderation.user.deleted") : blockedText(user.blocked);
   const locked = !!blocked;
   const reset = (f: ResetField) => onModerate({ action: "field_reset", preset: { fields: [f] } });
-  const status = [user.status_emoji, user.status_text].filter(Boolean).join(" ");
+  const status = [statusEmojiText(user.status_emoji), user.status_text].filter(Boolean).join(" ");
   const nicknamed = servers.filter((s) => s.nickname);
   const typing = typingStyleText(readTypingStyle(user.typing_style));
   const widgets = widgetsText(readWidgets(user.widgets), widgetTitle);
@@ -107,7 +107,7 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
       label: fieldLabel("status"),
       value: status ? (
         <span className={p.inline}>
-          {user.status_emoji ? <Twemoji text={user.status_emoji} className={p.emoji} /> : null}
+          {user.status_emoji ? <StatusEmoji emoji={user.status_emoji} className={p.emoji} /> : null}
           <bdi>{user.status_text}</bdi>
         </span>
       ) : (
@@ -308,7 +308,7 @@ function PublicFace({ user, hl }: { user: ModUser; hl: Part }) {
     if (!el || open) return;
     setFolds(el.scrollHeight > el.clientHeight + 1);
   }, [user.about_me, open]);
-  const status = [user.status_emoji, user.status_text].filter(Boolean).join(" ");
+  const status = [statusEmojiText(user.status_emoji), user.status_text].filter(Boolean).join(" ");
   return (
     <section className={p.face} aria-label={t("moderation.sheet.asSeen")} data-testid="public-face">
       <span className={p.faceCaption}>{t("moderation.sheet.asSeen")}</span>
@@ -331,7 +331,7 @@ function PublicFace({ user, hl }: { user: ModUser; hl: Part }) {
         </div>
         {status ? (
           <div className={p.faceStatus} data-hl={hl === "status" || undefined}>
-            {user.status_emoji ? <Twemoji text={user.status_emoji} className={p.emoji} /> : null}
+            {user.status_emoji ? <StatusEmoji emoji={user.status_emoji} className={p.emoji} /> : null}
             <span dir="auto">{user.status_text}</span>
           </div>
         ) : null}

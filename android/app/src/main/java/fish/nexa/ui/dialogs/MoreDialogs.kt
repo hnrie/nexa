@@ -31,7 +31,6 @@ import fish.nexa.Nexa
 import fish.nexa.crypto.Bytes
 import fish.nexa.crypto.Kdf
 import fish.nexa.data.Invites
-import fish.nexa.media.TwemojiImage
 import fish.nexa.net.Channel
 import fish.nexa.net.Presence
 import fish.nexa.net.Server
@@ -217,13 +216,13 @@ internal fun CustomStatusSheet(layer: Layer, close: () -> Unit) {
                             .sunken(Radii.Xs, c)
                             .clip(Radii.Xs)
                             .pressable(remember { MutableInteractionSource() }) {
-                                // a status can only carry text, so a server's own emoji is not taken
-                                fish.nexa.ui.chat.openExpressionPicker("") { token -> if (!token.startsWith("<") && !token.startsWith(":")) emoji = token.trim() }
+                                // a server's or a pack's own emoji goes as its token, which every app draws as its picture
+                                fish.nexa.ui.pickers.Pickers.open(fish.nexa.ui.pickers.Pickers.Opener(listOf(fish.nexa.ui.pickers.Pickers.Tab.EMOJI), null, closeOnEmoji = true, onEmoji = { p -> emoji = p.text.trim() }))
                             }
                             .semantics { contentDescription = if (emoji.isNotEmpty()) t("modals.customStatus.changeTheEmoji") else t("pickers.emojiPicker.pickAnEmoji") },
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (emoji.isNotEmpty()) TwemojiImage(emoji, 24.dp) else Icon("SmilePlus", c.textMuted, size = 20.dp)
+                        if (emoji.isNotEmpty()) fish.nexa.ui.profile.StatusEmojiImage(emoji, 24.dp) else Icon("SmilePlus", c.textMuted, size = 20.dp)
                     }
                     if (emoji.isNotEmpty()) Box(
                         Modifier

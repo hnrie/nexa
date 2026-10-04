@@ -5425,5 +5425,11 @@
   "android.update.failed": "Impossible de télécharger la nouvelle version. Réessayez dans un instant.",
   "bugs.context.appAndroid": "Application Android",
   "whatsNew.r202610028.swipeBody": "Sur téléphone, faites glisser un message vers la gauche et relâchez quand la flèche s'allume pour y répondre.",
-  "whatsNew.r202610028.swipeTitle": "Glisser pour répondre"
+  "whatsNew.r202610028.swipeTitle": "Glisser pour répondre",
+  "whatsNew.r20261004.statusEmojiTitle": "Emojis personnalisés dans ton statut",
+  "whatsNew.r20261004.statusEmojiBody": "Ton statut peut afficher n'importe quel emoji que tu peux utiliser, y compris ceux d'un serveur et ceux de tes packs. Clique sur ton nom dans le coin et choisis Définir un statut personnalisé.",
+  "whatsNew.r20261004.wholeStatusTitle": "Lire un statut en entier",
+  "whatsNew.r20261004.wholeStatusBody": "Un long statut est raccourci à côté de la photo sur le profil. Survole-le ou touche-le pour le lire en entier.",
+  "whatsNew.r20261004.callsTitle": "Les appels continuent sur Android",
+  "whatsNew.r20261004.callsBody": "Fermer l'app Android ne met plus fin à ton appel. Sa notification te ramène à l'appel ou raccroche."
 }

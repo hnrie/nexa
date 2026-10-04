@@ -5324,5 +5324,11 @@
   "android.update.failed": "The new version could not be downloaded. Try again in a moment.",
   "bugs.context.appAndroid": "Android app",
   "whatsNew.r202610028.swipeBody": "On a phone, swipe a message to the left and let go when the arrow lights up to reply to it.",
-  "whatsNew.r202610028.swipeTitle": "Swipe to Reply"
+  "whatsNew.r202610028.swipeTitle": "Swipe to Reply",
+  "whatsNew.r20261004.statusEmojiTitle": "Custom Emoji in Your Status",
+  "whatsNew.r20261004.statusEmojiBody": "Your status can show any emoji you can use, including a server's own and the ones in your packs. Click your name in the corner and choose Set a Custom Status.",
+  "whatsNew.r20261004.wholeStatusTitle": "Read a Whole Status",
+  "whatsNew.r20261004.wholeStatusBody": "A long status is cut short beside someone's picture on their profile. Hover over it or tap it to read every word.",
+  "whatsNew.r20261004.callsTitle": "Calls Keep Going on Android",
+  "whatsNew.r20261004.callsBody": "Closing the Android app no longer ends your call. Its notification brings the call back or hangs up."
 }

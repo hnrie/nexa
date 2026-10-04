@@ -5149,5 +5149,11 @@
   "android.update.failed": "새 버전을 내려받지 못했어요. 잠시 후 다시 시도해 주세요.",
   "bugs.context.appAndroid": "Android 앱",
   "whatsNew.r202610028.swipeBody": "휴대폰에서 메시지를 왼쪽으로 밀고 화살표가 밝아지면 손을 떼면 답장할 수 있어요.",
-  "whatsNew.r202610028.swipeTitle": "밀어서 답장"
+  "whatsNew.r202610028.swipeTitle": "밀어서 답장",
+  "whatsNew.r20261004.statusEmojiTitle": "상태에 맞춤 이모지",
+  "whatsNew.r20261004.statusEmojiBody": "이제 서버 고유 이모지와 팩의 이모지까지, 사용할 수 있는 이모지라면 무엇이든 상태에 넣을 수 있어요. 구석에 있는 내 이름을 누르고 맞춤 상태 설정을 고르세요.",
+  "whatsNew.r20261004.wholeStatusTitle": "상태 전체 보기",
+  "whatsNew.r20261004.wholeStatusBody": "긴 상태는 프로필 사진 옆에서 잘려 보여요. 마우스를 올리거나 탭하면 전부 읽을 수 있어요.",
+  "whatsNew.r20261004.callsTitle": "Android에서 통화가 이어져요",
+  "whatsNew.r20261004.callsBody": "이제 Android 앱을 닫아도 통화가 끝나지 않아요. 통화 알림에서 다시 돌아가거나 끊을 수 있어요."
 }

@@ -96,8 +96,6 @@ object Pickers {
     class Opener(
         val tabs: List<Tab>,
         val serverId: String?,
-        /** Standard emoji only (the status dialog). */
-        val unicodeOnly: Boolean = false,
         /** Custom emoji of this server only, plus the standard ones (poll answers). */
         val thisServerOnly: Boolean = false,
         val draggable: Boolean = true,
@@ -298,16 +296,14 @@ private fun EmojiTab(opener: Pickers.Opener, pick: (Pickers.Picked) -> Unit) {
         val byUnicode = { u: String -> EmojiData.byUnicode(u) }
         val freq = recent.mapNotNull { byUnicode(it) }.map { Cell.Std(it) }
         if (freq.isNotEmpty()) out += Section("frequent", t("pickers.emojiPicker.frequentlyUsed"), { Icon("Clock", c.textMuted, size = 20.dp) }, freq)
-        if (!opener.unicodeOnly) {
-            val servers = emojis.entries.filter { (sid, list) -> list.isNotEmpty() && (!opener.thisServerOnly || sid == opener.serverId) }
-                .sortedWith(compareBy({ it.key != opener.serverId }, { Nexa.servers.get(it.key)?.server?.name?.lowercase() ?: "" }))
-            for ((sid, list) in servers) {
-                val s = Nexa.servers.get(sid)?.server ?: continue
-                out += Section("server:$sid", s.name, { ServerIcon(s.id, s.name, s.iconId, 24.dp, radius = 12.dp) }, list.map { Cell.Custom(it) })
-            }
-            if (!opener.thisServerOnly) for (p in packs.values.filter { it.kind == "emoji" && it.stickers.isNotEmpty() }.sortedByDescending { it.updatedAt }) {
-                out += Section("pack:${p.id}", p.name, { PackCover(p) }, p.stickers.map { Cell.Pack(it) })
-            }
+        val servers = emojis.entries.filter { (sid, list) -> list.isNotEmpty() && (!opener.thisServerOnly || sid == opener.serverId) }
+            .sortedWith(compareBy({ it.key != opener.serverId }, { Nexa.servers.get(it.key)?.server?.name?.lowercase() ?: "" }))
+        for ((sid, list) in servers) {
+            val s = Nexa.servers.get(sid)?.server ?: continue
+            out += Section("server:$sid", s.name, { ServerIcon(s.id, s.name, s.iconId, 24.dp, radius = 12.dp) }, list.map { Cell.Custom(it) })
+        }
+        if (!opener.thisServerOnly) for (p in packs.values.filter { it.kind == "emoji" && it.stickers.isNotEmpty() }.sortedByDescending { it.updatedAt }) {
+            out += Section("pack:${p.id}", p.name, { PackCover(p) }, p.stickers.map { Cell.Pack(it) })
         }
         val icons = mapOf(0 to "Smile", 1 to "Users", 3 to "Cat", 4 to "Pizza", 5 to "Plane", 6 to "Activity", 7 to "Lightbulb", 8 to "Leaf", 9 to "Flag")
         for (g in EmojiData.groups()) {
@@ -319,9 +315,9 @@ private fun EmojiTab(opener: Pickers.Opener, pick: (Pickers.Picked) -> Unit) {
     val results: List<Cell>? = remember(query, loaded, emojis, packs) {
         val q = query.trim().lowercase().removePrefix(":").removeSuffix(":")
         if (q.isEmpty()) return@remember null
-        val custom = if (opener.unicodeOnly) emptyList() else emojis.entries.filter { !opener.thisServerOnly || it.key == opener.serverId }
+        val custom = emojis.entries.filter { !opener.thisServerOnly || it.key == opener.serverId }
             .flatMap { it.value }.filter { it.name.lowercase().contains(q) }.take(40).map { Cell.Custom(it) }
-        val pack = if (opener.unicodeOnly || opener.thisServerOnly) emptyList() else packs.values.filter { it.kind == "emoji" }.flatMap { it.stickers }.filter { it.name.lowercase().contains(q) }.take(40).map { Cell.Pack(it) }
+        val pack = if (opener.thisServerOnly) emptyList() else packs.values.filter { it.kind == "emoji" }.flatMap { it.stickers }.filter { it.name.lowercase().contains(q) }.take(40).map { Cell.Pack(it) }
         custom + pack + EmojiData.search(q, 100).filter { EmojiData.has(it.unicode) }.map { Cell.Std(it) }
     }
 

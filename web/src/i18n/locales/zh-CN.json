@@ -5149,5 +5149,11 @@
   "android.update.failed": "无法下载新版本。请稍后再试。",
   "bugs.context.appAndroid": "Android 应用",
   "whatsNew.r202610028.swipeBody": "在手机上将消息向左滑动，箭头亮起时松手即可回复。",
-  "whatsNew.r202610028.swipeTitle": "滑动回复"
+  "whatsNew.r202610028.swipeTitle": "滑动回复",
+  "whatsNew.r20261004.statusEmojiTitle": "状态里的自定义表情",
+  "whatsNew.r20261004.statusEmojiBody": "状态现在可以显示你能用的任何表情，包括服务器自己的表情和你表情包里的表情。点击角落里的你的名字，选择“设置自定义状态”。",
+  "whatsNew.r20261004.wholeStatusTitle": "查看完整状态",
+  "whatsNew.r20261004.wholeStatusBody": "较长的状态在个人资料的头像旁会被截短。将鼠标悬停在上面或点按它即可阅读全文。",
+  "whatsNew.r20261004.callsTitle": "Android 上通话不会中断",
+  "whatsNew.r20261004.callsBody": "关闭 Android 应用不会再结束通话。通过通话通知可以回到通话或挂断。"
 }
