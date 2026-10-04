@@ -1029,6 +1029,8 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
         </>
       ) : (
         <>
+          {/* the full profile wears the banner again, faint across the top of everything, in the theme's colours */}
+          {variant === "modal" && banner ? <div className={s.backdrop} style={{ backgroundImage: `url(${banner})` }} aria-hidden="true" data-testid="profile-backdrop" /> : null}
           <div className={s.side}>
             {top}
             <div className={s.info}>

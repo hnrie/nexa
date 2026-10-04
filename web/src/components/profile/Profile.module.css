@@ -244,6 +244,23 @@
   height: min(720px, var(--profile-max-h, calc(100dvh - 48px)));
   padding: 12px;
 }
+/* the banner again, large, blurred and fading out, behind both halves of the full profile */
+.backdrop {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 360px;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center 30%;
+  filter: blur(30px) saturate(1.3);
+  opacity: 0.4;
+  transform: scale(1.15);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, rgb(0 0 0 / 0.5) 45%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, rgb(0 0 0 / 0.5) 45%, transparent 100%);
+}
+/* on a theme's colours the picture is light and shade over them, so the card keeps its own colours */
+.card[data-themed] .backdrop { mix-blend-mode: soft-light; opacity: 0.85; }
+.card[data-layout="wide"] > .side, .card[data-layout="wide"] > .main { position: relative; }
 .side {
   min-height: 0;
   overflow: hidden auto;
