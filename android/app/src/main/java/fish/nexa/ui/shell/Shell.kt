@@ -137,6 +137,8 @@ fun MainShell() {
                         if (abs(total.x) >= 12 * density || abs(total.y) >= 12 * density) {
                             decided = abs(total.x) > 1.3f * abs(total.y)
                             if (decided == false) return@awaitEachGesture
+                            // a swipe inside something that scrolls sideways belongs to that thing
+                            if (fish.nexa.ui.chat.TouchClaims.sideways) return@awaitEachGesture
                             // a swipe against the drawer's direction that starts on a message replies to it
                             if (!wasOpen && !membersOpen && total.x * dir < 0 && fish.nexa.ui.chat.TouchClaims.onMessageRow) return@awaitEachGesture
                         } else continue

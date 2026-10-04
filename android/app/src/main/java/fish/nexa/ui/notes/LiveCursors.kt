@@ -109,7 +109,8 @@ private fun placeJson(p: PlaceMark): JsonObject = buildJsonObject {
     put("k", p.k)
 }
 
-private class Remote(val userId: String, val mark: CursorMark, val moved: Long)
+/** Someone's caret: from which of their pages, where, and when it last moved (which is when its name shows). */
+private class Remote(val userId: String, val page: String, val mark: CursorMark, val moved: Long)
 
 /**
  * Everyone else's caret and selection in a note (LiveCursors.tsx), as they
@@ -124,6 +125,8 @@ fun rememberLiveCursors(noteId: String, note: OpenNote, surface: FormatSurface, 
     val users by Nexa.users.byId.collectAsState()
     val meId = Nexa.users.meId
     val scope = rememberCoroutineScope()
+    // each person's caret, from whichever of their pages moved it last: a page that closed without
+    // saying so (a tab closed, the app taken off the screen) leaves no caret behind once the one in its place moves
     val remote = remember { mutableStateMapOf<String, Remote>() }
     /** This page, among its person's other pages with the note open. */
     val sid = remember { Bytes.b64url(Bytes.random(9)) }
@@ -168,15 +171,14 @@ fun rememberLiveCursors(noteId: String, note: OpenNote, surface: FormatSurface, 
                 val msg = readCursor(raw) ?: return@launch
                 // this person's own other pages are not drawn as somebody else
                 if (d.userId == Nexa.users.meId) return@launch
-                val key = "${d.userId}:${msg.s}"
                 when (msg) {
-                    is CursorMessage.Gone -> remote.remove(key)
-                    is CursorMessage.At -> remote[key] = Remote(d.userId, msg.mark, System.currentTimeMillis())
+                    is CursorMessage.Gone -> if (remote[d.userId]?.page == msg.s) remote.remove(d.userId)
+                    is CursorMessage.At -> remote[d.userId] = Remote(d.userId, msg.s, msg.mark, System.currentTimeMillis())
                 }
             }
         }
         note.onPresence = { d ->
-            if (!d.here) remote.keys.filter { it.startsWith("${d.userId}:") }.forEach { remote.remove(it) }
+            if (!d.here) remote.remove(d.userId)
             // someone has just opened the note: they see where this caret is at once
             else if (d.hello) send(always = true)
         }
@@ -259,11 +261,11 @@ fun rememberLiveCursors(noteId: String, note: OpenNote, surface: FormatSurface, 
 private fun fieldGeometry(surface: FormatSurface, sheet: LayoutCoordinates, key: FieldKey, offset: Int): Pair<Offset, Int>? {
     val coords = surface.placed[key] ?: return null
     if (!coords.isAttached) return null
-    val laid = surface.laidOut[key] ?: return null
-    val text = surface.values[key]?.text ?: return null
-    val mapped = runCatching { laid.transformation.filter(AnnotatedString(text)).offsetMapping.originalToTransformed(offset.coerceIn(0, text.length)) }.getOrNull() ?: return null
+    val laid = surface.laidOut[key]?.invoke() ?: return null
+    val text = surface.field(key)?.text ?: return null
+    val mapped = surface.shownAt(key, offset.coerceIn(0, text.length))
     val origin = sheet.localPositionOf(coords, Offset.Zero)
-    return origin to mapped.coerceIn(0, laid.text.layoutInput.text.length)
+    return origin to mapped.coerceIn(0, laid.layoutInput.text.length)
 }
 
 /** Someone's caret, in the sheet's coordinates. */
@@ -271,8 +273,8 @@ private fun caretRect(surface: FormatSurface, sheet: LayoutCoordinates, mark: Pl
     val p = surface.locate(mark) ?: return null
     val key = surface.fieldAt(p) ?: return null
     val (origin, at) = fieldGeometry(surface, sheet, key, p.o) ?: return null
-    val laid = surface.laidOut[key] ?: return null
-    return laid.text.getCursorRect(at).translate(origin)
+    val laid = surface.laidOut[key]?.invoke() ?: return null
+    return laid.getCursorRect(at).translate(origin)
 }
 
 private fun DrawScope.drawCaret(r: Rect, hue: Color) {
@@ -299,8 +301,8 @@ private fun DrawScope.drawSelection(surface: FormatSurface, sheet: LayoutCoordin
         if (end <= start) continue
         val (origin, s) = fieldGeometry(surface, sheet, key, start) ?: continue
         val (_, e) = fieldGeometry(surface, sheet, key, end) ?: continue
-        val laid = surface.laidOut[key] ?: continue
-        val path = laid.text.getPathForRange(s, e)
+        val laid = surface.laidOut[key]?.invoke() ?: continue
+        val path = laid.getPathForRange(s, e)
         translate(origin.x, origin.y) { drawPath(path, hue.copy(alpha = 0.26f)) }
     }
 }

@@ -42,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -599,7 +600,9 @@ private fun NoteEditor(noteId: String, note: OpenNote, bridge: NoteBridge, narro
     val titleFocus = remember { FocusRequester() }
     var files by remember { mutableStateOf(initial.files) }
     var over by remember { mutableStateOf(initial.md.length > NoteModel.MAX_CHARS) }
-    var state by remember { mutableStateOf(surface.state()) }
+    // read live from the surface: a format chosen to type with (Bold pressed with nothing selected)
+    // lights its button at once, not after the next letter
+    val state by remember(surface) { derivedStateOf { surface.state() } }
     var tray by remember { mutableStateOf<Tray?>(null) }
     var redraw by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -649,7 +652,6 @@ private fun NoteEditor(noteId: String, note: OpenNote, bridge: NoteBridge, narro
     val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { addFiles(it) }
 
     fun refresh() {
-        state = surface.state()
         redraw++
     }
     LaunchedEffect(surface) {
@@ -673,8 +675,6 @@ private fun NoteEditor(noteId: String, note: OpenNote, bridge: NoteBridge, narro
             runCatching { titleFocus.requestFocus() }
         }
     }
-    LaunchedEffect(surface.sel, surface.blocks) { state = surface.state() }
-
     fun changeTitle(v: TextFieldValue) {
         // a title is one line: Enter goes on to the note itself
         if (v.text.contains('\n') && !title.text.contains('\n')) {

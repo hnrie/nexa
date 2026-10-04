@@ -265,6 +265,30 @@ describe("a note on the writing surface", () => {
     expect(note.markdown()).toBe("first\nsecond, edited by them\nthird\nfourth, added by them");
   });
 
+  it("leaves the lines after a changed one where they are, with a selection running into them", () => {
+    note.load("one\ntwo\nthree\nfour");
+    const [, , three, four] = [...page.children];
+    // "one" and "two" selected as a triple click leaves it: to the very start of "three"
+    const first = document.createTreeWalker(page.children[0]!, NodeFilter.SHOW_TEXT).nextNode()!;
+    document.getSelection()!.setBaseAndExtent(first, 0, three!, 0);
+    document.dispatchEvent(new Event("selectionchange"));
+    const removed: Node[] = [];
+    const watch = new MutationObserver((records) => records.forEach((r) => removed.push(...r.removedNodes)));
+    watch.observe(page, { childList: true });
+    // someone writes in "two", inside the selection
+    note.reload("one\ntwo and more\nthree\nfour");
+    removed.push(...watch.takeRecords().flatMap((r) => [...r.removedNodes]));
+    watch.disconnect();
+    // only the old "two" went; "three" and "four" were not taken out and put back
+    expect(removed).toHaveLength(1);
+    expect(page.children[2]).toBe(three);
+    expect(page.children[3]).toBe(four);
+    // so the selection still ends where it did, not past "three"
+    const picked = document.getSelection()!;
+    expect(picked.focusNode).toBe(three);
+    expect(picked.focusOffset).toBe(0);
+  });
+
   it("keeps the caret on the words it was on when lines are added above it", () => {
     note.load("alpha\nbeta\ngamma");
     caretIn(2, 3);
@@ -284,6 +308,18 @@ describe("a note on the writing surface", () => {
     // they add words after the caret: it does not move
     note.reload("the very quick brown fox jumps");
     expect(note.sel.focus).toEqual({ b: 0, o: 20 });
+  });
+
+  it("keeps a format chosen to type with when someone else changes the note", () => {
+    note.load("the quick fox");
+    caretIn(0, 13);
+    // Bold pressed with nothing selected: the next letters typed are bold
+    note.command({ t: "mark", flag: "b" });
+    // someone else adds a line before anything is typed here
+    note.reload("the quick fox\na line from them");
+    const typed = new InputEvent("beforeinput", { inputType: "insertText", data: "x", bubbles: true, cancelable: true });
+    page.dispatchEvent(typed);
+    expect(note.markdown()).toBe("the quick fox**x**\na line from them");
   });
 
   it("puts the caret somewhere sensible when the line it was on is gone", () => {

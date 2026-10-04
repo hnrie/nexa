@@ -16,6 +16,8 @@ const SEND_EVERY = 150;
 
 interface Remote {
   userId: string;
+  /** The page it came from. */
+  page: string;
   mark: CursorMark;
   /** When it last moved, which is when its name shows. */
   moved: number;
@@ -60,6 +62,11 @@ export function useLiveCursors({ noteId, note, ctl, page }: Options): LiveCursor
   const here = useNotes((n) => n.here[noteId]);
   const users = useUsers((u) => u.byId);
   const [drawn, setDrawn] = useState<Drawn[]>([]);
+  /**
+   * Each person's caret, from whichever of their pages moved it last: a page
+   * that closed without saying so (a tab closed, an app taken off the screen)
+   * leaves no caret behind once the person's page in its place moves.
+   */
   const remote = useRef(new Map<string, Remote>());
   const frame = useRef(0);
   /** This page, among its person's other pages with the note open. */
@@ -136,9 +143,9 @@ export function useLiveCursors({ noteId, note, ctl, page }: Options): LiveCursor
               if (!msg) return;
               // this person's own other pages are not drawn as somebody else
               if (d.user_id === useAuth.getState().me?.id) return;
-              const key = `${d.user_id}:${msg.s}`;
-              if ("gone" in msg) remote.current.delete(key);
-              else remote.current.set(key, { userId: d.user_id, mark: { a: msg.a, f: msg.f }, moved: Date.now() });
+              if ("gone" in msg) {
+                if (remote.current.get(d.user_id)?.page === msg.s) remote.current.delete(d.user_id);
+              } else remote.current.set(d.user_id, { userId: d.user_id, page: msg.s, mark: { a: msg.a, f: msg.f }, moved: Date.now() });
               redraw();
             },
             () => undefined,
@@ -146,7 +153,7 @@ export function useLiveCursors({ noteId, note, ctl, page }: Options): LiveCursor
         },
         presence: (d) => {
           if (!d.here) {
-            for (const key of [...remote.current.keys()]) if (key.startsWith(`${d.user_id}:`)) remote.current.delete(key);
+            remote.current.delete(d.user_id);
             redraw();
           } else if (d.hello) {
             // someone has just opened the note: they see where this caret is at once

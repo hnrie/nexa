@@ -3,7 +3,6 @@ package fish.nexa.ui.settings
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +38,7 @@ import fish.nexa.ui.components.NxTextField
 import fish.nexa.ui.components.Spinner
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
+import fish.nexa.ui.components.sidewaysScroll
 import fish.nexa.ui.t
 import fish.nexa.ui.theme.Nx
 import fish.nexa.ui.theme.Radii
@@ -95,7 +95,7 @@ fun LicensesPage() {
         return
     }
     NxTextField(q, { q = it }, placeholder = t("settings.licenses.searchPackages"), modifier = Modifier.semantics { contentDescription = t("settings.licenses.searchPackages") })
-    Row(Modifier.fillMaxWidth().padding(top = 10.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(Modifier.fillMaxWidth().padding(top = 10.dp).sidewaysScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Chip(t("settings.licenses.everything"), part == null) { part = null }
         for (p in cat.parts) Chip(partName(p), part == p) { part = p }
     }

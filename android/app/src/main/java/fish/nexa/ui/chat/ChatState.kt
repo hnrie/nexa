@@ -90,4 +90,10 @@ object ChatUi {
  */
 object TouchClaims {
     @Volatile var onMessageRow: Boolean = false
+    /**
+     * The finger went down on something that scrolls sideways and has more to
+     * show (a toolbar, a strip of chips, a wide code block or table): its
+     * sideways drags are that thing's, not the drawers' (AppShell.tsx scrollsSideways).
+     */
+    @Volatile var sideways: Boolean = false
 }

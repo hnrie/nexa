@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.InlineTextContent
@@ -80,6 +78,7 @@ import fish.nexa.ui.I18n
 import fish.nexa.ui.Icon
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
+import fish.nexa.ui.components.sidewaysScroll
 import fish.nexa.ui.layers.AnchorRef
 import fish.nexa.ui.layers.anchor
 import fish.nexa.ui.layers.openPopout
@@ -620,7 +619,7 @@ private fun CodeBlockView(b: Node.CodeBlock, ctx: RenderCtx) {
                 .fillMaxWidth()
                 .background(c.codeBg, shape)
                 .border(1.dp, c.codeBorder, shape)
-                .horizontalScroll(rememberScrollState())
+                .sidewaysScroll()
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             BasicText(text, style = Nx.type.code.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20.3f), color = ctx.color ?: c.text), softWrap = false)
@@ -730,7 +729,7 @@ private fun TableView(b: Node.Table, ctx: RenderCtx) {
         Modifier
             .padding(vertical = 6.dp)
             .border(1.dp, c.border, shape)
-            .horizontalScroll(rememberScrollState())
+            .sidewaysScroll()
             .semantics { contentDescription = t("render.table") },
     ) {
         Layout(content = {
@@ -760,21 +759,20 @@ private fun TableView(b: Node.Table, ctx: RenderCtx) {
                     ) { InlineText(cell, ctx, if (head) base.copy(fontWeight = FontWeight(600)) else base, false) }
                 }
             }
-        }) { measurables, constraints ->
+        }) { measurables, _ ->
             val maxCell = (280 * density).toInt()
+            // each cell is measured once: a column as wide as its widest cell would like (to a limit),
+            // a row as tall as its tallest cell is at that width
             val widths = IntArray(cols)
-            val placeables0 = measurables.map { it.measure(Constraints(maxWidth = maxCell)) }
-            placeables0.forEachIndexed { i, p -> widths[i % cols] = maxOf(widths[i % cols], p.width) }
-            val placeables = measurables.mapIndexed { i, m -> m.measure(Constraints.fixedWidth(widths[i % cols])) }
-            val heights = rows.indices.map { r -> (0 until cols).maxOf { col -> placeables[r * cols + col].height } }
-            val total = widths.sum()
-            layout(total, heights.sum()) {
+            measurables.forEachIndexed { i, m -> widths[i % cols] = maxOf(widths[i % cols], minOf(maxCell, m.maxIntrinsicWidth(Constraints.Infinity))) }
+            val heights = rows.indices.map { r -> (0 until cols).maxOf { col -> measurables[r * cols + col].maxIntrinsicHeight(widths[col]) } }
+            val placeables = measurables.mapIndexed { i, m -> m.measure(Constraints.fixed(widths[i % cols], heights[i / cols])) }
+            layout(widths.sum(), heights.sum()) {
                 var y = 0
                 for (r in rows.indices) {
                     var x = 0
                     for (col in 0 until cols) {
-                        val p = measurables[r * cols + col].measure(Constraints.fixed(widths[col], heights[r]))
-                        p.place(x, y)
+                        placeables[r * cols + col].place(x, y)
                         x += widths[col]
                     }
                     y += heights[r]

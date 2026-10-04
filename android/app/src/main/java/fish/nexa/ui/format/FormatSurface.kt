@@ -1,9 +1,12 @@
 package fish.nexa.ui.format
 
+import androidx.compose.foundation.text.input.TextFieldBuffer
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import fish.nexa.Nexa
@@ -33,9 +36,6 @@ import java.util.Locale
 
 /** One field on the page: a text block, a code block, or a table cell (row, column). */
 data class FieldKey(val id: Int, val cell: Pair<Int, Int>? = null)
-
-/** A field's text as laid out, and how its offsets map to what is drawn (an atom shows its label). */
-class FieldLayout(val text: androidx.compose.ui.text.TextLayoutResult, val transformation: androidx.compose.ui.text.input.VisualTransformation)
 
 /** What the toolbar asks of the surface (surface.ts `Command`). */
 sealed interface Cmd {
@@ -97,6 +97,9 @@ object EditorNames : AtomNames, fish.nexa.ui.markdown.NameLookup by AppNames {
         Media.emojiUrl(id, css, Nexa.app.resources.displayMetrics.density, still = !animated)
 }
 
+/** What an atom (a mention, an emoji, a time) shows in a field: its label. */
+fun atomShown(a: Inline.Atom): String = a.label.ifEmpty { a.raw }
+
 /**
  * The formatting editor's surface (web/src/components/composer/format/surface.ts)
  * without the DOM: the document as blocks, the caret, the history, and every
@@ -136,12 +139,19 @@ class FormatSurface(
     /** Whether what was loaded had nesting shown one level deep only. */
     val simplified: Boolean
 
-    /** Each field as it last was: its text, selection and the keyboard's composition. */
-    val values = mutableStateMapOf<FieldKey, TextFieldValue>()
+    /** Each field's text and caret as the model last put them, or as the keyboard last left them. */
+    private val values = HashMap<FieldKey, TextFieldValue>()
+
+    /**
+     * What each field shows and the keyboard writes in. A change put in from
+     * here (someone else's words) leaves the keyboard where it is, typing on,
+     * unless it is in the middle of a word, which waits (see [busy]).
+     */
+    private val fields = mutableStateMapOf<FieldKey, TextFieldState>()
 
     /** Where each field is on the screen and how its text is laid out, for carets drawn over the page. */
     val placed = HashMap<FieldKey, androidx.compose.ui.layout.LayoutCoordinates>()
-    val laidOut = HashMap<FieldKey, FieldLayout>()
+    val laidOut = HashMap<FieldKey, () -> TextLayoutResult?>()
 
     /** Where the caret goes after a change that put it in another field; `seq` bumps every time. */
     data class Focus(val key: FieldKey, val seq: Int)
@@ -149,6 +159,8 @@ class FormatSurface(
     var focusTo by mutableStateOf<Focus?>(null)
         private set
     private var seq = 0
+    /** When the keyboard was last asked to go to another field, until that field says it has it. */
+    private var focusAskedAt = 0L
 
     /** The document changed. */
     var onChange: (() -> Unit)? = null
@@ -218,27 +230,99 @@ class FormatSurface(
             if (key == focusKey) {
                 val a = if (sel.anchor.b == sel.focus.b && sel.anchor.cell == sel.focus.cell) sel.anchor.o else sel.focus.o
                 val range = TextRange(a.coerceIn(0, text.length), sel.focus.o.coerceIn(0, text.length))
-                if (old == null || old.text != text || (force && old.selection != range)) values[key] = TextFieldValue(text, range)
+                if (old == null || old.text != text || (force && old.selection != range)) show(key, TextFieldValue(text, range))
             } else if (old == null || old.text != text) {
-                values[key] = TextFieldValue(text, TextRange(minOf(old?.selection?.end ?: text.length, text.length)))
+                show(key, TextFieldValue(text, TextRange(minOf(old?.selection?.end ?: text.length, text.length))))
             }
         }
         for (block in blocks) {
             when (block) {
                 is TextBlock, is CodeBlock -> put(FieldKey(block.id), fieldText(block, null) ?: "")
-                is TableBlock -> block.rows.forEachIndexed { r, row -> row.indices.forEach { c -> put(FieldKey(block.id, r to c), textOf(row[c])) } }
+                // every column of every row is a field, a row written short included
+                is TableBlock -> block.rows.forEachIndexed { r, row -> repeat(block.align.size) { c -> put(FieldKey(block.id, r to c), textOf(row.getOrNull(c) ?: emptyList())) } }
                 else -> Unit
             }
         }
         values.keys.filter { it !in seen }.forEach { values.remove(it) }
+        fields.keys.filter { it !in seen }.forEach { fields.remove(it) }
         placed.keys.retainAll(seen)
         laidOut.keys.retainAll(seen)
+    }
+
+    /** The state a field shows and the keyboard writes in. */
+    fun field(key: FieldKey): TextFieldState? = fields[key]
+
+    /** The field the keyboard is changing this moment ([input]): what is shown there is settled once the change is taken in. */
+    private var writing: FieldKey? = null
+
+    /** Set when the keyboard's change to a field went to the caret's field instead ([route]): that field keeps what the keyboard wrote. */
+    private var leaveAsTyped = false
+
+    /** A field's text and caret, as the model has them, put in the field. */
+    private fun show(key: FieldKey, v: TextFieldValue) {
+        values[key] = v
+        if (key == writing) return
+        val state = fields[key]
+        if (state == null) {
+            fields[key] = TextFieldState(v.text, v.selection)
+            return
+        }
+        if (state.text.contentEquals(v.text) && state.selection == v.selection) return
+        state.edit { match(this, v.text, v.selection) }
+    }
+
+    /** Makes a field's buffer say `text`, changing only what differs, so a word being typed elsewhere in it is left alone. */
+    private fun match(buf: TextFieldBuffer, text: String, selection: TextRange) {
+        val cur = buf.asCharSequence()
+        if (!cur.contentEquals(text)) {
+            val max = minOf(cur.length, text.length)
+            var p = 0
+            while (p < max && cur[p] == text[p]) p++
+            var s = 0
+            while (s < max - p && cur[cur.length - 1 - s] == text[text.length - 1 - s]) s++
+            buf.replace(p, cur.length - s, text.substring(p, text.length - s))
+        }
+        buf.selection = TextRange(selection.start.coerceIn(0, text.length), selection.end.coerceIn(0, text.length))
+    }
+
+    /**
+     * A change the keyboard or a tap is making to a field, before the field
+     * shows it: the model takes it in, and the field is left showing what the
+     * model says it holds (the change itself, almost always).
+     */
+    fun input(key: FieldKey, buf: TextFieldBuffer) {
+        leaveAsTyped = false
+        writing = key
+        try {
+            onValue(key, TextFieldValue(buf.asCharSequence().toString(), buf.selection))
+        } finally {
+            writing = null
+        }
+        if (leaveAsTyped) return
+        val v = values[key]
+        if (v == null) buf.revertAllChanges() else match(buf, v.text, v.selection)
+    }
+
+    /** Where an offset in a field's text is in what the field draws, where each atom shows its label. */
+    fun shownAt(key: FieldKey, offset: Int): Int {
+        val runs = contentOf(blocks.getOrNull(indexOf(key)), key.cell) ?: return offset
+        var o = 0
+        var t = 0
+        for (r in runs) {
+            val len = if (r is Inline.Text) r.text.length else 1
+            val shown = if (r is Inline.Text) r.text.length else atomShown(r as Inline.Atom).length
+            if (offset < o + len || (offset == o + len && r is Inline.Text)) return if (r is Inline.Text) t + (offset - o) else t
+            o += len
+            t += shown
+        }
+        return t
     }
 
     /** Puts the keyboard where the caret now is. */
     private fun focusCaret() {
         val key = keyAt(sel.focus) ?: return
         focusTo = Focus(key, ++seq)
+        focusAskedAt = System.currentTimeMillis()
     }
 
     // -----------------------------------------------------------------------
@@ -301,6 +385,13 @@ class FormatSurface(
     /** A field took focus: the caret is where that field has it. */
     fun focused(key: FieldKey) {
         activeKey = key
+        // the keyboard is in its new field: the one it left shows what the model says again
+        stale?.let { st ->
+            if (st.key != key) {
+                stale = null
+                settle(st.key)
+            }
+        }
         val b = indexOf(key)
         if (b < 0) return
         val v = values[key] ?: return
@@ -322,10 +413,20 @@ class FormatSurface(
 
     private var stale: Stale? = null
 
-    private fun markStale(key: FieldKey, v: TextFieldValue?) {
-        if (v == null) return
+    /** The keyboard is still in a field the caret just left: what it holds around its caret, as the model left it. */
+    private fun markStale(key: FieldKey) {
+        val v = values[key] ?: return
         val c = v.selection.end.coerceIn(0, v.text.length)
         stale = Stale(key, v.text.substring(0, c), v.text.substring(c), System.currentTimeMillis())
+    }
+
+    /** A field the keyboard has left, put back to what the model says it holds, once nothing is writing in it. */
+    private fun settle(key: FieldKey) {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            val v = values[key] ?: return@post
+            val state = fields[key] ?: return@post
+            if (key != activeKey && !state.text.contentEquals(v.text)) state.edit { match(this, v.text, v.selection) }
+        }
     }
 
     /** Typing that reached a stale buffer, put at the model's caret; false when it is not that. */
@@ -348,8 +449,9 @@ class FormatSurface(
             else -> return false
         }
         st.prefix = body
-        // the keyboard is still in this field until the next frame moves it
+        // the keyboard is still in this field until the next frame moves it, and goes on from what it wrote there
         stale = st
+        leaveAsTyped = true
         return true
     }
 
@@ -357,15 +459,18 @@ class FormatSurface(
     fun onValue(key: FieldKey, v: TextFieldValue) {
         val st = stale
         if (st != null && st.key == key) {
-            if (System.currentTimeMillis() - st.at < 1500 && route(st, v)) return
+            val fresh = System.currentTimeMillis() - st.at < 1500
+            if (fresh && route(st, v)) return
             stale = null
+            // something other than typing on from where the keyboard was (a word corrected): left as the model has it
+            if (fresh) return
         }
         val b = indexOf(key)
         if (b < 0) return
         val block = blocks[b]
         val old = values[key]?.text ?: fieldText(block, key.cell) ?: return
         if (v.text == old) {
-            values[key] = v
+            show(key, v)
             focused(key)
             return
         }
@@ -400,10 +505,7 @@ class FormatSurface(
     private fun typed(key: FieldKey, b: Int, from: Int, to: Int, inserted: String, v: TextFieldValue?) {
         val block = blocks[b]
         // a space after "- ", "1.", "[]", "#", ">" or "-#" at the start of a plain line
-        if (inserted == " " && from == to && shortcut(b, from, key.cell)) {
-            markStale(key, v)
-            return
-        }
+        if (inserted == " " && from == to && shortcut(b, from, key.cell)) return
         if ('\n' in inserted && block !is CodeBlock) {
             val parts = inserted.split('\n')
             replace(key, b, from, to, parts[0], null)
@@ -412,7 +514,7 @@ class FormatSurface(
                 if (key.cell != null) break
                 if (part.isNotEmpty()) typeText(part)
             }
-            markStale(key, v)
+            if (keyAt(sel.focus) != key) markStale(key)
             return
         }
         replace(key, b, from, to, inserted, v)
@@ -434,11 +536,11 @@ class FormatSurface(
         blocks = next
         val now = fieldText(blocks[b], key.cell) ?: ""
         if (v != null && v.text == now) {
-            values[key] = v
+            show(key, v)
             sel = Sel(Pos(b, v.selection.start, key.cell), Pos(b, v.selection.end, key.cell))
         } else {
             sel = FormatModel.caret(b, caretAt, key.cell)
-            values[key] = TextFieldValue(now, TextRange(caretAt))
+            show(key, TextFieldValue(now, TextRange(caretAt)))
         }
         // marks chosen at the caret last for as long as the typing goes on there
         pending = keep?.let { sel.focus to it }
@@ -549,7 +651,10 @@ class FormatSurface(
      * has caught up with a change the model made (a shortcut, Enter), so the
      * field's own copy would be out of date. True when it was handled.
      */
-    fun hardKey(key: FieldKey, text: String?, enter: Boolean, backspace: Boolean, delete: Boolean): Boolean {
+    fun hardKey(field: FieldKey, text: String?, enter: Boolean, backspace: Boolean, delete: Boolean): Boolean {
+        // a key that comes before the keyboard has reached the field the caret went to (Enter and a letter at once) goes there
+        val moving = focusTo?.let { it.key != field && System.currentTimeMillis() - focusAskedAt < 1000 } == true
+        val key = if (moving) keyAt(sel.focus) ?: field else field
         val b = indexOf(key)
         if (b < 0) return false
         val v = values[key] ?: return false
@@ -818,8 +923,20 @@ class FormatSurface(
     // -----------------------------------------------------------------------
     // a note written together (surface.ts caretMarkdown, placeOf, reload, cursor, locate)
 
-    /** Whether a word is being composed (an input method, dictation): the document is not swapped under it. */
-    val busy: Boolean get() = activeKey?.let { values[it]?.composition } != null
+    /**
+     * Whether the document must not be swapped under the keyboard just now: a
+     * word is being composed (an input method, dictation), or the keyboard is
+     * between fields (Enter split the line and it has not reached the new one
+     * yet, so what it sends next belongs at the caret, which a swap now would
+     * put back on the line just left). The caller tries again a moment later.
+     */
+    val busy: Boolean get() {
+        if (activeKey?.let { fields[it]?.composition } != null) return true
+        val now = System.currentTimeMillis()
+        if (stale?.let { now - it.at < 1500 } == true) return true
+        val f = focusTo
+        return f != null && f.key != activeKey && now - focusAskedAt < 1000
+    }
 
     /** The page changed under the caret without anything being typed (someone else's words came in). */
     var onReload: (() -> Unit)? = null
@@ -1018,6 +1135,9 @@ class FormatSurface(
             j = aj + 1
         }
         val moved = { p: Pos -> FormatModel.clampPos(next, follow(before, next, map, p)) }
+        // a format chosen to type with (Bold pressed with nothing selected) stays chosen at the caret:
+        // someone else writing elsewhere is no reason to drop what this person is about to type
+        val keep = pending?.takeIf { it.first == sel.focus && FormatModel.collapsed(sel) }?.second
         var s = Sel(moved(sel.anchor), moved(sel.focus))
         // Where the caller says the caret goes, it goes. Without that, someone
         // else's words put in right where the caret was could land on either
@@ -1026,7 +1146,7 @@ class FormatSurface(
         val exact = if (had && caretAt != null) placeOf(markdown, caretAt) else null
         if (exact != null) s = FormatModel.caret(exact.b, exact.o)
         sel = s
-        pending = null
+        pending = if (keep != null && FormatModel.collapsed(s)) s.focus to keep else null
         past.clear()
         future.clear()
         canUndo = false

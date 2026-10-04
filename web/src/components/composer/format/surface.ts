@@ -458,6 +458,9 @@ export class FormatSurface {
       if (j >= 0) next[j] = before[i]!;
     });
     const moved = (p: Pos): Pos => clampPos(next, follow(before, next, map, p));
+    // a format chosen to type with (Bold pressed with nothing selected) stays chosen at the caret:
+    // someone else writing elsewhere is no reason to drop what this person is about to type
+    const keep = this.pending && collapsed(this.sel) && comparePos(this.pending.at, this.sel.focus) === 0 ? this.pending.marks : null;
     const sel = { anchor: moved(this.sel.anchor), focus: moved(this.sel.focus) };
     // nothing of the page's own changed place: the selection is still right where the browser has it
     const still = map[this.sel.anchor.b]! >= 0 && map[this.sel.focus.b]! >= 0;
@@ -475,6 +478,7 @@ export class FormatSurface {
       this.sel = caret(exact.b, exact.o);
       this.placeSelection();
     } else if (had && !still) this.placeSelection();
+    if (keep && collapsed(this.sel)) this.pending = { at: this.sel.focus, marks: keep };
     this.emitState();
     return true;
   }
@@ -627,18 +631,16 @@ export class FormatSurface {
       children.push(el);
     });
     this.elements = next;
-    // Only what is out of place is moved. An element left where it is keeps
-    // the caret and the selection inside it, which swapping every child
-    // would drop.
+    // What is no longer drawn goes first, then only what is out of place is
+    // moved. An element left where it is keeps the caret and the selection
+    // inside it, which moving it would drop: with a line's old element still
+    // in place, its new one going in front would push every line after it.
+    const drawn = new Set<Node>(children);
+    for (const node of [...this.root.childNodes]) if (!drawn.has(node)) node.remove();
     let at: ChildNode | null = this.root.firstChild;
     for (const el of children) {
       if (el === at) at = at.nextSibling;
       else this.root.insertBefore(el, at);
-    }
-    while (at) {
-      const gone: ChildNode = at;
-      at = at.nextSibling;
-      gone.remove();
     }
     this.tellFiles();
     this.opts.onDraw?.();

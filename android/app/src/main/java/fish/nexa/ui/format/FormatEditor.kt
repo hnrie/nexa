@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -26,7 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -34,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import fish.nexa.ui.Icon
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
+import fish.nexa.ui.components.sidewaysScroll
 import fish.nexa.ui.layers.Layer
 import fish.nexa.ui.layers.Layers
 import fish.nexa.ui.markdown.Align
@@ -173,12 +173,13 @@ private fun EditorFrame(
     val enter = remember { Animatable(if (reduced) 1f else 0f) }
     var leaving by remember { mutableStateOf(false) }
     var markdown by remember { mutableStateOf(surface.markdown()) }
-    var state by remember { mutableStateOf(surface.state()) }
+    // read live from the surface: the caret, the text and a format chosen to type with (Bold pressed
+    // with nothing selected) all show on the toolbar the moment they change, not after the next letter
+    val state by remember(surface) { derivedStateOf { surface.state() } }
     var tray by remember { mutableStateOf<Tray?>(null) }
     val density = LocalDensity.current.density
     fun refresh() {
         markdown = surface.markdown()
-        state = surface.state()
     }
     fun gone() {
         if (leaving) return
@@ -209,8 +210,6 @@ private fun EditorFrame(
         surface.onEscape = { if (tray != null) tray = null else requestClose() }
         if (!reduced) enter.animateTo(1f, tween(280, easing = ease))
     }
-    // the caret moving changes what the toolbar shows
-    LaunchedEffect(surface.sel, surface.blocks) { state = surface.state() }
     BackHandler {
         if (tray != null) tray = null else requestClose()
     }
@@ -382,7 +381,7 @@ internal fun Toolbar(s: SurfaceState, tray: Tray?, toggle: (Tray) -> Unit, surfa
             .fillMaxWidth()
             .background(c.bgSurface)
             .topHairline(c.borderSubtle)
-            .horizontalScroll(rememberScrollState())
+            .sidewaysScroll()
             .padding(start = 10.dp, end = 10.dp, top = 4.dp)
             .semantics { contentDescription = t("composer.format.toolbar") },
         verticalAlignment = Alignment.CenterVertically,
@@ -584,7 +583,7 @@ private fun calloutTint(wrap: Wrap): Color {
 @Composable
 private fun Chips(content: @Composable () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().sidewaysScroll().padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) { content() }
@@ -688,7 +687,7 @@ private fun ColourTray(s: SurfaceState, surface: FormatSurface) {
     }
     Column {
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
+            Modifier.fillMaxWidth().sidewaysScroll().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -778,7 +777,7 @@ private fun LinkTray(s: SurfaceState, surface: FormatSurface, done: () -> Unit) 
     }
     Column {
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
+            Modifier.fillMaxWidth().sidewaysScroll().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -799,7 +798,7 @@ private fun CodeTray(lang: String, surface: FormatSurface) {
     var value by remember(lang) { mutableStateOf(lang) }
     Column {
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
+            Modifier.fillMaxWidth().sidewaysScroll().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {

@@ -2,7 +2,6 @@ package fish.nexa.ui.format
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +20,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.OutputTransformation
+import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -53,15 +55,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.OffsetMapping
-import androidx.compose.ui.text.input.TransformedText
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.LineHeightStyle
@@ -73,6 +71,7 @@ import androidx.compose.ui.unit.em
 import fish.nexa.ui.Icon
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
+import fish.nexa.ui.components.sidewaysScroll
 import fish.nexa.ui.markdown.Align
 import fish.nexa.ui.markdown.MarkdownColors
 import fish.nexa.ui.markdown.Rgb
@@ -329,7 +328,7 @@ private fun TextBlockView(surface: FormatSurface, block: TextBlock, number: Int?
         if (block.textKind == TextKind.NOTE) {
             Txt("[${block.label ?: ""}] ", style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600), lineHeight = style.lineHeight), color = c.link)
         }
-        EditField(surface, key, style, block.content, placeholder, Modifier.weight(1f))
+        EditField(surface, key, style, placeholder, Modifier.weight(1f))
     }
 }
 
@@ -397,7 +396,7 @@ private fun CodeBlockView(surface: FormatSurface, block: CodeBlock) {
         EditField(
             surface, FieldKey(block.id),
             Nx.type.code.copy(color = c.text, fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20.3f), textAlign = TextAlign.Left),
-            null, null, Modifier.fillMaxWidth(), code = true,
+            null, Modifier.fillMaxWidth(), code = true,
         )
     }
 }
@@ -407,12 +406,11 @@ private fun CodeBlockView(surface: FormatSurface, block: CodeBlock) {
 private fun TableView(surface: FormatSurface, block: TableBlock) {
     val c = Nx.colors
     val cols = block.align.size
-    Box(Modifier.fillMaxWidth().padding(vertical = 6.dp).horizontalScroll(rememberScrollState())) {
+    Box(Modifier.fillMaxWidth().padding(vertical = 6.dp).sidewaysScroll()) {
         Layout(
             content = {
                 block.rows.forEachIndexed { r, row ->
                     for (col in 0 until cols) {
-                        val cell = row.getOrNull(col) ?: emptyList()
                         val head = r == 0
                         Box(
                             Modifier
@@ -429,13 +427,13 @@ private fun TableView(surface: FormatSurface, block: TableBlock) {
                             EditField(
                                 surface, FieldKey(block.id, r to col),
                                 base.copy(fontWeight = if (head) FontWeight(600) else FontWeight(400), textAlign = align),
-                                cell, null, Modifier.widthIn(min = 52.dp, max = 220.dp),
+                                null, Modifier.widthIn(min = 52.dp, max = 220.dp),
                             )
                         }
                     }
                 }
             },
-        ) { measurables, constraints ->
+        ) { measurables, _ ->
             val rows = block.rows.size
             val min = 72.dp.roundToPx()
             val widths = IntArray(cols) { min }
@@ -443,8 +441,8 @@ private fun TableView(surface: FormatSurface, block: TableBlock) {
                 val w = measurables[k].maxIntrinsicWidth(Constraints.Infinity)
                 widths[k % cols] = maxOf(widths[k % cols], w)
             }
-            val placeables = measurables.mapIndexed { k, m -> m.measure(Constraints.fixedWidth(widths[k % cols])) }
-            val heights = IntArray(rows) { r -> (0 until cols).maxOf { col -> placeables[r * cols + col].height } }
+            // a row is as tall as its tallest cell, and each cell is measured once, at its row's height
+            val heights = IntArray(rows) { r -> (0 until cols).maxOf { col -> measurables[r * cols + col].maxIntrinsicHeight(widths[col]) } }
             val placed = measurables.mapIndexed { k, m -> m.measure(Constraints.fixed(widths[k % cols], heights[k / cols])) }
             val width = widths.sum()
             val height = heights.sum()
@@ -473,34 +471,33 @@ private fun EditField(
     surface: FormatSurface,
     key: FieldKey,
     style: TextStyle,
-    content: List<Inline>?,
     placeholder: String?,
     modifier: Modifier,
     code: Boolean = false,
 ) {
     val c = Nx.colors
-    val value = surface.values[key] ?: androidx.compose.ui.text.input.TextFieldValue("")
+    val state = surface.field(key) ?: return
     val focus = remember { FocusRequester() }
     val target = surface.focusTo
     LaunchedEffect(target) { if (target?.key == key) runCatching { focus.requestFocus() } }
     val mono = Nx.type.mono
-    val transformation = remember(content, c, mono) { if (content == null) VisualTransformation.None else RunsTransformation(content, c, mono) }
+    // one look for the field's life: a new one would restart the keyboard's connection to it
+    val look = remember(surface, key, c, mono, code) { if (code) null else RunsLook(surface, key, c, mono) }
+    val input = remember(surface, key) { FieldInput(surface, key) }
     BasicTextField(
-        value = value,
-        onValueChange = { surface.onValue(key, it) },
+        state = state,
         modifier = modifier
             .focusRequester(focus)
             .onFocusChanged { if (it.isFocused) surface.focused(key) else surface.blurred(key) }
             .onGloballyPositioned { surface.placed[key] = it }
             .onPreviewKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                val v = surface.values[key] ?: return@onPreviewKeyEvent false
                 val mod = e.isCtrlPressed || e.isMetaPressed
                 val ch = e.nativeKeyEvent.unicodeChar
                 when {
                     e.key == Key.Tab && key.cell != null -> { surface.moveCell(key, if (e.isShiftPressed) -1 else 1); true }
                     // the keyboard's composing stays the field's; everything else goes to the model first
-                    v.composition != null -> false
+                    state.composition != null -> false
                     e.key == Key.Backspace && !mod -> surface.hardKey(key, null, enter = false, backspace = true, delete = false)
                     e.key == Key.Delete && !mod -> surface.hardKey(key, null, enter = false, backspace = false, delete = true)
                     (e.key == Key.Enter || e.key == Key.NumPadEnter) && !mod -> surface.hardKey(key, null, enter = true, backspace = false, delete = false)
@@ -519,14 +516,15 @@ private fun EditField(
                     else -> false
                 }
             },
+        inputTransformation = input,
         textStyle = style,
         cursorBrush = SolidColor(c.textBrand),
-        visualTransformation = transformation,
-        onTextLayout = { surface.laidOut[key] = FieldLayout(it, transformation) },
+        outputTransformation = look,
+        onTextLayout = { result -> surface.laidOut[key] = result },
         keyboardOptions = KeyboardOptions(capitalization = if (code) KeyboardCapitalization.None else KeyboardCapitalization.Sentences, autoCorrectEnabled = !code),
-        decorationBox = { inner ->
+        decorator = { inner ->
             Box {
-                if (value.text.isEmpty() && placeholder != null) {
+                if (state.text.isEmpty() && placeholder != null) {
                     Txt(placeholder, style = style.copy(fontWeight = if (style.fontWeight == FontWeight(600)) FontWeight(600) else FontWeight(400)), color = c.textPlaceholder, maxLines = 1)
                 }
                 inner()
@@ -535,66 +533,46 @@ private fun EditField(
     )
 }
 
+/** What the keyboard (or a tap) does to a field goes to the surface first, which says what the field holds after it. */
+private class FieldInput(private val surface: FormatSurface, private val key: FieldKey) : InputTransformation {
+    override fun TextFieldBuffer.transformInput() = surface.input(key, this)
+
+    override fun equals(other: Any?): Boolean = other is FieldInput && other.surface === surface && other.key == key
+    override fun hashCode(): Int = key.hashCode()
+}
+
 /**
  * Draws a field's runs with their marks (FormatEditor.module.css, "marks,
- * drawn as a message draws them"): atoms, one character in the field, show
- * their label, so offsets are mapped across them.
+ * drawn as a message draws them"): an atom, one character in the field,
+ * shows its label, which the caret steps over whole. The runs are read from
+ * the model as the field is drawn, so the look stays the same object while
+ * the words change.
  */
-private class RunsTransformation(private val runs: List<Inline>, private val c: NexaColors, private val mono: androidx.compose.ui.text.font.FontFamily) : VisualTransformation {
-    override fun filter(text: AnnotatedString): TransformedText {
-        val plain = FormatSurface.textOf(runs)
-        if (plain != text.text) return TransformedText(text, OffsetMapping.Identity)
-        val out = AnnotatedString.Builder()
-        // original offset -> transformed offset, at each run's start
-        val starts = ArrayList<Pair<Int, Int>>()
-        val ends = ArrayList<Pair<Int, Int>>()
+private class RunsLook(
+    private val surface: FormatSurface,
+    private val key: FieldKey,
+    private val c: NexaColors,
+    private val mono: androidx.compose.ui.text.font.FontFamily,
+) : OutputTransformation {
+    override fun TextFieldBuffer.transformOutput() {
+        val runs = surface.contentOf(surface.blocks.getOrNull(surface.indexOf(key)), key.cell) ?: return
+        // the field runs a letter ahead of the model while it is typed: drawn plain for that moment
+        if (!asCharSequence().contentEquals(FormatSurface.textOf(runs))) return
+        val tones = MarkdownColors.Surface(Rgb.of(c.bgBase.toArgb()), Rgb.of(c.text.toArgb()))
         var o = 0
-        val surface = MarkdownColors.Surface(Rgb.of(c.bgBase.toArgb()), Rgb.of(c.text.toArgb()))
         for (r in runs) {
-            val shown = if (r is Inline.Text) r.text else atomLabel(r as Inline.Atom)
-            val from = out.length
-            out.append(shown)
-            val span = spanOf(r.marks, surface)
-            if (span != null) out.addStyle(span, from, out.length)
-            if (r is Inline.Atom) out.addStyle(atomStyle(r), from, out.length)
-            starts += o to from
-            o += if (r is Inline.Text) r.text.length else 1
-            ends += o to out.length
-        }
-        val shownText = out.toAnnotatedString()
-        val mapping = object : OffsetMapping {
-            override fun originalToTransformed(offset: Int): Int {
-                if (offset <= 0) return 0
-                for (k in starts.indices) {
-                    val (os, ts) = starts[k]
-                    val (oe, te) = ends[k]
-                    if (offset in os..oe) {
-                        val atom = runs[k] is Inline.Atom
-                        return if (atom) (if (offset == oe) te else ts) else ts + (offset - os)
-                    }
-                }
-                return shownText.length
+            val from = o
+            if (r is Inline.Atom) {
+                val label = atomShown(r)
+                replace(o, o + 1, label)
+                o += label.length
+            } else {
+                o += (r as Inline.Text).text.length
             }
-
-            override fun transformedToOriginal(offset: Int): Int {
-                if (offset <= 0) return 0
-                for (k in starts.indices) {
-                    val (os, ts) = starts[k]
-                    val (oe, te) = ends[k]
-                    if (offset in ts..te) {
-                        val atom = runs[k] is Inline.Atom
-                        return if (atom) (if (offset - ts > (te - ts) / 2) oe else os) else os + (offset - ts)
-                    }
-                }
-                return plain.length
-            }
+            if (o == from) continue
+            spanOf(r.marks, tones)?.let { addStyle(it, from, o) }
+            if (r is Inline.Atom) addStyle(atomStyle(r), from, o)
         }
-        return TransformedText(shownText, mapping)
-    }
-
-    private fun atomLabel(a: Inline.Atom): String = when (a.atom) {
-        AtomKind.EMOJI -> a.label.ifEmpty { a.raw }
-        else -> a.label.ifEmpty { a.raw }
     }
 
     private fun atomStyle(a: Inline.Atom): SpanStyle = when (a.atom) {
@@ -631,6 +609,6 @@ private class RunsTransformation(private val runs: List<Inline>, private val c: 
 
     private fun hexColour(hex: String): Color = Color(0xFF000000 or hex.removePrefix("#").toLong(16))
 
-    override fun equals(other: Any?): Boolean = other is RunsTransformation && other.runs == runs && other.c == c && other.mono == mono
-    override fun hashCode(): Int = runs.hashCode()
+    override fun equals(other: Any?): Boolean = other is RunsLook && other.surface === surface && other.key == key && other.c == c && other.mono == mono
+    override fun hashCode(): Int = key.hashCode()
 }

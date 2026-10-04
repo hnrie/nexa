@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +49,7 @@ import fish.nexa.ui.components.NxButton
 import fish.nexa.ui.components.NxCheckbox
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
+import fish.nexa.ui.components.sidewaysScroll
 import fish.nexa.ui.layers.Layer
 import fish.nexa.ui.layers.Layers
 import fish.nexa.ui.layers.Sheet
@@ -226,7 +226,7 @@ object Legal {
                 style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), lineHeight = Nx.type.sp(23.25f)), color = c.text,
             )
             if (updated) Changes()
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.sidewaysScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for ((id, label) in listOf("summary" to t("legal.readSummary"), "terms" to t("legal.termsTitle"), "privacy" to t("legal.privacyTitle"))) {
                     val on = tab == id
                     val shape = RoundedCornerShape(20.dp)

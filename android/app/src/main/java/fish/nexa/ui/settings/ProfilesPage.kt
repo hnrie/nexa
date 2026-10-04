@@ -5,7 +5,6 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -24,7 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -92,6 +90,7 @@ import fish.nexa.ui.components.Spinner
 import fish.nexa.ui.components.TabStrip
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
+import fish.nexa.ui.components.sidewaysScroll
 import fish.nexa.ui.describeError
 import fish.nexa.ui.layers.openSheet
 import fish.nexa.ui.profile.FullProfileCard
@@ -460,7 +459,7 @@ fun ProfilesPage(anchor: String?) {
         Modifier
             .padding(top = 12.dp, bottom = 14.dp)
             .bleed(16.dp)
-            .horizontalScroll(rememberScrollState())
+            .sidewaysScroll()
             .padding(horizontal = 16.dp, vertical = 2.dp)
             .semantics { contentDescription = t("designer.parts") },
         horizontalArrangement = Arrangement.spacedBy(6.dp),

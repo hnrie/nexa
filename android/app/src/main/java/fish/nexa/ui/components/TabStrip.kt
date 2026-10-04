@@ -1,7 +1,6 @@
 package fish.nexa.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -62,7 +60,7 @@ fun <T> TabStrip(
     ) {
         val inner = maxWidth - 6.dp
         val narrow = maxWidth < 420.dp
-        Box(Modifier.horizontalScroll(rememberScrollState()).padding(3.dp)) {
+        Box(Modifier.sidewaysScroll().padding(3.dp)) {
             ShareRow(inner, gap = 2.dp) {
                 for ((key, text) in tabs) StripTab(text, key == selected, tabHeight, if (narrow) 8.dp else 12.dp, count(key)) { onSelect(key) }
             }

@@ -40,6 +40,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import fish.nexa.ui.settings.keptAboveSaveBar
 import androidx.compose.ui.unit.offset
 import androidx.compose.ui.layout.layout
@@ -109,6 +114,33 @@ fun Txt(
         maxLines = maxLines,
         overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis,
     )
+}
+
+/**
+ * Marks a finger that goes down here as this sideways scroller's while [active]
+ * says it has more to show, so the page's drawer swipe leaves its drags alone
+ * (TouchClaims.sideways; the web's AppShell scrollsSideways).
+ */
+fun Modifier.claimsSideways(active: () -> Boolean): Modifier = this.pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        fish.nexa.ui.chat.TouchClaims.sideways = active()
+        try {
+            while (true) {
+                val ev = awaitPointerEvent(PointerEventPass.Initial)
+                if (ev.changes.none { it.pressed }) break
+            }
+        } finally {
+            fish.nexa.ui.chat.TouchClaims.sideways = false
+        }
+    }
+}
+
+/** horizontalScroll, with the finger claimed while there is more to scroll to. */
+@Composable
+fun Modifier.sidewaysScroll(): Modifier {
+    val state = rememberScrollState()
+    return this.claimsSideways { state.maxValue > 0 }.horizontalScroll(state)
 }
 
 /**

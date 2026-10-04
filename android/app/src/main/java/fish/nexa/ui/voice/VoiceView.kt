@@ -83,6 +83,7 @@ import fish.nexa.net.VoiceState
 import fish.nexa.ui.Icon
 import fish.nexa.ui.components.Avatar
 import fish.nexa.ui.components.Txt
+import fish.nexa.ui.components.claimsSideways
 import fish.nexa.ui.components.pressable
 import fish.nexa.ui.layers.Layer
 import fish.nexa.ui.layers.Layers
@@ -333,7 +334,8 @@ private fun Stage(channelId: String, state: CallState, byUser: Map<String, Voice
                     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         TileView(focusedTile, channelId, state, byUser, speaking, mix.localMutes, mix.streamMutes, Place.FOCUS, maxWidth, maxHeight)
                     }
-                    if (showStrip) LazyRow(Modifier.fillMaxWidth().height(72.dp), horizontalArrangement = Arrangement.spacedBy(GAP, Alignment.CenterHorizontally)) {
+                    val strip = androidx.compose.foundation.lazy.rememberLazyListState()
+                    if (showStrip) LazyRow(Modifier.fillMaxWidth().height(72.dp).claimsSideways { strip.canScrollForward || strip.canScrollBackward }, state = strip, horizontalArrangement = Arrangement.spacedBy(GAP, Alignment.CenterHorizontally)) {
                         items(tiles.filter { it.key != focusedTile.key }, key = { it.key }) { t ->
                             TileView(t, channelId, state, byUser, speaking, mix.localMutes, mix.streamMutes, Place.STRIP, 128.dp, 72.dp)
                         }

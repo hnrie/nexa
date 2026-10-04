@@ -16,7 +16,6 @@ import androidx.compose.foundation.content.consume
 import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.content.hasMediaType
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -73,6 +72,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import fish.nexa.Nexa
+import fish.nexa.ui.components.sidewaysScroll
 import fish.nexa.ui.nav.Route
 import fish.nexa.ui.nav.Nav
 import fish.nexa.ui.components.NxButton
@@ -780,7 +780,7 @@ private fun Tray(channelId: String, files: List<Staged>, shape: androidx.compose
             Txt(t("composer.composer.trayCount", "count" to files.size, "max" to Staging.MAX_FILES), style = Nx.type.hint.copy(fontWeight = FontWeight(600)), color = c.textMuted)
             Txt(Time.bytes(files.sumOf { it.size }), style = Nx.type.hint.copy(fontWeight = FontWeight(500), fontFeatureSettings = "tnum"), color = c.textMuted)
         }
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(16.dp, 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().sidewaysScroll().padding(16.dp, 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             for (f in files) TrayCard(channelId, f)
         }
     }
