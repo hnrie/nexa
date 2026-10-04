@@ -5162,7 +5162,5 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "如果 Nexa 在那里已经是开启的，说明权限仍指向旧的应用副本。选择“重置权限”，然后重新开启 Nexa。",
   "desktop.displayPicker.theOldPermissionIsCleared": "旧的权限已清除。",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "在“屏幕录制”中开启 Nexa。macOS 会提示重新打开 Nexa；如果没有提示，请在这里重启。",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS 没有重置权限。请在“屏幕录制”中用减号按钮移除 Nexa，再添加回来，然后重启。",
-  "whatsNew.r20261004.phoneShareTitle": "手机共享屏幕更流畅",
-  "whatsNew.r20261004.phoneShareBody": "Android 应用现在使用手机自带的视频编码器共享屏幕，画面在快速变化时也能保持流畅清晰。"
+  "desktop.displayPicker.couldNotResetThePermission": "macOS 没有重置权限。请在“屏幕录制”中用减号按钮移除 Nexa，再添加回来，然后重启。"
 }

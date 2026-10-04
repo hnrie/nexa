@@ -5337,7 +5337,5 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "अगर वहाँ Nexa पहले से चालू है, तो अनुमति अब भी ऐप की पुरानी प्रति की ओर इशारा करती है। अनुमति रीसेट करें चुनें, फिर Nexa को दोबारा चालू करें।",
   "desktop.displayPicker.theOldPermissionIsCleared": "पुरानी अनुमति हटा दी गई है।",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Screen Recording में Nexa को चालू करें। macOS, Nexa को फिर से खोलने का विकल्प देगा; अगर न दे, तो यहाँ से उसे दोबारा शुरू करें।",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS ने अनुमति रीसेट नहीं की। माइनस बटन से Nexa को Screen Recording से हटाएँ, फिर से जोड़ें और दोबारा शुरू करें।",
-  "whatsNew.r20261004.phoneShareTitle": "फ़ोन से और स्मूद स्क्रीन शेयरिंग",
-  "whatsNew.r20261004.phoneShareBody": "Android ऐप अब आपके फ़ोन के अपने वीडियो एनकोडर से स्क्रीन शेयर करता है, ताकि चीज़ें हिलने पर भी तस्वीर स्मूद और साफ़ रहे।"
+  "desktop.displayPicker.couldNotResetThePermission": "macOS ने अनुमति रीसेट नहीं की। माइनस बटन से Nexa को Screen Recording से हटाएँ, फिर से जोड़ें और दोबारा शुरू करें।"
 }

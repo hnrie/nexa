@@ -5660,7 +5660,5 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Если Nexa там уже включён, разрешение всё ещё указывает на старую копию приложения. Нажмите «Сбросить разрешение», затем снова включите Nexa.",
   "desktop.displayPicker.theOldPermissionIsCleared": "Старое разрешение удалено.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Включите Nexa в «Записи экрана». macOS предложит заново открыть Nexa; если не предложит, перезапустите приложение здесь.",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS не сбросила разрешение. Удалите Nexa из «Записи экрана» кнопкой «минус», добавьте снова и перезапустите.",
-  "whatsNew.r20261004.phoneShareTitle": "Плавная демонстрация экрана с телефона",
-  "whatsNew.r20261004.phoneShareBody": "Приложение для Android теперь показывает экран с помощью видеокодера самого телефона, поэтому картинка остаётся плавной и чёткой даже в движении."
+  "desktop.displayPicker.couldNotResetThePermission": "macOS не сбросила разрешение. Удалите Nexa из «Записи экрана» кнопкой «минус», добавьте снова и перезапустите."
 }

@@ -5947,7 +5947,5 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "إن كان Nexa مفعّلًا هناك أصلًا، فالإذن ما زال يشير إلى نسخة أقدم من التطبيق. اختر «إعادة ضبط الإذن»، ثم فعّل Nexa من جديد.",
   "desktop.displayPicker.theOldPermissionIsCleared": "مُسح الإذن القديم.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "فعّل Nexa في تسجيل الشاشة. سيعرض macOS إعادة فتح Nexa، وإن لم يفعل فأعد تشغيله من هنا.",
-  "desktop.displayPicker.couldNotResetThePermission": "لم يُعِد macOS ضبط الإذن. أزل Nexa من تسجيل الشاشة بزر الناقص، ثم أضفه من جديد وأعد التشغيل.",
-  "whatsNew.r20261004.phoneShareTitle": "مشاركة شاشة أسلس من الهاتف",
-  "whatsNew.r20261004.phoneShareBody": "صار تطبيق Android يشارك شاشتك بمشفّر الفيديو المدمج في هاتفك، فتبقى الصورة سلسة وواضحة حتى مع الحركة."
+  "desktop.displayPicker.couldNotResetThePermission": "لم يُعِد macOS ضبط الإذن. أزل Nexa من تسجيل الشاشة بزر الناقص، ثم أضفه من جديد وأعد التشغيل."
 }
