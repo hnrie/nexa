@@ -48,15 +48,18 @@ func TestPublicImagesComeInTheSizeTheyAreShown(t *testing.T) {
 		return me[kind+"_id"].(string)
 	}
 
-	big := photoPNG(2048, 1024)
+	big := photoPNG(2048, 2048)
 	avatar := upload("avatar", big)
-	if _, data := fetch("avatar", avatar, ""); !bytes.Equal(data, big) {
-		t.Error("without a size, the original is served")
+	// an oversized avatar is cut square here to no larger than 1024: what is
+	// served is the 1024 square, not the 2048 picture sent
+	res, data := fetch("avatar", avatar, "")
+	if cfg, format, err := image.DecodeConfig(bytes.NewReader(data)); err != nil || cfg.Width != 1024 || cfg.Height != 1024 || format != "png" {
+		t.Errorf("without a size, the cropped picture is served: %v %s %dx%d", err, format, cfg.Width, cfg.Height)
 	}
-	// asked for 50, it gets the next power of two: 64 across, still 2:1
-	res, data := fetch("avatar", avatar, "?size=50")
+	// asked for 50, it gets the next power of two: 64 across, still square
+	res, data = fetch("avatar", avatar, "?size=50")
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(data))
-	if res.StatusCode != 200 || err != nil || cfg.Width != 64 || cfg.Height != 32 || format != "jpeg" || res.Header.Get("Content-Type") != "image/jpeg" || res.Header.Get("Cache-Control") != "public, max-age=31536000, immutable" {
+	if res.StatusCode != 200 || err != nil || cfg.Width != 64 || cfg.Height != 64 || format != "jpeg" || res.Header.Get("Content-Type") != "image/jpeg" || res.Header.Get("Cache-Control") != "public, max-age=31536000, immutable" {
 		t.Fatalf("sized copy: %d %v %dx%d %s %v", res.StatusCode, err, cfg.Width, cfg.Height, format, res.Header)
 	}
 	// made once and kept
@@ -79,8 +82,10 @@ func TestPublicImagesComeInTheSizeTheyAreShown(t *testing.T) {
 	if _, data = fetch("avatar", tiny, "?size=64"); !bytes.Equal(data, small) {
 		t.Error("an image that already fits is served as it is")
 	}
-	// a bad size is ignored rather than refused
-	if res, data = fetch("avatar", avatar, "?size=nope"); res.StatusCode != 200 || !bytes.Equal(data, big) {
+	// a bad size is ignored rather than refused: the cropped picture again
+	if res, data = fetch("avatar", avatar, "?size=nope"); res.StatusCode != 200 {
 		t.Errorf("bad size: %d", res.StatusCode)
+	} else if cfg, _, err := image.DecodeConfig(bytes.NewReader(data)); err != nil || cfg.Width != 1024 || cfg.Height != 1024 {
+		t.Errorf("bad size serves the cropped picture: %v %dx%d", err, cfg.Width, cfg.Height)
 	}
 }

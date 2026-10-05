@@ -239,8 +239,10 @@ func cleanWebhookName(raw string) (string, *Error) {
 }
 
 // webhookAvatar stores an avatar sent as image data ("data:image/png;base64,
-// ..."), as Discord's API takes one. It returns the blob, holding a reference
-// for its caller.
+// ..."), as Discord's API takes one, no larger than a webhook picture. A
+// picture already that small is kept as it is, so one the staff took down
+// still matches; a larger one is cut square here, and a moving one stays
+// moving. It returns the blob, holding a reference for its caller.
 func (s *Server) webhookAvatar(ctx context.Context, data string, owner ids.ID) (*store.Blob, error) {
 	head, body, ok := strings.Cut(data, ",")
 	if !ok || !strings.HasPrefix(head, "data:image/") || !strings.HasSuffix(head, ";base64") {
@@ -256,7 +258,21 @@ func (s *Server) webhookAvatar(ctx context.Context, data string, owner ids.ID) (
 	if int64(len(raw)) > lim.MaxBytes {
 		return nil, media.ErrTooLarge
 	}
-	return s.Media.PutPublic(ctx, "avatar", bytes.NewReader(raw), lim, owner)
+	width, height, err := media.ImageDims(bytes.NewReader(raw))
+	if err != nil {
+		return nil, media.ErrUnsupported
+	} else if err := lim.Check(width, height); err != nil {
+		return nil, err
+	}
+	out := raw
+	if width > webhookAvatarSide || height > webhookAvatarSide {
+		var err error
+		out, _, err = media.Crop(raw, media.CropSpec{MaxW: webhookAvatarSide, MaxH: webhookAvatarSide})
+		if err != nil {
+			return nil, cropError(err)
+		}
+	}
+	return s.Media.PutPublic(ctx, "avatar", bytes.NewReader(out), media.Limits{MaxBytes: int64(len(out)) + 1, MaxW: webhookAvatarSide, MaxH: webhookAvatarSide}, owner)
 }
 
 // webhookChanged tells whoever manages a server's webhooks that its list

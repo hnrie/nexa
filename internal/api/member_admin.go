@@ -331,11 +331,12 @@ func (s *Server) handleMemberImage(banner bool) http.HandlerFunc {
 			return
 		}
 		kind := map[bool]string{true: "banner", false: "avatar"}[banner]
-		lim := s.limitsFor(kind)
-		r.Body = http.MaxBytesReader(w, r.Body, lim.MaxBytes+1)
-		b, err := s.Media.PutPublic(r.Context(), kind, r.Body, lim, me.ID)
-		if err != nil {
-			WriteError(w, err)
+		maxW, maxH := avatarSide, avatarSide
+		if banner {
+			maxW, maxH = userBannerW, userBannerH
+		}
+		b := s.cropUpload(w, r, kind, maxW, maxH, me.ID)
+		if b == nil {
 			return
 		}
 		bid := b.ID
@@ -382,7 +383,8 @@ func (s *Server) memberProfileChanged(w http.ResponseWriter, r *http.Request, sr
 	WriteJSON(w, http.StatusOK, updated)
 }
 
-// handleRoleIcon gives a role a picture of its own (animated ones keep moving).
+// handleRoleIcon gives a role a picture of its own, cut here square and
+// small (animated ones keep moving).
 func (s *Server) handleRoleIcon(w http.ResponseWriter, r *http.Request) {
 	srv, me, role, _ := s.roleCtx(w, r)
 	if srv == nil {
@@ -392,11 +394,8 @@ func (s *Server) handleRoleIcon(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "everyone_role", "@everyone has no icon."))
 		return
 	}
-	lim := s.limitsFor("icon")
-	r.Body = http.MaxBytesReader(w, r.Body, lim.MaxBytes+1)
-	b, err := s.Media.PutPublic(r.Context(), "icon", r.Body, lim, me.ID)
-	if err != nil {
-		WriteError(w, err)
+	b := s.cropUpload(w, r, "icon", roleIconSide, roleIconSide, me.ID)
+	if b == nil {
 		return
 	}
 	bid := b.ID

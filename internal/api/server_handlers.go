@@ -368,13 +368,15 @@ func (s *Server) handleServerPatch(w http.ResponseWriter, r *http.Request) {
 		p.DefaultNotifications = &n
 		changes["default_notifications"] = n
 	}
-	action := "server_update"
+	// pausing or resuming invites is a line of its own in the audit log, even
+	// when the same request changes other settings too
+	pauseAction, pauseChanges := "", map[string]any{}
 	if v, ok := raw["invites_paused_until"]; ok {
 		// pausing invites stops every way in at once: links, Discovery, the tag
 		if string(v) == "null" {
 			var open *int64
 			p.InvitesPausedUntil = &open
-			action = "invites_resume"
+			pauseAction = "invites_resume"
 		} else {
 			var until int64
 			now := time.Now().UnixMilli()
@@ -384,8 +386,8 @@ func (s *Server) handleServerPatch(w http.ResponseWriter, r *http.Request) {
 			}
 			up := &until
 			p.InvitesPausedUntil = &up
-			action = "invites_pause"
-			changes["invites_paused_until"] = until
+			pauseAction = "invites_pause"
+			pauseChanges["invites_paused_until"] = until
 		}
 	}
 	for key, dst := range map[string]**int{"verify_account_minutes": &p.VerifyAccountMinutes, "verify_member_minutes": &p.VerifyMemberMinutes} {
@@ -417,7 +419,12 @@ func (s *Server) handleServerPatch(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	s.audit(r, srv.ID, me.ID, action, "server", &srv.ID, changes, "")
+	if len(changes) > 0 || pauseAction == "" {
+		s.audit(r, srv.ID, me.ID, "server_update", "server", &srv.ID, changes, "")
+	}
+	if pauseAction != "" {
+		s.audit(r, srv.ID, me.ID, pauseAction, "server", &srv.ID, pauseChanges, "")
+	}
 	s.emitServer(r.Context(), srv.ID, "server_update", updated)
 	if p.InvitesPausedUntil != nil || p.Discoverable != nil || p.DiscoveryHidden != nil {
 		s.forgetCounts(srv.ID)
@@ -438,11 +445,13 @@ func (s *Server) handleServerImage(kind string) http.HandlerFunc {
 		if srv == nil {
 			return
 		}
-		lim := s.limitsFor(map[bool]string{true: "banner", false: "icon"}[kind == "banner"])
-		r.Body = http.MaxBytesReader(w, r.Body, lim.MaxBytes+1)
-		b, err := s.Media.PutPublic(r.Context(), map[bool]string{true: "banner", false: "icon"}[kind == "banner"], r.Body, lim, me.ID)
-		if err != nil {
-			WriteError(w, err)
+		picKind := map[bool]string{true: "banner", false: "icon"}[kind == "banner"]
+		maxW, maxH := avatarSide, avatarSide
+		if kind == "banner" {
+			maxW, maxH = serverBannerW, serverBannerH
+		}
+		b := s.cropUpload(w, r, picKind, maxW, maxH, me.ID)
+		if b == nil {
 			return
 		}
 		bid := b.ID

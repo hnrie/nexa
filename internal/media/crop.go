@@ -17,14 +17,15 @@ import (
 	"golang.org/x/image/webp"
 )
 
-// Cropping on the server. A picture someone frames in the app (a server tag's
-// badge, a widget's picture) is sent whole, with the part they framed, and
-// cut here: whatever the app did, what is kept is that part and no larger
-// than the place it goes. A moving picture stays moving. Every frame of a
-// GIF, an APNG or an animated WebP is put together on its canvas the way a
-// browser would draw it, cut the same way and scaled, and the frames are kept
-// as a GIF with their timing and how often they loop; a still picture is kept
-// as a PNG.
+// Cropping on the server. A picture someone frames in the app (an avatar, a
+// banner, an icon, a server tag's badge, a widget's picture) is sent whole,
+// with the part they framed, and cut here: whatever the app did, what is kept
+// is that part and no larger than the place it goes. A still picture already
+// in the shape asked for and no larger than asked is kept byte for byte.
+// Otherwise a moving picture stays moving. Every frame of a GIF, an APNG or
+// an animated WebP is put together on its canvas the way a browser would draw
+// it, cut the same way and scaled, and the frames are kept as a GIF with
+// their timing and how often they loop; a still picture is kept as a PNG.
 
 // CropSpec says what to cut and how large the result may be.
 type CropSpec struct {
@@ -50,7 +51,10 @@ var ErrTooManyFrames = errors.New("animation too long")
 // are never all held at full size at once.
 type sink func(canvas *image.NRGBA, delay int) error
 
-// Crop cuts data as spec says. It returns the new picture and its type.
+// Crop cuts data as spec says. It returns the new picture and its type. A
+// still picture already in the shape asked for and no larger than asked is
+// kept byte for byte: no needless re-encode. A moving picture is always cut
+// frame by frame, so too-long animations are still refused.
 func Crop(data []byte, spec CropSpec) ([]byte, string, error) {
 	mime, animated, ok := Sniff(data)
 	if !ok || (mime != "image/png" && mime != "image/jpeg" && mime != "image/gif" && mime != "image/webp") {
@@ -58,6 +62,15 @@ func Crop(data []byte, spec CropSpec) ([]byte, string, error) {
 	}
 	if spec.MaxW <= 0 || spec.MaxH <= 0 {
 		return nil, "", ErrBadDimensions
+	}
+	if !animated {
+		if w, h, err := ImageDims(bytes.NewReader(data)); err == nil {
+			bounds := image.Rect(0, 0, w, h)
+			rect := cropRect(bounds, spec)
+			if outW, outH := fitWithin(rect.Dx(), rect.Dy(), spec.MaxW, spec.MaxH); rect.Min == bounds.Min && rect.Max == bounds.Max && outW == w && outH == h {
+				return data, mime, nil
+			}
+		}
 	}
 	var out []*image.NRGBA
 	var delays []int

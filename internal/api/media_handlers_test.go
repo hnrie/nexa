@@ -85,6 +85,84 @@ func TestAvatarUploadServeDelete(t *testing.T) {
 	}
 }
 
+// Avatar-like pictures are cut on the server to the part framed and no
+// larger than where they go, and a moving picture stays moving. Pictures
+// already that small are kept as they are.
+func TestAvatarUploadCropsOnTheServer(t *testing.T) {
+	_, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	put := func(url, ctype string, body []byte) (int, []byte) {
+		t.Helper()
+		req, _ := http.NewRequest("PUT", url, bytes.NewReader(body))
+		req.Header.Set("Content-Type", ctype)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return res.StatusCode, b
+	}
+	get := func(kind, id string) []byte {
+		t.Helper()
+		res, err := http.Get(ts.URL + "/media/" + kind + "/" + id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		if res.StatusCode != 200 {
+			t.Fatalf("serve %s: %d", kind, res.StatusCode)
+		}
+		return b
+	}
+	// an oversized picture sent with the part framed comes back cut square
+	// to no larger than 1024
+	big := pngBytes(2048, 2048)
+	if code, raw := put(ts.URL+"/api/v1/users/@me/avatar?x=0&y=0&w=2048&h=2048", "image/png", big); code != 200 {
+		t.Fatalf("cropped upload: %d %s", code, raw)
+	}
+	_, me := do(t, ts, "GET", "/api/v1/users/@me", tok, nil)
+	data := get("avatar", me["avatar_id"].(string))
+	if cfg, _, err := image.DecodeConfig(bytes.NewReader(data)); err != nil || cfg.Width != 1024 || cfg.Height != 1024 {
+		t.Errorf("cropped avatar: %v %dx%d", err, cfg.Width, cfg.Height)
+	}
+	// already small enough with nothing framed: the original, untouched
+	small := pngBytes(48, 48)
+	if code, raw := put(ts.URL+"/api/v1/users/@me/avatar", "image/png", small); code != 200 {
+		t.Fatalf("small upload: %d %s", code, raw)
+	}
+	_, me = do(t, ts, "GET", "/api/v1/users/@me", tok, nil)
+	if data := get("avatar", me["avatar_id"].(string)); !bytes.Equal(data, small) {
+		t.Error("an image that already fits is kept byte for byte")
+	}
+	// a role icon is cut to 128
+	sid := createServer(t, ts, tok, "Icons")["id"].(string)
+	rid := createRole(t, ts, tok, sid, "Mods", 0)
+	if code, raw := put(ts.URL+"/api/v1/servers/"+sid+"/roles/"+rid+"/icon?x=0&y=0&w=2048&h=2048", "image/png", big); code != 200 {
+		t.Fatalf("role icon: %d %s", code, raw)
+	}
+	{
+		_, got := do(t, ts, "GET", "/api/v1/servers/"+sid+"/roles", tok, nil)
+		var iconID string
+		for _, r := range got["_list"].([]any) {
+			if r.(map[string]any)["id"] == rid {
+				iconID, _ = r.(map[string]any)["icon_id"].(string)
+			}
+		}
+		if iconID == "" {
+			t.Fatal("role has no icon")
+		}
+		if data := get("icon", iconID); func() bool {
+			cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+			return err != nil || cfg.Width != 128 || cfg.Height != 128
+		}() {
+			t.Error("role icon is cut to 128 square")
+		}
+	}
+}
+
 // A double tap on Remove releases a shared picture once, and setting the same
 // picture again does not leave an extra reference behind.
 func TestImageRemovalReleasesOnce(t *testing.T) {

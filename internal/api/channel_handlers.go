@@ -354,11 +354,8 @@ func (s *Server) handleChannelIcon(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "not_group", "Only group DMs have icons."))
 		return
 	}
-	lim := s.limitsFor("icon")
-	r.Body = http.MaxBytesReader(w, r.Body, lim.MaxBytes+1)
-	b, err := s.Media.PutPublic(r.Context(), "icon", r.Body, lim, me.ID)
-	if err != nil {
-		WriteError(w, err)
+	b := s.cropUpload(w, r, "icon", avatarSide, avatarSide, me.ID)
+	if b == nil {
 		return
 	}
 	bid := b.ID

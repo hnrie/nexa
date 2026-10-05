@@ -79,15 +79,18 @@ func (s *Server) handleMediaPublic(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleAvatarPut stores an uploaded image as the user's avatar or banner.
+// handleAvatarPut stores an uploaded image as the user's avatar or banner,
+// cut here to the part framed and no larger than where it goes. A moving
+// picture stays moving.
 func (s *Server) handleAvatarPut(kind string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := auth.UserFrom(r.Context())
-		lim := s.limitsFor(kind)
-		r.Body = http.MaxBytesReader(w, r.Body, lim.MaxBytes+1)
-		b, err := s.Media.PutPublic(r.Context(), kind, r.Body, lim, u.ID)
-		if err != nil {
-			WriteError(w, err)
+		maxW, maxH := avatarSide, avatarSide
+		if kind == "banner" {
+			maxW, maxH = userBannerW, userBannerH
+		}
+		b := s.cropUpload(w, r, kind, maxW, maxH, u.ID)
+		if b == nil {
 			return
 		}
 		bid := b.ID

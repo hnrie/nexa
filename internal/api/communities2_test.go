@@ -223,6 +223,24 @@ func TestInvitesPauseAndRevokeAll(t *testing.T) {
 	if len(listOf(log, "entries")) != 2 {
 		t.Errorf("audit filtered by action: %v", log)
 	}
+	// a pause sent with other settings is still a line of its own, and the
+	// other settings are a server update beside it
+	if res, body := do(t, c.ts, "PATCH", "/api/v1/servers/"+c.server, c.tokA, map[string]any{"invites_paused_until": until, "description": "Back soon."}); res.StatusCode != 200 {
+		t.Fatalf("pause with a description: %d %v", res.StatusCode, body)
+	}
+	_, log = do(t, c.ts, "GET", "/api/v1/servers/"+c.server+"/audit-log?limit=2", c.tokA, nil)
+	got := map[string]map[string]any{}
+	for _, raw := range listOf(log, "entries") {
+		e, _ := raw.(map[string]any)
+		action, _ := e["action"].(string)
+		got[action], _ = e["changes"].(map[string]any)
+	}
+	if ch, ok := got["invites_pause"]; !ok || ch["description"] != nil || ch["invites_paused_until"] == nil {
+		t.Errorf("pause entry: %v", log)
+	}
+	if ch, ok := got["server_update"]; !ok || ch["description"] != "Back soon." || ch["invites_paused_until"] != nil {
+		t.Errorf("update entry: %v", log)
+	}
 }
 
 // Anyone can list a server on Discovery; people find it by words, category

@@ -228,7 +228,7 @@ func (s *Server) handleDiscoveryServer(w http.ResponseWriter, r *http.Request) {
 		shown := []map[string]any{}
 		for i := len(emojis) - 1; i >= 0 && len(shown) < 8; i-- {
 			e := emojis[i]
-			shown = append(shown, map[string]any{"id": e.ID, "name": e.Name, "animated": e.Animated})
+			shown = append(shown, map[string]any{"id": e.ID, "blob_id": e.BlobID, "name": e.Name, "animated": e.Animated})
 		}
 		resp["emojis"] = shown
 	}
