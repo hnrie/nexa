@@ -92,6 +92,7 @@ import fish.nexa.ui.theme.ring
 import fish.nexa.ui.theme.sheen
 import fish.nexa.ui.theme.shadowHigh
 import fish.nexa.ui.theme.topEdge
+import fish.nexa.ui.threads.ThreadsPanel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -110,19 +111,20 @@ fun BoxScope.ChatPanels(channel: Channel) {
     when (ChatUi.panel) {
         "pins" -> Scrim { PinsPanel(channel) }
         "subchats" -> Scrim { SubchatsPanel(channel) }
+        "threads" -> Scrim { ThreadsPanel(channel) }
     }
 }
 
 /** A tap beside a panel closes it, and so does Back. */
 @Composable
-private fun BoxScope.Scrim(content: @Composable BoxScope.() -> Unit) {
+internal fun BoxScope.Scrim(content: @Composable BoxScope.() -> Unit) {
     BackHandler { ChatUi.panel = null }
     Box(Modifier.matchParentSize().pressable(remember { MutableInteractionSource() }) { ChatUi.panel = null }) { content() }
 }
 
 /** popDown: a panel drops in from the header, 200 ms. */
 @Composable
-private fun Modifier.popDown(): Modifier {
+internal fun Modifier.popDown(): Modifier {
     val reduced = Nx.motion.reduced
     val ease = Nx.motion.easeOut
     val p = remember { Animatable(if (reduced) 1f else 0f) }
@@ -197,13 +199,13 @@ private fun BoxScope.PinsPanel(channel: Channel) {
 }
 
 @Composable
-private fun PanelNote(text: String) = Txt(
+internal fun PanelNote(text: String) = Txt(
     text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = Nx.colors.textMuted,
     align = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(24.dp),
 )
 
 @Composable
-private fun PanelClose(label: String, icon: Int, onClick: () -> Unit) {
+internal fun PanelClose(label: String, icon: Int, onClick: () -> Unit) {
     Box(
         Modifier.size(48.dp).clip(Radii.Sm).pressable(remember { MutableInteractionSource() }, onClick = onClick).semantics { contentDescription = label },
         contentAlignment = Alignment.Center,

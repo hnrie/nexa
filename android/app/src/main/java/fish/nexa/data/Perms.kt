@@ -34,19 +34,31 @@ object P {
     const val MANAGE_ROLES = 1L shl 28
     const val MANAGE_WEBHOOKS = 1L shl 29
     const val MANAGE_EMOJIS = 1L shl 30
+    const val USE_EXTERNAL_EMOJIS = 1L shl 18
+    const val MANAGE_THREADS = 1L shl 34
+    const val CREATE_PUBLIC_THREADS = 1L shl 35
+    const val CREATE_PRIVATE_THREADS = 1L shl 36
+    const val USE_EXTERNAL_STICKERS = 1L shl 37
+    const val SEND_MESSAGES_IN_THREADS = 1L shl 38
     const val MODERATE_MEMBERS = 1L shl 40
     const val USE_SOUNDBOARD = 1L shl 42
+    const val CREATE_EXPRESSIONS = 1L shl 43
     const val CREATE_POLLS = 1L shl 49
+    const val PIN_MESSAGES = 1L shl 51
+    const val BYPASS_SLOWMODE = 1L shl 52
 
     val ALL = listOf(
         CREATE_INSTANT_INVITE, KICK_MEMBERS, BAN_MEMBERS, ADMINISTRATOR, MANAGE_CHANNELS, MANAGE_SERVER, ADD_REACTIONS,
         VIEW_AUDIT_LOG, PRIORITY_SPEAKER, STREAM, VIEW_CHANNEL, SEND_MESSAGES, MANAGE_MESSAGES, EMBED_LINKS, ATTACH_FILES,
         READ_MESSAGE_HISTORY, MENTION_EVERYONE, CONNECT, SPEAK, MUTE_MEMBERS, DEAFEN_MEMBERS, MOVE_MEMBERS, USE_VAD,
         CHANGE_NICKNAME, MANAGE_NICKNAMES, MANAGE_ROLES, MANAGE_WEBHOOKS, MANAGE_EMOJIS, MODERATE_MEMBERS, USE_SOUNDBOARD, CREATE_POLLS,
+        USE_EXTERNAL_EMOJIS, MANAGE_THREADS, CREATE_PUBLIC_THREADS, CREATE_PRIVATE_THREADS, USE_EXTERNAL_STICKERS, SEND_MESSAGES_IN_THREADS,
+        CREATE_EXPRESSIONS, PIN_MESSAGES, BYPASS_SLOWMODE,
     ).fold(0L) { a, b -> a or b }
 
     val DEFAULT_EVERYONE = CREATE_INSTANT_INVITE or ADD_REACTIONS or STREAM or VIEW_CHANNEL or SEND_MESSAGES or EMBED_LINKS or
-        ATTACH_FILES or READ_MESSAGE_HISTORY or CONNECT or SPEAK or USE_VAD or CHANGE_NICKNAME or USE_SOUNDBOARD or CREATE_POLLS
+        ATTACH_FILES or READ_MESSAGE_HISTORY or USE_EXTERNAL_EMOJIS or CONNECT or SPEAK or USE_VAD or CHANGE_NICKNAME or USE_SOUNDBOARD or
+        CREATE_POLLS or CREATE_PUBLIC_THREADS or CREATE_PRIVATE_THREADS or USE_EXTERNAL_STICKERS or SEND_MESSAGES_IN_THREADS
 
     /** What a timed-out member keeps. */
     const val TIMED_OUT_KEEP = VIEW_CHANNEL or READ_MESSAGE_HISTORY
@@ -62,8 +74,24 @@ data class PermMember(val userId: String, val roleIds: List<String>, val timedOu
 object Perms {
     fun roles(roles: Collection<Role>) = roles.map { PermRole(it.id, it.position, P.parse(it.permissions)) }
 
+    /** A member as permissions see them: one AutoMod holds counts as timed out, as the server has it. */
     fun member(m: Member?, userId: String, now: Long = System.currentTimeMillis()) =
-        PermMember(userId, m?.roleIds ?: emptyList(), (m?.timeoutUntil ?: 0L) > now)
+        PermMember(userId, m?.roleIds ?: emptyList(), (m?.quarantined ?: false) || (m?.timeoutUntil ?: 0L) > now)
+
+    /**
+     * What someone may do in a thread, from what they may do in its channel,
+     * as the server's perms.Thread works it out: talking is Send Messages in
+     * Threads, and a private thread is only for the people in it and those
+     * who manage threads.
+     */
+    fun thread(parent: Long, isPrivate: Boolean, member: Boolean): Long {
+        if (!P.has(parent, P.VIEW_CHANNEL)) return 0L
+        if (P.has(parent, P.ADMINISTRATOR)) return P.ALL
+        if (isPrivate && !member && !P.has(parent, P.MANAGE_THREADS)) return 0L
+        var p = parent and P.SEND_MESSAGES.inv()
+        if (P.has(parent, P.SEND_MESSAGES_IN_THREADS)) p = p or P.SEND_MESSAGES
+        return p
+    }
 
     fun base(everyoneId: String, roles: List<PermRole>, m: PermMember, isOwner: Boolean): Long {
         if (isOwner) return P.ALL

@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import fish.nexa.Nexa
 import fish.nexa.data.ChatMessage
 import fish.nexa.data.DecryptFail
+import fish.nexa.data.P
 import fish.nexa.data.PendingMessage
 import fish.nexa.data.Send
 import fish.nexa.data.ServerState
@@ -193,8 +194,16 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                         .graphicsLayer { val s = if (pressed) 0.95f else 1f; scaleX = s; scaleY = s }
                         .pressable(interaction) { if (hook != null && hookId != null) fish.nexa.ui.media.openHookCard(hook, hookId) else openProfile(item.authorId) },
                 ) {
-                    if (hook != null && hookId != null) fish.nexa.ui.media.HookAvatar(hook, hookId, 40.dp)
-                    else Avatar(item.authorId, authorName, user?.avatarId, 40.dp)
+                    val copy = item.cm?.m?.crosspost?.takeIf { item.cm.m.type == "crosspost" }
+                    when {
+                        copy != null -> Avatar(copy.serverId, copy.serverName, copy.serverIconId, 40.dp, icon = true)
+                        hook != null && hookId != null -> fish.nexa.ui.media.HookAvatar(hook, hookId, 40.dp)
+                        else -> {
+                            // in a server, the picture someone set for it
+                            val own = ctx.server?.members?.get(item.authorId)?.avatarId
+                            Avatar(item.authorId, authorName, own ?: user?.avatarId, 40.dp)
+                        }
+                    }
                 }
             }
             Column(
@@ -208,6 +217,8 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                 if (showHead) MessageHeader(item, ctx)
                 MessageBody(item, ctx, failed)
                 if (failed && p != null) FailedRow(ctx.channel.id, p.tmpId)
+                val sid = ctx.server?.server?.id
+                cm?.m?.thread?.let { th -> if (sid != null) fish.nexa.ui.threads.ThreadChip(sid, th) }
                 if (cm != null) ReactionsRow(cm, ctx)
             }
         }
@@ -279,26 +290,59 @@ private fun MessageHeader(item: MsgItem, ctx: ListCtx) {
     val sid = ctx.server?.server?.id
     val hook = fish.nexa.data.Hooks.of(item.cm?.hook)
     val hookId = item.cm?.m?.webhookId?.takeIf { hook != null }
-    val name = hook?.name ?: Names.member(sid, item.authorId)
-    // a webhook has no roles, so no role colour
-    val color = if (hookId != null) c.textStrong else ctx.server?.let { Nexa.servers.memberColor(it, item.authorId) }?.let { Color(0xFF000000 or it) } ?: c.textStrong
+    // a published post's copy speaks for a channel elsewhere, not for a person
+    val copy = item.cm?.m?.crosspost?.takeIf { item.cm.m.type == "crosspost" }
+    val name = when {
+        copy != null -> "${copy.serverName} #${copy.channelName}"
+        hook != null -> hook.name
+        else -> Names.member(sid, item.authorId)
+    }
+    // a webhook and a copy have no roles, so no role colours or icon
+    val look = if (hookId != null || copy != null) null else ctx.server?.let { fish.nexa.ui.chat.RoleLooks.of(it, item.authorId) }
     val user = Nexa.users.get(item.authorId)
-    val open = { if (hook != null && hookId != null) fish.nexa.ui.media.openHookCard(hook, hookId) else openProfile(item.authorId) }
+    val open = {
+        when {
+            copy != null -> Unit
+            hook != null && hookId != null -> fish.nexa.ui.media.openHookCard(hook, hookId)
+            else -> openProfile(item.authorId)
+        }
+    }
     Row(
         Modifier.fillMaxWidth().heightIn(min = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Txt(
+        RoleName(
             name,
+            look,
             style = Nx.type.body.copy(fontWeight = FontWeight(650)),
-            color = color,
-            maxLines = 1,
+            fallback = c.textStrong,
             modifier = Modifier.weight(1f, fill = false).pressable(remember { MutableInteractionSource() }, onClick = open),
         )
-        if (hookId != null) fish.nexa.ui.media.HookTags(open)
-        else user?.serverTag?.takeIf { it.text.isNotEmpty() }?.let { ServerTagChip(it, small = false, open = true) }
+        look?.icon?.let { RoleIcon(it, 18.dp) }
+        when {
+            copy != null -> CopyTag()
+            hookId != null -> fish.nexa.ui.media.HookTags(open)
+            else -> user?.serverTag?.takeIf { it.text.isNotEmpty() }?.let { ServerTagChip(it, small = false, open = true) }
+        }
         HeaderTime(item.createdAt)
+    }
+}
+
+/** A published post's copy is marked as one: an announcement from a channel this one follows. */
+@Composable
+private fun CopyTag() {
+    val c = Nx.colors
+    Row(
+        Modifier
+            .background(c.brand.copy(alpha = 0.18f), RoundedCornerShape(4.dp))
+            .semantics { contentDescription = t("follows.tagHint") }
+            .padding(horizontal = 5.dp, vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Icon("Megaphone", c.textBrand, size = 11.dp)
+        Txt(t("follows.tag"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(11f), fontWeight = FontWeight(650)), color = c.textBrand, maxLines = 1)
     }
 }
 
@@ -398,6 +442,26 @@ object AppNames : fish.nexa.ui.markdown.NameLookup {
 internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     val c = Nx.colors
     val cm = item.cm
+    // AutoMod keeps what got past it hidden: a moderator can still read it, on purpose
+    @Suppress("UNUSED_VARIABLE") val automodVersion by fish.nexa.data.Automod.version.collectAsState()
+    val held = cm?.let { fish.nexa.data.Automod.heldBy(it, ctx.meId) }
+    var reveal by remember(cm?.id) { mutableStateOf(false) }
+    if (held != null && !reveal) {
+        val mayReveal = ctx.server != null && Nexa.servers.canI(ctx.server, P.MANAGE_MESSAGES, ctx.channel.id)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon("ShieldAlert", c.textMuted, size = 15.dp)
+            Txt(t("automod.held.text"), style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = c.textMuted)
+            if (mayReveal) Txt(
+                t("automod.held.show"), style = Nx.type.bodySmall.copy(fontWeight = FontWeight(600)), color = c.link,
+                modifier = Modifier.pressable(remember { MutableInteractionSource() }) { reveal = true }.padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+        }
+        return
+    }
+    if (cm != null && cm.m.type == "crosspost" && cm.m.crosspost?.deleted == true) {
+        Txt(t("follows.originalDeleted"), style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = c.textMuted)
+        return
+    }
     val payload = cm?.payload ?: item.pending?.payload
     if (cm != null && cm.error != null && cm.call == null) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

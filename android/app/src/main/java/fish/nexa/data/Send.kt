@@ -34,6 +34,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
@@ -76,6 +77,8 @@ data class SendOptions(
     val flags: Long = 0,
     val replaces: String? = null,
     val poll: PollPayload? = null,
+    /** AutoMod has read it already (Send.screen): what to tell it once the message is sent. */
+    val screened: ((String) -> Unit)? = null,
 )
 
 data class Uploaded(val meta: AttachmentMeta, val blobId: String, val size: Long)
@@ -147,6 +150,39 @@ object Send {
     }
 
     private fun pendingOf(channelId: String, tmp: String): PendingMessage? = Nexa.messages.get(channelId).pending.firstOrNull { it.tmpId == tmp }
+
+    /** What AutoMod makes of a message before it goes. */
+    sealed interface Screened {
+        /** Stopped: the box keeps the words and says why. */
+        data object Stopped : Screened
+        /** Let through: what to tell AutoMod once it is sent. */
+        class Through(val afterSend: (String) -> Unit) : Screened
+        /** The rules are still on their way: the send itself waits for them. */
+        data object Later : Screened
+    }
+
+    /**
+     * Reads a message with the server's AutoMod rules before it goes, when the
+     * rules are here to say. The names of files about to go up count as they
+     * will once they are attached.
+     */
+    fun screen(channelId: String, rawText: String, files: List<String>, opts: SendOptions = SendOptions()): Screened {
+        val ch = Nexa.channels.get(channelId) ?: return Screened.Through {}
+        val me = Nexa.users.meId ?: return Screened.Through {}
+        if (ch.serverId == null) return Screened.Through {}
+        val w = written(channelId, rawText, opts)
+        val payload = if (files.isEmpty()) w.payload else w.payload.copy(att = files.map { fish.nexa.crypto.AttachmentMeta("", it, "", 0L, "") })
+        val verdict = Automod.screenOutgoing(ch, me, payload, onlyIfLoaded = true) ?: return Screened.Later
+        verdict.stopped?.let {
+            AutomodNotices.stopped(channelId, it, null)
+            return Screened.Stopped
+        }
+        AutomodNotices.dismiss(channelId)
+        return Screened.Through(verdict.afterSend)
+    }
+
+    /** Stopped while it was on its way: nothing waits in the list to be sent again, and the words go back in the box. */
+    private class AutomodStop(val c: Automod.Catch) : Exception("automod_blocked")
 
     fun sendMessage(channelId: String, rawText: String, opts: SendOptions = SendOptions()) {
         val me = Nexa.users.me.value ?: return
@@ -286,6 +322,15 @@ object Send {
             }
         }
         try {
+            // AutoMod reads it here when its rules were not in yet as it was sent
+            var afterSend = opts.screened
+            val ch = Nexa.channels.get(channelId)
+            if (afterSend == null && ch?.serverId != null) {
+                Automod.ready(ch.serverId)
+                val verdict = Automod.screenOutgoing(ch, meId, payload)
+                verdict?.stopped?.let { throw AutomodStop(it) }
+                afterSend = verdict?.afterSend
+            }
             val conv = Nexa.channels.convFor(channelId)
             val (epoch, _) = Nexa.keys.ensureConvKey(conv) ?: throw IllegalStateException("waiting_for_key")
             val chanKey = Nexa.keys.channelKey(conv, epoch, channelId) ?: throw IllegalStateException("waiting_for_key")
@@ -322,12 +367,26 @@ object Send {
                 }
             }
             val sent = wireJson.decodeFromJsonElement(Message.serializer(), Nexa.api.request("POST", "/channels/$channelId/messages", body))
+            afterSend?.invoke(sent.id)
             var dec = withContext(Dispatchers.Default) { Nexa.messages.decrypt(sent) }
             if (dec.payload == null) dec = dec.copy(payload = payload, error = null)
             Nexa.messages.settle(channelId, listOf(dec), tmpId = tmp, nonce = nonce)
             Nexa.channels.setLastMessage(channelId, sent.id)
             Slowmode.markSent(channelId)
         } catch (e: Exception) {
+            // stopped by AutoMod: it never went, so nothing waits in the list to be sent again
+            if (e is AutomodStop || (e is ApiError && e.code == "automod_blocked")) {
+                val words = pendingOf(channelId, tmp)?.payload?.t
+                Nexa.messages.removePending(channelId, tmp)
+                if (e is AutomodStop) AutomodNotices.stopped(channelId, e.c, words)
+                else {
+                    val d = (e as ApiError).details
+                    fun field(k: String) = (d?.get(k) as? JsonPrimitive)?.contentOrNull
+                    val custom = (d?.get("custom") as? JsonPrimitive)?.booleanOrNull == true
+                    AutomodNotices.show(channelId, AutomodNotices.Notice(if (custom) e.message ?: "" else "", field("rule") ?: "", field("kind") ?: "", text = words))
+                }
+                throw e
+            }
             Nexa.messages.failPending(channelId, tmp)
             if (e is ApiError && e.code == "slowmode") {
                 val secs = e.retryAfter?.takeIf { it > 0 } ?: 5
@@ -345,9 +404,11 @@ object Send {
             "rate_limited" -> t("composer.send.youAreSendingMessagesTooQuickly")
             "message_too_long", "too_large" -> tooLongMessage()
             "cannot_create_polls" -> t("poll.create.notAllowed")
+            "automod_blocked" -> t("automod.notice.stoppedEdit")
             else -> null
         }
         return when (e.message) {
+            "automod_blocked" -> t("automod.notice.stoppedEdit")
             "waiting_for_key" -> t("composer.send.waitingForTheEncryptionKeyFor")
             "too_long" -> tooLongMessage()
             else -> null
@@ -377,6 +438,17 @@ object Send {
             payload = payload.copy(embeds = kept.ifEmpty { null })
         }
         if (payload.t == null && payload.att.isNullOrEmpty() && payload.sticker == null) return
+        // an edit is read by AutoMod as a new message is
+        var afterEdit: ((String) -> Unit)? = null
+        Nexa.channels.get(channelId)?.takeIf { it.serverId != null }?.let { ch ->
+            Automod.ready(ch.serverId!!)
+            val verdict = Automod.screenOutgoing(ch, me.id, payload)
+            verdict?.stopped?.let {
+                AutomodNotices.stopped(channelId, it, null)
+                throw IllegalStateException("automod_blocked")
+            }
+            afterEdit = verdict?.afterSend
+        }
         val conv = existing.m.keyConvId ?: Nexa.channels.convFor(channelId)
         var epoch = existing.m.keyEpoch ?: 0
         var chanKey = Nexa.keys.channelKey(conv, epoch, channelId)
@@ -396,7 +468,10 @@ object Send {
             put("mention_everyone", ex.everyone)
         }
         val updated = wireJson.decodeFromJsonElement(Message.serializer(), Nexa.api.request("PATCH", "/channels/$channelId/messages/$messageId", body))
+        afterEdit?.invoke(messageId)
         Nexa.messages.update(channelId, withContext(Dispatchers.Default) { Nexa.messages.decrypt(updated) })
+        // a published post's copies follow its edits
+        if (fish.nexa.ui.chat.isPublished(updated)) fish.nexa.ui.chat.republish(channelId, messageId, payload)
     }
 
     fun retryPending(channelId: String, tmp: String) {

@@ -227,11 +227,12 @@ object ProfileForm {
         }
     }
 
-    /** Puts up a new picture (avatar or banner); it changes at once. */
+    /** Puts up a new picture (avatar or banner), cut on the server to the part framed; it changes at once. */
     suspend fun upload(kind: String, r: CropResult) {
         uploading = kind
         try {
-            val res = ServerApi.upload("PUT", "/users/@me/$kind", r.bytes, r.type) as JsonObject
+            val area = r.crop?.let { "?x=${it.x}&y=${it.y}&w=${it.w}&h=${it.h}" } ?: ""
+            val res = ServerApi.upload("PUT", "/users/@me/$kind$area", r.bytes, r.type) as JsonObject
             res["user"]?.let { Nexa.users.setMe(wireJson.decodeFromJsonElement(MeUser.serializer(), it)) }
             Nexa.ui.toast(if (kind == "avatar") t("settings.profile.avatarUpdated") else t("settings.profile.bannerUpdated"), "success")
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -333,8 +334,8 @@ fun ProfilesPage(anchor: String?) {
                 Nexa.ui.toast(t("settings.profile.imagesAreLimitedTo10Mb"), "error")
                 return@launch
             }
-            if (kind == "avatar") openImageCrop(file, 1f, round = true, title = t("settings.profile.cropYourAvatar"), maxSize = 1024) { r -> scope.launch { f.upload("avatar", r) } }
-            else openImageCrop(file, 600f / 240f, round = false, title = t("settings.profile.cropYourBanner"), maxSize = 1920) { r -> scope.launch { f.upload("banner", r) } }
+            if (kind == "avatar") openImageCrop(file, 1f, round = true, title = t("settings.profile.cropYourAvatar"), maxSize = 1024, serverCrop = true) { r -> scope.launch { f.upload("avatar", r) } }
+            else openImageCrop(file, 600f / 240f, round = false, title = t("settings.profile.cropYourBanner"), maxSize = 1920, serverCrop = true) { r -> scope.launch { f.upload("banner", r) } }
         }
     }
     fun choose(kind: String) {

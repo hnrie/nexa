@@ -77,7 +77,20 @@ fun ServerPage(route: Route.Server) {
             failed = true
         }
     }
-    val first = if (known && (ch == null || ch.serverId != route.serverId)) Nav.firstTextChannel(route.serverId) else null
+    // a thread this device does not hold (closed, or never opened here) is asked for before giving up on it
+    var asked by remember(route.channelId) { mutableStateOf(route.channelId == null) }
+    LaunchedEffect(known, route.channelId, ch == null) {
+        val id = route.channelId
+        if (!known || id == null || ch != null || asked) return@LaunchedEffect
+        try {
+            val got = wireJson.decodeFromJsonElement(Channel.serializer(), Nexa.api.get("/channels/$id"))
+            if (got.serverId == route.serverId) Nexa.channels.upsert(listOf(got))
+        } catch (_: Exception) {
+        } finally {
+            asked = true
+        }
+    }
+    val first = if (known && asked && (ch == null || ch.serverId != route.serverId)) Nav.firstTextChannel(route.serverId) else null
     LaunchedEffect(known, ch?.id, ch?.type, first) {
         when {
             !known -> Unit
@@ -114,6 +127,7 @@ fun ServerPage(route: Route.Server) {
         }
         ch == null || ch.serverId != route.serverId || ch.isCategory -> NoChannel(route.serverId)
         ch.type == "voice" -> fish.nexa.ui.voice.VoiceChannelPage(ch)
+        ch.isForum -> fish.nexa.ui.forum.ForumView(ch)
         else -> ChatView(ch.id)
     }
 }

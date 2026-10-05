@@ -25,6 +25,8 @@ import fish.nexa.crypto.PollPayload
 import fish.nexa.data.ChatMessage
 import fish.nexa.ui.Icon
 import fish.nexa.ui.Time
+import fish.nexa.ui.nav.Nav
+import fish.nexa.ui.nav.Route
 import fish.nexa.ui.shell.Names
 import fish.nexa.ui.shell.openProfile
 import fish.nexa.ui.t
@@ -48,6 +50,8 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
         "system_pin" -> "Pin"
         "system_poll_result" -> "ChartBar"
         "system_call" -> "Phone"
+        "system_thread" -> "MessageSquareText"
+        "system_thread_remove" -> "ArrowLeftFromLine"
         else -> "ArrowRightToLine"
     }
     val nameStyle = SpanStyle(color = c.textStrong, fontWeight = FontWeight(500))
@@ -84,8 +88,21 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
         else withLink(LinkAnnotation.Clickable("jump-$to", styles = linkStyle) { ChatUi.jumpTo(ctx.channel.id, to) }) { append(label) }
     }
 
+    // a thread's name in its notice: the way into it
+    fun threadLink(threadId: String, name: String): AnnotatedString.Builder.() -> Unit = {
+        withLink(LinkAnnotation.Clickable("thread-$threadId", styles = linkStyle) { if (sid != null) Nav.go(Route.Server(sid, threadId)) }) { append(name) }
+    }
+
     val self = target == null || target == actor
     val text: AnnotatedString = when (m.type) {
+        "system_thread" -> {
+            val th = m.thread
+            val name = th?.let { Nexa.channels.get(it.id)?.name ?: it.name }
+            if (th != null && !name.isNullOrEmpty()) fill(t("chat.systemMessage.startedThread"), mapOf("actor" to person(actor), "thread" to threadLink(th.id, name)))
+            else fill(t("chat.systemMessage.startedThreadGone"), mapOf("actor" to person(actor)))
+        }
+        "system_thread_add" -> fill(t("chat.systemMessage.addedToThread"), mapOf("actor" to person(actor), "target" to person(target)))
+        "system_thread_remove" -> fill(t("chat.systemMessage.removedFromThread"), mapOf("actor" to person(actor), "target" to person(target)))
         "system_member_add" -> if (self) fill(t("chat.systemMessage.joinedGroup"), mapOf("actor" to person(actor)))
         else fill(t("chat.systemMessage.addedToGroup"), mapOf("actor" to person(actor), "target" to person(target)))
         "system_member_remove" -> if (self) fill(t("chat.systemMessage.leftGroup"), mapOf("actor" to person(actor)))

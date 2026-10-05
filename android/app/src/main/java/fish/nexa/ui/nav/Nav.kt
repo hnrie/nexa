@@ -135,7 +135,7 @@ object Nav {
     /** A server opens on its remembered text channel, else its first one (serverNav.ts). */
     private fun resolve(r: Route): Route {
         if (r is Route.Server && r.channelId == null) {
-            val remembered = lastChannel(r.serverId)?.takeIf { id -> Nexa.channels.get(id)?.let { it.serverId == r.serverId && it.isText } == true }
+            val remembered = lastChannel(r.serverId)?.takeIf { id -> Nexa.channels.get(id)?.let { it.serverId == r.serverId && (it.isTextLike || it.isForum) } == true }
             return r.copy(channelId = remembered ?: firstTextChannel(r.serverId))
         }
         return r
@@ -144,10 +144,10 @@ object Nav {
     fun firstTextChannel(serverId: String): String? {
         val all = Nexa.channels.byId.value.values.filter { it.serverId == serverId }
         val cats = all.filter { it.isCategory }.sortedWith(compareBy({ it.position }, { it.id.length }, { it.id })).map { it.id }.toSet()
-        val loose = all.filter { it.isText && (it.parentId == null || it.parentId !in cats) }.sortedWith(compareBy({ it.position }, { it.id.length }, { it.id }))
+        val loose = all.filter { (it.isText || it.isAnnouncement) && (it.parentId == null || it.parentId !in cats) }.sortedWith(compareBy({ it.position }, { it.id.length }, { it.id }))
         loose.firstOrNull()?.let { return it.id }
         for (cat in all.filter { it.isCategory }.sortedWith(compareBy({ it.position }, { it.id.length }, { it.id }))) {
-            all.filter { it.isText && it.parentId == cat.id }.minWithOrNull(compareBy({ it.position }, { it.id.length }, { it.id }))?.let { return it.id }
+            all.filter { (it.isText || it.isAnnouncement) && it.parentId == cat.id }.minWithOrNull(compareBy({ it.position }, { it.id.length }, { it.id }))?.let { return it.id }
         }
         return null
     }
@@ -185,7 +185,7 @@ object Nav {
         when (val r = route) {
             is Route.Server -> {
                 Nexa.ui.open(r.serverId, r.channelId)
-                if (r.channelId != null && Nexa.channels.get(r.channelId)?.isText == true) rememberChannel(r.serverId, r.channelId)
+                if (r.channelId != null && Nexa.channels.get(r.channelId)?.let { it.isTextLike || it.isForum } == true) rememberChannel(r.serverId, r.channelId)
             }
             is Route.Dm -> Nexa.ui.open(null, r.channelId)
             else -> Nexa.ui.open(null, null)

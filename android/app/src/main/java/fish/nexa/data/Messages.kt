@@ -105,6 +105,12 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
             if (msg.type.startsWith("system_")) return ChatMessage(msg, hook = hook)
             return ChatMessage(msg, payload = Webhooks.payloadOf(hook), hook = hook)
         }
+        // a published post's copy: sealed to the follow it came through, not with this channel's key
+        if (msg.type == "crosspost") {
+            if (msg.crosspost?.deleted == true) return ChatMessage(msg)
+            val opened = Follows.openCopy(msg) ?: return ChatMessage(msg, error = DecryptFail.NO_KEY)
+            return opened.fold({ ChatMessage(msg, payload = it) }, { ChatMessage(msg, error = DecryptFail.BAD) })
+        }
         val ct = msg.ciphertext ?: return ChatMessage(msg)
         if (ct is kotlinx.serialization.json.JsonNull) return ChatMessage(msg)
         if (msg.type == "system_call") return decryptCallLine(msg)
@@ -448,6 +454,19 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
                 for (o in opened) if (cur.byId[o.id] != null) b[o.id] = o
                 cur.copy(byId = b.build())
             }
+        }
+    }
+
+    /** Opens again a channel's published copies that could not be read, once its follows' keys are here. */
+    suspend fun reopenCopies(channelId: String) {
+        val c = _channels.value[channelId] ?: return
+        val waiting = c.byId.values.filter { it.m.type == "crosspost" && it.error != null }
+        if (waiting.isEmpty()) return
+        val opened = withContext(Dispatchers.Default) { waiting.map { decrypt(it.m) } }
+        with(channelId) { cur ->
+            val b = cur.byId.builder()
+            for (o in opened) if (cur.byId[o.id] != null) b[o.id] = o
+            cur.copy(byId = b.build())
         }
     }
 

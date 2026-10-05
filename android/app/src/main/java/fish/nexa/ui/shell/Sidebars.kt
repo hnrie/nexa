@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -40,6 +41,7 @@ import coil3.compose.AsyncImage
 import fish.nexa.Nexa
 import fish.nexa.data.P
 import fish.nexa.data.Perms
+import fish.nexa.data.threadsOf
 import fish.nexa.net.Channel
 import fish.nexa.media.Media
 import fish.nexa.media.TwemojiImage
@@ -62,6 +64,7 @@ import fish.nexa.ui.theme.topEdge
 import fish.nexa.ui.theme.sunken
 import fish.nexa.ui.theme.ring
 import fish.nexa.ui.theme.boxShadow
+import fish.nexa.ui.theme.mixSrgb
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -98,8 +101,12 @@ fun ServerSidebar(serverId: String, channelId: String?) {
     val reads by Nexa.readStates.byChannel.collectAsState()
     val doc by Nexa.settings.doc.collectAsState()
     val voices by Nexa.voiceStates.byUser.collectAsState()
+    val joinedThreads by Nexa.threads.joined.collectAsState()
     // read so the list redraws when read marks, settings or voice states change
     @Suppress("UNUSED_VARIABLE") val touch = reads.size + doc.size + voices.size
+    // the threads this account is in (or has open), still going, under the channel they belong to
+    fun threadsUnder(ch: Channel): List<Channel> =
+        if (!ch.holdsThreads) emptyList() else threadsOf(channels.values, ch.id).filter { th -> th.thread?.archived != true && (th.id in joinedThreads || th.id == channelId) }
     val st = servers[serverId] ?: return
     val tree = remember(channels, serverId) { ChannelTree.of(serverId, channels.values) }
     val collapsed = Nexa.settings.collapsedCategories
@@ -119,14 +126,15 @@ fun ServerSidebar(serverId: String, channelId: String?) {
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).height(138.dp).offset(x = 0.dp).clip(RoundedCornerShape(topStart = Radii.lg, topEnd = Radii.lg)),
                 )
             } else item("top") { Spacer(Modifier.height(52.dp + 12.dp)) }
-            items(tree.loose, key = { it.id }) { ch -> ChannelRow(st.server.id, ch, ch.id == channelId) }
+            items(tree.loose, key = { it.id }) { ch -> ChannelRow(st.server.id, ch, ch.id == channelId, threadsUnder(ch), channelId) }
             for (cat in tree.categories) {
                 val isCollapsed = cat.channel.id in collapsed
                 item(cat.channel.id) { CategoryHeader(serverId, cat.channel, isCollapsed) }
                 val shown = if (!isCollapsed) cat.children else cat.children.filter { ch ->
-                    ch.id == channelId || (ch.isText && Unread.isUnread(Nexa.readStates.get(ch.id), ch.lastMessageId) && !Unread.isMuted(ch.id, serverId)) || (Nexa.readStates.get(ch.id)?.mentions ?: 0) > 0
+                    ch.id == channelId || (ch.isTextLike && Unread.isUnread(Nexa.readStates.get(ch.id), ch.lastMessageId) && !Unread.isMuted(ch.id, serverId)) || (Nexa.readStates.get(ch.id)?.mentions ?: 0) > 0 ||
+                        threadsUnder(ch).any { it.id == channelId }
                 }
-                items(shown, key = { it.id }) { ch -> ChannelRow(st.server.id, ch, ch.id == channelId) }
+                items(shown, key = { it.id }) { ch -> ChannelRow(st.server.id, ch, ch.id == channelId, threadsUnder(ch), channelId) }
             }
             if (tree.loose.isEmpty() && tree.categories.isEmpty()) item("empty") {
                 Txt(t("sidebar.serverSidebar.noChannelsYouCanSeeYet"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, align = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 24.dp))
@@ -213,6 +221,9 @@ fun ChannelGlyph(ch: Channel, size: androidx.compose.ui.unit.Dp, tint: Color, mo
             custom != null -> AsyncImage(Media.emojiUrl(custom.blobId, (size.value * 0.86f).toInt(), density), null, Media.loader, modifier = Modifier.size(size * 0.86f))
             ch.isVoice -> Icon("Volume2", tint, size = size)
             ch.isText -> Icon("Hash", tint, size = size)
+            ch.isAnnouncement -> Icon("Megaphone", tint, size = size)
+            ch.isForum -> Icon("MessagesSquare", tint, size = size)
+            ch.isThread -> Icon("MessageSquareText", tint, size = size)
         }
         if (private || voiceOwn) {
             val badge = maxOf(9f, (size.value / 2)).dp
@@ -237,13 +248,13 @@ val CHANNEL_ICONS = mapOf(
 )
 
 @Composable
-private fun ChannelRow(serverId: String, ch: Channel, selected: Boolean) {
+private fun ChannelRow(serverId: String, ch: Channel, selected: Boolean, threads: List<Channel> = emptyList(), activeId: String? = null) {
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val read = Nexa.readStates.get(ch.id)
     val muted = Unread.isMuted(ch.id, serverId)
-    val unread = ch.isText && !selected && Unread.isUnread(read, ch.lastMessageId) && !muted
+    val unread = ch.isTextLike && !selected && Unread.isUnread(read, ch.lastMessageId) && !muted
     val mentions = read?.mentions ?: 0
     val people = if (ch.isVoice) Nexa.voiceStates.inChannel(ch.id) else emptyList()
     Column {
@@ -292,6 +303,84 @@ private fun ChannelRow(serverId: String, ch: Channel, selected: Boolean) {
                 for (v in people) VoiceParticipantRow(serverId, v)
             }
         }
+        for ((i, th) in threads.withIndex()) ThreadRow(serverId, th, th.id == activeId, first = i == 0, last = i == threads.lastIndex)
+    }
+}
+
+/**
+ * A thread under its channel (ServerSidebar.module.css .threadRow): a line
+ * leaves from just below the channel's icon and curves into each thread,
+ * whose name lines up with the channel's; the thread's own tile starts after
+ * the curve, so the line never runs under a highlight or through the icon.
+ * Along the row, the icon's middle is 18 dp in and the channel's name 35.
+ */
+@Composable
+private fun ThreadRow(serverId: String, th: Channel, selected: Boolean, first: Boolean, last: Boolean) {
+    val c = Nx.colors
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val read = Nexa.readStates.get(th.id)
+    val muted = Unread.isMuted(th.id, serverId) || (th.parentId != null && Unread.isMuted(th.parentId, serverId))
+    val unread = !selected && Unread.isUnread(read, th.lastMessageId) && !muted
+    val mentions = read?.mentions ?: 0
+    // opaque, mixed with the panel, so where two pieces meet the line does not darken
+    val spine = mixSrgb(c.textMuted, c.bgBase, 0.62f)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .drawBehind {
+                val w = 2.dp.toPx()
+                val x = 18.dp.toPx()
+                val mid = size.height / 2f
+                val r = 8.dp.toPx()
+                val end = 26.dp.toPx()
+                // the first starts 3 dp under the channel's icon (its bottom is 12 dp above this row)
+                val top = if (first) -9.dp.toPx() else 0f
+                val path = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(x, top)
+                    lineTo(x, mid - r)
+                    quadraticTo(x, mid, x + r, mid)
+                    lineTo(end, mid)
+                    if (!last) {
+                        moveTo(x, mid - r)
+                        lineTo(x, size.height)
+                    }
+                }
+                drawPath(path, spine, style = androidx.compose.ui.graphics.drawscope.Stroke(width = w))
+            }
+            .padding(vertical = 2.dp),
+    ) {
+        if (unread) UnreadEdge(Modifier.align(Alignment.CenterStart))
+        Row(
+            Modifier
+                .padding(start = 28.dp)
+                .fillMaxWidth()
+                .height(40.dp)
+                .selectedRow(selected, pressed)
+                .pressable(interaction, onLongClick = { openMenu(channelMenu(serverId, th)) }) { Nav.go(Route.Server(serverId, th.id)) }
+                .padding(start = 7.dp, end = 4.dp)
+                .semantics {
+                    contentDescription = th.name + when {
+                        mentions > 0 -> ", " + t("sidebar.serverSidebar.mentionsCount", "count" to mentions)
+                        unread -> ", " + t("sidebar.serverSidebar.unread")
+                        else -> ""
+                    }
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Txt(
+                th.name,
+                style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(500)),
+                color = when {
+                    selected || unread -> c.textStrong
+                    pressed -> c.text
+                    else -> c.textChannel
+                },
+                maxLines = 1,
+                modifier = Modifier.weight(1f),
+            )
+            if (mentions > 0) CountBadge(mentions, Modifier.padding(start = 4.dp))
+        }
     }
 }
 
@@ -330,10 +419,10 @@ private fun VoiceParticipantRow(serverId: String, v: fish.nexa.net.VoiceState) {
 private fun channelMenu(serverId: String, ch: Channel): List<MenuItem> {
     val st = Nexa.servers.get(serverId)
     val items = ArrayList<MenuItem>()
-    if (ch.isText) items += MenuItem.Action(t("sidebar.dmMenu.markAsRead"), disabled = ch.lastMessageId == null, separatorAfter = true) { Unread.markRead(ch.id) }
+    if (ch.isTextLike) items += MenuItem.Action(t("sidebar.dmMenu.markAsRead"), disabled = ch.lastMessageId == null, separatorAfter = true) { Unread.markRead(ch.id) }
     if (Nexa.servers.canI(st, P.CREATE_INSTANT_INVITE, ch.id)) items += MenuItem.Action(t("chat.chat.invitePeople")) { openInvite(serverId, ch.id) }
     items += MenuItem.Action(t("sidebar.serverMenu.copyLink"), separatorAfter = true) { copyText("${Nexa.api.baseUrl}/channels/$serverId/${ch.id}") }
-    if (ch.isText) {
+    if (ch.isTextLike || ch.isForum) {
         val muted = ch.id in Unread.mutedIds()
         items += MenuItem.Action(if (muted) t("sidebar.serverMenu.unmuteChannel") else t("sidebar.serverMenu.muteChannel"), separatorAfter = true) { Unread.setMuted(ch.id, !muted) }
     }

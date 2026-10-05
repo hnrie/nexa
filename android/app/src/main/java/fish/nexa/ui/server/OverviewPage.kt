@@ -116,7 +116,8 @@ fun OverviewPage(serverId: String) {
         busy = true
         scope.launch {
             try {
-                val el = ServerApi.upload("PUT", "/servers/$serverId/$kind", r.bytes, r.type)
+                val area = r.crop?.let { "?x=${it.x}&y=${it.y}&w=${it.w}&h=${it.h}" } ?: ""
+                val el = ServerApi.upload("PUT", "/servers/$serverId/$kind$area", r.bytes, r.type)
                 Nexa.servers.setServer(fish.nexa.net.wireJson.decodeFromJsonElement(Server.serializer(), el))
             } catch (e: Exception) {
                 Nexa.ui.toast(describeError(e, if (kind == "icon") t("server.serverOverview.couldNotUploadTheIcon") else t("server.serverOverview.couldNotUploadTheBanner")), "error")
@@ -147,8 +148,8 @@ fun OverviewPage(serverId: String) {
         val kind = picking
         scope.launch {
             val f = runCatching { ServerApi.read(context, uri) }.getOrNull() ?: return@launch
-            if (kind == "icon") openImageCrop(f, 1f, round = true, title = t("server.serverOverview.cropTheServerIcon"), maxSize = 1024) { upload("icon", it) }
-            else openImageCrop(f, 16f / 9f, round = false, title = t("server.serverOverview.cropTheServerBanner"), maxSize = 1280) { upload("banner", it) }
+            if (kind == "icon") openImageCrop(f, 1f, round = true, title = t("server.serverOverview.cropTheServerIcon"), maxSize = 1024, serverCrop = true) { upload("icon", it) }
+            else openImageCrop(f, 16f / 9f, round = false, title = t("server.serverOverview.cropTheServerBanner"), maxSize = 1280, serverCrop = true) { upload("banner", it) }
         }
     }
     fun choose(kind: String) {

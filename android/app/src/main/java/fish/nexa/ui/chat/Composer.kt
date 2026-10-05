@@ -220,6 +220,7 @@ fun ComposerSlot(channel: Channel) {
         if (selecting) SelectionBar(channel)
         else {
             TypingBar(channel)
+            if (channel.isThread) fish.nexa.ui.threads.ThreadStateBar(channel)
             val mute = mutedNow()
             if (mute != null) MutedBar(mute) else Composer(channel)
         }
@@ -251,7 +252,8 @@ fun Composer(channel: Channel) {
         )
     }
     val st = channel.serverId?.let { Nexa.servers.get(it) }
-    val canWrite = st == null || Nexa.servers.canI(st, P.SEND_MESSAGES, channelId)
+    val lockedThread = channel.thread?.locked == true && !fish.nexa.ui.threads.ThreadsUi.canManage(channel)
+    val canWrite = (st == null || Nexa.servers.canI(st, P.SEND_MESSAGES, channelId)) && !lockedThread
     val canAttach = st == null || Nexa.servers.canI(st, P.ATTACH_FILES, channelId)
     val canPoll = st == null || (Nexa.servers.canI(st, P.SEND_MESSAGES, channelId) && Nexa.servers.canI(st, P.CREATE_POLLS, channelId))
     val state = remember(channelId) { TextFieldState(Nexa.settings.draft(channelId)) }
@@ -263,6 +265,13 @@ fun Composer(channel: Channel) {
         }
     }
     var notice by remember(channelId) { mutableStateOf<Notice?>(null) }
+    // what AutoMod said about the last message sent from here; one stopped on its way puts its words back
+    val amNotice = fish.nexa.data.AutomodNotices.byChannel[channelId]
+    LaunchedEffect(amNotice?.text) {
+        val back = amNotice?.text ?: return@LaunchedEffect
+        if (state.text.isEmpty()) state.setTextAndPlaceCursorAtEnd(back)
+        fish.nexa.data.AutomodNotices.restored(channelId)
+    }
     var preview by remember { mutableStateOf(false) }
     var ac by remember(channelId) { mutableStateOf<AcToken?>(null) }
     var lastUnknown by remember(channelId) { mutableStateOf<String?>(null) }
@@ -361,12 +370,16 @@ fun Composer(channel: Channel) {
         }
         val files = ChatUi.trays[channelId] ?: emptyList()
         if (text.isBlank() && files.isEmpty()) return false
+        // AutoMod reads it before anything goes: a message it stops stays in the box, with why above it
+        val screened = Send.screen(channelId, text, files.map { it.name })
+        if (screened is Send.Screened.Stopped) return false
         // previews are asked for when the message is sent, never while it is typed, and only if the setting allows
         val urls = if (Nexa.settings.linkPreviews) fish.nexa.data.Mentions.urls(text) else emptyList()
         val opts = SendOptions(
             replyTo = reply?.messageId,
             ping = reply?.ping,
             embedsLater = if (urls.isEmpty()) null else ({ previews.embedsFor(urls, if (urls.any { fish.nexa.ui.markdown.PostLinks.isPostLink(it) }) PREVIEW_WAIT_POST else PREVIEW_WAIT) }),
+            screened = (screened as? Send.Screened.Through)?.afterSend,
         )
         state.clearText()
         Nexa.settings.setDraft(channelId, "")
@@ -385,12 +398,14 @@ fun Composer(channel: Channel) {
         Column(Modifier.fillMaxWidth()) {
             // the stacked bars join the box into one shape
             val stack = buildList {
+                if (amNotice != null) add("automod")
                 if (notice != null) add("notice")
                 if (preview && state.text.isNotEmpty()) add("preview")
                 if (reply != null) add("reply")
                 if (tray.isNotEmpty()) add("tray")
             }
             fun topShape(name: String) = if (stack.firstOrNull() == name) RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp) else RoundedCornerShape(0.dp)
+            amNotice?.let { n -> AutomodNoticeBar(n, topShape("automod")) { fish.nexa.data.AutomodNotices.dismiss(channelId) } }
             notice?.let { n -> NoticeBar(n, topShape("notice"), canAttach, onDismiss = { notice = null }, onAction = { action ->
                 when (n) {
                     is Notice.PasteTooLong -> when (action) {
@@ -456,7 +471,7 @@ fun Composer(channel: Channel) {
                 },
             )
             val slow = channel.slowmodeSeconds
-            if (slow > 0 && !(st != null && Nexa.servers.canI(st, P.MANAGE_MESSAGES, channelId))) {
+            if (slow > 0 && !(st != null && (Nexa.servers.canI(st, P.MANAGE_MESSAGES, channelId) || Nexa.servers.canI(st, P.BYPASS_SLOWMODE, channelId)))) {
                 Row(Modifier.padding(start = 8.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Icon("Timer", c.textMuted, size = 14.dp)
                     if (slowLeft > 0) Txt(Time.shortDuration(slowLeft), style = Nx.type.hint.copy(fontWeight = FontWeight(600)), color = c.textWarning)
@@ -1011,7 +1026,7 @@ private fun suggestions(channel: Channel, token: AcToken): List<Pair<String, Lis
         }
         "channel" -> {
             val sid = channel.serverId ?: return emptyList()
-            val list = Nexa.channels.byId.value.values.filter { it.serverId == sid && it.isText && it.type == "text" && Nexa.servers.canI(st, P.VIEW_CHANNEL, it.id) && it.name.lowercase().contains(q) }
+            val list = Nexa.channels.byId.value.values.filter { it.serverId == sid && (it.isText || it.isAnnouncement || it.isForum) && Nexa.servers.canI(st, P.VIEW_CHANNEL, it.id) && it.name.lowercase().contains(q) }
                 .sortedWith(compareBy({ if (it.name.lowercase().startsWith(q)) 0 else 1 }, { it.position }))
                 .take(8)
                 .map { ch -> AcItem("channel", "#${ch.name} ", ch.name, ch.parentId?.let { Nexa.channels.get(it)?.name } ?: "") }
@@ -1166,6 +1181,7 @@ private fun MutedBar(mute: fish.nexa.data.Restriction) {
 fun composerPlaceholder(channel: fish.nexa.net.Channel): String = when (channel.type) {
     "dm" -> t("composer.composer.messageUser", "name" to (Names.otherOf(channel)?.let { Names.shown(it) } ?: ""))
     "group_dm", "subchat" -> t("composer.composer.messageGroup", "name" to Names.channel(channel))
+    "thread", "private_thread" -> t("composer.composer.messageGroup", "name" to channel.name)
     else -> t("composer.composer.messageChannel", "name" to channel.name)
 }
 
@@ -1180,3 +1196,34 @@ fun messageKeyboard(): androidx.compose.foundation.text.KeyboardOptions {
 /** How long Send waits for a link's card, and longer for a social post's, which the server reads from more places. */
 private const val PREVIEW_WAIT = 1500L
 private const val PREVIEW_WAIT_POST = 5000L
+
+
+/** Above the box: AutoMod stopped the last message, with the server's own words for why when it has some. */
+@Composable
+private fun AutomodNoticeBar(n: fish.nexa.data.AutomodNotices.Notice, shape: androidx.compose.ui.graphics.Shape, onDismiss: () -> Unit) {
+    val c = Nx.colors
+    val reason = fish.nexa.ui.automod.automodReason(n.kind, n.matched)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 40.dp)
+            .background(c.bgSurface, shape)
+            .semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite },
+    ) {
+        Box(Modifier.width(3.dp).heightIn(min = 40.dp).background(c.danger))
+        Row(Modifier.weight(1f).padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon("ShieldAlert", c.textDanger, size = 18.dp)
+            val words = androidx.compose.ui.text.buildAnnotatedString {
+                withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight(650), color = c.textStrong)) { append(t("automod.notice.stopped")) }
+                append(" ")
+                if (n.message.isNotEmpty()) {
+                    append(n.message)
+                    append(" ")
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = c.textMuted)) { append(reason) }
+                } else append(reason)
+            }
+            androidx.compose.foundation.text.BasicText(words, modifier = Modifier.weight(1f), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(18.9f), color = c.text))
+            IconTile("X", t("composer.composer.dismiss"), c.textMuted, onClick = onDismiss)
+        }
+    }
+}

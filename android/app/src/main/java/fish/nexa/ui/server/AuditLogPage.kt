@@ -125,7 +125,7 @@ fun AuditLogPage(serverId: String) {
         is JsonPrimitive -> v.booleanOrNull ?: (v.longOrNull?.let { it != 0L }) ?: v.content.isNotEmpty()
         else -> true
     }
-    fun shownChannel(id: String): String? = channels[id]?.let { if (it.isText) "#${it.name}" else it.name }
+    fun shownChannel(id: String): String? = channels[id]?.let { if (it.isText || it.isAnnouncement) "#${it.name}" else it.name }
     fun roleName(id: String): String? = if (id == serverId) "@everyone" else st?.roles?.get(id)?.name
     fun userName(id: String): String? = users[id]?.let { Names.display(it) }
     val none = t("settings.profile.none")

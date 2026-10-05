@@ -147,12 +147,107 @@ data class Channel(
     val overwrites: List<Overwrite>? = null,
     val locked: Boolean = false,
     val glyph: String? = null,
+    /** How a thread stands (types thread and private_thread). */
+    val thread: ThreadMeta? = null,
+    /** A forum channel's own settings. */
+    val forum: ForumSettings? = null,
+    /** On a channel threads start in: how many quiet minutes close a new thread (absent: three days). */
+    @SerialName("default_auto_archive") val defaultAutoArchive: Int? = null,
+    /** On a thread, as listed or announced: how many people are in it. */
+    @SerialName("member_count") val memberCount: Int? = null,
 ) {
     val isDmLike get() = type == "dm" || type == "group_dm" || type == "subchat"
     val isText get() = type == "text"
     val isVoice get() = type == "voice"
     val isCategory get() = type == "category"
+    val isAnnouncement get() = type == "announcement"
+    val isForum get() = type == "forum"
+    /** A thread, or a forum's post (which is one). */
+    val isThread get() = type == "thread" || type == "private_thread"
+    /** Where messages are read and written in a server: text and announcement channels, and threads. */
+    val isTextLike get() = type == "text" || type == "announcement" || isThread
+    /** Channels threads start in (a forum's posts are its threads). */
+    val holdsThreads get() = type == "text" || type == "announcement" || type == "forum"
 }
+
+/** How a thread stands (web ThreadMeta). */
+@Serializable
+data class ThreadMeta(
+    val archived: Boolean = false,
+    @SerialName("archived_at") val archivedAt: Long? = null,
+    val locked: Boolean = false,
+    /** Minutes without messages after which it closes itself. */
+    @SerialName("auto_archive") val autoArchive: Int = 4320,
+    /** The message it was started from, if any. */
+    @SerialName("starter_id") val starterId: Snowflake? = null,
+    @SerialName("message_count") val messageCount: Int = 0,
+    /** A forum post's tags. */
+    @SerialName("applied_tags") val appliedTags: List<Snowflake> = emptyList(),
+)
+
+@Serializable
+data class ForumTag(
+    val id: Snowflake,
+    val name: String = "",
+    /** A single emoji, or "" for none. */
+    val emoji: String = "",
+    /** Only people who manage threads may put it on a post. */
+    val moderated: Boolean = false,
+)
+
+@Serializable
+data class ForumSettings(
+    val tags: List<ForumTag> = emptyList(),
+    @SerialName("default_reaction") val defaultReaction: String = "",
+    val sort: String = "activity",
+    val layout: String = "list",
+    @SerialName("require_tag") val requireTag: Boolean = false,
+    @SerialName("pinned_post") val pinnedPost: Snowflake? = null,
+)
+
+/** A thread as the message it was started from shows it. */
+@Serializable
+data class ThreadSummary(
+    val id: Snowflake,
+    val name: String = "",
+    @SerialName("message_count") val messageCount: Int = 0,
+    @SerialName("last_message_id") val lastMessageId: Snowflake? = null,
+    val archived: Boolean = false,
+    val locked: Boolean = false,
+)
+
+/** On a copy of a post published from an announcement channel: where it came from. */
+@Serializable
+data class CrosspostInfo(
+    @SerialName("follow_id") val followId: Snowflake = "",
+    @SerialName("server_id") val serverId: Snowflake = "",
+    @SerialName("server_name") val serverName: String = "",
+    @SerialName("server_icon_id") val serverIconId: Snowflake? = null,
+    @SerialName("channel_id") val channelId: Snowflake = "",
+    @SerialName("channel_name") val channelName: String = "",
+    @SerialName("message_id") val messageId: Snowflake = "",
+    val deleted: Boolean = false,
+)
+
+/** On AutoMod's note in an alert channel: what it caught and did. */
+@Serializable
+data class AutomodNote(
+    @SerialName("event_id") val eventId: Snowflake = "",
+    @SerialName("rule_id") val ruleId: Snowflake? = null,
+    @SerialName("rule_name") val ruleName: String = "",
+    @SerialName("rule_kind") val ruleKind: String = "",
+    @SerialName("channel_id") val channelId: Snowflake? = null,
+    val actions: List<String> = emptyList(),
+    /** What was caught, sealed with the server's key. */
+    val content: JsonElement? = null,
+    val matched: String? = null,
+    val mentions: Int? = null,
+    val raid: Boolean = false,
+    val messages: Int? = null,
+    val seconds: Int? = null,
+    val title: Boolean = false,
+    @SerialName("message_id") val messageId: Snowflake? = null,
+)
 
 @Serializable
 data class ServerTag(
@@ -177,7 +272,23 @@ data class Server(
     val flags: Long = 0,
     @SerialName("created_at") val createdAt: Long = 0,
     val tag: ServerTag? = null,
-)
+    /** When the server takes new members again; null while it takes them. */
+    @SerialName("invites_paused_until") val invitesPausedUntil: Long? = null,
+    /** How it is listed on Discovery. */
+    val discoverable: Boolean = false,
+    @SerialName("discovery_category") val discoveryCategory: String = "",
+    @SerialName("discovery_tags") val discoveryTags: List<String> = emptyList(),
+    @SerialName("discovery_language") val discoveryLanguage: String = "",
+    /** Taken off Discovery by Nexa's staff. */
+    @SerialName("discovery_hidden") val discoveryHidden: Boolean = false,
+    /** How old an account, and how long a membership, has to be to talk here. */
+    @SerialName("verify_account_minutes") val verifyAccountMinutes: Int = 0,
+    @SerialName("verify_member_minutes") val verifyMemberMinutes: Int = 0,
+    /** When the AutoMod rules members' apps apply last changed; 0 when there are none. */
+    @SerialName("automod_at") val automodAt: Long = 0,
+) {
+    val invitesPaused get() = (invitesPausedUntil ?: 0L) > System.currentTimeMillis()
+}
 
 @Serializable
 data class Member(
@@ -185,11 +296,20 @@ data class Member(
     @SerialName("user_id") val userId: Snowflake,
     val nickname: String = "",
     @SerialName("avatar_id") val avatarId: Snowflake? = null,
+    /** The rest of the member's profile in this server, shown there in place of their own. */
+    @SerialName("banner_id") val bannerId: Snowflake? = null,
+    val bio: String = "",
+    val pronouns: String = "",
+    @SerialName("accent_color") val accentColor: Long? = null,
+    @SerialName("accent_color_2") val accentColor2: Long? = null,
     @SerialName("joined_at") val joinedAt: Long = 0,
     @SerialName("timeout_until") val timeoutUntil: Long? = null,
     val flags: Long = 0,
     @SerialName("role_ids") val roleIds: List<Snowflake> = emptyList(),
-)
+) {
+    /** AutoMod holds the member for what their name or profile says. */
+    val quarantined get() = flags and 1L != 0L
+}
 
 @Serializable
 data class Role(
@@ -202,6 +322,11 @@ data class Role(
     val position: Int = 0,
     val permissions: String = "0",
     @SerialName("icon_id") val iconId: Snowflake? = null,
+    /** An emoji for its icon ("custom:<id>" for one of the server's own), or "". */
+    @SerialName("icon_emoji") val iconEmoji: String = "",
+    /** With a second colour the name is a gradient; with a third, a shimmer across all three. */
+    val color2: Long? = null,
+    val color3: Long? = null,
     @SerialName("created_at") val createdAt: Long = 0,
 )
 
@@ -218,14 +343,31 @@ data class ServerView(
     val flags: Long = 0,
     @SerialName("created_at") val createdAt: Long = 0,
     val tag: ServerTag? = null,
+    @SerialName("invites_paused_until") val invitesPausedUntil: Long? = null,
+    val discoverable: Boolean = false,
+    @SerialName("discovery_category") val discoveryCategory: String = "",
+    @SerialName("discovery_tags") val discoveryTags: List<String> = emptyList(),
+    @SerialName("discovery_language") val discoveryLanguage: String = "",
+    @SerialName("discovery_hidden") val discoveryHidden: Boolean = false,
+    @SerialName("verify_account_minutes") val verifyAccountMinutes: Int = 0,
+    @SerialName("verify_member_minutes") val verifyMemberMinutes: Int = 0,
+    @SerialName("automod_at") val automodAt: Long = 0,
     val channels: List<Channel> = emptyList(),
+    /** Threads still going that this member can see, and the ones they are in. */
+    val threads: List<Channel> = emptyList(),
+    @SerialName("joined_threads") val joinedThreads: List<Snowflake> = emptyList(),
     val roles: List<Role> = emptyList(),
     val members: List<Member> = emptyList(),
     @SerialName("member_count") val memberCount: Int = 0,
     val me: Member? = null,
     @SerialName("my_permissions") val myPermissions: String = "0",
 ) {
-    fun server() = Server(id, name, iconId, bannerId, ownerId, description, systemChannelId, defaultNotifications, flags, createdAt, tag)
+    fun server() = Server(
+        id = id, name = name, iconId = iconId, bannerId = bannerId, ownerId = ownerId, description = description, systemChannelId = systemChannelId,
+        defaultNotifications = defaultNotifications, flags = flags, createdAt = createdAt, tag = tag, invitesPausedUntil = invitesPausedUntil,
+        discoverable = discoverable, discoveryCategory = discoveryCategory, discoveryTags = discoveryTags, discoveryLanguage = discoveryLanguage,
+        discoveryHidden = discoveryHidden, verifyAccountMinutes = verifyAccountMinutes, verifyMemberMinutes = verifyMemberMinutes, automodAt = automodAt,
+    )
 }
 
 @Serializable
@@ -459,6 +601,14 @@ data class Message(
     val webhook: JsonElement? = null,
     @SerialName("poll_results") val pollResults: PollTally? = null,
     @SerialName("poll_result") val pollResult: PollOutcome? = null,
+    /** The thread started from this message, if any. */
+    val thread: ThreadSummary? = null,
+    /** On a copy of a post published from an announcement channel: where it came from. */
+    val crosspost: CrosspostInfo? = null,
+    /** A post of an announcement channel that has been published. */
+    val published: Boolean = false,
+    /** On AutoMod's note in an alert channel: what it caught and did. */
+    val automod: AutomodNote? = null,
 ) {
     val pinned get() = flags and MSG_FLAG_PINNED != 0L
     val suppressEmbeds get() = flags and MSG_FLAG_SUPPRESS_EMBEDS != 0L
@@ -469,6 +619,8 @@ data class Message(
         const val MSG_FLAG_SUPPRESS_EMBEDS = 4L
         const val MSG_FLAG_SUPPRESS_NOTIFICATIONS = 1L shl 12
         const val MSG_FLAG_COMPONENTS_V2 = 1L shl 15
+        /** An announcement channel's post that has gone out to the channels following it. */
+        const val MSG_FLAG_PUBLISHED = 1L shl 20
     }
 }
 

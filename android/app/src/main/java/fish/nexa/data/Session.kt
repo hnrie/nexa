@@ -218,6 +218,30 @@ class Session(private val nx: Nexa) {
                 } ?: return
                 nx.channels.positions(sid, list)
             }
+            "thread_create", "thread_update" -> decode(d, Channel.serializer())?.let { th ->
+                nx.channels.upsert(listOf(th))
+                th.memberCount?.let { nx.threads.membersChanged(th.id, emptyList(), emptyList(), it, meId) }
+            }
+            "thread_delete" -> {
+                val id = d.str("id") ?: return
+                nx.channels.remove(id)
+                nx.messages.clearChannel(id)
+                nx.threads.forget(id)
+            }
+            "thread_members_update" -> {
+                val o = d as? JsonObject ?: return
+                val id = d.str("thread_id") ?: return
+                fun ids(k: String) = (o[k] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: emptyList()
+                val count = (o["member_count"] as? JsonPrimitive)?.intOrNull ?: 0
+                nx.threads.membersChanged(id, ids("added"), ids("removed"), count, meId)
+            }
+            "automod_rules_update" -> {
+                val sid = d.str("server_id") ?: return
+                val at = ((d as? JsonObject)?.get("automod_at") as? JsonPrimitive)?.longOrNull
+                nx.servers.get(sid)?.let { st -> if (at != null) nx.servers.setServer(st.server.copy(automodAt = at)) }
+                Automod.forget(sid)
+            }
+            "follows_update" -> d.str("channel_id")?.let { Follows.forget(it) }
             "group_add_notice" -> decode(d, GroupAddNotice.serializer())?.let { n -> nx.misc.groupAddNotices.update { it.put(n.channelId, n) } }
             "group_add_notice_delete" -> d.str("channel_id")?.let { id -> nx.misc.groupAddNotices.update { it.remove(id) } }
             "server_create" -> decode(d, ServerView.serializer())?.let { v ->
@@ -318,6 +342,7 @@ class Session(private val nx: Nexa) {
         judgeAll(users)
         nx.users.upsert(users)
         nx.channels.upsert(v.channels)
+        nx.threads.setServer(v.id, v.threads, v.joinedThreads)
         nx.servers.put(v)
     }
 
@@ -339,12 +364,16 @@ class Session(private val nx: Nexa) {
         nx.users.upsert(d.users + d.user.asPublic())
         nx.misc.nexa.value = d.nexa ?: d.user.nexa
         NexaInbox.setState(d.nexa ?: d.user.nexa)
-        nx.channels.replaceAll(d.channels + d.servers.flatMap { it.channels })
+        nx.channels.replaceAll(d.channels + d.servers.flatMap { it.channels + it.threads })
+        nx.threads.clear()
+        for (v in d.servers) nx.threads.setServer(v.id, v.threads, v.joinedThreads)
         nx.relationships.replaceAll(d.relationships)
         nx.readStates.replaceAll(d.readStates)
         nx.misc.groupAddNotices.value = persistentHashMapOf<String, GroupAddNotice>().builder().apply { d.groupAddNotices.forEach { put(it.channelId, it) } }.build()
         nx.presence.replaceAll(d.presences)
         nx.servers.replaceAll(d.servers)
+        // the rules members' apps apply, fetched for each server that has any
+        Automod.warm(d.servers.filter { it.automodAt > 0 }.map { it.id })
         nx.expressions.setAll(d.emojis, d.stickerPacks)
         nx.voiceStates.replaceAll(d.voiceStates)
         nx.settings.loadFromReady(d.settings)
@@ -398,6 +427,8 @@ class Session(private val nx: Nexa) {
         if (dec.error == DecryptFail.NO_KEY && m.keyConvId != null) nx.keys.markWaiting(m.keyConvId)
         ensureUsers(listOf(m.authorId))
         ensureChannel(m.channelId)
+        // AutoMod: repeats are counted, and a moderator's app reports what got past
+        Automod.onArrive(dec, meId)
         val mine = meId == m.authorId
         val acted = mine && m.type != "system_poll_result"
         if (acted || nx.ui.readingPresent(m.channelId)) {
@@ -409,7 +440,8 @@ class Session(private val nx: Nexa) {
             val type = nx.channels.get(m.channelId)?.type
             if (!mine && (type == null || type == "dm" || type == "group_dm" || type == "subchat")) nx.readStates.bumpUnread(m.channelId)
         }
-        onMessage?.invoke(m, mine, dec)
+        // what AutoMod keeps hidden makes no sound
+        if (Automod.heldBy(dec, meId) == null) onMessage?.invoke(m, mine, dec)
     }
 
     private fun adjustEditMentions(d: JsonElement?, m: Message, meId: String?) {

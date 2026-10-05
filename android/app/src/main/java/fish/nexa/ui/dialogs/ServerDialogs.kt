@@ -177,7 +177,7 @@ internal fun CreateChannelSheet(layer: Layer, serverId: String, parentId: String
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     fun create() {
-        val clean = if (type == "text") channelSlug(name) else name.trim()
+        val clean = if (type != "voice") channelSlug(name) else name.trim()
         if (clean.isEmpty() || busy) return
         busy = true
         scope.launch {
@@ -234,15 +234,23 @@ internal fun CreateChannelSheet(layer: Layer, serverId: String, parentId: String
                 name = typedChannelName(name)
             }
             ChoiceCard(type == "voice", t("modals.createChannel.voice"), t("modals.createChannel.hangOutTogetherWithVoiceVideo"), icon = "Volume2") { type = "voice" }
+            ChoiceCard(type == "announcement", t("modals.createChannel.announcement"), t("modals.createChannel.announcementDesc"), icon = "Megaphone") {
+                type = "announcement"
+                name = typedChannelName(name)
+            }
+            ChoiceCard(type == "forum", t("modals.createChannel.forum"), t("modals.createChannel.forumDesc"), icon = "MessagesSquare") {
+                type = "forum"
+                name = typedChannelName(name)
+            }
         }
         NxTextField(
-            name, { v -> name = (if (type == "text") typedChannelName(v) else v).take(100) },
+            name, { v -> name = (if (type != "voice") typedChannelName(v) else v).take(100) },
             label = t("modals.createChannel.channelName"),
             required = true,
             placeholder = t("modals.createChannel.namePlaceholder"),
             imeAction = ImeAction.Done,
             onIme = ::create,
-            capitalize = type != "text",
+            capitalize = type == "voice",
         )
         ToggleRow(private, { private = it }, t("modals.createChannel.privateChannel"), t("modals.createChannel.onlySelectedMembersAndRolesWill"))
         if (private) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

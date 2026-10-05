@@ -16,6 +16,7 @@ import fish.nexa.data.SecureStore
 import fish.nexa.data.ServersStore
 import fish.nexa.data.Session
 import fish.nexa.data.SettingsStore
+import fish.nexa.data.ThreadsStore
 import fish.nexa.data.TypingStore
 import fish.nexa.data.UiState
 import fish.nexa.data.UsersStore
@@ -46,6 +47,7 @@ object Nexa {
     val servers = ServersStore(users, channels)
     val relationships = RelationshipsStore(users)
     val readStates = ReadStatesStore(channels)
+    val threads = ThreadsStore(channels)
     val presence = PresenceStore()
     val typing = TypingStore()
     val voiceStates = VoiceStatesStore()
@@ -84,5 +86,7 @@ object Nexa {
         settings = SettingsStore(api, scope)
         session = Session(this)
         auth = Auth(this)
+        // a private thread's permissions depend on being in it
+        servers.joinedThread = { threads.isJoined(it) }
     }
 }

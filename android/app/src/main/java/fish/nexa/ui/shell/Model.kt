@@ -93,7 +93,8 @@ object Unread {
         var unread = false
         var mentions = 0
         for (ch in Nexa.channels.byId.value.values) {
-            if (ch.serverId != serverId || !ch.isText) continue
+            // a thread counts once this account is in it
+            if (ch.serverId != serverId || !ch.isTextLike || (ch.isThread && !Nexa.threads.isJoined(ch.id))) continue
             val read = Nexa.readStates.get(ch.id)
             mentions += read?.mentions ?: 0
             if (!unread && serverId !in muted && ch.id !in muted && isUnread(read, ch.lastMessageId)) unread = true
@@ -110,7 +111,7 @@ object Unread {
     /** Marks every unread text channel of a server read. */
     fun markServerRead(serverId: String) {
         for (ch in Nexa.channels.byId.value.values) {
-            if (ch.serverId != serverId || !ch.isText) continue
+            if (ch.serverId != serverId || !ch.isTextLike) continue
             val last = ch.lastMessageId ?: continue
             val read = Nexa.readStates.get(ch.id)
             if (isUnread(read, last) || (read?.mentions ?: 0) > 0) Nexa.scope.launch { Nexa.session.ack(ch.id, last) }
@@ -131,7 +132,8 @@ object ChannelTree {
     private val order = compareBy<Channel>({ it.position }, { it.id.length }, { it.id })
 
     fun of(serverId: String, all: Collection<Channel>): Tree {
-        val mine = all.filter { it.serverId == serverId }
+        // threads sit under their channel, not in the list of channels
+        val mine = all.filter { it.serverId == serverId && !it.isThread }
         val cats = mine.filter { it.isCategory }.sortedWith(order)
         val catIds = cats.map { it.id }.toSet()
         val loose = mine.filter { !it.isCategory && (it.parentId == null || it.parentId !in catIds) }.sortedWith(order)

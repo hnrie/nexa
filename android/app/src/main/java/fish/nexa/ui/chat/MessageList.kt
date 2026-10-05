@@ -418,7 +418,7 @@ fun MessageList(channel: Channel, modifier: Modifier = Modifier) {
                         if (cm?.m?.type == "system_call") CallRecordRow(cm, ctx)
                         else MessageRow(row.item, ctx, cm?.let { flashes[it.id] }, picked = cm != null && cm.id in ChatUi.picked, canPick = cm != null && canDelete(cm.m))
                     }
-                    is ListRow.System -> SystemRow(row.cm, ctx)
+                    is ListRow.System -> if (row.cm.m.type == "system_automod") fish.nexa.ui.automod.AutomodAlertRow(row.cm, ctx) else SystemRow(row.cm, ctx)
                     is ListRow.Blocked -> BlockedRun(row, ctx) { blockedShown[row.key] = !row.shown }
                     ListRow.Start -> ConversationStart(channel)
                     ListRow.TopLoader -> Loader()
@@ -575,6 +575,7 @@ private fun BoxScope.JumpButton(onClick: () -> Unit) {
 /** The top of a conversation's history: who or where this is, and that it is encrypted. */
 @Composable
 private fun ConversationStart(channel: Channel) {
+    if (channel.isThread) return fish.nexa.ui.threads.ThreadIntro(channel)
     val c = Nx.colors
     val endToEnd = t("chat.messageList.endToEnd")
     Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp)) {

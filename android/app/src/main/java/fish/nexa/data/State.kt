@@ -222,9 +222,19 @@ class ServersStore(private val users: UsersStore, private val channels: Channels
         return Perms.base(st.server.id, Perms.roles(st.roles.values), Perms.member(st.members[userId], userId), false)
     }
 
+    /** Threads this account is in, kept by the threads store, for private threads' permissions. */
+    var joinedThread: (String) -> Boolean = { false }
+
     fun channelPerms(st: ServerState, channelId: String, userId: String): Long {
         val ch = channels.get(channelId)
         val isOwner = st.server.ownerId == userId || isInstanceAdmin(userId)
+        // a thread answers to its channel
+        if (ch != null && ch.isThread && ch.parentId != null) {
+            val parent = Perms.compute(st.server.id, Perms.roles(st.roles.values), Perms.member(st.members[userId], userId), isOwner, channels.get(ch.parentId)?.overwrites)
+            // only this account's own membership is known here; others' private threads read as closed
+            val inIt = userId == st.me.userId && joinedThread(channelId)
+            return Perms.thread(parent, ch.type == "private_thread", inIt)
+        }
         return Perms.compute(st.server.id, Perms.roles(st.roles.values), Perms.member(st.members[userId], userId), isOwner, ch?.overwrites)
     }
 

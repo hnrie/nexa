@@ -182,6 +182,25 @@ fun ChatHeader(channel: Channel) {
                     }
                 }
             }
+            "thread", "private_thread" -> {
+                Icon("MessageSquareText", c.textMuted, size = 22.dp)
+                // the name keeps its room; the way back to its channel gives way first (`.hParent`)
+                ShrinkPair(Modifier.weight(1f)) {
+                    Txt(channel.name, style = nameStyle, color = c.textStrong, maxLines = 1, modifier = Modifier.padding(start = 2.dp))
+                    val parentId = channel.parentId
+                    val label = fish.nexa.ui.threads.parentLabel(channel)
+                    if (parentId != null && label != null && channel.serverId != null) Row(
+                        Modifier
+                            .padding(start = 8.dp)
+                            .pressable(remember { MutableInteractionSource() }) { Nav.go(Route.Server(channel.serverId, parentId)) },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon("ChevronLeft", c.textMuted, size = 14.dp)
+                        Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
+                    }
+                }
+            }
             else -> Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 ChannelGlyph(channel, 22.dp, c.textMuted)
                 Txt(channel.name, style = nameStyle, color = c.textStrong, maxLines = 1, modifier = Modifier.padding(start = 2.dp))
@@ -258,8 +277,15 @@ private fun KeyChip(userId: String) {
 /** The More menu (phones only): what the desktop header shows as buttons. */
 private fun openMoreMenu(channel: Channel) {
     val items = ArrayList<MenuItem>()
+    // a thread's own choices come first: joining it, closing, locking, its settings
+    if (channel.isThread) {
+        val own = fish.nexa.ui.threads.threadMenuItems(channel)
+        items += own.mapIndexed { i, it -> if (i == own.lastIndex && it is MenuItem.Action) it.copy(separatorAfter = true) else it }
+    }
     items += MenuItem.Action(t("chat.chat.pinnedMessages")) { ChatUi.panel = "pins" }
     val server = channel.serverId != null
+    if (server && (channel.isText || channel.isAnnouncement)) items += MenuItem.Action(t("threads.panel.title")) { ChatUi.panel = "threads" }
+    if (channel.isAnnouncement) items += MenuItem.Action(t("follows.follow")) { fish.nexa.ui.follows.openFollow(channel.id) }
     if (!server) items += MenuItem.Action(t("chat.chat.subchats")) { ChatUi.panel = "subchats" }
     if (server) items += MenuItem.Action(t("chat.chat.invitePeople")) { openInvite(channel.serverId!!, channel.id) }
     else {

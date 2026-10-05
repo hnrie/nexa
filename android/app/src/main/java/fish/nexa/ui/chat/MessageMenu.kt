@@ -65,7 +65,60 @@ fun canEdit(cm: ChatMessage): Boolean {
 fun canPin(m: Message): Boolean {
     val ch = Nexa.channels.get(m.channelId) ?: return true
     val sid = ch.serverId ?: return true
-    return Nexa.servers.canI(Nexa.servers.get(sid), P.MANAGE_MESSAGES, ch.id)
+    return Nexa.servers.canI(Nexa.servers.get(sid), P.PIN_MESSAGES, ch.id)
+}
+
+/** Whether a thread can be started from a message: something someone said, in a channel threads start in, that has none yet. */
+fun canThread(cm: ChatMessage): Boolean {
+    val m = cm.m
+    if (m.thread != null || (m.type != "default" && m.type != "reply" && m.type != "crosspost")) return false
+    val ch = Nexa.channels.get(m.channelId) ?: return false
+    return !ch.isThread && fish.nexa.ui.threads.ThreadsUi.canStart(ch)
+}
+
+/** Whether a post of an announcement channel has gone out to the channels following it. */
+fun isPublished(m: Message): Boolean = m.published || m.flags and Message.MSG_FLAG_PUBLISHED != 0L
+
+/**
+ * Whether this account may publish a message: one written in an announcement
+ * channel, not yet published, by this account (who can send there) or by
+ * anyone when this account may manage messages there.
+ */
+fun canPublish(cm: ChatMessage): Boolean {
+    val m = cm.m
+    if ((m.type != "default" && m.type != "reply") || cm.payload == null || isPublished(m)) return false
+    val ch = Nexa.channels.get(m.channelId) ?: return false
+    val sid = ch.serverId ?: return false
+    if (!ch.isAnnouncement) return false
+    val st = Nexa.servers.get(sid)
+    val me = Nexa.users.meId ?: return false
+    if (m.authorId == me && Nexa.servers.canI(st, P.SEND_MESSAGES, ch.id)) return true
+    return Nexa.servers.canI(st, P.MANAGE_MESSAGES, ch.id)
+}
+
+/** Publishes a post to every channel following its channel, each copy sealed to that follow. */
+fun publish(cm: ChatMessage) {
+    val payload = cm.payload ?: return
+    Nexa.scope.launch {
+        try {
+            val copies = fish.nexa.data.Follows.publish(cm.channelId, cm.id, payload)
+            Nexa.messages.setFlags(cm.channelId, cm.id, cm.m.flags or Message.MSG_FLAG_PUBLISHED)
+            Nexa.ui.toast(if (copies == 0) t("follows.publishedNone") else t("follows.publishedTo", "count" to copies), "success")
+        } catch (e: Exception) {
+            Nexa.ui.toast(if ((e as? ApiError)?.code == "publish_limit") t("follows.publishLimit") else (e as? ApiError)?.message ?: t("follows.publishFailed"), "error")
+        }
+    }
+}
+
+/** An edit to a published post goes out to its copies too. */
+fun republish(channelId: String, messageId: String, payload: fish.nexa.crypto.MessagePayload) {
+    Nexa.scope.launch {
+        try {
+            fish.nexa.data.Follows.publish(channelId, messageId, payload)
+        } catch (_: Exception) {
+            Nexa.ui.toast(t("follows.republishFailed"), "error")
+        }
+    }
 }
 
 /** The exact moments, which a phone has no tooltip for. */
@@ -132,7 +185,11 @@ fun openMessageMenu(cm: ChatMessage, ctx: ListCtx, image: ImageTarget? = null) {
     if (canEdit(cm)) items += MenuItem.Action(t("chat.messageItem.editMessage")) {
         ChatUi.editing[cm.channelId] = ChatUi.Edit(cm.id, fish.nexa.data.Mentions.humanizeForEdit(cm.payload?.t ?: "", cm.channelId))
     }
-    items += MenuItem.Action(t("chat.messageItem.reply"), separatorAfter = true) { ChatUi.reply[cm.channelId] = ChatUi.Reply(cm.id, ping = true) }
+    val threadable = canThread(cm)
+    val publishable = canPublish(cm)
+    items += MenuItem.Action(t("chat.messageItem.reply"), separatorAfter = !threadable && !publishable) { ChatUi.reply[cm.channelId] = ChatUi.Reply(cm.id, ping = true) }
+    if (threadable) items += MenuItem.Action(t("threads.create.title"), separatorAfter = !publishable) { fish.nexa.ui.threads.openCreateThread(cm.channelId, cm.id) }
+    if (publishable) items += MenuItem.Action(t("follows.publish"), separatorAfter = true) { publish(cm) }
     items += MenuItem.Action(t("chat.messageMenu.copyText"), disabled = cm.payload?.t.isNullOrEmpty()) {
         copy(fish.nexa.data.Mentions.humanize(cm.payload?.t ?: ""), t("clipboard.textCopied"))
     }
