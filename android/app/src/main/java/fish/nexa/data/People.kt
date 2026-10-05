@@ -14,6 +14,7 @@ import fish.nexa.ui.t
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
@@ -271,14 +272,16 @@ object People {
     }, { t("pick.blocked", "count" to it) }, t("friends.couldNotUpdate"))
 
     /** The person's public profile: mutual friends and servers and widgets come with it. */
-    data class Profile(val user: PublicUser, val mutualFriends: List<String>, val mutualServers: List<String>, val widgets: List<JsonObject>)
+    /** [serverWidgets]: the widgets are the ones they chose for the server asked about, not their main profile's. */
+    data class Profile(val user: PublicUser, val mutualFriends: List<String>, val mutualServers: List<String>, val widgets: List<JsonObject>, val serverWidgets: Boolean = false)
 
-    suspend fun profile(userId: String): Profile {
-        val res = Nexa.api.get("/users/$userId/profile") as JsonObject
+    /** Someone's whole profile; opened in a server both are in, with the widgets they chose for it, if they did. */
+    suspend fun profile(userId: String, serverId: String? = null): Profile {
+        val res = Nexa.api.get("/users/$userId/profile" + (serverId?.let { "?server_id=$it" } ?: "")) as JsonObject
         val user = wireJson.decodeFromJsonElement(PublicUser.serializer(), res["user"]!!)
         Nexa.users.upsert(listOf(user))
         fun ids(k: String) = (res[k] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content } ?: emptyList()
         val widgets = (res["widgets"] as? JsonArray)?.mapNotNull { it as? JsonObject } ?: emptyList()
-        return Profile(user, ids("mutual_friends"), ids("mutual_servers"), widgets)
+        return Profile(user, ids("mutual_friends"), ids("mutual_servers"), widgets, (res["server_widgets"] as? JsonPrimitive)?.booleanOrNull == true)
     }
 }

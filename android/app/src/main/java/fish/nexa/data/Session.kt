@@ -411,7 +411,7 @@ class Session(private val nx: Nexa) {
         if (nx.relationships.isBlocked(cm.authorId)) return true
         if (nx.settings.hideBlockedReplies) {
             val reply = cm.m.replyToId ?: return false
-            val target = nx.messages.get(cm.channelId).byId[reply] ?: return false
+            val target = nx.messages.get(cm.channelId).byId[reply] ?: (ReplyTargets.byId.value[reply] as? ReplyTarget.Found)?.cm ?: return false
             return nx.relationships.isBlocked(target.authorId)
         }
         return false

@@ -609,6 +609,12 @@ data class Message(
     val published: Boolean = false,
     /** On AutoMod's note in an alert channel: what it caught and did. */
     val automod: AutomodNote? = null,
+    /**
+     * What a reply (or a pin's or a poll's notice) points at, sent along by the
+     * server: the original as it is now, or null once it has been deleted.
+     * [NOT_SAID] where the server did not say (ReplyTargets fetches it then).
+     */
+    @SerialName("referenced_message") val referenced: JsonElement? = NOT_SAID,
 ) {
     val pinned get() = flags and MSG_FLAG_PINNED != 0L
     val suppressEmbeds get() = flags and MSG_FLAG_SUPPRESS_EMBEDS != 0L
@@ -621,6 +627,8 @@ data class Message(
         const val MSG_FLAG_COMPONENTS_V2 = 1L shl 15
         /** An announcement channel's post that has gone out to the channels following it. */
         const val MSG_FLAG_PUBLISHED = 1L shl 20
+        /** [referenced] when the server sent nothing about the original. */
+        val NOT_SAID: JsonElement = kotlinx.serialization.json.JsonPrimitive("not-said")
     }
 }
 

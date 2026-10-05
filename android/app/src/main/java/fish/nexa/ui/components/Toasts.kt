@@ -98,7 +98,8 @@ private fun ToastView(toast: Toast) {
             .panel(Radii.Md, c, c.bgFloating.copy(alpha = 0.92f), high = true)
             .pressable(interaction) { Nexa.ui.dismissToast(toast.id) }
             .semantics {
-                contentDescription = "$kindLabel: ${toast.text}. ${t("toasts.dismiss")}"
+                // a toast that ends its own sentence gets no second full stop
+                contentDescription = "$kindLabel: ${toast.text}" + (if (toast.text.trimEnd().lastOrNull() in listOf('.', '!', '?', '。', '！', '？')) " " else ". ") + t("toasts.dismiss")
                 liveRegion = if (toast.kind == "error") LiveRegionMode.Assertive else LiveRegionMode.Polite
             }
             .padding(start = 30.dp, end = 16.dp, top = 11.dp, bottom = 11.dp),

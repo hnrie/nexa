@@ -235,10 +235,12 @@ fun ThreadChip(serverId: String, summary: ThreadSummary) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Icon("MessageSquareText", c.textMuted, size = 16.dp)
-            Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-            if (roomy) Txt(if (count == 0) t("threads.chip.noMessages") else t("threads.chip.messages", "count" to count), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
-            if (archived) ClosedPill()
-            Spacer(Modifier.weight(1f, fill = !roomy))
+            // the name takes what the way in leaves, giving way first to how much was said and Closed
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                if (roomy) Txt(if (count == 0) t("threads.chip.noMessages") else t("threads.chip.messages", "count" to count), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
+                if (archived) ClosedPill()
+            }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 Txt(t("threads.chip.open"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = c.link, maxLines = 1)
                 Icon("ChevronRight", c.link, size = 14.dp)

@@ -109,22 +109,24 @@ private fun ChannelSettingsLayer(layer: Layer, channelId: String, initial: Strin
     val serverId = ch?.serverId ?: return
     val st = servers[serverId] ?: return
     val isCat = ch.isCategory
-    val hooks = ch.isText && Nexa.servers.canI(st, P.MANAGE_WEBHOOKS, ch.id)
+    val isThread = ch.isThread
+    val hooks = (ch.isText || ch.isAnnouncement) && Nexa.servers.canI(st, P.MANAGE_WEBHOOKS, ch.id)
     var page by remember { mutableStateOf(initial ?: "overview") }
     val sections = listOf(
         NavSection(
-            (if (isCat) "" else "#") + ch.name,
+            (if (isCat || isThread) "" else "#") + ch.name,
             listOfNotNull(
                 NavPage("overview", t("server.channelSettings.overview"), "Settings2"),
-                NavPage("permissions", t("server.channelSettings.permissions"), "SlidersHorizontal"),
+                // a thread answers to its channel's permissions
+                if (isThread) null else NavPage("permissions", t("server.channelSettings.permissions"), "SlidersHorizontal"),
                 if (hooks) NavPage("integrations", t("integrations.title"), "Webhook") else null,
             ),
         ),
-        NavSection(null, listOf(NavPage("delete", if (isCat) t("server.channelSettings.deleteCategory") else t("server.channelSettings.deleteChannel"), "Trash2", danger = true))),
+        NavSection(null, listOf(NavPage("delete", if (isCat) t("server.channelSettings.deleteCategory") else if (isThread) t("threads.bar.delete") else t("server.channelSettings.deleteChannel"), "Trash2", danger = true))),
     )
     SettingsFrame(layer, t("server.channelSettings.channelSettings"), sections, page, { page = it }, startOnList = initial == null, close = close) { id ->
         when (id) {
-            "permissions" -> ChannelPermissionsPage(ch, serverId)
+            "permissions" -> if (isThread) ChannelOverviewPage(ch) else ChannelPermissionsPage(ch, serverId)
             "integrations" -> if (hooks) IntegrationsPage(serverId, ch.id) else ChannelOverviewPage(ch)
             "delete" -> DeleteChannelPage(ch) {
                 close()
@@ -135,46 +137,113 @@ private fun ChannelSettingsLayer(layer: Layer, channelId: String, initial: Strin
     }
 }
 
+/** A forum tag as it is being edited: one not saved yet has no id. */
+private data class TagEdit(val id: String?, val name: String, val emoji: String, val moderated: Boolean, val key: String = id ?: java.util.UUID.randomUUID().toString())
+
+private const val MAX_FORUM_TAGS = 20
+
+private fun sameTags(a: List<TagEdit>, b: List<TagEdit>) =
+    a.size == b.size && a.zip(b).all { (x, y) -> x.id == y.id && x.name == y.name && x.emoji == y.emoji && x.moderated == y.moderated }
+
 /**
  * The Overview: only what was typed here is a draft; everything else
  * follows the channel, so saving never sends back values from before
- * somebody else's change.
+ * somebody else's change. A text channel can be made an announcement
+ * channel; a forum has its guidelines, tags, layout and order; a thread its
+ * name, when it closes, whether it is locked and its tags.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun ChannelOverviewPage(ch: Channel) {
+    val c = Nx.colors
     val scope = rememberCoroutineScope()
+    val channels by Nexa.channels.byId.collectAsState()
+    val thread = ch.isThread
+    val forum = ch.isForum
+    val textLike = ch.isText || ch.isAnnouncement
+    // names are written as text channels' are: lower case, dashes for spaces
+    val slugged = textLike || forum
+    val parent = if (thread) ch.parentId?.let { channels[it] } else null
+    val postTags = if (parent?.isForum == true) parent.forum?.tags.orEmpty() else emptyList()
+    val mayManageThreads = thread && fish.nexa.ui.threads.ThreadsUi.canManage(ch)
     var nameEdit by remember { mutableStateOf<String?>(null) }
     var topicEdit by remember { mutableStateOf<String?>(null) }
     var slowEdit by remember { mutableStateOf<Int?>(null) }
     var nsfwEdit by remember { mutableStateOf<Boolean?>(null) }
     var limitEdit by remember { mutableStateOf<Int?>(null) }
     var glyphEdit by remember { mutableStateOf<String?>(null) }
+    var announceEdit by remember { mutableStateOf<Boolean?>(null) }
+    var defaultArchiveEdit by remember { mutableStateOf<Int?>(null) }
+    var archiveEdit by remember { mutableStateOf<Int?>(null) }
+    var lockedEdit by remember { mutableStateOf<Boolean?>(null) }
+    var appliedEdit by remember { mutableStateOf<List<String>?>(null) }
+    var tagsEdit by remember { mutableStateOf<List<TagEdit>?>(null) }
+    var layoutEdit by remember { mutableStateOf<String?>(null) }
+    var sortEdit by remember { mutableStateOf<String?>(null) }
+    var requireTagEdit by remember { mutableStateOf<Boolean?>(null) }
     var busy by remember { mutableStateOf(false) }
+    val savedTags = remember(ch.forum?.tags) { ch.forum?.tags.orEmpty().map { TagEdit(it.id, it.name, it.emoji, it.moderated) } }
     val name = nameEdit ?: ch.name
     val topic = topicEdit ?: ch.topic
     val slow = slowEdit ?: ch.slowmodeSeconds
     val nsfw = nsfwEdit ?: ch.nsfw
     val limit = limitEdit ?: ch.userLimit
     val glyph = glyphEdit ?: ch.glyph ?: ""
-    val isText = ch.isText
-    val dirty = name != ch.name || topic != ch.topic || slow != ch.slowmodeSeconds || nsfw != ch.nsfw || limit != ch.userLimit || glyph != (ch.glyph ?: "")
+    val announce = announceEdit ?: ch.isAnnouncement
+    val defaultArchive = defaultArchiveEdit ?: ch.defaultAutoArchive ?: 4320
+    val archive = archiveEdit ?: ch.thread?.autoArchive ?: 4320
+    val locked = lockedEdit ?: (ch.thread?.locked == true)
+    val applied = appliedEdit ?: ch.thread?.appliedTags.orEmpty()
+    val tags = tagsEdit ?: savedTags
+    val layout = layoutEdit ?: ch.forum?.layout ?: "list"
+    val sort = sortEdit ?: ch.forum?.sort ?: "activity"
+    val requireTag = requireTagEdit ?: (ch.forum?.requireTag == true)
+    val forumDirty = forum && (!sameTags(tags, savedTags) || layout != (ch.forum?.layout ?: "list") || sort != (ch.forum?.sort ?: "activity") || requireTag != (ch.forum?.requireTag == true))
+    val dirty = name != ch.name || topic != ch.topic || slow != ch.slowmodeSeconds || nsfw != ch.nsfw || limit != ch.userLimit || glyph != (ch.glyph ?: "") ||
+        (textLike && announce != ch.isAnnouncement) ||
+        ((textLike || forum) && defaultArchive != (ch.defaultAutoArchive ?: 4320)) ||
+        (thread && (archive != (ch.thread?.autoArchive ?: 4320) || locked != (ch.thread?.locked == true) || applied != ch.thread?.appliedTags.orEmpty())) ||
+        forumDirty
     fun reset() {
         nameEdit = null; topicEdit = null; slowEdit = null; nsfwEdit = null; limitEdit = null; glyphEdit = null
+        announceEdit = null; defaultArchiveEdit = null; archiveEdit = null; lockedEdit = null; appliedEdit = null
+        tagsEdit = null; layoutEdit = null; sortEdit = null; requireTagEdit = null
     }
     fun save() {
         busy = true
         scope.launch {
             try {
                 val body = buildJsonObject {
-                    if (name != ch.name) put("name", if (isText) slugChannelName(name) else name)
+                    if (name != ch.name) put("name", if (slugged) slugChannelName(name) else name.trim())
                     if (topic != ch.topic) put("topic", topic)
                     if (slow != ch.slowmodeSeconds) put("slowmode_seconds", slow)
                     if (nsfw != ch.nsfw) put("nsfw", nsfw)
                     if (limit != ch.userLimit) put("user_limit", limit)
                     if (glyph != (ch.glyph ?: "")) put("glyph", glyph)
+                    if (textLike && announce != ch.isAnnouncement) put("type", if (announce) "announcement" else "text")
+                    if ((textLike || forum) && defaultArchive != (ch.defaultAutoArchive ?: 4320)) put("default_auto_archive", defaultArchive)
+                    if (thread) {
+                        if (archive != (ch.thread?.autoArchive ?: 4320)) put("auto_archive", archive)
+                        if (locked != (ch.thread?.locked == true)) put("locked", locked)
+                        if (applied != ch.thread?.appliedTags.orEmpty()) put("applied_tags", kotlinx.serialization.json.JsonArray(applied.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+                    }
+                    if (forumDirty) put("forum", buildJsonObject {
+                        put("tags", kotlinx.serialization.json.JsonArray(tags.filter { it.name.isNotBlank() }.map { tg ->
+                            buildJsonObject {
+                                tg.id?.let { put("id", it) }
+                                put("name", tg.name.trim())
+                                put("emoji", tg.emoji)
+                                put("moderated", tg.moderated)
+                            }
+                        }))
+                        put("layout", layout)
+                        put("sort", sort)
+                        put("require_tag", requireTag)
+                    })
                 }
                 val saved = Nexa.api.request("PATCH", "/channels/${ch.id}", Channel.serializer(), body)
                 Nexa.channels.upsert(listOf(saved))
+                // the server tidies names and topics, so what it kept is shown
                 reset()
                 Nexa.ui.toast(t("server.channelSettings.channelSaved"), "success")
             } catch (e: Exception) {
@@ -184,36 +253,71 @@ private fun ChannelOverviewPage(ch: Channel) {
             }
         }
     }
+    val nameLabel = if (ch.isCategory) t("server.channelSettings.categoryName") else if (thread) t("threads.settings.name") else t("server.channelSettings.channelName")
     SettingsPage(SaveState(dirty, busy, ::reset, ::save)) {
         PageTitle(t("server.channelSettings.overview"))
         Form {
             NxTextField(
-                name, { v -> nameEdit = (if (isText) typedChannelName(v) else v).take(100) },
-                label = if (ch.isCategory) t("server.channelSettings.categoryName") else t("server.channelSettings.channelName"),
+                name, { v -> nameEdit = (if (slugged) typedChannelName(v) else v).take(100) },
+                label = nameLabel,
                 required = true,
-                capitalize = !isText,
+                capitalize = !slugged,
                 trailing = {
                     // what the channel list will show, as it is being picked below
                     Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
-                        ChannelGlyph(ch.copy(glyph = glyph), 18.dp, Nx.colors.textMuted, cut = Nx.colors.bgInput)
+                        ChannelGlyph(ch.copy(type = if (textLike) (if (announce) "announcement" else "text") else ch.type, glyph = glyph), 18.dp, Nx.colors.textMuted, cut = Nx.colors.bgInput)
                     }
                 },
             )
-            Field(
+            if (!thread) Field(
                 if (ch.isCategory) t("server.channelIcon.categoryTitle") else t("server.channelIcon.title"),
                 hint = if (ch.isCategory) t("server.channelIcon.categoryHint") else t("server.channelIcon.hint"),
             ) { ChannelIconPicker(ch, glyph) { glyphEdit = it } }
-            if (isText) NxTextField(
+            if (textLike || forum) NxTextField(
                 topic, { topicEdit = it.take(1024) },
-                label = t("server.channelSettings.channelTopic"),
-                hint = t("server.channelSettings.charactersLeft", "count" to 1024 - topic.length),
-                placeholder = t("server.channelSettings.letEveryoneKnowHowToUse"),
+                label = if (forum) t("forum.settings.guidelines") else t("server.channelSettings.channelTopic"),
+                hint = (if (forum) t("forum.settings.guidelinesHint") + " " else "") + t("server.channelSettings.charactersLeft", "count" to 1024 - topic.length),
+                placeholder = if (forum) t("forum.settings.guidelinesPlaceholder") else t("server.channelSettings.letEveryoneKnowHowToUse"),
                 singleLine = false, minLines = 3, imeAction = ImeAction.Default, capitalize = true, autoCorrect = true,
             )
-            if (isText) Field(t("server.channelSettings.slowmode"), hint = t("server.channelSettings.membersWillBeRestrictedToSending")) {
+            if (textLike) ToggleLine(t("follows.settings.announcement"), announce, { announceEdit = it }, description = t("follows.settings.announcementDesc"))
+            if (forum) ForumTagsEditor(tags) { tagsEdit = it }
+            if (forum) ToggleLine(t("forum.settings.requireTag"), requireTag, { requireTagEdit = it }, description = t("forum.settings.requireTagDesc"))
+            if (forum) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.weight(1f)) {
+                    Field(t("forum.settings.layout")) {
+                        SelectField(listOf("list" to t("forum.layout.list"), "gallery" to t("forum.layout.gallery")), layout, { layoutEdit = it }, title = t("forum.settings.layout"))
+                    }
+                }
+                Box(Modifier.weight(1f)) {
+                    Field(t("forum.settings.sort")) {
+                        SelectField(listOf("activity" to t("forum.sort.activity"), "created" to t("forum.sort.created")), sort, { sortEdit = it }, title = t("forum.settings.sort"))
+                    }
+                }
+            }
+            if (thread && postTags.isNotEmpty()) Field(t("forum.post.tags")) {
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (tg in postTags) {
+                        val on = tg.id in applied
+                        val allowed = !tg.moderated || mayManageThreads
+                        TagChip(tg.emoji, tg.name, on, allowed) { appliedEdit = if (on) applied - tg.id else (applied + tg.id).take(5) }
+                    }
+                }
+            }
+            if (textLike || forum || thread) Field(
+                if (forum) t("forum.settings.slowmode") else t("server.channelSettings.slowmode"),
+                hint = if (forum) t("forum.settings.slowmodeHint") else t("server.channelSettings.membersWillBeRestrictedToSending"),
+            ) {
                 SelectField(SLOWMODE.map { it to slowLabel(it) }, slow, { slowEdit = it }, title = t("server.channelSettings.slowmode"))
             }
-            if (isText) ToggleLine(t("server.channelSettings.ageRestrictedChannel"), nsfw, { nsfwEdit = it }, description = t("server.channelSettings.usersWillNeedToConfirmThey"))
+            if (textLike || forum) Field(t("threads.settings.defaultArchive"), hint = t("threads.settings.defaultArchiveHint")) {
+                SelectField(fish.nexa.ui.threads.ThreadsUi.AUTO_ARCHIVE.map { it to fish.nexa.ui.threads.ThreadsUi.archiveLabel(it) }, defaultArchive, { defaultArchiveEdit = it }, title = t("threads.settings.defaultArchive"))
+            }
+            if (thread) Field(t("threads.create.closeAfter"), hint = t("threads.create.closeHint")) {
+                SelectField(fish.nexa.ui.threads.ThreadsUi.AUTO_ARCHIVE.map { it to fish.nexa.ui.threads.ThreadsUi.archiveLabel(it) }, archive, { archiveEdit = it }, title = t("threads.create.closeAfter"))
+            }
+            if (thread && mayManageThreads) ToggleLine(t("threads.settings.locked"), locked, { lockedEdit = it }, description = t("threads.settings.lockedDesc"))
+            if (textLike || forum) ToggleLine(t("server.channelSettings.ageRestrictedChannel"), nsfw, { nsfwEdit = it }, description = t("server.channelSettings.usersWillNeedToConfirmThey"))
             if (ch.isVoice) Field(
                 t("server.channelSettings.userLimitValue", "limit" to if (limit == 0) t("server.channelSettings.noLimit") else t("server.channelSettings.usersCount", "count" to limit)),
                 hint = t("server.channelSettings.limitHowManyPeopleCanJoin"),
@@ -222,6 +326,80 @@ private fun ChannelOverviewPage(ch: Channel) {
                     NxSlider(limit.toFloat(), { limitEdit = it.toInt().coerceIn(0, 99) }, 0f..99f, label = t("server.channelSettings.userLimitValue", "limit" to limit))
                 }
             }
+        }
+    }
+}
+
+/** A forum tag to put on a post, or take off: a pill that fills with the accent while it is on. */
+@Composable
+private fun TagChip(emoji: String, name: String, on: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val c = Nx.colors
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp)
+    Row(
+        Modifier
+            .heightIn(min = 36.dp)
+            .alpha(if (enabled) 1f else 0.5f)
+            .background(if (on) fish.nexa.ui.theme.mixSrgb(c.brand, c.bgSurface, 0.78f) else c.bgSurface, shape)
+            .border(1.dp, if (on) c.brand.copy(alpha = 0.7f) else c.borderSubtle, shape)
+            .clip(shape)
+            .pressable(remember { MutableInteractionSource() }, enabled = enabled, role = Role.Switch, onClick = onClick)
+            .semantics { selected = on }
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (emoji.isNotEmpty()) Txt(emoji, style = Nx.type.bodySmall)
+        Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), fontWeight = FontWeight(600)), color = if (on) c.textStrong else c.text, maxLines = 1)
+    }
+}
+
+/**
+ * A forum's tags: what posts can be filed under, each with an emoji if it
+ * likes, and whether only people who manage threads may put it on a post.
+ */
+@Composable
+private fun ForumTagsEditor(tags: List<TagEdit>, onChange: (List<TagEdit>) -> Unit) {
+    val c = Nx.colors
+    fun update(i: Int, fn: (TagEdit) -> TagEdit) = onChange(tags.mapIndexed { j, tg -> if (j == i) fn(tg) else tg })
+    Field(t("forum.settings.tags"), hint = t("forum.settings.tagsHint", "count" to MAX_FORUM_TAGS)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            tags.forEachIndexed { i, tg ->
+                key(tg.key) {
+                    Column(
+                        Modifier.fillMaxWidth().surfaceCard(c, Radii.Sm).padding(start = 8.dp, end = 4.dp, top = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(Modifier.size(width = 64.dp, height = 44.dp)) {
+                                NxTextField(
+                                    tg.emoji,
+                                    { v -> update(i) { it.copy(emoji = v.trim().let { s -> s.codePointCount(0, s.length).let { n -> if (n > 2) s.substring(s.offsetByCodePoints(0, n - 2)) else s } }) } },
+                                    Modifier.semantics { contentDescription = t("forum.settings.tagEmoji") },
+                                    placeholder = "🙂",
+                                )
+                            }
+                            Box(Modifier.weight(1f)) {
+                                NxTextField(
+                                    tg.name, { v -> update(i) { it.copy(name = v.take(20)) } },
+                                    Modifier.semantics { contentDescription = t("forum.settings.tagName") },
+                                    placeholder = t("forum.settings.tagName"),
+                                    capitalize = true,
+                                )
+                            }
+                            Box(
+                                Modifier.size(44.dp).clip(Radii.Xs).pressable(remember { MutableInteractionSource() }) { onChange(tags.filterIndexed { j, _ -> j != i }) }
+                                    .semantics { contentDescription = t("forum.settings.removeTag", "name" to tg.name.ifBlank { "…" }) },
+                                contentAlignment = Alignment.Center,
+                            ) { Icon("Trash2", c.icon, size = 18.dp) }
+                        }
+                        fish.nexa.ui.components.NxCheckbox(tg.moderated, { on -> update(i) { it.copy(moderated = on) } }, t("forum.settings.moderated"), Modifier.padding(start = 2.dp))
+                    }
+                }
+            }
+            if (tags.size < MAX_FORUM_TAGS) NxButton(
+                t("forum.settings.addTag"), { onChange(tags + TagEdit(null, "", "", false)) },
+                kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "Plus",
+            )
         }
     }
 }
@@ -570,10 +748,10 @@ private fun DeleteChannelPage(ch: Channel, onDone: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     val isCat = ch.isCategory
     SettingsPage {
-        PageTitle(if (isCat) t("server.channelSettings.deleteCategory") else t("server.channelSettings.deleteChannel"), Modifier.padding(bottom = 0.dp))
+        PageTitle(if (isCat) t("server.channelSettings.deleteCategory") else if (ch.isThread) t("threads.bar.delete") else t("server.channelSettings.deleteChannel"), Modifier.padding(bottom = 0.dp))
         Hint(if (isCat) t("server.channelSettings.deleteCategoryHint", "name" to ch.name) else t("server.channelSettings.deleteChannelHint", "name" to ch.name))
         Box(Modifier.padding(top = 24.dp)) {
-            NxButton(if (isCat) t("server.channelSettings.deleteCategory") else t("server.channelSettings.deleteChannel"), {
+            NxButton(if (isCat) t("server.channelSettings.deleteCategory") else if (ch.isThread) t("threads.bar.delete") else t("server.channelSettings.deleteChannel"), {
                 busy = true
                 scope.launch {
                     try {

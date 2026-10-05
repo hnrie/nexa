@@ -271,7 +271,7 @@ private suspend fun wearServerTag(serverId: String?, text: String = ""): Boolean
 }
 
 /** A part of the profile, in the strip of every part (designer.parts). */
-private class PartChip(val part: String, val icon: String, val label: String, val setting: String? = null)
+internal class PartChip(val part: String, val icon: String, val label: String, val setting: String? = null)
 
 /**
  * 3.2 Profiles (ProfilePage.tsx): the profile designer. What is edited is the
@@ -281,9 +281,31 @@ private class PartChip(val part: String, val icon: String, val label: String, va
  * card a name opens, and a conversation), and a strip of every part is the way
  * to each for anyone who would rather pick from a list.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProfilesPage(anchor: String?) {
+    // opened for one server ("server:<id>", its Edit Server Profile): that server's designer
+    val serverAnchor = anchor?.takeIf { it.startsWith("server:") }?.removePrefix("server:")
+    var scope by remember(anchor) { mutableStateOf(if (serverAnchor != null) "server" else "main") }
+    var picked by remember(anchor) { mutableStateOf(serverAnchor) }
+    androidx.compose.runtime.SideEffect { ProfileScope.scope = scope }
+    PageTitle(t("settings.profile.profiles"))
+    ScopeTabs(scope) { next -> Unsaved.unlessUnsaved { scope = next } }
+    if (scope == "main") MainDesigner(anchor?.takeIf { serverAnchor == null })
+    else ServerProfileDesigner(picked) { picked = it }
+}
+
+/** Main Profile and Server Profiles: which profile the designer below draws (`.scopeTabs`). */
+@Composable
+private fun ScopeTabs(scope: String, onScope: (String) -> Unit) {
+    fish.nexa.ui.components.UnderlineTabs(
+        listOf("main" to t("settings.profile.mainProfile"), "server" to t("settings.profile.serverProfiles")),
+        scope, t("settings.profile.profiles"), Modifier.padding(bottom = 18.dp),
+    ) { onScope(it) }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MainDesigner(anchor: String?) {
     val c = Nx.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -432,7 +454,6 @@ fun ProfilesPage(anchor: String?) {
     val tint = ProfileTheme.rememberDominant(if (theme != null) null else Media.bannerUrl(me.bannerId, 64, 1f) ?: Media.avatarUrl(me.avatarId, 64, 1f))
     val glow = theme?.top ?: tint ?: c.brand
 
-    PageTitle(t("settings.profile.profiles"))
     Txt(
         t("designer.intro"),
         style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), lineHeight = Nx.type.sp(21f)),
@@ -528,7 +549,7 @@ fun ProfilesPage(anchor: String?) {
 }
 
 /** Lets a row run edge to edge of the page, past its side padding. */
-private fun Modifier.bleed(side: androidx.compose.ui.unit.Dp): Modifier = layout { m, cs ->
+internal fun Modifier.bleed(side: androidx.compose.ui.unit.Dp): Modifier = layout { m, cs ->
     val extra = (side * 2).roundToPx()
     val w = cs.maxWidth + extra
     val p = m.measure(cs.copy(minWidth = w, maxWidth = w))
@@ -537,7 +558,7 @@ private fun Modifier.bleed(side: androidx.compose.ui.unit.Dp): Modifier = layout
 
 /** A part in the strip: a raised chip with its icon (`.part`). */
 @Composable
-private fun PartButton(p: PartChip, modifier: Modifier, onClick: () -> Unit) {
+internal fun PartButton(p: PartChip, modifier: Modifier, onClick: () -> Unit) {
     val c = Nx.colors
     val shape = RoundedCornerShape(999.dp)
     val interaction = remember { MutableInteractionSource() }
@@ -562,7 +583,7 @@ private fun PartButton(p: PartChip, modifier: Modifier, onClick: () -> Unit) {
 
 /** The stage: the profile as others see it, lit in its own colour; that glow is the one bold thing on the page. */
 @Composable
-private fun Stage(glow: Color, content: @Composable () -> Unit) {
+internal fun Stage(glow: Color, content: @Composable () -> Unit) {
     val c = Nx.colors
     val shape = Radii.Lg
     Box(
@@ -595,7 +616,7 @@ private fun Stage(glow: Color, content: @Composable () -> Unit) {
 
 /** A word of the profile written where it is shown: Done keeps it; leaving the box keeps it too. */
 @Composable
-private fun InlineText(value: String, onChange: (String) -> Unit, onDone: () -> Unit, max: Int, label: String, placeholder: String?, style: TextStyle) {
+internal fun InlineText(value: String, onChange: (String) -> Unit, onDone: () -> Unit, max: Int, label: String, placeholder: String?, style: TextStyle) {
     val c = Nx.colors
     val p = fish.nexa.ui.profile.LocalProfile.current
     val accent = if (p.accent != Color.Unspecified) p.accent else c.brand
@@ -639,14 +660,14 @@ private fun InlineText(value: String, onChange: (String) -> Unit, onDone: () -> 
 
 /** About Me written where it is shown, ready to type into as it opens. */
 @Composable
-private fun InlineAbout(onDone: () -> Unit) {
+internal fun InlineAbout(state: androidx.compose.foundation.text.input.TextFieldState = ProfileForm.aboutState, onDone: () -> Unit) {
     val c = Nx.colors
-    val f = ProfileForm
+    val about = state.text.toString()
     // the box with its count and Done kept in view while it is written in, above the save bar
-    Column(Modifier.keptAboveSaveBar(f.about, true), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        AboutMeEditor(f.aboutState, AboutMe.MAX, t("settings.profile.tellPeopleAboutYourself"), t("settings.profile.aboutMe"), focus = true)
+    Column(Modifier.keptAboveSaveBar(about, true), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        AboutMeEditor(state, AboutMe.MAX, t("settings.profile.tellPeopleAboutYourself"), t("settings.profile.aboutMe"), focus = true)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Txt(t("composer.limit.left", "count" to AboutMe.MAX - AboutMe.toSave(f.about).length), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted)
+            Txt(t("composer.limit.left", "count" to AboutMe.MAX - AboutMe.toSave(about).length), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted)
             NxButton(t("pick.done"), onDone, size = ButtonSize.SM)
         }
     }
@@ -654,9 +675,8 @@ private fun InlineAbout(onDone: () -> Unit) {
 
 /** The card view's side: which widget the card shows, which is the first one on the full profile. */
 @Composable
-private fun CardAside(tools: WidgetDesign?) {
+internal fun CardAside(tools: WidgetDesign?, widgets: List<Widgets.Widget> = ProfileForm.widgets) {
     val c = Nx.colors
-    val f = ProfileForm
     Column(
         Modifier
             .fillMaxWidth()
@@ -673,9 +693,9 @@ private fun CardAside(tools: WidgetDesign?) {
             Txt(t("designer.card.title"), style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(700)), color = c.textStrong, modifier = Modifier.semantics { heading() })
         }
         Txt(t("designer.card.hint"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), lineHeight = Nx.type.sp(19.6f)), color = c.textMuted)
-        val first = f.widgets.firstOrNull()
-        if (f.widgets.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            for (w in f.widgets) {
+        val first = widgets.firstOrNull()
+        if (widgets.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            for (w in widgets) {
                 val on = first?.id == w.id
                 val interaction = remember { MutableInteractionSource() }
                 val pressed by interaction.collectIsPressedAsState()
@@ -711,7 +731,15 @@ private fun CardAside(tools: WidgetDesign?) {
 
 /** A conversation as others see it: their message, then yours with your name and tag, then you typing. */
 @Composable
-private fun ChatPreview(me: MeUser, name: String, typing: TypingStyle?) {
+internal fun ChatPreview(
+    me: MeUser,
+    name: String,
+    typing: TypingStyle?,
+    avatarId: String? = me.avatarId,
+    channel: String = "general",
+    /** Your name in a server's roles' colours, as that server draws it. */
+    look: fish.nexa.ui.chat.RoleLook? = null,
+) {
     val c = Nx.colors
     // two messages from a few minutes ago, in the reader's own way of writing times
     val whenAt = remember { System.currentTimeMillis() - 4 * 60 * 1000L }
@@ -728,10 +756,10 @@ private fun ChatPreview(me: MeUser, name: String, typing: TypingStyle?) {
         Box(
             Modifier.fillMaxWidth().height(48.dp).drawBehind { drawRect(c.borderSubtle, Offset(0f, size.height - 1.dp.toPx()), androidx.compose.ui.geometry.Size(size.width, 1.dp.toPx())) }.padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart,
-        ) { Txt("# general", style = Nx.type.headerTitle.copy(fontSize = Nx.type.sp(16f), fontWeight = FontWeight(700)), color = c.textStrong) }
+        ) { Txt("#$channel", style = Nx.type.headerTitle.copy(fontSize = Nx.type.sp(16f), fontWeight = FontWeight(700)), color = c.textStrong) }
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             PreviewMessage("designer-friend", friend, null, null, Time.timestamp(whenAt - 60 * 1000L), t("designer.chat.theirs"))
-            PreviewMessage(me.id, name, me.avatarId, me.serverTag, Time.timestamp(whenAt), t("designer.chat.yours"))
+            PreviewMessage(me.id, name, avatarId, me.serverTag, Time.timestamp(whenAt), t("designer.chat.yours"), look)
         }
         Box(Modifier.fillMaxWidth().heightIn(min = 30.dp).padding(start = 16.dp, end = 16.dp, top = 4.dp), contentAlignment = Alignment.CenterStart) {
             StyledTyping(typing, name)
@@ -750,13 +778,14 @@ private fun ChatPreview(me: MeUser, name: String, typing: TypingStyle?) {
 }
 
 @Composable
-private fun PreviewMessage(id: String, name: String, avatarId: String?, tag: WornTag?, time: String, text: String) {
+private fun PreviewMessage(id: String, name: String, avatarId: String?, tag: WornTag?, time: String, text: String, look: fish.nexa.ui.chat.RoleLook? = null) {
     val c = Nx.colors
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Avatar(id, name, avatarId, 40.dp)
         Column(Modifier.weight(1f)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-                Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1)
+                fish.nexa.ui.chat.RoleName(name, look, Nx.type.body.copy(fontWeight = FontWeight(650)), c.textStrong)
+                look?.icon?.let { fish.nexa.ui.chat.RoleIcon(it, 18.dp) }
                 if (tag != null) ServerTagChip(tag, small = false)
                 Txt(time, style = Nx.type.timestamp, color = c.textMuted, maxLines = 1)
             }
@@ -767,7 +796,7 @@ private fun PreviewMessage(id: String, name: String, avatarId: String?, tag: Wor
 
 /** A hint inside a sheet (`.popHint`). */
 @Composable
-private fun PopHint(text: String) = Txt(text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18.9f)), color = Nx.colors.textMuted)
+internal fun PopHint(text: String) = Txt(text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18.9f)), color = Nx.colors.textMuted)
 
 /** Avatar: the picture, Change Avatar and Remove Avatar. */
 private fun openAvatarSheet(choose: (String) -> Unit, onRemove: () -> Unit) {
@@ -857,7 +886,7 @@ private fun openColoursSheet() {
 /** One of the theme's two colours: none, the presets, one of your own, and its code. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ColourRow(value: Long?, enabled: Boolean, noneLabel: String, hexLabel: String, fallback: Long, onNone: () -> Unit, onPick: (Long) -> Unit) {
+internal fun ColourRow(value: Long?, enabled: Boolean, noneLabel: String, hexLabel: String, fallback: Long, onNone: () -> Unit, onPick: (Long) -> Unit) {
     val c = Nx.colors
     // the second colour waits for the first
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.graphicsLayer { alpha = if (enabled) 1f else 0.45f }) {
@@ -960,6 +989,10 @@ private fun ServerTagList(onWorn: () -> Unit) {
 /** The designer's save bar: words, colours, widgets and the typing line wait for it. */
 @Composable
 fun BoxScope.ProfilesSaveBar() {
+    if (ProfileScope.scope == "server") {
+        ServerProfileSaveBar()
+        return
+    }
     val meState by Nexa.users.me.collectAsState()
     val me = meState ?: return
     val scope = rememberCoroutineScope()

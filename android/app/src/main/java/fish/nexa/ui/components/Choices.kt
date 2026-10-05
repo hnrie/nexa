@@ -69,14 +69,23 @@ fun <T> SelectField(label: String?, options: List<Pair<T, String>>, selected: T,
 
 /** Toggle.tsx: the words (and what they mean) beside a switch, the whole row its target, a rule under it. */
 @Composable
-fun ToggleRow(checked: Boolean, onChange: (Boolean) -> Unit, label: String, description: String? = null, modifier: Modifier = Modifier, enabled: Boolean = true) {
+fun ToggleRow(
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+    label: String,
+    description: String? = null,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    /** The rule under it; left out where the row is the last thing on a card. */
+    rule: Boolean = true,
+) {
     val c = Nx.colors
     Row(
         modifier
             .fillMaxWidth()
             .alpha(if (enabled) 1f else 0.5f)
             .pressable(remember { MutableInteractionSource() }, enabled = enabled, role = Role.Switch) { onChange(!checked) }
-            .drawBehind { drawRect(c.borderSubtle, androidx.compose.ui.geometry.Offset(0f, size.height - 1.dp.toPx()), androidx.compose.ui.geometry.Size(size.width, 1.dp.toPx())) }
+            .drawBehind { if (rule) drawRect(c.borderSubtle, androidx.compose.ui.geometry.Offset(0f, size.height - 1.dp.toPx()), androidx.compose.ui.geometry.Size(size.width, 1.dp.toPx())) }
             .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),

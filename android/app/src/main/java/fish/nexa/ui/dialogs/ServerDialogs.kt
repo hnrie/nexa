@@ -22,6 +22,7 @@ import fish.nexa.net.Channel
 import fish.nexa.net.Member
 import fish.nexa.ui.Icon
 import fish.nexa.ui.components.ButtonKind
+import fish.nexa.ui.components.ButtonSize
 import fish.nexa.ui.components.ChoiceCard
 import fish.nexa.ui.components.NxButton
 import fish.nexa.ui.components.NxTextField
@@ -63,27 +64,37 @@ internal fun FooterButtons(confirm: String, onConfirm: () -> Unit, close: () -> 
 internal fun DialogHint(text: String) = Txt(text, style = Nx.type.bodySmall.copy(lineHeight = Nx.type.sp(19.6f)), color = Nx.colors.textMuted)
 
 // ---------------------------------------------------------------------------
-// ServerProfileModal: a nickname in one server
+// ServerProfileModal: someone else's profile in a server, for a moderator
 
+/**
+ * Someone else's profile in a server, for a moderator with Manage Nicknames:
+ * their nickname to change, and what they set for the server (picture,
+ * banner, theme, About Me, widgets) to take away if it breaks the rules.
+ * One's own server profile is designed in Settings, Profiles.
+ */
 @Composable
 internal fun ServerProfileSheet(layer: Layer, serverId: String, userId: String?, close: () -> Unit) {
-    val me = Nexa.users.me.collectAsState().value
     val servers by Nexa.servers.byId.collectAsState()
     val st = servers[serverId]
-    val target = userId ?: me?.id ?: ""
-    val self = target == me?.id
-    var nick by remember { mutableStateOf(st?.members?.get(target)?.nickname ?: "") }
+    val target = userId ?: ""
+    val member = st?.members?.get(target)
+    var nick by remember { mutableStateOf(member?.nickname ?: "") }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    fun save(value: String) {
+    val mod = Nexa.servers.canI(st, P.MANAGE_NICKNAMES)
+    val serverName = st?.server?.name ?: t("modals.serverProfile.thisServer")
+    fun save() {
         busy = true
         scope.launch {
             try {
-                val res = Nexa.api.request("PATCH", "/servers/$serverId/members/${if (self) "@me" else target}", Member.serializer(), buildJsonObject {
-                    val v = value.trim()
-                    if (v.isEmpty()) put("nick", JsonNull) else put("nick", v)
-                })
-                Nexa.servers.upsertMember(res)
+                if (nick.trim() != (member?.nickname ?: "")) {
+                    val res = Nexa.api.request("PATCH", "/servers/$serverId/members/$target", Member.serializer(), buildJsonObject {
+                        val v = nick.trim()
+                        if (v.isEmpty()) put("nick", JsonNull) else put("nick", v)
+                    })
+                    Nexa.servers.upsertMember(res)
+                }
+                Nexa.ui.toast(t("serverProfile.nickSaved"), "success")
                 close()
             } catch (e: Exception) {
                 Nexa.ui.toast(describeError(e, t("modals.serverProfile.couldNotChangeTheNickname")), "error")
@@ -92,21 +103,47 @@ internal fun ServerProfileSheet(layer: Layer, serverId: String, userId: String?,
             }
         }
     }
-    Sheet(layer, title = if (self) t("modals.serverProfile.changeNickname") else t("modals.serverProfile.changeTheirNickname"), maxWidth = 440.dp, footer = {
+    fun resetOthers() {
+        busy = true
+        scope.launch {
+            try {
+                var m = Nexa.api.request("PATCH", "/servers/$serverId/members/$target", Member.serializer(), buildJsonObject {
+                    put("bio", "")
+                    put("pronouns", "")
+                    put("accent_color", JsonNull)
+                    put("accent_color_2", JsonNull)
+                    put("widgets", JsonNull)
+                })
+                if (m.avatarId != null) m = Nexa.api.request("DELETE", "/servers/$serverId/members/$target/avatar", Member.serializer())
+                if (m.bannerId != null) m = Nexa.api.request("DELETE", "/servers/$serverId/members/$target/banner", Member.serializer())
+                Nexa.servers.upsertMember(m)
+                Nexa.ui.toast(t("serverProfile.resetDone"), "success")
+            } catch (e: Exception) {
+                Nexa.ui.toast(describeError(e, t("serverProfile.uploadFailed")), "error")
+            } finally {
+                busy = false
+            }
+        }
+    }
+    Sheet(layer, title = t("modals.serverProfile.changeTheirNickname"), maxWidth = 440.dp, footer = {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-            NxButton(t("modals.serverProfile.resetNickname"), { save("") }, kind = ButtonKind.GHOST, enabled = !busy)
-            NxButton(t("chat.editMessage.save"), { save(nick) }, loading = busy)
+            NxButton(t("chat.editMessage.cancel"), close, kind = ButtonKind.GHOST, enabled = !busy)
+            NxButton(t("chat.editMessage.save"), ::save, loading = busy)
         }
     }) {
         NxTextField(
             nick, { nick = it.take(32) },
             label = t("modals.serverProfile.nickname"),
-            hint = t("modals.serverProfile.howYouAppearIn", "name" to (st?.server?.name ?: t("modals.serverProfile.thisServer"))),
-            placeholder = if (self) me?.displayName else Nexa.users.get(target)?.displayName,
+            hint = t("serverProfile.theirNickHint", "name" to serverName),
+            placeholder = Nexa.users.get(target)?.displayName,
             imeAction = ImeAction.Done,
-            onIme = { save(nick) },
+            onIme = ::save,
             capitalize = true,
         )
+        if (mod) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            DialogHint(t("serverProfile.othersResetHint"))
+            NxButton(t("serverProfile.resetOthers"), ::resetOthers, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, loading = busy)
+        }
     }
 }
 

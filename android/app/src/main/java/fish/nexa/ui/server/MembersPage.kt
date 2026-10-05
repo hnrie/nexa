@@ -69,9 +69,19 @@ private const val PAGE = 50
  * server's members are read in pages behind it; a search asks the server for
  * the ones not here yet.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MembersPage(serverId: String) {
+    val servers by Nexa.servers.byId.collectAsState()
+    val st = servers[serverId] ?: return
+    val s = Nexa.servers
+    // moderators get the page with its filters and Mod View; everyone else the plain list
+    val moderator = listOf(P.MANAGE_SERVER, P.MANAGE_ROLES, P.MANAGE_NICKNAMES, P.KICK_MEMBERS, P.BAN_MEMBERS, P.MODERATE_MEMBERS).any { s.canI(st, it) }
+    if (moderator) ModMembers(serverId) else PlainMembers(serverId)
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PlainMembers(serverId: String) {
     val c = Nx.colors
     val servers by Nexa.servers.byId.collectAsState()
     val users by Nexa.users.byId.collectAsState()

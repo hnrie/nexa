@@ -1,11 +1,13 @@
 package fish.nexa.ui.server
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -55,14 +57,32 @@ private data class AuditReply(val entries: List<AuditEntry> = emptyList(), val u
 
 private const val PAGE = 50
 
-/** What each audited action says, looked up when drawn so it follows the language. */
-private fun verb(action: String): String = when (action) {
+/** Every audited action, as the server records them. */
+private val ACTIONS = listOf(
     "server_update", "server_transfer", "channel_create", "channel_update", "channel_delete", "channel_positions", "overwrite_update", "overwrite_delete",
     "role_create", "role_update", "role_delete", "role_positions", "member_update", "member_role_add", "member_role_remove", "member_kick", "member_ban",
     "member_unban", "member_voice", "emoji_create", "emoji_update", "emoji_delete", "sticker_pack_create", "sticker_pack_update", "sticker_pack_delete",
     "invite_create", "invite_delete", "webhook_create", "webhook_update", "webhook_delete", "server_tag_update", "server_tag_delete",
-    -> t("server.auditLog.verb.$action")
-    else -> action
+    "invite_delete_all", "invites_pause", "invites_resume", "member_prune", "member_timeout", "member_timeout_remove", "member_quarantine_lift",
+    "message_delete", "message_bulk_delete", "message_pin", "message_unpin", "message_publish", "thread_create", "thread_update", "thread_delete",
+    "follow_create", "follow_delete", "automod_rule_create", "automod_rule_update", "automod_rule_delete", "automod_action",
+)
+
+/** What each audited action says, looked up when drawn so it follows the language. */
+private fun verb(action: String): String = if (action in ACTIONS) t("server.auditLog.verb.$action") else action
+
+/** AutoMod's own id, which stands for it as the one who did what it did. */
+private const val AUTOMOD = "0"
+
+/** What each kind of channel is called where one is made. */
+private fun channelKind(type: String?): String = when (type) {
+    "voice" -> t("modals.createChannel.voice")
+    "category" -> t("server.auditLog.category")
+    "announcement" -> t("modals.createChannel.announcement")
+    "forum" -> t("modals.createChannel.forum")
+    "thread" -> t("threads.create.public")
+    "private_thread" -> t("threads.create.private")
+    else -> t("modals.createChannel.text")
 }
 
 /** lib/moderation.ts formatSpan: "7 days", "12 hours". */
@@ -81,7 +101,9 @@ fun formatSpan(ms: Long): String {
 
 /**
  * AuditLogPage: every moderation and configuration change, newest first, a
- * page at a time, with who and what to narrow it to. Needs View Audit Log.
+ * page at a time, narrowed on the server to one person (or AutoMod) and one
+ * kind of action. What is done while it is open comes in at the top. Needs
+ * View Audit Log.
  */
 @Composable
 fun AuditLogPage(serverId: String) {
@@ -99,15 +121,24 @@ fun AuditLogPage(serverId: String) {
     var actor by remember { mutableStateOf("") }
     var action by remember { mutableStateOf("") }
     val expanded = remember { mutableStateListOf<String>() }
+    // who has done things here, as far as this log has been read
+    val actors = remember { mutableStateListOf<String>() }
 
     fun load(before: String?) {
         busy = true
         failed = false
         scope.launch {
             try {
-                val res = Nexa.api.get("/servers/$serverId/audit-log?limit=$PAGE" + (before?.let { "&before=$it" } ?: ""), AuditReply.serializer())
+                val q = buildString {
+                    append("limit=$PAGE")
+                    if (before != null) append("&before=$before")
+                    if (actor.isNotEmpty()) append("&actor_id=$actor")
+                    if (action.isNotEmpty()) append("&action=$action")
+                }
+                val res = Nexa.api.get("/servers/$serverId/audit-log?$q", AuditReply.serializer())
                 Nexa.users.upsert(res.users)
                 entries = (if (before != null) entries.orEmpty() else emptyList()) + res.entries
+                for (e in res.entries) if (e.actorId !in actors) actors += e.actorId
                 done = res.entries.size < PAGE
             } catch (_: Exception) {
                 failed = true
@@ -116,7 +147,22 @@ fun AuditLogPage(serverId: String) {
             }
         }
     }
-    LaunchedEffect(serverId) { load(null) }
+    // the filters are asked of the server, so older entries are found as well
+    LaunchedEffect(serverId, actor, action) {
+        entries = null
+        load(null)
+    }
+    // what is done while the log is open comes in at the top
+    LaunchedEffect(serverId, actor, action) {
+        Nexa.session.events.collect { ev ->
+            if (ev.t != "audit_log_entry") return@collect
+            val e = runCatching { fish.nexa.net.wireJson.decodeFromJsonElement(AuditEntry.serializer(), ev.d!!) }.getOrNull() ?: return@collect
+            if (e.serverId != serverId || (actor.isNotEmpty() && e.actorId != actor) || (action.isNotEmpty() && e.action != action)) return@collect
+            val cur = entries ?: return@collect
+            if (cur.none { it.id == e.id }) entries = listOf(e) + cur
+            if (e.actorId !in actors) actors += e.actorId
+        }
+    }
 
     fun str(v: JsonElement?): String? = (v as? JsonPrimitive)?.takeIf { it.isString }?.content
     fun num(v: JsonElement?): Long? = (v as? JsonPrimitive)?.takeIf { !it.isString }?.let { it.longOrNull ?: it.doubleOrNull?.toLong() }
@@ -128,9 +174,11 @@ fun AuditLogPage(serverId: String) {
     fun shownChannel(id: String): String? = channels[id]?.let { if (it.isText || it.isAnnouncement) "#${it.name}" else it.name }
     fun roleName(id: String): String? = if (id == serverId) "@everyone" else st?.roles?.get(id)?.name
     fun userName(id: String): String? = users[id]?.let { Names.display(it) }
+    fun actorName(id: String): String = if (id == AUTOMOD) t("automod.name") else Names.display(users[id])
     val none = t("settings.profile.none")
     fun onOff(v: JsonElement?) = if (truthy(v)) t("server.auditLog.on") else t("server.channelSettings.slowmodeOff")
     fun permNames(v: JsonElement?): String = PermInfo.labels(P.parse((v as? JsonPrimitive)?.contentOrNull)) ?: none
+    fun changedOrRemoved(v: JsonElement?) = if (truthy(v)) t("server.auditLog.changed") else t("server.auditLog.removed")
 
     fun targetName(e: AuditEntry): String {
         val id = e.targetId ?: return ""
@@ -157,11 +205,7 @@ fun AuditLogPage(serverId: String) {
             "name" -> t("modals.subchat.name") to (s?.ifEmpty { null } ?: none)
             "description" -> t("server.serverOverview.serverDescription") to (s?.ifEmpty { null } ?: none)
             "topic" -> t("server.channelSettings.channelTopic") to (s?.ifEmpty { null } ?: none)
-            "type" -> t("modals.createChannel.channelType") to when (s) {
-                "voice" -> t("modals.createChannel.voice")
-                "category" -> t("server.auditLog.category")
-                else -> t("modals.createChannel.text")
-            }
+            "type" -> t("modals.createChannel.channelType") to channelKind(s)
             "system_channel_id" -> t("server.serverOverview.systemMessagesChannel") to (s?.let { shownChannel(it) } ?: t("server.serverOverview.noSystemMessages"))
             "default_notifications" -> t("server.serverOverview.defaultNotificationSettings") to if (n == 1L) t("server.serverOverview.onlyMentions") else t("server.serverOverview.allMessages")
             "nsfw" -> t("server.channelSettings.ageRestrictedChannel") to onOff(v)
@@ -194,15 +238,58 @@ fun AuditLogPage(serverId: String) {
             "deaf" -> t("shell.user.deafen") to onOff(v)
             // the channel an entry is about is its own target; a voice move names where to
             "channel_id" -> if (s == e.targetId) null else t("server.invites.channel") to (s?.let { shownChannel(it) } ?: t("server.auditLog.disconnected"))
-            "parent_id" -> t("server.auditLog.category") to (s?.let { shownChannel(it) } ?: none)
+            // a thread's parent is the channel it was started in
+            "parent_id" -> if (e.action.startsWith("thread_")) t("server.invites.channel") to (s?.let { shownChannel(it) } ?: t("server.auditLog.aDeletedChannel"))
+            else t("server.auditLog.category") to (s?.let { shownChannel(it) } ?: none)
             "code" -> t("server.invites.code") to (s ?: "")
             "max_age" -> t("modals.groupInvite.expireAfter") to (n?.takeIf { it != 0L }?.let { formatSpan(it * 1000) } ?: t("server.invites.never"))
             "max_uses" -> t("modals.groupInvite.maxNumberOfUses") to (n?.takeIf { it != 0L }?.toString() ?: t("modals.invite.noLimit"))
             "delete_message_days" -> t("server.memberAction.deleteMessageHistory") to (n?.takeIf { it != 0L }?.let { formatSpan(it * 86_400_000L) } ?: none)
-            "icon" -> t("server.serverOverview.serverIcon") to if (truthy(v)) t("server.auditLog.changed") else t("server.auditLog.removed")
-            "banner" -> t("server.serverOverview.serverBanner") to if (truthy(v)) t("server.auditLog.changed") else t("server.auditLog.removed")
-            "avatar" -> t("integrations.image") to if (truthy(v)) t("server.auditLog.changed") else t("server.auditLog.removed")
-            "target_type", "current_name" -> null
+            "icon" -> (if (e.targetType == "role") t("roles.icon.label") else t("server.serverOverview.serverIcon")) to changedOrRemoved(v)
+            "icon_emoji" -> t("roles.icon.label") to (s?.ifEmpty { null }?.let { if (it.startsWith("custom:")) t("server.auditLog.changed") else it } ?: t("server.auditLog.removed"))
+            "color2" -> t("roles.style.second") to (n?.takeIf { it != 0L }?.let { hexOf(it) } ?: none)
+            "color3" -> t("roles.style.third") to (n?.takeIf { it != 0L }?.let { hexOf(it) } ?: none)
+            "glyph" -> t("server.channelIcon.title") to (s?.ifEmpty { null }?.let { if (it.startsWith("custom:")) t("server.auditLog.changed") else it } ?: t("server.channelIcon.default"))
+            "forum" -> t("server.auditLog.forumSettings") to t("server.auditLog.changed")
+            "applied_tags" -> t("forum.settings.tags") to ((v as? JsonArray)?.let { t("server.auditLog.itemsCount", "count" to it.size) } ?: none)
+            "enabled" -> t("server.auditLog.status") to onOff(v)
+            "discoverable" -> t("discovery.settings.list") to onOff(v)
+            "discovery_category" -> t("discovery.settings.category") to (s?.ifEmpty { null }?.let { t("discovery.cat.$it") } ?: t("discovery.settings.noCategory"))
+            "discovery_tags" -> t("discovery.settings.tags") to ((v as? JsonArray)?.takeIf { it.isNotEmpty() }?.joinToString(", ") { (it as? JsonPrimitive)?.content ?: "" } ?: none)
+            "discovery_language" -> t("discovery.settings.language") to (s?.ifEmpty { null }?.let { tag -> fish.nexa.ui.I18n.languages.firstOrNull { it.tag == tag }?.endonym ?: tag } ?: t("discovery.anyLanguage"))
+            "verify_account_minutes" -> t("safety.accountAge") to (n?.takeIf { it != 0L }?.let { formatSpan(it * 60_000L) } ?: t("safety.noWait"))
+            "verify_member_minutes" -> t("safety.memberAge") to (n?.takeIf { it != 0L }?.let { formatSpan(it * 60_000L) } ?: t("safety.noWait"))
+            "bio" -> t("settings.profile.aboutMe") to changedOrRemoved(v)
+            "pronouns" -> t("settings.profile.pronouns") to (s?.ifEmpty { null } ?: none)
+            "server_avatar" -> t("serverProfile.picture") to t("server.auditLog.removed")
+            "server_banner" -> t("serverProfile.banner") to t("server.auditLog.removed")
+            "quarantined" -> t("automod.action.held") to onOff(v)
+            "banner" -> t("server.serverOverview.serverBanner") to changedOrRemoved(v)
+            "avatar" -> t("integrations.image") to changedOrRemoved(v)
+            "rule" -> t("automod.log.rule") to (s ?: "")
+            "kind" -> t("automod.log.kind") to (s?.let { t("automod.kind.$it") } ?: "")
+            "actions" -> t("server.auditLog.whatItDid") to ((v as? JsonArray)?.joinToString(", ") {
+                when ((it as? JsonPrimitive)?.content) {
+                    "block" -> t("automod.action.blocked")
+                    "timeout" -> t("automod.action.timedOut")
+                    "quarantine" -> t("automod.action.held")
+                    else -> t("automod.action.alerted")
+                }
+            } ?: "")
+            "matched" -> t("automod.log.matched") to (s ?: "")
+            "mentions" -> t("automod.log.mentions") to (n ?: 0L).toString()
+            // a published post went to this many channels that follow this one
+            "count" -> if (e.action == "message_publish") t("server.auditLog.sentTo") to t("server.auditLog.followingChannels", "count" to (n ?: 0L))
+            else t("server.auditLog.count") to (n ?: 0L).toString()
+            "days" -> t("members.prune.days") to (n?.takeIf { it != 0L }?.let { formatSpan(it * 86_400_000L) } ?: "")
+            "invites_paused_until" -> t("server.invites.pausedHead") to (n?.takeIf { it != 0L }?.let { Time.full(it) } ?: none)
+            "archived" -> t("threads.chip.closed") to onOff(v)
+            "locked" -> t("threads.settings.locked") to onOff(v)
+            "auto_archive", "default_auto_archive" -> t("threads.create.closeAfter") to (n?.takeIf { it != 0L }?.let { formatSpan(it * 60_000L) } ?: none)
+            "source_server" -> t("follows.log.server") to (s ?: "")
+            "source_channel" -> t("follows.log.channel") to (s ?: "")
+            "author_id" -> t("server.auditLog.author") to (s?.let { userName(it) ?: it } ?: "")
+            "message_id", "follow_id", "bulk", "raid", "seconds", "messages", "title", "target_type", "current_name" -> null
             else -> k to when (v) {
                 is JsonArray -> t("server.auditLog.itemsCount", "count" to v.size)
                 is JsonPrimitive -> if (v.isString) v.content else v.toString()
@@ -221,36 +308,39 @@ fun AuditLogPage(serverId: String) {
     }
 
     val list = entries.orEmpty()
-    val actors = list.map { it.actorId }.distinct()
-    val actions = list.map { it.action }.distinct()
-    val shown = list.filter { (actor.isEmpty() || it.actorId == actor) && (action.isEmpty() || it.action == action) }
     val filtering = actor.isNotEmpty() || action.isNotEmpty()
+    val actionChoices = remember(fish.nexa.ui.I18n.locale) { ACTIONS.map { it to verb(it) }.sortedBy { it.second.lowercase() } }
 
     SettingsPage {
         PageTitle(t("server.auditLog.auditLog"), Modifier.padding(bottom = 0.dp))
         Hint(t("server.auditLog.everyModerationAndConfigurationChangeIn"), Modifier.padding(bottom = 16.dp))
-        if (list.isNotEmpty()) Wrap(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+        if (list.isNotEmpty() || filtering) Wrap(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
             Box(Modifier.weight(1f).widthIn(min = 160.dp)) {
-                SelectField(listOf("" to t("server.auditLog.anyone")) + actors.map { it to Names.display(users[it]) }, actor, { actor = it }, title = t("server.auditLog.filterByMember"))
+                SelectField(
+                    listOf("" to t("server.auditLog.anyone"), AUTOMOD to t("automod.name")) + actors.filter { it != AUTOMOD }.map { it to Names.display(users[it]) },
+                    actor, { actor = it }, title = t("server.auditLog.filterByMember"),
+                )
             }
             Box(Modifier.weight(1f).widthIn(min = 160.dp)) {
-                SelectField(listOf("" to t("server.auditLog.anyAction")) + actions.map { it to verb(it) }, action, { action = it }, title = t("server.auditLog.filterByAction"))
+                SelectField(listOf("" to t("server.auditLog.anyAction")) + actionChoices, action, { action = it }, title = t("server.auditLog.filterByAction"))
             }
         }
-        if (filtering && !done) Hint(t("server.auditLog.filteredSoFar"), Modifier.padding(bottom = 12.dp), top = 0.dp)
         when {
             entries == null && !failed -> Loading(t("server.auditLog.loadingTheAuditLog"))
-            list.isEmpty() && !failed && entries != null -> Hint(t("server.auditLog.nothingHasHappenedYet"), top = 0.dp)
-            list.isNotEmpty() && shown.isEmpty() -> Hint(t("server.auditLog.nothingMatches"), top = 0.dp)
+            list.isEmpty() && !failed && entries != null -> Hint(if (filtering) t("server.auditLog.nothingMatches") else t("server.auditLog.nothingHasHappenedYet"), top = 0.dp)
         }
-        for (e in shown) key(e.id) {
-            val name = Names.display(users[e.actorId])
+        for (e in list) key(e.id) {
+            val name = actorName(e.actorId)
             val target = targetName(e)
             Row(
                 Modifier.fillMaxWidth().padding(bottom = 6.dp).surfaceCard(c).padding(horizontal = 14.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Avatar(e.actorId, name, users[e.actorId]?.avatarId, 32.dp)
+                if (e.actorId == AUTOMOD) Box(
+                    Modifier.size(32.dp).background(c.brand.copy(alpha = 0.16f), androidx.compose.foundation.shape.CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { fish.nexa.ui.Icon("ShieldCheck", c.textBrand, size = 18.dp) }
+                else Avatar(e.actorId, name, users[e.actorId]?.avatarId, 32.dp)
                 Column(Modifier.weight(1f)) {
                     BasicText(
                         buildAnnotatedString {

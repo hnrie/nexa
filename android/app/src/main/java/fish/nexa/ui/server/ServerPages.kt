@@ -50,6 +50,15 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import fish.nexa.ui.layers.MenuItem
+import fish.nexa.ui.layers.openMenu
+import fish.nexa.ui.shell.confirm
+import fish.nexa.ui.theme.mixSrgb
+import fish.nexa.ui.theme.ring
+import fish.nexa.ui.theme.Radii
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 
 /** Whether a gateway event names this server (`server_id` in its payload). */
 private fun isFor(d: kotlinx.serialization.json.JsonElement?, serverId: String) =
@@ -204,11 +213,76 @@ fun InvitesPage(serverId: String) {
             }
         }
     }
+    val servers by Nexa.servers.byId.collectAsState()
+    val pausedUntil = servers[serverId]?.server?.invitesPausedUntil
+    val paused = pausedUntil != null && pausedUntil > System.currentTimeMillis()
+    val forever = paused && pausedUntil!! > System.currentTimeMillis() + 365L * 24 * 3600 * 1000
+    var pausing by remember { mutableStateOf(false) }
+    fun setPause(until: Long?) {
+        pausing = true
+        scope.launch {
+            try {
+                patchServer(serverId, mapOf("invites_paused_until" to (until?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)))
+                Nexa.ui.toast(if (until != null) t("server.invites.pausedToast") else t("server.invites.resumedToast"), "success")
+            } catch (e: Exception) {
+                Nexa.ui.toast(describeError(e, t("server.invites.pauseFailed")), "error")
+            } finally {
+                pausing = false
+            }
+        }
+    }
+    fun pauseMenu() {
+        val spans = listOf("1h" to 1L, "6h" to 6L, "12h" to 12L, "1d" to 24L, "1w" to 24L * 7)
+        openMenu(
+            spans.map { (id, h) -> MenuItem.Action(t("server.invites.pause$id")) { setPause(System.currentTimeMillis() + h * 3600 * 1000) } } +
+                MenuItem.Action(t("server.invites.pauseForever")) { setPause(32503600000000L) },
+            title = t("server.invites.pauseFor"),
+        )
+    }
+    fun revokeAll() {
+        confirm(t("server.invites.revokeAllTitle"), t("server.invites.revokeAllBody", "count" to (invites?.size ?: 0)), t("server.invites.revokeAll")) {
+            val res = Nexa.api.request("DELETE", "/servers/$serverId/invites") as? JsonObject
+            invites = emptyList()
+            val n = (res?.get("revoked") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+            Nexa.ui.toast(t("server.invites.revokedAll", "count" to n), "success")
+        }
+    }
     SettingsPage {
         PageTitle(t("server.invites.invites"), Modifier.padding(bottom = 0.dp))
         Hint(t("server.invites.activeInviteLinksForThisServer"))
-        Box(Modifier.padding(vertical = 16.dp)) {
+        // who can join: open, or paused (every invite, Discover and the server tag wait)
+        val shape = Radii.Md
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp, bottom = 12.dp)
+                .then(
+                    if (paused) Modifier.ring(shape, c.warning.copy(alpha = 0.5f)).background(mixSrgb(c.warning, c.bgSurface, 0.9f), shape)
+                    else Modifier.surfaceCard(c, shape),
+                )
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .semantics { contentDescription = t("server.invites.whoCanJoin") },
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(if (paused) "PauseCircle" else "DoorOpen", if (paused) c.textWarning else c.positive, size = 20.dp, modifier = Modifier.padding(top = 1.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.semantics(mergeDescendants = true) { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Txt(if (paused) t("server.invites.pausedHead") else t("server.invites.openHead"), style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong)
+                        Txt(
+                            if (!paused) t("server.invites.openDesc") else if (forever) t("server.invites.pausedForever") else t("server.invites.pausedUntil", "time" to Time.full(pausedUntil!!)),
+                            style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), lineHeight = Nx.type.sp(19f)),
+                            color = c.textMuted,
+                        )
+                    }
+                    if (paused) NxButton(t("server.invites.resume"), { setPause(null) }, kind = ButtonKind.POSITIVE, size = ButtonSize.SM, icon = "Play", loading = pausing)
+                    else NxButton(t("server.invites.pause"), ::pauseMenu, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "Pause", loading = pausing)
+                }
+            }
+        }
+        Row(Modifier.padding(bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NxButton(t("server.invites.createInvite"), { openInvite(serverId, null) }, size = ButtonSize.SM)
+            if (!invites.isNullOrEmpty()) NxButton(t("server.invites.revokeAll"), ::revokeAll, kind = ButtonKind.GHOST, size = ButtonSize.SM)
         }
         when {
             invites == null && !failed -> Loading(t("server.invites.loadingInvites"))

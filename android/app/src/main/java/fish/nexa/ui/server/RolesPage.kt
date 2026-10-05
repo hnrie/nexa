@@ -173,7 +173,7 @@ fun RolesPage(serverId: String) {
     val inner: @Composable () -> Unit = {
         PageTitle(t("server.members.roles"), Modifier.padding(bottom = 0.dp))
         Hint(t("server.roles.useRolesToGroupYourMembers"), Modifier.padding(bottom = 16.dp))
-        NxButton(t("server.roles.createRole"), { Holds.unlessUnsaved { create() } }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "Plus", loading = busy)
+        NxButton(t("server.roles.createRole"), { Holds.unlessUnsaved { create() } }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "Plus", loading = busy, block = true)
         if (movable.size > 1) Hint(t("android.server.reorderHint"), Modifier.padding(top = 8.dp, bottom = 4.dp))
         RoleList(st.server.id, roles, role.id, myHighest, iAmOwner, st.memberCount, st.members.values,
             onPick = { id ->
@@ -332,52 +332,47 @@ private fun Modifier.pointerInputDrag(onStart: () -> Unit, onDrag: (Float) -> Un
 /** `.tabs`: the words in a row, the open one in strong text over a lit accent line. */
 @Composable
 fun Tabs(tabs: List<Pair<String, String>>, current: String, onPick: (String) -> Unit) {
-    val c = Nx.colors
-    Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            for ((id, label) in tabs) {
-                val on = id == current
-                Column(
-                    Modifier
-                        .pressable(remember { MutableInteractionSource() }, role = Role.Tab) { if (!on) onPick(id) }
-                        .semantics { selected = on },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Txt(
-                        label,
-                        style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(600)),
-                        color = if (on) c.textStrong else c.textMuted,
-                        maxLines = 1,
-                        modifier = Modifier.padding(horizontal = 2.dp, vertical = 12.dp),
-                    )
-                    Box(
-                        Modifier
-                            .height(2.dp)
-                            .fillMaxWidth()
-                            .then(if (on) Modifier.boxShadow(RectangleShape, 0f, 10f, c.brand) else Modifier)
-                            .background(if (on) c.brand else Color.Transparent),
-                    )
-                }
-            }
-        }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
-    }
+    fish.nexa.ui.components.UnderlineTabs(tabs, current, t("server.members.roles"), Modifier.padding(top = 8.dp, bottom = 20.dp)) { id -> if (id != current) onPick(id) }
 }
 
-/** The Display tab: name, colour, separate listing, mentions; Delete Role. Drafts with the save bar. */
+/**
+ * The Display tab: name, colour and how the name is drawn (one colour, a
+ * gradient or a shimmer), the role's icon, separate listing, mentions; Delete
+ * Role. Drafts with the save bar; a new icon goes up at once.
+ */
 @Composable
 private fun DisplayTab(role: NexaRole, editable: Boolean, everyone: Boolean, header: @Composable () -> Unit, onDeleted: () -> Unit) {
     val c = Nx.colors
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
     var name by remember { mutableStateOf(role.name) }
     var color by remember { mutableLongStateOf(role.color) }
+    var color2 by remember { mutableStateOf(role.color2) }
+    var color3 by remember { mutableStateOf(role.color3) }
+    var iconEmoji by remember { mutableStateOf(role.iconEmoji) }
     var hoist by remember { mutableStateOf(role.hoist) }
     var mentionable by remember { mutableStateOf(role.mentionable) }
     var busy by remember { mutableStateOf(false) }
-    val dirty = name != role.name || color != role.color || hoist != role.hoist || mentionable != role.mentionable
+    var iconBusy by remember { mutableStateOf(false) }
+    val style = if (color2 == null) "solid" else if (color3 == null) "gradient" else "shimmer"
+    fun setStyle(next: String) {
+        if (next == "solid") {
+            color2 = null
+            color3 = null
+            return
+        }
+        if (color == 0L) color = 0x8000ffL
+        if (color2 == null) color2 = 0x00b0f4L
+        color3 = if (next == "shimmer") color3 ?: 0xffd166L else null
+    }
+    val dirty = name != role.name || color != role.color || hoist != role.hoist || mentionable != role.mentionable ||
+        color2 != role.color2 || color3 != role.color3 || iconEmoji != role.iconEmoji
     fun reset() {
         name = role.name
         color = role.color
+        color2 = role.color2
+        color3 = role.color3
+        iconEmoji = role.iconEmoji
         hoist = role.hoist
         mentionable = role.mentionable
     }
@@ -390,12 +385,18 @@ private fun DisplayTab(role: NexaRole, editable: Boolean, everyone: Boolean, hea
                     if (color != role.color) put("color", color)
                     if (hoist != role.hoist) put("hoist", hoist)
                     if (mentionable != role.mentionable) put("mentionable", mentionable)
+                    if (color2 != role.color2) put("color2", color2?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
+                    if (color3 != role.color3) put("color3", color3?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
+                    if (iconEmoji != role.iconEmoji) put("icon_emoji", iconEmoji.trim())
                 }
                 val saved = Nexa.api.request("PATCH", "/servers/${role.serverId}/roles/${role.id}", NexaRole.serializer(), body)
                 Nexa.servers.upsertRole(saved)
                 // the server tidies whitespace in names: show what it kept, or the save bar never goes away
                 name = saved.name
                 color = saved.color
+                color2 = saved.color2
+                color3 = saved.color3
+                iconEmoji = saved.iconEmoji
                 hoist = saved.hoist
                 mentionable = saved.mentionable
                 Nexa.ui.toast(t("server.roles.roleSaved"), "success")
@@ -406,6 +407,59 @@ private fun DisplayTab(role: NexaRole, editable: Boolean, everyone: Boolean, hea
             }
         }
     }
+    fun uploadIcon(r: CropResult) {
+        iconBusy = true
+        scope.launch {
+            try {
+                val area = r.crop?.let { "?x=${it.x}&y=${it.y}&w=${it.w}&h=${it.h}" } ?: ""
+                val res = ServerApi.upload("PUT", "/servers/${role.serverId}/roles/${role.id}/icon$area", r.bytes, r.type)
+                val saved = fish.nexa.net.wireJson.decodeFromJsonElement(NexaRole.serializer(), res)
+                Nexa.servers.upsertRole(saved)
+                iconEmoji = ""
+                Nexa.ui.toast(t("roles.icon.saved"), "success")
+            } catch (e: Exception) {
+                Nexa.ui.toast(describeError(e, t("roles.icon.failed")), "error")
+            } finally {
+                iconBusy = false
+            }
+        }
+    }
+    fun removeIcon() {
+        iconBusy = true
+        scope.launch {
+            try {
+                val saved = if (role.iconId != null) Nexa.api.request("DELETE", "/servers/${role.serverId}/roles/${role.id}/icon", NexaRole.serializer())
+                else Nexa.api.request("PATCH", "/servers/${role.serverId}/roles/${role.id}", NexaRole.serializer(), buildJsonObject { put("icon_emoji", "") })
+                Nexa.servers.upsertRole(saved)
+                iconEmoji = ""
+            } catch (e: Exception) {
+                Nexa.ui.toast(describeError(e, t("roles.icon.failed")), "error")
+            } finally {
+                iconBusy = false
+            }
+        }
+    }
+    val pick = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val file = runCatching { ServerApi.read(context, uri) }.getOrNull() ?: return@launch
+            openImageCrop(file, 1f, round = false, title = t("roles.icon.crop"), maxSize = 128, serverCrop = true) { r -> uploadIcon(r) }
+        }
+    }
+    // the name as it will be drawn: its colour, its gradient or its shimmer, and its icon
+    val colours = if (color != 0L) listOfNotNull(color, color2, color3?.takeIf { color2 != null }).map { rgbColor(it) } else emptyList()
+    val look = fish.nexa.ui.chat.RoleLook(
+        color = colours.firstOrNull(),
+        colors = colours.takeIf { it.size > 1 },
+        shimmer = colours.size > 2,
+        icon = when {
+            everyone -> null
+            role.iconId != null -> fish.nexa.ui.chat.RoleIconInfo.Image(role.iconId, name)
+            iconEmoji.startsWith("custom:") -> fish.nexa.ui.chat.RoleIconInfo.Custom(iconEmoji.removePrefix("custom:"), name)
+            iconEmoji.isNotEmpty() -> fish.nexa.ui.chat.RoleIconInfo.Emoji(iconEmoji, name)
+            else -> null
+        },
+    )
     SettingsPage(SaveState(dirty, busy, ::reset, ::save)) {
         header()
         Form {
@@ -418,8 +472,10 @@ private fun DisplayTab(role: NexaRole, editable: Boolean, everyone: Boolean, hea
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    ColorDot(color)
-                    Txt(name.ifBlank { "@everyone" }, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(600)), color = if (color != 0L) rgbColor(color) else c.text, maxLines = 1)
+                    if (look.colors != null) Box(Modifier.size(14.dp).background(androidx.compose.ui.graphics.Brush.horizontalGradient(look.colors), androidx.compose.foundation.shape.CircleShape))
+                    else ColorDot(color)
+                    fish.nexa.ui.chat.RoleName(name.ifBlank { "@everyone" }, look, Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(600)), c.text)
+                    look.icon?.let { fish.nexa.ui.chat.RoleIcon(it, 18.dp) }
                 }
                 Wrap(gap = 10.dp) {
                     Swatch(c.bgActive, color == 0L, t("server.roles.default"), editable) { color = 0L }
@@ -429,6 +485,30 @@ private fun DisplayTab(role: NexaRole, editable: Boolean, everyone: Boolean, hea
                     CustomSwatch(if (color != 0L && color !in SWATCHES) color else null, editable) {
                         openColourPick(t("server.roles.customColour"), if (color != 0L) color else 0x99aab5L) { picked -> color = picked }
                     }
+                }
+            }
+            if (!everyone) Field(t("roles.style.label"), hint = t("roles.style.hint")) {
+                Wrap(gap = 6.dp) {
+                    for (x in listOf("solid", "gradient", "shimmer")) StyleOption(t("roles.style.$x"), style == x, editable) { setStyle(x) }
+                }
+                if (style != "solid") Wrap(gap = 14.dp) {
+                    StyleColour(t("roles.style.second"), color2 ?: 0x00b0f4L, editable) { color2 = it }
+                    if (style == "shimmer") StyleColour(t("roles.style.third"), color3 ?: 0xffd166L, editable) { color3 = it }
+                }
+            }
+            if (!everyone) Field(t("roles.icon.label"), hint = t("roles.icon.hint")) {
+                Wrap(gap = 8.dp) {
+                    NxButton(t("roles.icon.upload"), { pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)) }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "ImagePlus", enabled = editable && !iconBusy, loading = iconBusy)
+                    Box(Modifier.size(width = 120.dp, height = 44.dp)) {
+                        NxTextField(
+                            if (iconEmoji.startsWith("custom:")) "" else iconEmoji,
+                            { v -> iconEmoji = v.trim().let { s -> s.codePointCount(0, s.length).let { n -> if (n > 8) s.substring(s.offsetByCodePoints(0, n - 8)) else s } } },
+                            Modifier.semantics { contentDescription = t("roles.icon.emoji") },
+                            placeholder = t("roles.icon.emoji"),
+                            enabled = editable,
+                        )
+                    }
+                    if (role.iconId != null || role.iconEmoji.isNotEmpty()) NxButton(t("roles.icon.remove"), ::removeIcon, kind = ButtonKind.GHOST, size = ButtonSize.SM, enabled = editable && !iconBusy)
                 }
             }
             Column {
@@ -443,6 +523,50 @@ private fun DisplayTab(role: NexaRole, editable: Boolean, everyone: Boolean, hea
                 }
             }, kind = ButtonKind.DANGER, size = ButtonSize.SM, icon = "Trash2")
         }
+    }
+}
+
+/** One of the ways a name is drawn (`.styleOpt`): a radio pill, ringed in the accent when chosen. */
+@Composable
+private fun StyleOption(label: String, on: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val c = Nx.colors
+    val shape = Radii.Sm
+    Row(
+        Modifier
+            .heightIn(min = 40.dp)
+            .background(if (on) fish.nexa.ui.theme.mixSrgb(c.brand, c.bgSurface, 0.9f) else c.bgSurface, shape)
+            .then(if (on) Modifier.border(2.dp, c.brand.copy(alpha = 0.8f), shape) else Modifier.border(1.dp, c.borderSubtle, shape))
+            .clip(shape)
+            .alpha(if (enabled) 1f else 0.6f)
+            .pressable(remember { MutableInteractionSource() }, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+            .semantics { selected = on }
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            Modifier.size(16.dp).border(2.dp, if (on) c.brand else c.borderStrong, androidx.compose.foundation.shape.CircleShape).padding(4.dp)
+                .then(if (on) Modifier.background(c.brand, androidx.compose.foundation.shape.CircleShape) else Modifier),
+        )
+        Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.text)
+    }
+}
+
+/** The gradient's second or third colour: its swatch, opening the picker. */
+@Composable
+private fun StyleColour(label: String, value: Long, enabled: Boolean, onPick: (Long) -> Unit) {
+    val c = Nx.colors
+    Row(
+        Modifier
+            .heightIn(min = 44.dp)
+            .clip(Radii.Sm)
+            .pressable(remember { MutableInteractionSource() }, enabled = enabled) { openColourPick(label, value, onPick) }
+            .semantics { contentDescription = "$label ${hexOf(value)}" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = c.textMuted)
+        Box(Modifier.size(width = 40.dp, height = 32.dp).background(rgbColor(value), Radii.Sm).border(1.dp, c.borderSubtle, Radii.Sm))
     }
 }
 

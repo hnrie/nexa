@@ -112,7 +112,7 @@ private sealed interface MemberRow {
     val key: String
 
     data class Head(override val key: String, val label: String, val count: Int) : MemberRow
-    data class Person(override val key: String, val userId: String, val name: String, val user: PublicUser?, val avatarId: String?, val color: Long?, val offline: Boolean, val crown: Crown) : MemberRow
+    data class Person(override val key: String, val userId: String, val name: String, val user: PublicUser?, val avatarId: String?, val look: RoleLook?, val offline: Boolean, val crown: Crown) : MemberRow
 }
 
 /** The mark after a name: Nexa's owner (the accent), a server's or group's owner (gold), an admin's hammer. */
@@ -174,13 +174,15 @@ private fun PersonRow(row: MemberRow.Person, list: String, ownerLabel: String, o
         Avatar(row.userId, row.name, row.avatarId, 32.dp, Modifier.alpha(if (row.offline && !pressed) 0.5f else 1f), status = status)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Txt(
+                // in their roles' colours: one, a gradient or a shimmer, and their highest role's icon
+                RoleName(
                     row.name,
-                    style = Nx.type.name.copy(fontFamily = Nx.type.text, fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(18.6f), fontWeight = FontWeight(550)),
-                    color = row.color?.let { rgbColor(it) } ?: if (pressed) c.text else c.textChannel,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f, fill = false),
+                    row.look,
+                    Nx.type.name.copy(fontFamily = Nx.type.text, fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(18.6f), fontWeight = FontWeight(550)),
+                    if (pressed) c.text else c.textChannel,
+                    Modifier.weight(1f, fill = false),
                 )
+                row.look?.icon?.let { RoleIcon(it, 16.dp) }
                 when (row.crown) {
                     Crown.NEXA -> Icon("Crown", c.textBrand, size = 14.dp, label = t("profile.profileCard.owner"))
                     Crown.OWNER -> Icon("Crown", c.warning, size = 14.dp, label = ownerLabel)
@@ -286,7 +288,7 @@ fun MemberList(serverId: String, channelId: String?) {
             out += MemberRow.Head("h:$key", label, list.size)
             for ((m, name) in list) out += MemberRow.Person(
                 m.userId, m.userId, name, users[m.userId], m.avatarId ?: users[m.userId]?.avatarId,
-                Nexa.servers.memberColor(st, m.userId), isOff, crownOf(m.userId, st.server.ownerId),
+                RoleLooks.of(st, m.userId), isOff, crownOf(m.userId, st.server.ownerId),
             )
         }
         for ((id, g) in groups) push(id, g.first, g.second, false)
@@ -344,8 +346,11 @@ fun memberMenuItems(serverId: String, userId: String): List<MenuItem.Action> {
         items += people.dropLast(1)
         items += people.last().copy(separatorAfter = true)
     }
-    val canNick = if (self) Nexa.servers.canI(st, P.CHANGE_NICKNAME) || Nexa.servers.canI(st, P.MANAGE_NICKNAMES) else Nexa.servers.canI(st, P.MANAGE_NICKNAMES) && above
-    if (canNick) items += MenuItem.Action(if (self) t("perms.changeNickname") else t("server.memberMenu.changeTheirNickname")) { Dialogs.serverProfile(serverId, userId) }
+    // one's own server profile is designed in Settings, Profiles; someone else's nickname here
+    val canNick = self || Nexa.servers.canI(st, P.MANAGE_NICKNAMES) && above
+    if (canNick) items += MenuItem.Action(if (self) t("sidebar.serverMenu.editServerProfile") else t("server.memberMenu.changeTheirNickname")) {
+        if (self) fish.nexa.ui.shell.openServerProfile(serverId) else Dialogs.serverProfile(serverId, userId)
+    }
     if (Nexa.servers.canI(st, P.MANAGE_ROLES) && above) items += MenuItem.Action(t("server.members.roles")) { MemberActions.open(serverId, userId, MemberActions.Kind.ROLES) }
     if (!self && above) {
         val until = st.members[userId]?.timeoutUntil

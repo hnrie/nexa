@@ -62,6 +62,8 @@ class ProfileDesign(
     val widgets: WidgetDesign? = null,
     /** Every part outlined once as the designer opens, so nobody has to guess what can be pressed. */
     val intro: Boolean = false,
+    /** Parts drawn as they are, with nothing to press: a server profile's status and tag are the account's. */
+    val fixed: Set<ProfilePart> = emptySet(),
 )
 
 /** The widgets as the designer draws them: each with its tools, and after them the way to add another. */
@@ -103,7 +105,7 @@ fun Spotted(
     kind: SpotKind = SpotKind.CORNER,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    if (design == null) {
+    if (design == null || part in design.fixed) {
         Box(modifier, content = content)
         return
     }

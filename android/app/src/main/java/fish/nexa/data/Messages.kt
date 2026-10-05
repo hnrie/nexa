@@ -181,11 +181,13 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
     fun insert(ch: String, msgs: List<ChatMessage>) {
         if (msgs.isEmpty()) return
         resolveAuthors?.invoke(msgs.flatMap { listOf(it.authorId) + it.m.mentions })
+        ReplyTargets.ingest(msgs.map { it.m })
         with(ch) { c -> if (c.loaded) arrived(c, msgs) else keepNewest(arrived(c, msgs), 50) }
     }
 
     fun settle(ch: String, msgs: List<ChatMessage>, tmpId: String? = null, nonce: String? = null) {
         resolveAuthors?.invoke(msgs.map { it.authorId })
+        ReplyTargets.ingest(msgs.map { it.m })
         with(ch) { c ->
             val kept = c.pending.filter { (tmpId == null || it.tmpId != tmpId) && (nonce == null || it.nonce != nonce) }
             val next = arrived(c, msgs)
@@ -194,7 +196,14 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
     }
 
     /** An edit or a change from the server: keep this device's reactions and votes, take the rest. */
-    fun update(ch: String, msg: ChatMessage) = with(ch) { c ->
+    fun update(ch: String, msg: ChatMessage) {
+        // a quoted original follows its edits, loaded here or not
+        ReplyTargets.refresh(msg)
+        ReplyTargets.ingest(listOf(msg.m))
+        updateLoaded(ch, msg)
+    }
+
+    private fun updateLoaded(ch: String, msg: ChatMessage) = with(ch) { c ->
         val prev = c.byId[msg.id] ?: return@with c
         var m = msg.m.copy(reactions = prev.m.reactions)
         val pr = prev.m.pollResults
@@ -206,7 +215,13 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
         c.copy(byId = c.byId.put(msg.id, msg.copy(m = m)))
     }
 
-    fun removeMany(ch: String, ids: Collection<String>) = with(ch) { c ->
+    fun removeMany(ch: String, ids: Collection<String>) {
+        // replies to what went say it was deleted, wherever they are
+        ReplyTargets.markDeleted(ids)
+        removeLoaded(ch, ids)
+    }
+
+    private fun removeLoaded(ch: String, ids: Collection<String>) = with(ch) { c ->
         val drop = ids.toHashSet()
         if (c.ids.none { it in drop }) return@with c
         val byId = c.byId.builder()
@@ -295,7 +310,11 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
         return api.get(q.toString(), ListSerializer(Message.serializer()))
     }
 
-    private suspend fun decryptAll(page: List<Message>): List<ChatMessage> = withContext(Dispatchers.Default) { page.map { decrypt(it) } }
+    private suspend fun decryptAll(page: List<Message>): List<ChatMessage> {
+        // the originals the page's replies point at came along with it
+        ReplyTargets.ingest(page)
+        return withContext(Dispatchers.Default) { page.map { decrypt(it) } }
+    }
 
     suspend fun loadInitial(ch: String) {
         val cur = _channels.value[ch]
@@ -444,6 +463,7 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
 
     /** Opens again what waited for keys that have now arrived. */
     suspend fun redecrypt(convs: Set<String>) {
+        ReplyTargets.redecrypt(convs)
         val snapshot = _channels.value
         for ((ch, c) in snapshot) {
             val waiting = c.byId.values.filter { it.error == DecryptFail.NO_KEY && it.m.keyConvId in convs || it.m.type == "system_call" && it.call == null && it.m.keyConvId in convs }
@@ -471,6 +491,7 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
     }
 
     fun clear() {
+        ReplyTargets.clear()
         synchronized(generations) { for (k in generations.keys) generations[k] = generations[k]!! + 1 }
         _channels.value = persistentHashMapOf()
     }

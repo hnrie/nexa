@@ -90,7 +90,8 @@ fun openServerSettings(serverId: String) = fish.nexa.ui.server.ServerSettings.op
 fun openCreateChannel(serverId: String, parentId: String?) = fish.nexa.ui.dialogs.Dialogs.createChannel(serverId, parentId)
 fun openCreateCategory(serverId: String) = fish.nexa.ui.dialogs.Dialogs.createCategory(serverId)
 fun openServerNotifications(serverId: String) = fish.nexa.ui.dialogs.Dialogs.serverNotifications(serverId)
-fun openServerProfile(serverId: String) = fish.nexa.ui.dialogs.Dialogs.serverProfile(serverId)
+/** One's own profile in a server: the server profile designer, in Settings, Profiles. */
+fun openServerProfile(serverId: String) = fish.nexa.ui.settings.Settings.open("profiles", "server:$serverId")
 fun openEditGroup(channelId: String) = fish.nexa.ui.dialogs.Dialogs.editGroup(channelId)
 fun openGroupInvite(channelId: String) = fish.nexa.ui.dialogs.Dialogs.groupInvite(channelId)
 fun openProfile(userId: String) = fish.nexa.ui.profile.Profiles.open(userId)

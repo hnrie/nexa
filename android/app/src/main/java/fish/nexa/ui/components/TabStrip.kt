@@ -17,6 +17,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -114,6 +118,47 @@ private fun StripTab(text: String, on: Boolean, height: Dp, pad: Dp, count: Int?
                 contentAlignment = Alignment.Center,
             ) {
                 Txt(java.text.NumberFormat.getIntegerInstance(fish.nexa.ui.I18n.locale).format(count), style = Nx.type.hint.copy(fontSize = Nx.type.sp(11.5f), fontWeight = FontWeight(700), fontFeatureSettings = "tnum"), color = c.textSubtle, maxLines = 1)
+            }
+        }
+    }
+}
+
+/**
+ * Underlined tabs (AutoMod's Rules and Log, Profiles' Main Profile and Server
+ * Profiles): the words in a row over a hairline, the chosen one in the strong
+ * text colour with a bar of the focus colour under it, as the web draws them.
+ */
+@Composable
+fun <T> UnderlineTabs(tabs: List<Pair<T, String>>, selected: T, label: String, modifier: Modifier = Modifier, onSelect: (T) -> Unit) {
+    val c = Nx.colors
+    Row(
+        modifier
+            .fillMaxWidth()
+            .drawBehind { drawRect(c.borderSubtle, Offset(0f, size.height - 1.dp.toPx()), Size(size.width, 1.dp.toPx())) }
+            // three long names on a narrow phone slide sideways rather than squeeze
+            .sidewaysScroll()
+            .semantics { contentDescription = label },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        for ((key, text) in tabs) {
+            val on = key == selected
+            Box(
+                Modifier
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .pressable(remember { MutableInteractionSource() }, role = Role.Tab) { onSelect(key) }
+                    .semantics { this.selected = on }
+                    .drawBehind {
+                        if (on) {
+                            val inset = 10.dp.toPx()
+                            val h = 3.dp.toPx()
+                            drawRoundRect(c.focusRing, Offset(inset, size.height - h), Size(size.width - 2 * inset, h + 3.dp.toPx()), CornerRadius(h))
+                        }
+                    }
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Txt(text, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(600)), color = if (on) c.textStrong else c.textMuted, maxLines = 1)
             }
         }
     }

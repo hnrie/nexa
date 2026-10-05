@@ -58,7 +58,9 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
     val linkStyle = TextLinkStyles(SpanStyle(color = c.link))
     // a closed poll's question and answers: from the list, or fetched when the list does not hold the poll (usePollOf.ts)
     val personPoll = m.type == "system_poll_result" && m.webhookId == null
-    val held = if (personPoll) m.replyToId?.let { Nexa.messages.get(ctx.channel.id).byId[it]?.payload?.poll } else null
+    val held = if (personPoll) m.replyToId?.let {
+        (Nexa.messages.get(ctx.channel.id).byId[it] ?: (fish.nexa.data.ReplyTargets.byId.value[it] as? fish.nexa.data.ReplyTarget.Found)?.cm)?.payload?.poll
+    } else null
     val fetched by produceState<PollPayload?>(null, m.replyToId, held == null) {
         val id = m.replyToId
         if (personPoll && held == null && id != null) value = FetchedPolls.load(ctx.channel.id, id)

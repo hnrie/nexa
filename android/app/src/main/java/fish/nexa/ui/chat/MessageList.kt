@@ -221,7 +221,7 @@ private fun buildRows(
             continue
         }
         if (hideBlockedReplies && m.replyToId != null) {
-            val orig = state.byId[m.replyToId]
+            val orig = state.byId[m.replyToId] ?: (fish.nexa.data.ReplyTargets.byId.value[m.replyToId] as? fish.nexa.data.ReplyTarget.Found)?.cm
             if (orig != null && Nexa.relationships.isBlocked(orig.authorId)) continue
         }
         closeRun()
@@ -611,7 +611,7 @@ private fun ConversationStart(channel: Channel) {
             else -> {
                 StartTitle(t("chat.messageList.welcomeToChannel", "name" to channel.name))
                 Spacer(Modifier.height(8.dp))
-                val topic = channel.topic.takeIf { it.isNotBlank() }
+                val topic = channel.topic.takeIf { it.isNotBlank() }?.let { fish.nexa.ui.markdown.Markdown.plainText(fish.nexa.ui.markdown.Markdown.parse(it), AppNames).replace(Regex("\\s+"), " ").trim() }
                 StartText(boldIn("chat.messageList.channelStart", "name", "#${channel.name}", listOfNotNull(topic, endToEnd).joinToString(" ", prefix = " ")))
             }
         }

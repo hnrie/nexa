@@ -296,6 +296,14 @@ fun Rail(modifier: Modifier = Modifier) {
                 Icon("Plus", c.positive, size = 24.dp)
             }
         }
+        // servers anyone can join, as the web's rail has them under Add a Server
+        val discovering = route is Route.Discover
+        RailItem(t("discovery.title"), discovering, false, 0, picture = discovering, onClick = { Nav.go(Route.Discover) }) {
+            Box(
+                Modifier.fillMaxSize().then(if (discovering) Modifier.background(c.positive) else Modifier.ring(RoundedCornerShape(16.dp), c.positive.copy(alpha = 0.5f), 1.5.dp)),
+                contentAlignment = Alignment.Center,
+            ) { Icon("Compass", if (discovering) Color.White else c.positive, size = 24.dp) }
+        }
     }
 }
 

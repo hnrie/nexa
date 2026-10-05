@@ -374,11 +374,8 @@ private fun Tools(q: String, onQ: (String) -> Unit, sort: String, layout: String
     val c = Nx.colors
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(Modifier.weight(1f)) {
-            NxTextField(q, onQ, placeholder = t("forum.search"), imeAction = ImeAction.Search, trailing = if (q.isNotEmpty()) ({
-                Box(Modifier.size(36.dp).pressable(remember { MutableInteractionSource() }) { onQ("") }.semantics { contentDescription = t("composer.composer.dismiss") }, contentAlignment = Alignment.Center) {
-                    Icon("X", c.textMuted, size = 16.dp)
-                }
-            }) else null)
+            // the magnifier and the way to clear it, as the web's search box has them
+            fish.nexa.ui.server.SearchBox(q, onQ, t("forum.search"))
         }
         val interaction = remember { MutableInteractionSource() }
         val pressed by interaction.collectIsPressedAsState()

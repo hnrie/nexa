@@ -39,9 +39,12 @@ object ServerSettings {
             Triple(NavPage("stickers", t("pickers.expressionPicker.stickers"), "Sticker"), true, 0),
             Triple(NavPage("integrations", t("integrations.title"), "Webhook"), webhooks, 0),
             Triple(NavPage("encryption", t("server.encryption.encryption"), "Lock"), true, 0),
+            Triple(NavPage("discovery", t("discovery.title"), "Compass"), s.canI(st, P.MANAGE_SERVER), 0),
             Triple(NavPage("members", t("server.serverSettings.members"), "Users"), true, 1),
             Triple(NavPage("invites", t("server.invites.invites"), "Link"), s.canI(st, P.MANAGE_SERVER), 1),
             Triple(NavPage("bans", t("server.serverSettings.bans"), "Gavel"), s.canI(st, P.BAN_MEMBERS), 1),
+            Triple(NavPage("automod", t("automod.title"), "ShieldCheck"), s.canI(st, P.MANAGE_SERVER) || s.canI(st, P.VIEW_AUDIT_LOG), 1),
+            Triple(NavPage("safety", t("safety.title"), "ShieldAlert"), s.canI(st, P.MANAGE_SERVER), 1),
             Triple(NavPage("audit", t("server.auditLog.auditLog"), "ScrollText"), s.canI(st, P.VIEW_AUDIT_LOG), 1),
             Triple(NavPage("delete", t("server.deleteServer.deleteServer"), "Trash2", danger = true), owner, 2),
         )
@@ -83,6 +86,9 @@ private fun ServerSettingsLayer(layer: Layer, serverId: String, initial: String?
             "stickers" -> ServerStickersPage(serverId)
             "tag" -> ServerTagPage(serverId)
             "members" -> MembersPage(serverId)
+            "discovery" -> DiscoverySettingsPage(serverId)
+            "safety" -> SafetyPage(serverId) { page = it }
+            "automod" -> fish.nexa.ui.automod.AutomodPage(serverId)
             "delete" -> DeleteServerPage(serverId) {
                 close()
                 Nav.go(Route.Friends, replace = true)

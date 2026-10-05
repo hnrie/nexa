@@ -459,7 +459,7 @@ class SaveState(val dirty: Boolean, val busy: Boolean, val onReset: () -> Unit, 
  * and, while it has unsaved edits, the save bar floating over its bottom.
  */
 @Composable
-fun SettingsPage(save: SaveState? = null, content: @Composable ColumnScope.() -> Unit) {
+fun SettingsPage(save: SaveState? = null, bar: (@Composable () -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     HoldWhile(save?.dirty == true)
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -470,6 +470,8 @@ fun SettingsPage(save: SaveState? = null, content: @Composable ColumnScope.() ->
             content = content,
         )
         if (save?.dirty == true) SaveBar(save, Modifier.align(Alignment.BottomCenter))
+        // a page's own bar (what is picked, and what can be done to it) floats where the save bar would
+        else if (bar != null) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)) { bar() }
     }
 }
 
@@ -538,12 +540,13 @@ private fun SaveBar(s: SaveState, modifier: Modifier) {
 
 /** `.title`: the page's heading, 26/700 in the display face. */
 @Composable
-fun PageTitle(text: String, modifier: Modifier = Modifier) {
+fun PageTitle(text: String, modifier: Modifier = Modifier, gap: Dp = 22.dp) {
     Txt(
         text,
         style = Nx.type.title.copy(fontSize = Nx.type.sp(26f), lineHeight = Nx.type.sp(30f), fontWeight = FontWeight(700), letterSpacing = TextUnit(-0.012f, TextUnitType.Em)),
         color = Nx.colors.textStrong,
-        modifier = modifier.padding(bottom = 22.dp).semantics { heading() },
+        // `.title`'s 22 px under it; a page whose intro is drawn up close to it asks for less
+        modifier = modifier.padding(bottom = gap).semantics { heading() },
     )
 }
 

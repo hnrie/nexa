@@ -213,12 +213,14 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                     .heightIn(min = 22.dp)
                     .alpha(if (p != null && !failed) (if (uploading) 0.8f else 0.55f) else 1f),
             ) {
-                if (reply != null) ReplyLine(ctx, reply)
+                if (reply != null) ReplyLine(ctx, reply, cm?.m)
                 if (showHead) MessageHeader(item, ctx)
                 MessageBody(item, ctx, failed)
                 if (failed && p != null) FailedRow(ctx.channel.id, p.tmpId)
                 val sid = ctx.server?.server?.id
                 cm?.m?.thread?.let { th -> if (sid != null) fish.nexa.ui.threads.ThreadChip(sid, th) }
+                // an announcement not yet sent on to the channels following this one
+                if (cm != null && canPublish(cm)) PublishButton { publish(cm) }
                 if (cm != null) ReactionsRow(cm, ctx)
             }
         }
@@ -329,6 +331,28 @@ private fun MessageHeader(item: MsgItem, ctx: ListCtx) {
     }
 }
 
+/** `.publishBtn`: Publish, under a post of an announcement channel that has not gone out yet. */
+@Composable
+private fun PublishButton(onClick: () -> Unit) {
+    val c = Nx.colors
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Row(
+        Modifier
+            .padding(top = 6.dp)
+            .heightIn(min = 36.dp)
+            .clip(Radii.Sm)
+            .background(if (pressed) c.bgSelected else c.bgActive)
+            .pressable(interaction, onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon("Megaphone", c.textStrong, size = 15.dp)
+        Txt(t("follows.publish"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
+    }
+}
+
 /** A published post's copy is marked as one: an announcement from a channel this one follows. */
 @Composable
 private fun CopyTag() {
@@ -346,12 +370,34 @@ private fun CopyTag() {
     }
 }
 
-/** The curved line from the avatar column up into the replied-to message, then who and what. */
+/**
+ * The curved line from the avatar column up into the replied-to message, then
+ * who and what. Most originals are not in the stretch that is loaded: the
+ * server sends them along, and anything it did not is fetched (ReplyTargets).
+ */
 @Composable
-private fun ReplyLine(ctx: ListCtx, replyId: String) {
+private fun ReplyLine(ctx: ListCtx, replyId: String, msg: fish.nexa.net.Message?) {
     val c = Nx.colors
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val original = Nexa.messages.get(ctx.channel.id).byId[replyId]
+    val inList = Nexa.messages.get(ctx.channel.id).byId[replyId]
+    val targets by fish.nexa.data.ReplyTargets.byId.collectAsState()
+    val kept = if (inList == null) targets[replyId] else null
+    val original = inList ?: (kept as? fish.nexa.data.ReplyTarget.Found)?.cm?.takeIf { it.channelId == ctx.channel.id }
+    // a message on its way has no word from the server about its original
+    val referenced = msg?.referenced ?: if (msg == null) fish.nexa.net.Message.NOT_SAID else null
+    val deleted = original == null && (kept == fish.nexa.data.ReplyTarget.Deleted || (kept == null && referenced == null))
+    val failed = original == null && kept == fish.nexa.data.ReplyTarget.Failed
+    LaunchedEffect(replyId, inList == null, kept) {
+        if (inList != null) return@LaunchedEffect
+        if (kept is fish.nexa.data.ReplyTarget.Found) {
+            fish.nexa.data.ReplyTargets.used(replyId)
+            return@LaunchedEffect
+        }
+        if (kept != null || referenced == null) return@LaunchedEffect
+        // sent along but not kept (yet, or any more): opened here, without asking anyone
+        if (referenced != fish.nexa.net.Message.NOT_SAID && msg != null) fish.nexa.data.ReplyTargets.ingest(listOf(msg))
+        else fish.nexa.data.ReplyTargets.request(ctx.channel.id, replyId)
+    }
     val stroke = c.borderStrong
     Box(Modifier.fillMaxWidth().height(24.dp)) {
         // ::before: 32 wide, 15 tall, from 38 dp before the content, a 2 dp border on its start and top, 6 dp corner
@@ -377,13 +423,29 @@ private fun ReplyLine(ctx: ListCtx, replyId: String) {
             Modifier
                 .fillMaxWidth()
                 .height(22.dp)
-                .pressable(remember { MutableInteractionSource() }) { ChatUi.jumpTo(ctx.channel.id, replyId) }
-                .semantics { contentDescription = t("chat.messageItem.goToOriginal") },
+                .then(
+                    when {
+                        // gone is gone: there is nothing to go to
+                        deleted -> Modifier
+                        failed -> Modifier.pressable(remember { MutableInteractionSource() }) { fish.nexa.data.ReplyTargets.retry(ctx.channel.id, replyId) }
+                            .semantics { contentDescription = t("chat.messageList.tryAgain") }
+                        else -> Modifier.pressable(remember { MutableInteractionSource() }) { ChatUi.jumpTo(ctx.channel.id, replyId) }
+                            .semantics { contentDescription = if (original == null) t("chat.messageItem.originalLoading") else t("chat.messageItem.goToOriginal") }
+                    },
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            if (original == null) {
-                Txt(t("chat.messageItem.originalMessageWasDeletedOrIs"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
+            if (deleted) {
+                Txt(t("chat.messageItem.originalDeleted"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = c.textMuted, maxLines = 1)
+            } else if (failed) {
+                Icon("RotateCw", c.textMuted, size = 13.dp)
+                Txt(t("chat.messageItem.originalFailed"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
+            } else if (original == null) {
+                // waiting for it: a quiet bar where the quote goes
+                Box(Modifier.size(16.dp).background(c.bgActive, CircleShape))
+                Box(Modifier.size(width = 64.dp, height = 10.dp).background(c.bgActive, RoundedCornerShape(5.dp)))
+                Box(Modifier.size(width = 140.dp, height = 10.dp).background(c.bgHover, RoundedCornerShape(5.dp)))
             } else {
                 val blocked = Nexa.relationships.isBlocked(original.authorId)
                 if (blocked) {

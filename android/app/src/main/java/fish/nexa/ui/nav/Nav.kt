@@ -24,6 +24,8 @@ sealed interface Route {
     data class Server(val serverId: String, val channelId: String? = null, val jumpTo: String? = null) : Route
     /** `/channels/@admin`: staff only. */
     data object Admin : Route
+    /** `/channels/@discover`: servers anyone can join. */
+    data object Discover : Route
 
     val isHome get() = this is Friends || this is Dm || this is NexaConvo || this is NexaCase || this is NexaBug || this is Notes
 
@@ -37,6 +39,7 @@ sealed interface Route {
         is Notes -> if (noteId != null) "/channels/@me/notes/$noteId" else "/channels/@me/notes"
         is Server -> if (channelId != null) "/channels/$serverId/$channelId" else "/channels/$serverId"
         Admin -> "/channels/@admin"
+        Discover -> "/channels/@discover"
     }
 }
 
@@ -117,6 +120,7 @@ object Nav {
                 else -> return false
             }
             "@admin" -> Route.Admin
+            "@discover" -> Route.Discover
             else -> if (id.matches(parts[1])) Route.Server(parts[1], parts.getOrNull(2)?.takeIf { id.matches(it) }, parts.getOrNull(3)?.takeIf { id.matches(it) }) else return false
         }
         go(next)

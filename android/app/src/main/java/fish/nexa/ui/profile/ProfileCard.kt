@@ -139,11 +139,11 @@ class ProfileExtras {
 }
 
 @Composable
-fun rememberProfileExtras(userId: String): ProfileExtras {
-    val x = remember(userId) { ProfileExtras() }
-    LaunchedEffect(userId) {
+fun rememberProfileExtras(userId: String, serverId: String? = null): ProfileExtras {
+    val x = remember(userId, serverId) { ProfileExtras() }
+    LaunchedEffect(userId, serverId) {
         try {
-            val p = People.profile(userId)
+            val p = People.profile(userId, serverId)
             x.mutualFriends = p.mutualFriends
             x.mutualServers = p.mutualServers
             x.widgets = Widgets.read(p.widgets)
@@ -152,6 +152,25 @@ fun rememberProfileExtras(userId: String): ProfileExtras {
         }
     }
     return x
+}
+
+/**
+ * Inside a server, what someone set for that server stands in for their own:
+ * their name there, picture, banner, pronouns, About Me and colours.
+ */
+@Composable
+fun withServerProfile(user: PublicUser, serverId: String?): PublicUser {
+    val servers by Nexa.servers.byId.collectAsState()
+    val m = serverId?.let { servers[it]?.members?.get(user.id) } ?: return user
+    return user.copy(
+        displayName = m.nickname.ifEmpty { null } ?: user.displayName,
+        avatarId = m.avatarId ?: user.avatarId,
+        bannerId = m.bannerId ?: user.bannerId,
+        pronouns = m.pronouns.ifEmpty { null } ?: user.pronouns,
+        aboutMe = m.bio.ifEmpty { null } ?: user.aboutMe,
+        accentColor = if (m.accentColor != null) m.accentColor else user.accentColor,
+        accentColor2 = if (m.accentColor != null) m.accentColor2 else user.accentColor2,
+    )
 }
 
 /** Someone as the app knows them: the account's own record for yourself, else the users store. */
@@ -374,7 +393,7 @@ private fun ProfileTop(
             val bubbleAt = Modifier.padding(start = avLeft + av + 14.dp, end = 16.dp).offset(y = bannerH - 18.dp)
             // in the designer, an empty status is a bubble waiting to be filled
             if (custom != null) StatusBubble(custom, statusLines, bubbleAt, design, statusOpen) { statusOpen = it }
-            else if (design != null) GhostBubble(design, bubbleAt)
+            else if (design != null && ProfilePart.STATUS !in design.fixed) GhostBubble(design, bubbleAt)
         }
     }
 }
@@ -438,7 +457,7 @@ private fun Identity(user: PublicUser, rel: Relationship?, full: Boolean, theme:
             }
             val tag = user.serverTag
             if (tag != null) Spotted(design, ProfilePart.TAG, t("designer.spot.tag"), kind = SpotKind.WORD) { fish.nexa.ui.chat.ServerTagChip(tag, small = false, open = design == null) }
-            else if (design != null) GhostChip(design)
+            else if (design != null && ProfilePart.TAG !in design.fixed) GhostChip(design)
             if (onNote != null) Box(
                 Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).pressable(remember { MutableInteractionSource() }, onClick = onNote).semantics { contentDescription = noteLabel },
                 contentAlignment = Alignment.Center,
@@ -990,11 +1009,13 @@ private fun editOwnProfile(anchor: String? = null) = fish.nexa.ui.settings.Setti
  */
 @Composable
 fun ProfilePopoutCard(user: PublicUser, serverId: String?, close: () -> Unit, design: ProfileDesign? = null, previewWidgets: List<Widgets.Widget>? = null) {
+    val servers by Nexa.servers.byId.collectAsState()
+    val here = if (design != null) null else serverId?.takeIf { servers[it] != null }
+    @Suppress("NAME_SHADOWING") val user = if (here != null) withServerProfile(user, here) else user
     val look = rememberProfileLook(user)
-    val extras = rememberProfileExtras(user.id)
+    val extras = rememberProfileExtras(user.id, here)
     val rels by Nexa.relationships.byId.collectAsState()
     val presence by Nexa.presence.byId.collectAsState()
-    val servers by Nexa.servers.byId.collectAsState()
     val doc by Nexa.settings.doc.collectAsState()
     val rel = if (design != null) null else rels[user.id]
     val isMe = user.id == Nexa.users.meId
@@ -1183,11 +1204,13 @@ fun FullProfileCard(
     /** Changed to show [initialTab] again on a card already drawn (the designer's parts). */
     tabNonce: Int = 0,
 ) {
+    val servers by Nexa.servers.byId.collectAsState()
+    val here = if (design != null) null else serverId?.takeIf { servers[it] != null }
+    @Suppress("NAME_SHADOWING") val user = if (here != null) withServerProfile(user, here) else user
     val look = rememberProfileLook(user)
-    val extras = rememberProfileExtras(user.id)
+    val extras = rememberProfileExtras(user.id, here)
     val rels by Nexa.relationships.byId.collectAsState()
     val presence by Nexa.presence.byId.collectAsState()
-    val servers by Nexa.servers.byId.collectAsState()
     val users by Nexa.users.byId.collectAsState()
     val doc by Nexa.settings.doc.collectAsState()
     val preview = design != null

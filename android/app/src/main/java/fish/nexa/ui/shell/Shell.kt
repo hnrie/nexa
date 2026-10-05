@@ -196,6 +196,7 @@ fun MainShell() {
                     is Route.NexaCase -> fish.nexa.ui.nexa.NexaCasePage(route.caseId)
                     is Route.NexaBug -> fish.nexa.ui.nexa.NexaBugPage(route.reportId)
                     is Route.Notes -> fish.nexa.ui.notes.NotesPage(route)
+                    is Route.Discover -> fish.nexa.ui.discovery.DiscoverPage()
                     else -> PlaceholderPage(route)
                 }
             }

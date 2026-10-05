@@ -337,6 +337,8 @@ fun NxTextField(
     capitalize: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
     mono: Boolean = false,
+    /** The monospace text's size; AutoMod's lists of words are a little smaller, as the web's are. */
+    monoSize: Float = 15f,
 ) {
     val c = Nx.colors
     val type = Nx.type
@@ -379,7 +381,7 @@ fun NxTextField(
                 singleLine = singleLine,
                 minLines = minLines,
                 interactionSource = interaction,
-                textStyle = (if (mono) type.code.copy(fontSize = type.sp(15f)) else type.input).copy(color = c.text),
+                textStyle = (if (mono) type.code.copy(fontSize = type.sp(monoSize)) else type.input).copy(color = c.text),
                 cursorBrush = SolidColor(c.focusRing),
                 visualTransformation = if (password && !reveal) PasswordVisualTransformation() else VisualTransformation.None,
                 keyboardOptions = KeyboardOptions(
@@ -396,7 +398,7 @@ fun NxTextField(
                 decorationBox = { inner ->
                     // a box of several lines starts at the top, its placeholder wrapping as the web's textarea does
                     Box(contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart, modifier = if (singleLine) Modifier.defaultMinSize(minHeight = 42.dp) else Modifier) {
-                        if (value.isEmpty() && placeholder != null) Txt(placeholder, style = type.input, color = c.textPlaceholder, maxLines = if (singleLine) 1 else Int.MAX_VALUE)
+                        if (value.isEmpty() && placeholder != null) Txt(placeholder, style = if (mono) type.code.copy(fontSize = type.sp(monoSize)) else type.input, color = c.textPlaceholder, maxLines = if (singleLine) 1 else Int.MAX_VALUE)
                         inner()
                     }
                 },

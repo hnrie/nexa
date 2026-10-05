@@ -204,11 +204,15 @@ fun ChatHeader(channel: Channel) {
             else -> Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 ChannelGlyph(channel, 22.dp, c.textMuted)
                 Txt(channel.name, style = nameStyle, color = c.textStrong, maxLines = 1, modifier = Modifier.padding(start = 2.dp))
-                if (channel.topic.isNotBlank()) {
+                // a topic can be formatted: the header gives its words on one line, the topic's sheet the whole of it
+                val topicLine = remember(channel.topic) {
+                    if (channel.topic.isBlank()) "" else fish.nexa.ui.markdown.Markdown.plainText(fish.nexa.ui.markdown.Markdown.parse(channel.topic), AppNames).replace(Regex("\\s+"), " ").trim()
+                }
+                if (topicLine.isNotEmpty()) {
                     Row(Modifier.weight(1f, fill = false).padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(1.dp, 20.dp).background(c.border))
                         Txt(
-                            channel.topic, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1,
+                            topicLine, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1,
                             modifier = Modifier.padding(start = 8.dp).pressable(remember { MutableInteractionSource() }) { openChannelTopic(channel) },
                         )
                     }
