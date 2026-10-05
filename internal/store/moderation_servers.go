@@ -37,14 +37,18 @@ const modServerCountCols = `(SELECT count(*) FROM server_members m WHERE m.serve
 
 // modServerCols is what the panel reads of a server: everything a member
 // sees, its tag included, and how many members and channels it has.
-var modServerCols = prefixed("s", serverCols) + `, ` + prefixed("s", serverTagCols) + `, ` + modServerCountCols
+var modServerCols = prefixed("s", serverCols) + `, ` + prefixed("s", serverTagCols) + `, ` + prefixed("s", serverCommunityCols) + `, ` + modServerCountCols
 
 func scanModServer(r rowScanner) (*ModServer, error) {
 	var m ModServer
 	var icon, banner, system, tagColor sql.NullInt64
 	var tagText, tagBadge, tagRoles, tagInvite string
-	if err := r.Scan(&m.ID, &m.Name, &icon, &banner, &m.OwnerID, &m.Description, &system, &m.DefaultNotifications, &m.Flags, &m.CreatedAt,
-		&tagText, &tagBadge, &tagColor, &tagRoles, &tagInvite, &m.MemberCount, &m.ChannelCount); err != nil {
+	var c communityScan
+	dest := []any{&m.ID, &m.Name, &icon, &banner, &m.OwnerID, &m.Description, &system, &m.DefaultNotifications, &m.Flags, &m.CreatedAt,
+		&tagText, &tagBadge, &tagColor, &tagRoles, &tagInvite}
+	dest = append(dest, c.dest()...)
+	dest = append(dest, &m.MemberCount, &m.ChannelCount)
+	if err := r.Scan(dest...); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -52,6 +56,7 @@ func scanModServer(r rowScanner) (*ModServer, error) {
 	}
 	m.IconID, m.BannerID, m.SystemChannelID = idPtr(icon), idPtr(banner), idPtr(system)
 	m.Tag = tagOf(tagText, tagBadge, tagColor, tagRoles, tagInvite)
+	c.apply(&m.Server)
 	return &m, nil
 }
 
@@ -161,6 +166,8 @@ type ModServerReset struct {
 	// Tag takes the server's tag away. Taking it off the people wearing it,
 	// and letting its badge and invite go, is the caller's to do after.
 	Tag bool
+	// Discovery takes the server off Discovery until the staff put it back.
+	Discovery bool
 }
 
 // ModResetServer takes back parts of what a server shows everyone and opens
@@ -200,6 +207,9 @@ func (s *Store) ModResetServer(ctx context.Context, c *ModCase, serverID ids.ID,
 		}
 		if f.Tag {
 			sets = append(sets, "tag_text = ''", "tag_badge = ''", "tag_color = NULL", "tag_roles = ''", "tag_invite = ''")
+		}
+		if f.Discovery {
+			sets = append(sets, "discovery_hidden = 1")
 		}
 		if len(sets) == 0 {
 			return errors.New("server reset: nothing to reset")

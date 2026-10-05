@@ -430,7 +430,16 @@ func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"user": u.Public(), "mutual_friends": friends, "mutual_servers": servers, "widgets": widgetsJSON(widgets)})
+	// opened in a server both are in, the ones they chose for it, if they did
+	own := false
+	if sid, err := ids.Parse(r.URL.Query().Get("server_id")); err == nil && r.URL.Query().Get("server_id") != "" {
+		if in, err := s.Store.IsMember(r.Context(), sid, me.ID); err == nil && in {
+			if there, err := s.Store.MemberWidgets(r.Context(), sid, u.ID); err == nil && there != nil {
+				widgets, own = *there, true
+			}
+		}
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"user": u.Public(), "mutual_friends": friends, "mutual_servers": servers, "widgets": widgetsJSON(widgets), "server_widgets": own})
 }
 
 func (s *Server) handlePublicKey(w http.ResponseWriter, r *http.Request) {

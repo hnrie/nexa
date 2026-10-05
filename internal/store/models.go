@@ -257,6 +257,65 @@ type Channel struct {
 	// speaker: "icon:<name>", "emoji:<emoji>" or "custom:<emoji id>".
 	// Empty keeps the default.
 	Glyph string `json:"glyph,omitempty"`
+	// Thread is how a thread stands (types thread and private_thread); nil
+	// on every other channel.
+	Thread *ThreadMeta `json:"thread,omitempty"`
+	// Forum is a forum channel's own settings; nil on every other channel.
+	Forum *ForumSettings `json:"forum,omitempty"`
+	// DefaultAutoArchive is, on a channel threads start in, how many quiet
+	// minutes close a new one (0: three days).
+	DefaultAutoArchive int `json:"default_auto_archive,omitempty"`
+}
+
+// Thread channel types: a public thread (also every forum post) and a
+// private one, seen only by the people in it and by moderators.
+const (
+	ChannelThread        = "thread"
+	ChannelPrivateThread = "private_thread"
+	ChannelAnnouncement  = "announcement"
+	ChannelForum         = "forum"
+)
+
+// IsThread reports whether a channel type is a thread.
+func IsThread(t string) bool { return t == ChannelThread || t == ChannelPrivateThread }
+
+// HoldsThreads reports whether threads can be started in a channel of this type.
+func HoldsThreads(t string) bool { return t == "text" || t == ChannelAnnouncement || t == ChannelForum }
+
+// Talkable reports whether people write messages straight into a channel of
+// this type: a forum only holds posts, which are threads.
+func Talkable(t string) bool { return t == "text" || t == ChannelAnnouncement || IsThread(t) }
+
+// ThreadMeta is a thread's state.
+type ThreadMeta struct {
+	Archived    bool     `json:"archived"`
+	ArchivedAt  *int64   `json:"archived_at"`
+	Locked      bool     `json:"locked"`
+	AutoArchive int      `json:"auto_archive"`
+	StarterID   *ids.ID  `json:"starter_id"`
+	Messages    int      `json:"message_count"`
+	AppliedTags []ids.ID `json:"applied_tags"`
+}
+
+// ForumSettings are a forum channel's own: the tags its posts can wear, the
+// reaction offered on every post, how posts are sorted and drawn at first,
+// whether a post needs a tag, and the one post pinned at the top.
+type ForumSettings struct {
+	Tags            []ForumTag `json:"tags"`
+	DefaultReaction string     `json:"default_reaction"`
+	Sort            string     `json:"sort"`
+	Layout          string     `json:"layout"`
+	RequireTag      bool       `json:"require_tag"`
+	PinnedPost      *ids.ID    `json:"pinned_post"`
+}
+
+// ForumTag is one tag a forum's posts can wear. A moderated one only people
+// who manage threads may put on a post.
+type ForumTag struct {
+	ID        ids.ID `json:"id"`
+	Name      string `json:"name"`
+	Emoji     string `json:"emoji"`
+	Moderated bool   `json:"moderated"`
 }
 
 // Server is a community with channels, roles and members.
@@ -274,6 +333,24 @@ type Server struct {
 	// Tag is the tag its members can wear (server_tags.go), or nil. Read
 	// by ServerByID and ServersForUser; other server reads leave it nil.
 	Tag *ServerTag `json:"tag"`
+	// InvitesPausedUntil is when the server takes new members again; nil
+	// while it takes them.
+	InvitesPausedUntil *int64 `json:"invites_paused_until"`
+	// How the server shows in Discovery, where it is listed when
+	// Discoverable and not DiscoveryHidden (taken off by Nexa's staff).
+	Discoverable      bool     `json:"discoverable"`
+	DiscoveryCategory string   `json:"discovery_category"`
+	DiscoveryTags     []string `json:"discovery_tags"`
+	DiscoveryLanguage string   `json:"discovery_language"`
+	DiscoverySince    *int64   `json:"discovery_since"`
+	DiscoveryHidden   bool     `json:"discovery_hidden"`
+	// How old an account, and how long a membership, has to be before it may
+	// talk here; 0 for no wait.
+	VerifyAccountMinutes int `json:"verify_account_minutes"`
+	VerifyMemberMinutes  int `json:"verify_member_minutes"`
+	// AutomodAt is when the AutoMod rules members' apps apply last changed,
+	// or 0 when there are none: apps fetch them only where there are some.
+	AutomodAt int64 `json:"automod_at"`
 }
 
 // ServerPatch is an optional set of server changes.
@@ -285,38 +362,92 @@ type ServerPatch struct {
 	SystemChannelID      **ids.ID
 	DefaultNotifications *int
 	OwnerID              *ids.ID
+	InvitesPausedUntil   **int64
+	Discoverable         *bool
+	DiscoveryCategory    *string
+	DiscoveryTags        *[]string
+	DiscoveryLanguage    *string
+	DiscoveryHidden      *bool
+	VerifyAccountMinutes *int
+	VerifyMemberMinutes  *int
 }
 
-// Member is a user's membership in a server.
+// Member is a user's membership in a server. Nickname, avatar, banner, bio
+// and pronouns are the member's profile in this server, shown there in place
+// of their account's own. How they joined is kept from everyone but those who
+// may see the server's invites (MemberJoin).
 type Member struct {
 	ServerID     ids.ID   `json:"server_id"`
 	UserID       ids.ID   `json:"user_id"`
 	Nickname     string   `json:"nickname"`
 	AvatarID     *ids.ID  `json:"avatar_id"`
+	BannerID     *ids.ID  `json:"banner_id"`
+	Bio          string   `json:"bio"`
+	Pronouns     string   `json:"pronouns"`
+	// AccentColor and AccentColor2 are the profile's theme in this server, as
+	// the account's own are (nil uses those).
+	AccentColor  *int     `json:"accent_color,omitempty"`
+	AccentColor2 *int     `json:"accent_color_2,omitempty"`
 	JoinedAt     int64    `json:"joined_at"`
 	TimeoutUntil *int64   `json:"timeout_until"`
 	Flags        int64    `json:"flags"`
 	RoleIDs      []ids.ID `json:"role_ids"`
+	JoinMethod   string   `json:"-"`
+	JoinCode     string   `json:"-"`
+	InvitedBy    *ids.ID  `json:"-"`
+}
+
+// Member flag bits.
+const (
+	// MemberQuarantined is a member AutoMod held for what their name or
+	// profile in the server says: they can look, and do nothing else, until
+	// a moderator lets them out or they change it.
+	MemberQuarantined int64 = 1
+)
+
+// MemberJoin is how someone came into a server, for the people who may see
+// its invites.
+type MemberJoin struct {
+	Method    string  `json:"join_method"`
+	Code      string  `json:"join_code"`
+	InvitedBy *ids.ID `json:"invited_by"`
+}
+
+// Join is m's MemberJoin.
+func (m *Member) Join() MemberJoin {
+	return MemberJoin{Method: m.JoinMethod, Code: m.JoinCode, InvitedBy: m.InvitedBy}
 }
 
 // MemberPatch is an optional set of membership changes.
 type MemberPatch struct {
 	Nickname     *string
 	AvatarID     **ids.ID
+	BannerID     **ids.ID
+	Bio          *string
+	Pronouns     *string
+	AccentColor  **int
+	AccentColor2 **int
 	TimeoutUntil **int64
+	Flags        *int64
 }
 
-// Role is a server role.
+// Role is a server role. With Color2 its name is drawn as a gradient from
+// Color to Color2, and with Color3 as well, as a shimmer across all three.
+// Its icon is a picture (IconID) or an emoji (IconEmoji: the character, or
+// "custom:<emoji id>" for one of the server's own).
 type Role struct {
 	ID          ids.ID     `json:"id"`
 	ServerID    ids.ID     `json:"server_id"`
 	Name        string     `json:"name"`
 	Color       int        `json:"color"`
+	Color2      *int       `json:"color2"`
+	Color3      *int       `json:"color3"`
 	Hoist       bool       `json:"hoist"`
 	Mentionable bool       `json:"mentionable"`
 	Position    int        `json:"position"`
 	Permissions perms.Perm `json:"permissions"`
 	IconID      *ids.ID    `json:"icon_id"`
+	IconEmoji   string     `json:"icon_emoji"`
 	CreatedAt   int64      `json:"created_at"`
 }
 
@@ -324,10 +455,13 @@ type Role struct {
 type RolePatch struct {
 	Name        *string
 	Color       *int
+	Color2      **int
+	Color3      **int
 	Hoist       *bool
 	Mentionable *bool
 	Permissions *perms.Perm
 	IconID      **ids.ID
+	IconEmoji   *string
 }
 
 // Overwrite is a channel permission overwrite.
@@ -394,6 +528,14 @@ type ChannelPatch struct {
 	UserLimit       *int
 	ParentID        **ids.ID
 	Position        *int
+	Type            *string
+	// threads
+	Archived    *bool
+	Locked      *bool
+	AutoArchive *int
+	AppliedTags *[]ids.ID
+	// forums
+	Forum *ForumSettings
 }
 
 // Message flag bits, at the same values as Discord's.
@@ -406,6 +548,9 @@ const (
 	// MsgFlagComponentsV2 is a webhook message laid out entirely by its
 	// components: it has no content or embeds of its own.
 	MsgFlagComponentsV2 int64 = 1 << 15
+	// MsgFlagPublished is a post of an announcement channel that has been
+	// published to the channels following it (Nexa's own bit).
+	MsgFlagPublished int64 = 1 << 20
 )
 
 // Message is an encrypted message row plus its attachments and reactions.
@@ -441,12 +586,34 @@ type Message struct {
 	// is kept where a webhook's words are (messages.plain): the server wrote
 	// it, so there is nothing to seal.
 	PollResult *PollOutcome `json:"poll_result,omitempty"`
+	// Crosspost is, on a post published from an announcement channel into
+	// this one, where it came from (api/follows.go): the words themselves
+	// are sealed in Ciphertext, for the people of this channel.
+	Crosspost json.RawMessage `json:"crosspost,omitempty"`
+	// Automod is, on AutoMod's note in an alert channel, what it caught and
+	// what it did; anything the member's app caught is sealed inside it.
+	Automod json.RawMessage `json:"automod,omitempty"`
+	// Published says a post of an announcement channel has been published.
+	Published bool `json:"published,omitempty"`
+	// Thread is the thread started from this message, for drawing it under
+	// the message: its id, name, how much has been said and when last.
+	Thread *ThreadSummary `json:"thread,omitempty"`
 	// Referenced is the message a reply (or a pin's or a poll's notice)
 	// points at, as it is now, sealed as it was sent: readers quote it from
 	// this rather than from whatever part of the conversation they happen to
 	// have loaded. The JSON null says it has been deleted. Absent on a message
 	// that points at nothing, and wherever WithReferences was not asked.
 	Referenced json.RawMessage `json:"referenced_message,omitempty"`
+}
+
+// ThreadSummary is a thread as the message it started from shows it.
+type ThreadSummary struct {
+	ID            ids.ID  `json:"id"`
+	Name          string  `json:"name"`
+	Messages      int     `json:"message_count"`
+	LastMessageID *ids.ID `json:"last_message_id"`
+	Archived      bool    `json:"archived"`
+	Locked        bool    `json:"locked"`
 }
 
 // PollOutcome is how a person's poll went, as the line that closes it carries

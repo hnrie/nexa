@@ -52,6 +52,8 @@ func WriteError(w http.ResponseWriter, err error) {
 		apiErr = E(http.StatusBadRequest, "limit_reached", "That is as many as this can hold.")
 	case errors.Is(err, store.ErrBanned):
 		apiErr = E(http.StatusForbidden, "banned", "You are banned from this server.")
+	case errors.Is(err, store.ErrJoinsPaused):
+		apiErr = errJoinsPaused
 	case errors.Is(err, media.ErrTooLarge):
 		apiErr = E(http.StatusRequestEntityTooLarge, "too_large", "That file is too large.")
 	case errors.Is(err, media.ErrUnsupported):

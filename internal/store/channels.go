@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -10,7 +11,7 @@ import (
 	"evilion.xyz/chat/internal/ids"
 )
 
-const channelCols = `id, server_id, type, name, topic, position, parent_id, nsfw, slowmode_seconds, user_limit, owner_id, icon_id, last_message_id, created_at, updated_at, glyph`
+const channelCols = `id, server_id, type, name, topic, position, parent_id, nsfw, slowmode_seconds, user_limit, owner_id, icon_id, last_message_id, created_at, updated_at, glyph, archived, archived_at, thread_locked, auto_archive, starter_id, message_count, applied_tags, forum`
 
 // channelReadCols adds what is read but never written back through insertChannel.
 // The comparison is spelled as a CASE so it comes back as 0/1 on both
@@ -26,11 +27,15 @@ func IsDMLike(t string) bool { return t == "dm" || t == "group_dm" || t == "subc
 
 func scanChannel(r rowScanner) (*Channel, error) {
 	var c Channel
-	var server, parent, owner, icon, last sql.NullInt64
+	var server, parent, owner, icon, last, archivedAt, starter sql.NullInt64
 	var nsfw int64
 	var updated int64
 	var locked int64
-	if err := r.Scan(&c.ID, &server, &c.Type, &c.Name, &c.Topic, &c.Position, &parent, &nsfw, &c.SlowmodeSeconds, &c.UserLimit, &owner, &icon, &last, &c.CreatedAt, &updated, &c.Glyph, &locked); err != nil {
+	var archived, threadLocked int64
+	var autoArchive, messages int
+	var tags, forum string
+	if err := r.Scan(&c.ID, &server, &c.Type, &c.Name, &c.Topic, &c.Position, &parent, &nsfw, &c.SlowmodeSeconds, &c.UserLimit, &owner, &icon, &last, &c.CreatedAt, &updated, &c.Glyph,
+		&archived, &archivedAt, &threadLocked, &autoArchive, &starter, &messages, &tags, &forum, &locked); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -39,6 +44,16 @@ func scanChannel(r rowScanner) (*Channel, error) {
 	c.ServerID, c.ParentID, c.OwnerID, c.IconID, c.LastMessageID = idPtr(server), idPtr(parent), idPtr(owner), idPtr(icon), idPtr(last)
 	c.NSFW = nsfw == 1
 	c.Locked = locked == 1
+	switch {
+	case IsThread(c.Type):
+		c.Thread = &ThreadMeta{Archived: archived == 1, ArchivedAt: int64Ptr(archivedAt), Locked: threadLocked == 1, AutoArchive: autoArchive,
+			StarterID: idPtr(starter), Messages: messages, AppliedTags: parseIDsJSONOrEmpty(tags)}
+	case HoldsThreads(c.Type):
+		c.DefaultAutoArchive = autoArchive
+		if c.Type == ChannelForum {
+			c.Forum = parseForum(forum)
+		}
+	}
 	// the default key conversation; callers that know about private-channel epochs refine it
 	if c.ServerID != nil {
 		c.KeyConvID = *c.ServerID
@@ -55,9 +70,56 @@ func (s *Store) insertChannel(ctx context.Context, q querier, c *Channel) error 
 	if c.CreatedAt == 0 {
 		c.CreatedAt = nowMs()
 	}
-	_, err := q.ExecContext(ctx, `INSERT INTO channels (`+channelCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		int64(c.ID), nullID(c.ServerID), c.Type, c.Name, c.Topic, c.Position, nullID(c.ParentID), boolInt(c.NSFW), c.SlowmodeSeconds, c.UserLimit, nullID(c.OwnerID), nullID(c.IconID), nullID(c.LastMessageID), c.CreatedAt, c.CreatedAt, c.Glyph)
+	var archived, threadLocked int64
+	var autoArchive int
+	var starter *ids.ID
+	tags, forum := "", ""
+	if c.Thread != nil {
+		archived, threadLocked, autoArchive, starter = boolInt(c.Thread.Archived), boolInt(c.Thread.Locked), c.Thread.AutoArchive, c.Thread.StarterID
+		if len(c.Thread.AppliedTags) > 0 {
+			tags = idsJSON(c.Thread.AppliedTags)
+		}
+	} else {
+		autoArchive = c.DefaultAutoArchive
+	}
+	if c.Forum != nil {
+		b, err := json.Marshal(c.Forum)
+		if err != nil {
+			return err
+		}
+		forum = string(b)
+	}
+	_, err := q.ExecContext(ctx, `INSERT INTO channels (`+channelCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		int64(c.ID), nullID(c.ServerID), c.Type, c.Name, c.Topic, c.Position, nullID(c.ParentID), boolInt(c.NSFW), c.SlowmodeSeconds, c.UserLimit, nullID(c.OwnerID), nullID(c.IconID), nullID(c.LastMessageID), c.CreatedAt, c.CreatedAt, c.Glyph,
+		archived, nil, threadLocked, autoArchive, nullID(starter), 0, tags, forum)
 	return err
+}
+
+// parseIDsJSONOrEmpty reads a JSON list of ids, or an empty column, as a list.
+func parseIDsJSONOrEmpty(s string) []ids.ID {
+	if s == "" {
+		return []ids.ID{}
+	}
+	return parseIDsJSON(s)
+}
+
+// parseForum reads a forum channel's settings, filling in what an empty or
+// older column leaves out.
+func parseForum(s string) *ForumSettings {
+	f := &ForumSettings{}
+	if s != "" {
+		_ = json.Unmarshal([]byte(s), f)
+	}
+	if f.Tags == nil {
+		f.Tags = []ForumTag{}
+	}
+	if f.Sort == "" {
+		f.Sort = "activity"
+	}
+	if f.Layout == "" {
+		f.Layout = "list"
+	}
+	return f
 }
 
 // CreateDM returns the DM between a and b, creating it when missing, in both
@@ -171,6 +233,13 @@ func (s *Store) ChannelByID(ctx context.Context, id ids.ID) (*Channel, error) {
 			return nil, err
 		} else if own {
 			c.KeyConvID = c.ID
+		} else if IsThread(c.Type) && c.ParentID != nil {
+			// a thread without keys of its own is sealed as its channel is
+			if _, parentOwn, err := s.LatestEpoch(ctx, *c.ParentID); err != nil {
+				return nil, err
+			} else if parentOwn {
+				c.KeyConvID = *c.ParentID
+			}
 		}
 		if c.Overwrites, err = s.Overwrites(ctx, c.ID); err != nil {
 			return nil, err
@@ -596,6 +665,33 @@ func (s *Store) UpdateChannel(ctx context.Context, id ids.ID, p ChannelPatch) er
 	if p.Position != nil {
 		set("position", *p.Position)
 	}
+	if p.Type != nil {
+		set("type", *p.Type)
+	}
+	if p.Archived != nil {
+		set("archived", boolInt(*p.Archived))
+		if *p.Archived {
+			set("archived_at", nowMs())
+		} else {
+			sets = append(sets, "archived_at = NULL")
+		}
+	}
+	if p.Locked != nil {
+		set("thread_locked", boolInt(*p.Locked))
+	}
+	if p.AutoArchive != nil {
+		set("auto_archive", *p.AutoArchive)
+	}
+	if p.AppliedTags != nil {
+		set("applied_tags", idsJSON(*p.AppliedTags))
+	}
+	if p.Forum != nil {
+		b, err := json.Marshal(p.Forum)
+		if err != nil {
+			return err
+		}
+		set("forum", string(b))
+	}
 	if len(sets) == 0 {
 		return nil
 	}
@@ -608,12 +704,17 @@ func (s *Store) UpdateChannel(ctx context.Context, id ids.ID, p ChannelPatch) er
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
+	// a channel's type and a thread's state are part of who may do what in it
+	if p.Type != nil || p.Archived != nil || p.Locked != nil {
+		s.changedIn(channelServer(ctx, s.db.R, id))
+	}
 	return nil
 }
 
 // DeleteChannel removes a channel and everything in it. Deleting a category
 // leaves its children in place without a parent; deleting a conversation
-// deletes its subchats with it, since nothing could reach them afterwards.
+// deletes its subchats with it, and a channel its threads (forum posts
+// included), since nothing could reach them afterwards.
 func (s *Store) DeleteChannel(ctx context.Context, id ids.ID) error {
 	var server ids.ID
 	var serverErr error
@@ -621,7 +722,7 @@ func (s *Store) DeleteChannel(ctx context.Context, id ids.ID) error {
 	defer func() { s.changedIn(server, serverErr) }()
 	return s.Tx(ctx, func(tx *db.Tx) error {
 		server, serverErr = channelServer(ctx, tx, id)
-		subs, err := idsTx(ctx, tx, `SELECT id FROM channels WHERE parent_id = ? AND type = 'subchat'`, int64(id))
+		subs, err := idsTx(ctx, tx, `SELECT id FROM channels WHERE parent_id = ? AND type IN ('subchat','thread','private_thread')`, int64(id))
 		if err != nil {
 			return err
 		}

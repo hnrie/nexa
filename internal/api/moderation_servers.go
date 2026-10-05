@@ -20,10 +20,12 @@ func (s *Server) modServerRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/moderation/servers", s.admin(s.handleModServers))
 	mux.Handle("GET /api/v1/moderation/servers/{id}", s.admin(s.handleModServer))
 	mux.Handle("POST /api/v1/moderation/servers/{id}/actions", s.admin(s.handleModServerAction))
+	mux.Handle("DELETE /api/v1/moderation/servers/{id}/discovery-hold", s.admin(s.handleModDiscoveryRestore))
 }
 
-// serverResetFields are what a server_reset can take back.
-var serverResetFields = []string{"icon", "banner", "name", "description", "tag"}
+// serverResetFields are what a server_reset can take back. "discovery" takes
+// the server off Discovery until the staff let it back on.
+var serverResetFields = []string{"icon", "banner", "name", "description", "tag", "discovery"}
 
 // modServerView is a server in the panel, and whether this moderator may act on it.
 type modServerView struct {
@@ -180,7 +182,7 @@ func (s *Server) handleModServerAction(w http.ResponseWriter, r *http.Request) {
 	var fields []string
 	for _, f := range req.Fields {
 		if !OneOf(f, serverResetFields...) {
-			WriteError(w, E(http.StatusBadRequest, "unknown_field", "Only a server's icon, banner, name, description and tag can be taken back."))
+			WriteError(w, E(http.StatusBadRequest, "unknown_field", "Only a server's icon, banner, name, description, tag and place in Discovery can be taken back."))
 			return
 		}
 		if !chosen[f] {
@@ -201,6 +203,9 @@ func (s *Server) handleModServerAction(w http.ResponseWriter, r *http.Request) {
 	case chosen["description"] && m.Description == "":
 		WriteError(w, E(http.StatusBadRequest, "field_empty", "That server has no description to clear."))
 		return
+	case chosen["discovery"] && (!m.Discoverable || m.DiscoveryHidden):
+		WriteError(w, E(http.StatusBadRequest, "not_listed", "That server is not on Discovery."))
+		return
 	}
 	var tag *store.ServerTag
 	if chosen["tag"] {
@@ -210,7 +215,7 @@ func (s *Server) handleModServerAction(w http.ResponseWriter, r *http.Request) {
 		}
 		tag = m.Tag
 	}
-	reset := store.ModServerReset{Icon: chosen["icon"], Banner: chosen["banner"], Description: chosen["description"], Tag: tag != nil}
+	reset := store.ModServerReset{Icon: chosen["icon"], Banner: chosen["banner"], Description: chosen["description"], Tag: tag != nil, Discovery: chosen["discovery"]}
 	oldVals, newVals := map[string]string{}, map[string]string{}
 	if tag != nil {
 		oldVals["tag"], newVals["tag"] = tag.Text, ""
@@ -246,6 +251,34 @@ func (s *Server) handleModServerAction(w http.ResponseWriter, r *http.Request) {
 		s.emitServer(ctx, m.ID, "server_update", updated)
 	}
 	s.actionDone(w, ctx, c, log)
+}
+
+// handleModDiscoveryRestore lets a server the staff took off Discovery back
+// on, which its owner then decides about as before.
+func (s *Server) handleModDiscoveryRestore(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	me := auth.UserFrom(ctx)
+	m := s.modServerFor(w, r)
+	if m == nil {
+		return
+	}
+	if !m.DiscoveryHidden {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	no := false
+	if err := s.Store.UpdateServer(ctx, m.ID, store.ServerPatch{DiscoveryHidden: &no}); err != nil {
+		WriteError(w, err)
+		return
+	}
+	details := mustJSON(map[string]any{"server_id": m.ID, "server_name": m.Name})
+	if err := s.Store.AppendModLog(ctx, &store.ModLogEntry{Action: store.LogDiscoveryRestore, ModeratorID: me.ID, ModeratorUsername: me.Username, TargetID: &m.OwnerID, Details: details}); err != nil {
+		s.Log.Warn("mod log", "err", err)
+	}
+	if updated, err := s.Store.ServerByID(ctx, m.ID); err == nil {
+		s.emitServer(ctx, m.ID, "server_update", updated)
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // serverBlockError says why a server's owner is out of this moderator's reach.

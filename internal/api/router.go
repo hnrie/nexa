@@ -110,6 +110,14 @@ type Server struct {
 	limMusic *ratelimit.Limiter
 	// limPreview paces the song previews an address plays, each a lookup on Deezer and half a megabyte through WARP
 	limPreview *ratelimit.Limiter
+	// limAutomod paces the AutoMod reports an account's app sends
+	limAutomod *ratelimit.Limiter
+	// limPublish paces how often an announcement channel publishes, each one a copy into every channel following it
+	limPublish *ratelimit.Limiter
+	// limThread paces the threads and forum posts an account starts
+	limThread *ratelimit.Limiter
+	// limDiscover paces Discovery searches, each a query over every listed server
+	limDiscover *ratelimit.Limiter
 
 	// handoffs are sealed sign-ins on their way from a moved address to Nexa's own (handoff.go)
 	handoffs handoffStore
@@ -284,6 +292,15 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limMusic: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
 		// a play is a few requests (Safari asks for two bytes first), a song every few seconds at most
 		limPreview: ratelimit.New(ratelimit.Every(240, time.Minute), 60, 10*time.Minute),
+		// AutoMod reports, per account: someone's own blocked messages, and a
+		// moderator's app clearing what slipped past, a burst at a time
+		limAutomod: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
+		// publishing, per announcement channel: ten an hour, as Discord allows
+		limPublish: ratelimit.New(ratelimit.Every(10, time.Hour), 10, 2*time.Hour),
+		// new threads and forum posts, per account
+		limThread: ratelimit.New(ratelimit.Every(30, 10*time.Minute), 15, time.Hour),
+		// Discovery searches, per account: a few for each word typed
+		limDiscover: ratelimit.New(ratelimit.Every(120, time.Minute), 60, 10*time.Minute),
 	}
 }
 
@@ -297,6 +314,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
 		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile,
 		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord, "server-tag": s.limTag, "music-search": s.limMusic, "music-preview": s.limPreview,
+		"automod": s.limAutomod, "publish": s.limPublish, "thread": s.limThread, "discover": s.limDiscover,
 		"note": s.limNote, "note-save": s.limNoteSave, "note-update": s.limNoteUpdate, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,
 	}
 }

@@ -298,7 +298,11 @@ func (s *Store) PurgeUserLeftovers(ctx context.Context, uid ids.ID) error {
 	// its overwrites, in whichever servers they were
 	defer s.everythingChanged()
 	return s.Tx(ctx, func(tx *db.Tx) error {
-		if err := releaseBlobRefs(ctx, tx, `SELECT avatar_id FROM server_members WHERE user_id = ? AND avatar_id IS NOT NULL`, id); err != nil {
+		if err := releaseBlobRefs(ctx, tx, `SELECT avatar_id FROM server_members WHERE user_id = ? AND avatar_id IS NOT NULL
+			UNION ALL SELECT banner_id FROM server_members WHERE user_id = ? AND banner_id IS NOT NULL`, id, id); err != nil {
+			return err
+		}
+		if err := releaseWidgetRefs(ctx, tx, `SELECT widgets FROM server_members WHERE user_id = ? AND widgets IS NOT NULL`, id); err != nil {
 			return err
 		}
 		if err := deleteUserBugReportsTx(ctx, tx, id); err != nil {
@@ -319,7 +323,8 @@ func (s *Store) PurgeUserLeftovers(ctx context.Context, uid ids.ID) error {
 			`DELETE FROM note_members WHERE user_id = ?`,
 			`DELETE FROM note_invites WHERE from_id = ?`,
 			`DELETE FROM note_invites WHERE to_id = ?`,
-			`UPDATE server_members SET avatar_id = NULL WHERE user_id = ?`,
+			`UPDATE server_members SET avatar_id = NULL, banner_id = NULL, bio = '', pronouns = '', accent_color = NULL, accent_color_2 = NULL, widgets = NULL WHERE user_id = ?`,
+			`DELETE FROM thread_members WHERE user_id = ?`,
 			`DELETE FROM poll_votes WHERE user_id = ?`,
 			`DELETE FROM invites WHERE inviter_id = ?`,
 			`DELETE FROM guest_links WHERE creator_id = ?`,

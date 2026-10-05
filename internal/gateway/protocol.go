@@ -161,6 +161,21 @@ const (
 	// server and sealed as its writer sent it; a big one goes by its number
 	// alone, for the others to fetch.
 	EvNoteCRDT = "note_crdt"
+
+	// EvAuditLogEntry is a new line in a server's audit log, for those who may read it.
+	EvAuditLogEntry = "audit_log_entry"
+	// EvAutomodEvent is AutoMod acting in a server, for those who may read its log.
+	EvAutomodEvent = "automod_event"
+	// EvAutomodRulesUpdate says a server's AutoMod rules changed, so members' apps fetch them again.
+	EvAutomodRulesUpdate = "automod_rules_update"
+	// EvFollowsUpdate says which announcement channels a channel follows changed.
+	EvFollowsUpdate = "follows_update"
+	// EvThreadCreate is a thread someone can now see: started, or opened to them.
+	EvThreadCreate = "thread_create"
+	// EvThreadDelete is a thread gone, or no longer visible to whoever gets it.
+	EvThreadDelete = "thread_delete"
+	// EvThreadMembersUpdate is people joining or leaving a thread, with how many are in it now.
+	EvThreadMembersUpdate = "thread_members_update"
 )
 
 // Presence is a user's visible status.

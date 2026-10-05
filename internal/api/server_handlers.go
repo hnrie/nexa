@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -101,13 +102,22 @@ func (s *Server) serverCtx(w http.ResponseWriter, r *http.Request, need perms.Pe
 }
 
 func (s *Server) audit(r *http.Request, serverID, actor ids.ID, action, targetType string, target *ids.ID, changes any, reason string) {
+	s.auditAs(r.Context(), serverID, actor, action, targetType, target, changes, reason)
+}
+
+// auditAs is audit outside a request's own handling. Every entry also goes
+// at once to the members who may read the log, so an open log keeps up.
+func (s *Server) auditAs(ctx context.Context, serverID, actor ids.ID, action, targetType string, target *ids.ID, changes any, reason string) {
 	var raw json.RawMessage
 	if changes != nil {
 		raw, _ = json.Marshal(changes)
 	}
-	if err := s.Store.Audit(r.Context(), &store.AuditEntry{ServerID: serverID, ActorID: actor, Action: action, TargetType: targetType, TargetID: target, Changes: raw, Reason: reason}); err != nil {
+	e := &store.AuditEntry{ServerID: serverID, ActorID: actor, Action: action, TargetType: targetType, TargetID: target, Changes: raw, Reason: reason}
+	if err := s.Store.Audit(ctx, e); err != nil {
 		s.Log.Warn("audit", "err", err)
+		return
 	}
+	s.emitServerWithPerm(ctx, serverID, perms.ViewAuditLog, "audit_log_entry", e)
 }
 
 func (s *Server) emitServer(ctx context.Context, serverID ids.ID, event string, data any) {
@@ -358,6 +368,42 @@ func (s *Server) handleServerPatch(w http.ResponseWriter, r *http.Request) {
 		p.DefaultNotifications = &n
 		changes["default_notifications"] = n
 	}
+	action := "server_update"
+	if v, ok := raw["invites_paused_until"]; ok {
+		// pausing invites stops every way in at once: links, Discovery, the tag
+		if string(v) == "null" {
+			var open *int64
+			p.InvitesPausedUntil = &open
+			action = "invites_resume"
+		} else {
+			var until int64
+			now := time.Now().UnixMilli()
+			if json.Unmarshal(v, &until) != nil || until <= now || until > maxPauseUntil {
+				WriteError(w, E(http.StatusBadRequest, "invalid_pause", "Pause invites until a time in the future."))
+				return
+			}
+			up := &until
+			p.InvitesPausedUntil = &up
+			action = "invites_pause"
+			changes["invites_paused_until"] = until
+		}
+	}
+	for key, dst := range map[string]**int{"verify_account_minutes": &p.VerifyAccountMinutes, "verify_member_minutes": &p.VerifyMemberMinutes} {
+		v, ok := raw[key]
+		if !ok {
+			continue
+		}
+		var n int
+		if json.Unmarshal(v, &n) != nil || n < 0 || n > maxVerifyMinutes {
+			WriteError(w, E(http.StatusBadRequest, "invalid_value", "The wait is between 0 minutes and 30 days."))
+			return
+		}
+		*dst = &n
+		changes[key] = n
+	}
+	if !s.discoveryPatch(w, raw, &p, changes) {
+		return
+	}
 	if err := s.Store.UpdateServer(r.Context(), srv.ID, p); err != nil {
 		WriteError(w, err)
 		return
@@ -371,10 +417,20 @@ func (s *Server) handleServerPatch(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	s.audit(r, srv.ID, me.ID, "server_update", "server", &srv.ID, changes, "")
+	s.audit(r, srv.ID, me.ID, action, "server", &srv.ID, changes, "")
 	s.emitServer(r.Context(), srv.ID, "server_update", updated)
+	if p.InvitesPausedUntil != nil || p.Discoverable != nil || p.DiscoveryHidden != nil {
+		s.forgetCounts(srv.ID)
+	}
 	WriteJSON(w, http.StatusOK, updated)
 }
+
+// maxPauseUntil is as far ahead as invites can be paused: far enough to read
+// as "until resumed".
+const maxPauseUntil = int64(32503680000000) // the year 3000
+
+// maxVerifyMinutes is the longest wait a server can ask of new accounts or members: 30 days.
+const maxVerifyMinutes = 30 * 24 * 60
 
 func (s *Server) handleServerImage(kind string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -504,6 +560,14 @@ func (s *Server) removeMember(r *http.Request, srv *store.Server, uid ids.ID, ev
 			convs = append(convs, c.ID)
 		}
 	}
+	// and every private thread with a key of its own they could read
+	if threads, err := s.Store.PrivateThreads(ctx, srv.ID); err == nil {
+		for _, th := range threads {
+			if _, ok := visible[th.ID]; ok && th.KeyConvID == th.ID {
+				convs = append(convs, th.ID)
+			}
+		}
+	}
 	tr := true
 	remaining, err := s.Store.MemberIDs(ctx, srv.ID)
 	if err != nil {
@@ -628,7 +692,7 @@ func cleanChannelName(name, typ string) (string, bool) {
 	if !ok || clean == "" {
 		return "", false
 	}
-	if typ == "text" {
+	if typ == "text" || typ == store.ChannelAnnouncement || typ == store.ChannelForum {
 		clean = strings.ToLower(strings.Join(strings.Fields(clean), "-"))
 	}
 	return clean, true
@@ -648,8 +712,8 @@ func (s *Server) handleServerChannelCreate(w http.ResponseWriter, r *http.Reques
 		WriteError(w, err)
 		return
 	}
-	if !OneOf(req.Type, "text", "voice", "category") {
-		WriteError(w, E(http.StatusBadRequest, "invalid_type", "type must be text, voice or category."))
+	if !OneOf(req.Type, "text", "voice", "category", store.ChannelAnnouncement, store.ChannelForum) {
+		WriteError(w, E(http.StatusBadRequest, "invalid_type", "type must be text, voice, announcement, forum or category."))
 		return
 	}
 	name, ok := cleanChannelName(req.Name, req.Type)
@@ -779,20 +843,27 @@ func (s *Server) handleServerChannelPositions(w http.ResponseWriter, r *http.Req
 
 // handleServerChannelPatch backs PATCH /channels/{id} for server channels.
 func (s *Server) handleServerChannelPatch(w http.ResponseWriter, r *http.Request, ch *store.Channel, me *store.User) {
+	if store.IsThread(ch.Type) {
+		s.threadPatch(w, r, ch, me)
+		return
+	}
 	p, _, err := s.Store.ChannelPerms(r.Context(), ch.ID, me.ID)
 	if err != nil || !p.Has(perms.ManageChannels) {
 		WriteError(w, E(http.StatusForbidden, "missing_permission", "You need Manage Channels to edit this channel."))
 		return
 	}
 	var req struct {
-		Name            *string `json:"name"`
-		Topic           *string `json:"topic"`
-		NSFW            *bool   `json:"nsfw"`
-		SlowmodeSeconds *int    `json:"slowmode_seconds"`
-		UserLimit       *int    `json:"user_limit"`
-		Glyph           *string `json:"glyph"`
+		Name               *string              `json:"name"`
+		Topic              *string              `json:"topic"`
+		NSFW               *bool                `json:"nsfw"`
+		SlowmodeSeconds    *int                 `json:"slowmode_seconds"`
+		UserLimit          *int                 `json:"user_limit"`
+		Glyph              *string              `json:"glyph"`
+		Type               *string              `json:"type"`
+		DefaultAutoArchive *int                 `json:"default_auto_archive"`
+		Forum              *store.ForumSettings `json:"forum"`
 	}
-	if err := ReadJSON(w, r, &req, 8<<10); err != nil {
+	if err := ReadJSON(w, r, &req, 64<<10); err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -808,13 +879,61 @@ func (s *Server) handleServerChannelPatch(w http.ResponseWriter, r *http.Request
 		changes["name"] = name
 	}
 	if req.Topic != nil {
-		topic, ok := CleanText(*req.Topic, maxTopic)
+		// a forum's topic is its post guidelines, which run longer
+		limit := maxTopic
+		if ch.Type == store.ChannelForum {
+			limit = maxForumTopic
+		}
+		topic, ok := CleanText(*req.Topic, limit)
 		if !ok {
-			WriteError(w, E(http.StatusBadRequest, "invalid_topic", "Topics are at most 1024 characters."))
+			WriteError(w, E(http.StatusBadRequest, "invalid_topic", fmt.Sprintf("Topics are at most %d characters.", limit)))
 			return
 		}
 		patch.Topic = &topic
 		changes["topic"] = topic
+	}
+	if req.Type != nil && *req.Type != ch.Type {
+		// a text channel can become an announcement channel and back; the
+		// rest keep what they are
+		if !(ch.Type == "text" && *req.Type == store.ChannelAnnouncement) && !(ch.Type == store.ChannelAnnouncement && *req.Type == "text") {
+			WriteError(w, E(http.StatusBadRequest, "invalid_type", "Only a text channel becomes an announcement channel, and back."))
+			return
+		}
+		if *req.Type == "text" {
+			if n, _ := s.Store.FollowerCount(r.Context(), ch.ID); n > 0 {
+				WriteError(w, E(http.StatusBadRequest, "has_followers", "Other servers follow this channel. It stays an announcement channel while they do."))
+				return
+			}
+		}
+		patch.Type = req.Type
+		changes["type"] = *req.Type
+	}
+	if req.DefaultAutoArchive != nil {
+		if !store.HoldsThreads(ch.Type) || !validAutoArchive(*req.DefaultAutoArchive) {
+			WriteError(w, E(http.StatusBadRequest, "invalid_auto_archive", "Threads close after an hour, a day, three days or a week without messages."))
+			return
+		}
+		patch.AutoArchive = req.DefaultAutoArchive
+		changes["default_auto_archive"] = *req.DefaultAutoArchive
+	}
+	if req.Forum != nil {
+		if ch.Type != store.ChannelForum {
+			WriteError(w, E(http.StatusBadRequest, "not_forum", "Only a forum has forum settings."))
+			return
+		}
+		f, ferr := cleanForum(ch.Forum, req.Forum)
+		if ferr != nil {
+			WriteError(w, ferr)
+			return
+		}
+		if f.DefaultReaction != "" {
+			if _, ok := parseEmoji(f.DefaultReaction); !ok {
+				WriteError(w, E(http.StatusBadRequest, "bad_emoji", "The default reaction is one emoji."))
+				return
+			}
+		}
+		patch.Forum = f
+		changes["forum"] = map[string]any{"tags": len(f.Tags), "require_tag": f.RequireTag, "sort": f.Sort, "layout": f.Layout, "default_reaction": f.DefaultReaction}
 	}
 	if req.NSFW != nil {
 		patch.NSFW = req.NSFW
@@ -894,6 +1013,10 @@ func (s *Server) handleServerChannelDelete(w http.ResponseWriter, r *http.Reques
 	p, _, err := s.Store.ChannelPerms(r.Context(), ch.ID, me.ID)
 	if err != nil || p == 0 {
 		WriteError(w, ErrNotFound)
+		return
+	}
+	if store.IsThread(ch.Type) {
+		s.threadDelete(w, r, ch, me)
 		return
 	}
 	if !p.Has(perms.ManageChannels) {
@@ -1190,6 +1313,26 @@ type roleBody struct {
 	Hoist       *bool       `json:"hoist"`
 	Mentionable *bool       `json:"mentionable"`
 	Permissions *perms.Perm `json:"permissions"`
+	// the second and third colours of a gradient or shimmer: a number, or
+	// null to go back to one colour
+	Color2    json.RawMessage `json:"color2"`
+	Color3    json.RawMessage `json:"color3"`
+	IconEmoji *string         `json:"icon_emoji"`
+}
+
+// roleColor reads an optional role colour: absent, null, or 0–0xFFFFFF.
+func roleColor(raw json.RawMessage) (set bool, v *int, ok bool) {
+	if len(raw) == 0 {
+		return false, nil, true
+	}
+	if string(raw) == "null" {
+		return true, nil, true
+	}
+	var n int
+	if json.Unmarshal(raw, &n) != nil || n < 0 || n > 0xFFFFFF {
+		return true, nil, false
+	}
+	return true, &n, true
 }
 
 func (s *Server) handleRoleCreate(w http.ResponseWriter, r *http.Request) {
@@ -1323,6 +1466,38 @@ func (s *Server) handleRolePatch(w http.ResponseWriter, r *http.Request) {
 		p.Mentionable = req.Mentionable
 		changes["mentionable"] = *req.Mentionable
 	}
+	for key, raw := range map[string]json.RawMessage{"color2": req.Color2, "color3": req.Color3} {
+		set, v, ok := roleColor(raw)
+		if !ok {
+			WriteError(w, E(http.StatusBadRequest, "invalid_color", key+" must be 0–16777215 or null."))
+			return
+		}
+		if !set {
+			continue
+		}
+		if key == "color2" {
+			p.Color2 = &v
+		} else {
+			p.Color3 = &v
+		}
+		changes[key] = v
+	}
+	if req.IconEmoji != nil && role.ID != srv.ID {
+		icon, ok := s.roleEmoji(r.Context(), srv.ID, *req.IconEmoji)
+		if !ok {
+			WriteError(w, E(http.StatusBadRequest, "invalid_icon", "A role's icon is one emoji, or one of this server's own."))
+			return
+		}
+		p.IconEmoji = &icon
+		changes["icon_emoji"] = icon
+		// an emoji takes the place of a picture
+		if icon != "" && role.IconID != nil {
+			if err := s.Store.SwapRoleIcon(r.Context(), role.ID, nil); err != nil {
+				WriteError(w, err)
+				return
+			}
+		}
+	}
 	if req.Permissions != nil {
 		diff := *req.Permissions ^ role.Permissions
 		if actorPerms != perms.All && (diff&^actorPerms) != 0 {
@@ -1356,6 +1531,30 @@ func (s *Server) handleRolePatch(w http.ResponseWriter, r *http.Request) {
 		s.syncVisibility(r.Context(), srv.ID, before, nil)
 	}
 	WriteJSON(w, http.StatusOK, updated)
+}
+
+// roleEmoji checks a role's emoji icon: "" for none, a single emoji, or
+// "custom:<id>" naming one of the server's own emoji.
+func (s *Server) roleEmoji(ctx context.Context, serverID ids.ID, raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", true
+	}
+	if rest, ok := strings.CutPrefix(raw, "custom:"); ok {
+		id, err := ids.Parse(rest)
+		if err != nil {
+			return "", false
+		}
+		e, err := s.Store.EmojiByID(ctx, id)
+		if err != nil || e.ServerID != serverID {
+			return "", false
+		}
+		return "custom:" + id.String(), true
+	}
+	if len(raw) > maxEmojiLen || !isEmojiSequence(raw) {
+		return "", false
+	}
+	return raw, true
 }
 
 func (s *Server) handleRoleDelete(w http.ResponseWriter, r *http.Request) {
@@ -1572,6 +1771,114 @@ func (s *Server) handleMemberPatch(w http.ResponseWriter, r *http.Request) {
 		}
 		changes["timeout_until"] = string(v)
 	}
+	// a member's profile in this server: their own to write; a moderator may
+	// only clear someone else's
+	for key, max := range map[string]int{"bio": maxAboutMe, "pronouns": maxPronouns} {
+		v, ok := raw[key]
+		if !ok {
+			continue
+		}
+		var text string
+		if string(v) != "null" && json.Unmarshal(v, &text) != nil {
+			WriteError(w, E(http.StatusBadRequest, "invalid_"+key, "That is malformed."))
+			return
+		}
+		if !self {
+			if text != "" || !actorPerms.Has(perms.ManageNicknames) || !s.canActOn(r.Context(), srv, me.ID, m.UserID) {
+				WriteError(w, E(http.StatusForbidden, "missing_permission", "You can only reset someone else's server profile."))
+				return
+			}
+		}
+		clean, ok := CleanText(text, max)
+		if !ok {
+			WriteError(w, E(http.StatusBadRequest, "invalid_"+key, fmt.Sprintf("That is at most %d characters.", max)))
+			return
+		}
+		if key == "bio" {
+			patch.Bio = &clean
+		} else {
+			patch.Pronouns = &clean
+		}
+		if !self {
+			changes[key] = clean
+		}
+	}
+	// the profile's theme in this server: the member's own to choose, a
+	// moderator's only to clear
+	for _, key := range []string{"accent_color", "accent_color_2"} {
+		v, ok := raw[key]
+		if !ok {
+			continue
+		}
+		_, color, ok := roleColor(v)
+		if !ok {
+			WriteError(w, E(http.StatusBadRequest, "invalid_color", key+" must be 0–16777215 or null."))
+			return
+		}
+		if !self && (color != nil || !actorPerms.Has(perms.ManageNicknames) || !s.canActOn(r.Context(), srv, me.ID, m.UserID)) {
+			WriteError(w, E(http.StatusForbidden, "missing_permission", "You can only reset someone else's server profile."))
+			return
+		}
+		if key == "accent_color" {
+			patch.AccentColor = &color
+		} else {
+			patch.AccentColor2 = &color
+		}
+		if !self {
+			changes[key] = nil
+		}
+	}
+	// its widgets: a list of the member's own for this server, or null for
+	// the ones on their account
+	widgetsSet := false
+	var widgets *string
+	if v, ok := raw["widgets"]; ok {
+		if string(v) == "null" {
+			if !self && (!actorPerms.Has(perms.ManageNicknames) || !s.canActOn(r.Context(), srv, me.ID, m.UserID)) {
+				WriteError(w, E(http.StatusForbidden, "missing_permission", "You can only reset someone else's server profile."))
+				return
+			}
+		} else {
+			if !self {
+				WriteError(w, E(http.StatusForbidden, "missing_permission", "You can only reset someone else's server profile."))
+				return
+			}
+			// every save is shown to everyone who opens the profile there
+			if ok, retry := s.limProfile.Allow("profile:" + me.ID.String()); !ok {
+				w.Header().Set("Retry-After", retryAfter(retry))
+				WriteError(w, ErrRateLimited)
+				return
+			}
+			before, err := s.Store.MemberWidgets(r.Context(), srv.ID, m.UserID)
+			if err != nil {
+				WriteError(w, err)
+				return
+			}
+			was := ""
+			if before != nil {
+				was = *before
+			}
+			clean, problem := s.cleanWidgets(r.Context(), v, was)
+			if problem != "" {
+				WriteError(w, E(http.StatusBadRequest, "invalid_widgets", problem))
+				return
+			}
+			widgets = &clean
+		}
+		widgetsSet = true
+		if !self {
+			changes["widgets"] = nil
+		}
+	}
+	if v, ok := raw["quarantined"]; ok {
+		var on bool
+		if json.Unmarshal(v, &on) != nil || on || self || !actorPerms.Has(perms.ModerateMembers) || !s.canActOn(r.Context(), srv, me.ID, m.UserID) {
+			WriteError(w, E(http.StatusForbidden, "missing_permission", "You can let someone out of quarantine with Time Out Members."))
+			return
+		}
+		mine := me.ID
+		s.setQuarantine(r, srv, m.UserID, false, &mine, "")
+	}
 	var newRoles []ids.ID
 	rolesSet := false
 	if v, ok := raw["roles"]; ok {
@@ -1625,8 +1932,18 @@ func (s *Server) handleMemberPatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if patch.Nickname != nil || patch.TimeoutUntil != nil {
+	if patch.Nickname != nil || patch.TimeoutUntil != nil || patch.Bio != nil || patch.Pronouns != nil || patch.AccentColor != nil || patch.AccentColor2 != nil {
 		if err := s.Store.UpdateMember(r.Context(), srv.ID, m.UserID, patch); err != nil {
+			WriteError(w, err)
+			return
+		}
+	}
+	if widgetsSet {
+		if err := s.Store.SetMemberWidgets(r.Context(), srv.ID, m.UserID, widgets); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				WriteError(w, E(http.StatusBadRequest, "invalid_widgets", "One of those pictures has gone. Put it up again."))
+				return
+			}
 			WriteError(w, err)
 			return
 		}
@@ -1646,10 +1963,21 @@ func (s *Server) handleMemberPatch(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	s.audit(r, srv.ID, me.ID, "member_update", "user", &m.UserID, changes, "")
+	// a member's own profile changes are theirs, not the log's
+	if len(changes) > 0 {
+		action := "member_update"
+		if _, ok := changes["timeout_until"]; ok && len(changes) == 1 {
+			action = map[bool]string{true: "member_timeout_remove", false: "member_timeout"}[patch.TimeoutUntil != nil && *patch.TimeoutUntil == nil]
+		}
+		s.audit(r, srv.ID, me.ID, action, "user", &m.UserID, changes, "")
+	}
 	s.emitServer(r.Context(), srv.ID, "member_update", updated)
 	if rolesSet || patch.TimeoutUntil != nil {
 		s.syncVisibility(r.Context(), srv.ID, before, nil)
+	}
+	// AutoMod reads a nickname or a server profile when it changes
+	if patch.Nickname != nil || patch.Bio != nil || patch.Pronouns != nil {
+		s.checkProfileRules(r, srv, m.UserID)
 	}
 	if rolesSet {
 		// a tag kept to some roles comes off whoever no longer has one
@@ -2044,7 +2372,7 @@ func (s *Server) handleInvitePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	count, online := s.counts(r.Context(), srv.ID)
-	resp := map[string]any{"code": in.Code, "server": map[string]any{"id": srv.ID, "name": srv.Name, "icon_id": srv.IconID, "banner_id": srv.BannerID, "description": srv.Description, "member_count": count, "online_count": online}, "expires_at": in.ExpiresAt}
+	resp := map[string]any{"code": in.Code, "server": map[string]any{"id": srv.ID, "name": srv.Name, "icon_id": srv.IconID, "banner_id": srv.BannerID, "description": srv.Description, "member_count": count, "online_count": online}, "expires_at": in.ExpiresAt, "joins_paused": joinsPaused(srv)}
 	if in.ChannelID != nil {
 		if ch, err := s.Store.ChannelByID(r.Context(), *in.ChannelID); err == nil {
 			resp["channel"] = map[string]any{"id": ch.ID, "name": ch.Name, "type": ch.Type}
@@ -2075,13 +2403,17 @@ func (s *Server) handleInviteJoin(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
 		return
 	}
-	// the ban check and the invite use happen with the insert, so neither a
-	// ban written a moment ago nor a used-up invite can be slipped past
+	// the ban check, the pause and the invite use happen with the insert, so
+	// neither a ban or pause written a moment ago nor a used-up invite can be
+	// slipped past
 	s.forgetCounts(srv.ID)
 	member, err := s.Store.JoinByInvite(r.Context(), srv.ID, me.ID, in.Code)
 	switch {
 	case errors.Is(err, store.ErrBanned):
 		WriteError(w, E(http.StatusForbidden, "banned", "You are banned from this server."))
+		return
+	case errors.Is(err, store.ErrJoinsPaused):
+		WriteError(w, errJoinsPaused)
 		return
 	case errors.Is(err, store.ErrNotFound):
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
@@ -2093,25 +2425,13 @@ func (s *Server) handleInviteJoin(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusOK
 	if err == nil {
 		status = http.StatusCreated
-		s.emitServer(r.Context(), srv.ID, "member_add", map[string]any{"server_id": srv.ID, "member": member, "user": me.Public()})
-		// the people already here have never seen this user's presence
-		s.Bcast.PresenceChanged(me.ID)
-		if srv.SystemChannelID != nil {
-			if ch, err := s.Store.ChannelByID(r.Context(), *srv.SystemChannelID); err == nil {
-				s.systemMessage(r, ch, me.ID, "system_join", []ids.ID{me.ID}, nil)
+		// the invite kept for the server's tag is joining from the tag
+		if srv.Tag != nil && srv.Tag.Invite == in.Code {
+			if err := s.Store.SetJoinMethod(r.Context(), srv.ID, me.ID, "tag"); err == nil {
+				member.JoinMethod = "tag"
 			}
 		}
-		s.Bcast.KeysMaybeNeeded(srv.ID)
-		// channels with keys of their own the newcomer can see need grants too
-		if visible, err := s.Store.ViewableServerChannels(r.Context(), srv.ID, me.ID); err == nil {
-			if chans, err := s.Store.ServerChannels(r.Context(), srv.ID); err == nil {
-				for _, c := range chans {
-					if _, ok := visible[c.ID]; ok && c.KeyConvID == c.ID {
-						s.Bcast.KeysMaybeNeeded(c.ID)
-					}
-				}
-			}
-		}
+		s.joined(r, srv, me, member)
 	}
 	view, users, err := s.serverView(r.Context(), srv, me.ID)
 	if err != nil {
@@ -2122,6 +2442,34 @@ func (s *Server) handleInviteJoin(w http.ResponseWriter, r *http.Request) {
 		s.Bcast.EmitUsers([]ids.ID{me.ID}, "server_create", serverCreateEvent{view, users})
 	}
 	WriteJSON(w, status, map[string]any{"server": view, "users": users})
+}
+
+// joined tells everyone about someone who has just come into a server, by
+// whatever way: the members see them, the system channel greets them, the
+// server's checks run on their name, and keys are asked for on their behalf.
+func (s *Server) joined(r *http.Request, srv *store.Server, me *store.User, member *store.Member) {
+	ctx := r.Context()
+	s.emitServer(ctx, srv.ID, "member_add", map[string]any{"server_id": srv.ID, "member": member, "user": me.Public()})
+	// the people already here have never seen this user's presence
+	s.Bcast.PresenceChanged(me.ID)
+	if srv.SystemChannelID != nil {
+		if ch, err := s.Store.ChannelByID(ctx, *srv.SystemChannelID); err == nil {
+			s.systemMessage(r, ch, me.ID, "system_join", []ids.ID{me.ID}, nil)
+		}
+	}
+	// AutoMod reads the newcomer's name before anyone else has to
+	s.checkProfileRules(r, srv, me.ID)
+	s.Bcast.KeysMaybeNeeded(srv.ID)
+	// channels with keys of their own the newcomer can see need grants too
+	if visible, err := s.Store.ViewableServerChannels(ctx, srv.ID, me.ID); err == nil {
+		if chans, err := s.Store.ServerChannels(ctx, srv.ID); err == nil {
+			for _, c := range chans {
+				if _, ok := visible[c.ID]; ok && c.KeyConvID == c.ID {
+					s.Bcast.KeysMaybeNeeded(c.ID)
+				}
+			}
+		}
+	}
 }
 
 func (s *Server) handleInviteDelete(w http.ResponseWriter, r *http.Request) {
@@ -2181,9 +2529,20 @@ func (s *Server) handleAuditLog(w http.ResponseWriter, r *http.Request) {
 	if srv == nil {
 		return
 	}
-	before, _ := ids.Parse(r.URL.Query().Get("before"))
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	entries, err := s.Store.AuditEntries(r.Context(), srv.ID, before, limit)
+	q := r.URL.Query()
+	before, _ := ids.Parse(q.Get("before"))
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	var f store.AuditFilter
+	if a := strings.TrimSpace(q.Get("action")); a != "" {
+		f.Actions = strings.Split(a, ",")
+	}
+	if id, err := ids.Parse(q.Get("actor_id")); err == nil {
+		f.Actor = &id
+	}
+	if id, err := ids.Parse(q.Get("target_id")); err == nil {
+		f.Target = &id
+	}
+	entries, err := s.Store.AuditEntriesFor(r.Context(), srv.ID, f, before, limit)
 	if err != nil {
 		WriteError(w, err)
 		return

@@ -21,6 +21,8 @@ const (
 	NeedWebhooks = "webhooks"
 	// NeedPolls is Create Polls in the channel.
 	NeedPolls = "polls"
+	// NeedExternalEmoji is Use External Emojis in the channel.
+	NeedExternalEmoji = "external_emoji"
 )
 
 // channel loads the channel from the path and checks the caller may act in it.

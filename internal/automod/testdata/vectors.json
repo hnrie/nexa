@@ -1,0 +1,292 @@
+[
+ {
+  "name": "whole word",
+  "words": [
+   "cat"
+  ],
+  "text": "a cat sat",
+  "match": "cat",
+  "regex": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "whole word is not part of one",
+  "words": [
+   "cat"
+  ],
+  "text": "concatenate",
+  "match": null,
+  "regex": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "prefix",
+  "words": [
+   "cat*"
+  ],
+  "text": "get a catsitter",
+  "match": "cat*",
+  "regex": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "prefix needs the start",
+  "words": [
+   "cat*"
+  ],
+  "text": "bobcat",
+  "match": null,
+  "regex": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "suffix",
+  "words": [
+   "*cat"
+  ],
+  "text": "cool bobcat",
+  "match": "*cat",
+  "regex": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "anywhere",
+  "words": [
+   "*ana*"
+  ],
+  "text": "bananas",
+  "match": "*ana*",
+  "regex": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "phrase",
+  "words": [
+   "this is bananas"
+  ],
+  "text": "wow this is bananas lol",
+  "match": "this is bananas",
+  "regex": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "phrase needs every word",
+  "words": [
+   "this is bananas"
+  ],
+  "text": "is bananas",
+  "match": null,
+  "regex": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "case",
+  "words": [
+   "Cat"
+  ],
+  "text": "CAT!",
+  "match": "cat",
+  "regex": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "allowed word is left alone",
+  "words": [
+   "ass*"
+  ],
+  "allow": [
+   "assassin"
+  ],
+  "text": "an assassin",
+  "match": null,
+  "regex": [],
+  "evasion": true
+ },
+ {
+  "name": "allowed word does not hide others",
+  "words": [
+   "ass*"
+  ],
+  "allow": [
+   "assassin"
+  ],
+  "text": "assassin asshat",
+  "match": "ass*",
+  "regex": [],
+  "evasion": true
+ },
+ {
+  "name": "accents",
+  "words": [
+   "fuck*"
+  ],
+  "evasion": true,
+  "text": "what the fûck",
+  "match": "fuck*",
+  "regex": [],
+  "allow": []
+ },
+ {
+  "name": "numbers for letters",
+  "words": [
+   "cat"
+  ],
+  "evasion": true,
+  "text": "a c4t",
+  "match": "cat",
+  "regex": [],
+  "allow": []
+ },
+ {
+  "name": "stretched letters",
+  "words": [
+   "cat"
+  ],
+  "evasion": true,
+  "text": "caaaat",
+  "match": "cat",
+  "regex": [],
+  "allow": []
+ },
+ {
+  "name": "doubled letters stay doubled",
+  "words": [
+   "ass"
+  ],
+  "evasion": true,
+  "text": "as far as i know",
+  "match": null,
+  "regex": [],
+  "allow": []
+ },
+ {
+  "name": "doubled letters stretched",
+  "words": [
+   "ass"
+  ],
+  "evasion": true,
+  "text": "you asss",
+  "match": "ass",
+  "regex": [],
+  "allow": []
+ },
+ {
+  "name": "spaced letters",
+  "words": [
+   "cat"
+  ],
+  "evasion": true,
+  "text": "a c a t here",
+  "match": "cat",
+  "regex": [],
+  "allow": []
+ },
+ {
+  "name": "dotted letters",
+  "words": [
+   "cat"
+  ],
+  "evasion": true,
+  "text": "c.a.t",
+  "match": "cat",
+  "regex": [],
+  "allow": []
+ },
+ {
+  "name": "invisible characters",
+  "words": [
+   "cat"
+  ],
+  "evasion": true,
+  "text": "c​at",
+  "match": "cat",
+  "regex": [],
+  "allow": []
+ },
+ {
+  "name": "look-alike letters",
+  "words": [
+   "cat"
+  ],
+  "evasion": true,
+  "text": "саt",
+  "match": "cat",
+  "regex": [],
+  "allow": []
+ },
+ {
+  "name": "without evasion only plain spellings",
+  "words": [
+   "cat"
+  ],
+  "evasion": false,
+  "text": "c4t",
+  "match": null,
+  "regex": [],
+  "allow": []
+ },
+ {
+  "name": "pattern",
+  "regex": [
+   "(b|c)at"
+  ],
+  "text": "a bat",
+  "match": "bat",
+  "words": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "pattern ignores case",
+  "regex": [
+   "hello\\s+world"
+  ],
+  "text": "HELLO   World",
+  "match": "HELLO   World",
+  "words": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "nothing",
+  "words": [
+   "cat"
+  ],
+  "text": "   ",
+  "match": null,
+  "regex": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "word between punctuation",
+  "words": [
+   "cat"
+  ],
+  "text": "(cat)",
+  "match": "cat",
+  "regex": [],
+  "allow": [],
+  "evasion": true
+ },
+ {
+  "name": "apostrophes belong to words",
+  "words": [
+   "cat"
+  ],
+  "text": "cat's",
+  "match": null,
+  "regex": [],
+  "allow": [],
+  "evasion": true
+ }
+]

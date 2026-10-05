@@ -232,6 +232,10 @@ var keyColumns = []struct{ table, cols string }{
 	// a linked Discord account's sealed tokens: ones that came across wrong
 	// cannot put it back in the activity server
 	{"discord_links", "user_id, discord_id, access_sealed, refresh_sealed"},
+	// a followed announcement channel's key pair: the public half posts are
+	// sealed to, and the private half sealed for the channel that follows;
+	// either one wrong and the posts it gets can no longer be read
+	{"channel_follows", "id, source_id, target_id, public_key, secret"},
 	// a note's key, sealed to each person in it, to each one asked in and for
 	// each link, and its earlier keys: one that came across wrong is a note
 	// somebody can no longer open, or a version nobody can

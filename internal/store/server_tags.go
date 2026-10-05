@@ -30,13 +30,48 @@ type ServerTag struct {
 
 const serverTagCols = `tag_text, tag_badge, tag_color, tag_roles, tag_invite`
 
-// scanServerTagged reads serverCols followed by serverTagCols.
+// serverCommunityCols are a server's invite pause, Discovery listing and
+// safety settings, read after serverTagCols.
+const serverCommunityCols = `invites_paused_until, discoverable, discovery_category, discovery_tags, discovery_language, discovery_since, discovery_hidden, verify_account_minutes, verify_member_minutes, automod_at`
+
+// communityScan holds what serverCommunityCols scan into until it is put on a Server.
+type communityScan struct {
+	paused, since                   sql.NullInt64
+	discoverable, hidden            int64
+	category, tags, language        string
+	verifyAccount, verifyMembership int
+	automodAt                       int64
+}
+
+func (c *communityScan) dest() []any {
+	return []any{&c.paused, &c.discoverable, &c.category, &c.tags, &c.language, &c.since, &c.hidden, &c.verifyAccount, &c.verifyMembership, &c.automodAt}
+}
+
+func (c *communityScan) apply(s *Server) {
+	s.InvitesPausedUntil = int64Ptr(c.paused)
+	s.Discoverable, s.DiscoveryHidden = c.discoverable == 1, c.hidden == 1
+	s.DiscoveryCategory, s.DiscoveryLanguage = c.category, c.language
+	s.DiscoveryTags = []string{}
+	if c.tags != "" {
+		var list []string
+		if json.Unmarshal([]byte(c.tags), &list) == nil {
+			s.DiscoveryTags = list
+		}
+	}
+	s.DiscoverySince = int64Ptr(c.since)
+	s.VerifyAccountMinutes, s.VerifyMemberMinutes = c.verifyAccount, c.verifyMembership
+	s.AutomodAt = c.automodAt
+}
+
+// scanServerTagged reads serverCols followed by serverTagCols and serverCommunityCols.
 func scanServerTagged(r rowScanner) (*Server, error) {
 	var s Server
 	var icon, banner, sys, tagColor sql.NullInt64
 	var tagText, tagBadge, tagRoles, tagInvite string
-	if err := r.Scan(&s.ID, &s.Name, &icon, &banner, &s.OwnerID, &s.Description, &sys, &s.DefaultNotifications, &s.Flags, &s.CreatedAt,
-		&tagText, &tagBadge, &tagColor, &tagRoles, &tagInvite); err != nil {
+	var c communityScan
+	dest := append([]any{&s.ID, &s.Name, &icon, &banner, &s.OwnerID, &s.Description, &sys, &s.DefaultNotifications, &s.Flags, &s.CreatedAt,
+		&tagText, &tagBadge, &tagColor, &tagRoles, &tagInvite}, c.dest()...)
+	if err := r.Scan(dest...); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
 		}
@@ -44,6 +79,7 @@ func scanServerTagged(r rowScanner) (*Server, error) {
 	}
 	s.IconID, s.BannerID, s.SystemChannelID = idPtr(icon), idPtr(banner), idPtr(sys)
 	s.Tag = tagOf(tagText, tagBadge, tagColor, tagRoles, tagInvite)
+	c.apply(&s)
 	return &s, nil
 }
 

@@ -42,20 +42,38 @@ const (
 	ManageRoles         Perm = 1 << 28
 	ManageWebhooks      Perm = 1 << 29
 	ManageEmojis        Perm = 1 << 30
+	UseExternalEmojis   Perm = 1 << 18
 	ModerateMembers     Perm = 1 << 40
 	UseSoundboard       Perm = 1 << 42
 	CreatePolls         Perm = 1 << 49
+	// Threads: whoever may see a channel may see its public threads; these say
+	// who may start them, talk in them, and look after them (rename, close,
+	// lock, delete, see every private one).
+	ManageThreads         Perm = 1 << 34
+	CreatePublicThreads   Perm = 1 << 35
+	CreatePrivateThreads  Perm = 1 << 36
+	UseExternalStickers   Perm = 1 << 37
+	SendMessagesInThreads Perm = 1 << 38
+	// CreateExpressions lets a member add emoji and stickers, and change or
+	// remove the ones they added; ManageEmojis covers everyone's.
+	CreateExpressions Perm = 1 << 43
+	// PinMessages is pinning and unpinning, apart from Manage Messages.
+	PinMessages Perm = 1 << 51
+	// BypassSlowmode sends without waiting out a channel's slow mode.
+	BypassSlowmode Perm = 1 << 52
 )
 
 // All is every permission this server knows.
 const All = CreateInstantInvite | KickMembers | BanMembers | Administrator | ManageChannels | ManageServer | AddReactions | ViewAuditLog |
 	PrioritySpeaker | Stream | ViewChannel | SendMessages | ManageMessages | EmbedLinks | AttachFiles | ReadMessageHistory | MentionEveryone |
-	Connect | Speak | MuteMembers | DeafenMembers | MoveMembers | UseVAD | ChangeNickname | ManageNicknames | ManageRoles | ManageWebhooks |
-	ManageEmojis | ModerateMembers | UseSoundboard | CreatePolls
+	UseExternalEmojis | Connect | Speak | MuteMembers | DeafenMembers | MoveMembers | UseVAD | ChangeNickname | ManageNicknames | ManageRoles |
+	ManageWebhooks | ManageEmojis | ManageThreads | CreatePublicThreads | CreatePrivateThreads | UseExternalStickers | SendMessagesInThreads |
+	ModerateMembers | UseSoundboard | CreateExpressions | CreatePolls | PinMessages | BypassSlowmode
 
 // DefaultEveryone is what a fresh server's @everyone role gets.
 const DefaultEveryone = CreateInstantInvite | AddReactions | Stream | ViewChannel | SendMessages | EmbedLinks | AttachFiles |
-	ReadMessageHistory | Connect | Speak | UseVAD | ChangeNickname | UseSoundboard | CreatePolls
+	ReadMessageHistory | UseExternalEmojis | Connect | Speak | UseVAD | ChangeNickname | UseSoundboard | CreatePolls |
+	CreatePublicThreads | CreatePrivateThreads | UseExternalStickers | SendMessagesInThreads
 
 // TimedOutKeep is all a timed-out member retains.
 const TimedOutKeep = ViewChannel | ReadMessageHistory
@@ -69,7 +87,9 @@ var Names = map[string]Perm{
 	"MENTION_EVERYONE": MentionEveryone, "CONNECT": Connect, "SPEAK": Speak, "MUTE_MEMBERS": MuteMembers, "DEAFEN_MEMBERS": DeafenMembers,
 	"MOVE_MEMBERS": MoveMembers, "USE_VAD": UseVAD, "CHANGE_NICKNAME": ChangeNickname, "MANAGE_NICKNAMES": ManageNicknames,
 	"MANAGE_ROLES": ManageRoles, "MANAGE_WEBHOOKS": ManageWebhooks, "MANAGE_EMOJIS": ManageEmojis, "MODERATE_MEMBERS": ModerateMembers, "USE_SOUNDBOARD": UseSoundboard,
-	"CREATE_POLLS": CreatePolls,
+	"CREATE_POLLS": CreatePolls, "USE_EXTERNAL_EMOJIS": UseExternalEmojis, "MANAGE_THREADS": ManageThreads, "CREATE_PUBLIC_THREADS": CreatePublicThreads,
+	"CREATE_PRIVATE_THREADS": CreatePrivateThreads, "USE_EXTERNAL_STICKERS": UseExternalStickers, "SEND_MESSAGES_IN_THREADS": SendMessagesInThreads,
+	"CREATE_EXPRESSIONS": CreateExpressions, "PIN_MESSAGES": PinMessages, "BYPASS_SLOWMODE": BypassSlowmode,
 }
 
 // MarshalJSON writes the bitset as a decimal string.
@@ -117,12 +137,18 @@ type Overwrite struct {
 	Deny     Perm
 }
 
-// Member is the part of a membership the resolver needs.
+// Member is the part of a membership the resolver needs. A member AutoMod
+// has quarantined keeps only what a timed-out one does, until a moderator
+// lets them out or what caught them is gone.
 type Member struct {
-	UserID   ids.ID
-	RoleIDs  []ids.ID
-	TimedOut bool
+	UserID      ids.ID
+	RoleIDs     []ids.ID
+	TimedOut    bool
+	Quarantined bool
 }
+
+// restricted reports whether m keeps only TimedOutKeep.
+func (m Member) restricted() bool { return m.TimedOut || m.Quarantined }
 
 // Base computes server-level permissions: @everyone OR the member's roles,
 // Administrator and ownership granting everything. A timed-out member keeps
@@ -145,7 +171,7 @@ func Base(everyoneID ids.ID, roles []Role, m Member, isOwner bool) Perm {
 	if p.Has(Administrator) {
 		return All
 	}
-	if m.TimedOut {
+	if m.restricted() {
 		p &= TimedOutKeep
 	}
 	return p
@@ -184,11 +210,32 @@ func Compute(everyoneID ids.ID, roles []Role, m Member, isOwner bool, overwrites
 	if memberOW != nil {
 		p = p&^memberOW.Deny | memberOW.Allow
 	}
-	if m.TimedOut {
+	if m.restricted() {
 		p &= TimedOutKeep
 	}
 	if !p.Has(ViewChannel) {
 		return 0
+	}
+	return p
+}
+
+// Thread is what someone may do in a thread, from what they may do in its
+// parent channel: the same, except that talking in a thread is Send Messages
+// in Threads rather than Send Messages, and a private thread is seen only by
+// the people in it and by those who may manage threads.
+func Thread(parent Perm, private, member bool) Perm {
+	if !parent.Has(ViewChannel) {
+		return 0
+	}
+	if parent.Has(Administrator) {
+		return All
+	}
+	if private && !member && !parent.Has(ManageThreads) {
+		return 0
+	}
+	p := parent &^ SendMessages
+	if parent.Has(SendMessagesInThreads) {
+		p |= SendMessages
 	}
 	return p
 }

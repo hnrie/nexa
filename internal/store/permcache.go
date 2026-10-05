@@ -41,6 +41,7 @@ const maxPermSnapshots = 1024
 type permMember struct {
 	roleIDs      []ids.ID
 	timeoutUntil *int64
+	flags        int64
 }
 
 // serverSnapshot is one server's permission inputs, as of one version. Nothing
@@ -57,6 +58,12 @@ type serverSnapshot struct {
 	// channels maps each channel of the server to its type, in channelOrder
 	channels     map[ids.ID]string
 	channelOrder []ids.ID
+	// threads maps each thread to its parent channel; private threads also
+	// list the people in them, who with moderators are all who see them
+	threads       map[ids.ID]ids.ID
+	threadMembers map[ids.ID]map[ids.ID]bool
+	// archived threads, which ready leaves out of the read states it sends
+	archived map[ids.ID]bool
 	// admins are the Nexa admins as of the same version: an admin holds
 	// every permission its owner does in any server it is a member of
 	admins map[ids.ID]bool
@@ -228,7 +235,8 @@ func (c *permCache) evictLocked() {
 // loadSnapshot reads a server's permission inputs.
 func (s *Store) loadSnapshot(ctx context.Context, serverID ids.ID, version uint64) (*serverSnapshot, error) {
 	snap := &serverSnapshot{serverID: serverID, members: map[ids.ID]*permMember{}, overwrites: map[ids.ID][]perms.Overwrite{},
-		channels: map[ids.ID]string{}, version: version, loadedAt: time.Now(), viewers: map[ids.ID][]ids.ID{}}
+		channels: map[ids.ID]string{}, threads: map[ids.ID]ids.ID{}, threadMembers: map[ids.ID]map[ids.ID]bool{}, archived: map[ids.ID]bool{},
+		version: version, loadedAt: time.Now(), viewers: map[ids.ID][]ids.ID{}}
 	snap.lastUsed = snap.loadedAt
 	var err error
 	if snap.admins, err = s.admins(ctx); err != nil {
@@ -246,18 +254,19 @@ func (s *Store) loadSnapshot(ctx context.Context, serverID ids.ID, version uint6
 	}
 	snap.roles = toPermRoles(roles)
 
-	rows, err := s.db.R.QueryContext(ctx, `SELECT user_id, timeout_until FROM server_members WHERE server_id = ? ORDER BY user_id`, int64(serverID))
+	rows, err := s.db.R.QueryContext(ctx, `SELECT user_id, timeout_until, flags FROM server_members WHERE server_id = ? ORDER BY user_id`, int64(serverID))
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		var uid ids.ID
 		var timeout sql.NullInt64
-		if err := rows.Scan(&uid, &timeout); err != nil {
+		var flags int64
+		if err := rows.Scan(&uid, &timeout, &flags); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		snap.members[uid] = &permMember{roleIDs: []ids.ID{}, timeoutUntil: int64Ptr(timeout)}
+		snap.members[uid] = &permMember{roleIDs: []ids.ID{}, timeoutUntil: int64Ptr(timeout), flags: flags}
 		snap.memberOrder = append(snap.memberOrder, uid)
 	}
 	rows.Close()
@@ -291,19 +300,46 @@ func (s *Store) loadSnapshot(ctx context.Context, serverID ids.ID, version uint6
 		snap.overwrites[ch] = toPermOverwrites(list)
 	}
 
-	rows, err = s.db.R.QueryContext(ctx, `SELECT id, type FROM channels WHERE server_id = ? ORDER BY coalesce(parent_id, 0), position, id`, int64(serverID))
+	rows, err = s.db.R.QueryContext(ctx, `SELECT id, type, parent_id, archived FROM channels WHERE server_id = ? ORDER BY coalesce(parent_id, 0), position, id`, int64(serverID))
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		var id ids.ID
 		var typ string
-		if err := rows.Scan(&id, &typ); err != nil {
+		var parent sql.NullInt64
+		var archived int64
+		if err := rows.Scan(&id, &typ, &parent, &archived); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		snap.channels[id] = typ
 		snap.channelOrder = append(snap.channelOrder, id)
+		if IsThread(typ) && parent.Valid {
+			snap.threads[id] = ids.ID(parent.Int64)
+			if archived == 1 {
+				snap.archived[id] = true
+			}
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows, err = s.db.R.QueryContext(ctx, `SELECT t.thread_id, t.user_id FROM thread_members t JOIN channels c ON c.id = t.thread_id WHERE c.server_id = ? AND c.type = 'private_thread'`, int64(serverID))
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var thread, uid ids.ID
+		if err := rows.Scan(&thread, &uid); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if snap.threadMembers[thread] == nil {
+			snap.threadMembers[thread] = map[ids.ID]bool{}
+		}
+		snap.threadMembers[thread][uid] = true
 	}
 	rows.Close()
 	return snap, rows.Err()
@@ -364,7 +400,7 @@ func (snap *serverSnapshot) member(uid ids.ID, now int64) (perms.Member, bool) {
 	if m == nil {
 		return perms.Member{}, false
 	}
-	return perms.Member{UserID: uid, RoleIDs: m.roleIDs, TimedOut: m.timeoutUntil != nil && *m.timeoutUntil > now}, true
+	return perms.Member{UserID: uid, RoleIDs: m.roleIDs, TimedOut: m.timeoutUntil != nil && *m.timeoutUntil > now, Quarantined: m.flags&MemberQuarantined != 0}, true
 }
 
 // privileged reports whether uid holds every permission in this server: its
@@ -374,11 +410,17 @@ func (snap *serverSnapshot) privileged(uid ids.ID) bool {
 }
 
 // channelPerms is what uid may do in one of the server's channels: 0 for
-// someone who is not a member.
+// someone who is not a member. A thread answers to its parent channel
+// (perms.Thread).
 func (snap *serverSnapshot) channelPerms(channelID, uid ids.ID, now int64) perms.Perm {
 	pm, ok := snap.member(uid, now)
 	if !ok {
 		return 0
+	}
+	if parent, isThread := snap.threads[channelID]; isThread {
+		p := perms.Compute(snap.serverID, snap.roles, pm, snap.privileged(uid), snap.overwrites[parent])
+		private := snap.channels[channelID] == ChannelPrivateThread
+		return perms.Thread(p, private, snap.threadMembers[channelID][uid])
 	}
 	return perms.Compute(snap.serverID, snap.roles, pm, snap.privileged(uid), snap.overwrites[channelID])
 }

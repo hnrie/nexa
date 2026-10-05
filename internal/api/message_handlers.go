@@ -316,6 +316,7 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.withRefs(r.Context(), me.ID, list...)
+		s.withServerExtras(r.Context(), ch, list)
 		WriteJSON(w, http.StatusOK, list)
 		return
 	}
@@ -329,7 +330,26 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.withRefs(r.Context(), me.ID, list...)
+	s.withServerExtras(r.Context(), ch, list)
 	WriteJSON(w, http.StatusOK, list)
+}
+
+// withServerExtras fills in, for a page of a server channel, the threads its
+// messages started and which of an announcement channel's have been published.
+func (s *Server) withServerExtras(ctx context.Context, ch *store.Channel, list []*store.Message) {
+	if ch.ServerID == nil || len(list) == 0 {
+		return
+	}
+	if store.HoldsThreads(ch.Type) {
+		if err := s.Store.ThreadSummaries(ctx, list); err != nil {
+			s.Log.Warn("thread summaries", "err", err)
+		}
+	}
+	if ch.Type == store.ChannelAnnouncement {
+		for _, m := range list {
+			m.Published = m.Flags&store.MsgFlagPublished != 0
+		}
+	}
 }
 
 // maxLookupIDs is the most messages one ?ids= lookup answers.
@@ -359,12 +379,18 @@ func (s *Server) handleMessageGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.withRefs(r.Context(), me.ID, m)
+	s.withServerExtras(r.Context(), ch, []*store.Message{m})
 	WriteJSON(w, http.StatusOK, m)
 }
 
 func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 	ch, me := s.channel(w, r, NeedSend)
 	if ch == nil {
+		return
+	}
+	// a forum holds posts, each a thread with a first message of its own
+	if ch.Type == store.ChannelForum {
+		WriteError(w, E(http.StatusBadRequest, "forum_posts_only", "Start a post to say something in a forum."))
 		return
 	}
 	var body messageBody
@@ -388,19 +414,15 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if ch.SlowmodeSeconds > 0 && !s.isDM(ch) && s.ChannelAccess != nil {
-		if ok, _ := s.ChannelAccess(ctx, me, ch, NeedManage); !ok {
-			if last, err := s.Store.LastMessageAt(ctx, ch.ID, me.ID); err == nil && last > 0 {
-				wait := time.Duration(ch.SlowmodeSeconds)*time.Second - time.Since(time.UnixMilli(last))
-				if wait > 0 {
-					w.Header().Set("Retry-After", retryAfter(wait))
-					WriteError(w, E(http.StatusTooManyRequests, "slowmode", "Slow mode is on: wait before sending another message."))
-					return
-				}
-			}
-		}
+	if wait := s.slowmodeLeft(ctx, ch, me); wait > 0 {
+		w.Header().Set("Retry-After", retryAfter(wait))
+		WriteError(w, E(http.StatusTooManyRequests, "slowmode", "Slow mode is on: wait before sending another message."))
+		return
 	}
 	if s.dmBlocked(w, r, ch, me) {
+		return
+	}
+	if !s.mayTalkYet(w, r, ch, me) {
 		return
 	}
 	env, ok := s.checkEnvelope(w, r, ch, &body, nil)
@@ -449,6 +471,22 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	m := &store.Message{ChannelID: ch.ID, AuthorID: me.ID, Type: "default", Ciphertext: body.Ciphertext, KeyConvID: &env.Conv, KeyEpoch: &env.Epoch,
 		Mentions: dedupeIDs(body.Mentions, maxMentions), MentionRoles: s.allowedRoleMentions(ctx, me, ch, body.MentionRoles), MentionEveryone: body.MentionEveryone, Nonce: body.Nonce, Flags: body.Flags & store.MsgFlagSuppressEmbeds, NewPoll: poll}
+	// AutoMod's rules about what the server can see for itself: how many
+	// people a message pings, and how fast its sender is going
+	if !s.isDM(ch) {
+		pings := len(m.Mentions) + len(m.MentionRoles)
+		if m.MentionEveryone {
+			pings++
+		}
+		if v := s.checkMessageRules(r, ch, me, pings); v.blocked != nil {
+			writeAutomodBlocked(w, v.blocked, v.message, "This server's AutoMod stopped that message.")
+			return
+		}
+	}
+	// writing in a thread is joining it, and opens it again if it had closed
+	if store.IsThread(ch.Type) && !s.threadActivity(w, r, ch, me) {
+		return
+	}
 	if body.ReplyToID != nil {
 		target, err := s.Store.MessageByID(ctx, *body.ReplyToID, me.ID)
 		if err != nil || target.ChannelID != ch.ID {
@@ -502,8 +540,16 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.withRefs(ctx, me.ID, full)
+	// a forum post goes up for everyone with its first message, before it
+	if store.IsThread(ch.Type) {
+		s.announcePost(ctx, ch, ch.LastMessageID == nil)
+	}
 	s.Bcast.EmitChannel(ch.ID, "message_create", full)
 	s.Bcast.KeysMaybeNeeded(env.Conv)
+	// the people a message in a private thread mentions are brought into it
+	if ch.Type == store.ChannelPrivateThread {
+		s.mentionedIntoThread(r, ch, me, m.Mentions)
+	}
 	WriteJSON(w, http.StatusCreated, full)
 }
 
@@ -619,6 +665,10 @@ func (s *Server) handleMessageDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	s.auditDeletes(r, ch, me, map[ids.ID]ids.ID{mid: m.AuthorID})
+	if ch.Type == store.ChannelAnnouncement {
+		s.originalsGone(r.Context(), []ids.ID{mid})
+	}
 	// what it mentioned goes along: a reader who never loaded it had it
 	// counted in an unread badge, and nothing else says to take it back
 	ev := map[string]any{"id": mid, "channel_id": ch.ID, "author_id": m.AuthorID,
@@ -674,6 +724,14 @@ func (s *Server) handleMessageBulkDelete(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if len(deleted.IDs) > 0 {
+		gone := map[ids.ID]ids.ID{}
+		for _, id := range deleted.IDs {
+			gone[id] = authors[id]
+		}
+		s.auditDeletes(r, ch, me, gone)
+		if ch.Type == store.ChannelAnnouncement {
+			s.originalsGone(r.Context(), deleted.IDs)
+		}
 		s.Bcast.EmitChannel(ch.ID, "message_delete_bulk", s.bulkDeleteEvent(r.Context(), ch.ID, deleted))
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"ids": deleted.IDs})
@@ -790,6 +848,14 @@ func (s *Server) handleReactionAdd(w http.ResponseWriter, r *http.Request) {
 	if ch == nil || s.dmBlocked(w, r, ch, me) {
 		return
 	}
+	// someone else's emoji from another server, where the server allows it;
+	// joining a reaction already there is always fine
+	if !s.isDM(ch) && s.externalEmoji(r.Context(), ch, emoji) && !hasReaction(m, emoji) {
+		if ok, _ := s.canAccess(r, me, ch, NeedExternalEmoji); !ok {
+			WriteError(w, E(http.StatusForbidden, "external_emoji", "This server does not allow emoji from other servers."))
+			return
+		}
+	}
 	added, err := s.Store.AddReaction(r.Context(), m.ID, me.ID, emoji)
 	if err != nil {
 		if errors.Is(err, store.ErrLimit) {
@@ -836,3 +902,13 @@ func (s *Server) handleReactors(w http.ResponseWriter, r *http.Request) {
 }
 
 var _ = auth.UserFrom
+
+// hasReaction reports whether a message already carries a reaction.
+func hasReaction(m *store.Message, emoji string) bool {
+	for _, r := range m.Reactions {
+		if r.Emoji == emoji {
+			return true
+		}
+	}
+	return false
+}

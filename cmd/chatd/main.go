@@ -167,6 +167,7 @@ func main() {
 	srv.StartGuests(ctx)
 	srv.StartModeration(ctx)
 	srv.StartPolls(ctx)
+	srv.StartThreads(ctx)
 	srv.StartDiscord(ctx)
 	// whatever deleted accounts still own goes, now and every hour after
 	srv.StartAccountSweep(ctx)

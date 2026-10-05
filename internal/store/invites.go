@@ -257,13 +257,44 @@ func (s *Store) Audit(ctx context.Context, e *AuditEntry) error {
 
 // AuditEntries pages a server's audit log, newest first.
 func (s *Store) AuditEntries(ctx context.Context, serverID, before ids.ID, limit int) ([]*AuditEntry, error) {
+	return s.AuditEntriesFor(ctx, serverID, AuditFilter{}, before, limit)
+}
+
+// AuditFilter narrows the audit log: to some actions, to what one person
+// did, or to what was done to one person.
+type AuditFilter struct {
+	Actions []string
+	Actor   *ids.ID
+	Target  *ids.ID
+}
+
+// AuditEntriesFor pages a server's audit log through a filter, newest first.
+func (s *Store) AuditEntriesFor(ctx context.Context, serverID ids.ID, f AuditFilter, before ids.ID, limit int) ([]*AuditEntry, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
 	if before.IsZero() {
 		before = ids.ID(1<<62 - 1)
 	}
-	rows, err := s.db.R.QueryContext(ctx, `SELECT id, server_id, actor_id, action, target_type, target_id, changes, reason, created_at FROM audit_log WHERE server_id = ? AND id < ? ORDER BY id DESC LIMIT ?`, int64(serverID), int64(before), limit)
+	q := `SELECT id, server_id, actor_id, action, target_type, target_id, changes, reason, created_at FROM audit_log WHERE server_id = ? AND id < ?`
+	args := []any{int64(serverID), int64(before)}
+	if len(f.Actions) > 0 {
+		q += ` AND action IN (` + placeholders(len(f.Actions)) + `)`
+		for _, a := range f.Actions {
+			args = append(args, a)
+		}
+	}
+	if f.Actor != nil {
+		q += ` AND actor_id = ?`
+		args = append(args, int64(*f.Actor))
+	}
+	if f.Target != nil {
+		q += ` AND target_type = 'user' AND target_id = ?`
+		args = append(args, int64(*f.Target))
+	}
+	q += ` ORDER BY id DESC LIMIT ?`
+	args = append(args, limit)
+	rows, err := s.db.R.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}

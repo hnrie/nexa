@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strings"
 
 	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
@@ -91,7 +92,11 @@ func scanMessage(r rowScanner) (*Message, error) {
 	m.Nonce = nonce.String
 	m.WebhookID = idPtr(webhook)
 	if plain.Valid && plain.String != "" {
-		if m.WebhookID == nil && m.Type == "system_poll_result" {
+		if m.Type == "crosspost" {
+			m.Crosspost = json.RawMessage(plain.String)
+		} else if m.Type == "system_automod" {
+			m.Automod = json.RawMessage(plain.String)
+		} else if m.WebhookID == nil && m.Type == "system_poll_result" {
 			// the line closing a person's poll: numbers the server wrote itself
 			var out PollOutcome
 			if json.Unmarshal([]byte(plain.String), &out) == nil {
@@ -132,7 +137,11 @@ func (s *Store) InsertMessage(ctx context.Context, m *Message) error {
 		epoch = int64(*m.KeyEpoch)
 	}
 	var plain any
-	if len(m.Webhook) > 0 {
+	if len(m.Crosspost) > 0 {
+		plain = string(m.Crosspost)
+	} else if len(m.Automod) > 0 {
+		plain = string(m.Automod)
+	} else if len(m.Webhook) > 0 {
 		plain = string(m.Webhook)
 	} else if m.PollResult != nil {
 		b, err := json.Marshal(m.PollResult)
@@ -169,7 +178,12 @@ func (s *Store) InsertMessage(ctx context.Context, m *Message) error {
 				return err
 			}
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE channels SET last_message_id = `+tx.Dialect().Greatest("coalesce(last_message_id, 0)", "?")+` WHERE id = ?`, int64(m.ID), int64(m.ChannelID))
+		// what people say is counted, for threads to show how much is in them
+		said := 0
+		if !strings.HasPrefix(m.Type, "system_") {
+			said = 1
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE channels SET last_message_id = `+tx.Dialect().Greatest("coalesce(last_message_id, 0)", "?")+`, message_count = message_count + ? WHERE id = ?`, int64(m.ID), said, int64(m.ChannelID))
 		return err
 	})
 }
@@ -535,9 +549,11 @@ func deleteMessageTx(ctx context.Context, tx *db.Tx, id ids.ID) error {
 	return err
 }
 
-// fixLastMessageTx points the channel's last_message_id at its newest remaining message.
+// fixLastMessageTx points the channel's last_message_id at its newest
+// remaining message, and counts again what has been said in it.
 func fixLastMessageTx(ctx context.Context, tx *db.Tx, chID ids.ID) error {
-	_, err := tx.ExecContext(ctx, `UPDATE channels SET last_message_id = (SELECT max(id) FROM messages WHERE channel_id = ?) WHERE id = ?`, int64(chID), int64(chID))
+	_, err := tx.ExecContext(ctx, `UPDATE channels SET last_message_id = (SELECT max(id) FROM messages WHERE channel_id = ?),
+		message_count = (SELECT count(*) FROM messages WHERE channel_id = ? AND type NOT LIKE 'system!_%' ESCAPE '!') WHERE id = ?`, int64(chID), int64(chID), int64(chID))
 	return err
 }
 
@@ -686,6 +702,25 @@ func (s *Store) AttachmentByBlob(ctx context.Context, blobID ids.ID) (*Attachmen
 		return nil, err
 	}
 	return &a, nil
+}
+
+// AttachmentChannels lists the channels whose messages hold a blob (a post
+// published to channels following it holds its files in each), oldest first.
+func (s *Store) AttachmentChannels(ctx context.Context, blobID ids.ID) ([]ids.ID, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT channel_id FROM attachments WHERE blob_id = ? GROUP BY channel_id ORDER BY min(id) LIMIT 100`, int64(blobID))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ids.ID
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, ids.ID(id))
+	}
+	return out, rows.Err()
 }
 
 // MaxPurgeMessages is how many of a banned member's messages one purge takes.

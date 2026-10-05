@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -75,7 +76,7 @@ func (s *Store) CreateServer(ctx context.Context, owner ids.ID, name string, def
 		if _, err := tx.ExecContext(ctx, `UPDATE servers SET system_channel_id = ? WHERE id = ?`, int64(general.ID), int64(srv.ID)); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `INSERT INTO server_members (server_id, user_id, nickname, joined_at, flags) VALUES (?,?,?,?,0)`, int64(srv.ID), int64(owner), "", now)
+		_, err := tx.ExecContext(ctx, `INSERT INTO server_members (server_id, user_id, nickname, joined_at, flags, join_method) VALUES (?,?,?,?,0,'owner')`, int64(srv.ID), int64(owner), "", now)
 		return err
 	})
 	if err != nil {
@@ -88,12 +89,12 @@ func (s *Store) CreateServer(ctx context.Context, owner ids.ID, name string, def
 
 // ServerByID loads a server.
 func (s *Store) ServerByID(ctx context.Context, id ids.ID) (*Server, error) {
-	return scanServerTagged(s.db.R.QueryRowContext(ctx, `SELECT `+serverCols+`, `+serverTagCols+` FROM servers WHERE id = ?`, int64(id)))
+	return scanServerTagged(s.db.R.QueryRowContext(ctx, `SELECT `+serverCols+`, `+serverTagCols+`, `+serverCommunityCols+` FROM servers WHERE id = ?`, int64(id)))
 }
 
 // ServersForUser lists the servers a user belongs to, oldest membership first.
 func (s *Store) ServersForUser(ctx context.Context, uid ids.ID) ([]*Server, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+prefixed("s", serverCols)+`, `+prefixed("s", serverTagCols)+` FROM servers s JOIN server_members m ON m.server_id = s.id WHERE m.user_id = ? ORDER BY m.joined_at, s.id`, int64(uid))
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+prefixed("s", serverCols)+`, `+prefixed("s", serverTagCols)+`, `+prefixed("s", serverCommunityCols)+` FROM servers s JOIN server_members m ON m.server_id = s.id WHERE m.user_id = ? ORDER BY m.joined_at, s.id`, int64(uid))
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +144,41 @@ func (s *Store) UpdateServer(ctx context.Context, id ids.ID, p ServerPatch) erro
 	if p.OwnerID != nil {
 		set("owner_id", int64(*p.OwnerID))
 	}
+	if p.InvitesPausedUntil != nil {
+		set("invites_paused_until", nullInt64(*p.InvitesPausedUntil))
+	}
+	if p.Discoverable != nil {
+		set("discoverable", boolInt(*p.Discoverable))
+		// listed since the first time it went in, and again after it came out
+		if *p.Discoverable {
+			sets = append(sets, "discovery_since = coalesce(discovery_since, ?)")
+			args = append(args, nowMs())
+		} else {
+			sets = append(sets, "discovery_since = NULL")
+		}
+	}
+	if p.DiscoveryCategory != nil {
+		set("discovery_category", *p.DiscoveryCategory)
+	}
+	if p.DiscoveryTags != nil {
+		b, err := json.Marshal(*p.DiscoveryTags)
+		if err != nil {
+			return err
+		}
+		set("discovery_tags", string(b))
+	}
+	if p.DiscoveryLanguage != nil {
+		set("discovery_language", *p.DiscoveryLanguage)
+	}
+	if p.DiscoveryHidden != nil {
+		set("discovery_hidden", boolInt(*p.DiscoveryHidden))
+	}
+	if p.VerifyAccountMinutes != nil {
+		set("verify_account_minutes", *p.VerifyAccountMinutes)
+	}
+	if p.VerifyMemberMinutes != nil {
+		set("verify_member_minutes", *p.VerifyMemberMinutes)
+	}
 	if len(sets) == 0 {
 		return nil
 	}
@@ -175,8 +211,14 @@ func (s *Store) DeleteServer(ctx context.Context, id ids.ID) error {
 			UNION ALL SELECT banner_id FROM servers WHERE id = ?
 			UNION ALL SELECT blob_id FROM emojis WHERE server_id = ?
 			UNION ALL SELECT st.blob_id FROM stickers st JOIN sticker_packs p ON p.id = st.pack_id WHERE p.server_id = ?
-			UNION ALL SELECT avatar_id FROM webhooks WHERE server_id = ?`,
-			int64(id), int64(id), int64(id), int64(id), int64(id)); err != nil {
+			UNION ALL SELECT avatar_id FROM webhooks WHERE server_id = ?
+			UNION ALL SELECT avatar_id FROM server_members WHERE server_id = ?
+			UNION ALL SELECT banner_id FROM server_members WHERE server_id = ?
+			UNION ALL SELECT icon_id FROM roles WHERE server_id = ?`,
+			int64(id), int64(id), int64(id), int64(id), int64(id), int64(id), int64(id), int64(id)); err != nil {
+			return err
+		}
+		if err := releaseWidgetRefs(ctx, tx, `SELECT widgets FROM server_members WHERE server_id = ? AND widgets IS NOT NULL`, int64(id)); err != nil {
 			return err
 		}
 		// its tag's picture goes too, and nobody wears the tag of a server that is gone
@@ -245,33 +287,49 @@ func releaseBlobRefs(ctx context.Context, tx *db.Tx, query string, args ...any) 
 
 // --- members -------------------------------------------------------------
 
-const memberCols = `server_id, user_id, nickname, avatar_id, joined_at, timeout_until, flags`
+const memberCols = `server_id, user_id, nickname, avatar_id, joined_at, timeout_until, flags, banner_id, bio, pronouns, join_method, join_code, invited_by, accent_color, accent_color_2`
 
 func scanMember(r rowScanner) (*Member, error) {
 	var m Member
-	var avatar, timeout sql.NullInt64
-	if err := r.Scan(&m.ServerID, &m.UserID, &m.Nickname, &avatar, &m.JoinedAt, &timeout, &m.Flags); err != nil {
+	var avatar, timeout, banner, inviter, accent, accent2 sql.NullInt64
+	if err := r.Scan(&m.ServerID, &m.UserID, &m.Nickname, &avatar, &m.JoinedAt, &timeout, &m.Flags, &banner, &m.Bio, &m.Pronouns, &m.JoinMethod, &m.JoinCode, &inviter, &accent, &accent2); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
 	m.AvatarID = idPtr(avatar)
+	m.BannerID = idPtr(banner)
+	m.InvitedBy = idPtr(inviter)
 	m.TimeoutUntil = int64Ptr(timeout)
+	m.AccentColor = intPtr(accent)
+	m.AccentColor2 = intPtr(accent2)
 	m.RoleIDs = []ids.ID{}
 	return &m, nil
+}
+
+// JoinInfo is how someone joined a server, recorded with their membership.
+type JoinInfo struct {
+	Method    string
+	Code      string
+	InvitedBy *ids.ID
 }
 
 // ErrBanned is returned when a banned user tries to join a server.
 var ErrBanned = errors.New("banned")
 
 // AddMember joins a user to a server; ErrAlreadyExists when already a member,
-// ErrBanned when banned.
+// ErrBanned when banned, ErrJoinsPaused while it takes nobody new.
 func (s *Store) AddMember(ctx context.Context, serverID, uid ids.ID) (*Member, error) {
+	return s.Join(ctx, serverID, uid, JoinInfo{})
+}
+
+// Join is AddMember recording how the user came in.
+func (s *Store) Join(ctx context.Context, serverID, uid ids.ID, how JoinInfo) (*Member, error) {
 	var m *Member
 	err := s.Tx(ctx, func(tx *db.Tx) error {
 		var err error
-		m, err = addMember(ctx, tx, serverID, uid)
+		m, err = addMember(ctx, tx, serverID, uid, how)
 		return err
 	})
 	if err == nil {
@@ -279,6 +337,9 @@ func (s *Store) AddMember(ctx context.Context, serverID, uid ids.ID) (*Member, e
 	}
 	return m, err
 }
+
+// ErrJoinsPaused is returned when a server has paused its invites.
+var ErrJoinsPaused = errors.New("joins paused")
 
 // JoinByInvite is AddMember spending one use of an invite in the same
 // transaction, so people joining at once cannot overrun its limit. It is
@@ -288,8 +349,12 @@ func (s *Store) AddMember(ctx context.Context, serverID, uid ids.ID) (*Member, e
 func (s *Store) JoinByInvite(ctx context.Context, serverID, uid ids.ID, code string) (*Member, error) {
 	var m *Member
 	err := s.Tx(ctx, func(tx *db.Tx) error {
+		var inviter sql.NullInt64
+		if err := tx.QueryRowContext(ctx, `SELECT inviter_id FROM invites WHERE code = ?`, code).Scan(&inviter); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
 		var err error
-		if m, err = addMember(ctx, tx, serverID, uid); err != nil {
+		if m, err = addMember(ctx, tx, serverID, uid, JoinInfo{Method: "invite", Code: code, InvitedBy: idPtr(inviter)}); err != nil {
 			return err
 		}
 		_, err = spendInvite(ctx, tx, uid, code)
@@ -302,13 +367,33 @@ func (s *Store) JoinByInvite(ctx context.Context, serverID, uid ids.ID, code str
 	return m, nil
 }
 
-// addMember inserts the membership unless the user is banned, checking the ban
-// in the same statement so a ban written a moment earlier always holds.
-func addMember(ctx context.Context, tx *db.Tx, serverID, uid ids.ID) (*Member, error) {
+// addMember inserts the membership unless the user is banned or the server
+// has paused joins, checking both in the same statement so a ban or a pause
+// written a moment earlier always holds.
+func addMember(ctx context.Context, tx *db.Tx, serverID, uid ids.ID, how JoinInfo) (*Member, error) {
 	now := nowMs()
-	res, err := tx.ExecContext(ctx, `INSERT INTO server_members (server_id, user_id, nickname, joined_at, flags)
-		SELECT ?, ?, '', ?, 0 WHERE NOT EXISTS (SELECT 1 FROM bans WHERE server_id = ? AND user_id = ?) ON CONFLICT DO NOTHING`,
-		int64(serverID), int64(uid), now, int64(serverID), int64(uid))
+	if how.Method != "owner" {
+		var paused sql.NullInt64
+		if err := tx.QueryRowContext(ctx, `SELECT invites_paused_until FROM servers WHERE id = ?`, int64(serverID)).Scan(&paused); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, ErrNotFound
+			}
+			return nil, err
+		}
+		if paused.Valid && paused.Int64 > now {
+			var already int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM server_members WHERE server_id = ? AND user_id = ?`, int64(serverID), int64(uid)).Scan(&already); err != nil {
+				return nil, err
+			}
+			if already > 0 {
+				return nil, ErrAlreadyExists
+			}
+			return nil, ErrJoinsPaused
+		}
+	}
+	res, err := tx.ExecContext(ctx, `INSERT INTO server_members (server_id, user_id, nickname, joined_at, flags, join_method, join_code, invited_by)
+		SELECT ?, ?, '', ?, 0, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bans WHERE server_id = ? AND user_id = ?) ON CONFLICT DO NOTHING`,
+		int64(serverID), int64(uid), now, how.Method, how.Code, nullID(how.InvitedBy), int64(serverID), int64(uid))
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +407,7 @@ func addMember(ctx context.Context, tx *db.Tx, serverID, uid ids.ID) (*Member, e
 		}
 		return nil, ErrAlreadyExists
 	}
-	return &Member{ServerID: serverID, UserID: uid, JoinedAt: now, RoleIDs: []ids.ID{}}, nil
+	return &Member{ServerID: serverID, UserID: uid, JoinedAt: now, RoleIDs: []ids.ID{}, JoinMethod: how.Method, JoinCode: how.Code, InvitedBy: how.InvitedBy}, nil
 }
 
 // RemoveMember removes a membership (roles cascade).
@@ -335,12 +420,23 @@ func addMember(ctx context.Context, tx *db.Tx, serverID, uid ids.ID) (*Member, e
 func (s *Store) RemoveMember(ctx context.Context, serverID, uid ids.ID) error {
 	defer s.serverChanged(serverID)
 	return s.Tx(ctx, func(tx *db.Tx) error {
+		// their pictures in this server go with them, the ones in its widgets too
+		if err := releaseBlobRefs(ctx, tx, `SELECT avatar_id FROM server_members WHERE server_id = ? AND user_id = ?
+			UNION ALL SELECT banner_id FROM server_members WHERE server_id = ? AND user_id = ?`, int64(serverID), int64(uid), int64(serverID), int64(uid)); err != nil {
+			return err
+		}
+		if err := releaseWidgetRefs(ctx, tx, `SELECT widgets FROM server_members WHERE server_id = ? AND user_id = ? AND widgets IS NOT NULL`, int64(serverID), int64(uid)); err != nil {
+			return err
+		}
 		res, err := tx.ExecContext(ctx, `DELETE FROM server_members WHERE server_id = ? AND user_id = ?`, int64(serverID), int64(uid))
 		if err != nil {
 			return err
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrNotFound
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM thread_members WHERE user_id = ? AND thread_id IN (SELECT id FROM channels WHERE server_id = ?)`, int64(uid), int64(serverID)); err != nil {
+			return err
 		}
 		_, err = tx.ExecContext(ctx, `DELETE FROM channel_overwrites WHERE target_id = ? AND target_type = 'member' AND channel_id IN (SELECT id FROM channels WHERE server_id = ?)`, int64(uid), int64(serverID))
 		return err
@@ -474,6 +570,24 @@ func (s *Store) UpdateMember(ctx context.Context, serverID, uid ids.ID, p Member
 	if p.TimeoutUntil != nil {
 		set("timeout_until", nullInt64(*p.TimeoutUntil))
 	}
+	if p.BannerID != nil {
+		set("banner_id", nullID(*p.BannerID))
+	}
+	if p.Bio != nil {
+		set("bio", *p.Bio)
+	}
+	if p.Pronouns != nil {
+		set("pronouns", *p.Pronouns)
+	}
+	if p.AccentColor != nil {
+		set("accent_color", nullInt(*p.AccentColor))
+	}
+	if p.AccentColor2 != nil {
+		set("accent_color_2", nullInt(*p.AccentColor2))
+	}
+	if p.Flags != nil {
+		set("flags", *p.Flags)
+	}
 	if len(sets) == 0 {
 		return nil
 	}
@@ -485,7 +599,8 @@ func (s *Store) UpdateMember(ctx context.Context, serverID, uid ids.ID, p Member
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
-	if p.TimeoutUntil != nil {
+	// a timeout and a quarantine both change what the member may do
+	if p.TimeoutUntil != nil || p.Flags != nil {
 		s.serverChanged(serverID)
 	}
 	return nil
@@ -523,13 +638,13 @@ func (s *Store) SetMemberRoles(ctx context.Context, serverID, uid ids.ID, roleID
 
 // --- roles ---------------------------------------------------------------
 
-const roleCols = `id, server_id, name, color, hoist, mentionable, position, permissions, icon_id, created_at`
+const roleCols = `id, server_id, name, color, hoist, mentionable, position, permissions, icon_id, created_at, color2, color3, icon_emoji`
 
 func scanRole(r rowScanner) (*Role, error) {
 	var ro Role
 	var hoist, mention, permsRaw int64
-	var icon sql.NullInt64
-	if err := r.Scan(&ro.ID, &ro.ServerID, &ro.Name, &ro.Color, &hoist, &mention, &ro.Position, &permsRaw, &icon, &ro.CreatedAt); err != nil {
+	var icon, color2, color3 sql.NullInt64
+	if err := r.Scan(&ro.ID, &ro.ServerID, &ro.Name, &ro.Color, &hoist, &mention, &ro.Position, &permsRaw, &icon, &ro.CreatedAt, &color2, &color3, &ro.IconEmoji); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -538,6 +653,7 @@ func scanRole(r rowScanner) (*Role, error) {
 	ro.Hoist, ro.Mentionable = hoist == 1, mention == 1
 	ro.Permissions = perms.Perm(uint64(permsRaw))
 	ro.IconID = idPtr(icon)
+	ro.Color2, ro.Color3 = intPtr(color2), intPtr(color3)
 	return &ro, nil
 }
 
@@ -557,7 +673,7 @@ func (s *Store) CreateRole(ctx context.Context, serverID ids.ID, name string, pe
 			return err
 		}
 		ro.Position = 1
-		_, err := tx.ExecContext(ctx, `INSERT INTO roles (`+roleCols+`) VALUES (?,?,?,?,?,?,?,?,?,?)`, int64(ro.ID), int64(serverID), ro.Name, ro.Color, 0, 0, ro.Position, int64(ro.Permissions), nil, ro.CreatedAt)
+		_, err := tx.ExecContext(ctx, `INSERT INTO roles (`+roleCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, int64(ro.ID), int64(serverID), ro.Name, ro.Color, 0, 0, ro.Position, int64(ro.Permissions), nil, ro.CreatedAt, nil, nil, "")
 		return err
 	})
 	if err != nil {
@@ -612,6 +728,15 @@ func (s *Store) UpdateRole(ctx context.Context, id ids.ID, p RolePatch) error {
 	if p.IconID != nil {
 		set("icon_id", nullID(*p.IconID))
 	}
+	if p.Color2 != nil {
+		set("color2", nullInt(*p.Color2))
+	}
+	if p.Color3 != nil {
+		set("color3", nullInt(*p.Color3))
+	}
+	if p.IconEmoji != nil {
+		set("icon_emoji", *p.IconEmoji)
+	}
 	if len(sets) == 0 {
 		return nil
 	}
@@ -642,6 +767,9 @@ func (s *Store) DeleteRole(ctx context.Context, id ids.ID) error {
 			return ErrConflict
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM channel_overwrites WHERE target_type = 'role' AND target_id = ?`, int64(id)); err != nil {
+			return err
+		}
+		if err := releaseBlobRefs(ctx, tx, `SELECT icon_id FROM roles WHERE id = ?`, int64(id)); err != nil {
 			return err
 		}
 		_, err := tx.ExecContext(ctx, `DELETE FROM roles WHERE id = ?`, int64(id))
@@ -702,7 +830,9 @@ func (s *Store) CreateServerChannel(ctx context.Context, serverID ids.ID, typ, n
 
 // ServerChannels lists a server's channels ordered by parent then position.
 func (s *Store) ServerChannels(ctx context.Context, serverID ids.ID) ([]*Channel, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelReadCols+` FROM channels WHERE server_id = ? ORDER BY coalesce(parent_id, 0), position, id`, int64(serverID))
+	// threads are listed apart (Threads): a client that knows nothing of them
+	// would draw each one as a channel of its own
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelReadCols+` FROM channels WHERE server_id = ? AND type NOT IN ('thread','private_thread') ORDER BY coalesce(parent_id, 0), position, id`, int64(serverID))
 	if err != nil {
 		return nil, err
 	}
@@ -831,4 +961,70 @@ func (s *Store) OverwritesForServer(ctx context.Context, serverID ids.ID) (map[i
 		out[ow.ChannelID] = append(out[ow.ChannelID], ow)
 	}
 	return out, rows.Err()
+}
+
+// SwapMemberImage points a member's avatar or banner in one server at newID
+// (nil clears it), releasing the picture it pointed at before. The caller
+// already holds a reference on newID.
+func (s *Store) SwapMemberImage(ctx context.Context, serverID, uid ids.ID, banner bool, newID *ids.ID) error {
+	col := "avatar_id"
+	if banner {
+		col = "banner_id"
+	}
+	return s.Tx(ctx, func(tx *db.Tx) error {
+		if err := tx.Serialise(ctx, "image:server_members."+col, int64(serverID), int64(uid)); err != nil {
+			return err
+		}
+		var old sql.NullInt64
+		if err := tx.QueryRowContext(ctx, `SELECT `+col+` FROM server_members WHERE server_id = ? AND user_id = ?`, int64(serverID), int64(uid)).Scan(&old); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE server_members SET `+col+` = ? WHERE server_id = ? AND user_id = ?`, nullID(newID), int64(serverID), int64(uid)); err != nil {
+			return err
+		}
+		if !old.Valid {
+			return nil
+		}
+		_, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - 1")+` WHERE id = ?`, old.Int64)
+		return err
+	})
+}
+
+// SwapRoleIcon points a role's picture at newID (nil clears it), releasing
+// the one before. The caller already holds a reference on newID.
+func (s *Store) SwapRoleIcon(ctx context.Context, roleID ids.ID, newID *ids.ID) error {
+	var serverID int64
+	err := s.Tx(ctx, func(tx *db.Tx) error {
+		if err := tx.Serialise(ctx, "image:roles.icon_id", int64(roleID)); err != nil {
+			return err
+		}
+		var old sql.NullInt64
+		if err := tx.QueryRowContext(ctx, `SELECT icon_id, server_id FROM roles WHERE id = ?`, int64(roleID)).Scan(&old, &serverID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE roles SET icon_id = ? WHERE id = ?`, nullID(newID), int64(roleID)); err != nil {
+			return err
+		}
+		if !old.Valid {
+			return nil
+		}
+		_, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - 1")+` WHERE id = ?`, old.Int64)
+		return err
+	})
+	if serverID != 0 {
+		s.serverChanged(ids.ID(serverID))
+	}
+	return err
+}
+
+// SetJoinMethod says how a member came in, when the join itself could not.
+func (s *Store) SetJoinMethod(ctx context.Context, serverID, uid ids.ID, method string) error {
+	_, err := s.db.W.ExecContext(ctx, `UPDATE server_members SET join_method = ? WHERE server_id = ? AND user_id = ?`, method, int64(serverID), int64(uid))
+	return err
 }

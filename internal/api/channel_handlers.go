@@ -583,12 +583,17 @@ func (s *Server) handleAttachmentDownload(w http.ResponseWriter, r *http.Request
 	// A file is its uploader's until something holds it: then it is for
 	// whoever can read the conversation it was sent in, or is in the note
 	// that holds it.
+	// (a published post holds its files in every channel it went to)
 	allowed := false
-	att, err := s.Store.AttachmentByBlob(r.Context(), id)
-	if err == nil {
-		if ch, err := s.Store.ChannelByID(r.Context(), att.ChannelID); err == nil {
-			if ok, err := s.canAccess(r, me, ch, NeedHistory); err == nil && ok {
+	held, err := s.Store.AttachmentChannels(r.Context(), id)
+	if err == nil && len(held) == 0 {
+		err = store.ErrNotFound
+	}
+	for _, chID := range held {
+		if ch, cerr := s.Store.ChannelByID(r.Context(), chID); cerr == nil {
+			if ok, aerr := s.canAccess(r, me, ch, NeedHistory); aerr == nil && ok {
 				allowed = true
+				break
 			}
 		}
 	}
@@ -643,6 +648,10 @@ func (s *Server) handlePin(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	if ch.ServerID != nil {
+		author := m.AuthorID
+		s.audit(r, *ch.ServerID, me.ID, "message_pin", "user", &author, map[string]any{"channel_id": ch.ID, "message_id": mid}, "")
+	}
 	s.Bcast.EmitChannel(ch.ID, "pin_update", map[string]any{"channel_id": ch.ID, "message_id": mid, "pinned": true})
 	s.systemMessage(r, ch, me.ID, "system_pin", []ids.ID{}, &mid)
 	w.WriteHeader(http.StatusNoContent)
@@ -661,6 +670,15 @@ func (s *Server) handleUnpin(w http.ResponseWriter, r *http.Request) {
 	if err := s.Store.UnpinMessage(r.Context(), ch.ID, mid); err != nil {
 		WriteError(w, err)
 		return
+	}
+	if ch.ServerID != nil {
+		changes := map[string]any{"channel_id": ch.ID, "message_id": mid}
+		var target *ids.ID
+		if m, err := s.Store.MessageByID(r.Context(), mid, me.ID); err == nil {
+			author := m.AuthorID
+			target = &author
+		}
+		s.audit(r, *ch.ServerID, me.ID, "message_unpin", "user", target, changes, "")
 	}
 	s.Bcast.EmitChannel(ch.ID, "pin_update", map[string]any{"channel_id": ch.ID, "message_id": mid, "pinned": false})
 	w.WriteHeader(http.StatusNoContent)

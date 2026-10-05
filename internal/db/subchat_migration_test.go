@@ -73,6 +73,7 @@ func TestMigrationTidiesSubchatMembers(t *testing.T) {
 	ALTER TABLE servers DROP COLUMN tag_roles;
 	ALTER TABLE servers DROP COLUMN tag_invite;
 	ALTER TABLE users DROP COLUMN widgets;
+	` + undoCommunities + `
 	PRAGMA user_version = 6;`)
 	if err != nil {
 		t.Fatal(err)

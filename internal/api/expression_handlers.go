@@ -130,8 +130,13 @@ func (s *Server) handleEmojis(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEmojiCreate(w http.ResponseWriter, r *http.Request) {
-	srv, me, _ := s.serverCtx(w, r, perms.ManageEmojis)
+	srv, me, p := s.serverCtx(w, r, 0)
 	if srv == nil {
+		return
+	}
+	// adding is Create Expressions, or Manage Expressions, which covers it
+	if !p.Has(perms.ManageEmojis) && !p.Has(perms.CreateExpressions) {
+		WriteError(w, E(http.StatusForbidden, "missing_permission", "You cannot add emoji to this server."))
 		return
 	}
 	name := strings.TrimSpace(r.URL.Query().Get("name"))
@@ -161,8 +166,10 @@ func (s *Server) handleEmojiCreate(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusCreated, e)
 }
 
+// emojiTarget loads an emoji for someone who may change it: anyone with
+// Manage Expressions, or whoever added it with Create Expressions.
 func (s *Server) emojiTarget(w http.ResponseWriter, r *http.Request) (*store.Server, *store.User, *store.Emoji) {
-	srv, me, _ := s.serverCtx(w, r, perms.ManageEmojis)
+	srv, me, p := s.serverCtx(w, r, 0)
 	if srv == nil {
 		return nil, nil, nil
 	}
@@ -174,6 +181,10 @@ func (s *Server) emojiTarget(w http.ResponseWriter, r *http.Request) (*store.Ser
 	e, err := s.Store.EmojiByID(r.Context(), id)
 	if err != nil || e.ServerID != srv.ID {
 		WriteError(w, ErrNotFound)
+		return nil, nil, nil
+	}
+	if !p.Has(perms.ManageEmojis) && !(p.Has(perms.CreateExpressions) && e.CreatorID == me.ID) {
+		WriteError(w, E(http.StatusForbidden, "missing_permission", "You can change the emoji you added, or any with Manage Expressions."))
 		return nil, nil, nil
 	}
 	return srv, me, e

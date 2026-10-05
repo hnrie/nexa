@@ -15,8 +15,12 @@ func needBits(need string) perms.Perm {
 	switch need {
 	case NeedSend:
 		return perms.ViewChannel | perms.SendMessages
-	case NeedManage, NeedPin:
+	case NeedManage:
 		return perms.ViewChannel | perms.ManageMessages
+	case NeedPin:
+		return perms.ViewChannel | perms.PinMessages
+	case NeedExternalEmoji:
+		return perms.ViewChannel | perms.UseExternalEmojis
 	case NeedHistory:
 		return perms.ViewChannel | perms.ReadMessageHistory
 	case NeedReact:
@@ -35,9 +39,14 @@ func needBits(need string) perms.Perm {
 }
 
 // ServerView is a server as the ready payload and join responses carry it.
+// Threads are apart from Channels, so a client that knows nothing of them
+// does not draw them as channels: the ones still going that this member can
+// see, and the ones they are in.
 type ServerView struct {
 	*store.Server
 	Channels      []*store.Channel `json:"channels"`
+	Threads       []*store.Channel `json:"threads"`
+	JoinedThreads []ids.ID         `json:"joined_threads"`
 	Roles         []*store.Role    `json:"roles"`
 	Members       []*store.Member  `json:"members"`
 	MemberCount   int              `json:"member_count"`
@@ -98,7 +107,21 @@ func (s *Server) serverViewUsers(ctx context.Context, srv *store.Server, uid ids
 	if err != nil {
 		return nil, nil, err
 	}
-	view := &ServerView{Server: srv, Channels: chans, Roles: roles, Members: []*store.Member{}, MemberCount: count, Me: me}
+	threads := []*store.Channel{}
+	if active, err := s.Store.ActiveThreads(ctx, srv.ID); err == nil {
+		for _, th := range active {
+			if _, ok := visible[th.ID]; ok {
+				threads = append(threads, th)
+			}
+		}
+	} else {
+		return nil, nil, err
+	}
+	joined, err := s.Store.JoinedThreads(ctx, srv.ID, uid)
+	if err != nil {
+		return nil, nil, err
+	}
+	view := &ServerView{Server: srv, Channels: chans, Threads: threads, JoinedThreads: joined, Roles: roles, Members: []*store.Member{}, MemberCount: count, Me: me}
 	view.MyPermissions, err = s.Store.ServerPerms(ctx, srv.ID, uid)
 	if err != nil {
 		return nil, nil, err

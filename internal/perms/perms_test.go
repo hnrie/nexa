@@ -102,7 +102,7 @@ func TestHierarchy(t *testing.T) {
 	if !CanActOn(5, 2, false, false) || CanActOn(5, 5, false, false) || CanActOn(9, 0, false, true) || !CanActOn(0, 9, true, false) {
 		t.Error("act on")
 	}
-	if len(Names) != 31 {
+	if len(Names) != 40 {
 		t.Errorf("names = %d", len(Names))
 	}
 	var all Perm
@@ -111,5 +111,47 @@ func TestHierarchy(t *testing.T) {
 	}
 	if all != All {
 		t.Error("Names must cover All")
+	}
+}
+
+// A thread answers to its parent channel, except that talking in it is its
+// own permission and a private one is only for the people in it and those who
+// manage threads.
+func TestThreadPermissions(t *testing.T) {
+	member := ViewChannel | ReadMessageHistory | SendMessages | SendMessagesInThreads | CreatePublicThreads
+	if got := Thread(member, false, false); !got.Has(ViewChannel|SendMessages) || got.Has(ManageThreads) {
+		t.Errorf("public thread for a member: %d", got)
+	}
+	// can talk in the channel but not in its threads
+	if got := Thread(ViewChannel|SendMessages, false, true); got.Has(SendMessages) || !got.Has(ViewChannel) {
+		t.Errorf("Send Messages alone sends in threads: %d", got)
+	}
+	// can talk in threads though not in the channel itself
+	if got := Thread(ViewChannel|SendMessagesInThreads, false, false); !got.Has(SendMessages) {
+		t.Errorf("Send Messages in Threads does not send: %d", got)
+	}
+	if Thread(member, true, false) != 0 {
+		t.Error("an outsider sees a private thread")
+	}
+	if !Thread(member, true, true).Has(ViewChannel) {
+		t.Error("a member of a private thread cannot see it")
+	}
+	if !Thread(member|ManageThreads, true, false).Has(ViewChannel) {
+		t.Error("Manage Threads does not see private threads")
+	}
+	if Thread(SendMessagesInThreads, false, true) != 0 {
+		t.Error("a thread of a channel one cannot see is visible")
+	}
+	if Thread(All, true, false) != All {
+		t.Error("an administrator is held back in a thread")
+	}
+}
+
+// Quarantine holds a member as a timeout does.
+func TestQuarantine(t *testing.T) {
+	srv := ids.ID(1)
+	everyone := []Role{{ID: srv, Permissions: DefaultEveryone}}
+	if got := Base(srv, everyone, Member{UserID: 9, Quarantined: true}, false); got != DefaultEveryone&TimedOutKeep {
+		t.Errorf("quarantined base: %d", got)
 	}
 }

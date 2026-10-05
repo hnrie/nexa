@@ -40,6 +40,8 @@ const (
 	LogAccountEnable      = "account_enable"
 	// LogExpressionRelist lets a pack taken out of Discover be listed again.
 	LogExpressionRelist = "expression_relist"
+	// LogDiscoveryRestore lets a server taken off Discovery be listed again.
+	LogDiscoveryRestore = "discovery_restore"
 )
 
 // The restrictions a case can put in force.
