@@ -85,7 +85,7 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
   const nav = useNavigate();
   const ctx = useRenderCtx();
   const band = useBand(card);
-  const [emojis, setEmojis] = useState<{ id: string; name: string; animated: boolean }[]>([]);
+  const [emojis, setEmojis] = useState<{ id: string; blob_id: string; name: string; animated: boolean }[]>([]);
   const [owner, setOwner] = useState<PublicUser | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -158,7 +158,7 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
         ) : null}
         {emojis.length ? (
           <div className={s.emojis} aria-label={t("discovery.emojis")}>
-            {emojis.map((e) => <img key={e.id} src={emojiUrl(e.id, e.animated, 32)} alt={`:${e.name}:`} title={`:${e.name}:`} loading="lazy" />)}
+            {emojis.map((e) => <img key={e.id} src={emojiUrl(e.blob_id, e.animated, 32)} alt={`:${e.name}:`} title={`:${e.name}:`} loading="lazy" />)}
           </div>
         ) : null}
         {owner ? <div className={s.facts}>{t("discovery.ownedBy", { name: owner.display_name })}</div> : null}

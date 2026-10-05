@@ -22,7 +22,7 @@ export const discovery = {
   categories(): Promise<{ categories: string[]; counts: Record<string, number>; total: number; tags: string[]; languages: string[] }> {
     return api.request("GET", "/discovery/categories");
   },
-  server(id: Snowflake): Promise<{ server: DiscoveryCard; emojis?: { id: Snowflake; name: string; animated: boolean }[]; owner?: PublicUser }> {
+  server(id: Snowflake): Promise<{ server: DiscoveryCard; emojis?: { id: Snowflake; blob_id: Snowflake; name: string; animated: boolean }[]; owner?: PublicUser }> {
     return api.request("GET", `/discovery/${id}`);
   },
   join(id: Snowflake, captcha?: string | null): Promise<{ server: ServerView; users: PublicUser[] }> {

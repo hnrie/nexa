@@ -61,10 +61,10 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
       setBusy(false);
     }
   };
-  const upload = async (kind: "icon" | "banner", file: File) => {
+  const upload = async (kind: "icon" | "banner", file: File, crop?: { x: number; y: number; w: number; h: number } | null) => {
     setBusy(true);
     try {
-      updateServer(await (kind === "icon" ? serversApi.uploadIcon(serverId, file) : serversApi.uploadBanner(serverId, file)));
+      updateServer(await (kind === "icon" ? serversApi.uploadIcon(serverId, file, crop) : serversApi.uploadBanner(serverId, file, crop)));
     } catch (err) {
       toast(describeError(err, kind === "icon" ? t("server.serverOverview.couldNotUploadTheIcon") : t("server.serverOverview.couldNotUploadTheBanner")), "error");
     } finally {
@@ -146,11 +146,12 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
           round={crop.kind === "icon"}
           maxSize={crop.kind === "icon" ? 1024 : 1280}
           title={crop.kind === "icon" ? t("server.serverOverview.cropTheServerIcon") : t("server.serverOverview.cropTheServerBanner")}
+          serverCrop
           onClose={() => setCrop(null)}
-          onDone={({ blob }) => {
+          onDone={({ blob, crop: area }) => {
             const kind = crop.kind;
             setCrop(null);
-            void upload(kind, new File([blob], `${kind}.png`, { type: blob.type }));
+            void upload(kind, new File([blob], `${kind}.png`, { type: blob.type }), area ?? null);
           }}
         />
       ) : null}

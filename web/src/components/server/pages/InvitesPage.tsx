@@ -1,4 +1,4 @@
-import { Pause, Play } from "lucide-react";
+import { CirclePause, DoorOpen, Pause, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { menuAnchor } from "@/components/common/ContextMenu";
 import { useServers } from "@/stores/servers";
@@ -132,22 +132,25 @@ export default function InvitesPage({ serverId }: { serverId: string }) {
       <h2 className={st.title}>{t("server.invites.invites")}</h2>
       <p className={st.hint}>{t("server.invites.activeInviteLinksForThisServer")}</p>
       <section className={s.joinPanel} data-paused={paused || undefined} aria-label={t("server.invites.whoCanJoin")}>
-        <div className={s.joinText}>
-          <span className={s.joinHead}>{paused ? t("server.invites.pausedHead") : t("server.invites.openHead")}</span>
-          <span className={s.joinDesc}>
-            {paused ? (forever ? t("server.invites.pausedForever") : t("server.invites.pausedUntil", { time: formatFull(pausedUntil!) })) : t("server.invites.openDesc")}
-          </span>
-        </div>
-        <div className={s.joinBtns}>
-          {paused ? (
-            <Button size="sm" variant="positive" loading={pausing} onClick={() => void setPause(null)} data-testid="invites-resume">
-              <Play size={14} aria-hidden="true" /> {t("server.invites.resume")}
-            </Button>
-          ) : (
-            <Button size="sm" variant="secondary" loading={pausing} onClick={(e) => pauseMenu(e.currentTarget)} data-testid="invites-pause">
-              <Pause size={14} aria-hidden="true" /> {t("server.invites.pause")}
-            </Button>
-          )}
+        <span className={s.joinIcon} aria-hidden="true">{paused ? <CirclePause size={20} /> : <DoorOpen size={20} />}</span>
+        <div className={s.joinMain}>
+          <div className={s.joinText}>
+            <span className={s.joinHead}>{paused ? t("server.invites.pausedHead") : t("server.invites.openHead")}</span>
+            <span className={s.joinDesc}>
+              {paused ? (forever ? t("server.invites.pausedForever") : t("server.invites.pausedUntil", { time: formatFull(pausedUntil!) })) : t("server.invites.openDesc")}
+            </span>
+          </div>
+          <div className={s.joinBtns}>
+            {paused ? (
+              <Button size="sm" variant="positive" loading={pausing} onClick={() => void setPause(null)} data-testid="invites-resume">
+                <Play size={14} aria-hidden="true" /> {t("server.invites.resume")}
+              </Button>
+            ) : (
+              <Button size="sm" variant="secondary" loading={pausing} onClick={(e) => pauseMenu(e.currentTarget)} data-testid="invites-pause">
+                <Pause size={14} aria-hidden="true" /> {t("server.invites.pause")}
+              </Button>
+            )}
+          </div>
         </div>
       </section>
       <div className={s.inviteTools}>

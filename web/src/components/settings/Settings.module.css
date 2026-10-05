@@ -236,7 +236,7 @@
 .foundLabel { display: block; }
 .foundPage { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); }
 /* a page's pointer to where something else now lives */
-.inlineLink { padding: 0; font: inherit; color: var(--link); }
+.inlineLink { padding: 0; font: inherit; color: var(--link); text-align: start; }
 .inlineLink:hover { text-decoration: underline; }
 /* the setting a search went to, lit for a moment once it is in view */
 [data-setting][data-found] { border-radius: var(--radius-sm); animation: found 1.6s var(--ease-out); }

@@ -906,7 +906,7 @@ export function MessageList({ channel }: { channel: Channel }) {
           {channel.server_id
             ? <Tr id="chat.messageList.channelStart" values={{ name: <b>#{name}</b> }} />
             : <Tr id="chat.messageList.groupStart" values={{ name: <b>{name}</b> }} />}
-          {channel.server_id && channel.topic ? ` ${channel.topic}` : ""} {t("chat.messageList.endToEnd")}
+          {channel.server_id && channel.topic ? ` ${plainText(parse(channel.topic)).replace(/\s+/g, " ").trim()}` : ""} {t("chat.messageList.endToEnd")}
         </p>}
       </div>
     );

@@ -194,11 +194,11 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     if (savedWidgets) setWidgets(savedWidgets);
     setInline(null);
   };
-  const upload = async (kind: "avatar" | "banner", file: File) => {
+  const upload = async (kind: "avatar" | "banner", file: File, crop?: { x: number; y: number; w: number; h: number } | null) => {
     if (file.size > 10 * 1024 * 1024) return toast(t("settings.profile.imagesAreLimitedTo10Mb"), "error");
     setUploading(kind);
     try {
-      const res = kind === "avatar" ? await usersApi.uploadAvatar(file) : await usersApi.uploadBanner(file);
+      const res = kind === "avatar" ? await usersApi.uploadAvatar(file, crop) : await usersApi.uploadBanner(file, crop);
       setMe(res.user);
       toast(kind === "avatar" ? t("settings.profile.avatarUpdated") : t("settings.profile.bannerUpdated"), "success");
     } catch (err) {
@@ -462,12 +462,13 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
           round={crop.kind === "avatar"}
           maxSize={crop.kind === "avatar" ? 1024 : 1920}
           title={crop.kind === "avatar" ? t("settings.profile.cropYourAvatar") : t("settings.profile.cropYourBanner")}
+          serverCrop
           onClose={() => setCrop(null)}
-          onDone={({ blob }) => {
+          onDone={({ blob, crop: area }) => {
             const kind = crop.kind;
             setCrop(null);
             setPop(null);
-            void upload(kind, new File([blob], kind + (blob.type === "image/png" ? ".png" : ""), { type: blob.type }));
+            void upload(kind, new File([blob], kind + (blob.type === "image/png" ? ".png" : ""), { type: blob.type }), area ?? null);
           }}
         />
       ) : null}

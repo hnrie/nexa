@@ -202,11 +202,11 @@ function Designer({ serverId, servers, onServer }: { serverId: string; servers: 
     if (savedWidgets !== undefined) setWidgets(savedWidgets);
     setInline(null);
   };
-  const upload = async (kind: "avatar" | "banner", file: File) => {
+  const upload = async (kind: "avatar" | "banner", file: File, crop?: { x: number; y: number; w: number; h: number } | null) => {
     if (file.size > 10 * 1024 * 1024) return toast(t("settings.profile.imagesAreLimitedTo10Mb"), "error");
     setUploading(kind);
     try {
-      upsertMember(await serversApi.uploadMemberImage(serverId, kind, file));
+      upsertMember(await serversApi.uploadMemberImage(serverId, kind, file, crop));
     } catch (err) {
       toast(err instanceof ApiError ? err.message : t("serverProfile.uploadFailed"), "error");
     } finally {
@@ -496,12 +496,13 @@ function Designer({ serverId, servers, onServer }: { serverId: string; servers: 
           round={crop.kind === "avatar"}
           maxSize={crop.kind === "avatar" ? 1024 : 1920}
           title={crop.kind === "avatar" ? t("settings.profile.cropYourAvatar") : t("settings.profile.cropYourBanner")}
+          serverCrop
           onClose={() => setCrop(null)}
-          onDone={({ blob }) => {
+          onDone={({ blob, crop: area }) => {
             const kind = crop.kind;
             setCrop(null);
             setPop(null);
-            void upload(kind, new File([blob], kind + (blob.type === "image/png" ? ".png" : ""), { type: blob.type }));
+            void upload(kind, new File([blob], kind + (blob.type === "image/png" ? ".png" : ""), { type: blob.type }), area ?? null);
           }}
         />
       ) : null}

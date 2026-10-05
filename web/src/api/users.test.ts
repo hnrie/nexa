@@ -99,7 +99,7 @@ describe("users", () => {
   it("passes the avatar progress callback through", async () => {
     const uploads = recordUploads();
     const onProgress = (): void => undefined;
-    await users.uploadAvatar(new Blob([], { type: "image/webp" }), onProgress);
+    await users.uploadAvatar(new Blob([], { type: "image/webp" }), null, onProgress);
     expect(one(uploads).opts?.onProgress).toBe(onProgress);
   });
 

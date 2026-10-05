@@ -3,7 +3,7 @@ import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import { iconUrl } from "@/api/users";
 import { Button } from "@/components/common/Button";
-import { IconPicker } from "@/components/common/IconPicker";
+import { IconPicker, type PickedIcon } from "@/components/common/IconPicker";
 import { Modal } from "@/components/common/Modal";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { managesGroup } from "@/components/sidebar/dmMenu";
@@ -23,7 +23,7 @@ export function EditGroupModal({ channelId, onClose }: { channelId: string; onCl
   const meId = useAuth((a) => a.me?.id);
   const toast = useUI((u) => u.toast);
   const [name, setName] = useState(ch?.name ?? "");
-  const [icon, setIcon] = useState<File | null>(null);
+  const [icon, setIcon] = useState<PickedIcon | null>(null);
   const [removeIcon, setRemoveIcon] = useState(false);
   const [busy, setBusy] = useState(false);
   if (!ch || ch.type !== "group_dm") return null;
@@ -37,7 +37,7 @@ export function EditGroupModal({ channelId, onClose }: { channelId: string; onCl
     try {
       let next = ch;
       if (name.trim() !== (ch.name ?? "")) next = await channelsApi.patch(ch.id, { name: name.trim() });
-      if (icon) next = await channelsApi.uploadIcon(ch.id, icon);
+      if (icon) next = await channelsApi.uploadIcon(ch.id, icon.file, icon.crop);
       else if (removeIcon && ch.icon_id) {
         await channelsApi.deleteIcon(ch.id);
         next = { ...next, icon_id: null };

@@ -1,13 +1,19 @@
 /* The Members page for moderators (ModMembers.tsx), Mod View (ModView.tsx), and pruning. */
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
-.search { flex: 1 1 240px; min-width: 0; }
+.search { width: 100%; margin-bottom: 10px; }
 .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 12px; }
-.filterBtn { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 999px; background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--border-subtle); color: var(--text); font-size: 13px; font-weight: 600; }
+.filterBtn { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 999px; background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--border-subtle); color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.filterBtn > svg { color: var(--text-muted); }
+.filterBtn[data-on] > svg { color: var(--text-strong); }
+/* between the lists to pick from and the signs that turn on and off */
+.filterRule { flex: none; width: 1px; height: 20px; background: var(--border-subtle); }
 .filterBtn:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
 .filterBtn[data-on] { background: color-mix(in srgb, var(--brand) 22%, var(--bg-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 70%, transparent); color: var(--text-strong); }
-.clear { font-size: 13px; color: var(--link); min-height: 32px; padding: 0 6px; }
+.clear { font-size: 13px; font-weight: 600; color: var(--link); min-height: 32px; padding: 0 6px; }
 .clear:hover { text-decoration: underline; }
-.count { font-size: 13.5px; color: var(--text-muted); margin-bottom: 8px; }
+/* how many, what clears the filters, and pruning, in one line over the list */
+.countRow { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.count { flex: 1; min-width: 0; font-size: 13.5px; color: var(--text-muted); }
 
 /* the table: a row per member, its columns named once at the top */
 .table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
@@ -16,8 +22,9 @@
 .table tbody tr { cursor: pointer; }
 .table tbody tr:hover td { background: var(--bg-hover); }
 .table tbody tr[data-picked] td { background: color-mix(in srgb, var(--brand) 10%, transparent); }
-.tick { width: 18px; height: 18px; accent-color: var(--brand); }
+.tick { cursor: pointer; }
 .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.who > .signals { margin-inline-start: auto; }
 .whoText { display: flex; flex-direction: column; min-width: 0; }
 .name { font-weight: 650; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22ch; }
 .handle { font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22ch; }
@@ -35,8 +42,9 @@
 
 /* a phone has no room for columns: each member is a card, the same facts stacked */
 .cards { display: flex; flex-direction: column; gap: 8px; }
-.card { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: var(--radius-md); background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--border-subtle); }
-.card[data-picked] { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand) 70%, transparent); }
+.card { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: var(--radius-md); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), inset 0 0 0 1px var(--border-subtle); }
+.card[data-picked] { background: color-mix(in srgb, var(--brand) 8%, var(--bg-surface)); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand) 70%, transparent); }
+.card > .tick { margin-top: 8px; }
 .cardMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; text-align: start; }
 .cardFacts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--text-muted); }
 
@@ -60,8 +68,11 @@
 .person { display: flex; align-items: center; gap: 14px; }
 .personText { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .personName { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--text-strong); overflow-wrap: anywhere; }
-.facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; margin: 0; font-size: 14px; }
-.facts dt { color: var(--text-muted); }
+/* the facts on a card of their own, a line between each */
+.facts { display: grid; grid-template-columns: 42% minmax(0, 1fr); margin: 0; padding: 0 14px; border-radius: var(--radius-md); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), inset 0 0 0 1px var(--border-subtle); font-size: 14px; }
+.facts dt, .facts dd { padding-block: 10px; border-bottom: 1px solid var(--border-subtle); }
+.facts dt:last-of-type, .facts dd:last-of-type { border-bottom: 0; }
+.facts dt { color: var(--text-muted); padding-inline-end: 14px; }
 .facts dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
 .block { display: flex; flex-direction: column; gap: 8px; }
 .blockHead { margin: 0; font-size: 13.5px; font-weight: 650; color: var(--text-muted); }
@@ -72,6 +83,16 @@
 .signalLine { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
 
 @media (max-width: 767px) {
-  .sheet { width: 100vw; }
+  /* a phone has the filters in one row that scrolls sideways, edge to edge */
+  .filters { flex-wrap: nowrap; overflow-x: auto; margin-inline: -16px; padding-inline: 16px; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .filters::-webkit-scrollbar { display: none; }
+  /* and Mod View rises from the bottom like every other sheet on a phone (Modal.module.css) */
+  .sheet, [dir="rtl"] .sheet { inset-block: auto 0; inset-inline: 0; width: 100%; max-height: 92vh; max-height: min(92dvh, calc(var(--vvh, 100dvh) - 12px)); border-radius: var(--radius-lg) var(--radius-lg) 0 0; animation: sheetUp 280ms var(--ease-out); }
+  .sheet::before { content: ""; flex: none; display: block; width: 36px; height: 4px; margin: 8px auto -4px; border-radius: 2px; background: var(--border-strong); }
+  .sheetHead { border-bottom: 0; padding-inline: 16px 10px; }
+  .sheetTitle { font-size: 21px; font-weight: 700; }
+  .sheetBody { padding: 4px 16px calc(16px + env(safe-area-inset-bottom)); gap: 18px; }
   .bulk { bottom: 8px; }
 }
+@keyframes sheetUp { from { transform: translateY(40px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet, [dir="rtl"] .sheet { animation: none; } }

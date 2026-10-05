@@ -14,7 +14,7 @@
 .hSub[data-status="dnd"] { color: var(--status-dnd); }
 .hStatus { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .hStatusText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hTopic { text-align: start; min-width: 0; flex: 0 4 auto; color: var(--text-muted); border-inline-start: 1px solid var(--border); padding-inline-start: 8px; unicode-bidi: plaintext; }
+.hTopic { text-align: start; min-width: 0; flex: 0 1000 auto; color: var(--text-muted); border-inline-start: 1px solid var(--border); padding-inline-start: 8px; unicode-bidi: plaintext; }
 .hTopic:hover { color: var(--text); }
 /* In a narrow header the search box grows while it is used, and the topic
    makes way for it rather than both it and the channel's name being cut to

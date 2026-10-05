@@ -1,4 +1,4 @@
-import { ChevronDown, Scissors } from "lucide-react";
+import { ArrowDownUp, ChevronDown, Scissors } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { servers as serversApi, type MemberQuery } from "@/api/servers";
@@ -34,6 +34,20 @@ type Sort = NonNullable<MemberQuery["sort"]>;
 
 /** How far back, as the Joined and Account Age filters offer it. */
 const SPANS = [1, 7, 30, 90];
+const SORTS: Sort[] = ["joined_desc", "joined_asc", "created_desc", "created_asc"];
+
+function sortLabel(sort: Sort): string {
+  switch (sort) {
+    case "joined_asc":
+      return t("members.sort.joinedOld");
+    case "created_desc":
+      return t("members.sort.createdNew");
+    case "created_asc":
+      return t("members.sort.createdOld");
+    default:
+      return t("members.sort.joinedNew");
+  }
+}
 
 function RoleChips({ serverId, ids }: { serverId: string; ids: string[] }) {
   const roles = useServers((x) => x.byId[serverId]?.roles);
@@ -212,28 +226,19 @@ export function ModMembers({ serverId }: { serverId: string }) {
   return (
     <>
       <h2 className={st.title}>{t("server.members.membersCount", { count: server.memberCount })}</h2>
-      <div className={s.top}>
-        <SearchBox className={s.search} value={q} onChange={setQ} placeholder={t("members.search")} aria-label={t("members.search")} data-testid="members-search" />
-        <Select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label={t("members.sort.label")} style={{ width: "auto" }}>
-          <option value="joined_desc">{t("members.sort.joinedNew")}</option>
-          <option value="joined_asc">{t("members.sort.joinedOld")}</option>
-          <option value="created_desc">{t("members.sort.createdNew")}</option>
-          <option value="created_asc">{t("members.sort.createdOld")}</option>
-        </Select>
-        {canI(server, P.KICK_MEMBERS) ? (
-          <Button size="sm" variant="secondary" onClick={() => setPruning(true)}>
-            <Scissors size={14} aria-hidden="true" /> {t("members.prune.button")}
-          </Button>
-        ) : null}
-      </div>
+      <SearchBox className={s.search} value={q} onChange={setQ} placeholder={t("members.search")} aria-label={t("members.search")} data-testid="members-search" />
+      {/* the filters in one row; a phone scrolls it sideways rather than stacking four rows of it */}
       <div className={s.filters} role="group" aria-label={t("members.filter.label")}>
-        <button type="button" className={s.filterBtn} data-on={roles.length ? "" : undefined} onClick={(e) => menu(e.currentTarget, t("server.members.roles"), allRoles.map((r) => ({ id: r.id, label: r.name, checked: roles.includes(r.id), toggle: true, onSelect: () => setRoles((cur) => (cur.includes(r.id) ? cur.filter((x) => x !== r.id) : [...cur, r.id])) })))}>
+        <button type="button" className={s.filterBtn} aria-haspopup="menu" onClick={(e) => menu(e.currentTarget, t("members.sort.label"), SORTS.map((k) => ({ id: k, label: sortLabel(k), checked: sort === k, onSelect: () => setSort(k) })))} data-testid="members-sort">
+          <ArrowDownUp size={14} aria-hidden="true" /> {sortLabel(sort)} <ChevronDown size={14} aria-hidden="true" />
+        </button>
+        <button type="button" className={s.filterBtn} data-on={roles.length ? "" : undefined} aria-haspopup="menu" onClick={(e) => menu(e.currentTarget, t("server.members.roles"), allRoles.map((r) => ({ id: r.id, label: r.name, checked: roles.includes(r.id), toggle: true, onSelect: () => setRoles((cur) => (cur.includes(r.id) ? cur.filter((x) => x !== r.id) : [...cur, r.id])) })))}>
           {roles.length ? t("members.filter.rolesN", { count: roles.length }) : t("server.members.roles")} <ChevronDown size={14} aria-hidden="true" />
         </button>
-        <button type="button" className={s.filterBtn} data-on={joined ? "" : undefined} onClick={(e) => menu(e.currentTarget, t("members.filter.joined"), [{ id: "any", label: t("members.filter.any"), checked: !joined, onSelect: () => setJoined(0) }, ...SPANS.map((d) => ({ id: `j${d}`, label: spanLabel(d), checked: joined === d, onSelect: () => setJoined(d) }))])}>
+        <button type="button" className={s.filterBtn} data-on={joined ? "" : undefined} aria-haspopup="menu" onClick={(e) => menu(e.currentTarget, t("members.filter.joined"), [{ id: "any", label: t("members.filter.any"), checked: !joined, onSelect: () => setJoined(0) }, ...SPANS.map((d) => ({ id: `j${d}`, label: spanLabel(d), checked: joined === d, onSelect: () => setJoined(d) }))])}>
           {joined ? t("members.filter.joinedIn", { span: spanLabel(joined) }) : t("members.filter.joined")} <ChevronDown size={14} aria-hidden="true" />
         </button>
-        <button type="button" className={s.filterBtn} data-on={created ? "" : undefined} onClick={(e) => menu(e.currentTarget, t("members.filter.age"), [{ id: "any", label: t("members.filter.any"), checked: !created, onSelect: () => setCreated(0) }, ...SPANS.map((d) => ({ id: `c${d}`, label: spanLabel(d), checked: created === d, onSelect: () => setCreated(d) }))])}>
+        <button type="button" className={s.filterBtn} data-on={created ? "" : undefined} aria-haspopup="menu" onClick={(e) => menu(e.currentTarget, t("members.filter.age"), [{ id: "any", label: t("members.filter.any"), checked: !created, onSelect: () => setCreated(0) }, ...SPANS.map((d) => ({ id: `c${d}`, label: spanLabel(d), checked: created === d, onSelect: () => setCreated(d) }))])}>
           {created ? t("members.filter.ageIn", { span: spanLabel(created) }) : t("members.filter.age")} <ChevronDown size={14} aria-hidden="true" />
         </button>
         {seesJoins ? (
@@ -241,6 +246,7 @@ export function ModMembers({ serverId }: { serverId: string }) {
             type="button"
             className={s.filterBtn}
             data-on={method || code ? "" : undefined}
+            aria-haspopup="menu"
             onClick={(e) =>
               menu(e.currentTarget, t("members.col.joinMethod"), [
                 { id: "any", label: t("members.filter.any"), checked: !method && !code, onSelect: () => { setMethod(""); setCode(""); } },
@@ -253,14 +259,22 @@ export function ModMembers({ serverId }: { serverId: string }) {
             {code ? t("members.filter.invite", { code }) : method ? joinMethodLabel(method) : t("members.col.joinMethod")} <ChevronDown size={14} aria-hidden="true" />
           </button>
         ) : null}
+        <span className={s.filterRule} aria-hidden="true" />
         {SIGNALS.map((sig) => (
           <button key={sig} type="button" className={s.filterBtn} aria-pressed={signals.includes(sig)} data-on={signals.includes(sig) ? "" : undefined} onClick={() => setSignals((cur) => (cur.includes(sig) ? cur.filter((x) => x !== sig) : [...cur, sig]))}>
             <SignalIcon kind={sig} /> {signalLabel(sig)}
           </button>
         ))}
-        {filtering ? <button type="button" className={s.clear} onClick={clearFilters}>{t("members.filter.clear")}</button> : null}
       </div>
-      {rows ? <div className={s.count} role="status">{filtering ? t("members.found", { count: total }) : t("members.total", { count: total })}</div> : null}
+      <div className={s.countRow}>
+        <span className={s.count} role="status">{rows ? (filtering ? t("members.found", { count: total }) : t("members.total", { count: total })) : ""}</span>
+        {filtering ? <button type="button" className={s.clear} onClick={clearFilters}>{t("members.filter.clear")}</button> : null}
+        {canI(server, P.KICK_MEMBERS) ? (
+          <Button size="sm" variant="secondary" onClick={() => setPruning(true)}>
+            <Scissors size={14} aria-hidden="true" /> {t("members.prune.button")}
+          </Button>
+        ) : null}
+      </div>
       {failed ? <LoadError message={t("members.loadFailed")} onRetry={() => void load(0)} /> : null}
       {rows === null && !failed ? <Spinner label={t("chat.pins.loading")} /> : null}
       {rows && rows.length === 0 ? <p className={st.hint}>{filtering ? t("members.none") : t("members.empty")}</p> : null}
@@ -268,7 +282,18 @@ export function ModMembers({ serverId }: { serverId: string }) {
         mobile ? (
           <div className={s.cards}>
             {rows.map((m) => (
-              <div key={m.user_id} className={s.card} data-picked={picked.has(m.user_id) || undefined} data-member={m.user_id}>
+              <div
+                key={m.user_id}
+                className={s.card}
+                data-picked={picked.has(m.user_id) || undefined}
+                data-member={m.user_id}
+                // a long press picks, as it does in the phone app
+                onContextMenu={(e) => {
+                  if (!pickable(m.user_id)) return;
+                  e.preventDefault();
+                  toggle(m.user_id);
+                }}
+              >
                 {pickable(m.user_id) ? <input type="checkbox" className={s.tick} checked={picked.has(m.user_id)} onChange={() => toggle(m.user_id)} aria-label={t("members.pick", { name: nameOf(m) })} /> : <span style={{ width: 18 }} />}
                 <button type="button" className={s.cardMain} onClick={() => setViewing(m.user_id)}>
                   <span className={s.who}>
@@ -277,13 +302,13 @@ export function ModMembers({ serverId }: { serverId: string }) {
                       <span className={s.name} dir="auto">{nameOf(m)}</span>
                       <span className={s.handle}>@{users[m.user_id]?.username ?? ""}</span>
                     </span>
+                    <Signals list={m.signals} />
                   </span>
                   <span className={s.cardFacts}>
                     <span>{t("members.card.member", { date: formatDateDivider(m.joined_at) })}</span>
                     <span>{t("members.card.account", { age: formatSpan(Date.now() - m.account_created_at) })}</span>
                     {m.join ? <span>{joinMethodLabel(m.join.join_method)}</span> : null}
                   </span>
-                  <Signals list={m.signals} />
                   <RoleChips serverId={serverId} ids={m.role_ids} />
                 </button>
               </div>

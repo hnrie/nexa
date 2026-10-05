@@ -32,6 +32,12 @@ function putImage<T>(path: string, file: Blob, onProgress?: Progress): Promise<T
   return api.upload<T>(path, file, opts);
 }
 
+/** The part framed in the picture's own pixels, as ?x=&y=&w=&h=; empty keeps the middle. */
+function cropQuery(crop?: { x: number; y: number; w: number; h: number } | null): string {
+  if (!crop) return "";
+  return `?x=${Math.round(crop.x)}&y=${Math.round(crop.y)}&w=${Math.round(crop.w)}&h=${Math.round(crop.h)}`;
+}
+
 export const users = {
   me(): Promise<MeUser> {
     return api.request<MeUser>("GET", "/users/@me");
@@ -107,14 +113,14 @@ export const users = {
   publicKey(id: Snowflake): Promise<{ user_id: Snowflake; public_key: string }> {
     return api.request("GET", `/users/${id}/public-key`);
   },
-  uploadAvatar(file: Blob, onProgress?: Progress): Promise<{ avatar_id: Snowflake; user: MeUser }> {
-    return putImage("/users/@me/avatar", file, onProgress);
+  uploadAvatar(file: Blob, crop?: { x: number; y: number; w: number; h: number } | null, onProgress?: Progress): Promise<{ avatar_id: Snowflake; user: MeUser }> {
+    return putImage(`/users/@me/avatar${cropQuery(crop)}`, file, onProgress);
   },
   deleteAvatar(): Promise<void> {
     return api.request<void>("DELETE", "/users/@me/avatar");
   },
-  uploadBanner(file: Blob, onProgress?: Progress): Promise<{ banner_id: Snowflake; user: MeUser }> {
-    return putImage("/users/@me/banner", file, onProgress);
+  uploadBanner(file: Blob, crop?: { x: number; y: number; w: number; h: number } | null, onProgress?: Progress): Promise<{ banner_id: Snowflake; user: MeUser }> {
+    return putImage(`/users/@me/banner${cropQuery(crop)}`, file, onProgress);
   },
   deleteBanner(): Promise<void> {
     return api.request<void>("DELETE", "/users/@me/banner");

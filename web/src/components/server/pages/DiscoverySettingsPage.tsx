@@ -8,6 +8,8 @@ import { Toggle } from "@/components/common/Toggle";
 import { ServerCard } from "@/components/discovery/DiscoveryPage";
 import { t } from "@/i18n";
 import { LANGUAGES } from "@/i18n/core";
+import { useAuth } from "@/stores/auth";
+import { usePresence } from "@/stores/presence";
 import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import st from "@/components/settings/Settings.module.css";
@@ -26,6 +28,8 @@ export default function DiscoverySettingsPage({ serverId }: { serverId: string }
   const st_ = useServers((x) => x.byId[serverId]);
   const server = st_?.server;
   const toast = useUI((u) => u.toast);
+  const presence = usePresence((p) => p.byUser);
+  const meId = useAuth((a) => a.me?.id);
   const [listed, setListed] = useState<boolean | null>(null);
   const [category, setCategory] = useState<string | null>(null);
   const [tags, setTags] = useState<string[] | null>(null);
@@ -73,7 +77,11 @@ export default function DiscoverySettingsPage({ serverId }: { serverId: string }
     tags: tagList,
     language: lang,
     member_count: st_.memberCount,
-    online_count: 0,
+    // the members this app has loaded who are about now, which is everyone in a small server
+    online_count: Object.keys(st_.members).filter((id) => {
+      const status = presence[id]?.status ?? (id === meId ? "online" : undefined);
+      return !!status && status !== "offline" && status !== "invisible";
+    }).length,
     created_at: server.created_at,
     listed_at: null,
     tag: null,
@@ -98,7 +106,7 @@ export default function DiscoverySettingsPage({ serverId }: { serverId: string }
             {tagList.map((tg) => (
               <span key={tg} className={s.tagChip} aria-pressed="true">
                 {tg}
-                <button type="button" aria-label={t("discovery.settings.removeTag", { tag: tg })} onClick={() => setTags(tagList.filter((x) => x !== tg))} style={{ display: "grid", placeItems: "center" }}><X size={13} /></button>
+                <button type="button" className={s.tagRemove} aria-label={t("discovery.settings.removeTag", { tag: tg })} onClick={() => setTags(tagList.filter((x) => x !== tg))}><X size={13} /></button>
               </span>
             ))}
           </div>

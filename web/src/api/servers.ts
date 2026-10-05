@@ -106,6 +106,14 @@ function upload<T>(path: string, file: Blob, onProgress?: Progress): Promise<T> 
   return api.upload<T>(path, file, opts);
 }
 
+type Crop = { x: number; y: number; w: number; h: number } | null;
+
+/** The part framed in the picture's own pixels, as ?x=&y=&w=&h=; empty keeps the middle. */
+function cropQuery(crop?: Crop): string {
+  if (!crop) return "";
+  return `?x=${Math.round(crop.x)}&y=${Math.round(crop.y)}&w=${Math.round(crop.w)}&h=${Math.round(crop.h)}`;
+}
+
 export const servers = {
   /**
    * The first categories and channels are records people can rename, not
@@ -130,14 +138,14 @@ export const servers = {
   delete(id: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/servers/${id}`);
   },
-  uploadIcon(id: Snowflake, file: Blob, onProgress?: Progress): Promise<Server> {
-    return upload<Server>(`/servers/${id}/icon`, file, onProgress);
+  uploadIcon(id: Snowflake, file: Blob, crop?: Crop, onProgress?: Progress): Promise<Server> {
+    return upload<Server>(`/servers/${id}/icon${cropQuery(crop)}`, file, onProgress);
   },
   deleteIcon(id: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/servers/${id}/icon`);
   },
-  uploadBanner(id: Snowflake, file: Blob, onProgress?: Progress): Promise<Server> {
-    return upload<Server>(`/servers/${id}/banner`, file, onProgress);
+  uploadBanner(id: Snowflake, file: Blob, crop?: Crop, onProgress?: Progress): Promise<Server> {
+    return upload<Server>(`/servers/${id}/banner${cropQuery(crop)}`, file, onProgress);
   },
   deleteBanner(id: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/servers/${id}/banner`);
@@ -294,14 +302,14 @@ export const servers = {
     return api.request("POST", `/servers/${id}/bulk-ban`, { user_ids: userIds, ...body });
   },
   /** The caller's own picture or banner in one server ("@me"); a moderator may only remove someone else's. */
-  uploadMemberImage(id: Snowflake, which: "avatar" | "banner", file: Blob, onProgress?: Progress): Promise<Member> {
-    return upload<Member>(`/servers/${id}/members/@me/${which}`, file, onProgress);
+  uploadMemberImage(id: Snowflake, which: "avatar" | "banner", file: Blob, crop?: Crop, onProgress?: Progress): Promise<Member> {
+    return upload<Member>(`/servers/${id}/members/@me/${which}${cropQuery(crop)}`, file, onProgress);
   },
   deleteMemberImage(id: Snowflake, userId: Snowflake | "@me", which: "avatar" | "banner"): Promise<Member> {
     return api.request<Member>("DELETE", `/servers/${id}/members/${userId}/${which}`);
   },
-  uploadRoleIcon(id: Snowflake, roleId: Snowflake, file: Blob, onProgress?: Progress): Promise<Role> {
-    return upload<Role>(`/servers/${id}/roles/${roleId}/icon`, file, onProgress);
+  uploadRoleIcon(id: Snowflake, roleId: Snowflake, file: Blob, crop?: Crop, onProgress?: Progress): Promise<Role> {
+    return upload<Role>(`/servers/${id}/roles/${roleId}/icon${cropQuery(crop)}`, file, onProgress);
   },
   deleteRoleIcon(id: Snowflake, roleId: Snowflake): Promise<Role> {
     return api.request<Role>("DELETE", `/servers/${id}/roles/${roleId}/icon`);

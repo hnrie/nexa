@@ -21,7 +21,8 @@
   select.input > button { all: unset; display: flex; align-items: center; flex: 1; min-width: 0; }
   select.input selectedcontent { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   select.input:hover { border-color: var(--border); }
-  select.input::picker-icon { color: var(--text-muted); transition: rotate var(--transition); }
+  /* the chevron the phone app draws, not the browser's solid triangle */
+  select.input::picker-icon { content: ""; flex: none; width: 18px; height: 18px; background: var(--text-muted); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 18px 18px no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 18px 18px no-repeat; transition: rotate var(--transition); }
   select.input:open::picker-icon { rotate: 180deg; }
   select.input::picker(select) { margin-block: 6px; padding: 6px; border: 0; border-radius: var(--radius-md); background: var(--bg-floating); color: var(--text); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); }
   select.input option { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 10px; border-radius: var(--radius-sm); font-size: 15px; cursor: pointer; }

@@ -4,6 +4,7 @@
 .tab[aria-selected="true"] { color: var(--text-strong); }
 .tab[aria-selected="true"]::after { content: ""; position: absolute; inset-inline: 10px; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--focus-ring); }
 .tab:hover { color: var(--text); }
+@media (pointer: coarse) { .tab { min-height: 44px; } }
 
 .intro { margin: -12px 0 20px; color: var(--text-muted); font-size: 14.5px; line-height: 1.5; max-width: 64ch; }
 .week { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; font-size: 14px; color: var(--text-muted); }
@@ -97,9 +98,8 @@
 .eventDetail { font-size: 14px; color: var(--text); }
 
 @media (max-width: 767px) {
-  .rule { padding: 12px; gap: 10px; align-items: flex-start; }
-  .ruleIcon { width: 34px; height: 34px; }
-  .ruleCount { display: none; }
+  /* a phone keeps the week's count beside the switch, as the phone app does */
+  .rule { padding: 12px; gap: 10px; }
   .kinds { grid-template-columns: 1fr; }
   .section { padding: 14px 12px; }
   .event { padding: 12px; }

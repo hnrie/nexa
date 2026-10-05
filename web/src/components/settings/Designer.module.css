@@ -15,6 +15,7 @@
 .scopeTab[aria-selected="true"] { color: var(--text-strong); }
 .scopeTab[aria-selected="true"]::after { content: ""; position: absolute; inset-inline: 10px; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--focus-ring); }
 .scopeTab:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: var(--radius-xs); }
+@media (pointer: coarse) { .scopeTab { min-height: 44px; } }
 .scopeTabs ~ .intro { margin-top: 0; }
 
 /* which server's profile this is, and the way back to the main one there */

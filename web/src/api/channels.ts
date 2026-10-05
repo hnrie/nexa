@@ -26,13 +26,14 @@ export const channels = {
   patch(id: Snowflake, body: { name?: string; owner_id?: Snowflake; password_key?: string; password_salt?: string; password_params?: unknown; password_remove?: boolean }): Promise<Channel> {
     return api.request<Channel>("PATCH", `/channels/${id}`, body);
   },
-  uploadIcon(id: Snowflake, file: Blob, onProgress?: Progress): Promise<Channel> {
+  uploadIcon(id: Snowflake, file: Blob, crop?: { x: number; y: number; w: number; h: number } | null, onProgress?: Progress): Promise<Channel> {
+    const q = crop ? `?x=${Math.round(crop.x)}&y=${Math.round(crop.y)}&w=${Math.round(crop.w)}&h=${Math.round(crop.h)}` : "";
     const opts: { method: string; headers: Record<string, string>; onProgress?: Progress } = {
       method: "PUT",
       headers: { "Content-Type": file.type || "application/octet-stream" },
     };
     if (onProgress) opts.onProgress = onProgress;
-    return api.upload<Channel>(`/channels/${id}/icon`, file, opts);
+    return api.upload<Channel>(`/channels/${id}/icon${q}`, file, opts);
   },
   deleteIcon(id: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/channels/${id}/icon`);

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import { Button } from "@/components/common/Button";
-import { IconPicker } from "@/components/common/IconPicker";
+import { IconPicker, type PickedIcon } from "@/components/common/IconPicker";
 import { initials } from "@/lib/avatarColor";
 import { Modal } from "@/components/common/Modal";
 import { Field, TextInput } from "@/components/common/TextInput";
@@ -23,7 +23,7 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"create" | "join">("create");
   const [name, setName] = useState(() => (me ? t("modals.createServer.namedServer", { name: me.display_name || me.username }) : t("modals.createServer.myServer")));
   const [code, setCode] = useState("");
-  const [icon, setIcon] = useState<File | null>(null);
+  const [icon, setIcon] = useState<PickedIcon | null>(null);
   const [busy, setBusy] = useState(false);
 
   const create = async () => {
@@ -37,7 +37,7 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
       // the icon goes up once the server exists; a failure there still leaves the server made
       if (icon) {
         try {
-          useServers.getState().updateServer(await serversApi.uploadIcon(view.id, icon));
+          useServers.getState().updateServer(await serversApi.uploadIcon(view.id, icon.file, icon.crop));
         } catch (err) {
           toast(err instanceof ApiError ? t("modals.createServer.theServerWasMadeButItsIcon", { error: err.message }) : t("modals.createServer.theServerWasMadeButIts"), "error");
         }

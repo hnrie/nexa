@@ -215,10 +215,10 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
   };
   const dirty = name !== role.name || color !== role.color || hoist !== role.hoist || mentionable !== role.mentionable || color2 !== (role.color2 ?? null) || color3 !== (role.color3 ?? null) || iconEmoji !== (role.icon_emoji ?? "");
   const look = { color: color ? hex(color) : undefined, ...(color && color2 != null ? { colors: [hex(color), hex(color2), ...(color3 != null ? [hex(color3)] : [])], shimmer: color3 != null } : {}) } as RoleLook;
-  const uploadIcon = async (blob: Blob) => {
+  const uploadIcon = async (blob: Blob, crop?: { x: number; y: number; w: number; h: number } | null) => {
     setIconBusy(true);
     try {
-      const saved = await serversApi.uploadRoleIcon(role.server_id, role.id, blob);
+      const saved = await serversApi.uploadRoleIcon(role.server_id, role.id, blob, crop);
       onSaved(saved);
       setIconEmoji("");
       toast(t("roles.icon.saved"), "success");
@@ -327,9 +327,9 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
             <Button size="sm" variant="secondary" disabled={!editable || iconBusy} onClick={() => iconRef.current?.click()}>{t("roles.icon.upload")}</Button>
             <TextInput className={s.emojiField} value={iconEmoji.startsWith("custom:") ? "" : iconEmoji} placeholder={t("roles.icon.emoji")} aria-label={t("roles.icon.emoji")} disabled={!editable} onChange={(e) => setIconEmoji([...e.target.value.trim()].slice(-8).join(""))} maxLength={16} />
             {role.icon_id || role.icon_emoji ? <Button size="sm" variant="ghost" disabled={!editable || iconBusy} onClick={() => void removeIcon()}>{t("roles.icon.remove")}</Button> : null}
-            <input ref={iconRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (f.type === "image/gif") void uploadIcon(f); else setCrop(f); } e.target.value = ""; }} />
+            <input ref={iconRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop(f); e.target.value = ""; }} />
           </div>
-          {crop ? <ImageCropModal file={crop} aspect={1} maxSize={128} title={t("roles.icon.crop")} onClose={() => setCrop(null)} onDone={({ blob }) => { setCrop(null); void uploadIcon(blob); }} /> : null}
+          {crop ? <ImageCropModal file={crop} aspect={1} maxSize={128} title={t("roles.icon.crop")} serverCrop onClose={() => setCrop(null)} onDone={({ blob, crop: area }) => { setCrop(null); void uploadIcon(blob, area ?? null); }} /> : null}
         </Field>
       ) : null}
       {!everyone ? <Toggle checked={hoist} disabled={!editable} onChange={setHoist} label={t("server.roles.displayRoleMembersSeparatelyFromOnline")} /> : null}
