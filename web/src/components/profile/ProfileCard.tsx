@@ -276,6 +276,8 @@ export type ProfilePart = "banner" | "avatar" | "name" | "pronouns" | "tag" | "s
 export interface ProfileDesign {
   /** Opens what changes a part, beside the part pressed. */
   edit: (part: ProfilePart, anchor: HTMLElement) => void;
+  /** Parts drawn as they are, with nothing to press: a server profile's status and tag are the account's. */
+  fixed?: ProfilePart[];
   /** Parts being written where they are: the editor drawn in each one's place. */
   inline?: Partial<Record<"name" | "pronouns" | "about", ReactNode>>;
   /** The Widgets tab's tools. */
@@ -284,6 +286,7 @@ export interface ProfileDesign {
 
 /** A part of the profile the designer changes: an outline and a label on hover or focus (always on a touch screen). */
 function Spot({ design, part, label, round }: { design: ProfileDesign; part: ProfilePart; label: string; round?: boolean }) {
+  if (design.fixed?.includes(part)) return null;
   return (
     <button type="button" className={s.spot} data-round={round || undefined} data-spot={part} aria-label={label} onClick={(e) => design.edit(part, e.currentTarget)}>
       <span className={s.spotLabel} aria-hidden="true"><Pencil size={11} /><span className={s.spotText}>{label}</span></span>
@@ -426,7 +429,20 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const ids = useId();
   const isMe = !visitor && me?.id === userId;
   const base: PublicUser | undefined = visitor ? visitor.user : isMe && me ? me : stored;
-  const user: PublicUser | undefined = base ? { ...base, ...preview } : undefined;
+  // inside a server, what someone set for that server stands in for their own:
+  // their name there, picture, banner, pronouns, About Me and colours
+  const member = inServer && !visitor ? servers[inServer]?.members[userId] : undefined;
+  const serverOwn: Partial<PublicUser> = member
+    ? {
+        ...(member.nickname ? { display_name: member.nickname } : {}),
+        ...(member.avatar_id ? { avatar_id: member.avatar_id } : {}),
+        ...(member.banner_id ? { banner_id: member.banner_id } : {}),
+        ...(member.pronouns ? { pronouns: member.pronouns } : {}),
+        ...(member.bio ? { about_me: member.bio } : {}),
+        ...(typeof member.accent_color === "number" ? { accent_color: member.accent_color, accent_color_2: member.accent_color_2 ?? null } : {}),
+      }
+    : {};
+  const user: PublicUser | undefined = base ? { ...base, ...serverOwn, ...preview } : undefined;
   // the preview and the popout are one column, with one widget and the way to the rest
   const compact = variant !== "modal";
   const panel = variant === "panel";
@@ -444,7 +460,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
     setMutual({ friends: [], servers: [] });
     setWidgets([]);
     usersApi
-      .profile(userId)
+      .profile(userId, inServer)
       .then((p) => {
         if (!alive) return;
         upsertUser(p.user);
@@ -457,7 +473,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
     return () => {
       alive = false;
     };
-  }, [userId, upsertUser, preview, visitor]);
+  }, [userId, upsertUser, preview, visitor, inServer]);
 
   // the preview shows the start of a long bio and offers the rest
   const about = user?.about_me ?? "";
@@ -657,7 +673,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
       </div>
       {cs ? (
         <StatusBubble status={cs} design={design} />
-      ) : design ? (
+      ) : design && !design.fixed?.includes("status") ? (
         // in the designer, an empty status is a bubble waiting to be filled
         <div className={s.bubble}>
           <button type="button" className={[s.bubbleText, s.ghostBubble].join(" ")} data-spot="status" onClick={(e) => design.edit("status", e.currentTarget)}>
@@ -686,7 +702,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
             ) : (
               <ServerTagChip tag={user.server_tag} size="lg" open={interactive} />
             )
-          ) : design ? (
+          ) : design && !design.fixed?.includes("tag") ? (
             <button type="button" className={s.ghostChip} data-spot="tag" onClick={(e) => design.edit("tag", e.currentTarget)}>
               <Plus size={12} aria-hidden="true" /> {t("designer.ghost.tag")}
             </button>

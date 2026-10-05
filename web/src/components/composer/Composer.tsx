@@ -18,6 +18,7 @@ import { canEdit } from "@/components/chat/messageMenu";
 import { useUsers } from "@/stores/users";
 import { canI, rolesByPosition, useServers } from "@/stores/servers";
 import { useChannels } from "@/stores/channels";
+import { isThread } from "@/stores/threads";
 import { slowmodeRemaining, useSlowmode } from "@/stores/slowmode";
 import { P } from "@/lib/perms";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
@@ -41,7 +42,10 @@ import { closeShortcode, typedColon } from "./shortcodeTyping";
 import { MessagePreview } from "./MessagePreview";
 import { ReplyWords, useReplyWords } from "@/components/chat/ReplyWords";
 import { useRenderCtx } from "@/lib/markdownCtx";
-import { mentionScope, sendMessage, sendWithFiles, type SendOptions } from "./send";
+import { formatWait, mentionScope, screenForSend, sendMessage, sendWithFiles, type SendOptions } from "./send";
+import { AutomodNotice } from "./AutomodNotice";
+import { useAutomodNotices } from "@/stores/automodNotices";
+import { talkGate } from "@/lib/talkGate";
 import { canCreatePoll, plusButton, type PlusOption } from "./plusMenu";
 import { menuAnchor } from "@/components/common/ContextMenu";
 import { extractMentions } from "./mentions";
@@ -157,10 +161,23 @@ export function Composer({ channel }: { channel: Channel }) {
   // the plus button: files, a poll, or a menu of both where both are allowed
   const plus = plusButton({ attach: canAttach, poll: canCreatePoll(serverState, channel) });
   const canEveryone = !isServer || canI(serverState, P.MENTION_EVERYONE, channel.id);
-  const bypassSlowmode = isServer && canI(serverState, P.MANAGE_MESSAGES, channel.id);
+  // as the server has it: whoever manages the channel or its messages, or may skip slow mode
+  const bypassSlowmode = isServer && (canI(serverState, P.BYPASS_SLOWMODE, channel.id) || canI(serverState, P.MANAGE_MESSAGES, channel.id) || canI(serverState, P.MANAGE_CHANNELS, channel.id));
+  // emoji and stickers from elsewhere take their own permissions in a server
+  const ownEmojiOnly = isServer && !canI(serverState, P.USE_EXTERNAL_EMOJIS, channel.id);
+  const ownStickersOnly = isServer && !canI(serverState, P.USE_EXTERNAL_STICKERS, channel.id);
   const slow = useSlowmode();
   const [now, setNow] = useState(() => Date.now());
   const remaining = channel.slowmode_seconds > 0 && !bypassSlowmode ? slowmodeRemaining(slow, channel.id, channel.slowmode_seconds, now) : 0;
+  // a timeout, AutoMod holding this account, or the newcomers' wait: said in the box, with how long
+  const gate = isServer ? talkGate(serverState, me, now) : null;
+  const gateUntil = gate && gate.kind !== "quarantine" ? gate.until : 0;
+  useEffect(() => {
+    if (!gateUntil) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [gateUntil]);
+  const automodNotice = useAutomodNotices((n) => n.byChannel[channel.id]);
   // the emoji set loads in a quiet moment, so the picker and :shortcodes: never wait for it
   useEffect(() => preloadEmoji(), []);
   useEffect(() => {
@@ -262,7 +279,8 @@ export function Composer({ channel }: { channel: Channel }) {
   });
 
   const name = channelDisplayName(channel, users, me?.id);
-  const placeholder = channel.type === "dm" ? tr_("composer.composer.messageUser", { name }) : isServer ? tr_("composer.composer.messageChannel", { name }) : tr_("composer.composer.messageGroup", { name });
+  // a thread is named like a sentence, not a channel, so it goes without the #
+  const placeholder = channel.type === "dm" ? tr_("composer.composer.messageUser", { name }) : isServer && !isThread(channel) ? tr_("composer.composer.messageChannel", { name }) : tr_("composer.composer.messageGroup", { name });
 
   useEffect(() => {
     touched.current = false;
@@ -293,6 +311,17 @@ export function Composer({ channel }: { channel: Channel }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
 
+  // AutoMod stopped a message after the box emptied for it: the words come back, unless something new is typed
+  useEffect(() => {
+    if (automodNotice?.text === undefined) return;
+    const words = automodNotice.text;
+    useAutomodNotices.getState().restored(channel.id);
+    if (textRef.current.trim()) return;
+    touched.current = true;
+    setText(words);
+    persistDraftRef.current?.(words);
+  }, [automodNotice, channel.id]);
+
   const persistDraft = useCallback((value: string) => {
     if (draftTimer.current) clearTimeout(draftTimer.current);
     const p = { channelId: channel.id, text: value };
@@ -303,6 +332,9 @@ export function Composer({ channel }: { channel: Channel }) {
       saveDraft(p.channelId, p.text);
     }, 600);
   }, [channel.id]);
+
+  const persistDraftRef = useRef<((value: string) => void) | null>(null);
+  persistDraftRef.current = persistDraft;
 
   // The box can open before the account's settings arrive: show the saved
   // draft once they do, or save what was typed meanwhile.
@@ -633,10 +665,14 @@ export function Composer({ channel }: { channel: Channel }) {
     }
     sendAsIs.current = null;
     if (!body && files.length === 0) return false;
+    // AutoMod reads it first: a message it stops stays in the box, with why above it
+    const screened = screenForSend(channel.id, body, files.map((f) => f.name));
+    if (screened?.stopped) return false;
     // the emoji it uses (a server's by their :name: too) count towards the ones suggested first
     if (body) noteEmojiUse(emojiKeysIn(extractMentions(body, {}, { emoji: mentionScope(channel.id).emoji ?? [] }).text));
     const channelId = channel.id;
     const opts: SendOptions = takeReply();
+    if (screened) opts.screened = screened.afterSend;
     // The box empties now rather than when the send is through, so anything
     // typed while it goes (files can take a while) is the next message and is
     // never mixed up with this one. The message shows in the list at once;
@@ -720,11 +756,22 @@ export function Composer({ channel }: { channel: Channel }) {
   const replyWords = useReplyWords(replyTarget);
   const replyCtx = useRenderCtx();
 
-  if (!canSend) {
+  if (!canSend || gate) {
+    const why =
+      gate?.kind === "timeout"
+        ? tr_("composer.locked.timedOut", { time: formatWait((gate.until - now) / 1000) })
+        : gate?.kind === "quarantine"
+          ? tr_("composer.locked.quarantined")
+          : gate?.kind === "verify"
+            ? tr_("composer.locked.verifyWait", { time: formatWait((gate.until - now) / 1000) })
+            : tr_("composer.composer.youDoNotHavePermissionTo");
     return (
       <div className={s.wrap}>
-          <DropOverlay name={name} hash={!!channel.server_id} onFiles={() => {}} disabled />
-        <div className={[s.box, s.locked].join(" ")} data-testid="composer-locked">{tr_("composer.composer.youDoNotHavePermissionTo")}</div>
+        <DropOverlay name={name} hash={!!channel.server_id} onFiles={() => {}} disabled />
+        <div className={[s.box, s.locked].join(" ")} data-testid="composer-locked" data-gate={gate?.kind}>
+          {gate && gate.kind !== "quarantine" ? <Timer size={18} aria-hidden="true" style={{ flex: "none", marginInlineEnd: 8 }} /> : null}
+          <span className={s.lockedTimer}>{why}</span>
+        </div>
       </div>
     );
   }
@@ -808,6 +855,7 @@ export function Composer({ channel }: { channel: Channel }) {
             insertAt(caret, taRef.current?.selectionEnd ?? caret, (custom ? emojiText(em.unicode, custom[1]!) : em.unicode) + " ");
           }}
           serverId={channel.server_id}
+          onlyServer={ownEmojiOnly}
           gifs={<GifPicker onPick={(g) => {
             setPicker(false);
             if (g.att) {
@@ -822,7 +870,7 @@ export function Composer({ channel }: { channel: Channel }) {
             const opts: SendOptions = { ...takeReply(), embeds: [{ url: g.url, type: "gif", image: g.url, ...(g.w ? { image_w: g.w } : {}), ...(g.h ? { image_h: g.h } : {}) }] };
             void sendMessage(channel.id, g.url, opts);
           }} />}
-          stickers={<StickerPicker serverId={channel.server_id} onPick={({ sticker }) => {
+          stickers={<StickerPicker serverId={channel.server_id} onlyServer={ownStickersOnly} onPick={({ sticker }) => {
             setPicker(false);
             if (remaining > 0) return toast(tr_("composer.composer.slowModeOnSeconds", { seconds: remaining }), "error");
             // The send settles first so a failed send never lands in recents;
@@ -837,6 +885,7 @@ export function Composer({ channel }: { channel: Channel }) {
           }} />}
         />
       ) : null}
+      {automodNotice ? <AutomodNotice notice={automodNotice} onDismiss={() => useAutomodNotices.getState().dismiss(channel.id)} /> : null}
       {notice ? (
         <div className={s.notice} role="status" data-testid="composer-notice">
           <span className={s.noticeText}>

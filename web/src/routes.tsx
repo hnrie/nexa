@@ -25,6 +25,7 @@ const NoteLinkPage = lazyPage(() => import("@/pages/NoteLinkPage"));
 const DiscordConnectedPage = lazyPage(() => import("@/pages/DiscordConnectedPage"));
 const NotFoundPage = lazyPage(() => import("@/pages/NotFoundPage"));
 const ProfilePage = lazyPage(() => import("@/pages/ProfilePage"));
+const DiscoveryPage = lazyPage(() => import("@/components/discovery/DiscoveryPage"));
 // The app itself: its sidebars, conversations, calls and every store behind
 // them. The public pages (the front page, signing in, an invite) never load it.
 const loadAppShell = () => import("@/components/shell/AppShell");
@@ -102,6 +103,7 @@ export function AppRoutes() {
                     <Route path="bugs/:reportId" element={<AdminBugs />} />
                     <Route path="*" element={<Navigate to="users" replace />} />
                   </Route>
+                  <Route path="@discover" element={<DiscoveryPage />} />
                   <Route path="@me/:channelId" element={<DMPage />} />
                   <Route path="@me/:channelId/:messageId" element={<DMPage />} />
                   <Route path=":serverId" element={<ServerPage />} />

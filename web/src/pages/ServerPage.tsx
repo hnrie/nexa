@@ -1,8 +1,11 @@
 import { ChannelGlyph } from "@/components/common/ChannelGlyph";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
+import { channels as channelsApi } from "@/api/channels";
+import { lazyPage } from "@/lib/lazyChunk";
+import { isThread } from "@/stores/threads";
 import { Button } from "@/components/common/Button";
 import { ChatView } from "@/components/chat/ChatView";
 import { VoiceView } from "@/components/voice/VoiceView";
@@ -16,6 +19,14 @@ import { useUsers } from "@/stores/users";
 import s from "./ServerPage.module.css";
 
 import { t as tr_ } from "@/i18n";
+
+const ForumView = lazyPage(() => import("@/components/forum/ForumView"));
+
+/** Channels people write in, where the conversation is the page. */
+function talkable(type: string | undefined): boolean {
+  return type === "text" || type === "announcement" || type === "thread" || type === "private_thread";
+}
+
 export default function ServerPage() {
   const { serverId = "", channelId, messageId } = useParams();
   const nav = useNavigate();
@@ -38,6 +49,18 @@ export default function ServerPage() {
   const [attempt, setAttempt] = useState(0);
   const seen = useRef<string | null>(null);
   const channel = channelId ? channels[channelId] : undefined;
+  // a thread that has closed is not among the ones this app is sent: fetched once by its link
+  const [asked, setAsked] = useState<string | null>(null);
+  useEffect(() => {
+    if (!st || !channelId || channel || asked === channelId || !/^\d+$/.test(channelId)) return;
+    setAsked(channelId);
+    channelsApi
+      .get(channelId)
+      .then((ch) => {
+        if (ch.server_id === serverId && isThread(ch)) upsert(ch);
+      })
+      .catch(() => undefined);
+  }, [st, channelId, channel, asked, serverId, upsert]);
 
   // an unknown server (deep link before ready, or one we were just added to) is fetched once;
   // one that vanishes after being seen was left, deleted or kicked from: go home without asking
@@ -83,10 +106,10 @@ export default function ServerPage() {
 
   const firstText = useMemo(() => {
     const tree = channelTree(channels, serverId);
-    const loose = tree.loose.find((c) => c.type === "text");
+    const loose = tree.loose.find((c) => c.type === "text" || c.type === "announcement");
     if (loose) return loose.id;
     for (const cat of tree.categories) {
-      const t = cat.children.find((c) => c.type === "text");
+      const t = cat.children.find((c) => c.type === "text" || c.type === "announcement");
       if (t) return t.id;
     }
     return null;
@@ -97,7 +120,7 @@ export default function ServerPage() {
   const chId = channel?.id;
   const chType = channel?.type;
   useEffect(() => {
-    if (!chId || chType !== "text") {
+    if (!chId || !talkable(chType)) {
       setActiveChannel(null);
       return;
     }
@@ -127,6 +150,8 @@ export default function ServerPage() {
     );
   }
   if (!st) return <PaneSpinner text={tr_("server.openingServer")} />;
+  // a thread asked for by its link is waited for before falling back to the first channel
+  if (channelId && !channel && asked !== channelId && /^\d+$/.test(channelId)) return <PaneSpinner text={tr_("server.openingServer")} />;
   if (!channelId || (channelId && !channel && firstText)) {
     if (firstText) return <Navigate to={`/channels/${serverId}/${firstText}`} replace state={navState} />;
     if (!channelId) return <NoChannels />;
@@ -134,6 +159,13 @@ export default function ServerPage() {
   if (!channel || channel.server_id !== serverId) return <NoChannels />;
   if (channel.type === "voice") return <VoiceRoom channel={channel} />;
   if (channel.type === "category") return <Navigate to={`/channels/${serverId}`} replace state={navState} />;
+  if (channel.type === "forum") {
+    return (
+      <Suspense fallback={<PaneSpinner text={tr_("forum.loading")} />}>
+        <ForumView channel={channel} />
+      </Suspense>
+    );
+  }
   return <ChatView channel={channel} />;
 }
 

@@ -21,6 +21,9 @@ const EmojiPage = lazyPage(() => import("./pages/EmojiPage"));
 const ServerStickersPage = lazyPage(() => import("./pages/ServerStickersPage"));
 const IntegrationsPage = lazyPage(() => import("./pages/IntegrationsPage"));
 const DeleteServerPage = lazyPage(() => import("./pages/DeleteServerPage"));
+const AutomodPage = lazyPage(() => import("./pages/automod/AutomodPage"));
+const DiscoverySettingsPage = lazyPage(() => import("./pages/DiscoverySettingsPage"));
+const SafetyPage = lazyPage(() => import("./pages/SafetyPage"));
 
 export default function ServerSettingsModal({ onClose, serverId, page: initial }: { onClose: () => void; serverId: string; page?: string | undefined }) {
   const st = useServers((x) => x.byId[serverId]);
@@ -35,9 +38,12 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
     { id: "stickers", label: t("pickers.expressionPicker.stickers"), ok: true, group: 0 },
     { id: "integrations", label: t("integrations.title"), ok: canI(st, P.MANAGE_WEBHOOKS) || Object.values(useChannels.getState().byId).some((c) => c.server_id === serverId && c.type === "text" && canI(st, P.MANAGE_WEBHOOKS, c.id)), group: 0 },
     { id: "encryption", label: t("server.encryption.encryption"), ok: true, group: 0 },
+    { id: "discovery", label: t("discovery.title"), ok: canI(st, P.MANAGE_SERVER), group: 0 },
     { id: "members", label: t("server.serverSettings.members"), ok: true, group: 1 },
     { id: "invites", label: t("server.invites.invites"), ok: canI(st, P.MANAGE_SERVER), group: 1 },
     { id: "bans", label: t("server.serverSettings.bans"), ok: canI(st, P.BAN_MEMBERS), group: 1 },
+    { id: "automod", label: t("automod.title"), ok: canI(st, P.MANAGE_SERVER) || canI(st, P.VIEW_AUDIT_LOG), group: 1 },
+    { id: "safety", label: t("safety.title"), ok: canI(st, P.MANAGE_SERVER), group: 1 },
     { id: "audit", label: t("server.auditLog.auditLog"), ok: canI(st, P.VIEW_AUDIT_LOG), group: 1 },
     { id: "delete", label: t("server.deleteServer.deleteServer"), ok: owner, group: 2, danger: true },
   ];
@@ -60,6 +66,9 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
     page === "bans" ? <BansPage serverId={serverId} /> :
     page === "invites" ? <InvitesPage serverId={serverId} /> :
     page === "audit" ? <AuditLogPage serverId={serverId} /> :
+    page === "automod" ? <AutomodPage serverId={serverId} /> :
+    page === "discovery" ? <DiscoverySettingsPage serverId={serverId} /> :
+    page === "safety" ? <SafetyPage serverId={serverId} go={setPage} /> :
     page === "emoji" ? <EmojiPage serverId={serverId} /> :
     page === "stickers" ? <ServerStickersPage serverId={serverId} /> :
     page === "integrations" ? <IntegrationsPage serverId={serverId} /> :

@@ -76,10 +76,12 @@ export interface Session {
   current: boolean;
 }
 
+export type ChannelType = "text" | "voice" | "category" | "dm" | "group_dm" | "subchat" | "announcement" | "forum" | "thread" | "private_thread";
+
 export interface Channel {
   id: Snowflake;
   server_id: Snowflake | null;
-  type: "text" | "voice" | "category" | "dm" | "group_dm" | "subchat";
+  type: ChannelType;
   name: string;
   topic: string;
   position: number;
@@ -100,6 +102,64 @@ export interface Channel {
   locked?: boolean;
   /** A server channel's own icon in place of its # or speaker (see lib/channelGlyph); absent for none. */
   glyph?: string;
+  /** How a thread stands (types thread and private_thread). */
+  thread?: ThreadMeta;
+  /** A forum channel's own settings. */
+  forum?: ForumSettings;
+  /** On a channel threads start in: how many quiet minutes close a new thread (absent: three days). */
+  default_auto_archive?: number;
+  /** On a thread, as listed or announced: how many people are in it. */
+  member_count?: number;
+}
+
+export interface ThreadMeta {
+  archived: boolean;
+  archived_at: number | null;
+  locked: boolean;
+  /** Minutes without messages after which it closes itself. */
+  auto_archive: number;
+  /** The message it was started from, if any. */
+  starter_id: Snowflake | null;
+  message_count: number;
+  /** A forum post's tags. */
+  applied_tags: Snowflake[];
+}
+
+export interface ForumTag {
+  id: Snowflake;
+  name: string;
+  /** A single emoji, or "" for none. */
+  emoji: string;
+  /** Only people who manage threads may put it on a post. */
+  moderated: boolean;
+}
+
+export interface ForumSettings {
+  tags: ForumTag[];
+  default_reaction: string;
+  sort: "activity" | "created";
+  layout: "list" | "gallery";
+  require_tag: boolean;
+  pinned_post: Snowflake | null;
+}
+
+/** A thread as a message it started from shows it. */
+export interface ThreadSummary {
+  id: Snowflake;
+  name: string;
+  message_count: number;
+  last_message_id: Snowflake | null;
+  archived: boolean;
+  locked: boolean;
+}
+
+/** A thread in a channel's list of them, or a forum's posts. */
+export interface ThreadListing extends Channel {
+  member_count: number;
+  joined: boolean;
+  member_ids: Snowflake[];
+  /** A forum post's first message: what the post says. */
+  first_message?: Message;
 }
 
 /** Permission bits travel as decimal strings; `lib/perms` turns them into BigInt. */
@@ -126,6 +186,21 @@ export interface Server {
   created_at: number;
   /** The tag its members can wear beside their name (lib/serverTags), or null. */
   tag?: ServerTag | null;
+  /** When the server takes new members again; null while it takes them. */
+  invites_paused_until?: number | null;
+  /** How it is listed on Discovery. */
+  discoverable?: boolean;
+  discovery_category?: string;
+  discovery_tags?: string[];
+  discovery_language?: string;
+  discovery_since?: number | null;
+  /** Taken off Discovery by Nexa's staff. */
+  discovery_hidden?: boolean;
+  /** How old an account, and how long a membership, has to be to talk here. */
+  verify_account_minutes?: number;
+  verify_member_minutes?: number;
+  /** When the AutoMod rules members' apps apply last changed; 0 when there are none. */
+  automod_at?: number;
 }
 
 /** A server's tag, as its members and admins see it. */
@@ -156,12 +231,45 @@ export interface ServerTagPreview {
 export interface Member {
   server_id: Snowflake;
   user_id: Snowflake;
+  /** The member's profile in this server, shown there in place of their own. */
   nickname: string;
   avatar_id: Snowflake | null;
+  banner_id?: Snowflake | null;
+  bio?: string;
+  pronouns?: string;
+  /** The profile's theme in this server; absent uses the account's. */
+  accent_color?: number | null;
+  accent_color_2?: number | null;
   joined_at: number;
   timeout_until: number | null;
+  /** MEMBER_QUARANTINED, and more to come. */
   flags: number;
   role_ids: Snowflake[];
+}
+
+/** A member AutoMod holds for what their name or profile says. */
+export const MEMBER_QUARANTINED = 1;
+
+/** How someone joined a server, for those who see its invites. */
+export interface MemberJoin {
+  join_method: "invite" | "discovery" | "tag" | "owner" | "";
+  join_code: string;
+  invited_by: Snowflake | null;
+}
+
+/** A member as the Members page lists them. */
+export interface MemberRow extends Member {
+  account_created_at: number;
+  signals: MemberSignal[];
+  join?: MemberJoin;
+}
+
+export type MemberSignal = "timed_out" | "quarantined" | "new_account" | "unusual_dms";
+
+/** What Mod View shows of one member. */
+export interface MemberDetail extends MemberRow {
+  message_count: number;
+  last_seen: number | null;
 }
 
 export interface Role {
@@ -173,13 +281,21 @@ export interface Role {
   mentionable: boolean;
   position: number;
   permissions: PermString;
+  /** A picture of its own, or null; and an emoji ("custom:<id>" for one of the server's), or "". */
   icon_id: Snowflake | null;
+  icon_emoji?: string;
+  /** With a second colour the name is a gradient; with a third, a shimmer across all three. */
+  color2?: number | null;
+  color3?: number | null;
   created_at: number;
 }
 
 /** A server as the ready payload, create and join responses carry it. */
 export interface ServerView extends Server {
   channels: Channel[];
+  /** Threads still going that this member can see, and the ones they are in. */
+  threads?: Channel[];
+  joined_threads?: Snowflake[];
   roles: Role[];
   members: Member[];
   member_count: number;
@@ -208,6 +324,8 @@ export interface InvitePreview {
   channel?: { id: Snowflake; name: string; type: Channel["type"] };
   inviter?: PublicUser;
   expires_at: number | null;
+  /** The server takes nobody new right now. */
+  joins_paused?: boolean;
 }
 
 export interface Ban {
@@ -499,12 +617,53 @@ export interface Message {
    * Absent when the server did not say (stores/replyTargets fetches it then).
    */
   referenced_message?: Message | null;
+  /** The thread started from this message, if any. */
+  thread?: ThreadSummary;
+  /** On a copy of a post published from an announcement channel: where it came from. */
+  crosspost?: CrosspostInfo;
+  /** A post of an announcement channel that has been published. */
+  published?: boolean;
+  /** On AutoMod's note in an alert channel: what it caught and did. */
+  automod?: AutomodNote;
+}
+
+export interface CrosspostInfo {
+  follow_id: Snowflake;
+  server_id: Snowflake;
+  server_name: string;
+  server_icon_id: Snowflake | null;
+  channel_id: Snowflake;
+  channel_name: string;
+  message_id: Snowflake;
+  /** The original has been deleted. */
+  deleted?: boolean;
+}
+
+export interface AutomodNote {
+  event_id: Snowflake;
+  rule_id: Snowflake | null;
+  rule_name: string;
+  rule_kind: string;
+  channel_id: Snowflake | null;
+  actions: string[];
+  /** What was caught, sealed with the server's key. */
+  content?: Envelope;
+  matched?: string;
+  mentions?: number;
+  raid?: boolean;
+  messages?: number;
+  seconds?: number;
+  title?: boolean;
+  /** The message it was about, when the rule let it through: to jump to. */
+  message_id?: Snowflake;
 }
 
 export const MSG_FLAG_PINNED = 1;
 export const MSG_FLAG_SUPPRESS_EMBEDS = 4;
 /** No sound or notification; it still counts as unread. */
 export const MSG_FLAG_SUPPRESS_NOTIFICATIONS = 1 << 12;
+/** A post of an announcement channel that has been published to the channels following it. */
+export const MSG_FLAG_PUBLISHED = 1 << 20;
 /** A webhook message laid out entirely by its components. */
 export const MSG_FLAG_COMPONENTS_V2 = 1 << 15;
 
@@ -1030,4 +1189,118 @@ export interface SendMessageRequest {
   flags?: number;
   /** Opens a poll with the message. */
   poll?: PollRequest;
+}
+
+/** One AutoMod rule (see api/automod and lib/automod). */
+export interface AutomodRule {
+  id: Snowflake;
+  server_id: Snowflake;
+  name: string;
+  kind: AutomodKind;
+  enabled: boolean;
+  config: AutomodConfig;
+  actions: AutomodAction[];
+  exempt_roles: Snowflake[];
+  exempt_channels: Snowflake[];
+  creator_id: Snowflake;
+  created_at: number;
+  updated_at: number;
+}
+
+export type AutomodKind = "flagged_words" | "words" | "spam" | "links" | "invites" | "personal" | "caps" | "emoji_spam" | "attachments" | "mentions" | "flood" | "profile";
+
+export interface AutomodConfig {
+  lists?: string[];
+  words?: string[];
+  regex?: string[];
+  allow?: string[];
+  evasion?: boolean;
+  mode?: "all" | "list";
+  domains?: string[];
+  scams?: boolean;
+  repeats?: boolean;
+  shady_links?: boolean;
+  zalgo?: boolean;
+  walls?: boolean;
+  emails?: boolean;
+  phones?: boolean;
+  ips?: boolean;
+  cards?: boolean;
+  percent?: number;
+  min_length?: number;
+  max?: number;
+  raid?: boolean;
+  messages?: number;
+  seconds?: number;
+  extensions?: string[];
+  allow_own?: boolean;
+  names?: boolean;
+  bio?: boolean;
+}
+
+export interface AutomodAction {
+  type: "block" | "alert" | "timeout" | "quarantine";
+  message?: string;
+  channel_id?: Snowflake;
+  seconds?: number;
+  after?: number;
+}
+
+export interface AutomodEvent {
+  id: Snowflake;
+  server_id: Snowflake;
+  rule_id: Snowflake | null;
+  rule_name: string;
+  rule_kind: string;
+  user_id: Snowflake;
+  channel_id: Snowflake | null;
+  actions: string[];
+  content: Envelope | null;
+  reporter_id: Snowflake | null;
+  created_at: number;
+}
+
+/** The ready-made lists and spam signs every app applies alike. */
+export interface AutomodPresets {
+  lists: Record<string, string[]>;
+  spam_phrases: string[];
+  shorteners: string[];
+  impersonated: Record<string, string[]>;
+  risky_extensions: string[];
+}
+
+/** A server as Discovery lists it. */
+export interface DiscoveryCard {
+  id: Snowflake;
+  name: string;
+  icon_id: Snowflake | null;
+  banner_id: Snowflake | null;
+  description: string;
+  category: string;
+  tags: string[];
+  language: string;
+  member_count: number;
+  online_count: number;
+  created_at: number;
+  listed_at: number | null;
+  tag: ServerTag | null;
+  member: boolean;
+  joins_paused: boolean;
+}
+
+/** A followed announcement channel, as the channel it posts into sees it. */
+export interface Follow {
+  id: Snowflake;
+  source_id: Snowflake;
+  target_id: Snowflake;
+  server_id: Snowflake;
+  creator_id: Snowflake | null;
+  public_key: string;
+  /** Its private key sealed with the target channel's key. */
+  secret: string;
+  created_at: number;
+  source_server_name: string;
+  source_server_icon_id: Snowflake | null;
+  source_channel_name: string;
+  source_server_id: Snowflake | null;
 }

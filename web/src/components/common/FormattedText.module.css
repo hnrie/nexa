@@ -1,0 +1,9 @@
+.wrap { display: flex; flex-direction: column; gap: 6px; }
+.preview { min-height: 96px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text); font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.empty { color: var(--text-muted); font-style: italic; }
+.tools { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.tool { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; border-radius: var(--radius-sm); background: var(--bg-active); color: var(--text); font-size: 13px; font-weight: 600; }
+.tool:hover { background: var(--bg-selected); }
+.tool[aria-pressed="true"] { color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.count { margin-inline-start: auto; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+@media (pointer: coarse) { .tool { min-height: 36px; } }

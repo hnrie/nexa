@@ -1,11 +1,12 @@
 import { create } from "zustand";
 import type { Member, Role, Server, ServerView } from "@/api/types";
-import { ALL, base, compute, has, highestPosition, P, toPermMember, toPermRoles, type PermRole } from "@/lib/perms";
+import { ALL, base, compute, has, highestPosition, P, threadPerms, toPermMember, toPermRoles, type PermRole } from "@/lib/perms";
 
 /** The flag bit marking an account that runs Nexa. */
 const USER_FLAG_ADMIN = 1;
 import { useAuth } from "./auth";
 import { useChannels } from "./channels";
+import { useThreads } from "./threads";
 import { useUsers } from "./users";
 
 export interface ServerState {
@@ -44,7 +45,9 @@ interface ServersState {
 }
 
 function stripView(view: ServerView): Server {
-  const { channels: _c, roles: _r, members: _m, member_count: _mc, me: _me, my_permissions: _mp, ...server } = view;
+  const { channels: _c, roles: _r, members: _m, member_count: _mc, me: _me, my_permissions: _mp, threads: _t, joined_threads: _j, ...server } = view;
+  void _t;
+  void _j;
   void _c;
   void _r;
   void _m;
@@ -184,11 +187,20 @@ export function serverPerms(st: ServerState, userId: string): bigint {
   return base(st.server.id, toPermRoles(Object.values(st.roles)), toPermMember(m, userId), false);
 }
 
-/** A user's permissions in a channel of the server, from local state. */
+/** A user's permissions in a channel of the server, from local state. A thread answers to its channel (threadPerms). */
 export function channelPerms(st: ServerState, channelId: string, userId: string): bigint {
-  const ch = useChannels.getState().byId[channelId];
+  const byId = useChannels.getState().byId;
+  const ch = byId[channelId];
   const isOwner = st.server.owner_id === userId || isInstanceAdmin(userId);
-  return compute(st.server.id, toPermRoles(Object.values(st.roles)), toPermMember(st.members[userId], userId), isOwner, ch?.overwrites);
+  const roles = toPermRoles(Object.values(st.roles));
+  const member = toPermMember(st.members[userId], userId);
+  if ((ch?.type === "thread" || ch?.type === "private_thread") && ch.parent_id) {
+    const parent = compute(st.server.id, roles, member, isOwner, byId[ch.parent_id]?.overwrites);
+    // only this account's own membership is known here; others' private threads read as closed
+    const inIt = userId === st.me.user_id && !!useThreads.getState().joined[channelId];
+    return threadPerms(parent, ch.type === "private_thread", inIt);
+  }
+  return compute(st.server.id, roles, member, isOwner, ch?.overwrites);
 }
 
 export function memberHighest(st: ServerState, userId: string): { highest: number; isOwner: boolean } {

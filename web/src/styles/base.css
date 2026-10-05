@@ -96,3 +96,12 @@ code, pre, kbd { font-family: var(--font-mono); }
 /* Misspelled words in a contenteditable box, marked by Nexa's own checker
    (components/common/SpellLines.tsx); a textarea gets the same line from a layer. */
 ::highlight(nexa-spelling) { text-decoration-line: underline; text-decoration-style: wavy; text-decoration-color: var(--text-danger); text-decoration-thickness: 1.5px; text-decoration-skip-ink: none; text-underline-offset: 2px; }
+
+/* A name in its role's gradient (lib/roleLook.ts): the colours are the text.
+   Three colours shimmer across it, slowly, unless motion is turned down. */
+.role-gradient { background-image: var(--name-grad); background-size: 100% auto; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent !important; }
+.role-shimmer { background-size: 200% auto; animation: role-shimmer 4s linear infinite; }
+@keyframes role-shimmer { to { background-position: -200% center; } }
+@media (prefers-reduced-motion: reduce) { .role-shimmer { animation: none; } }
+[data-reduced-motion="true"] .role-shimmer { animation: none; }
+@media (forced-colors: active) { .role-gradient { -webkit-text-fill-color: currentColor; color: CanvasText !important; background: none; } }

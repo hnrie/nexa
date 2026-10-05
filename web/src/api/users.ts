@@ -49,9 +49,13 @@ export const users = {
   get(id: Snowflake): Promise<PublicUser> {
     return api.request<PublicUser>("GET", `/users/${id}`);
   },
-  /** The whole profile: with the mutual friends and servers, and its widgets (read with readWidgets). */
-  profile(id: Snowflake): Promise<{ user: PublicUser; mutual_friends: Snowflake[]; mutual_servers: Snowflake[]; widgets?: unknown }> {
-    return api.request("GET", `/users/${id}/profile`);
+  /**
+   * The whole profile: with the mutual friends and servers, and its widgets
+   * (read with readWidgets). Opened in a server, the widgets are the ones
+   * chosen for it, where there are (server_widgets says so).
+   */
+  profile(id: Snowflake, serverId?: Snowflake | null): Promise<{ user: PublicUser; mutual_friends: Snowflake[]; mutual_servers: Snowflake[]; widgets?: unknown; server_widgets?: boolean }> {
+    return api.request("GET", `/users/${id}/profile`, undefined, serverId ? { query: { server_id: serverId } } : undefined);
   },
   /** Replaces the account's widgets (lib/widgets), as the server cleaned them. */
   setWidgets(widgets: unknown[]): Promise<{ widgets: unknown }> {

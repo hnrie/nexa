@@ -14,12 +14,16 @@ import { useAuth } from "@/stores/auth";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
 import { StatusLine } from "@/components/activity/StatusLine";
 import { useChannels } from "@/stores/channels";
-import { isInstanceAdmin, memberColor, permRolesOf, rolesByPosition, useServers } from "@/stores/servers";
+import { isThread, useThreads } from "@/stores/threads";
+import { threads as threadsApi } from "@/api/threads";
+import { isInstanceAdmin, permRolesOf, rolesByPosition, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { openProfilePopout } from "@/stores/profilePopout";
 import { P, compute, has, toPermMember } from "@/lib/perms";
 import { nameOrder } from "./nameOrder";
+import { memberLook, nameClass, nameStyle, type RoleLook } from "@/lib/roleLook";
+import { RoleIcon } from "@/components/common/RoleIcon";
 import s from "./MemberList.module.css";
 import { UserTag } from "@/components/servertag/UserTag";
 
@@ -29,7 +33,7 @@ import { t } from "@/i18n";
 
 type Row =
   | { kind: "head"; key: string; label: string; count: number }
-  | { kind: "member"; key: string; member: Member; user: PublicUser | undefined; color: string | undefined; offline: boolean };
+  | { kind: "member"; key: string; member: Member; user: PublicUser | undefined; look: RoleLook | undefined; offline: boolean };
 
 const ROW_H = 44;
 const HEAD_H = 40;
@@ -101,19 +105,45 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
     return () => ro.disconnect();
   }, []);
 
+  // A thread lists the people in it; it has no overwrites of its own, so who
+  // may see it at all is its channel's business.
+  const threadParent = useChannels((c) => (isThread(c.byId[channelId]) ? (c.byId[channelId]?.parent_id ?? null) : undefined));
+  const inThread = threadParent !== undefined;
+  const threadCount = useThreads((x) => x.memberCounts[channelId]);
+  const [threadIds, setThreadIds] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    setThreadIds(null);
+    if (!inThread) return;
+    let alive = true;
+    threadsApi
+      .members(channelId)
+      .then((res) => {
+        if (!alive) return;
+        upsertUsers(res.users);
+        setThreadIds(new Set(res.members.map((m) => m.user_id)));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+    // a change in how many are in it is someone joining or leaving: asked again
+  }, [inThread, channelId, threadCount, upsertUsers]);
+
   // Who can see the channel changes with members, roles and overwrites, not
   // presence, so it is worked out apart from the presence-driven rows below,
   // with the server's roles converted once rather than once per member.
-  const overwrites = useChannels((c) => c.byId[channelId]?.overwrites);
+  const overwrites = useChannels((c) => c.byId[threadParent ?? channelId]?.overwrites);
   const visible = useMemo<Member[]>(() => {
     if (!st) return [];
+    if (inThread && !threadIds) return [];
     const roles = permRolesOf(st);
     const now = Date.now();
     return Object.values(st.members).filter((m) => {
+      if (threadIds && !threadIds.has(m.user_id)) return false;
       const isOwner = st.server.owner_id === m.user_id || isInstanceAdmin(m.user_id);
       return has(compute(serverId, roles, toPermMember(m, m.user_id, now), isOwner, overwrites), P.VIEW_CHANNEL);
     });
-  }, [st, serverId, overwrites]);
+  }, [st, serverId, overwrites, inThread, threadIds]);
 
   // The order by name depends on names, not on who is online, so it is sorted
   // when the members or their names change. Presence changes all the time, and
@@ -153,7 +183,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
     const push = (key: string, label: string, list: Member[], off: boolean) => {
       if (list.length === 0) return;
       out.push({ kind: "head", key: "h:" + key, label, count: list.length });
-      for (const m of list) out.push({ kind: "member", key: m.user_id, member: m, user: users[m.user_id], color: memberColor(st, m.user_id), offline: off });
+      for (const m of list) out.push({ kind: "member", key: m.user_id, member: m, user: users[m.user_id], look: memberLook(st, m.user_id), offline: off });
     };
     for (const [id, g] of groups) push(id, g.label, g.members, false);
     push("online", t("chat.memberList.online"), online, false);
@@ -231,8 +261,9 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
             {isPicking ? <PickMark on={picked.includes(row.member.user_id)} label={t("pick.pickNamed", { name })} /> : null}
             <Avatar id={row.member.user_id} avatarId={row.member.avatar_id ?? row.user?.avatar_id ?? null} name={name} size={32} status={statusOf(p)} />
             <span className={s.text}>
-              <span className={s.name} style={row.color ? { color: row.color } : undefined}>
-                <span className={s.nameText}>{name}</span>
+              <span className={s.name} style={row.look?.color ? { color: row.look.color } : undefined}>
+                <span className={[s.nameText, nameClass(row.look)].join(" ")} style={nameStyle(row.look)}>{name}</span>
+                {row.look?.icon ? <RoleIcon icon={row.look.icon} size={16} /> : null}
                 {isOwner(row.member.user_id) ? <OwnerCrown /> : st.server.owner_id === row.member.user_id ? <Crown size={14} className={s.crown} aria-label={t("chat.memberList.serverOwner")} /> : null}
                 {!isOwner(row.member.user_id) && isInstanceAdmin(row.member.user_id) ? <AdminHammer /> : null}
                 <UserTag userId={row.member.user_id} size="sm" />

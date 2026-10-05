@@ -1,4 +1,4 @@
-import { Check, Hash, Link2, Lock, MailOpen, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, SmilePlus, Trash2 } from "lucide-react";
+import { Check, Hash, Link2, Lock, MailOpen, Megaphone, MessageSquareText, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, ShieldAlert, SmilePlus, Trash2 } from "lucide-react";
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { Markdown, isEmojiOnly, parse, plainText } from "@/markdown";
@@ -10,7 +10,10 @@ import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuState } from "@/stores/ui";
 import { rangeBetween, useSelection } from "@/stores/selection";
 import { useUsers } from "@/stores/users";
-import { memberColor, useServers } from "@/stores/servers";
+import { useServers } from "@/stores/servers";
+import { useMemberLook } from "@/lib/useMemberLook";
+import { nameClass, nameStyle } from "@/lib/roleLook";
+import { RoleIcon } from "@/components/common/RoleIcon";
 import { useChannels } from "@/stores/channels";
 import { openProfilePopout } from "@/stores/profilePopout";
 import { useRelationships } from "@/stores/relationships";
@@ -30,6 +33,10 @@ import { PackCards } from "./PackCards";
 import { ProfileCards } from "./ProfileCards";
 import { NoteCards } from "@/components/notes/NoteCards";
 import { MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
+import { useAutomodHeld } from "@/lib/automod/useHeld";
+import { canI, P } from "@/stores/servers";
+import { ThreadChip } from "./ThreadChip";
+import { canPublish, publish } from "./publish";
 import type { UnfurlResult } from "@/api/types";
 import { EditMessage } from "./EditMessage";
 import { isOnlyMediaLinks } from "./mediaLinks";
@@ -42,7 +49,7 @@ import { menuAnchor } from "@/components/common/ContextMenu";
 import { copyText } from "@/lib/clipboard";
 import { MSG_FLAG_PINNED } from "@/api/types";
 import { discardPending, retryPending } from "@/components/composer/send";
-import { buildMessageMenu, canDelete, canEdit, canRemoveEmbeds, confirmRemoveEmbeds, canPick, canPin, canReact, copyMessageLink, deleteMessageNow, markUnread, messageTimes, togglePin } from "./messageMenu";
+import { buildMessageMenu, canDelete, canEdit, canRemoveEmbeds, confirmRemoveEmbeds, canPick, canPin, canReact, canThread, copyMessageLink, deleteMessageNow, markUnread, messageTimes, togglePin } from "./messageMenu";
 import { useRowActive } from "./activeRow";
 import { useShownName } from "./useShownName";
 import { HookAvatar, HookPopout, HookTags } from "./webhook/HookHeader";
@@ -168,21 +175,29 @@ function ToolButton({ label, danger, onClick, children }: { label: string; dange
 
 export const MessageItem = memo(function MessageItem({ msg, groupStart, pending, upload, highlight, first }: Props) {
   const me = useAuth((a) => a.me);
-  const avatarId = useUsers((u) => u.byId[msg.author_id]?.avatar_id ?? null);
+  const ownAvatar = useUsers((u) => u.byId[msg.author_id]?.avatar_id ?? null);
+  // in a server, the picture someone set for it
+  const serverAvatar = useServers((st) => {
+    const sid = useChannels.getState().byId[msg.channel_id]?.server_id;
+    return sid ? (st.byId[sid]?.members[msg.author_id]?.avatar_id ?? null) : null;
+  });
+  const avatarId = serverAvatar ?? ownAvatar;
   // A webhook's message goes by the name and picture it was sent with.
   const hook = msg.hook;
   // A nickname you gave a friend applies everywhere their name appears, not
   // just in the sidebar; a server nickname wins inside that server.
-  const shownName = useShownName(msg.channel_id, hook ? undefined : msg.author_id);
-  const name = hook ? hook.name : shownName;
+  // a post published from an announcement channel this one follows goes by where it came from
+  const copy = msg.type === "crosspost" ? msg.crosspost : undefined;
+  const shownName = useShownName(msg.channel_id, hook || copy ? undefined : msg.author_id);
+  const name = copy ? `${copy.server_name} #${copy.channel_name}` : hook ? hook.name : shownName;
   const [hookCard, setHookCard] = useState<HTMLElement | null>(null);
   const closeHookCard = useCallback(() => setHookCard(null), []);
   const editing = useUI((u) => u.editing?.channelId === msg.channel_id && u.editing.messageId === msg.id);
   const openContextMenu = useUI((u) => u.openContextMenu);
   const dev = useSettings((st) => st.settings.developerMode);
   const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
-  // the author's colour only, so a change to anyone else in the server leaves this row alone
-  const color = useServers((st) => (serverId && st.byId[serverId] && !msg.webhook_id ? memberColor(st.byId[serverId], msg.author_id) : undefined));
+  // the author's colours and role icon only, so a change to anyone else in the server leaves this row alone
+  const look = useMemberLook(serverId, msg.webhook_id ? undefined : msg.author_id);
   const [picker, setPicker] = useState<DOMRect | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuWatch = useRef<(() => void) | null>(null);
@@ -245,6 +260,8 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
 
   const showHeader = groupStart || isReply;
   const profile = (e: React.MouseEvent<HTMLElement>) => {
+    // a published copy speaks for a channel elsewhere, not for a person
+    if (copy) return;
     // a webhook is not a person with a profile: its card says what it is
     if (hook) {
       const el = e.currentTarget;
@@ -309,11 +326,17 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
         <>
           {/* the same way to the profile as the name beside it, for a pointer only: one stop for the keyboard is enough */}
           <button type="button" className={s.avatar} data-group-start={showHeader} onClick={profile} tabIndex={-1} aria-hidden="true">
-            {hook && msg.webhook_id ? <HookAvatar hook={hook} webhookId={msg.webhook_id} /> : <Avatar id={msg.author_id} avatarId={avatarId} name={name} size={40} />}
+            {copy ? <Avatar id={copy.server_id} avatarId={copy.server_icon_id} name={copy.server_name} size={40} kind="icon" /> : hook && msg.webhook_id ? <HookAvatar hook={hook} webhookId={msg.webhook_id} /> : <Avatar id={msg.author_id} avatarId={avatarId} name={name} size={40} />}
           </button>
           <div className={s.headerRow} id={whoId}>
-            <button type="button" className={s.author} data-author={msg.author_id} data-webhook={msg.webhook_id} style={color ? { color } : undefined} onClick={profile} dir="auto" aria-haspopup={hook ? "dialog" : undefined}>{name}</button>
-            {hook ? <HookTags /> : <UserTag userId={msg.author_id} open />}
+            <button type="button" className={[s.author, copy ? "" : nameClass(look)].join(" ")} data-author={msg.author_id} data-webhook={msg.webhook_id} style={copy ? undefined : nameStyle(look)} onClick={profile} dir="auto" aria-haspopup={hook ? "dialog" : undefined}>{name}</button>
+            {look?.icon && !copy && !hook ? <RoleIcon icon={look.icon} size={18} /> : null}
+            {copy ? (
+              <span className={s.followTag} title={t("follows.tagHint")}>
+                <Megaphone size={11} aria-hidden="true" />
+                {t("follows.tag")}
+              </span>
+            ) : hook ? <HookTags /> : <UserTag userId={msg.author_id} open />}
             <HeaderTime at={msg.created_at} />
           </div>
           {hookCard && hook && msg.webhook_id ? <HookPopout hook={hook} webhookId={msg.webhook_id} anchor={hookCard} onClose={closeHookCard} /> : null}
@@ -325,6 +348,13 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
         </>
       )}
       {editing ? <EditMessage msg={msg} /> : <MessageBody msg={msg} name={name} id={bodyId} pending={pending} upload={upload} />}
+      {msg.thread && serverId && !pending ? <ThreadChip serverId={serverId} summary={msg.thread} /> : null}
+      {!pending && !editing && canPublish(msg) ? (
+        <button type="button" className={s.publishBtn} onClick={() => void publish(msg)} data-testid="publish">
+          <Megaphone size={15} aria-hidden="true" />
+          {t("follows.publish")}
+        </button>
+      ) : null}
       {!pending ? <Reactions msg={msg} pickerAnchor={picker} onOpenPicker={setPicker} onPickerClose={() => setPicker(null)} /> : null}
       {!pending && !editing && !selecting && (active || menuOpen) ? <RowToolbar msg={msg} pinned={pinned} dev={dev} setPicker={setPicker} openMenu={openMenu} /> : null}
       {dev && !pending ? <span hidden data-dev-id={msg.id} /> : null}
@@ -338,6 +368,37 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
  * shown, in the conversation and in its pins alike.
  */
 export function MessageBody({ msg, name, id, pending, upload }: { msg: DecryptedMessage; name: string; id?: string; pending?: "sending" | "failed" | undefined; upload?: PendingUpload | undefined }) {
+  const held = useAutomodHeld(msg);
+  const [reveal, setReveal] = useState(false);
+  // a moderator can still read what AutoMod holds back, on purpose
+  const mayReveal = useServers((st) => {
+    const sid = held ? useChannels.getState().byId[msg.channel_id]?.server_id : null;
+    return sid ? canI(st.byId[sid], P.MANAGE_MESSAGES, msg.channel_id) : false;
+  });
+  if (held && !reveal) {
+    return (
+      <div id={id} className={s.content}>
+        <span className={s.heldLine} data-testid="automod-held">
+          <ShieldAlert size={15} aria-hidden="true" />
+          {t("automod.held.text")}
+          {mayReveal ? (
+            <button type="button" className={s.sysLink} onClick={() => setReveal(true)}>{t("automod.held.show")}</button>
+          ) : null}
+        </span>
+      </div>
+    );
+  }
+  if (msg.type === "crosspost" && msg.crosspost?.deleted) {
+    return (
+      <div id={id} className={s.content}>
+        <span className={s.waiting}>{t("follows.originalDeleted")}</span>
+      </div>
+    );
+  }
+  return <MessageContent msg={msg} name={name} id={id} pending={pending} upload={upload} />;
+}
+
+function MessageContent({ msg, name, id, pending, upload }: { msg: DecryptedMessage; name: string; id?: string | undefined; pending?: "sending" | "failed" | undefined; upload?: PendingUpload | undefined }) {
   const ctx = useRowRenderCtx();
   const hook = msg.hook;
   const imagePreviews = useSettings((st) => st.settings.imagePreviews);
@@ -411,6 +472,7 @@ function RowToolbar({ msg, pinned, dev, setPicker, openMenu }: { msg: DecryptedM
         <ToolButton label={t("chat.messageItem.editMessage")} onClick={() => setEditing({ channelId: msg.channel_id, messageId: msg.id })}><Pencil size={18} /></ToolButton>
       ) : null}
       <ToolButton label={t("chat.messageItem.reply")} onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={18} /></ToolButton>
+      {canThread(msg) ? <ToolButton label={t("threads.create.title")} onClick={() => useUI.getState().openModal("createThread", { channelId: msg.channel_id, messageId: msg.id })}><MessageSquareText size={18} /></ToolButton> : null}
       {shift ? (
         <>
           {canPin(msg) ? <ToolButton label={pinned ? t("chat.messageItem.unpinMessage") : t("chat.messageItem.pinMessage")} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={18} /> : <Pin size={18} />}</ToolButton> : null}

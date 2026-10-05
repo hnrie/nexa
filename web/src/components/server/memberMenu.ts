@@ -45,8 +45,9 @@ export function memberMenuItems(serverId: string, userId: string, ctx: { openMod
     items.push(...people);
     items[items.length - 1]!.separatorAfter = true;
   }
-  const canNick = self ? canI(st, P.CHANGE_NICKNAME) || canI(st, P.MANAGE_NICKNAMES) : canI(st, P.MANAGE_NICKNAMES) && above;
-  if (canNick) items.push({ id: "nick", label: self ? t("perms.changeNickname") : t("server.memberMenu.changeTheirNickname"), onSelect: () => ctx.openModal("serverProfile", { serverId, userId }) });
+  // one's own profile in a server is always one's own to edit; someone else's nickname takes Manage Nicknames
+  const canNick = self || (canI(st, P.MANAGE_NICKNAMES) && above);
+  if (canNick) items.push({ id: "nick", label: self ? t("sidebar.serverMenu.editServerProfile") : t("server.memberMenu.changeTheirNickname"), onSelect: () => (self ? ctx.openModal("settings", { page: "profiles", serverId }) : ctx.openModal("serverProfile", { serverId, userId })) });
   if (canI(st, P.MANAGE_ROLES) && above) items.push({ id: "roles", label: t("server.members.roles"), onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "roles" }) });
   if (!self && above) {
     const timedOut = !!st.members[userId]?.timeout_until && st.members[userId]!.timeout_until! > Date.now();

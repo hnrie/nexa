@@ -20,6 +20,8 @@ import { emojiToken, packEmoji, useExpressions } from "@/stores/expressions";
 import { emojiByShortcode, emojiLoaded } from "@/components/pickers/emojiIndex";
 import { extractUrls } from "@/markdown";
 import { pollRequest } from "@/lib/poll";
+import { automodReady, screenOutgoing, type Stopped } from "@/lib/automod/rules";
+import { useAutomodNotices } from "@/stores/automodNotices";
 import { tooLong, tooLongMessage } from "./limit";
 import { extractMentions, type HumanNames, type MentionScope } from "./mentions";
 
@@ -36,6 +38,8 @@ export interface SendOptions {
   replaces?: string;
   /** A poll: sealed in the message, with only its shape told to the server (lib/poll.ts). */
   poll?: PollPayload;
+  /** AutoMod has read it already (screenForSend): what to tell it once the message is sent. */
+  screened?: (messageId: string) => void;
 }
 
 /** The conversation whose keys encrypt a channel: the server tells us (itself for DMs and private channels, the server root otherwise). */
@@ -81,6 +85,8 @@ interface Written {
   mentions: string[];
   roles: string[];
   everyone: boolean;
+  /** What was typed, to put back in the box should AutoMod stop it. */
+  raw: string;
 }
 
 /** The conversation a channel belongs to: a subchat's people are those of the chat it is in. */
@@ -120,8 +126,12 @@ export function mentionScope(channelId: string): MentionScope {
   const ex = useExpressions.getState();
   const emoji: NonNullable<MentionScope["emoji"]> = [];
   if (serverId) for (const e of ex.emojis[serverId] ?? []) emoji.push({ name: e.name, token: emojiToken(e) });
-  for (const [sid, list] of Object.entries(ex.emojis)) if (sid !== serverId) for (const e of list) emoji.push({ name: e.name, token: emojiToken(e), fallback: true });
-  for (const { items } of packEmoji(ex.packs)) for (const e of items) emoji.push({ name: e.name, token: emojiToken(e), fallback: true });
+  // another server's emoji (and packs') need Use External Emoji in a server channel
+  const external = !st || canI(st, P.USE_EXTERNAL_EMOJIS, channelId);
+  if (external) {
+    for (const [sid, list] of Object.entries(ex.emojis)) if (sid !== serverId) for (const e of list) emoji.push({ name: e.name, token: emojiToken(e), fallback: true });
+    for (const { items } of packEmoji(ex.packs)) for (const e of items) emoji.push({ name: e.name, token: emojiToken(e), fallback: true });
+  }
   scope.emoji = emoji;
   // until the emoji set is here nobody can say a name is free, so nothing borrowed stands in for it
   scope.isShortcode = (name) => !emojiLoaded() || !!emojiByShortcode(name);
@@ -148,7 +158,52 @@ function written(channelId: string, rawText: string, opts: SendOptions): Written
   if (Array.isArray(opts.embeds) && opts.embeds.length) payload.embeds = opts.embeds;
   if (opts.sticker) payload.sticker = opts.sticker;
   if (opts.poll) payload.poll = opts.poll;
-  return { payload, mentions, roles, everyone };
+  return { payload, mentions, roles, everyone, raw: rawText };
+}
+
+/** A message AutoMod stopped before it went. */
+export class AutomodStop extends Error {
+  constructor(readonly stopped: Stopped) {
+    super("automod_blocked");
+    this.name = "AutomodStop";
+  }
+}
+
+/** Puts up what AutoMod said about a message in its conversation's box, with what was typed to go back in it. */
+function noticeStopped(channelId: string, err: AutomodStop | ApiError, raw: string | undefined): void {
+  if (err instanceof AutomodStop) {
+    const c = err.stopped.first;
+    useAutomodNotices.getState().show(channelId, { message: c.message, rule: c.rule.name, kind: c.rule.kind, matched: c.matched, ...(raw ? { text: raw } : {}), at: Date.now() });
+    return;
+  }
+  const d = err.details ?? {};
+  const custom = d["custom"] === true;
+  useAutomodNotices.getState().show(channelId, { message: custom ? err.message : "", rule: typeof d["rule"] === "string" ? d["rule"] : "", kind: typeof d["kind"] === "string" ? d["kind"] : "", ...(raw ? { text: raw } : {}), at: Date.now() });
+}
+
+/**
+ * What AutoMod makes of a message before it goes, when the server's rules are
+ * here to say: "stopped" (and the box shows why), or what to tell AutoMod
+ * once it is sent. Null when the rules are still on their way: the send
+ * itself waits for them.
+ */
+export function screenForSend(channelId: string, rawText: string, files: readonly string[], opts: SendOptions = {}): { stopped: true } | { stopped: false; afterSend: (messageId: string) => void } | null {
+  const ch = useChannels.getState().byId[channelId];
+  const me = useAuth.getState().me;
+  if (!ch?.server_id || !me) return { stopped: false, afterSend: () => undefined };
+  const st = useServers.getState().byId[ch.server_id];
+  if (!st) return null;
+  const w = written(channelId, rawText, opts);
+  // the names of files about to go up count as they will once they are attached
+  const payload: MessagePayload = files.length ? { ...w.payload, att: files.map((name) => ({ name }) as AttachmentMeta) } : w.payload;
+  const verdict = screenOutgoing(ch, me.id, payload, { onlyIfLoaded: true });
+  if (verdict === null) return null;
+  if (verdict.stopped) {
+    noticeStopped(channelId, new AutomodStop(verdict.stopped), undefined);
+    return { stopped: true };
+  }
+  useAutomodNotices.getState().dismiss(channelId);
+  return { stopped: false, afterSend: verdict.afterSend };
 }
 
 /** What a pending copy keeps of the options, so a retry sends what was chosen. */
@@ -367,6 +422,15 @@ async function deliver(channelId: string, meId: string, w: Written, tmp: string,
       const got = await opts.embeds.catch(() => []);
       if (got.length) payload = { ...w.payload, embeds: got };
     }
+    // AutoMod reads it here when its rules were not in yet as it was sent
+    let afterSend = opts.screened;
+    const ch = useChannels.getState().byId[channelId];
+    if (!afterSend && ch?.server_id) {
+      await automodReady(ch.server_id);
+      const verdict = screenOutgoing(ch, meId, payload);
+      if (verdict?.stopped) throw new AutomodStop(verdict.stopped);
+      afterSend = verdict?.afterSend;
+    }
     const conv = convForChannel(channelId);
     const key = await useKeys.getState().ensureConvKey(conv);
     if (!key) throw new Error("waiting_for_key");
@@ -386,14 +450,26 @@ async function deliver(channelId: string, meId: string, w: Written, tmp: string,
     if (opts.flags) body.flags = opts.flags;
     if (payload.poll) body.poll = pollRequest(payload.poll);
     const sent = await messagesApi.send(channelId, body);
+    afterSend?.(sent.id);
     const decrypted = await decryptForStore(sent);
     if (!decrypted.payload) decrypted.payload = payload;
     useMessages.getState().settle(channelId, [decrypted], { tmpId: tmp, nonce });
     useChannels.getState().setLastMessage(channelId, sent.id);
     useSlowmode.getState().markSent(channelId);
   } catch (err) {
+    // stopped by AutoMod: it never went, so nothing waits in the list to be sent again
+    if (err instanceof AutomodStop || (err instanceof ApiError && err.code === "automod_blocked")) {
+      useMessages.getState().removePending(channelId, tmp);
+      noticeStopped(channelId, err, w.raw);
+      return;
+    }
     useMessages.getState().failPending(channelId, tmp);
     const ui = useUI.getState();
+    if (err instanceof ApiError && err.code === "verification_wait") {
+      const secs = Number(err.retryAfter ?? 0) || 60;
+      ui.toast(t("composer.send.verificationWait", { time: formatWait(secs) }), "error");
+      throw err;
+    }
     if (err instanceof ApiError && err.code === "slowmode") {
       const secs = Number(err.retryAfter ?? 0) || 5;
       useSlowmode.getState().setUntil(channelId, Date.now() + secs * 1000);
@@ -408,7 +484,9 @@ async function deliver(channelId: string, meId: string, w: Written, tmp: string,
  * than the error's own: sending and editing throw bare codes.
  */
 export function sendErrorText(err: unknown): string | null {
+  if (err instanceof AutomodStop) return err.stopped.first.message || t("automod.notice.stoppedEdit");
   if (err instanceof ApiError) {
+    if (err.code === "automod_blocked") return err.details?.["custom"] === true ? err.message : t("automod.notice.stoppedEdit");
     if (err.code === "rate_limited") return t("composer.send.youAreSendingMessagesTooQuickly");
     // the server's own ceiling, which only a message far past the limit reaches
     if (err.code === "message_too_long" || err.code === "too_large") return tooLongMessage();
@@ -420,6 +498,14 @@ export function sendErrorText(err: unknown): string | null {
   if (err.message === "waiting_for_key") return t("composer.send.waitingForTheEncryptionKeyFor");
   if (err.message === "too_long") return tooLongMessage();
   return null;
+}
+
+/** A wait, in the largest unit that fits. */
+export function formatWait(seconds: number): string {
+  if (seconds < 90) return t("composer.send.waitSeconds", { count: Math.max(1, Math.ceil(seconds)) });
+  if (seconds < 90 * 60) return t("composer.send.waitMinutes", { count: Math.ceil(seconds / 60) });
+  if (seconds < 36 * 3600) return t("composer.send.waitHours", { count: Math.ceil(seconds / 3600) });
+  return t("composer.send.waitDays", { count: Math.ceil(seconds / 86400) });
 }
 
 function replyAuthor(channelId: string, messageId: string): string | undefined {
@@ -456,6 +542,15 @@ export async function editMessage(channelId: string, messageId: string, rawText:
     else delete payload.embeds;
   }
   if (!payload.t && !payload.att?.length && !payload.sticker) return;
+  // an edit is read by AutoMod as a new message is
+  const ch = useChannels.getState().byId[channelId];
+  let afterEdit: ((id: string) => void) | undefined;
+  if (ch?.server_id) {
+    await automodReady(ch.server_id);
+    const verdict = screenOutgoing(ch, me.id, payload);
+    if (verdict?.stopped) throw new AutomodStop(verdict.stopped);
+    afterEdit = verdict?.afterSend;
+  }
   const conv = existing.key_conv_id ?? convForChannel(channelId);
   const epoch = existing.key_epoch ?? 0;
   let chanKey = channelKeyFor(conv, epoch, channelId);
@@ -469,6 +564,7 @@ export async function editMessage(channelId: string, messageId: string, rawText:
   if (!chanKey) throw new Error("waiting_for_key");
   const ciphertext = await encryptMessage(chanKey, { conv, epoch: useEpoch, channelId, authorId: me.id }, payload);
   const updated = await messagesApi.edit(channelId, messageId, { ciphertext, key_conv_id: conv, key_epoch: useEpoch, mentions, mention_roles: roles, mention_everyone: everyone });
+  afterEdit?.(messageId);
   const decrypted = await decryptForStore(updated);
   useMessages.getState().update(channelId, decrypted);
 }

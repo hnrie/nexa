@@ -1,5 +1,8 @@
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useId, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type DragEvent } from "react";
+import { ImageCropModal } from "@/components/common/ImageCropModal";
+import { RoleIcon } from "@/components/common/RoleIcon";
+import { nameClass, nameStyle, type RoleLook } from "@/lib/roleLook";
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import type { Role } from "@/api/types";
@@ -189,11 +192,54 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
   const [color, setColor] = useState(role.color);
   const [hoist, setHoist] = useState(role.hoist);
   const [mentionable, setMentionable] = useState(role.mentionable);
+  const [color2, setColor2] = useState<number | null>(role.color2 ?? null);
+  const [color3, setColor3] = useState<number | null>(role.color3 ?? null);
+  const [iconEmoji, setIconEmoji] = useState(role.icon_emoji ?? "");
+  const [iconBusy, setIconBusy] = useState(false);
+  const [crop, setCrop] = useState<File | null>(null);
+  const iconRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   // One group per role, so switching roles does not leave the browser thinking
   // two sets of swatches are the same set.
   const swatchName = `role-colour-${useId()}`;
-  const dirty = name !== role.name || color !== role.color || hoist !== role.hoist || mentionable !== role.mentionable;
+  const style: "solid" | "gradient" | "shimmer" = color2 == null ? "solid" : color3 == null ? "gradient" : "shimmer";
+  const setStyle = (next: "solid" | "gradient" | "shimmer") => {
+    if (next === "solid") {
+      setColor2(null);
+      setColor3(null);
+      return;
+    }
+    if (!color) setColor(0x8000ff);
+    setColor2((c) => c ?? 0x00b0f4);
+    setColor3(next === "shimmer" ? (color3 ?? 0xffd166) : null);
+  };
+  const dirty = name !== role.name || color !== role.color || hoist !== role.hoist || mentionable !== role.mentionable || color2 !== (role.color2 ?? null) || color3 !== (role.color3 ?? null) || iconEmoji !== (role.icon_emoji ?? "");
+  const look = { color: color ? hex(color) : undefined, ...(color && color2 != null ? { colors: [hex(color), hex(color2), ...(color3 != null ? [hex(color3)] : [])], shimmer: color3 != null } : {}) } as RoleLook;
+  const uploadIcon = async (blob: Blob) => {
+    setIconBusy(true);
+    try {
+      const saved = await serversApi.uploadRoleIcon(role.server_id, role.id, blob);
+      onSaved(saved);
+      setIconEmoji("");
+      toast(t("roles.icon.saved"), "success");
+    } catch (err) {
+      toast(describeError(err, t("roles.icon.failed")), "error");
+    } finally {
+      setIconBusy(false);
+    }
+  };
+  const removeIcon = async () => {
+    setIconBusy(true);
+    try {
+      const saved = role.icon_id ? await serversApi.deleteRoleIcon(role.server_id, role.id) : await serversApi.patchRole(role.server_id, role.id, { icon_emoji: "" });
+      onSaved(saved);
+      setIconEmoji("");
+    } catch (err) {
+      toast(describeError(err, t("roles.icon.failed")), "error");
+    } finally {
+      setIconBusy(false);
+    }
+  };
   const save = async () => {
     setBusy(true);
     try {
@@ -202,8 +248,14 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
       if (color !== role.color) body.color = color;
       if (hoist !== role.hoist) body.hoist = hoist;
       if (mentionable !== role.mentionable) body.mentionable = mentionable;
+      if (color2 !== (role.color2 ?? null)) body.color2 = color2;
+      if (color3 !== (role.color3 ?? null)) body.color3 = color3;
+      if (iconEmoji !== (role.icon_emoji ?? "")) body.icon_emoji = iconEmoji.trim();
       const saved = await serversApi.patchRole(role.server_id, role.id, body);
       onSaved(saved);
+      setColor2(saved.color2 ?? null);
+      setColor3(saved.color3 ?? null);
+      setIconEmoji(saved.icon_emoji ?? "");
       // the server tidies whitespace in names, so show what it kept or the save bar never goes away
       setName(saved.name);
       setColor(saved.color);
@@ -227,7 +279,11 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
       )}
       <Field as="div" label={t("server.roles.roleColour")} hint={t("server.roles.membersUseTheColourOfTheir")}>
         <div className={s.swatches} role="radiogroup" aria-label={t("server.roles.roleColour")}>
-          <span className={s.preview}><span className={s.dot} style={{ background: color ? hex(color) : "var(--text-muted)" }} />{name || "@everyone"}</span>
+          <span className={s.preview}>
+            <span className={s.dot} style={{ background: look.colors ? `linear-gradient(90deg, ${look.colors.join(", ")})` : color ? hex(color) : "var(--text-muted)" }} />
+            <span className={nameClass(look)} style={nameStyle(look)}>{name || "@everyone"}</span>
+            {!everyone && (role.icon_id || iconEmoji) ? <RoleIcon icon={role.icon_id ? { kind: "image", id: role.icon_id, name } : iconEmoji.startsWith("custom:") ? { kind: "custom", id: iconEmoji.slice(7), name } : { kind: "emoji", text: iconEmoji, name }} size={18} /> : null}
+          </span>
           {/* Without a shared `name` the browser treats twenty-one swatches as
               twenty-one unrelated radios: no arrow keys between them, and one
               tab stop each. Their only name was `title={hex(c)}`, which a
@@ -239,6 +295,43 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
           <label className={s.swatch} style={{ background: color && !SWATCHES.includes(color) ? hex(color) : "var(--bg-surface)", border: "2px dashed var(--border-strong)" }} title={t("server.roles.customColour")}><input type="color" value={hex(color || 0x99aab5)} disabled={!editable} onChange={(e) => setColor(parseInt(e.target.value.slice(1), 16))} /></label>
         </div>
       </Field>
+      {!everyone ? (
+        <Field as="div" label={t("roles.style.label")} hint={t("roles.style.hint")}>
+          <div className={s.styleRow} role="radiogroup" aria-label={t("roles.style.label")}>
+            {(["solid", "gradient", "shimmer"] as const).map((x) => (
+              <label key={x} className={s.styleOpt} data-on={style === x}>
+                <input type="radio" name={`${swatchName}-style`} checked={style === x} disabled={!editable} onChange={() => setStyle(x)} />
+                {t(`roles.style.${x}`)}
+              </label>
+            ))}
+          </div>
+          {style !== "solid" ? (
+            <div className={s.styleColors}>
+              <label className={s.styleColor}>
+                <span>{t("roles.style.second")}</span>
+                <input type="color" value={hex(color2 ?? 0x00b0f4)} disabled={!editable} onChange={(e) => setColor2(parseInt(e.target.value.slice(1), 16))} />
+              </label>
+              {style === "shimmer" ? (
+                <label className={s.styleColor}>
+                  <span>{t("roles.style.third")}</span>
+                  <input type="color" value={hex(color3 ?? 0xffd166)} disabled={!editable} onChange={(e) => setColor3(parseInt(e.target.value.slice(1), 16))} />
+                </label>
+              ) : null}
+            </div>
+          ) : null}
+        </Field>
+      ) : null}
+      {!everyone ? (
+        <Field as="div" label={t("roles.icon.label")} hint={t("roles.icon.hint")}>
+          <div className={s.styleColors}>
+            <Button size="sm" variant="secondary" disabled={!editable || iconBusy} onClick={() => iconRef.current?.click()}>{t("roles.icon.upload")}</Button>
+            <TextInput className={s.emojiField} value={iconEmoji.startsWith("custom:") ? "" : iconEmoji} placeholder={t("roles.icon.emoji")} aria-label={t("roles.icon.emoji")} disabled={!editable} onChange={(e) => setIconEmoji([...e.target.value.trim()].slice(-8).join(""))} maxLength={16} />
+            {role.icon_id || role.icon_emoji ? <Button size="sm" variant="ghost" disabled={!editable || iconBusy} onClick={() => void removeIcon()}>{t("roles.icon.remove")}</Button> : null}
+            <input ref={iconRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (f.type === "image/gif") void uploadIcon(f); else setCrop(f); } e.target.value = ""; }} />
+          </div>
+          {crop ? <ImageCropModal file={crop} aspect={1} maxSize={128} title={t("roles.icon.crop")} onClose={() => setCrop(null)} onDone={({ blob }) => { setCrop(null); void uploadIcon(blob); }} /> : null}
+        </Field>
+      ) : null}
       {!everyone ? <Toggle checked={hoist} disabled={!editable} onChange={setHoist} label={t("server.roles.displayRoleMembersSeparatelyFromOnline")} /> : null}
       <Toggle checked={mentionable} disabled={!editable} onChange={setMentionable} label={t("server.roles.allowAnyoneToMentionThisRole")} description={t("server.roles.membersWithMentionEveryoneCanAlways")} />
       {!everyone && editable ? (
@@ -246,7 +339,7 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
           <Button variant="danger" size="sm" onClick={() => openModal("confirm", { title: t("server.roles.deleteNamed", { name: role.name }), body: t("server.roles.membersLoseThisRoleAndAny"), confirmLabel: t("server.roles.deleteRole"), danger: true, onConfirm: async () => { await serversApi.deleteRole(role.server_id, role.id); onDeleted(); } })} data-testid="delete-role"><Trash2 size={14} /> {t("server.roles.deleteRole")}</Button>
         </div>
       ) : null}
-      <SaveBar dirty={dirty} busy={busy} onReset={() => { setName(role.name); setColor(role.color); setHoist(role.hoist); setMentionable(role.mentionable); }} onSave={() => void save()} />
+      <SaveBar dirty={dirty} busy={busy} onReset={() => { setName(role.name); setColor(role.color); setHoist(role.hoist); setMentionable(role.mentionable); setColor2(role.color2 ?? null); setColor3(role.color3 ?? null); setIconEmoji(role.icon_emoji ?? ""); }} onSave={() => void save()} />
     </div>
   );
 }

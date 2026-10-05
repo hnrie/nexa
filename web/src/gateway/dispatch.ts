@@ -1,8 +1,11 @@
 import type { GatewayEvent, MentionMeta } from "./events";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
-import { useKeys } from "@/stores/keys";
+import { keysGoneHooks, useKeys } from "@/stores/keys";
 import { useMessages } from "@/stores/messages";
+import { isThread, useThreads } from "@/stores/threads";
+import { clearAutomod, forgetAutomodRules, heldBy, onArrive, warmAutomod } from "@/lib/automod/rules";
+import { forgetFollows } from "@/lib/follows";
 import { usePresence } from "@/stores/presence";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { useRelationships } from "@/stores/relationships";
@@ -34,6 +37,9 @@ import { loadChunk } from "@/lib/lazyChunk";
 
 type VoiceModule = typeof import("@/voice/session");
 let voiceModule: Promise<VoiceModule> | null = null;
+
+// what AutoMod held for this account goes with it
+keysGoneHooks.push(clearAutomod);
 
 /**
  * The call engine, fetched the first time an event needs it rather than with
@@ -167,6 +173,7 @@ function usersShownIn(channelIds: string[]): Record<string, PublicUser> {
 
 function ingestServerView(view: ServerView): void {
   useChannels.getState().upsert(view.channels);
+  useThreads.getState().setServer(view.id, view.threads ?? [], view.joined_threads ?? []);
   useServers.getState().setFromView(view);
 }
 
@@ -250,8 +257,10 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useNexa.setState({ feed: null, threads: {} });
       applyNexaState(d.nexa);
       const servers = d.servers ?? [];
-      const channels = [...d.channels, ...servers.flatMap((v) => v.channels)];
+      const channels = [...d.channels, ...servers.flatMap((v) => v.channels), ...servers.flatMap((v) => v.threads ?? [])];
       useChannels.setState({ byId: Object.fromEntries(channels.map((c) => [c.id, c])) });
+      useThreads.getState().clear();
+      for (const v of servers) useThreads.getState().setServer(v.id, v.threads ?? [], v.joined_threads ?? []);
       useRelationships.getState().setMany(d.relationships);
       useReadStates.getState().setMany(d.read_states);
       useGroupAddNotices.getState().setAll(d.group_add_notices ?? []);
@@ -284,6 +293,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       await useKeys.getState().ingestGrants(d.key_grants);
       if (gone()) return;
       readyGen = sessionGen;
+      // the rules members' apps apply, from the servers that have any
+      warmAutomod(servers.filter((v) => (v.automod_at ?? 0) > 0).map((v) => v.id));
       for (const fn of [...readyListeners]) fn();
       for (const h of dispatchHooks.onReady) h();
       void useKeys.getState().reconcile();
@@ -302,9 +313,17 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const messages = useMessages.getState();
       if (m.nonce && meId === m.author_id) messages.settle(m.channel_id, [decrypted], { nonce: m.nonce });
       else messages.insert(m.channel_id, [decrypted]);
+      // AutoMod reads what arrives (a moderator's app clears away what a rule stops)
+      onArrive(decrypted, meId ?? undefined);
+      const held = !!heldBy(decrypted, meId ?? undefined);
       // what was newest before this one, to tell whether the conversation had been read
       const lastBefore = useChannels.getState().byId[m.channel_id]?.last_message_id ?? null;
       useChannels.getState().setLastMessage(m.channel_id, m.id);
+      // a thread counts what is said in it, for the message it hangs from
+      const thread = useChannels.getState().byId[m.channel_id];
+      if (thread?.thread && !m.type.startsWith("system_") && lastBefore !== m.id) {
+        useChannels.getState().upsert({ ...thread, thread: { ...thread.thread, message_count: thread.thread.message_count + 1, archived: false } });
+      }
       useTyping.getState().remove(m.channel_id, m.author_id);
       if (decrypted.decryptError === "no_key" && m.key_conv_id) useKeys.getState().markWaiting(m.key_conv_id);
       ensureUser(m.author_id);
@@ -322,7 +341,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const visible = ui.activeChannelId === m.channel_id && appOnScreen() && readingPresent(m.channel_id);
       if (acted || visible) {
         void useReadStates.getState().ack(m.channel_id, m.id);
-      } else if (isQuiet(decrypted, currentBlockRules(), loadedAuthorOf(m.channel_id))) {
+      } else if (held || isQuiet(decrypted, currentBlockRules(), loadedAuthorOf(m.channel_id))) {
         // Someone blocked (or a reply to them, when those are hidden): no badge,
         // no mention, and a conversation that was read up to here stays read.
         if (!isUnread(useReadStates.getState().byChannel[m.channel_id], lastBefore)) void useReadStates.getState().ack(m.channel_id, m.id);
@@ -401,11 +420,53 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useChannels.getState().upsert(e.d);
       fetchMissingUsers(e.d.recipient_ids);
       return;
-    case "channel_delete":
+    case "channel_delete": {
+      // a channel's threads go with it
+      const gone = [e.d.id, ...Object.values(useChannels.getState().byId).filter((c) => isThread(c) && c.parent_id === e.d.id).map((c) => c.id)];
+      for (const id of gone) {
+        useChannels.getState().remove(id);
+        useMessages.getState().clearChannel(id);
+        useThreads.getState().forget(id);
+      }
+      useGroupAddNotices.getState().remove(e.d.id);
+      for (const h of dispatchHooks.onMessageChange) h({ kind: "channelsGone", channelIds: gone });
+      return;
+    }
+    case "thread_create":
+    case "thread_update": {
+      const { member_count, ...thread } = e.d;
+      useChannels.getState().upsert(thread);
+      if (typeof member_count === "number") useThreads.getState().membersChanged(thread.id, [], [], member_count, meId);
+      for (const h of dispatchHooks.onUnhandled) h(e);
+      return;
+    }
+    case "thread_delete":
       useChannels.getState().remove(e.d.id);
       useMessages.getState().clearChannel(e.d.id);
-      useGroupAddNotices.getState().remove(e.d.id);
+      useThreads.getState().forget(e.d.id);
+      for (const h of dispatchHooks.onUnhandled) h(e);
       for (const h of dispatchHooks.onMessageChange) h({ kind: "channelsGone", channelIds: [e.d.id] });
+      return;
+    case "thread_members_update":
+      useThreads.getState().membersChanged(e.d.thread_id, e.d.added, e.d.removed, e.d.member_count, meId);
+      for (const h of dispatchHooks.onUnhandled) h(e);
+      return;
+    case "automod_rules_update": {
+      const st = useServers.getState().byId[e.d.server_id];
+      if (st && e.d.automod_at !== undefined) useServers.getState().updateServer({ ...st.server, automod_at: e.d.automod_at });
+      forgetAutomodRules(e.d.server_id);
+      return;
+    }
+    case "automod_event":
+    case "audit_log_entry":
+    case "follows_update":
+      if (e.t === "follows_update") {
+        const channelId = e.d.channel_id;
+        forgetFollows(channelId);
+        // a follow's key sealed again (or a new follow) opens copies that could not be read
+        void useMessages.getState().redecrypt((m) => m.channel_id === channelId && m.type === "crosspost" && !!m.decryptError);
+      }
+      for (const h of dispatchHooks.onUnhandled) h(e);
       return;
     case "channel_positions":
       useChannels.getState().applyPositions(e.d.channels);

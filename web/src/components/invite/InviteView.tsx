@@ -1,11 +1,18 @@
 import { Link2Off } from "lucide-react";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { InvitePreview, UnfurlResult } from "@/api/types";
-import { bannerUrl, iconUrl } from "@/api/users";
+import { bannerUrl, emojiUrl, iconUrl } from "@/api/users";
+import { Markdown, type RenderCtx } from "@/markdown";
 import { t } from "@/i18n";
 import { avatarColor, initials } from "@/lib/avatarColor";
 import { useDominantColor } from "@/lib/dominantColor";
 import s from "./Invite.module.css";
+
+/**
+ * A server's description is formatted. Read before joining, it knows none of
+ * the server's people or channels, so a mention in it shows as plain words.
+ */
+const DESCRIPTION_CTX: RenderCtx = { users: {}, channels: {}, roles: {}, emojiUrl: (id, animated, css) => emojiUrl(id, animated, css), inert: false };
 
 /** Where an invite leads, as the views draw it. */
 export interface InviteTarget {
@@ -156,7 +163,11 @@ export function InviteView({ target, variant, lead, headingId, actions, children
           <Counts target={target} />
         </div>
         {variant === "card" ? <div className={s.cardActions}>{actions}</div> : null}
-        {target.description ? <p className={s.desc} dir="auto">{target.description}</p> : null}
+        {target.description ? (
+          <div className={s.desc} dir="auto">
+            <Markdown source={target.description} ctx={DESCRIPTION_CTX} />
+          </div>
+        ) : null}
         {variant !== "card" ? <div className={s.actions}>{actions}</div> : null}
         {children}
       </div>

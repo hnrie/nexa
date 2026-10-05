@@ -1,4 +1,4 @@
-import { Hash, Lock, Volume2 } from "lucide-react";
+import { Hash, Lock, Megaphone, MessagesSquare, Volume2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -30,28 +30,38 @@ export function slug(name: string): string {
   return typedChannelName(name.trim()).replace(/^-+|-+$/g, "");
 }
 
+type Kind = "text" | "voice" | "announcement" | "forum";
+
+/** The kinds of channel there are, each with what it is for. */
+const KINDS: { kind: Kind; icon: typeof Hash; label: string; desc: string }[] = [
+  { kind: "text", icon: Hash, label: "modals.createChannel.text", desc: "modals.createChannel.sendMessagesImagesGifsEmojiOpinions" },
+  { kind: "voice", icon: Volume2, label: "modals.createChannel.voice", desc: "modals.createChannel.hangOutTogetherWithVoiceVideo" },
+  { kind: "announcement", icon: Megaphone, label: "modals.createChannel.announcement", desc: "modals.createChannel.announcementDesc" },
+  { kind: "forum", icon: MessagesSquare, label: "modals.createChannel.forum", desc: "modals.createChannel.forumDesc" },
+];
+
 export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: () => void; serverId: string; parentId?: string | undefined }) {
   const nav = useNavigate();
   const parent = useChannels((c) => (parentId ? c.byId[parentId] : undefined));
   const upsert = useChannels((c) => c.upsert);
   const toast = useUI((u) => u.toast);
-  const [type, setTypeState] = useState<"text" | "voice">("text");
+  const [type, setTypeState] = useState<Kind>("text");
   // a name typed as a voice channel's becomes a text channel's when the type changes
-  const setType = (next: "text" | "voice") => {
+  const setType = (next: Kind) => {
     setTypeState(next);
-    if (next === "text") setName((n) => typedChannelName(n));
+    if (next !== "voice") setName((n) => typedChannelName(n));
   };
   const [name, setName] = useState("");
   const [priv, setPriv] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const create = async () => {
-    const clean = type === "text" ? slug(name) : name.trim();
+    const clean = type !== "voice" ? slug(name) : name.trim();
     if (!clean || busy) return;
     setBusy(true);
     let made: Channel | null = null;
     try {
-      const body: { type: "text" | "voice"; name: string; parent_id?: string | null } = { type, name: clean };
+      const body: { type: Kind; name: string; parent_id?: string | null } = { type, name: clean };
       if (parentId) body.parent_id = parentId;
       const ch = await serversApi.createChannel(serverId, body);
       made = ch;
@@ -95,22 +105,19 @@ export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: (
             or on any gap between the options, to the first radio. */}
         <Field as="div" label={t("modals.createChannel.channelType")}>
           <div className={s.types} role="radiogroup" aria-label={t("modals.createChannel.channelType")}>
-            <label className={s.type} data-on={type === "text"}>
-              <span className={s.typeIcon}><Hash size={22} /></span>
-              <span className={s.typeText}><span className={s.typeLabel}>{t("modals.createChannel.text")}</span><span className={s.typeDesc}>{t("modals.createChannel.sendMessagesImagesGifsEmojiOpinions")}</span></span>
-              <input type="radio" name="type" checked={type === "text"} onChange={() => setType("text")} />
-            </label>
-            <label className={s.type} data-on={type === "voice"}>
-              <span className={s.typeIcon}><Volume2 size={22} /></span>
-              <span className={s.typeText}><span className={s.typeLabel}>{t("modals.createChannel.voice")}</span><span className={s.typeDesc}>{t("modals.createChannel.hangOutTogetherWithVoiceVideo")}</span></span>
-              <input type="radio" name="type" checked={type === "voice"} onChange={() => setType("voice")} />
-            </label>
+            {KINDS.map(({ kind, icon: Icon, label, desc }) => (
+              <label key={kind} className={s.type} data-on={type === kind}>
+                <span className={s.typeIcon}><Icon size={22} /></span>
+                <span className={s.typeText}><span className={s.typeLabel}>{t(label)}</span><span className={s.typeDesc}>{t(desc)}</span></span>
+                <input type="radio" name="type" checked={type === kind} onChange={() => setType(kind)} data-testid={`channel-type-${kind}`} />
+              </label>
+            ))}
           </div>
         </Field>
         <Field label={t("modals.createChannel.channelName")} required>
           <div className={s.hashInput}>
-            {type === "text" ? <Hash size={16} /> : <Volume2 size={16} />}
-            <TextInput value={name} onChange={(e) => setName(type === "text" ? typedChannelName(e.target.value) : e.target.value)} placeholder={t("modals.createChannel.namePlaceholder")} maxLength={100} autoFocus autoCapitalize={type === "text" ? "none" : undefined} onKeyDown={(e) => e.key === "Enter" && void create()} data-testid="channel-name" />
+            {type === "voice" ? <Volume2 size={16} /> : type === "announcement" ? <Megaphone size={16} /> : type === "forum" ? <MessagesSquare size={16} /> : <Hash size={16} />}
+            <TextInput value={name} onChange={(e) => setName(type !== "voice" ? typedChannelName(e.target.value) : e.target.value)} placeholder={t("modals.createChannel.namePlaceholder")} maxLength={100} autoFocus autoCapitalize={type !== "voice" ? "none" : undefined} onKeyDown={(e) => e.key === "Enter" && void create()} data-testid="channel-name" />
           </div>
         </Field>
         <Toggle checked={priv} onChange={setPriv} label={t("modals.createChannel.privateChannel")} description={t("modals.createChannel.onlySelectedMembersAndRolesWill")} />

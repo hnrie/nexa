@@ -1,4 +1,7 @@
-import { ArrowLeftFromLine, ArrowRightToLine, ChartBar, Crown, Pin } from "lucide-react";
+import { ArrowLeftFromLine, ArrowRightToLine, ChartBar, Crown, MessageSquareText, Pin } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useChannels } from "@/stores/channels";
+import { AutomodAlert } from "./AutomodAlert";
 import { CallLine } from "@/components/voice/CallLine";
 import type { DecryptedMessage } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
@@ -11,8 +14,14 @@ import s from "./Chat.module.css";
 
 import { t, Tr } from "@/i18n";
 export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
+  if (msg.type === "system_automod") return <AutomodAlert msg={msg} />;
+  return <PlainSystemMessage msg={msg} />;
+}
+
+function PlainSystemMessage({ msg }: { msg: DecryptedMessage }) {
   const users = useUsers((u) => u.byId);
   const setJumpTo = useUI((u) => u.setJumpTo);
+  const thread = useChannels((c) => (msg.thread ? c.byId[msg.thread.id] : undefined));
   // a poll's closing line speaks for whoever asked: the webhook that posted it, or the person
   const actor = msg.hook?.name ?? displayName(users[msg.author_id]);
   const target = msg.mentions[0] ? displayName(users[msg.mentions[0]]) : t("chat.systemMessage.someone");
@@ -60,6 +69,24 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
     case "system_join":
       body = <Tr id="chat.systemMessage.joined" values={{ actor: A }} />;
       break;
+    case "system_thread": {
+      // a thread started on its own: its note is what it hangs from
+      icon = <MessageSquareText size={18} />;
+      const name = thread?.name ?? msg.thread?.name;
+      body = name && msg.thread ? (
+        <Tr id="chat.systemMessage.startedThread" values={{ actor: A, thread: <ThreadLink channelId={msg.channel_id} threadId={msg.thread.id} name={name} /> }} />
+      ) : (
+        <Tr id="chat.systemMessage.startedThreadGone" values={{ actor: A }} />
+      );
+      break;
+    }
+    case "system_thread_add":
+      body = <Tr id="chat.systemMessage.addedToThread" values={{ actor: A, target: T }} />;
+      break;
+    case "system_thread_remove":
+      icon = <ArrowLeftFromLine size={18} />;
+      body = <Tr id="chat.systemMessage.removedFromThread" values={{ actor: A, target: T }} />;
+      break;
     case "system_call":
       // told from where the reader stands, from the summary its caller sealed onto it
       return <CallLine msg={msg} />;
@@ -80,6 +107,17 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
         <span className={s.time}>{formatTimestamp(msg.created_at)}</span>
       </span>
     </div>
+  );
+}
+
+/** A thread's name in its notice: the way into it. */
+function ThreadLink({ channelId, threadId, name }: { channelId: string; threadId: string; name: string }) {
+  const nav = useNavigate();
+  const serverId = useChannels((c) => c.byId[channelId]?.server_id ?? null);
+  return (
+    <button type="button" className={s.sysLink} onClick={() => serverId && nav(`/channels/${serverId}/${threadId}`)} dir="auto">
+      {name}
+    </button>
   );
 }
 

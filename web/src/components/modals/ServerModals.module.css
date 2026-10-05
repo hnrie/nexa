@@ -10,9 +10,9 @@
 .type:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
 .type[data-on="true"] { background: color-mix(in srgb, var(--brand) 12%, var(--bg-floating)); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand) 80%, transparent); }
 .type[data-on="true"] .typeIcon { color: var(--text-brand); }
-.type input { accent-color: var(--brand); width: 18px; height: 18px; margin-inline-start: auto; }
-.typeIcon { display: flex; color: var(--text-muted); }
-.typeText { display: flex; flex-direction: column; }
+.type input { flex: none; accent-color: var(--brand); width: 18px; height: 18px; margin-inline-start: auto; }
+.typeIcon { flex: none; display: flex; color: var(--text-muted); }
+.typeText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .typeLabel { font-size: 16px; font-weight: 500; }
 .typeDesc { font-size: 13px; color: var(--text-muted); }
 .linkRow { display: flex; gap: 8px; align-items: stretch; }

@@ -21,9 +21,17 @@ import s from "../ServerSettings.module.css";
 import r from "../RoleChips.module.css";
 
 import { t } from "@/i18n";
+import { ModMembers } from "./members/ModMembers";
 const PAGE = 50;
 
+/** Moderators get the Members page with its filters and Mod View; everyone else the plain list. */
 export default function MembersPage({ serverId }: { serverId: string }) {
+  const server = useServers((x) => x.byId[serverId]);
+  const moderator = [P.MANAGE_SERVER, P.MANAGE_ROLES, P.MANAGE_NICKNAMES, P.KICK_MEMBERS, P.BAN_MEMBERS, P.MODERATE_MEMBERS].some((p) => canI(server, p));
+  return moderator ? <ModMembers serverId={serverId} /> : <PlainMembers serverId={serverId} />;
+}
+
+function PlainMembers({ serverId }: { serverId: string }) {
   const server = useServers((x) => x.byId[serverId]);
   const upsertMembers = useServers((x) => x.upsertMembers);
   const users = useUsers((u) => u.byId);

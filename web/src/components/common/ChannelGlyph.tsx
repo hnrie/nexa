@@ -1,4 +1,4 @@
-import { Hash, Lock, Volume2 } from "lucide-react";
+import { Hash, Lock, Megaphone, MessageSquareText, MessagesSquare, Volume2 } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import type { Channel } from "@/api/types";
 import { emojiUrl } from "@/api/users";
@@ -37,7 +37,7 @@ export function ChannelGlyph({ channel, size, locked = false, className }: Props
   } else if (custom) {
     own = <img className={s.picture} src={emojiUrl(custom.blob_id, custom.animated, size)} alt="" draggable={false} loading="lazy" decoding="async" />;
   }
-  const body = own ?? (channel.type === "voice" ? <Volume2 size={size} /> : channel.type === "category" ? null : <Hash size={size} />);
+  const body = own ?? (channel.type === "category" ? null : <TypeIcon type={channel.type} size={size} />);
   if (!body) return null;
   const badge = locked ? <Lock size={badgeSize(size)} /> : own && channel.type === "voice" ? <Volume2 size={badgeSize(size)} /> : null;
   return (
@@ -46,6 +46,23 @@ export function ChannelGlyph({ channel, size, locked = false, className }: Props
       {badge ? <span className={s.badge}>{badge}</span> : null}
     </span>
   );
+}
+
+/** The mark of a kind of channel: # for talking, a speaker, a megaphone for announcements, speech for forums and threads. */
+export function TypeIcon({ type, size }: { type: Channel["type"]; size: number }) {
+  switch (type) {
+    case "voice":
+      return <Volume2 size={size} />;
+    case "announcement":
+      return <Megaphone size={size} />;
+    case "forum":
+      return <MessagesSquare size={size} />;
+    case "thread":
+    case "private_thread":
+      return <MessageSquareText size={size} />;
+    default:
+      return <Hash size={size} />;
+  }
 }
 
 /**

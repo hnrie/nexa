@@ -16,7 +16,8 @@ interface Props {
 export function Toggle({ checked, onChange, label, description, disabled, ariaLabel, setting }: Props) {
   const descId = useId();
   return (
-    <label className={s.row} data-disabled={disabled} data-setting={setting}>
+    // a switch on its own sits in someone else's row, without the padding and rule of a settings row
+    <label className={s.row} data-disabled={disabled} data-setting={setting} data-bare={label === undefined || undefined}>
       {label !== undefined ? (
         <span className={s.text}>
           <span className={s.label}>{label}</span>

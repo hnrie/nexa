@@ -12,7 +12,9 @@ import { useVoice } from "@/stores/voice";
 import { Tooltip } from "@/components/common/Tooltip";
 import { P, isPrivateChannel } from "@/lib/perms";
 import { isMuted } from "@/lib/unread";
-import { channelTree, useChannels } from "@/stores/channels";
+import { channelTree, selectThreads, useChannels } from "@/stores/channels";
+import { useThreads } from "@/stores/threads";
+import { holdsThreads } from "@/lib/threads";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { canI, useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
@@ -43,6 +45,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   const upsert = useChannels((c) => c.upsert);
   const applyPositions = useChannels((c) => c.applyPositions);
   const reads = useReadStates((r) => r.byChannel);
+  const joinedThreads = useThreads((x) => x.joined);
   const settings = useSettings((x) => x.settings);
   const patch = useSettings((x) => x.patch);
   const openModal = useUI((u) => u.openModal);
@@ -196,9 +199,46 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
 
   if (!st) return <div className={s.sidebar} />;
 
+  /** A thread under its channel, joined or open: the line from the channel says whose it is. */
+  const renderThread = (th: Channel, last: boolean) => {
+    const rs = reads[th.id];
+    const selected = active === th.id;
+    const unread = isUnread(rs, th.last_message_id) && !isMuted(settings, th.id, serverId) && !isMuted(settings, th.parent_id ?? "", serverId);
+    const mentions = rs?.mentions ?? 0;
+    return (
+      <div
+        key={th.id}
+        className={[s.row, s.threadRow].join(" ")}
+        data-selected={selected}
+        data-unread={unread && !selected}
+        data-last={last || undefined}
+        data-channel={th.id}
+        onContextMenu={(e) => onChannelContext(e, th.id)}
+      >
+        <span className={s.threadSpine} aria-hidden="true" />
+        {last ? null : <span className={s.threadRail} aria-hidden="true" />}
+        <button
+          className={s.channel}
+          onClick={() => {
+            nav(`/channels/${serverId}/${th.id}`);
+            useUI.getState().setLeftOpen(false);
+          }}
+          aria-current={selected ? "page" : undefined}
+          data-testid="sidebar-thread"
+        >
+          <span className={s.name} dir="auto">{th.name}</span>
+          {mentions > 0 ? <span className="visually-hidden">{`, ${t("sidebar.serverSidebar.mentionsCount", { count: mentions })}`}</span> : unread && !selected ? <span className="visually-hidden">{`, ${t("sidebar.serverSidebar.unread")}`}</span> : null}
+        </button>
+        {mentions > 0 ? <span className={s.mention} aria-hidden="true">{mentions > 99 ? "99+" : mentions}</span> : null}
+      </div>
+    );
+  };
+
   const renderChannel = (ch: Channel) => {
     const rs = reads[ch.id];
-    const unread = ch.type === "text" && isUnread(rs, ch.last_message_id) && !isMuted(settings, ch.id, serverId);
+    const unread = (ch.type === "text" || ch.type === "announcement") && isUnread(rs, ch.last_message_id) && !isMuted(settings, ch.id, serverId);
+    // the threads this account is in (or has open), still going, under the channel they belong to
+    const threads = holdsThreads(ch) ? selectThreads(channels, ch.id).filter((th) => !th.thread?.archived && (joinedThreads[th.id] || th.id === active)) : [];
     const mentions = rs?.mentions ?? 0;
     const selected = active === ch.id;
     const priv = isPrivateChannel(serverId, ch.overwrites);
@@ -252,6 +292,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
         {mentions > 0 ? <span className={s.mention} aria-hidden="true">{mentions > 99 ? "99+" : mentions}</span> : null}
       </div>
       {ch.type === "voice" ? <VoiceParticipants channelId={ch.id} serverId={serverId} /> : null}
+      {threads.length ? <div className={s.threads}>{threads.map((th, i) => renderThread(th, i === threads.length - 1))}</div> : null}
       </div>
     );
   };

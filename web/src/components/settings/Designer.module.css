@@ -8,6 +8,27 @@
  */
 .intro { margin: -12px 0 18px; font-size: 14.5px; line-height: 1.45; color: var(--text-muted); max-width: 62ch; }
 
+/* the main profile, or one for a server: the page's own tabs, under its title */
+.scopeTabs { display: flex; gap: 4px; margin: -8px 0 18px; border-bottom: 1px solid var(--border-subtle); }
+.scopeTab { position: relative; min-height: 40px; padding: 0 14px; font-size: 15px; font-weight: 600; color: var(--text-muted); }
+.scopeTab:hover { color: var(--text); }
+.scopeTab[aria-selected="true"] { color: var(--text-strong); }
+.scopeTab[aria-selected="true"]::after { content: ""; position: absolute; inset-inline: 10px; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--focus-ring); }
+.scopeTab:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: var(--radius-xs); }
+.scopeTabs ~ .intro { margin-top: 0; }
+
+/* which server's profile this is, and the way back to the main one there */
+.serverHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 10px; }
+.serverPick { display: inline-flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; height: 44px; padding: 0 12px 0 8px; border-radius: var(--radius-sm); background: var(--sheen), var(--bg-surface); color: var(--text-strong); font-size: 15.5px; font-weight: 650; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); transition: box-shadow var(--transition); }
+.serverPick:hover { box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-strong); }
+.serverPick:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.serverPick svg { flex: none; color: var(--text-muted); }
+.serverPickName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.serverHead + .intro { margin-top: 0; }
+.empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 48px 16px; text-align: center; }
+.emptyTitle { margin: 0; font-family: var(--font-display); font-size: 18px; font-weight: 700; color: var(--text-strong); }
+.emptyText { margin: 0; max-width: 42ch; font-size: 14.5px; color: var(--text-muted); }
+
 .toolbar { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
 .views { align-self: flex-start; display: inline-flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--bg-input); box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 45%, transparent), inset 0 0 0 1px var(--border-subtle); }
 .viewBtn { height: 32px; padding: 0 14px; border-radius: 9px; color: var(--text-muted); font-size: 14.5px; font-weight: 600; white-space: nowrap; transition: background-color var(--transition), color var(--transition), box-shadow var(--transition); }
@@ -68,6 +89,8 @@
 
 /* a conversation as others see it, and the typing line's own tools beside it */
 .chatView { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); align-items: start; gap: 20px; }
+/* a server profile's conversation has no typing line to design beside it */
+.chatView[data-single] { grid-template-columns: minmax(0, 560px); justify-content: center; }
 .chat { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border-radius: var(--radius-lg); background: var(--bg-raised); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium); }
 .chatHead { display: flex; align-items: center; height: 48px; padding: 0 16px; font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--text-strong); box-shadow: 0 1px 0 var(--border-subtle); }
 .chatBody { display: flex; flex-direction: column; gap: 18px; padding: 18px 16px 6px; }

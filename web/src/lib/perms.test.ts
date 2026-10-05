@@ -14,8 +14,8 @@ describe("perms", () => {
   it("matches the server's bit values", () => {
     expect(permString(P.VIEW_CHANNEL)).toBe("1024");
     expect(permString(P.MODERATE_MEMBERS)).toBe("1099511627776");
-    expect(permString(DEFAULT_EVERYONE)).toBe("567348103859777");
-    expect(permString(ALL)).toBe("568449658253311");
+    expect(permString(DEFAULT_EVERYONE)).toBe("567863500197441");
+    expect(permString(ALL)).toBe("7333177768538111");
     expect(parsePerm("garbage")).toBe(0n);
   });
   it("computes base permissions", () => {

@@ -1,4 +1,7 @@
+import { ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
+import { dispatchHooks } from "@/gateway/dispatch";
+import type { GatewayEvent } from "@/gateway/events";
 import { servers as serversApi } from "@/api/servers";
 import type { AuditEntry } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
@@ -18,6 +21,7 @@ import s from "../ServerSettings.module.css";
 
 import { t } from "@/i18n";
 import { isolate } from "../bidi";
+import { LANGUAGES } from "@/i18n/core";
 /** What each audited action says, looked up per render so it follows the language. */
 function verbs(): Record<string, string> {
   return {
@@ -53,13 +57,59 @@ function verbs(): Record<string, string> {
     webhook_delete: t("server.auditLog.verb.webhook_delete"),
     server_tag_update: t("server.auditLog.verb.server_tag_update"),
     server_tag_delete: t("server.auditLog.verb.server_tag_delete"),
+    invite_delete_all: t("server.auditLog.verb.invite_delete_all"),
+    invites_pause: t("server.auditLog.verb.invites_pause"),
+    invites_resume: t("server.auditLog.verb.invites_resume"),
+    member_prune: t("server.auditLog.verb.member_prune"),
+    member_timeout: t("server.auditLog.verb.member_timeout"),
+    member_timeout_remove: t("server.auditLog.verb.member_timeout_remove"),
+    member_quarantine_lift: t("server.auditLog.verb.member_quarantine_lift"),
+    message_delete: t("server.auditLog.verb.message_delete"),
+    message_bulk_delete: t("server.auditLog.verb.message_bulk_delete"),
+    message_pin: t("server.auditLog.verb.message_pin"),
+    message_unpin: t("server.auditLog.verb.message_unpin"),
+    message_publish: t("server.auditLog.verb.message_publish"),
+    thread_create: t("server.auditLog.verb.thread_create"),
+    thread_update: t("server.auditLog.verb.thread_update"),
+    thread_delete: t("server.auditLog.verb.thread_delete"),
+    follow_create: t("server.auditLog.verb.follow_create"),
+    follow_delete: t("server.auditLog.verb.follow_delete"),
+    automod_rule_create: t("server.auditLog.verb.automod_rule_create"),
+    automod_rule_update: t("server.auditLog.verb.automod_rule_update"),
+    automod_rule_delete: t("server.auditLog.verb.automod_rule_delete"),
+    automod_action: t("server.auditLog.verb.automod_action"),
   };
 }
 
-/** A channel by the name its row shows: text channels with their "#", voice channels and categories without. */
+/** AutoMod's own id, which stands for it as the one who did what it did. */
+const AUTOMOD = "0";
+
+/** A channel by the name its row shows: text and announcement channels with their "#", the rest without. */
 function shownChannel(ch: { type: string; name: string }): string {
-  return ch.type === "text" ? `#${ch.name}` : ch.name;
+  return ch.type === "text" || ch.type === "announcement" ? `#${ch.name}` : ch.name;
 }
+
+/** What each kind of channel is called where one is made. */
+function channelKind(type: string | undefined): string {
+  switch (type) {
+    case "voice":
+      return t("modals.createChannel.voice");
+    case "category":
+      return t("server.auditLog.category");
+    case "announcement":
+      return t("modals.createChannel.announcement");
+    case "forum":
+      return t("modals.createChannel.forum");
+    case "thread":
+      return t("threads.create.public");
+    case "private_thread":
+      return t("threads.create.private");
+    default:
+      return t("modals.createChannel.text");
+  }
+}
+
+const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
 
 export default function AuditLogPage({ serverId }: { serverId: string }) {
   const users = useUsers((u) => u.byId);
@@ -85,7 +135,7 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
     setBusy(true);
     setFailed(false);
     try {
-      const res = await serversApi.auditLog(serverId, { limit: 50, ...(before ? { before } : {}) });
+      const res = await serversApi.auditLog(serverId, { limit: 50, ...(before ? { before } : {}), ...(actor ? { actor_id: actor } : {}), ...(action ? { actions: [action] } : {}) });
       upsertUsers(res.users);
       setEntries((cur) => [...(before ? (cur ?? []) : []), ...res.entries]);
       setDone(res.entries.length < 50);
@@ -96,10 +146,26 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
     }
   };
 
+  // the filters are asked of the server, so older entries are found as well
   useEffect(() => {
+    setEntries(null);
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverId]);
+  }, [serverId, actor, action]);
+  // what is done while the log is open comes in at the top
+  useEffect(() => {
+    const hook = (ev: GatewayEvent) => {
+      if (ev.t !== "audit_log_entry" || ev.d.server_id !== serverId) return;
+      const e = ev.d;
+      if ((actor && e.actor_id !== actor) || (action && e.action !== action)) return;
+      setEntries((cur) => (cur && !cur.some((x) => x.id === e.id) ? [e, ...cur] : cur));
+    };
+    dispatchHooks.onUnhandled.push(hook);
+    return () => {
+      dispatchHooks.onUnhandled.splice(dispatchHooks.onUnhandled.indexOf(hook), 1);
+    };
+  }, [serverId, actor, action]);
+  const actorName = (id: string) => (id === AUTOMOD ? t("automod.name") : displayName(users[id]));
 
   const targetName = (e: AuditEntry): string => {
     if (!e.target_id) return "";
@@ -165,7 +231,7 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
       case "topic":
         return [t("server.channelSettings.channelTopic"), str || none()];
       case "type":
-        return [t("modals.createChannel.channelType"), str === "voice" ? t("modals.createChannel.voice") : str === "category" ? t("server.auditLog.category") : t("modals.createChannel.text")];
+        return [t("modals.createChannel.channelType"), channelKind(str)];
       case "system_channel_id":
         return [t("server.serverOverview.systemMessagesChannel"), (str && channelName(str)) || t("server.serverOverview.noSystemMessages")];
       case "default_notifications":
@@ -222,6 +288,8 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
         if (v === e.target_id) return null;
         return [t("server.invites.channel"), (str && channelName(str)) || t("server.auditLog.disconnected")];
       case "parent_id":
+        // a thread's parent is the channel it was started in
+        if (e.action.startsWith("thread_")) return [t("server.invites.channel"), (str && channelName(str)) || t("server.auditLog.aDeletedChannel")];
         return [t("server.auditLog.category"), (str && channelName(str)) || none()];
       case "code":
         return [t("server.invites.code"), str ?? ""];
@@ -232,11 +300,85 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
       case "delete_message_days":
         return [t("server.memberAction.deleteMessageHistory"), num ? formatSpan(num * 86_400_000) : none()];
       case "icon":
-        return [t("server.serverOverview.serverIcon"), v ? t("server.auditLog.changed") : t("server.auditLog.removed")];
+        return [e.target_type === "role" ? t("roles.icon.label") : t("server.serverOverview.serverIcon"), v ? t("server.auditLog.changed") : t("server.auditLog.removed")];
+      case "icon_emoji":
+        return [t("roles.icon.label"), str ? (str.startsWith("custom:") ? t("server.auditLog.changed") : str) : t("server.auditLog.removed")];
+      case "color2":
+        return [t("roles.style.second"), num ? hex(num) : none()];
+      case "color3":
+        return [t("roles.style.third"), num ? hex(num) : none()];
+      case "glyph":
+        return [t("server.channelIcon.title"), str ? (str.startsWith("custom:") ? t("server.auditLog.changed") : str) : t("server.channelIcon.default")];
+      case "forum":
+        return [t("server.auditLog.forumSettings"), t("server.auditLog.changed")];
+      case "applied_tags":
+        return [t("forum.settings.tags"), Array.isArray(v) ? t("server.auditLog.itemsCount", { count: v.length }) : none()];
+      case "enabled":
+        return [t("server.auditLog.status"), onOff(v)];
+      case "discoverable":
+        return [t("discovery.settings.list"), onOff(v)];
+      case "discovery_category":
+        return [t("discovery.settings.category"), str ? t(`discovery.cat.${str}`) : t("discovery.settings.noCategory")];
+      case "discovery_tags":
+        return [t("discovery.settings.tags"), Array.isArray(v) && v.length ? v.join(", ") : none()];
+      case "discovery_language":
+        return [t("discovery.settings.language"), (str && LANGUAGES.find((l) => l.tag === str)?.endonym) || str || t("discovery.anyLanguage")];
+      case "verify_account_minutes":
+        return [t("safety.accountAge"), num ? formatSpan(num * 60_000) : t("safety.noWait")];
+      case "verify_member_minutes":
+        return [t("safety.memberAge"), num ? formatSpan(num * 60_000) : t("safety.noWait")];
+      case "bio":
+        return [t("settings.profile.aboutMe"), str ? t("server.auditLog.changed") : t("server.auditLog.removed")];
+      case "pronouns":
+        return [t("settings.profile.pronouns"), str || none()];
+      case "server_avatar":
+        return [t("serverProfile.picture"), t("server.auditLog.removed")];
+      case "server_banner":
+        return [t("serverProfile.banner"), t("server.auditLog.removed")];
+      case "quarantined":
+        return [t("automod.action.held"), onOff(v)];
       case "banner":
         return [t("server.serverOverview.serverBanner"), v ? t("server.auditLog.changed") : t("server.auditLog.removed")];
       case "avatar":
         return [t("integrations.image"), v ? t("server.auditLog.changed") : t("server.auditLog.removed")];
+      case "rule":
+        return [t("automod.log.rule"), str ?? ""];
+      case "kind":
+        return [t("automod.log.kind"), str ? t(`automod.kind.${str}`) : ""];
+      case "actions":
+        return [t("server.auditLog.whatItDid"), Array.isArray(v) ? v.map((a) => t(`automod.action.${a === "block" ? "blocked" : a === "timeout" ? "timedOut" : a === "quarantine" ? "held" : "alerted"}`)).join(", ") : ""];
+      case "matched":
+        return [t("automod.log.matched"), str ?? ""];
+      case "mentions":
+        return [t("automod.log.mentions"), String(num ?? 0)];
+      case "count":
+        // a published post went to this many channels that follow this one
+        if (e.action === "message_publish") return [t("server.auditLog.sentTo"), t("server.auditLog.followingChannels", { count: num ?? 0 })];
+        return [t("server.auditLog.count"), String(num ?? 0)];
+      case "days":
+        return [t("members.prune.days"), num ? formatSpan(num * 86_400_000) : ""];
+      case "invites_paused_until":
+        return [t("server.invites.pausedHead"), num ? formatFull(num) : none()];
+      case "archived":
+        return [t("threads.chip.closed"), onOff(v)];
+      case "locked":
+        return [t("threads.settings.locked"), onOff(v)];
+      case "auto_archive":
+      case "default_auto_archive":
+        return [t("threads.create.closeAfter"), num ? formatSpan(num * 60_000) : none()];
+      case "source_server":
+        return [t("follows.log.server"), str ?? ""];
+      case "source_channel":
+        return [t("follows.log.channel"), str ?? ""];
+      case "author_id":
+        return [t("server.auditLog.author"), (str && userName(str)) || str || ""];
+      case "message_id":
+      case "follow_id":
+      case "bulk":
+      case "raid":
+      case "seconds":
+      case "messages":
+      case "title":
       case "target_type":
       case "current_name":
         return null;
@@ -275,9 +417,15 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
       </div>
     );
   };
-  const actors = [...new Set((entries ?? []).map((e) => e.actor_id))];
-  const actions = [...new Set((entries ?? []).map((e) => e.action))];
-  const shown = (entries ?? []).filter((e) => (!actor || e.actor_id === actor) && (!action || e.action === action));
+  // who has done things here, as far as this log has been read, and AutoMod
+  const [actors, setActors] = useState<string[]>([]);
+  useEffect(() => {
+    if (!entries) return;
+    setActors((cur) => [...new Set([...cur, ...entries.map((e) => e.actor_id)])]);
+  }, [entries]);
+  const allVerbs = verbs();
+  const actions = Object.keys(allVerbs).sort((a, b) => allVerbs[a]!.localeCompare(allVerbs[b]!));
+  const shown = entries ?? [];
   const filtering = !!actor || !!action;
 
   return (
@@ -285,27 +433,31 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
       <h2 className={st.title}>{t("server.auditLog.auditLog")}</h2>
       <p className={st.hint}>{t("server.auditLog.everyModerationAndConfigurationChangeIn")}</p>
       <div style={{ height: 16 }} />
-      {entries && entries.length > 0 ? (
+      {(entries && entries.length > 0) || filtering ? (
         <div className={s.auditFilters}>
           <Select value={actor} onChange={(e) => setActor(e.target.value)} aria-label={t("server.auditLog.filterByMember")} data-testid="audit-actor">
             <option value="">{t("server.auditLog.anyone")}</option>
-            {actors.map((id) => <option key={id} value={id}>{displayName(users[id])}</option>)}
+            <option value={AUTOMOD}>{t("automod.name")}</option>
+            {actors.filter((id) => id !== AUTOMOD).map((id) => <option key={id} value={id}>{displayName(users[id])}</option>)}
           </Select>
           <Select value={action} onChange={(e) => setAction(e.target.value)} aria-label={t("server.auditLog.filterByAction")} data-testid="audit-action">
             <option value="">{t("server.auditLog.anyAction")}</option>
-            {actions.map((a) => <option key={a} value={a}>{verbs()[a] ?? a}</option>)}
+            {actions.map((a) => <option key={a} value={a}>{allVerbs[a]}</option>)}
           </Select>
         </div>
       ) : null}
-      {filtering && !done ? <p className={st.hint} style={{ margin: "0 0 12px" }}>{t("server.auditLog.filteredSoFar")}</p> : null}
       {entries === null && !failed ? <Spinner label={t("server.auditLog.loadingTheAuditLog")} /> : null}
       {entries && entries.length === 0 && !failed ? <p className={st.hint}>{t("server.auditLog.nothingHasHappenedYet")}</p> : null}
       {entries && entries.length > 0 && shown.length === 0 ? <p className={st.hint}>{t("server.auditLog.nothingMatches")}</p> : null}
       {shown.map((e) => (
-        <div key={e.id} className={s.auditRow}>
-          <Avatar id={e.actor_id} avatarId={users[e.actor_id]?.avatar_id ?? null} name={displayName(users[e.actor_id])} size={32} />
+        <div key={e.id} className={s.auditRow} data-action={e.action}>
+          {e.actor_id === AUTOMOD ? (
+            <span className={s.auditAutomod} aria-hidden="true"><ShieldCheck size={18} /></span>
+          ) : (
+            <Avatar id={e.actor_id} avatarId={users[e.actor_id]?.avatar_id ?? null} name={displayName(users[e.actor_id])} size={32} />
+          )}
           <div className={s.auditText}>
-            <b>{displayName(users[e.actor_id])}</b> {verbs()[e.action] ?? e.action} {targetName(e) ? <b>{targetName(e)}</b> : null}
+            <b>{actorName(e.actor_id)}</b> {allVerbs[e.action] ?? e.action} {targetName(e) ? <b>{targetName(e)}</b> : null}
             <div className={s.auditMeta}>{formatFull(e.created_at)}{e.reason ? ` · ${t("server.auditLog.reason", { reason: e.reason })}` : ""}</div>
             {changesView(e)}
           </div>

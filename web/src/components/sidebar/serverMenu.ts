@@ -74,7 +74,7 @@ export function serverMenuItems(serverId: string, ctx: MenuCtx): ContextMenuItem
   items[items.length - 1]!.separatorAfter = true;
   items.push({ id: "mute", label: muted ? t("sidebar.serverMenu.unmuteServer") : t("sidebar.serverMenu.muteServer"), onSelect: () => toggleMuted(serverId) });
   items.push({ id: "notif", label: t("modals.serverNotifications.notificationSettings"), onSelect: () => ctx.openModal("serverNotifications", { serverId }), separatorAfter: true });
-  items.push({ id: "profile", label: t("sidebar.serverMenu.editServerProfile"), onSelect: () => ctx.openModal("serverProfile", { serverId }) });
+  items.push({ id: "profile", label: t("sidebar.serverMenu.editServerProfile"), onSelect: () => ctx.openModal("settings", { page: "profiles", serverId }) });
   // its tag, beside your name everywhere: on with one press, and off again
   const tag = st.server.tag;
   if (tag && me?.server_tag?.server_id === serverId) items.push({ id: "tagOff", label: t("serverTag.menu.takeOff"), onSelect: () => void wearServerTag(null) });

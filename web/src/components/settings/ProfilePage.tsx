@@ -1,44 +1,30 @@
-import { AlignLeft, CircleUserRound, Image as ImageIcon, ImagePlus, LayoutGrid, LoaderCircle, MessageCircleMore, Palette, Pin, Plus, Smile, Tag, Type, UserRound, X, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { AlignLeft, CircleUserRound, Image as ImageIcon, ImagePlus, LayoutGrid, LoaderCircle, MessageCircleMore, Palette, Pin, Plus, Smile, Tag, Type, UserRound, type LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ApiError } from "@/api/client";
 import { avatarUrl, bannerUrl, users as usersApi } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
-import { Modal } from "@/components/common/Modal";
-import { Popout } from "@/components/common/Popout";
-import { StyledTyping } from "@/components/chat/TypingLine";
 import { ProfileCard, type ProfileDesign, type ProfilePart, type ProfileTab } from "@/components/profile/ProfileCard";
 import { widgetName, type WidgetDesign } from "@/components/profile/Widgets";
-import { ServerTagChip } from "@/components/servertag/ServerTagChip";
 import { SaveBar } from "@/components/server/SettingsLayer";
-import { useIsMobile } from "@/hooks/useIsMobile";
 import { t } from "@/i18n";
 import { profileThemeOf } from "@/lib/avatarColor";
 import { useDominantColor } from "@/lib/dominantColor";
 import { describeError } from "@/lib/errors";
-import { formatTimestamp } from "@/lib/time";
 import { readTypingStyle, sameTypingStyle, type TypingStyle } from "@/lib/typingStyle";
 import { isGameWidget, isMusicType, isMusicWidget, newWidgetId, readWidgets, type Widget, type WidgetType } from "@/lib/widgets";
 import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
-import { AboutMeEditor, aboutToEdit, aboutToSave } from "./AboutMeEditor";
-import { CustomColorIcon } from "./CustomColorIcon";
+import { unlessUnsaved } from "@/stores/unsaved";
+import { aboutToEdit, aboutToSave } from "./AboutMeEditor";
+import { ChatPreview, ColoursPicker, EditPop, hexOf, InlineAbout, InlineText } from "./designerParts";
+import { ServerProfileDesigner } from "./ServerProfileDesigner";
 import { ServerTagList, wearServerTag } from "./ServerTagChooser";
 import { TypingStyleEditor } from "./TypingStyleEditor";
 import { AddWidgetDialog, CardDialog, GameWidgetDialog, MusicWidgetDialog } from "./WidgetsEditor";
 import st from "./Settings.module.css";
 import d from "./Designer.module.css";
-
-const PRESETS = ["#8000ff", "#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#1abc9c", "#e67e22", "#607d8b"];
-
-/** The longest About Me the server keeps (internal/api/user_handlers.go maxAboutMe). */
-const ABOUT_MAX = 1000;
-
-/** A colour column may be missing entirely on an older server, so treat anything but a number as unset. */
-function hexOf(v: number | null | undefined): string | null {
-  return typeof v === "number" ? `#${v.toString(16).padStart(6, "0")}` : null;
-}
 
 type View = "full" | "card" | "chat";
 /** What the strip of parts and the profile's own parts open. */
@@ -48,192 +34,6 @@ type Pop = { part: "banner" | "avatar" | "colours" | "tag"; anchor: HTMLElement 
 /** Where the designer opens when Settings was asked for one of its parts (its search, a typing line's Make Your Own). */
 function viewFor(anchor: string | null | undefined): View {
   return anchor === "typingStyle" ? "chat" : "full";
-}
-
-/** A word of the profile written where it is shown: Enter keeps it, Escape puts it back. */
-function InlineText({ value, onChange, onDone, max, label, placeholder, className, testId }: { value: string; onChange: (v: string) => void; onDone: () => void; max: number; label: string; placeholder?: string; className?: string | undefined; testId: string }) {
-  const ref = useRef<HTMLInputElement>(null);
-  const before = useRef(value);
-  useEffect(() => {
-    ref.current?.focus();
-    ref.current?.select();
-  }, []);
-  return (
-    <input
-      ref={ref}
-      className={className}
-      value={value}
-      maxLength={max}
-      aria-label={label}
-      placeholder={placeholder}
-      spellCheck={false}
-      size={Math.max(6, Math.min(max, (value || placeholder || "").length + 1))}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={onDone}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          onDone();
-        } else if (e.key === "Escape") {
-          // back as it was, and the settings stay open
-          e.preventDefault();
-          e.stopPropagation();
-          onChange(before.current);
-          onDone();
-        }
-      }}
-      data-testid={testId}
-    />
-  );
-}
-
-/** About Me written where it is shown, ready to type into as it opens. */
-function InlineAbout({ value, onChange, outLength, onDone }: { value: string; onChange: (v: string) => void; outLength: number; onDone: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const box = ref.current?.querySelector("textarea");
-    box?.focus();
-    box?.setSelectionRange(box.value.length, box.value.length);
-  }, []);
-  return (
-    <div ref={ref} className={d.aboutEdit} data-testid="designer-about">
-      <AboutMeEditor value={value} onChange={onChange} max={ABOUT_MAX} placeholder={t("settings.profile.tellPeopleAboutYourself")} label={t("settings.profile.aboutMe")} />
-      <div className={d.aboutFoot}>
-        <span className={d.count}>{t("composer.limit.left", { count: ABOUT_MAX - outLength })}</span>
-        <Button size="sm" onClick={onDone} data-testid="designer-about-done">{t("pick.done")}</Button>
-      </div>
-    </div>
-  );
-}
-
-/** What changes a part: beside it on a computer, a sheet from the bottom on a phone. */
-function EditPop({ anchor, title, onClose, children, testId }: { anchor: HTMLElement; title: string; onClose: () => void; children: ReactNode; testId: string }) {
-  const mobile = useIsMobile();
-  if (mobile) {
-    return (
-      <Modal open onClose={onClose} title={title} width={440}>
-        <div className={d.popBody} data-testid={testId}>{children}</div>
-      </Modal>
-    );
-  }
-  return (
-    <Popout anchor={anchor} onClose={onClose} label={title} prefer="below" className={d.pop} testId={testId}>
-      <div className={d.popHead}>
-        <h3 className={d.popTitle}>{title}</h3>
-        <button type="button" className={d.popClose} aria-label={t("chat.attachments.close")} onClick={onClose}>
-          <X size={16} />
-        </button>
-      </div>
-      <div className={d.popBody}>{children}</div>
-    </Popout>
-  );
-}
-
-/** A hex field for people who know the colour they want. */
-function HexInput({ value, fallback, label, testId, disabled, onChange }: { value: string | null; fallback: string; label: string; testId: string; disabled?: boolean; onChange: (v: string) => void }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const shown = draft ?? value ?? "";
-  const commit = (raw: string) => {
-    const hex = raw.trim().replace(/^#?/, "#").toLowerCase();
-    const short = /^#([0-9a-f]{3})$/.exec(hex);
-    const full = /^#([0-9a-f]{6})$/.exec(hex);
-    if (short) {
-      const [r, g, b] = short[1]!.split("");
-      onChange(`#${r}${r}${g}${g}${b}${b}`);
-    } else if (full) {
-      onChange(hex);
-    }
-    setDraft(null);
-  };
-  return (
-    <input
-      className={st.hex}
-      value={shown}
-      disabled={disabled}
-      spellCheck={false}
-      maxLength={7}
-      placeholder={fallback}
-      aria-label={label}
-      data-testid={testId}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={(e) => commit(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          commit(e.currentTarget.value);
-          e.currentTarget.blur();
-        }
-      }}
-    />
-  );
-}
-
-/** The profile's two colours: the top one alone colours the banner; both make the whole card a gradient. */
-function ColoursPicker({ accent, accent2, setAccent, setAccent2 }: { accent: string | null; accent2: string | null; setAccent: (v: string | null) => void; setAccent2: (v: string | null) => void }) {
-  return (
-    <div className={d.colours}>
-      <p className={d.popHint}>{t("settings.profile.topColourOnItsOwnIt")}</p>
-      <div className={st.swatches}>
-        <button className={st.swatch} data-on={accent === null} aria-pressed={accent === null} style={{ background: "var(--bg-active)" }} title={t("server.roles.default")} aria-label={t("server.roles.default")} onClick={() => { setAccent(null); setAccent2(null); }} />
-        {PRESETS.map((c, i) => <button key={c} className={st.swatch} data-on={accent === c} aria-pressed={accent === c} style={{ background: c }} title={c} aria-label={t("server.roles.colourIndexOfCount", { index: i + 1, count: PRESETS.length })} onClick={() => setAccent(c)} />)}
-        <label className={st.swatch} data-on={!!accent && !PRESETS.includes(accent)} title={t("settings.appearance.custom")}>
-          <CustomColorIcon color={accent && !PRESETS.includes(accent) ? accent : null} />
-          <input type="color" value={accent ?? "#8000ff"} aria-label={t("settings.appearance.custom")} onChange={(e) => setAccent(e.target.value)} />
-        </label>
-        <HexInput value={accent} fallback="#8000ff" label={t("settings.profile.primaryColourHex")} testId="accent-hex" onChange={setAccent} />
-      </div>
-      <p className={d.popHint}>{t("settings.profile.bottomColourPickOneTooAnd")}</p>
-      <div className={st.swatches}>
-        <button className={st.swatch} data-on={accent2 === null} aria-pressed={accent2 === null} style={{ background: "var(--bg-active)" }} title={t("settings.profile.none")} aria-label={t("settings.profile.none")} onClick={() => setAccent2(null)} disabled={!accent} />
-        {PRESETS.map((c, i) => <button key={c} className={st.swatch} data-on={accent2 === c} aria-pressed={accent2 === c} style={{ background: c }} title={c} aria-label={t("server.roles.colourIndexOfCount", { index: i + 1, count: PRESETS.length })} onClick={() => setAccent2(c)} disabled={!accent} />)}
-        <label className={st.swatch} data-on={!!accent2 && !PRESETS.includes(accent2)} style={{ opacity: accent ? 1 : 0.4 }} title={t("settings.appearance.custom")}>
-          <CustomColorIcon color={accent2 && !PRESETS.includes(accent2) ? accent2 : null} />
-          <input type="color" value={accent2 ?? "#eb459e"} disabled={!accent} aria-label={t("settings.appearance.custom")} onChange={(e) => setAccent2(e.target.value)} />
-        </label>
-        <HexInput value={accent2} fallback="#eb459e" label={t("settings.profile.secondColourHex")} testId="accent2-hex" disabled={!accent} onChange={setAccent2} />
-      </div>
-    </div>
-  );
-}
-
-/** A conversation as others see it: their message, then yours with your name and tag, then you typing. */
-function ChatPreview({ name, avatarId, userId, typing }: { name: string; avatarId: string | null; userId: string; typing: TypingStyle | null }) {
-  const me = useAuth((a) => a.me);
-  // two messages from a few minutes ago, in the reader's own way of writing times
-  const when = useMemo(() => Date.now() - 4 * 60 * 1000, []);
-  const friend = t("designer.chat.friend");
-  return (
-    <div className={d.chat} data-testid="designer-chat">
-      <div className={d.chatHead} aria-hidden="true"># general</div>
-      <div className={d.chatBody}>
-        <div className={d.msg}>
-          <Avatar id="designer-friend" avatarId={null} name={friend} size={40} />
-          <div className={d.msgMain}>
-            <div className={d.msgHead}>
-              <span className={d.msgName} dir="auto">{friend}</span>
-              <span className={d.msgTime}>{formatTimestamp(when - 60 * 1000)}</span>
-            </div>
-            <p className={d.msgText}>{t("designer.chat.theirs")}</p>
-          </div>
-        </div>
-        <div className={d.msg}>
-          <Avatar id={userId} avatarId={avatarId} name={name} size={40} />
-          <div className={d.msgMain}>
-            <div className={d.msgHead}>
-              <span className={d.msgName} dir="auto">{name}</span>
-              {me?.server_tag ? <ServerTagChip tag={me.server_tag} open={false} /> : null}
-              <span className={d.msgTime}>{formatTimestamp(when)}</span>
-            </div>
-            <p className={d.msgText}>{t("designer.chat.yours")}</p>
-          </div>
-        </div>
-      </div>
-      <div className={d.chatTyping}>
-        <StyledTyping style={typing} name={name} />
-      </div>
-      <div className={d.chatComposer} aria-hidden="true">{t("typing.editor.composer")}</div>
-    </div>
-  );
 }
 
 /**
@@ -246,7 +46,32 @@ function ChatPreview({ name, avatarId, userId, typing }: { name: string; avatarI
  * and the typing line wait for Save Changes; pictures, the server tag worn
  * and the status change at once, as they always have.
  */
-export default function ProfilePage({ anchor }: { anchor?: string | null }) {
+export default function ProfilePage({ anchor, serverId }: { anchor?: string | null; serverId?: string | null | undefined }) {
+  const [scope, setScope] = useState<"main" | "server">(serverId ? "server" : "main");
+  const [picked, setPicked] = useState<string | null>(serverId ?? null);
+  // opened for one server (its menu's Edit Server Profile), or for a part of the main profile (Settings' search)
+  useEffect(() => {
+    if (!serverId) return;
+    setScope("server");
+    setPicked(serverId);
+  }, [serverId]);
+  useEffect(() => {
+    if (anchor) setScope("main");
+  }, [anchor]);
+  return (
+    <>
+      <h2 data-setting="profile" className={st.title}>{t("settings.profile.profiles")}</h2>
+      <div className={d.scopeTabs} role="tablist" aria-label={t("settings.profile.profiles")}>
+        <button type="button" role="tab" className={d.scopeTab} aria-selected={scope === "main"} onClick={unlessUnsaved(() => setScope("main"))} data-testid="profiles-main">{t("settings.profile.mainProfile")}</button>
+        <button type="button" role="tab" className={d.scopeTab} aria-selected={scope === "server"} onClick={unlessUnsaved(() => setScope("server"))} data-testid="profiles-servers">{t("settings.profile.serverProfiles")}</button>
+      </div>
+      {scope === "main" ? <MainDesigner anchor={anchor} /> : <ServerProfileDesigner serverId={picked} onServer={setPicked} />}
+    </>
+  );
+}
+
+/** The account's own profile, as it shows everywhere a server has not been given one of its own. */
+function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
   const me = useAuth((a) => a.me);
   const setMe = useAuth((a) => a.setMe);
   const toast = useUI((u) => u.toast);
@@ -497,7 +322,6 @@ export default function ProfilePage({ anchor }: { anchor?: string | null }) {
 
   return (
     <>
-      <h2 data-setting="profile" className={st.title}>{t("settings.profile.profiles")}</h2>
       <p className={d.intro}>{t("designer.intro")}</p>
 
       <div className={d.toolbar}>

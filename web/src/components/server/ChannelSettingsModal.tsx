@@ -7,7 +7,7 @@ import type { Channel, Overwrite } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { Select } from "@/components/common/Select";
-import { Field, TextArea, TextInput } from "@/components/common/TextInput";
+import { Field, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
 import { memberName } from "@/lib/names";
 import { P, has, isPrivateChannel, parsePerm, permString, canManageRole, canActOn } from "@/lib/perms";
@@ -30,6 +30,8 @@ import { formatShortDuration } from "@/lib/time";
 import { unlessUnsaved } from "@/stores/unsaved";
 import { isolate } from "./bidi";
 import { slug, typedChannelName } from "@/components/modals/CreateChannelModal";
+import { FormattedText } from "@/components/common/FormattedText";
+import { AUTO_ARCHIVE, autoArchiveLabel } from "@/lib/threads";
 const SLOWMODE = [0, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21600];
 const IntegrationsPage = lazyPage(() => import("./pages/IntegrationsPage"));
 
@@ -46,18 +48,20 @@ export default function ChannelSettingsModal({ onClose, channelId, page: initial
   }, [channel, onClose]);
   if (!channel || !channel.server_id) return null;
   const isCat = channel.type === "category";
+  const isThreadCh = channel.type === "thread" || channel.type === "private_thread";
   // a text channel's webhooks can be managed from its own settings too
-  const hooks = channel.type === "text" && canI(useServers.getState().byId[channel.server_id], P.MANAGE_WEBHOOKS, channel.id);
+  const hooks = (channel.type === "text" || channel.type === "announcement") && canI(useServers.getState().byId[channel.server_id], P.MANAGE_WEBHOOKS, channel.id);
   const groups: NavGroup[] = [
     {
-      head: isolate((isCat ? "" : "#") + channel.name),
+      head: isolate((isCat || isThreadCh ? "" : "#") + channel.name),
       items: [
         { id: "overview", label: tr_("server.channelSettings.overview") },
-        { id: "permissions", label: tr_("server.channelSettings.permissions") },
+        // a thread answers to its channel's permissions
+        ...(isThreadCh ? [] : [{ id: "permissions", label: tr_("server.channelSettings.permissions") }]),
         ...(hooks ? [{ id: "integrations", label: tr_("integrations.title") }] : []),
       ],
     },
-    { head: "", items: [{ id: "delete", label: isCat ? tr_("server.channelSettings.deleteCategory") : tr_("server.channelSettings.deleteChannel"), danger: true }] },
+    { head: "", items: [{ id: "delete", label: isCat ? tr_("server.channelSettings.deleteCategory") : isThreadCh ? tr_("threads.bar.delete") : tr_("server.channelSettings.deleteChannel"), danger: true }] },
   ];
   return (
     <SettingsLayer label={tr_("server.channelSettings.channelSettings")} groups={groups} page={page} setPage={setPage} onClose={onClose} startOnList={!initial}>
@@ -78,40 +82,102 @@ interface ChannelEdits {
   nsfw?: boolean;
   limit?: number;
   glyph?: string;
+  announce?: boolean;
+  defaultArchive?: number;
+  archive?: number;
+  locked?: boolean;
+  tags?: TagEdit[];
+  layout?: "list" | "gallery";
+  sort?: "activity" | "created";
+  requireTag?: boolean;
+  applied?: string[];
+}
+
+/** A forum tag as it is being edited: one not saved yet has no id. */
+interface TagEdit {
+  id?: string;
+  name: string;
+  emoji: string;
+  moderated: boolean;
+}
+
+const MAX_TAGS = 20;
+
+function sameTags(a: TagEdit[], b: TagEdit[]): boolean {
+  return a.length === b.length && a.every((x, i) => x.id === b[i]!.id && x.name === b[i]!.name && x.emoji === b[i]!.emoji && x.moderated === b[i]!.moderated);
+}
+
+function sameList(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((x, i) => x === b[i]);
 }
 
 function OverviewPage({ channel }: { channel: Channel }) {
   const upsert = useChannels((c) => c.upsert);
   const toast = useUI((u) => u.toast);
+  const server = useServers((x) => (channel.server_id ? x.byId[channel.server_id] : undefined));
   // Seeding the fields once would leave the form holding values from before
   // somebody else's change, and saving would send those stale values back over
   // their edit. What was not typed here follows the channel instead.
   const [edits, setEdits] = useState<ChannelEdits>({});
   const [busy, setBusy] = useState(false);
+  const thread = channel.type === "thread" || channel.type === "private_thread";
+  const forum = channel.type === "forum";
+  const textLike = channel.type === "text" || channel.type === "announcement";
+  // names are written as text channels' are: lower case, dashes for spaces
+  const slugged = textLike || forum;
+  const parent = useChannels((c) => (thread && channel.parent_id ? c.byId[channel.parent_id] : undefined));
+  const postTags = parent?.type === "forum" ? (parent.forum?.tags ?? []) : [];
+  const savedTags: TagEdit[] = useMemo(() => (channel.forum?.tags ?? []).map((tg) => ({ id: tg.id, name: tg.name, emoji: tg.emoji, moderated: tg.moderated })), [channel.forum?.tags]);
   const name = edits.name ?? channel.name;
   const topic = edits.topic ?? channel.topic;
   const slow = edits.slow ?? channel.slowmode_seconds;
   const nsfw = edits.nsfw ?? channel.nsfw;
   const limit = edits.limit ?? channel.user_limit;
   const glyph = edits.glyph ?? channel.glyph ?? "";
-  const setName = (v: string) => setEdits((e) => ({ ...e, name: v }));
-  const setTopic = (v: string) => setEdits((e) => ({ ...e, topic: v }));
-  const setSlow = (v: number) => setEdits((e) => ({ ...e, slow: v }));
-  const setNsfw = (v: boolean) => setEdits((e) => ({ ...e, nsfw: v }));
-  const setLimit = (v: number) => setEdits((e) => ({ ...e, limit: v }));
-  const setGlyph = (v: string) => setEdits((e) => ({ ...e, glyph: v }));
+  const announce = edits.announce ?? channel.type === "announcement";
+  const defaultArchive = edits.defaultArchive ?? channel.default_auto_archive ?? 4320;
+  const archive = edits.archive ?? channel.thread?.auto_archive ?? 4320;
+  const locked = edits.locked ?? !!channel.thread?.locked;
+  const tags = edits.tags ?? savedTags;
+  const layout = edits.layout ?? channel.forum?.layout ?? "list";
+  const sort = edits.sort ?? channel.forum?.sort ?? "activity";
+  const requireTag = edits.requireTag ?? !!channel.forum?.require_tag;
+  const applied = edits.applied ?? channel.thread?.applied_tags ?? [];
+  const set = (e: ChannelEdits) => setEdits((cur) => ({ ...cur, ...e }));
   const reset = () => setEdits({});
-  const dirty = name !== channel.name || topic !== channel.topic || slow !== channel.slowmode_seconds || nsfw !== channel.nsfw || limit !== channel.user_limit || glyph !== (channel.glyph ?? "");
+  const mayManageThreads = canI(server, P.MANAGE_THREADS, channel.id);
+  const forumDirty = forum && (!sameTags(tags, savedTags) || layout !== (channel.forum?.layout ?? "list") || sort !== (channel.forum?.sort ?? "activity") || requireTag !== !!channel.forum?.require_tag);
+  const dirty =
+    name !== channel.name ||
+    topic !== channel.topic ||
+    slow !== channel.slowmode_seconds ||
+    nsfw !== channel.nsfw ||
+    limit !== channel.user_limit ||
+    glyph !== (channel.glyph ?? "") ||
+    (textLike && announce !== (channel.type === "announcement")) ||
+    ((textLike || forum) && defaultArchive !== (channel.default_auto_archive ?? 4320)) ||
+    (thread && (archive !== (channel.thread?.auto_archive ?? 4320) || locked !== !!channel.thread?.locked || !sameList(applied, channel.thread?.applied_tags ?? []))) ||
+    forumDirty;
   const save = async () => {
     setBusy(true);
     try {
       const body: Parameters<typeof serversApi.patchChannel>[1] = {};
-      if (name !== channel.name) body.name = isText ? slug(name) : name;
+      if (name !== channel.name) body.name = slugged ? slug(name) : name.trim();
       if (topic !== channel.topic) body.topic = topic;
       if (slow !== channel.slowmode_seconds) body.slowmode_seconds = slow;
       if (nsfw !== channel.nsfw) body.nsfw = nsfw;
       if (limit !== channel.user_limit) body.user_limit = limit;
       if (glyph !== (channel.glyph ?? "")) body.glyph = glyph;
+      if (textLike && announce !== (channel.type === "announcement")) body.type = announce ? "announcement" : "text";
+      if ((textLike || forum) && defaultArchive !== (channel.default_auto_archive ?? 4320)) body.default_auto_archive = defaultArchive;
+      if (thread) {
+        if (archive !== (channel.thread?.auto_archive ?? 4320)) body.auto_archive = archive;
+        if (locked !== !!channel.thread?.locked) body.locked = locked;
+        if (!sameList(applied, channel.thread?.applied_tags ?? [])) body.applied_tags = applied;
+      }
+      if (forumDirty) {
+        body.forum = { tags: tags.filter((tg) => tg.name.trim()).map((tg) => ({ ...(tg.id ? { id: tg.id } : {}), name: tg.name.trim(), emoji: tg.emoji, moderated: tg.moderated })), layout, sort, require_tag: requireTag };
+      }
       const ch = await serversApi.patchChannel(channel.id, body);
       upsert(ch);
       // the server tidies names and topics (text channel names become lowercase-with-dashes), so show what it kept
@@ -123,42 +189,130 @@ function OverviewPage({ channel }: { channel: Channel }) {
       setBusy(false);
     }
   };
-  const isText = channel.type === "text";
+  const nameLabel = channel.type === "category" ? tr_("server.channelSettings.categoryName") : thread ? tr_("threads.settings.name") : tr_("server.channelSettings.channelName");
   return (
     <>
       <h2 className={st.title}>{tr_("server.channelSettings.overview")}</h2>
       <div className={st.form}>
-        <Field label={channel.type === "category" ? tr_("server.channelSettings.categoryName") : tr_("server.channelSettings.channelName")} required>
+        <Field label={nameLabel} required>
           <div className={s.iconInput}>
             {/* what the channel list will show, as it is being picked below */}
-            <span className={s.nameGlyph}><ChannelGlyph channel={{ type: channel.type, server_id: channel.server_id, glyph }} size={16} /></span>
-            <TextInput value={name} onChange={(e) => setName(isText ? typedChannelName(e.target.value) : e.target.value)} maxLength={100} data-testid="channel-settings-name" {...(isText ? { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } : {})} />
+            <span className={s.nameGlyph}><ChannelGlyph channel={{ type: textLike ? (announce ? "announcement" : "text") : channel.type, server_id: channel.server_id, glyph }} size={16} /></span>
+            <TextInput value={name} onChange={(e) => set({ name: slugged ? typedChannelName(e.target.value) : e.target.value })} maxLength={100} data-testid="channel-settings-name" {...(slugged ? { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } : {})} />
           </div>
         </Field>
-        <Field as="div" label={channel.type === "category" ? tr_("server.channelIcon.categoryTitle") : tr_("server.channelIcon.title")} hint={channel.type === "category" ? tr_("server.channelIcon.categoryHint") : tr_("server.channelIcon.hint")}>
-          <ChannelIconPicker channel={channel} value={glyph} onChange={setGlyph} label={channel.type === "category" ? tr_("server.channelIcon.categoryTitle") : tr_("server.channelIcon.title")} />
-        </Field>
-        {isText ? (
-          <Field label={tr_("server.channelSettings.channelTopic")} hint={tr_("server.channelSettings.charactersLeft", { count: 1024 - topic.length })}>
-            <TextArea value={topic} onChange={(e) => setTopic(e.target.value.slice(0, 1024))} placeholder={tr_("server.channelSettings.letEveryoneKnowHowToUse")} maxLength={1024} />
+        {!thread ? (
+          <Field as="div" label={channel.type === "category" ? tr_("server.channelIcon.categoryTitle") : tr_("server.channelIcon.title")} hint={channel.type === "category" ? tr_("server.channelIcon.categoryHint") : tr_("server.channelIcon.hint")}>
+            <ChannelIconPicker channel={channel} value={glyph} onChange={(v) => set({ glyph: v })} label={channel.type === "category" ? tr_("server.channelIcon.categoryTitle") : tr_("server.channelIcon.title")} />
           </Field>
         ) : null}
-        {isText ? (
-          <Field label={tr_("server.channelSettings.slowmode")} hint={tr_("server.channelSettings.membersWillBeRestrictedToSending")}>
-            <Select value={slow} onChange={(e) => setSlow(Number(e.target.value))}>
+        {textLike || forum ? (
+          <Field as="div" label={forum ? tr_("forum.settings.guidelines") : tr_("server.channelSettings.channelTopic")} hint={forum ? tr_("forum.settings.guidelinesHint") : undefined}>
+            <FormattedText value={topic} onChange={(v) => set({ topic: v })} max={1024} placeholder={forum ? tr_("forum.settings.guidelinesPlaceholder") : tr_("server.channelSettings.letEveryoneKnowHowToUse")} title={forum ? tr_("forum.settings.guidelines") : tr_("server.channelSettings.channelTopic")} serverId={channel.server_id ?? undefined} testId="channel-topic" />
+          </Field>
+        ) : null}
+        {textLike ? (
+          <Toggle checked={announce} onChange={(v) => set({ announce: v })} label={tr_("follows.settings.announcement")} description={tr_("follows.settings.announcementDesc")} />
+        ) : null}
+        {forum ? <ForumTagsEditor tags={tags} onChange={(v) => set({ tags: v })} /> : null}
+        {forum ? (
+          <Toggle checked={requireTag} onChange={(v) => set({ requireTag: v })} label={tr_("forum.settings.requireTag")} description={tr_("forum.settings.requireTagDesc")} />
+        ) : null}
+        {forum ? (
+          <div className={s.twoCol}>
+            <Field label={tr_("forum.settings.layout")}>
+              <Select value={layout} onChange={(e) => set({ layout: e.target.value as "list" | "gallery" })}>
+                <option value="list">{tr_("forum.layout.list")}</option>
+                <option value="gallery">{tr_("forum.layout.gallery")}</option>
+              </Select>
+            </Field>
+            <Field label={tr_("forum.settings.sort")}>
+              <Select value={sort} onChange={(e) => set({ sort: e.target.value as "activity" | "created" })}>
+                <option value="activity">{tr_("forum.sort.activity")}</option>
+                <option value="created">{tr_("forum.sort.created")}</option>
+              </Select>
+            </Field>
+          </div>
+        ) : null}
+        {thread && postTags.length ? (
+          <Field as="div" label={tr_("forum.post.tags")}>
+            <div className={s.tagPick}>
+              {postTags.map((tg) => {
+                const on = applied.includes(tg.id);
+                const allowed = !tg.moderated || mayManageThreads;
+                return (
+                  <button key={tg.id} type="button" className={s.tagChip} aria-pressed={on} disabled={!allowed} onClick={() => set({ applied: on ? applied.filter((x) => x !== tg.id) : [...applied, tg.id].slice(0, 5) })}>
+                    {tg.emoji ? <span aria-hidden="true">{tg.emoji}</span> : null}
+                    <span dir="auto">{tg.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+        ) : null}
+        {textLike || forum || thread ? (
+          <Field label={forum ? tr_("forum.settings.slowmode") : tr_("server.channelSettings.slowmode")} hint={forum ? tr_("forum.settings.slowmodeHint") : tr_("server.channelSettings.membersWillBeRestrictedToSending")}>
+            <Select value={slow} onChange={(e) => set({ slow: Number(e.target.value) })}>
               {SLOWMODE.map((v) => <option key={v} value={v}>{slowLabel(v)}</option>)}
             </Select>
           </Field>
         ) : null}
-        {isText ? <Toggle checked={nsfw} onChange={setNsfw} label={tr_("server.channelSettings.ageRestrictedChannel")} description={tr_("server.channelSettings.usersWillNeedToConfirmThey")} /> : null}
+        {textLike || forum ? (
+          <Field label={tr_("threads.settings.defaultArchive")} hint={tr_("threads.settings.defaultArchiveHint")}>
+            <Select value={defaultArchive} onChange={(e) => set({ defaultArchive: Number(e.target.value) })}>
+              {AUTO_ARCHIVE.map((m) => <option key={m} value={m}>{autoArchiveLabel(m)}</option>)}
+            </Select>
+          </Field>
+        ) : null}
+        {thread ? (
+          <Field label={tr_("threads.create.closeAfter")} hint={tr_("threads.create.closeHint")}>
+            <Select value={archive} onChange={(e) => set({ archive: Number(e.target.value) })}>
+              {AUTO_ARCHIVE.map((m) => <option key={m} value={m}>{autoArchiveLabel(m)}</option>)}
+            </Select>
+          </Field>
+        ) : null}
+        {thread && mayManageThreads ? (
+          <Toggle checked={locked} onChange={(v) => set({ locked: v })} label={tr_("threads.settings.locked")} description={tr_("threads.settings.lockedDesc")} />
+        ) : null}
+        {textLike || forum ? <Toggle checked={nsfw} onChange={(v) => set({ nsfw: v })} label={tr_("server.channelSettings.ageRestrictedChannel")} description={tr_("server.channelSettings.usersWillNeedToConfirmThey")} /> : null}
         {channel.type === "voice" ? (
           <Field label={tr_("server.channelSettings.userLimitValue", { limit: limit === 0 ? tr_("server.channelSettings.noLimit") : tr_("server.channelSettings.usersCount", { count: limit }) })} hint={tr_("server.channelSettings.limitHowManyPeopleCanJoin")}>
-            <input type="range" className={st.slider} min={0} max={99} value={limit} onChange={(e) => setLimit(Number(e.target.value))} />
+            <input type="range" className={st.slider} min={0} max={99} value={limit} onChange={(e) => set({ limit: Number(e.target.value) })} />
           </Field>
         ) : null}
       </div>
       <SaveBar dirty={dirty} busy={busy} onReset={reset} onSave={() => void save()} />
     </>
+  );
+}
+
+/**
+ * A forum's tags: what posts can be filed under, each with an emoji if it
+ * likes, and whether only people who manage threads may put it on a post.
+ */
+function ForumTagsEditor({ tags, onChange }: { tags: TagEdit[]; onChange: (v: TagEdit[]) => void }) {
+  const update = (i: number, patch: Partial<TagEdit>) => onChange(tags.map((tg, j) => (j === i ? { ...tg, ...patch } : tg)));
+  return (
+    <Field as="div" label={tr_("forum.settings.tags")} hint={tr_("forum.settings.tagsHint", { count: MAX_TAGS })}>
+      <div className={s.tagList}>
+        {tags.map((tg, i) => (
+          <div key={tg.id ?? `new${i}`} className={s.tagRow}>
+            <TextInput className={s.tagEmoji} value={tg.emoji} onChange={(e) => update(i, { emoji: [...e.target.value].slice(-2).join("").trim() })} placeholder="🙂" aria-label={tr_("forum.settings.tagEmoji")} maxLength={8} />
+            <TextInput value={tg.name} onChange={(e) => update(i, { name: e.target.value.slice(0, 20) })} placeholder={tr_("forum.settings.tagName")} aria-label={tr_("forum.settings.tagName")} maxLength={20} />
+            <label className={s.tagMod} title={tr_("forum.settings.moderatedDesc")}>
+              <input type="checkbox" checked={tg.moderated} onChange={(e) => update(i, { moderated: e.target.checked })} />
+              <span>{tr_("forum.settings.moderated")}</span>
+            </label>
+            <button type="button" className={s.tagRemove} aria-label={tr_("forum.settings.removeTag", { name: tg.name || "…" })} onClick={() => onChange(tags.filter((_, j) => j !== i))}><Trash2 size={16} /></button>
+          </div>
+        ))}
+        {tags.length < MAX_TAGS ? (
+          <Button size="sm" variant="secondary" onClick={() => onChange([...tags, { name: "", emoji: "", moderated: false }])}>
+            <Plus size={16} aria-hidden="true" /> {tr_("forum.settings.addTag")}
+          </Button>
+        ) : null}
+      </div>
+    </Field>
   );
 }
 

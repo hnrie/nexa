@@ -133,7 +133,7 @@ function useFindSetting(page: string, anchor: string | null, done: () => void): 
   }, [page, anchor, done]);
 }
 
-export default function SettingsModal({ onClose, page: initial, packId, modalId, resume, anchor: openAt }: { onClose: () => void; page: string; packId?: string | undefined; modalId?: number; resume?: string | undefined; anchor?: string | undefined }) {
+export default function SettingsModal({ onClose, page: initial, packId, modalId, resume, anchor: openAt, serverId }: { onClose: () => void; page: string; packId?: string | undefined; modalId?: number; resume?: string | undefined; anchor?: string | undefined; serverId?: string | undefined }) {
   // pages that were folded into others open where they went
   // The whole app is drawn again when the language changes, this with it: it
   // comes back on the page it was showing (kept with the modal), not the one
@@ -176,7 +176,7 @@ export default function SettingsModal({ onClose, page: initial, packId, modalId,
   };
 
   const body =
-    page === "profiles" ? <ProfilePage anchor={anchor} /> :
+    page === "profiles" ? <ProfilePage anchor={anchor} serverId={serverId} /> :
     page === "privacy" ? <PrivacyPage /> :
     page === "data" ? <DataPage onDeleteAccount={() => go({ page: "account", label: "", anchor: "deleteAccount" })} /> :
     page === "activity" ? <ActivityPage /> :

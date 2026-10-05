@@ -35,7 +35,13 @@
 .noticeAlt { background: var(--bg-active); color: var(--text); }
 .noticeAlt:hover { background: var(--bg-hover); }
 /* stacked bars share one rounded outline with the box under them */
-.notice + .replyBar, .notice + .trayWrap, .replyBar + .trayWrap { border-radius: 0; }
+.notice + .replyBar, .notice + .trayWrap, .replyBar + .trayWrap, .notice + .notice { border-radius: 0; }
+/* AutoMod's word on the last message: the same strip, in the colour of a refusal */
+.automodNotice { border-inline-start-color: var(--danger); align-items: flex-start; padding-block: 9px; }
+.automodIcon { flex: none; color: var(--text-danger); margin-block-start: 1px; }
+.automodLead { font-weight: 700; }
+.automodWhy { display: block; margin-block-start: 2px; color: var(--text-muted); font-size: 13px; }
+.lockedTimer { font-variant-numeric: tabular-nums; }
 .notice + .box { border-radius: 0 0 var(--radius-md) var(--radius-md); }
 .thumb { width: 100%; height: 130px; object-fit: contain; border-radius: var(--radius-sm); background: var(--bg-input); display: flex; align-items: center; justify-content: center; color: var(--text-muted); overflow: hidden; }
 .thumb img, .thumb video { width: 100%; height: 100%; object-fit: contain; }

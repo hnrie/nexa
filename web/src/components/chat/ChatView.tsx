@@ -1,4 +1,9 @@
-import { AtSign, ChevronLeft, MessageCircle, MoreVertical, Phone, Pin, Search, UserPlus, UserRound, Users, Video, X } from "lucide-react";
+import { AtSign, BellPlus, ChevronLeft, MessageCircle, MessageSquareText, MoreVertical, Phone, Pin, Search, UserPlus, UserRound, Users, Video, X } from "lucide-react";
+import { ThreadsPanel } from "@/components/threads/ThreadsPanel";
+import { ThreadActions, ThreadParentLink, ThreadStateBar } from "@/components/threads/ThreadBar";
+import { isThread } from "@/stores/threads";
+import { holdsThreads } from "@/lib/threads";
+import { parse, plainText } from "@/markdown";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
@@ -63,6 +68,7 @@ export function ChatView({ channel }: { channel: Channel }) {
   const rightOpen = useUI((u) => u.rightOpen);
   const setRightOpen = useUI((u) => u.setRightOpen);
   const [pins, setPins] = useState(false);
+  const [threadsOpen, setThreadsOpen] = useState(false);
   const [subchats, setSubchats] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -120,6 +126,11 @@ export function ChatView({ channel }: { channel: Channel }) {
   const rels = useRelationships((r) => r.byUser);
   const nicknames = useMemo(() => friendNicknames(rels), [rels]);
   const name = channelDisplayName(channel, users, me?.id, nicknames);
+  // a topic can be formatted: the header gives its words on one line, the topic's dialog the whole of it
+  const topicLine = useMemo(() => (channel.topic ? plainText(parse(channel.topic)).replace(/\s+/g, " ").trim() : ""), [channel.topic]);
+  const thread = isThread(channel);
+  // threads start in text and announcement channels (a forum's posts are its threads)
+  const threadsHere = !!channel.server_id && holdsThreads(channel) && channel.type !== "forum";
   const isServer = !!serverId && !!serverState;
   const inThisCall = useVoice((v) => v.mine?.channel_id === convo.id);
   const startCall = async (video: boolean) => {
@@ -130,6 +141,7 @@ export function ChatView({ channel }: { channel: Channel }) {
   // so leaving one open across a channel switch hides the new conversation.
   useEffect(() => {
     setPins(false);
+    setThreadsOpen(false);
     setSubchats(false);
     setSearchOpen(false);
     setSearchQuery("");
@@ -144,7 +156,7 @@ export function ChatView({ channel }: { channel: Channel }) {
   // runs updaters on the next render, long after the keydown has finished
   // dispatching, so stopping it there stopped nothing
   const open = useRef({ searchOpen, pins, subchats });
-  open.current = { searchOpen, pins, subchats };
+  open.current = { searchOpen, pins: pins || threadsOpen, subchats };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
@@ -153,7 +165,10 @@ export function ChatView({ channel }: { channel: Channel }) {
       // the subchat list over the chat, then search. It used to close all
       // three at once, and a second Escape found nothing left to close.
       const now = open.current;
-      if (now.pins) setPins(false);
+      if (now.pins) {
+        setPins(false);
+        setThreadsOpen(false);
+      }
       else if (now.subchats) setSubchats(false);
       else if (now.searchOpen) setSearchOpen(false);
       else return;
@@ -238,8 +253,10 @@ export function ChatView({ channel }: { channel: Channel }) {
           ) : (
             <span className={s.hSub} data-status={otherStatus} data-testid="dm-status">{statusLabel(otherStatus)}</span>
           )
+        ) : isServer && thread ? (
+          <ThreadParentLink thread={channel} />
         ) : isServer ? (
-          channel.topic ? <button className={[s.hSub, s.hTopic].join(" ")} title={channel.topic} dir="auto" onClick={() => openModal("channelTopic", { channelId: channel.id })}>{channel.topic}</button> : null
+          topicLine ? <button className={[s.hSub, s.hTopic].join(" ")} title={topicLine} dir="auto" onClick={() => openModal("channelTopic", { channelId: channel.id })}>{topicLine}</button> : null
         ) : (
           // a phone keeps the header for the group's name; the count is in the member list
           mobile ? null : <span className={s.hSub}>{tr_("chat.chatView.membersCount", { count: channel.recipient_ids.length })}</span>
@@ -303,6 +320,17 @@ export function ChatView({ channel }: { channel: Channel }) {
             onKeyDown={(e) => void searchKeys.current?.(e)}
           />
         )}
+        {isServer && thread ? <ThreadActions thread={channel} compact={mobile} /> : null}
+        {!mobile && threadsHere ? (
+          <Tooltip text={tr_("threads.panel.title")} side="bottom">
+            <button className={s.hBtn} data-on={threadsOpen} aria-label={tr_("threads.panel.title")} onClick={() => setThreadsOpen((v) => !v)} data-pop-toggle="threads" data-testid="threads-button"><MessageSquareText size={22} /></button>
+          </Tooltip>
+        ) : null}
+        {!mobile && isServer && channel.type === "announcement" ? (
+          <Tooltip text={tr_("follows.follow")} side="bottom">
+            <button className={s.hBtn} aria-label={tr_("follows.follow")} onClick={() => openModal("follow", { channelId: channel.id })} data-testid="follow-button"><BellPlus size={22} /></button>
+          </Tooltip>
+        ) : null}
         {!mobile ? (
           <Tooltip text={tr_("chat.chat.pinnedMessages")} side="bottom">
             <button className={s.hBtn} data-on={pins} aria-label={tr_("chat.chat.pinnedMessages")} onClick={() => setPins((v) => !v)} data-pop-toggle="pins"><Pin size={22} /></button>
@@ -339,6 +367,8 @@ export function ChatView({ channel }: { channel: Channel }) {
               const anchor = menuAnchor(e.currentTarget);
               const items: ContextMenuItem[] = [
                 { id: "pins", label: tr_("chat.chat.pinnedMessages"), onSelect: () => setPins(true) },
+                ...(threadsHere ? [{ id: "threads", label: tr_("threads.panel.title"), onSelect: () => setThreadsOpen(true) }] : []),
+                ...(isServer && channel.type === "announcement" ? [{ id: "follow", label: tr_("follows.follow"), onSelect: () => openModal("follow", { channelId: channel.id }) }] : []),
                 // server channels have no subchats
                 ...(!isServer ? [{ id: "subchats", label: tr_("chat.chat.subchats"), onSelect: () => setSubchats(true) }] : []),
               ];
@@ -382,6 +412,7 @@ export function ChatView({ channel }: { channel: Channel }) {
               {/* the composer stays mounted underneath, so a draft and its attachments survive picking — and a mute */}
               <div className={s.composerSlot} hidden={selecting}>
                 <TypingBar channelId={channel.id} />
+                {thread ? <ThreadStateBar thread={channel} /> : null}
                 <div hidden={!!mute} className={s.composerSlot}>
                   <Composer channel={channel} />
                 </div>
@@ -392,6 +423,7 @@ export function ChatView({ channel }: { channel: Channel }) {
           )}
         </div>
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}
+        {threadsOpen && threadsHere ? <ThreadsPanel channel={channel} onClose={() => setThreadsOpen(false)} /> : null}
         {/* where search covers the chat, a picked result closes it (keeping the query) so the message shows */}
         {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={setSearchQuery} caret={searchCaret} inline={compactSearch} keysRef={searchKeys} onSuggest={onSuggest} onJump={drawer ? () => setSearchOpen(false) : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
         {isServer && serverId && (drawer ? membersOpen || membersMounted : membersOpen) ? <MemberList serverId={serverId} channelId={channel.id} drawer={drawer} open={membersOpen} /> : null}

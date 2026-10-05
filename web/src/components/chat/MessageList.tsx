@@ -20,6 +20,7 @@ import { useReplyTargets, type ReplyTarget } from "@/stores/replyTargets";
 import { useChannels } from "@/stores/channels";
 import { MessageItem } from "./MessageItem";
 import { GroupAlone } from "./GroupAlone";
+import { ThreadIntro } from "@/components/threads/ThreadIntro";
 import { GroupAddNoticeRow } from "./GroupAddNoticeRow";
 import { noticeSpot } from "@/lib/groupAdd";
 import { useGroupAddNotices } from "@/stores/groupAddNotices";
@@ -884,6 +885,7 @@ export function MessageList({ channel }: { channel: Channel }) {
         </div>
       );
     }
+    if (channel.type === "thread" || channel.type === "private_thread") return <ThreadIntro thread={channel} />;
     if (channel.type === "subchat") {
       const parent = channel.parent_id ? byIdChannels[channel.parent_id] : undefined;
       const where = parent ? channelDisplayName(parent, users, me?.id) : t("chat.messageList.thisConversation");

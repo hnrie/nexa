@@ -4,25 +4,36 @@ import { servers as serversApi } from "@/api/servers";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Field, TextInput } from "@/components/common/TextInput";
-import { useAuth } from "@/stores/auth";
-import { useServers } from "@/stores/servers";
+import { P } from "@/lib/perms";
+import { canI, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
+import { displayName, useUsers } from "@/stores/users";
 import s from "./ServerModals.module.css";
 
 import { t } from "@/i18n";
-/** Edit your nickname in one server (or someone else's, with Manage Nicknames). */
+
+/**
+ * Someone else's profile in a server, for a moderator with Manage
+ * Nicknames: their nickname to change, and what they set for the server
+ * (picture, banner, theme, About Me, widgets) to take away if it breaks the
+ * rules. One's own server profile is edited in Settings, Profiles.
+ */
 export function ServerProfileModal({ onClose, serverId, userId }: { onClose: () => void; serverId: string; userId?: string | undefined }) {
-  const me = useAuth((a) => a.me);
   const st = useServers((x) => x.byId[serverId]);
   const upsertMember = useServers((x) => x.upsertMember);
   const toast = useUI((u) => u.toast);
-  const target = userId ?? me?.id ?? "";
-  const [nick, setNick] = useState(st?.members[target]?.nickname ?? "");
+  const target = userId ?? "";
+  const member = st?.members[target];
+  const user = useUsers((u) => u.byId[target]);
+  const [nick, setNick] = useState(member?.nickname ?? "");
   const [busy, setBusy] = useState(false);
-  const save = async (value: string) => {
+  const mod = canI(st, P.MANAGE_NICKNAMES);
+
+  const save = async () => {
     setBusy(true);
     try {
-      upsertMember(await serversApi.patchMember(serverId, target === me?.id ? "@me" : target, { nick: value.trim() || null }));
+      if (nick.trim() !== (member?.nickname ?? "")) upsertMember(await serversApi.patchMember(serverId, target, { nick: nick.trim() || null }));
+      toast(t("serverProfile.nickSaved"), "success");
       onClose();
     } catch (err) {
       toast(err instanceof ApiError ? err.message : t("modals.serverProfile.couldNotChangeTheNickname"), "error");
@@ -30,12 +41,46 @@ export function ServerProfileModal({ onClose, serverId, userId }: { onClose: () 
       setBusy(false);
     }
   };
+  const resetOthers = async () => {
+    setBusy(true);
+    try {
+      let m = await serversApi.patchMember(serverId, target, { bio: "", pronouns: "", accent_color: null, accent_color_2: null, widgets: null });
+      if (m.avatar_id) m = await serversApi.deleteMemberImage(serverId, target, "avatar");
+      if (m.banner_id) m = await serversApi.deleteMemberImage(serverId, target, "banner");
+      upsertMember(m);
+      toast(t("serverProfile.resetDone"), "success");
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : t("serverProfile.uploadFailed"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const serverName = st?.server.name ?? t("modals.serverProfile.thisServer");
   return (
-    <Modal open onClose={onClose} title={target === me?.id ? t("modals.serverProfile.changeNickname") : t("modals.serverProfile.changeTheirNickname")} width={440} footer={<><Button variant="ghost" onClick={() => void save("")} disabled={busy}>{t("modals.serverProfile.resetNickname")}</Button><Button onClick={() => void save(nick)} loading={busy}>{t("chat.editMessage.save")}</Button></>}>
+    <Modal
+      open
+      onClose={onClose}
+      title={t("modals.serverProfile.changeTheirNickname")}
+      width={440}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>{t("chat.editMessage.cancel")}</Button>
+          <Button onClick={() => void save()} loading={busy} data-testid="server-profile-save">{t("chat.editMessage.save")}</Button>
+        </>
+      }
+    >
       <div className={s.form}>
-        <Field label={t("modals.serverProfile.nickname")} hint={t("modals.serverProfile.howYouAppearIn", { name: st?.server.name ?? t("modals.serverProfile.thisServer") })}>
-          <TextInput value={nick} onChange={(e) => setNick(e.target.value)} maxLength={32} placeholder={me?.display_name} autoFocus onKeyDown={(e) => e.key === "Enter" && void save(nick)} />
+        <Field label={t("modals.serverProfile.nickname")} hint={t("serverProfile.theirNickHint", { name: serverName })}>
+          <TextInput value={nick} onChange={(e) => setNick(e.target.value)} maxLength={32} placeholder={user ? displayName(user) : undefined} autoFocus />
         </Field>
+        {mod ? (
+          <div>
+            <p className={s.hint}>{t("serverProfile.othersResetHint")}</p>
+            <div style={{ marginTop: 8 }}>
+              <Button size="sm" variant="secondary" loading={busy} onClick={() => void resetOthers()} data-testid="server-profile-reset">{t("serverProfile.resetOthers")}</Button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </Modal>
   );

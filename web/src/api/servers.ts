@@ -1,6 +1,6 @@
 import { api, captchaOptions } from "./client";
 import { t } from "@/i18n";
-import type { AuditEntry, Ban, Channel, Invite, InvitePreview, Member, MeUser, PermString, PublicUser, Role, Server, ServerKeyInfo, ServerTagPreview, ServerView, Snowflake } from "./types";
+import type { AuditEntry, Ban, Channel, ForumSettings, Invite, InvitePreview, Member, MemberDetail, MemberRow, MeUser, PermString, PublicUser, Role, Server, ServerKeyInfo, ServerTagPreview, ServerView, Snowflake } from "./types";
 
 /**
  * What accepting an invite gives back. A server invite answers with the server
@@ -16,6 +16,13 @@ export interface ServerPatch {
   description?: string;
   system_channel_id?: Snowflake | null;
   default_notifications?: number;
+  invites_paused_until?: number | null;
+  discoverable?: boolean;
+  discovery_category?: string;
+  discovery_tags?: string[];
+  discovery_language?: string;
+  verify_account_minutes?: number;
+  verify_member_minutes?: number;
 }
 
 export interface ChannelPatch {
@@ -26,6 +33,15 @@ export interface ChannelPatch {
   user_limit?: number;
   /** The channel's own icon (see lib/channelGlyph); "" puts the default back. */
   glyph?: string;
+  /** Text and announcement channels turn into each other. */
+  type?: "text" | "announcement";
+  default_auto_archive?: number;
+  forum?: Partial<Omit<ForumSettings, "tags">> & { tags: { id?: Snowflake; name: string; emoji: string; moderated: boolean }[] };
+  /** Threads: */
+  archived?: boolean;
+  locked?: boolean;
+  auto_archive?: number;
+  applied_tags?: Snowflake[];
 }
 
 export interface ChannelPositionPatch {
@@ -37,6 +53,10 @@ export interface ChannelPositionPatch {
 export interface RoleBody {
   name?: string;
   color?: number;
+  color2?: number | null;
+  color3?: number | null;
+  /** A single emoji, "custom:<id>" for one of the server's own, or "" for none. */
+  icon_emoji?: string;
   hoist?: boolean;
   mentionable?: boolean;
   permissions?: PermString;
@@ -46,6 +66,38 @@ export interface MemberPatch {
   nick?: string | null;
   timeout_until?: number | null;
   roles?: Snowflake[];
+  bio?: string;
+  pronouns?: string;
+  /** The profile's theme in this server (null uses the account's). */
+  accent_color?: number | null;
+  accent_color_2?: number | null;
+  /** Widgets for this server alone (lib/widgets); null goes back to the account's. */
+  widgets?: unknown[] | null;
+  /** false lets a member out of AutoMod's quarantine. */
+  quarantined?: false;
+}
+
+export interface MemberQuery {
+  q?: string;
+  roles?: Snowflake[];
+  joined_after?: number;
+  joined_before?: number;
+  created_after?: number;
+  created_before?: number;
+  join_method?: string;
+  join_code?: string;
+  signals?: string[];
+  sort?: "joined_desc" | "joined_asc" | "created_desc" | "created_asc";
+  offset?: number;
+  limit?: number;
+}
+
+export interface AuditQuery {
+  before?: Snowflake;
+  limit?: number;
+  actions?: string[];
+  actor_id?: Snowflake;
+  target_id?: Snowflake;
 }
 
 function upload<T>(path: string, file: Blob, onProgress?: Progress): Promise<T> {
@@ -124,7 +176,7 @@ export const servers = {
   channels(id: Snowflake): Promise<Channel[]> {
     return api.request<Channel[]>("GET", `/servers/${id}/channels`);
   },
-  createChannel(id: Snowflake, body: { type: "text" | "voice" | "category"; name: string; parent_id?: Snowflake | null }): Promise<Channel> {
+  createChannel(id: Snowflake, body: { type: "text" | "voice" | "category" | "announcement" | "forum"; name: string; parent_id?: Snowflake | null }): Promise<Channel> {
     return api.request<Channel>("POST", `/servers/${id}/channels`, body);
   },
   setChannelPositions(id: Snowflake, list: ChannelPositionPatch[]): Promise<Channel[]> {
@@ -204,11 +256,55 @@ export const servers = {
   deleteInvite(code: string): Promise<void> {
     return api.request<void>("DELETE", `/invites/${encodeURIComponent(code)}`);
   },
-  auditLog(id: Snowflake, query: { before?: Snowflake; limit?: number } = {}): Promise<{ entries: AuditEntry[]; users: PublicUser[] }> {
+  auditLog(id: Snowflake, query: AuditQuery = {}): Promise<{ entries: AuditEntry[]; users: PublicUser[] }> {
     const q: Record<string, string> = {};
     if (query.before) q["before"] = query.before;
     if (query.limit) q["limit"] = String(query.limit);
+    if (query.actions?.length) q["action"] = query.actions.join(",");
+    if (query.actor_id) q["actor_id"] = query.actor_id;
+    if (query.target_id) q["target_id"] = query.target_id;
     return api.request("GET", `/servers/${id}/audit-log`, undefined, { query: q });
+  },
+  /** Revokes every invite the server has. */
+  revokeAllInvites(id: Snowflake): Promise<{ revoked: number }> {
+    return api.request("DELETE", `/servers/${id}/invites`);
+  },
+  /** The Members page: members filtered and sorted on the server. */
+  searchMembers(id: Snowflake, query: MemberQuery = {}): Promise<{ members: MemberRow[]; total: number; users: PublicUser[]; join_codes?: string[] }> {
+    const q: Record<string, string> = {};
+    for (const [k, v] of Object.entries(query)) {
+      if (v === undefined || v === "" || (Array.isArray(v) && v.length === 0)) continue;
+      q[k] = Array.isArray(v) ? v.join(",") : String(v);
+    }
+    return api.request("GET", `/servers/${id}/member-search`, undefined, { query: q });
+  },
+  /** Mod View's facts about one member. */
+  modView(id: Snowflake, userId: Snowflake): Promise<{ member: MemberDetail; audit?: AuditEntry[]; automod?: import("./types").AutomodEvent[]; users: PublicUser[] }> {
+    return api.request("GET", `/servers/${id}/members/${userId}/mod`);
+  },
+  prunePreview(id: Snowflake, days: number, roles: Snowflake[] = []): Promise<{ count: number }> {
+    const q: Record<string, string> = { days: String(days) };
+    if (roles.length) q["roles"] = roles.join(",");
+    return api.request("GET", `/servers/${id}/prune`, undefined, { query: q });
+  },
+  prune(id: Snowflake, days: number, roles: Snowflake[] = [], reason?: string): Promise<{ pruned: number }> {
+    return api.request("POST", `/servers/${id}/prune`, { days, roles, ...(reason ? { reason } : {}) });
+  },
+  bulkBan(id: Snowflake, userIds: Snowflake[], body: { reason?: string; delete_message_days?: number } = {}): Promise<{ banned: Snowflake[]; failed: Snowflake[] }> {
+    return api.request("POST", `/servers/${id}/bulk-ban`, { user_ids: userIds, ...body });
+  },
+  /** The caller's own picture or banner in one server ("@me"); a moderator may only remove someone else's. */
+  uploadMemberImage(id: Snowflake, which: "avatar" | "banner", file: Blob, onProgress?: Progress): Promise<Member> {
+    return upload<Member>(`/servers/${id}/members/@me/${which}`, file, onProgress);
+  },
+  deleteMemberImage(id: Snowflake, userId: Snowflake | "@me", which: "avatar" | "banner"): Promise<Member> {
+    return api.request<Member>("DELETE", `/servers/${id}/members/${userId}/${which}`);
+  },
+  uploadRoleIcon(id: Snowflake, roleId: Snowflake, file: Blob, onProgress?: Progress): Promise<Role> {
+    return upload<Role>(`/servers/${id}/roles/${roleId}/icon`, file, onProgress);
+  },
+  deleteRoleIcon(id: Snowflake, roleId: Snowflake): Promise<Role> {
+    return api.request<Role>("DELETE", `/servers/${id}/roles/${roleId}/icon`);
   },
   keys(id: Snowflake): Promise<ServerKeyInfo[]> {
     return api.request<ServerKeyInfo[]>("GET", `/servers/${id}/keys`);

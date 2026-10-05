@@ -9,6 +9,7 @@ import { TermsGate } from "@/components/legal/TermsGate";
 import { WhatsNew } from "@/components/shell/WhatsNewDialog";
 import { DownloadBanner } from "@/components/shell/DownloadBanner";
 import { RpcBanner } from "@/components/shell/RpcBanner";
+import { isTypingField } from "@/lib/keyboardInset";
 import { rowSwipeActive } from "@/lib/swipeReply";
 import { DiscordBanner } from "@/components/shell/DiscordBanner";
 import { UpdatePrompt } from "@/components/shell/UpdateDialog";
@@ -31,6 +32,12 @@ import { t } from "@/i18n";
 
 /** Controls a horizontal drag already means something to. */
 const NATIVE_DRAG = "input, textarea, select, [contenteditable=''], [contenteditable='true'], [role=slider], [data-native-press]";
+
+/** Puts the on-screen keyboard away: whatever text field has it lets go. */
+function dismissKeyboard(): void {
+  const el = document.activeElement;
+  if (isTypingField(el)) el.blur();
+}
 
 /** Three-pane desktop layout; on phones the rail+sidebar live in a left drawer. */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -127,6 +134,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loc.pathname, setLeftOpen, setRightOpen]);
 
+  // a panel opened any other way (its button, a link) puts the keyboard away too
+  useEffect(() => {
+    if (mobile && (leftOpen || rightOpen)) dismissKeyboard();
+  }, [mobile, leftOpen, rightOpen]);
+
   useEffect(() => {
     if (!mobile) return;
     // put back what was there rather than clearing outright: the drawer is not
@@ -190,6 +202,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
       d.axis = Math.abs(dx) > Math.abs(dy) * 1.3 ? "x" : "y";
       if (d.axis === "y") drag.current = null;
+      // a panel being dragged over the chat puts the keyboard away with it
+      else dismissKeyboard();
       return;
     }
     if (d.right) return;

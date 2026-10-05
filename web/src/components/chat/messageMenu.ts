@@ -16,6 +16,9 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { canI, isInstanceAdmin, P, useServers } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
 import { mentionsMe } from "@/lib/mentionsMe";
+import { canStartThread } from "@/lib/threads";
+import { isThread } from "@/stores/threads";
+import { canPublish, publish } from "./publish";
 
 import { t } from "@/i18n";
 export interface MenuHooks {
@@ -61,11 +64,18 @@ export function confirmRemoveEmbeds(msg: DecryptedMessage, skip = false): void {
   });
 }
 
-/** Anyone in a DM may pin; a server channel needs Manage Messages, as the server requires. */
+/** Anyone in a DM may pin; a server channel needs Pin Messages, as the server requires. */
 export function canPin(msg: DecryptedMessage): boolean {
   const ch = useChannels.getState().byId[msg.channel_id];
   if (!ch?.server_id) return true;
-  return canI(useServers.getState().byId[ch.server_id], P.MANAGE_MESSAGES, ch.id);
+  return canI(useServers.getState().byId[ch.server_id], P.PIN_MESSAGES, ch.id);
+}
+
+/** Whether a thread can be started from a message: something someone said, in a channel threads start in, that has none yet. */
+export function canThread(msg: DecryptedMessage): boolean {
+  if (msg.thread || (msg.type !== "default" && msg.type !== "reply" && msg.type !== "crosspost")) return false;
+  const ch = useChannels.getState().byId[msg.channel_id];
+  return !!ch && !isThread(ch) && canStartThread(ch);
 }
 
 /**
@@ -115,7 +125,9 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks, image?
   // where reacting is not allowed the item is not offered, rather than failing after the pick
   if (canReact(msg)) items.push({ id: "react", label: t("chat.messageItem.addReaction"), onSelect: hooks.openReactionPicker, separatorAfter: true });
   if (canEdit(msg)) items.push({ id: "edit", label: t("chat.messageItem.editMessage"), onSelect: () => ui.setEditing({ channelId: msg.channel_id, messageId: msg.id }) });
-  items.push({ id: "reply", label: t("chat.messageItem.reply"), onSelect: () => ui.setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true }), separatorAfter: true });
+  items.push({ id: "reply", label: t("chat.messageItem.reply"), onSelect: () => ui.setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true }), separatorAfter: !canThread(msg) && !canPublish(msg) });
+  if (canThread(msg)) items.push({ id: "thread", label: t("threads.create.title"), onSelect: () => ui.openModal("createThread", { channelId: msg.channel_id, messageId: msg.id }), separatorAfter: !canPublish(msg) });
+  if (canPublish(msg)) items.push({ id: "publish", label: t("follows.publish"), onSelect: () => void publish(msg), separatorAfter: true });
   items.push({
     id: "copy",
     label: t("chat.messageMenu.copyText"),

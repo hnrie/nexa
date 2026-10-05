@@ -92,8 +92,10 @@ function prefersStill(): boolean {
 }
 
 /** The Stickers tab: this server's packs, mine, installed; searchable by name and tags. */
-export function StickerPicker({ serverId, onPick }: { serverId: string | null | undefined; onPick: (p: StickerPick) => void }) {
-  const packs = useExpressions((x) => x.packs);
+export function StickerPicker({ serverId, onPick, onlyServer = false }: { serverId: string | null | undefined; onPick: (p: StickerPick) => void; onlyServer?: boolean }) {
+  const allPacks = useExpressions((x) => x.packs);
+  // without Use External Stickers a server channel takes only the server's own
+  const packs = useMemo(() => (onlyServer && serverId ? Object.fromEntries(Object.entries(allPacks).filter(([, p]) => p.server_id === serverId)) : allPacks), [allPacks, onlyServer, serverId]);
   const recents = useExpressions((x) => x.recents);
   const meId = useAuth((a) => a.me?.id);
   // whether a pack can be removed depends on the servers you are in

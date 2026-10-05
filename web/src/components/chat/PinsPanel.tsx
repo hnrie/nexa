@@ -9,7 +9,8 @@ import { formatFull, formatTimestamp } from "@/lib/time";
 import { RenderCtxProvider, useRenderCtx } from "@/lib/markdownCtx";
 import { useChannels } from "@/stores/channels";
 import { useMessages } from "@/stores/messages";
-import { memberColor, useServers } from "@/stores/servers";
+import { useMemberLook } from "@/lib/useMemberLook";
+import { nameClass, nameStyle } from "@/lib/roleLook";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { openProfilePopout } from "@/stores/profilePopout";
@@ -56,7 +57,7 @@ function PinnedMessage({ msg, collapsed, unpinning, onJump, onUnpin }: { msg: De
   const shownName = useShownName(msg.channel_id, hook ? undefined : msg.author_id);
   const name = hook ? hook.name : shownName;
   const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
-  const color = useServers((st) => (serverId && st.byId[serverId] && !msg.webhook_id ? memberColor(st.byId[serverId], msg.author_id) : undefined));
+  const look = useMemberLook(serverId, msg.webhook_id ? undefined : msg.author_id);
   const whoId = useId();
   return (
     <article className={s.pinCard} aria-labelledby={whoId} data-testid="pinned-message" data-pin={msg.id}>
@@ -68,7 +69,7 @@ function PinnedMessage({ msg, collapsed, unpinning, onJump, onUnpin }: { msg: De
           {hook ? (
             <span className={s.pinName} dir="auto">{name}</span>
           ) : (
-            <button type="button" className={s.author} style={color ? { color } : undefined} onClick={(e) => openProfilePopout(msg.author_id, e.currentTarget, serverId ?? undefined)} dir="auto">
+            <button type="button" className={[s.author, nameClass(look)].join(" ")} style={nameStyle(look)} onClick={(e) => openProfilePopout(msg.author_id, e.currentTarget, serverId ?? undefined)} dir="auto">
               {name}
             </button>
           )}

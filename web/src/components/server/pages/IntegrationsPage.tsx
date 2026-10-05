@@ -1,3 +1,4 @@
+import { FollowedChannels } from "@/components/follows/FollowedChannels";
 import { ChevronDown, ChevronRight, Copy, LockOpen, Plus, Trash2, Webhook as WebhookIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { webhooks as webhooksApi, type WebhookPatch } from "@/api/webhooks";
@@ -294,6 +295,7 @@ export default function IntegrationsPage({ serverId, channelId }: { serverId: st
           }}
         />
       ) : null}
+      <FollowedChannels serverId={serverId} channelId={channelId} />
       <SaveBar
         dirty={dirtyIds.length > 0}
         busy={busy}

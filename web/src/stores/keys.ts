@@ -9,6 +9,7 @@ import { keystore } from "@/crypto/keystore";
 import { unwrapGrant, wrapGrant, type Identity } from "@/crypto/keys";
 import { hasLock } from "@/lib/appLock";
 import { checkRecipients } from "@/lib/convMembers";
+import { clearFollows } from "@/lib/follows";
 import { closePins, openPins } from "@/lib/keyPins";
 import { clearKeyring, ring } from "@/lib/keyring";
 import { judgeKey, useKeyAlerts } from "./keyAlerts";
@@ -314,6 +315,7 @@ export const useKeys = create<KeysState>()((set, get) => ({
   markWaiting: (conv) => set((s) => (s.waiting[conv] ? s : { waiting: { ...s.waiting, [conv]: true } })),
   reset: () => {
     clearKeyring();
+    clearFollows();
     for (const h of keysGoneHooks) h();
     pendingEnsure.clear();
     // The pins themselves stay on the device — that is the point of them — but

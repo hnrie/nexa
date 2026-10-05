@@ -48,11 +48,11 @@ function signIn(userId: string) {
     flags: 0,
     created_at: 0,
     channels: [ch("200"), ch("300", { server_id: null, type: "group_dm", owner_id: "1", recipient_ids: ["1", "2", "3"] })],
-    roles: [role(S, 0, DEFAULT_EVERYONE), role("400", 1, DEFAULT_EVERYONE | P.MANAGE_MESSAGES)],
+    roles: [role(S, 0, DEFAULT_EVERYONE), role("400", 1, DEFAULT_EVERYONE | P.MANAGE_MESSAGES | P.PIN_MESSAGES)],
     members: [member("1"), member("2", ["400"]), member("3")],
     member_count: 3,
     me: member(userId, mod ? ["400"] : []),
-    my_permissions: permString(mod ? DEFAULT_EVERYONE | P.MANAGE_MESSAGES : DEFAULT_EVERYONE),
+    my_permissions: permString(mod ? DEFAULT_EVERYONE | P.MANAGE_MESSAGES | P.PIN_MESSAGES : DEFAULT_EVERYONE),
   };
   useServers.getState().clear();
   useChannels.getState().clear();
@@ -71,7 +71,7 @@ describe("message permissions", () => {
     signIn("1");
     expect(canDelete(msg("200", "3"))).toBe(true);
   });
-  it("offers pinning in servers only with Manage Messages", () => {
+  it("offers pinning in servers only with Pin Messages", () => {
     expect(canPin(msg("200", "3"))).toBe(false);
     expect(canPin(msg("300", "1"))).toBe(true);
     signIn("2");

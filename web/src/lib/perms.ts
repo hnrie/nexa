@@ -34,27 +34,41 @@ export const P = {
   MANAGE_ROLES: 1n << 28n,
   MANAGE_WEBHOOKS: 1n << 29n,
   MANAGE_EMOJIS: 1n << 30n,
+  USE_EXTERNAL_EMOJIS: 1n << 18n,
+  MANAGE_THREADS: 1n << 34n,
+  CREATE_PUBLIC_THREADS: 1n << 35n,
+  CREATE_PRIVATE_THREADS: 1n << 36n,
+  USE_EXTERNAL_STICKERS: 1n << 37n,
+  SEND_MESSAGES_IN_THREADS: 1n << 38n,
   MODERATE_MEMBERS: 1n << 40n,
   USE_SOUNDBOARD: 1n << 42n,
+  CREATE_EXPRESSIONS: 1n << 43n,
   CREATE_POLLS: 1n << 49n,
+  PIN_MESSAGES: 1n << 51n,
+  BYPASS_SLOWMODE: 1n << 52n,
 } as const;
 
 export type PermName = keyof typeof P;
 
 export const ALL: bigint = Object.values(P).reduce((a, b) => a | b, 0n);
 export const DEFAULT_EVERYONE: bigint =
-  P.CREATE_INSTANT_INVITE | P.ADD_REACTIONS | P.STREAM | P.VIEW_CHANNEL | P.SEND_MESSAGES | P.EMBED_LINKS | P.ATTACH_FILES | P.READ_MESSAGE_HISTORY | P.CONNECT | P.SPEAK | P.USE_VAD | P.CHANGE_NICKNAME | P.USE_SOUNDBOARD | P.CREATE_POLLS;
+  P.CREATE_INSTANT_INVITE | P.ADD_REACTIONS | P.STREAM | P.VIEW_CHANNEL | P.SEND_MESSAGES | P.EMBED_LINKS | P.ATTACH_FILES | P.READ_MESSAGE_HISTORY | P.USE_EXTERNAL_EMOJIS | P.CONNECT | P.SPEAK | P.USE_VAD | P.CHANGE_NICKNAME | P.USE_SOUNDBOARD | P.CREATE_POLLS |
+  P.CREATE_PUBLIC_THREADS | P.CREATE_PRIVATE_THREADS | P.USE_EXTERNAL_STICKERS | P.SEND_MESSAGES_IN_THREADS;
 export const TIMED_OUT_KEEP: bigint = P.VIEW_CHANNEL | P.READ_MESSAGE_HISTORY;
 
-/** Permissions shown in the role and channel editors, grouped as Discord groups them. */
-export function permGroups(): { group: string; items: { name: PermName; label: string; description: string; channel?: ("text" | "voice")[] }[] }[] {
+/** The kinds of channel a permission matters in, for the channel permission editor. */
+export type PermChannelKind = "text" | "voice" | "forum";
+
+/** Permissions shown in the role and channel editors, in groups. */
+export function permGroups(): { group: string; items: { name: PermName; label: string; description: string; channel?: PermChannelKind[] }[] }[] {
   return [
   {
     group: t("perms.generalServerPermissions"),
     items: [
-      { name: "VIEW_CHANNEL", label: t("perms.viewChannels"), description: t("perms.allowsMembersToViewChannelsBy"), channel: ["text", "voice"] },
-      { name: "MANAGE_CHANNELS", label: t("perms.manageChannels"), description: t("perms.allowsMembersToCreateEditOr"), channel: ["text", "voice"] },
-      { name: "MANAGE_ROLES", label: t("perms.manageRoles"), description: t("perms.allowsMembersToCreateNewRoles"), channel: ["text", "voice"] },
+      { name: "VIEW_CHANNEL", label: t("perms.viewChannels"), description: t("perms.allowsMembersToViewChannelsBy"), channel: ["text", "voice", "forum"] },
+      { name: "MANAGE_CHANNELS", label: t("perms.manageChannels"), description: t("perms.allowsMembersToCreateEditOr"), channel: ["text", "voice", "forum"] },
+      { name: "MANAGE_ROLES", label: t("perms.manageRoles"), description: t("perms.allowsMembersToCreateNewRoles"), channel: ["text", "voice", "forum"] },
+      { name: "CREATE_EXPRESSIONS", label: t("perms.createExpressions"), description: t("perms.createExpressionsDescription") },
       { name: "MANAGE_EMOJIS", label: t("perms.manageExpressions"), description: t("perms.allowsMembersToAddOrRemove") },
       { name: "MANAGE_WEBHOOKS", label: t("perms.manageWebhooks"), description: t("perms.manageWebhooksDescription"), channel: ["text"] },
       { name: "VIEW_AUDIT_LOG", label: t("perms.viewAuditLog"), description: t("perms.allowsMembersToViewARecord") },
@@ -64,7 +78,7 @@ export function permGroups(): { group: string; items: { name: PermName; label: s
   {
     group: t("perms.membershipPermissions"),
     items: [
-      { name: "CREATE_INSTANT_INVITE", label: t("server.invites.createInvite"), description: t("perms.allowsMembersToInviteNewPeople"), channel: ["text", "voice"] },
+      { name: "CREATE_INSTANT_INVITE", label: t("server.invites.createInvite"), description: t("perms.allowsMembersToInviteNewPeople"), channel: ["text", "voice", "forum"] },
       { name: "CHANGE_NICKNAME", label: t("perms.changeNickname"), description: t("perms.allowsMembersToChangeTheirOwn") },
       { name: "MANAGE_NICKNAMES", label: t("perms.manageNicknames"), description: t("perms.allowsMembersToChangeTheNicknames") },
       { name: "KICK_MEMBERS", label: t("perms.kickMembers"), description: t("perms.allowsMembersToRemoveOtherMembers") },
@@ -75,14 +89,22 @@ export function permGroups(): { group: string; items: { name: PermName; label: s
   {
     group: t("perms.textChannelPermissions"),
     items: [
-      { name: "SEND_MESSAGES", label: t("perms.sendMessages"), description: t("perms.allowsMembersToSendMessagesIn"), channel: ["text"] },
-      { name: "EMBED_LINKS", label: t("perms.embedLinks"), description: t("perms.allowsLinksThatMembersShareTo"), channel: ["text"] },
-      { name: "ATTACH_FILES", label: t("perms.attachFiles"), description: t("perms.allowsMembersToUploadFilesOr"), channel: ["text"] },
-      { name: "ADD_REACTIONS", label: t("perms.addReactions"), description: t("perms.allowsMembersToAddNewEmoji"), channel: ["text"] },
-      { name: "MENTION_EVERYONE", label: t("perms.mentionEveryoneAndAllRoles"), description: t("perms.allowsMembersToUseEveryoneAnd"), channel: ["text"] },
-      { name: "MANAGE_MESSAGES", label: t("perms.manageMessages"), description: t("perms.allowsMembersToDeleteMessagesBy"), channel: ["text"] },
-      { name: "READ_MESSAGE_HISTORY", label: t("perms.readMessageHistory"), description: t("perms.allowsMembersToReadPreviousMessages"), channel: ["text"] },
-      { name: "CREATE_POLLS", label: t("perms.createPolls"), description: t("perms.allowsMembersToCreatePolls"), channel: ["text"] },
+      { name: "SEND_MESSAGES", label: t("perms.sendMessages"), description: t("perms.allowsMembersToSendMessagesIn"), channel: ["text", "forum"] },
+      { name: "SEND_MESSAGES_IN_THREADS", label: t("perms.sendMessagesInThreads"), description: t("perms.sendMessagesInThreadsDescription"), channel: ["text", "forum"] },
+      { name: "CREATE_PUBLIC_THREADS", label: t("perms.createPublicThreads"), description: t("perms.createPublicThreadsDescription"), channel: ["text"] },
+      { name: "CREATE_PRIVATE_THREADS", label: t("perms.createPrivateThreads"), description: t("perms.createPrivateThreadsDescription"), channel: ["text"] },
+      { name: "EMBED_LINKS", label: t("perms.embedLinks"), description: t("perms.allowsLinksThatMembersShareTo"), channel: ["text", "forum"] },
+      { name: "ATTACH_FILES", label: t("perms.attachFiles"), description: t("perms.allowsMembersToUploadFilesOr"), channel: ["text", "forum"] },
+      { name: "ADD_REACTIONS", label: t("perms.addReactions"), description: t("perms.allowsMembersToAddNewEmoji"), channel: ["text", "forum"] },
+      { name: "USE_EXTERNAL_EMOJIS", label: t("perms.useExternalEmojis"), description: t("perms.useExternalEmojisDescription"), channel: ["text", "forum"] },
+      { name: "USE_EXTERNAL_STICKERS", label: t("perms.useExternalStickers"), description: t("perms.useExternalStickersDescription"), channel: ["text", "forum"] },
+      { name: "MENTION_EVERYONE", label: t("perms.mentionEveryoneAndAllRoles"), description: t("perms.allowsMembersToUseEveryoneAnd"), channel: ["text", "forum"] },
+      { name: "MANAGE_MESSAGES", label: t("perms.manageMessages"), description: t("perms.allowsMembersToDeleteMessagesBy"), channel: ["text", "forum"] },
+      { name: "PIN_MESSAGES", label: t("perms.pinMessages"), description: t("perms.pinMessagesDescription"), channel: ["text", "forum"] },
+      { name: "MANAGE_THREADS", label: t("perms.manageThreads"), description: t("perms.manageThreadsDescription"), channel: ["text", "forum"] },
+      { name: "READ_MESSAGE_HISTORY", label: t("perms.readMessageHistory"), description: t("perms.allowsMembersToReadPreviousMessages"), channel: ["text", "forum"] },
+      { name: "BYPASS_SLOWMODE", label: t("perms.bypassSlowmode"), description: t("perms.bypassSlowmodeDescription"), channel: ["text", "forum"] },
+      { name: "CREATE_POLLS", label: t("perms.createPolls"), description: t("perms.allowsMembersToCreatePolls"), channel: ["text", "forum"] },
     ],
   },
   {
@@ -134,6 +156,7 @@ export interface PermRole {
 export interface PermMember {
   userId: string;
   roleIds: string[];
+  /** Timed out, or held by AutoMod's quarantine: both keep only looking. */
   timedOut: boolean;
 }
 
@@ -144,7 +167,23 @@ export function toPermRoles(roles: Iterable<Role>): PermRole[] {
 }
 
 export function toPermMember(m: Member | undefined, userId: string, now = Date.now()): PermMember {
-  return { userId, roleIds: m?.role_ids ?? [], timedOut: !!m?.timeout_until && m.timeout_until > now };
+  const quarantined = ((m?.flags ?? 0) & 1) !== 0;
+  return { userId, roleIds: m?.role_ids ?? [], timedOut: quarantined || (!!m?.timeout_until && m.timeout_until > now) };
+}
+
+/**
+ * What someone may do in a thread, from what they may do in its channel, as
+ * the server's perms.Thread works it out: talking is Send Messages in
+ * Threads, and a private thread is only for the people in it and those who
+ * manage threads.
+ */
+export function threadPerms(parent: bigint, isPrivate: boolean, member: boolean): bigint {
+  if (!has(parent, P.VIEW_CHANNEL)) return 0n;
+  if (has(parent, P.ADMINISTRATOR)) return ALL;
+  if (isPrivate && !member && !has(parent, P.MANAGE_THREADS)) return 0n;
+  let p = parent & ~P.SEND_MESSAGES;
+  if (has(parent, P.SEND_MESSAGES_IN_THREADS)) p |= P.SEND_MESSAGES;
+  return p;
 }
 
 /** Server-level permissions: @everyone OR the member's roles; Administrator and ownership grant everything. */

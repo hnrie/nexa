@@ -1,4 +1,4 @@
-import { Pin, Plus, Shield, Users } from "lucide-react";
+import { Pin, Plus, Shield, Users, Compass } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
@@ -462,6 +462,14 @@ export function Rail() {
         <Tooltip text={t("rail.rail.addAServer")} side="right">
           <button className={s.btn} aria-label={t("rail.rail.addAServer")} data-testid="add-server" onClick={() => openModal("createServer")}>
             <Plus size={24} />
+          </button>
+        </Tooltip>
+      </div>
+      <div className={[s.item, s.add].join(" ")} data-selected={loc.pathname.startsWith("/channels/@discover")} data-testid="rail-discover">
+        <span className={s.pill} />
+        <Tooltip text={t("discovery.title")} side="right">
+          <button className={s.btn} aria-label={t("discovery.title")} aria-current={loc.pathname.startsWith("/channels/@discover") ? "page" : undefined} onClick={() => { nav("/channels/@discover"); useUI.getState().setLeftOpen(false); }}>
+            <Compass size={24} />
           </button>
         </Tooltip>
       </div>

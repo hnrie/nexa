@@ -4,13 +4,18 @@ import { P, permGroups, has, type PermName } from "@/lib/perms";
 import s from "./PermissionGrid.module.css";
 
 import { t } from "@/i18n";
-/** Which permissions a channel of this type exposes; categories show everything channel-scoped. */
-export function permsForChannel(type: "text" | "voice" | "category" | undefined): PermName[] {
+/**
+ * Which permissions a channel of this type exposes; categories show
+ * everything channel-scoped. An announcement channel is a text channel to its
+ * permissions.
+ */
+export function permsForChannel(type: string | undefined): PermName[] {
+  const kind = type === "announcement" ? "text" : type;
   const out: PermName[] = [];
   for (const g of permGroups()) {
     for (const it of g.items) {
       if (!it.channel) continue;
-      if (!type || type === "category" || it.channel.includes(type)) out.push(it.name);
+      if (!kind || kind === "category" || (it.channel as string[]).includes(kind)) out.push(it.name);
     }
   }
   return out;

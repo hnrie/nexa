@@ -13,6 +13,8 @@ import { useAuth } from "@/stores/auth";
 import { emojiReactionKey } from "@/stores/expressions";
 import { useMessages, type DecryptedMessage } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
+import { useChannels } from "@/stores/channels";
+import { canI, P, useServers } from "@/stores/servers";
 import { useUsers, displayName } from "@/stores/users";
 import { canReact } from "./messageMenu";
 import { REACTORS_SHOWN, ReactorsPopover } from "./ReactorsPopover";
@@ -80,6 +82,9 @@ interface Props {
 
 export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Props) {
   const users = useUsers((u) => u.byId);
+  // reacting with another server's emoji takes Use External Emoji, as the server holds it
+  const reactServer = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
+  const ownOnly = useServers((x) => (reactServer ? !canI(x.byId[reactServer], P.USE_EXTERNAL_EMOJIS, msg.channel_id) : false));
   // who reacted, asked for once per emoji and count: a count that moved means
   // the list did too, where it used to be kept from the first look for good
   const [who, setWho] = useState<Record<string, string[]>>({});
@@ -153,7 +158,7 @@ export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Pr
           onClose={closeShowing}
         />
       ) : null}
-      {pickerAnchor ? <ExpressionPicker anchor={pickerAnchor} onClose={closePicker} onEmoji={(e) => { closePicker(); void toggleReaction(msg, reactionKeyOf(e)); }} /> : null}
+      {pickerAnchor ? <ExpressionPicker anchor={pickerAnchor} serverId={reactServer} onlyServer={ownOnly} onClose={closePicker} onEmoji={(e) => { closePicker(); void toggleReaction(msg, reactionKeyOf(e)); }} /> : null}
     </div>
   );
 }

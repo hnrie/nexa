@@ -72,3 +72,25 @@
   .row { height: 40px; }
   .catHead { height: 40px; }
 }
+
+/* Threads under their channel. A line leaves from just below the channel's
+   icon and curves into each thread, whose name lines up with the channel's;
+   the thread's own tile starts after the curve, so the line never runs under
+   a highlight or through the icon. Geometry, along the row: the icon's middle
+   is 18px in (the row's 8px padding and half its 20px icon), the channel's
+   name 35px. The line is opaque, mixed with the panel, so where two pieces
+   meet it does not darken. */
+.threads { --spine: color-mix(in srgb, var(--text-muted) 38%, var(--bg-base)); --parent-h: 36px; }
+.threadRow { height: 32px; margin-inline-start: 28px; }
+.threadRow .channel { padding-inline-start: 7px; font-size: 14.5px; font-weight: 500; }
+.threadSpine { position: absolute; inset-inline-start: -11px; top: -4px; bottom: calc(50% - 1px); width: 9px; border-inline-start: 2px solid var(--spine); border-bottom: 2px solid var(--spine); border-end-start-radius: 8px; pointer-events: none; }
+/* the first starts 3px under the channel's icon, whatever the row's height */
+.threadRow:first-child .threadSpine { top: calc(9px - var(--parent-h) / 2); }
+/* a thread with more under it carries the line on down to the next */
+.threadRail { position: absolute; inset-inline-start: -11px; top: calc(50% - 8px); bottom: 0; border-inline-start: 2px solid var(--spine); pointer-events: none; }
+/* the unread mark stays at the panel's edge, where a channel's is */
+.threadRow[data-unread="true"]::before { inset-inline-start: -36px; }
+@media (pointer: coarse) {
+  .threads { --parent-h: 40px; }
+  .threadRow { height: 40px; }
+}

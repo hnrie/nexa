@@ -55,11 +55,18 @@ export const useChannels = create<ChannelsState>()((set) => ({
   clear: () => set({ byId: {} }),
 }));
 
-/** Channels of a server in display order: position, then id. */
+/** Channels of a server in display order: position, then id. Threads are listed apart (selectThreads). */
 export function selectServerChannels(byId: Record<string, Channel>, serverId: string): Channel[] {
   return Object.values(byId)
-    .filter((c) => c.server_id === serverId)
+    .filter((c) => c.server_id === serverId && c.type !== "thread" && c.type !== "private_thread")
     .sort((a, b) => a.position - b.position || compareIds(a.id, b.id));
+}
+
+/** The threads of one channel this device knows of, most recent activity first. */
+export function selectThreads(byId: Record<string, Channel>, parentId: string): Channel[] {
+  return Object.values(byId)
+    .filter((c) => (c.type === "thread" || c.type === "private_thread") && c.parent_id === parentId)
+    .sort((a, b) => compareIds(b.last_message_id ?? b.id, a.last_message_id ?? a.id));
 }
 
 export interface ChannelTree {

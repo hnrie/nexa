@@ -1,6 +1,7 @@
 import type { Message } from "@/api/types";
 import { decryptMessage, isEnvelope, type MessagePayload } from "@/crypto/message";
 import { decryptCallLine, type CallSummary } from "@/voice/callSummary";
+import { openCopy } from "./follows";
 import { channelKeyFor } from "./keyring";
 import { listedAttachments, sanitizeHook, type HookContent } from "./webhookMessage";
 
@@ -38,6 +39,16 @@ export async function decryptForStore(msg: Message): Promise<DecryptedMessage> {
     const att = listedAttachments(hook);
     if (att.length) payload.att = att;
     out.payload = payload;
+    return out;
+  }
+  // a post published from an announcement channel this one follows, sealed to the follow
+  if (msg.type === "crosspost") {
+    if (msg.ciphertext === null || msg.ciphertext === undefined) return out;
+    try {
+      out.payload = await openCopy(msg);
+    } catch (e) {
+      out.decryptError = e instanceof Error && e.message === "no_key" ? "no_key" : "bad";
+    }
     return out;
   }
   if (msg.ciphertext === null || msg.ciphertext === undefined) return out;

@@ -1,0 +1,106 @@
+/* AutoMod's settings (AutomodPage.tsx): a list of rules, the editor of one, and the log. */
+.tabs { display: flex; gap: 4px; margin: -8px 0 20px; border-bottom: 1px solid var(--border-subtle); }
+.tab { position: relative; min-height: 40px; padding: 0 14px; font-size: 15px; font-weight: 600; color: var(--text-muted); }
+.tab[aria-selected="true"] { color: var(--text-strong); }
+.tab[aria-selected="true"]::after { content: ""; position: absolute; inset-inline: 10px; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--focus-ring); }
+.tab:hover { color: var(--text); }
+
+.intro { margin: -12px 0 20px; color: var(--text-muted); font-size: 14.5px; line-height: 1.5; max-width: 64ch; }
+.week { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; font-size: 14px; color: var(--text-muted); }
+.weekNum { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+
+/* Each rule is a line in a ledger: what it looks for, what it does, and how often it did it this week. */
+.rules { display: flex; flex-direction: column; border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--border-subtle); overflow: hidden; background: var(--bg-surface); }
+.rule { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.rule + .rule { border-top: 1px solid var(--border-subtle); }
+.rule[data-off] .ruleMain, .rule[data-off] .ruleIcon { opacity: 0.55; }
+.ruleIcon { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: var(--bg-active); color: var(--text-strong); }
+.ruleIcon[data-server] { background: color-mix(in srgb, var(--brand) 18%, var(--bg-surface)); color: var(--focus-ring); }
+.ruleMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; text-align: start; border-radius: var(--radius-sm); padding: 2px 4px; margin: -2px -4px; }
+.ruleMain:hover .ruleName { text-decoration: underline; }
+.ruleMain:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.ruleName { font-weight: 650; font-size: 15.5px; color: var(--text-strong); overflow-wrap: anywhere; }
+.ruleSummary { font-size: 13.5px; color: var(--text-muted); overflow-wrap: anywhere; }
+.does { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
+.doChip { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--bg-active); color: var(--text); }
+.doChip[data-kind="block"] { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--text-danger); }
+.ruleCount { flex: none; min-width: 3ch; text-align: end; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-muted); }
+.ruleCount b { display: block; font-size: 16px; color: var(--text-strong); font-weight: 700; }
+.empty { padding: 28px 18px; text-align: center; color: var(--text-muted); }
+.empty h3 { margin: 0 0 6px; font-family: var(--font-display); font-size: 18px; color: var(--text-strong); }
+.empty p { margin: 0 auto; max-width: 48ch; font-size: 14px; }
+.addRow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+/* Picking what a new rule looks for */
+.kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.kindGroup { margin: 18px 0 8px; font-size: 14px; font-weight: 650; color: var(--text-muted); }
+.kind { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border-radius: var(--radius-md); background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--border-subtle); text-align: start; color: var(--text); }
+.kind:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.kind:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.kindText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kindName { font-weight: 650; color: var(--text-strong); }
+.kindDesc { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
+
+/* The editor */
+.back { display: inline-flex; align-items: center; gap: 4px; margin: -6px 0 14px; min-height: 32px; padding: 0 8px 0 4px; border-radius: var(--radius-sm); color: var(--text-muted); font-size: 14px; font-weight: 600; }
+.back:hover { color: var(--text); background: var(--bg-hover); }
+.editorHead { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.editorHead h2 { margin: 0; }
+.section { display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: var(--radius-md); background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.sectionHead { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 680; color: var(--text-strong); }
+.sectionNote { margin: -8px 0 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.45; }
+.checks { display: flex; flex-direction: column; gap: 8px; }
+.check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.check input { accent-color: var(--brand); width: 18px; height: 18px; margin-top: 2px; flex: none; }
+.checkText { display: flex; flex-direction: column; gap: 1px; }
+.checkLabel { font-weight: 600; color: var(--text); }
+.checkDesc { font-size: 13px; color: var(--text-muted); }
+.area { font-family: var(--font-mono); font-size: 13.5px; min-height: 96px; }
+.problem { margin: 0; font-size: 13.5px; color: var(--text-danger); }
+.inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.inline > label { display: inline-flex; align-items: center; gap: 8px; }
+.num { width: 90px; }
+
+/* Try It: the rule as it stands, on words typed here */
+.try { position: relative; }
+.tryResult { display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; padding: 10px 12px; border-radius: var(--radius-sm); font-size: 14px; line-height: 1.4; background: var(--bg-input); color: var(--text-muted); }
+.tryResult[data-hit] { background: color-mix(in srgb, var(--danger) 14%, var(--bg-input)); color: var(--text); }
+.tryResult[data-hit] svg { color: var(--text-danger); }
+.tryResult[data-clear] svg { color: var(--positive); }
+.tryResult svg { flex: none; margin-top: 2px; }
+
+/* An action: a switch, and what it needs under it once it is on */
+.action { display: flex; flex-direction: column; gap: 10px; }
+.action + .action { padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+.actionBody { display: flex; flex-direction: column; gap: 10px; padding-inline-start: 4px; }
+
+/* Who a rule leaves alone */
+.picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 6px 0 10px; border-radius: 999px; background: var(--bg-active); color: var(--text); font-size: 13px; font-weight: 600; }
+.pick button { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: var(--icon); }
+.pick button:hover { background: var(--bg-hover); color: var(--text-strong); }
+.roleDot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+
+.footerRow { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; }
+
+/* The log */
+.logFilter { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 14px; color: var(--text-muted); }
+.events { display: flex; flex-direction: column; gap: 8px; }
+.event { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 4px 12px; padding: 12px 14px; border-radius: var(--radius-md); background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.eventWho { grid-row: span 3; }
+.eventHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-width: 0; }
+.eventName { font-weight: 650; color: var(--text-strong); }
+.eventName:hover { text-decoration: underline; }
+.eventMeta { font-size: 13px; color: var(--text-muted); }
+.eventWords { margin: 0; padding: 8px 10px; border-inline-start: 3px solid var(--danger); border-radius: 4px; background: var(--bg-input); color: var(--text); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 120px; overflow: hidden; }
+.eventWords[data-open] { max-height: none; }
+.eventDetail { font-size: 14px; color: var(--text); }
+
+@media (max-width: 767px) {
+  .rule { padding: 12px; gap: 10px; align-items: flex-start; }
+  .ruleIcon { width: 34px; height: 34px; }
+  .ruleCount { display: none; }
+  .kinds { grid-template-columns: 1fr; }
+  .section { padding: 14px 12px; }
+  .event { padding: 12px; }
+}

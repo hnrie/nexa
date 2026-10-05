@@ -22,6 +22,7 @@ import { hookText } from "./webhookMessage";
 import { pollWords } from "./poll";
 import { mediaSrc } from "./mediaLinks";
 import { roundAvatar } from "./roundIcon";
+import { heldBy } from "./automod/rules";
 import { currentBlockRules, isQuiet, loadedAuthorOf } from "./blocked";
 import { bugAlertHooks, bugNumber, bugStatusLabel, type BugAlert } from "./bugs";
 
@@ -157,6 +158,8 @@ function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): voi
   if (isQuiet(decrypted ?? m, currentBlockRules(), loadedAuthorOf(m.channel_id))) return;
   const me = useAuth.getState().me;
   if (!me) return;
+  // nor does anything AutoMod holds back
+  if (decrypted && heldBy(decrypted, me.id)) return;
   const settings = useSettings.getState().settings;
   const { perChannel, muted } = settings.notifications;
   const chan = useChannels.getState().byId[m.channel_id];

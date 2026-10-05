@@ -371,7 +371,7 @@ function sanitizePoll(x: unknown): PollPayload | undefined {
  * client that shows the message. Only well-typed fields are kept, and a
  * payload that had content but none of it usable counts as undecryptable.
  */
-function sanitizePayload(p: Obj): MessagePayload {
+export function sanitizePayload(p: Obj): MessagePayload {
   const out: MessagePayload = {};
   if (typeof p["t"] === "string") out.t = p["t"];
   if (Array.isArray(p["att"])) {

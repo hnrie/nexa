@@ -1,5 +1,7 @@
 import type { DiscordState } from "@/api/connections";
 import type {
+  AuditEntry,
+  AutomodEvent,
   Channel,
   Emoji,
   GroupAddNotice,
@@ -120,6 +122,19 @@ export type GatewayEvent =
   | { t: "mod_bug"; d: { report: StaffBug; messages: BugMessage[]; people: People; counts: BugCounts } }
   /** This account's linked Discord account changed: linked, unlinked, out of the activity server or back in it. */
   | { t: "discord_link"; d: DiscordState }
+  /** A thread started, changed (renamed, closed, opened, locked, retagged) or was shown to someone just put in it. */
+  | { t: "thread_create" | "thread_update"; d: Channel & { member_count?: number } }
+  | { t: "thread_delete"; d: { id: Snowflake; parent_id: Snowflake | null; server_id: Snowflake | null } }
+  /** People came into or left a thread. */
+  | { t: "thread_members_update"; d: { thread_id: Snowflake; server_id: Snowflake | null; added: Snowflake[]; removed: Snowflake[]; member_count: number } }
+  /** A server's AutoMod rules changed: apps fetch them again. */
+  | { t: "automod_rules_update"; d: { server_id: Snowflake; automod_at?: number } }
+  /** AutoMod acted, for those who may read its log. */
+  | { t: "automod_event"; d: AutomodEvent }
+  /** A new line in a server's audit log, for those who may read it. */
+  | { t: "audit_log_entry"; d: AuditEntry }
+  /** What a channel follows changed, or a follow's key was sealed again. */
+  | { t: "follows_update"; d: { channel_id: Snowflake } }
   /** Not from the server: the gateway was closed because the account is banned. */
   | { t: "account_banned"; d?: undefined }
   | { t: "heartbeat_ack"; d?: undefined };

@@ -32,6 +32,8 @@ import { FolderSettingsModal } from "@/components/rail/FolderSettingsModal";
 import type { BugFrom } from "@/components/bugs/ReportBugModal";
 import { InviteDialog } from "@/components/invite/InviteDialog";
 import { NoteLinkDialog } from "@/components/notes/NoteLinkDialog";
+import { CreateThreadModal } from "@/components/threads/CreateThreadModal";
+import { FollowDialog } from "@/components/follows/FollowDialog";
 
 import { t } from "@/i18n";
 import { PasteUpdateDialog } from "@/components/desktop/PasteUpdateDialog";
@@ -113,6 +115,8 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       {modal?.kind === "guestLink" ? <GuestLinkModal onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
       {modal?.kind === "channelTopic" ? <ChannelTopicModal onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
       {modal?.kind === "createPoll" ? <CreatePollModal onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
+      {modal?.kind === "follow" ? <FollowDialog onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
+      {modal?.kind === "createThread" ? <CreateThreadModal onClose={close} channelId={String(modal.props?.["channelId"])} messageId={modal.props?.["messageId"] as string | undefined} /> : null}
       {modal?.kind === "stickerPack" ? <StickerPackModal onClose={close} info={modal.props?.["info"] as StickerInfo} stickerId={String(modal.props?.["stickerId"])} /> : null}
       {modal?.kind === "serverProfile" ? <ServerProfileModal onClose={close} serverId={String(modal.props?.["serverId"])} userId={modal.props?.["userId"] as string | undefined} /> : null}
       {modal?.kind === "block" ? <BlockDialog onClose={close} userId={String(modal.props?.["userId"])} /> : null}
@@ -123,7 +127,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
           on a slow phone connection a tap that shows nothing for seconds is a
           tap people repeat: the dialog's place is taken at once instead. */}
       <Suspense fallback={<Loading onClose={close} />}>
-        {modal?.kind === "settings" ? <SettingsModal onClose={close} page={(modal.props?.["page"] as string | undefined) ?? "account"} packId={modal.props?.["packId"] as string | undefined} modalId={modal.id} resume={modal.props?.["resume"] as string | undefined} anchor={modal.props?.["anchor"] as string | undefined} /> : null}
+        {modal?.kind === "settings" ? <SettingsModal onClose={close} page={(modal.props?.["page"] as string | undefined) ?? "account"} packId={modal.props?.["packId"] as string | undefined} modalId={modal.id} resume={modal.props?.["resume"] as string | undefined} anchor={modal.props?.["anchor"] as string | undefined} serverId={modal.props?.["serverId"] as string | undefined} /> : null}
         {modal?.kind === "profile" ? <ProfileModal onClose={close} userId={modal.props?.["userId"] as string} tab={modal.props?.["tab"] as ProfileTab | undefined} full={!!modal.props?.["full"]} /> : null}
         {modal?.kind === "screenPermission" ? <ScreenPermission stale={Boolean(modal.props?.["stale"])} onClose={close} /> : null}
         {modal?.kind === "subchat" ? <SubchatModal onClose={close} channel={modal.props?.["channel"] as never} parentId={modal.props?.["parentId"] as string | undefined} name={modal.props?.["name"] as string | undefined} /> : null}

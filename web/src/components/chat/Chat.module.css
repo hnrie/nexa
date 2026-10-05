@@ -474,3 +474,47 @@ button.sysName:hover { text-decoration: underline; }
   .pinRemove { width: 36px; height: 36px; }
   .pinJump { height: 36px; padding: 0 14px; }
 }
+
+/* AutoMod's alert (AutomodAlert.tsx): a message of AutoMod's own, laid out as one, with its shield where an avatar goes */
+.amAlert { position: relative; margin-top: 17px; margin-inline: 8px; padding-block: 4px 8px; padding-inline: 64px 16px; border-radius: var(--radius-sm); }
+@media (hover: hover) { .amAlert:hover { background: var(--bg-message-hover); } }
+.amMark { position: absolute; inset-inline-start: 8px; top: 4px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--brand) 22%, var(--bg-surface)); color: var(--focus-ring); }
+.amHead { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; min-height: 22px; }
+.amName { font-weight: 600; color: var(--text-strong); font-size: 16px; }
+.amRule { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--bg-active); color: var(--text); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.amLine { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 2px; color: var(--text-muted); font-size: 15px; line-height: 22px; }
+.amWho { display: inline-flex; }
+.amChannel { display: inline-flex; align-items: center; gap: 3px; color: var(--text-strong); font-weight: 500; font-size: inherit; border-radius: 4px; padding-inline: 2px; }
+.amChannel:hover { background: var(--bg-hover); }
+.amCaught { margin: 6px 0 0; padding: 8px 12px; border-inline-start: 3px solid var(--danger); border-radius: 4px; background: var(--bg-surface); color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 21px; max-height: 132px; overflow: hidden; }
+.amCaught[data-open] { max-height: none; }
+.amPending { margin-top: 6px; color: var(--text-muted); font-style: italic; font-size: 14px; }
+.amDetail { margin-top: 6px; color: var(--text); font-size: 15px; }
+.amDone { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.amChip { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--text-danger); }
+.amButtons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.amBtn { min-height: 32px; padding: 0 12px; border-radius: var(--radius-sm); background: var(--bg-active); color: var(--text-strong); font-size: 13px; font-weight: 600; }
+.amBtn:hover { background: var(--bg-selected); filter: brightness(1.1); }
+.amBtn[data-danger="true"] { color: var(--text-danger); }
+@media (max-width: 767px) { .amAlert { padding-inline-end: 8px; } .amBtn { min-height: 36px; } }
+
+/* the thread a message started, under it (ThreadChip.tsx) */
+.threadChip { display: flex; align-items: center; gap: 8px; margin-top: 6px; max-width: min(520px, 100%); min-height: 40px; padding: 6px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text); font-size: 14px; text-align: start; }
+.threadChip:hover { border-color: var(--border); background: color-mix(in srgb, var(--bg-surface) 85%, var(--brand)); }
+.threadChipIcon { flex: none; color: var(--text-muted); }
+.threadChipName { font-weight: 600; color: var(--text-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.threadChipMeta { flex: none; color: var(--text-muted); font-size: 13px; }
+.threadChipClosed { flex: none; font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--bg-active); color: var(--text-muted); }
+.threadChipGo { flex: none; margin-inline-start: auto; display: inline-flex; align-items: center; gap: 2px; color: var(--link); font-size: 13px; font-weight: 600; }
+@media (max-width: 479px) { .threadChipMeta { display: none; } }
+
+/* what AutoMod holds back, in its place */
+.heldLine { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--text-muted); font-style: italic; font-size: 15px; }
+.heldLine svg { color: var(--text-danger); flex: none; }
+.heldLine .sysLink { font-style: normal; font-weight: 500; }
+/* a published copy's mark beside the name of where it came from */
+.followTag { display: inline-flex; align-items: center; gap: 3px; height: 16px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--brand) 30%, var(--bg-surface)); color: var(--text-strong); font-size: 11px; font-weight: 600; line-height: 16px; flex: none; align-self: center; }
+/* under a post of an announcement channel not yet published, for whoever may */
+.publishBtn { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; min-height: 32px; padding: 0 12px; border-radius: var(--radius-sm); background: var(--bg-active); color: var(--text-strong); font-size: 13px; font-weight: 600; }
+.publishBtn:hover { background: var(--bg-selected); }
+.publishBtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

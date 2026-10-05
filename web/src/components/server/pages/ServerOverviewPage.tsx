@@ -5,7 +5,8 @@ import { bannerUrl, iconUrl } from "@/api/users";
 import { Button } from "@/components/common/Button";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
 import { Select } from "@/components/common/Select";
-import { Field, TextArea, TextInput } from "@/components/common/TextInput";
+import { Field, TextInput } from "@/components/common/TextInput";
+import { FormattedText } from "@/components/common/FormattedText";
 import { initials } from "@/lib/avatarColor";
 import { selectServerChannels, useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";
@@ -122,8 +123,8 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
         <Field label={t("modals.createServer.serverName")} required>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} data-testid="server-settings-name" />
         </Field>
-        <Field label={t("server.serverOverview.serverDescription")} hint={t("server.serverOverview.shownOnInvitePagesSoPeople")}>
-          <TextArea value={description} onChange={(e) => setDescription(e.target.value.slice(0, 1000))} maxLength={1000} placeholder={t("server.serverOverview.whatIsThisServerAbout")} />
+        <Field as="div" label={t("server.serverOverview.serverDescription")} hint={t("server.serverOverview.shownOnInvitePagesSoPeople")}>
+          <FormattedText value={description} onChange={setDescription} max={1000} placeholder={t("server.serverOverview.whatIsThisServerAbout")} title={t("server.serverOverview.serverDescription")} serverId={serverId} testId="server-description" />
         </Field>
         <Field label={t("server.serverOverview.systemMessagesChannel")} hint={t("server.serverOverview.joinMessagesArePostedHere")}>
           <Select value={system} onChange={(e) => setSystem(e.target.value)}>
