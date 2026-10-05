@@ -33,6 +33,8 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
@@ -88,6 +90,15 @@ fun MainShell() {
         fish.nexa.ui.WhatsNew.maybeShow()
     }
 
+    // A drawer dragged or opened over the chat puts the keyboard away with it.
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focus = LocalFocusManager.current
+    val putKeyboardAway = {
+        keyboard?.hide()
+        focus.clearFocus()
+    }
+    LaunchedEffect(Nav.leftOpen, Nav.rightOpen) { if (Nav.leftOpen || Nav.rightOpen) putKeyboardAway() }
+
     // How far the drawer is open, 0..1; follows the finger during a swipe.
     val drawer = remember { Animatable(0f) }
     val members = remember { Animatable(0f) }
@@ -141,6 +152,7 @@ fun MainShell() {
                             if (fish.nexa.ui.chat.TouchClaims.sideways) return@awaitEachGesture
                             // a swipe against the drawer's direction that starts on a message replies to it
                             if (!wasOpen && !membersOpen && total.x * dir < 0 && fish.nexa.ui.chat.TouchClaims.onMessageRow) return@awaitEachGesture
+                            putKeyboardAway()
                         } else continue
                     }
                     ch.consume()
