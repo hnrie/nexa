@@ -26,20 +26,20 @@ export interface Release {
 /** Newest first. */
 export const RELEASES: Release[] = [
   {
-    id: "2026-10-04.2",
+    id: "2026-10-05",
     items: [
-      { icon: MessageSquareText, title: "whatsNew.r202610042.threadsTitle", body: "whatsNew.r202610042.threadsBody" },
-      { icon: MessagesSquare, title: "whatsNew.r202610042.forumsTitle", body: "whatsNew.r202610042.forumsBody" },
-      { icon: Megaphone, title: "whatsNew.r202610042.announcementsTitle", body: "whatsNew.r202610042.announcementsBody" },
-      { icon: Compass, title: "whatsNew.r202610042.discoveryTitle", body: "whatsNew.r202610042.discoveryBody" },
-      { icon: ShieldCheck, title: "whatsNew.r202610042.automodTitle", body: "whatsNew.r202610042.automodBody" },
-      { icon: Users, title: "whatsNew.r202610042.membersTitle", body: "whatsNew.r202610042.membersBody" },
-      { icon: IdCard, title: "whatsNew.r202610042.profilesTitle", body: "whatsNew.r202610042.profilesBody" },
-      { icon: ImagePlay, title: "whatsNew.r202610042.movingTitle", body: "whatsNew.r202610042.movingBody" },
-      { icon: Sparkles, title: "whatsNew.r202610042.rolesTitle", body: "whatsNew.r202610042.rolesBody" },
-      { icon: Type, title: "whatsNew.r202610042.topicsTitle", body: "whatsNew.r202610042.topicsBody" },
-      { icon: Pause, title: "whatsNew.r202610042.invitesTitle", body: "whatsNew.r202610042.invitesBody" },
-      { icon: ScrollText, title: "whatsNew.r202610042.auditTitle", body: "whatsNew.r202610042.auditBody" },
+      { icon: MessageSquareText, title: "whatsNew.r20261005.threadsTitle", body: "whatsNew.r20261005.threadsBody" },
+      { icon: MessagesSquare, title: "whatsNew.r20261005.forumsTitle", body: "whatsNew.r20261005.forumsBody" },
+      { icon: Megaphone, title: "whatsNew.r20261005.announcementsTitle", body: "whatsNew.r20261005.announcementsBody" },
+      { icon: Compass, title: "whatsNew.r20261005.discoveryTitle", body: "whatsNew.r20261005.discoveryBody" },
+      { icon: ShieldCheck, title: "whatsNew.r20261005.automodTitle", body: "whatsNew.r20261005.automodBody" },
+      { icon: Users, title: "whatsNew.r20261005.membersTitle", body: "whatsNew.r20261005.membersBody" },
+      { icon: IdCard, title: "whatsNew.r20261005.profilesTitle", body: "whatsNew.r20261005.profilesBody" },
+      { icon: ImagePlay, title: "whatsNew.r20261005.movingTitle", body: "whatsNew.r20261005.movingBody" },
+      { icon: Sparkles, title: "whatsNew.r20261005.rolesTitle", body: "whatsNew.r20261005.rolesBody" },
+      { icon: Type, title: "whatsNew.r20261005.topicsTitle", body: "whatsNew.r20261005.topicsBody" },
+      { icon: Pause, title: "whatsNew.r20261005.invitesTitle", body: "whatsNew.r20261005.invitesBody" },
+      { icon: ScrollText, title: "whatsNew.r20261005.auditTitle", body: "whatsNew.r20261005.auditBody" },
     ],
   },
   {
