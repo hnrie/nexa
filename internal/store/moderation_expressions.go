@@ -108,7 +108,7 @@ func (s *Store) ModPacks(ctx context.Context, f ModPackFilter) ([]*ModPack, erro
 	case "oldest":
 		q += "ORDER BY p.created_at ASC, p.id ASC"
 	case "installs":
-		q += "ORDER BY 13 DESC, p.created_at DESC, p.id DESC"
+		q += "ORDER BY (SELECT count(*) FROM sticker_installs i WHERE i.pack_id = p.id) DESC, p.created_at DESC, p.id DESC"
 	case "name":
 		q += "ORDER BY " + s.db.Dialect.Lower("p.name") + " ASC, p.id ASC"
 	default:

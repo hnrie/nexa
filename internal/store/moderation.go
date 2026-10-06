@@ -329,13 +329,14 @@ type ModCaseCounts struct {
 	All        int `json:"all"`
 }
 
-// CountModCases counts the cases in each staff view.
+// CountModCases counts the cases in each staff view, each the way
+// ModCaseList picks them, so a view holds what its count says.
 func (s *Store) CountModCases(ctx context.Context, now int64) (ModCaseCounts, error) {
 	var c ModCaseCounts
 	err := s.db.R.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM mod_cases WHERE status = 'open' AND awaiting = 'staff'),
 		(SELECT count(*) FROM mod_cases WHERE status = 'open'),
-		(SELECT count(*) FROM mod_restrictions WHERE expires_at IS NULL OR expires_at > ?),
+		(SELECT count(*) FROM mod_cases WHERE EXISTS (SELECT 1 FROM mod_restrictions r WHERE r.case_id = mod_cases.id AND (r.expires_at IS NULL OR r.expires_at > ?))),
 		(SELECT count(*) FROM mod_cases WHERE status = 'closed'),
 		(SELECT count(*) FROM mod_cases)`, now).Scan(&c.NeedsReply, &c.Open, &c.InEffect, &c.Closed, &c.All)
 	return c, err
