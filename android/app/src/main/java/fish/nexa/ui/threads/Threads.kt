@@ -1,5 +1,9 @@
 package fish.nexa.ui.threads
 
+import fish.nexa.ui.theme.mixSrgb
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -204,47 +208,111 @@ object ThreadsUi {
 // under a message (ThreadChip.tsx)
 
 /**
- * The thread a message started, under it: its name, how much has been said in
- * it, and the way in. Kept current from the thread itself where this app holds it.
+ * The thread a message started, under it (ThreadChip.tsx): a line runs down
+ * from the message's avatar and turns into a card with the thread's name,
+ * how many messages it holds, and the newest of them: who said it, a line of
+ * it and when. Pressing the card opens the thread. It is kept current from
+ * the thread itself, as messages arrive in it. [spineFrom] is where the line
+ * starts, in the message's column (below the avatar, or at the top of a row
+ * that has none); null leaves it out (compact mode).
  */
 @Composable
-fun ThreadChip(serverId: String, summary: ThreadSummary) {
+fun ThreadChip(serverId: String, summary: ThreadSummary, spineFrom: androidx.compose.ui.unit.Dp? = null) {
     val c = Nx.colors
     val channels by Nexa.channels.byId.collectAsState()
+    val lasts by fish.nexa.data.ThreadLast.byThread.collectAsState()
     val live = channels[summary.id]
     val name = live?.name ?: summary.name
     val count = live?.thread?.messageCount ?: summary.messageCount
     val archived = live?.thread?.archived ?: summary.archived
+    val last = lasts[summary.id]
+    val sealed = summary.lastMessage
+    LaunchedEffect(summary.id, sealed?.id) { if (sealed != null) fish.nexa.data.ThreadLast.openSummaryLast(summary.id, sealed) }
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val shape = Radii.Sm
-    BoxWithConstraints(Modifier.padding(top = 6.dp).widthIn(max = 520.dp).fillMaxWidth()) {
-        val roomy = maxWidth >= 360.dp
-        Row(
+    val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+    var spineUp by remember { mutableStateOf(0f) }
+    val spine = mixSrgb(c.textMuted, c.bgRaised, 0.54f)
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    // where the card sits in the message's column, so the line reaches it however tall the message above it is
+    BoxWithConstraints(
+        Modifier
+            .onPlaced { co -> if (spineFrom != null) spineUp = co.positionInParent().y + with(density) { 8.dp.toPx() } - with(density) { spineFrom.toPx() } }
+            .padding(top = 8.dp)
+            .fillMaxWidth(),
+    ) {
+        val minW = minOf(300.dp, maxWidth)
+        Box(
             Modifier
-                .fillMaxWidth()
-                .heightIn(min = 44.dp)
-                .ring(shape, if (pressed) c.border else c.borderSubtle)
-                .clip(shape)
-                .background(if (pressed) c.bgHover else c.bgSurface, shape)
-                .pressable(interaction) { Nav.go(Route.Server(serverId, summary.id)) }
-                .semantics { contentDescription = t("threads.chip.open") + ", " + name }
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .widthIn(min = minW, max = minOf(560.dp, maxWidth))
+                // the line from the avatar, curving into the card's middle (`.threadSpine`)
+                .drawBehind {
+                    if (spineFrom == null) return@drawBehind
+                    val w = 2.dp.toPx()
+                    val left = -33.dp.toPx()
+                    val right = -1.dp.toPx()
+                    val r = 10.dp.toPx()
+                    val top = -spineUp.coerceAtLeast(0f)
+                    val bottom = size.height / 2f
+                    val x0 = if (rtl) size.width - left else left
+                    val x1 = if (rtl) size.width - right else right
+                    val dir = if (rtl) -1f else 1f
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(x0 + dir * w / 2, top)
+                        lineTo(x0 + dir * w / 2, bottom - r)
+                        quadraticTo(x0 + dir * w / 2, bottom, x0 + dir * (w / 2 + r), bottom)
+                        lineTo(x1, bottom)
+                    }
+                    drawPath(path, spine, style = androidx.compose.ui.graphics.drawscope.Stroke(width = w))
+                },
         ) {
-            Icon("MessageSquareText", c.textMuted, size = 16.dp)
-            // the name takes what the way in leaves, giving way first to how much was said and Closed
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                if (roomy) Txt(if (count == 0) t("threads.chip.noMessages") else t("threads.chip.messages", "count" to count), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
-                if (archived) ClosedPill()
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                Txt(t("threads.chip.open"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = c.link, maxLines = 1)
-                Icon("ChevronRight", c.link, size = 14.dp)
+            Column(
+                Modifier
+                    .ring(shape, c.borderSubtle)
+                    .background(if (pressed) mixSrgb(c.bgSurface, c.textStrong, 0.12f) else c.bgSurface, shape)
+                    .topEdge(shape, c.edgeLight)
+                    .clip(shape)
+                    .pressable(interaction) { Nav.go(Route.Server(serverId, summary.id)) }
+                    .semantics { contentDescription = t("threads.chip.open") + ", " + name }
+                    .padding(start = 12.dp, end = 12.dp, top = 9.dp, bottom = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // the name has all the room the count leaves, with the Closed pill right after it
+                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Txt(name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), lineHeight = Nx.type.sp(20f), fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                        if (archived) ClosedPill()
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Txt(if (count == 0) t("threads.chip.open") else t("threads.card.count", "count" to count), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(650)), color = c.link, maxLines = 1)
+                        Icon(if (rtl) "ChevronLeft" else "ChevronRight", c.link, size = 16.dp)
+                    }
+                }
+                when {
+                    last != null && count > 0 -> LastLine(serverId, summary.id, last)
+                    count == 0 -> Txt(t("threads.chip.noMessages"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
+                }
             }
         }
+    }
+}
+
+/** Who said the newest thing in a thread, a line of it, and when. */
+@Composable
+private fun LastLine(serverId: String, threadId: String, last: fish.nexa.data.ThreadLast.Last) {
+    val c = Nx.colors
+    val st = Nexa.servers.get(serverId)
+    val name = fish.nexa.ui.shell.Names.member(serverId, last.authorId)
+    val own = st?.members?.get(last.authorId)?.avatarId
+    val look = st?.let { fish.nexa.ui.chat.RoleLooks.of(it, last.authorId) }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        fish.nexa.ui.components.Avatar(last.authorId, name, own ?: Nexa.users.get(last.authorId)?.avatarId, 16.dp)
+        Box(Modifier.widthIn(max = 120.dp)) {
+            fish.nexa.ui.chat.RoleName(name, look, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20f), fontWeight = FontWeight(600)), fallback = c.textStrong)
+        }
+        Txt(last.text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+        Txt(fish.nexa.ui.Time.relative(last.createdAt), style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted, maxLines = 1)
     }
 }
 

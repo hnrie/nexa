@@ -139,6 +139,8 @@ data class BugMessage(
     val event: String = "",
     val body: String = "",
     @SerialName("created_at") val createdAt: Long = 0,
+    /** The pictures and recordings sent with it. */
+    val files: List<NexaFile> = emptyList(),
 )
 
 /** One thing in the Nexa conversation. */
@@ -254,6 +256,8 @@ object NexaInbox {
         val (st, people) = NexaStanding.parse(el) ?: return
         _standing.value = st
         mergePeople(people)
+        // for staff, what is waiting on them comes with it
+        Moderation.applyStaff(el)
     }
 
     /** A mute in force, or null. */
@@ -448,8 +452,12 @@ object NexaInbox {
         return thread
     }
 
-    suspend fun replyBug(reportId: String, body: String) {
-        val res = Nexa.api.request("POST", "/bugs/$reportId/messages", buildJsonObject { put("body", body) }) as JsonObject
+    /** A line to a bug report's thread, with the files already up. */
+    suspend fun replyBug(reportId: String, body: String, files: List<NexaFile>) {
+        val res = Nexa.api.request("POST", "/bugs/$reportId/messages", buildJsonObject {
+            put("body", body)
+            put("files", JsonArray(files.map { f -> buildJsonObject { put("id", f.id); put("name", f.name) } }))
+        }) as JsonObject
         mergePeople(res["people"])
         val report = res["report"]?.let { wireJson.decodeFromJsonElement(MemberBug.serializer(), it) }
         val lines = (res["messages"] ?: res["message"]?.let { JsonArray(listOf(it)) })?.let { wireJson.decodeFromJsonElement(ListSerializer(BugMessage.serializer()), it) } ?: emptyList()
@@ -545,6 +553,7 @@ object NexaInbox {
     /** Forgets the account's Nexa state on sign-out; a deletion notice stays. */
     fun reset() {
         generation++
+        Moderation.reset()
         _standing.value = null
         _people.value = emptyMap()
         _feed.value = null

@@ -134,11 +134,15 @@ fun VideoSurface(
     val gestures = if (!zoomable) Modifier else Modifier.pointerInput(track) {
         detectTransformGestures { centroid, pan, zoom, _ ->
             val next = (scale * zoom).coerceIn(1f, 6f)
-            // zoom about the fingers, then keep the picture covering the box
+            // zoom about the fingers, then keep the picture's edges at or beyond the box's:
+            // a share in its own shape moves only as far as it is larger than the box
+            // (lib/zoomPan.ts clampView), or its bars let it be dragged out of sight
             val c = centroid - Offset(box.width / 2f, box.height / 2f)
             var o = (offset - c) * (next / scale) + c + pan
-            val maxX = box.width * (next - 1) / 2f
-            val maxY = box.height * (next - 1) / 2f
+            val fitW = if (whole && aspect > 0f) minOf(box.width.toFloat(), box.height * aspect) else box.width.toFloat()
+            val fitH = if (whole && aspect > 0f) minOf(box.height.toFloat(), box.width / aspect) else box.height.toFloat()
+            val maxX = maxOf(0f, (fitW * next - box.width) / 2f)
+            val maxY = maxOf(0f, (fitH * next - box.height) / 2f)
             o = Offset(o.x.coerceIn(-maxX, maxX), o.y.coerceIn(-maxY, maxY))
             if ((next > 1f) != (scale > 1f)) onZoom?.invoke(next > 1f)
             scale = next

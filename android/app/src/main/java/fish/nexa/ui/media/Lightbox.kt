@@ -337,9 +337,22 @@ private fun ZoomablePicture(
     LaunchedEffect(scale) { onZoomed(scale > 1.01f) }
     val reduced = Nx.motion.reduced
     val zoomAnim = remember { Animatable(1f) }
+    // the picture's own size, for how far it may move once zoomed (lib/zoomPan.ts clampView)
+    var natural by remember(item) { mutableStateOf(androidx.compose.ui.geometry.Size.Unspecified) }
+    /**
+     * Holds an offset to where the picture's edges stay at or beyond the
+     * screen's: it moves only as far as it is larger than the screen, and while
+     * narrower (or shorter) it stays in the middle that way. Measuring the
+     * screen alone let a wide picture on a tall phone be dragged out of sight.
+     */
     fun clamp(o: Offset, s: Float, w: Float, h: Float): Offset {
-        val mx = max(0f, (w * s - w) / 2)
-        val my = max(0f, (h * s - h) / 2)
+        val n = natural
+        val known = n != androidx.compose.ui.geometry.Size.Unspecified && n.width > 0 && n.height > 0 && n.width.isFinite() && n.height.isFinite()
+        val fit = if (known) minOf(w / n.width, h / n.height) else 1f
+        val cw = if (known) n.width * fit else w
+        val ch = if (known) n.height * fit else h
+        val mx = max(0f, (cw * s - w) / 2)
+        val my = max(0f, (ch * s - h) / 2)
         return Offset(o.x.coerceIn(-mx, mx), o.y.coerceIn(-my, my))
     }
     val model: Any? = file ?: copy ?: item.src
@@ -433,6 +446,7 @@ private fun ZoomablePicture(
                 model, item.name,
                 imageLoader = Media.loader,
                 contentScale = ContentScale.Fit,
+                onSuccess = { st -> natural = st.painter.intrinsicSize },
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {

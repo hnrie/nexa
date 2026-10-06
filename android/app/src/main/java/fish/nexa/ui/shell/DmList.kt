@@ -464,7 +464,14 @@ fun DmSidebar() {
                 item("friends") { NavRow("Users", t("sidebar.dMSidebar.friends"), route is Route.Friends, requests, t("rail.rail.friendRequestsCount", "count" to requests)) { Nav.go(Route.Friends); Nav.leftOpen = false } }
                 // note requests waiting for an answer, counted where the answering is done
                 item("notes") { NavRow("NotebookPen", t("notes.title"), route is Route.Notes, noteRequests, t("notes.requests.count", "count" to noteRequests)) { Nav.go(Route.Notes()); Nav.leftOpen = false } }
-                if (me?.isAdmin == true) item("mod") { NavRow("Shield", t("moderation.navLabel"), route is Route.Admin, 0, null) { Nav.go(Route.Admin); Nav.leftOpen = false } }
+                // case threads and bug reports waiting on the staff that hold something this person has not read
+                if (me?.isAdmin == true) item("mod") {
+                    val waitingOnStaff = fish.nexa.data.Moderation.unread.collectAsState().value.count
+                    NavRow("Shield", t("moderation.navLabel"), route is Route.Admin, waitingOnStaff, t("moderation.railWithCount", "count" to waitingOnStaff), onLongClick = { fish.nexa.ui.moderation.openModerationMenu() }) {
+                        Nav.go(Route.Admin())
+                        Nav.leftOpen = false
+                    }
+                }
                 if (view.pinned.isNotEmpty()) item("pinned-head") { SectionHeader(pinned = true) }
                 rows(view.pinned, Place.PINNED, activeId, activeConvo, nexaOpen, picking, ::openRowMenu, ::tapRow, ::moves)
                 item("dm-head") { SectionHeader(pinned = false) }
@@ -558,7 +565,7 @@ private fun SearchButton() {
 }
 
 @Composable
-private fun NavRow(icon: String, label: String, selected: Boolean, badge: Int, badgeLabel: String?, onClick: () -> Unit) {
+private fun NavRow(icon: String, label: String, selected: Boolean, badge: Int, badgeLabel: String?, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -568,7 +575,7 @@ private fun NavRow(icon: String, label: String, selected: Boolean, badge: Int, b
             .padding(bottom = 2.dp)
             .height(42.dp)
             .selectedRow(selected, pressed)
-            .pressable(interaction, onClick = onClick)
+            .pressable(interaction, onLongClick = onLongClick, onClick = onClick)
             .semantics { contentDescription = if (badge > 0 && badgeLabel != null) "$label, $badgeLabel" else label }
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,

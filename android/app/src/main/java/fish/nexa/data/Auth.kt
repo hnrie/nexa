@@ -77,6 +77,7 @@ class Auth(private val nx: Nexa) {
             if (_state.value is AuthState.Ready) nx.scope.launch { signOutLocally("expired") }
         }
         nx.session.onSignedOut = { reason -> nx.scope.launch { signOutLocally(reason) } }
+        nx.api.captchaSolver = { action -> solveCaptcha(action) }
         LockTimers.install()
     }
 
@@ -88,6 +89,17 @@ class Auth(private val nx: Nexa) {
         }
     } catch (_: Exception) {
         null
+    }
+
+    /**
+     * A captcha for `action`, for a request the server turned down for want of
+     * one (lib/captcha.ts solveFor): null when this instance has none set up.
+     */
+    suspend fun solveCaptcha(action: String): String? {
+        val info = _instance.value?.takeIf { it.captcha != null } ?: loadInstance()
+        val key = info?.captcha?.takeIf { it.provider == "turnstile" && it.siteKey.isNotEmpty() }?.siteKey ?: return null
+        val p = captcha ?: return null
+        return p.token(key, action)
     }
 
     /** For requests outside signing in that may need a captcha (joining through an invite, friend requests). */

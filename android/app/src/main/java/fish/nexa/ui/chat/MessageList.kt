@@ -466,7 +466,7 @@ private fun LoadError(retry: () -> Unit) {
 
 /** The date in a small pill, a line fading out on each side. */
 @Composable
-private fun DateDivider(at: Long) {
+internal fun DateDivider(at: Long) {
     val c = Nx.colors
     Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 24.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.weight(1f).height(1.dp).background(Brush.horizontalGradient(0f to Color.Transparent, 0.3f to c.border, 1f to c.border)))
@@ -546,7 +546,7 @@ private fun BoxScope.NewPill(count: Int, since: Long, onClick: () -> Unit) {
 }
 
 @Composable
-private fun BoxScope.JumpButton(onClick: () -> Unit) {
+internal fun BoxScope.JumpButton(onClick: () -> Unit) {
     val c = Nx.colors
     val enter = remember { Animatable(0f) }
     val spring = Nx.motion.spring
@@ -619,7 +619,7 @@ private fun ConversationStart(channel: Channel) {
 }
 
 @Composable
-private fun StartAvatar(content: @Composable () -> Unit) {
+internal fun StartAvatar(content: @Composable () -> Unit) {
     val c = Nx.colors
     Box(
         Modifier
@@ -631,24 +631,24 @@ private fun StartAvatar(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun StartTitle(text: String) = Txt(
+internal fun StartTitle(text: String) = Txt(
     text,
     style = Nx.type.title.copy(fontSize = Nx.type.sp(28f), lineHeight = Nx.type.sp(30.8f), fontWeight = FontWeight(700)),
     color = Nx.colors.textStrong,
 )
 
 @Composable
-private fun StartText(text: String) = StartText(androidx.compose.ui.text.AnnotatedString(text))
+internal fun StartText(text: String) = StartText(androidx.compose.ui.text.AnnotatedString(text))
 
 @Composable
-private fun StartText(text: androidx.compose.ui.text.AnnotatedString) = androidx.compose.foundation.text.BasicText(
+internal fun StartText(text: androidx.compose.ui.text.AnnotatedString) = androidx.compose.foundation.text.BasicText(
     text,
     modifier = Modifier.widthIn(max = 560.dp),
     style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(23.25f), color = Nx.colors.textMuted),
 )
 
 /** A sentence with one of its values in bold, as the web's `<Tr values={{ name: <b>…</b> }}>` draws it. */
-private fun boldIn(key: String, arg: String, value: String, after: String = ""): androidx.compose.ui.text.AnnotatedString {
+internal fun boldIn(key: String, arg: String, value: String, after: String = ""): androidx.compose.ui.text.AnnotatedString {
     val mark = "\u0000"
     val parts = t(key, arg to mark).split(mark)
     return androidx.compose.ui.text.buildAnnotatedString {

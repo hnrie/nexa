@@ -269,7 +269,7 @@ private fun EditorFrame(
                 FormatPage(surface, placeholder)
             }
             // what the caret is in, or the tray asked for, then the tools
-            val shown = trayShown(tray, state)
+            val shown = settledTray(tray, state)
             if (shown != null) {
                 Column(Modifier.fillMaxWidth().background(c.bgSurface).topHairline(c.borderSubtle)) {
                     TrayBody(shown, state, surface, setTray = { tray = it })
@@ -365,6 +365,21 @@ internal fun trayShown(tray: Tray?, s: SurfaceState): Shown? = when {
     s.link != null -> Shown.LinkHere
     s.kind == "li" -> Shown.ListTools
     else -> null
+}
+
+/**
+ * trayShown, held still while a selection is being made: what the caret was
+ * in when it started stays the tray until the selection closes. Dragging a
+ * selection from a list into the text under it otherwise took the list's
+ * tools away and put them back as it crossed, the page's height changing
+ * under the finger each time (the web's FormatEditor does the same).
+ */
+@Composable
+internal fun settledTray(tray: Tray?, s: SurfaceState): Shown? {
+    val held = androidx.compose.runtime.remember { arrayOfNulls<Shown>(1) }
+    val caret = trayShown(null, s)
+    if (s.collapsed) held[0] = caret
+    return if (tray != null) Shown.Asked(tray) else if (s.collapsed) caret else held[0]
 }
 
 @Composable

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -40,6 +41,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -196,6 +199,9 @@ private fun detailsFields(d: kotlinx.serialization.json.JsonObject): List<String
 private fun detailsNew(d: kotlinx.serialization.json.JsonObject, f: String) = ((d["new"] as? kotlinx.serialization.json.JsonObject)?.get(f) as? kotlinx.serialization.json.JsonPrimitive)?.content
 private fun detailsOld(d: kotlinx.serialization.json.JsonObject, f: String) = ((d["old"] as? kotlinx.serialization.json.JsonObject)?.get(f) as? kotlinx.serialization.json.JsonPrimitive)?.content
 
+/** Whether a server_reset did nothing but hide the server from Discover. */
+private fun onlyDiscover(d: kotlinx.serialization.json.JsonObject) = detailsFields(d) == listOf("discovery")
+
 fun severity(action: String): String = when (action) {
     "ban", "delete" -> "danger"
     "mute", "field_reset", "avatar_remove", "server_reset", "expression_takedown" -> "warn"
@@ -220,7 +226,8 @@ fun noticeTitle(action: String, d: kotlinx.serialization.json.JsonObject): Strin
         else -> t("nexa.notice.titleAvatar")
     }
     "field_reset" -> t("nexa.notice.titleFieldReset")
-    "server_reset" -> t("nexa.notice.titleServerReset")
+    // hiding a server from Discover alone takes nothing down, so it is said as what it is
+    "server_reset" -> if (onlyDiscover(d)) t("nexa.notice.titleServerDiscover") else t("nexa.notice.titleServerReset")
     "expression_takedown" -> when {
         detailsBool(d, "deleted") -> if (detailsStr(d, "pack_kind") == "emoji") t("nexa.notice.titleEmojiPackRemoved") else t("nexa.notice.titleStickerPackRemoved")
         detailsList(d, "emojis").isNotEmpty() -> t("nexa.notice.titleServerEmoji")
@@ -237,7 +244,15 @@ private fun noticeExplainer(c: MemberCase): String {
     return when (c.action) {
         "avatar_remove" -> t("nexa.notice.explainAvatar")
         "field_reset" -> if ("username" in detailsFields(d)) t("nexa.notice.explainUsername") else t("nexa.notice.explainFields")
-        "server_reset" -> t("nexa.notice.explainServer", "name" to (detailsStr(d, "server_name") ?: ""))
+        // a server hidden from Discover stays hidden until staff show it again, whatever the owner does
+        "server_reset" -> {
+            val name = detailsStr(d, "server_name") ?: ""
+            when {
+                onlyDiscover(d) -> t("nexa.notice.explainServerDiscover", "name" to name)
+                "discovery" in detailsFields(d) -> t("nexa.notice.explainServerWithDiscover", "name" to name)
+                else -> t("nexa.notice.explainServer", "name" to name)
+            }
+        }
         "expression_takedown" -> when {
             detailsBool(d, "deleted") -> t("nexa.notice.explainPackRemoved", "name" to (detailsStr(d, "pack_name") ?: ""))
             detailsList(d, "emojis").isNotEmpty() -> t("nexa.notice.explainServerEmoji", "name" to (detailsStr(d, "server_name") ?: ""))
@@ -276,12 +291,13 @@ fun formatSpan(ms: Long): String {
     return t("nexa.span.minutes", "count" to maxOf(1L, Math.round(ms.toDouble() / minute)))
 }
 
-private fun fieldLabel(f: String): String = when (f) {
+internal fun fieldLabel(f: String): String = when (f) {
     "username" -> t("moderation.field.username")
     "display_name" -> t("moderation.field.displayName")
     "about_me" -> t("moderation.field.aboutMe")
     "pronouns" -> t("moderation.field.pronouns")
     "nicknames" -> t("moderation.field.nicknames")
+    "server_profiles" -> t("moderation.field.serverProfiles")
     "typing_style" -> t("moderation.field.typingStyle")
     "widgets" -> t("moderation.field.widgets")
     "server_tag" -> t("moderation.field.serverTagWorn")
@@ -290,21 +306,25 @@ private fun fieldLabel(f: String): String = when (f) {
     "banner" -> t("moderation.field.serverBanner")
     "name" -> t("moderation.field.serverName")
     "description" -> t("moderation.field.serverDescription")
-    else -> t("moderation.field.status")
+    "discovery" -> t("moderation.field.serverDiscovery")
+    "status" -> t("moderation.field.status")
+    // every field has its words above; one a newer server sends is shown as it came
+    else -> f
 }
 
-private fun packFieldLabel(f: String): String = when (f) {
+internal fun packFieldLabel(f: String): String = when (f) {
     "name" -> t("moderation.field.packName")
     "description" -> t("moderation.field.packDescription")
     else -> t("moderation.field.packPublic")
 }
 
-private val WORD_FIELDS = setOf("status", "nicknames", "description", "icon", "banner", "public")
+private val WORD_FIELDS = setOf("status", "nicknames", "server_profiles", "description", "icon", "banner", "public", "discovery")
 
 private fun nowValue(f: String, d: kotlinx.serialization.json.JsonObject): String = when (f) {
     "public" -> t("nexa.notice.madePrivate")
-    "status", "nicknames", "description" -> t("nexa.notice.cleared")
+    "status", "nicknames", "server_profiles", "description" -> t("nexa.notice.cleared")
     "icon", "banner" -> t("nexa.notice.removedShort")
+    "discovery" -> t("nexa.notice.hiddenShort")
     "username" -> "@" + (detailsNew(d, "username") ?: "")
     else -> detailsNew(d, f) ?: ""
 }
@@ -319,7 +339,14 @@ private fun nowValue(f: String, d: kotlinx.serialization.json.JsonObject): Strin
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun NoticeCard(c: MemberCase, onOpenThread: (() -> Unit)? = null, bare: Boolean = false, modifier: Modifier = Modifier) {
+fun NoticeCard(
+    c: MemberCase,
+    onOpenThread: (() -> Unit)? = null,
+    bare: Boolean = false,
+    modifier: Modifier = Modifier,
+    /** The staff's view of it: what a reset took away, and whether the member has seen the notice. */
+    staff: fish.nexa.data.StaffCase? = null,
+) {
     val col = Nx.colors
     val tone = severity(c.action)
     val toneColour = when (tone) {
@@ -371,15 +398,29 @@ fun NoticeCard(c: MemberCase, onOpenThread: (() -> Unit)? = null, bare: Boolean 
                 if (detailsBool(d, "avatar")) t("moderation.field.avatar") else null,
                 if (detailsBool(d, "banner")) t("moderation.field.banner") else null,
             ).joinToString(", ")))
-            "field_reset" -> ChangedFields(d, t("nexa.notice.resetFields")) { fieldLabel(it) }
+            "field_reset" -> ChangedFields(d, t("nexa.notice.resetFields"), staff != null) { fieldLabel(it) }
             "server_reset" -> {
                 detailsStr(d, "server_name")?.let { DetailLine("Server", t("nexa.notice.serverNamed", "name" to it)) }
-                ChangedFields(d, t("nexa.notice.serverFields")) { fieldLabel(it) }
+                ChangedFields(d, t("nexa.notice.serverFields"), staff != null) { fieldLabel(it) }
             }
-            "expression_takedown" -> TakenDownParts(d)
+            "expression_takedown" -> TakenDownParts(d, staff != null)
         }
         if (c.action == "field_reset" && "username" in detailsFields(d) && detailsNew(d, "username") != null) {
-            Callout(t("nexa.notice.signInNote", "next" to (detailsNew(d, "username") ?: ""), "old" to (detailsOld(d, "username") ?: "")))
+            Callout(
+                if (staff != null) t("nexa.notice.signInNoteStaff", "old" to "@" + (detailsOld(d, "username") ?: ""))
+                else t("nexa.notice.signInNote", "next" to (detailsNew(d, "username") ?: ""), "old" to (detailsOld(d, "username") ?: "")),
+            )
+        }
+        // what a deletion took, for the staff
+        val counts = d["counts"] as? kotlinx.serialization.json.JsonObject
+        if (c.action == "delete" && staff != null && counts != null) {
+            fun n(k: String) = (counts[k] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull() ?: 0L
+            val incomplete = (d["complete"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "false"
+            DetailLine(null, t(
+                "moderation.delete.removedSummary",
+                "messages" to n("messages"), "files" to n("attachments"), "size" to Time.bytes(n("attachment_bytes")),
+                "servers" to n("owned_servers"), "groups" to n("owned_groups"),
+            ) + if (incomplete) " " + t("moderation.delete.incomplete") else "")
         }
         if (c.action == "mute" || c.action == "ban") {
             val until = c.expiresAt
@@ -403,6 +444,10 @@ fun NoticeCard(c: MemberCase, onOpenThread: (() -> Unit)? = null, bare: Boolean 
                 PersonChip(c.moderatorId, 18.dp, withUsername = true)
             }
             Txt(t("nexa.notice.caseNumber", "number" to c.number) + " · " + Time.timestamp(c.createdAt), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = col.textMuted, maxLines = 1)
+            if (staff != null) Txt(
+                staff.noticeAckAt?.let { t("moderation.case.seenAt", "when" to Time.timestamp(it)) } ?: t("moderation.case.notSeen"),
+                style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = col.textMuted, maxLines = 1,
+            )
         }
         if (onOpenThread != null) ThreadButton(if (c.action == "delete") t("nexa.notice.viewCase") else t("nexa.notice.openThread"), c.unread, onOpenThread)
     }
@@ -426,36 +471,72 @@ private fun Callout(text: String) {
     )
 }
 
-/** The fields a reset took, each with what it says now. */
+/** The fields a reset took, each with what it says now, and, for the staff, what it said before. */
 @Composable
-private fun ChangedFields(d: kotlinx.serialization.json.JsonObject, label: String, labelOf: (String) -> String) {
+private fun ChangedFields(d: kotlinx.serialization.json.JsonObject, label: String, staff: Boolean, labelOf: (String) -> String) {
     val fields = detailsFields(d)
     if (fields.isEmpty()) return
-    FieldTable(label, fields.map { f -> Triple(labelOf(f), nowValue(f, d), f in WORD_FIELDS) })
+    FieldTable(label, fields.map { f -> FieldRow(labelOf(f), nowValue(f, d), f in WORD_FIELDS, if (staff) detailsOld(d, f)?.takeIf { it.isNotEmpty() }?.let { f to it } else null) })
 }
 
+private data class FieldRow(val name: String, val value: String, val word: Boolean, val was: Pair<String, String>? = null)
+
 @Composable
-private fun FieldTable(label: String, rows: List<Triple<String, String, Boolean>>) {
+private fun FieldTable(label: String, rows: List<FieldRow>) {
     val c = Nx.colors
     Column(Modifier.fillMaxWidth().border(1.dp, c.borderSubtle, Radii.Sm).semantics { contentDescription = label }) {
-        rows.forEachIndexed { i, (name, value, word) ->
+        rows.forEachIndexed { i, r ->
             if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
             // a phone's narrow card: the field over its value
             Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textMuted)
+                Txt(r.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textMuted)
                 Txt(
-                    value,
-                    style = if (word) Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)) else Nx.type.code.copy(fontSize = Nx.type.sp(13f)),
+                    r.value,
+                    style = if (r.word) Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)) else Nx.type.code.copy(fontSize = Nx.type.sp(13f)),
                     color = c.textStrong,
                 )
+                r.was?.let { (field, value) -> WasValue(field, value) }
             }
         }
     }
 }
 
+/** Fields whose words are formatted where people read them, so they are shown formatted here too. */
+private val RICH_FIELDS = setOf("about_me", "description")
+
+/**
+ * What a field said before a reset took it, for the staff: in full, as
+ * people saw it, folding after a few lines until asked for the rest.
+ */
+@Composable
+private fun WasValue(field: String, value: String) {
+    val c = Nx.colors
+    var open by remember(value) { mutableStateOf(false) }
+    var natural by remember(value) { mutableStateOf(0) }
+    val fold = 120.dp
+    val folds = natural > with(androidx.compose.ui.platform.LocalDensity.current) { fold.roundToPx() }
+    Column(
+        Modifier.padding(top = 6.dp).fillMaxWidth().background(c.bgBase, Radii.Xs).padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Txt(t("nexa.notice.was"), style = Nx.type.hint.copy(fontWeight = FontWeight(700)), color = c.textMuted)
+        Box(Modifier.then(if (open) Modifier else Modifier.heightIn(max = fold)).clipToBounds()) {
+            Box(Modifier.wrapContentHeight(align = Alignment.Top, unbounded = true).onSizeChanged { natural = it.height }) {
+                if (field in RICH_FIELDS) MarkdownView(value, RenderCtx(surface = c.bgBase))
+                else Txt(if (field == "username") "@$value" else value, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text)
+            }
+        }
+        if (folds || open) Txt(
+            if (open) t("chat.embeds.showLess") else t("nexa.notice.showAll"),
+            style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = c.link,
+            modifier = Modifier.clip(Radii.Xs).pressable(remember { MutableInteractionSource() }) { open = !open }.padding(vertical = 6.dp),
+        )
+    }
+}
+
 /** What an expression takedown took: which pack or server, the items by name, and whether the pictures are blocked. */
 @Composable
-private fun TakenDownParts(d: kotlinx.serialization.json.JsonObject) {
+private fun TakenDownParts(d: kotlinx.serialization.json.JsonObject, staff: Boolean) {
     val emojis = detailsList(d, "emojis").mapNotNull { ((it as? kotlinx.serialization.json.JsonObject)?.get("name") as? kotlinx.serialization.json.JsonPrimitive)?.content }
     val stickers = detailsList(d, "stickers").mapNotNull { ((it as? kotlinx.serialization.json.JsonObject)?.get("name") as? kotlinx.serialization.json.JsonPrimitive)?.content }
     val items = if (emojis.isNotEmpty()) emojis.map { ":$it:" } else stickers
@@ -463,11 +544,11 @@ private fun TakenDownParts(d: kotlinx.serialization.json.JsonObject) {
     val pack = detailsStr(d, "pack_name")
     val server = detailsStr(d, "server_name")
     if (pack != null || server != null) DetailLine(if (pack != null) "Sticker" else "Server", if (pack != null) t("nexa.notice.packNamed", "name" to pack) else t("nexa.notice.serverNamed", "name" to (server ?: "")))
-    if (items.isNotEmpty()) FieldTable(t("nexa.notice.takenDownItems"), listOf(Triple(
+    if (items.isNotEmpty()) FieldTable(t("nexa.notice.takenDownItems"), listOf(FieldRow(
         if (emoji) t("nexa.notice.emojiCount", "count" to items.size) else t("nexa.notice.stickerCount", "count" to items.size),
         items.joinToString(", "), true,
     )))
-    if (!detailsBool(d, "deleted")) ChangedFields(d, t("nexa.notice.packFields")) { packFieldLabel(it) }
+    if (!detailsBool(d, "deleted")) ChangedFields(d, t("nexa.notice.packFields"), staff) { packFieldLabel(it) }
     if (detailsBool(d, "blocked")) Callout(t("nexa.notice.picturesBlocked"))
 }
 
@@ -694,11 +775,11 @@ private fun bugStatusTone(s: String): String = when (s) {
     else -> ""
 }
 
-private fun bugNumber(n: Long) = t("bugs.number", "number" to n)
+internal fun bugNumber(n: Long) = t("bugs.number", "number" to n)
 
-/** A report's status, as a small coloured label with its dot. */
+/** A report's status, as a small coloured label with its dot; [small] as a list row's (`.rowStatus`). */
 @Composable
-fun BugStatusChip(status: String) {
+fun BugStatusChip(status: String, small: Boolean = false) {
     val c = Nx.colors
     val (fg, bg) = when (bugStatusTone(status)) {
         "info" -> c.textBrand to c.brand.copy(alpha = 0.16f)
@@ -706,9 +787,13 @@ fun BugStatusChip(status: String) {
         "done" -> c.positive to c.positive.copy(alpha = 0.14f)
         else -> c.textSubtle to c.bgActive
     }
-    Row(Modifier.height(22.dp).background(bg, RoundedCornerShape(11.dp)).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+    Row(
+        Modifier.height(if (small) 18.dp else 22.dp).background(bg, RoundedCornerShape(if (small) 4.dp else 11.dp)).padding(horizontal = if (small) 6.dp else 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
         Box(Modifier.size(7.dp).background(fg, CircleShape))
-        Txt(bugStatusLabel(status), style = Nx.type.hint.copy(fontWeight = FontWeight(600)), color = fg, maxLines = 1)
+        Txt(bugStatusLabel(status), style = Nx.type.hint.copy(fontSize = Nx.type.sp(if (small) 11f else 12f), fontWeight = FontWeight(if (small) 700 else 600)), color = fg, maxLines = 1)
     }
 }
 
@@ -777,34 +862,8 @@ private fun BugFeedEntry(it: FeedItem, onOpen: (String) -> Unit) {
     }
 }
 
-/** A report as it opens its thread: subject and status, what was written, its files and device details. */
 @Composable
-private fun BugReportCard(report: MemberBug) {
-    val c = Nx.colors
-    Column(
-        Modifier.widthIn(max = 720.dp).fillMaxWidth().nexaCard(Radii.Lg, c.bgRaised, c.borderSubtle, c).padding(horizontal = 16.dp, vertical = 14.dp)
-            .semantics { contentDescription = t("bugs.card.label", "number" to bugNumber(report.number)) },
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
-            Box(Modifier.size(36.dp).background(c.brand.copy(alpha = 0.14f), CircleShape), contentAlignment = Alignment.Center) { Icon("Bug", c.textBrand, size = 18.dp) }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Txt(report.subject, style = Nx.type.body.copy(fontSize = Nx.type.sp(17f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(22.1f)), color = c.textStrong)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Txt(bugNumber(report.number), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted)
-                    Txt(Time.timestamp(report.createdAt), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted)
-                }
-                Box(Modifier.padding(top = 2.dp)) { BugStatusChip(report.status) }
-            }
-        }
-        MarkdownView(report.description, RenderCtx(surface = c.bgRaised))
-        if (report.attachments.isNotEmpty()) NexaGallery(report.attachments, "bugs")
-        BugFacts(report.context)
-    }
-}
-
-@Composable
-private fun BugFacts(context: kotlinx.serialization.json.JsonObject) {
+internal fun BugFacts(context: kotlinx.serialization.json.JsonObject) {
     val c = Nx.colors
     val rows = remember(context) { fish.nexa.ui.bugs.factRows(context) }
     if (rows.isEmpty()) {
@@ -833,379 +892,24 @@ private fun BugFacts(context: kotlinx.serialization.json.JsonObject) {
     }
 }
 
-/**
- * BugGallery: a report's or a thread line's files, pictures as thumbnails
- * that open full size in the viewer, a recording as a tile that plays there.
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun NexaGallery(files: List<NexaFile>, kind: String) {
-    val c = Nx.colors
-    val scope = rememberCoroutineScope()
-    val pictures = files.filter { !it.mime.startsWith("video/") }
-    fun nameOf(f: NexaFile) = f.name.ifEmpty { if (f.mime.startsWith("video/")) t("bugs.file.recording") else t("bugs.file.screenshot") }
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.semantics { contentDescription = t("bugs.card.files", "count" to files.size) }) {
-        for (f in files) {
-            val video = f.mime.startsWith("video/")
-            var thumb by remember(f.id) { mutableStateOf<java.io.File?>(null) }
-            var failed by remember(f.id) { mutableStateOf(false) }
-            var tries by remember(f.id) { mutableStateOf(0) }
-            if (!video) LaunchedEffect(f.id, tries) {
-                failed = false
-                thumb = runCatching { PrivateFiles.file(kind, f.id, 512) }.onFailure { failed = true }.getOrNull()
-            }
-            Box(
-                Modifier
-                    .width(150.dp)
-                    .aspectRatio(4f / 3f)
-                    .clip(Radii.Sm)
-                    .background(c.bgBase)
-                    .border(1.dp, c.borderSubtle, Radii.Sm)
-                    .pressable(remember { MutableInteractionSource() }) {
-                        if (failed) {
-                            tries++
-                            return@pressable
-                        }
-                        scope.launch {
-                            try {
-                                if (video) {
-                                    val file = PrivateFiles.file(kind, f.id)
-                                    openLightbox(listOf(LightboxItem(nameOf(f), f.mime, src = android.net.Uri.fromFile(file).toString())), 0)
-                                } else {
-                                    val full = pictures.map { p -> PrivateFiles.file(kind, p.id) }
-                                    openLightbox(pictures.mapIndexed { i, p -> LightboxItem(nameOf(p), p.mime, src = android.net.Uri.fromFile(full[i]).toString()) }, pictures.indexOf(f))
-                                }
-                            } catch (_: Exception) {
-                                Nexa.ui.toast(if (video) t("bugs.card.videoFailed") else t("bugs.card.fileFailed"), "error")
-                            }
-                        }
-                    }
-                    .semantics {
-                        contentDescription = when {
-                            video -> t("bugs.card.playVideo", "name" to nameOf(f), "size" to Time.bytes(f.size))
-                            failed -> t("bugs.card.retryPicture", "name" to nameOf(f))
-                            else -> t("bugs.card.openPicture", "name" to nameOf(f))
-                        }
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                when {
-                    video -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(Modifier.size(40.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) { Icon("Play", Color.White, size = 18.dp) }
-                        Txt(Time.bytes(f.size), style = Nx.type.hint, color = c.textMuted)
-                    }
-                    failed -> Icon("ImageOff", c.textMuted, size = 22.dp)
-                    thumb != null -> AsyncImage(thumb, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    else -> Spinner(size = 18.dp)
-                }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// threads (CaseThread.tsx), shared by the case page and the bug page
-
-/** One line of a thread, whichever kind of thread it is in. */
-data class ThreadLine(
-    val id: String,
-    val authorId: String,
-    val kind: String,
-    val event: String,
-    val body: String,
-    val createdAt: Long,
-    val files: List<NexaFile> = emptyList(),
-)
-
-private fun CaseMessage.line() = ThreadLine(id, authorId, kind, event, body, createdAt, files)
-private fun BugMessage.line() = ThreadLine(id, authorId, kind, event, body, createdAt)
-
-private const val MAX_LINE = 2000
-private const val MAX_FILES = 4
-private const val GROUP_GAP = 7 * 60_000L
-private val CASE_TYPES = setOf("image/png", "image/jpeg", "image/gif", "image/webp", "video/mp4", "video/webm", "video/quicktime")
-
-private fun systemText(line: ThreadLine, action: String?): Pair<String, String> {
-    val who = personName(NexaInbox.people.value[line.authorId])
-    val what = if (action == "ban") t("nexa.thread.theBan") else t("nexa.thread.theMute")
-    return when (line.event) {
-        "status" -> "CircleDot" to t("bugs.thread.statusChanged", "who" to who, "status" to bugStatusLabel(line.body))
-        "lifted" -> "LockOpen" to (if (line.body.isNotEmpty()) t("nexa.thread.liftedWithReason", "who" to who, "what" to what, "reason" to line.body) else t("nexa.thread.lifted", "who" to who, "what" to what))
-        "closed" -> "CircleCheck" to t("nexa.thread.closed", "who" to who)
-        "reopened" -> "RotateCcw" to t("nexa.thread.reopenedByReply")
-        "expired" -> "Clock" to t("nexa.thread.expired", "what" to what)
-        "replaced" -> "ShieldAlert" to t("nexa.thread.replaced", "number" to line.body)
-        else -> "History" to line.body
-    }
-}
-
-/** A file picked for the next line, with how far its upload is. */
-private class Staged(val uri: android.net.Uri, val name: String, val type: String, val size: Long) {
-    var progress by mutableStateOf(0f)
-    var state by mutableStateOf("uploading")
-    var file: NexaFile? = null
-    var job: kotlinx.coroutines.Job? = null
-}
-
-/**
- * A thread with the team: the header (the notice or the report), the lines
- * grouped as a conversation groups them, and a box to write in, or the note
- * that says why there is none.
- */
-@Composable
-private fun ThreadView(
-    lines: List<ThreadLine>,
-    action: String?,
-    header: @Composable () -> Unit,
-    emptyNote: String,
-    placeholder: String,
-    composerNote: String,
-    closedNote: String?,
-    upload: Boolean,
-    onSend: (suspend (String, List<NexaFile>) -> Unit)?,
-    onSeen: () -> Unit,
-) {
-    val c = Nx.colors
-    val state = rememberLazyListState()
-    // newest at the bottom; reading it marks it read
-    val rows = remember(lines) {
-        val out = ArrayList<Any>()
-        lines.forEachIndexed { i, l ->
-            val prev = lines.getOrNull(i - 1)
-            if (prev == null || !Time.sameDay(prev.createdAt, l.createdAt)) out += DayMark(l.createdAt)
-            val grouped = prev != null && l.kind != "system" && prev.kind == l.kind && prev.authorId == l.authorId && Time.sameDay(prev.createdAt, l.createdAt) && l.createdAt - prev.createdAt < GROUP_GAP
-            out += l to grouped
-        }
-        out.reversed()
-    }
-    LaunchedEffect(lines.lastOrNull()?.id, state.firstVisibleItemIndex) { if (state.firstVisibleItemIndex == 0) onSeen() }
-    Column(Modifier.fillMaxSize().imePadding()) {
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = state, reverseLayout = true, verticalArrangement = Arrangement.Top, contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 16.dp, bottom = 12.dp)) {
-            if (lines.isEmpty()) item("empty") {
-                Txt(emptyNote, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20.3f)), color = c.textMuted, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp).widthIn(max = 640.dp))
-            }
-            for (r in rows) {
-                if (r is DayMark) item("day" + r.at) { DayDivider(r.at, pill = false) }
-                else {
-                    @Suppress("UNCHECKED_CAST") val (line, grouped) = r as Pair<ThreadLine, Boolean>
-                    item(line.id) { if (line.kind == "system") SystemLine(line, action) else LineView(line, grouped) }
-                }
-            }
-            item("header") { Box(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) { header() } }
-        }
-        if (onSend != null) ThreadComposer(placeholder, composerNote, upload, onSend)
-        else if (closedNote != null) Row(
-            Modifier.fillMaxWidth().drawBehind { drawRect(c.borderSubtle, size = Size(size.width, 1.dp.toPx())) }.navigationBarsPadding().padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon("Lock", c.textMuted, size = 16.dp)
-            Txt(closedNote, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
-        }
-    }
-}
-
-@Composable
-private fun SystemLine(line: ThreadLine, action: String?) {
-    val c = Nx.colors
-    val (icon, text) = systemText(line, action)
-    val tint = when {
-        line.event == "lifted" || line.event == "closed" || (line.event == "status" && line.body == "resolved") -> c.positive
-        line.event == "replaced" || (line.event == "status" && line.body == "in_progress") -> c.warning
-        line.event == "status" && line.body == "open" -> c.textBrand
-        else -> c.textMuted
-    }
-    Row(
-        Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp).fillMaxWidth().background(c.bgRaised, Radii.Sm).padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Icon(icon, tint, size = 16.dp)
-        Txt(text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = c.textSubtle, modifier = Modifier.weight(1f))
-        Txt(Time.timestamp(line.createdAt), style = Nx.type.timestamp, color = c.textMuted, maxLines = 1)
-    }
-}
-
-/** A line: the team's as from Nexa ("sent by" the one who wrote it), the member's as from them. */
-@Composable
-private fun LineView(line: ThreadLine, grouped: Boolean) {
-    val c = Nx.colors
-    val staff = line.kind == "staff"
-    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = if (grouped) 0.dp else 14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        Box(Modifier.width(36.dp).padding(top = 2.dp)) {
-            if (!grouped) {
-                if (staff) NexaAvatar(36.dp)
-                else {
-                    val p = NexaInbox.people.value[line.authorId]
-                    Avatar(line.authorId, personName(p), p?.avatarId ?: Nexa.users.get(line.authorId)?.avatarId, 36.dp)
-                }
-            }
-        }
-        Column(Modifier.weight(1f)) {
-            if (!grouped) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (staff) {
-                    Txt("Nexa", style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(600)), color = c.textStrong)
-                    OfficialBadge(compact = true)
-                    Txt(t("nexa.thread.sentBy"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted)
-                    PersonChip(line.authorId, 16.dp)
-                } else {
-                    val p = NexaInbox.people.value[line.authorId] ?: Nexa.users.get(line.authorId)?.let { NexaPerson(it.id, it.username, it.displayName) }
-                    Txt(personName(p), style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
-                }
-                Txt(Time.timestamp(line.createdAt), style = Nx.type.timestamp, color = c.textMuted, maxLines = 1)
-            }
-            if (line.body.isNotEmpty()) MarkdownView(line.body, RenderCtx(surface = c.bgCanvas))
-            if (line.files.isNotEmpty()) Box(Modifier.padding(top = 6.dp)) { NexaGallery(line.files, "cases") }
-        }
-    }
-}
-
-/** The box at the foot of a thread: words, and pictures or videos for a case. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ThreadComposer(placeholder: String, note: String, upload: Boolean, onSend: suspend (String, List<NexaFile>) -> Unit) {
-    val c = Nx.colors
-    val scope = rememberCoroutineScope()
-    var text by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    val staged = remember { mutableStateListOf<Staged>() }
-    val len = text.codePointCount(0, text.length)
-    val over = len > MAX_LINE
-    val uploading = staged.any { it.state == "uploading" }
-    val ready = staged.filter { it.state == "done" }
-    val can = (text.isNotBlank() || ready.isNotEmpty()) && !over && !busy && !uploading
-
-    fun stage(uris: List<android.net.Uri>) {
-        val resolver = Nexa.app.contentResolver
-        for (uri in uris) {
-            if (staged.size >= MAX_FILES) {
-                Nexa.ui.toast(t("nexa.thread.tooManyFiles", "count" to MAX_FILES), "error")
-                break
-            }
-            val type = (resolver.getType(uri) ?: "").lowercase()
-            if (type !in CASE_TYPES) {
-                Nexa.ui.toast(t("nexa.thread.fileType"), "error")
-                continue
-            }
-            var name = ""
-            var size = 0L
-            runCatching {
-                resolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE), null, null, null)?.use { cur ->
-                    if (cur.moveToFirst()) {
-                        name = cur.getString(0) ?: ""
-                        size = cur.getLong(1)
-                    }
-                }
-            }
-            val s = Staged(uri, name.ifEmpty { t("bugs.file.screenshot") }, type, size)
-            staged += s
-            s.job = scope.launch {
-                try {
-                    val q = java.net.URLEncoder.encode(s.name.take(120), "UTF-8")
-                    val body = fish.nexa.net.UriBody(uri, type, s.size) { f -> s.progress = f }
-                    val req = Nexa.api.requestBuilder("/nexa/cases/attachments?name=$q").post(body).header("Content-Type", type).build()
-                    val res = Nexa.api.execute(Nexa.api.http, req, true)
-                    s.file = fish.nexa.net.wireJson.decodeFromJsonElement(NexaFile.serializer(), res)
-                    s.progress = 1f
-                    s.state = "done"
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    s.state = "failed"
-                    Nexa.ui.toast((e as? ApiError)?.message?.takeIf { it.isNotBlank() } ?: t("nexa.thread.uploadFailed"), "error")
-                }
-            }
-        }
-    }
-    val pick = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(MAX_FILES)) { uris -> if (uris.isNotEmpty()) stage(uris) }
-
-    fun send() {
-        if (!can) return
-        busy = true
-        val files = staged.filter { it.state == "done" }.mapNotNull { it.file }
-        scope.launch {
-            try {
-                onSend(text.trim(), files)
-                text = ""
-                staged.clear()
-            } catch (e: Exception) {
-                Nexa.ui.toast((e as? ApiError)?.message?.takeIf { it.isNotBlank() } ?: t("nexa.thread.couldNotSend"), "error")
-            } finally {
-                busy = false
-            }
-        }
-    }
-
-    Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-        Row(Modifier.padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Icon("ShieldAlert", c.textMuted, size = 14.dp)
-            Txt(note, style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted)
-        }
-        if (staged.isNotEmpty()) FlowRow(Modifier.padding(bottom = 8.dp).semantics { contentDescription = t("nexa.thread.filesToSend") }, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (s in staged) Box(
-                Modifier.size(72.dp).ring(Radii.Sm, if (s.state == "failed") c.danger else c.borderSubtle, if (s.state == "failed") 2.dp else 1.dp).clip(Radii.Sm).background(c.bgInput),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (s.type.startsWith("video/")) Icon("Film", c.textMuted, size = 22.dp)
-                else AsyncImage(s.uri, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().alpha(if (s.state == "failed") 0.45f else 1f))
-                if (s.state == "uploading") Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(s.progress.coerceIn(0.02f, 1f)).height(4.dp).background(c.brand))
-                Box(
-                    Modifier.align(Alignment.TopEnd).size(40.dp).pressable(remember { MutableInteractionSource() }) {
-                        s.job?.cancel()
-                        staged.remove(s)
-                    }.semantics { contentDescription = t("nexa.thread.removeFile", "name" to s.name) },
-                    contentAlignment = Alignment.TopEnd,
-                ) { Box(Modifier.padding(4.dp).size(28.dp).background(Color.Black.copy(alpha = 0.66f), CircleShape), contentAlignment = Alignment.Center) { Icon("X", Color.White, size = 14.dp) } }
-            }
-        }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .background(c.bgComposer, Radii.Sm)
-                .border(1.dp, if (over) c.danger else Color.Transparent, Radii.Sm)
-                .padding(start = if (upload) 2.dp else 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (upload) Box(
-                Modifier.size(40.dp).clip(Radii.Xs).pressable(remember { MutableInteractionSource() }, enabled = !busy && staged.size < MAX_FILES) {
-                    pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-                }.semantics { contentDescription = t("nexa.thread.addFiles") },
-                contentAlignment = Alignment.Center,
-            ) { Icon("ImagePlus", c.icon, size = 20.dp) }
-            BasicTextField(
-                text, { text = it },
-                modifier = Modifier.weight(1f).heightIn(min = 36.dp, max = 240.dp).padding(vertical = 7.dp).semantics { contentDescription = placeholder },
-                textStyle = Nx.type.body.copy(fontSize = Nx.type.sp(15f), lineHeight = Nx.type.sp(22f), color = c.text),
-                cursorBrush = SolidColor(c.textBrand),
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                decorationBox = { inner ->
-                    Box {
-                        if (text.isEmpty()) Txt(placeholder, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = c.textPlaceholder, maxLines = 1)
-                        inner()
-                    }
-                },
-            )
-            if (len > MAX_LINE - 200) Txt((MAX_LINE - len).toString(), style = Nx.type.hint, color = if (over) c.textDanger else c.textMuted, modifier = Modifier.padding(vertical = 9.dp))
-            Box(
-                Modifier
-                    .size(40.dp)
-                    .alpha(if (can) 1f else 0.4f)
-                    .background(c.brand, Radii.Xs)
-                    .clip(Radii.Xs)
-                    .pressable(remember { MutableInteractionSource() }, enabled = can) { send() }
-                    .semantics { contentDescription = t("nexa.thread.send") },
-                contentAlignment = Alignment.Center,
-            ) { if (busy) Spinner(c.onBrand, 18.dp) else Icon("SendHorizontal", c.onBrand, size = 18.dp) }
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // the case page and the bug page (NexaCasePage.tsx, NexaBugPage.tsx)
 
+/** "Not end-to-end encrypted: ...", the quiet line over a member's box. */
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.NotE2E() {
+    val c = Nx.colors
+    Icon("ShieldAlert", c.textMuted, size = 14.dp)
+    Txt(t("nexa.chat.notE2E"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(17.5f)), color = c.textMuted)
+}
+
+/**
+ * One case, as the member it is about sees it: a conversation with the Nexa
+ * team that opens with the notice, where they can appeal or ask.
+ */
 @Composable
 fun NexaCasePage(caseId: String) {
-    val c = Nx.colors
     val threads by NexaInbox.threads.collectAsState()
     val thread = threads[caseId]
     var failed by remember(caseId) { mutableStateOf(false) }
@@ -1220,25 +924,28 @@ fun NexaCasePage(caseId: String) {
         if (thread != null && !thread.case.acknowledged) runCatching { NexaInbox.ack(caseId) }
     }
     Column(Modifier.fillMaxSize()) {
+        val cs = thread?.case
         NexaHeader(
             back = true,
-            title = thread?.let { t("nexa.notice.caseNumber", "number" to it.case.number) } ?: t("nexa.caseTitle"),
-            sub = thread?.let { noticeTitle(it.case.action, it.case.details) } ?: "",
-        )
+            title = cs?.let { t("nexa.notice.caseNumber", "number" to it.number) } ?: t("nexa.caseTitle"),
+            sub = cs?.let { noticeTitle(it.action, it.details) } ?: "",
+        ) { cs?.let { caseStanding(it) }?.let { (label, tone) -> ToneChip(label, tone) } }
         when {
-            thread != null -> {
-                val cs = thread.case
-                val writable = cs.action != "delete" && cs.status != "closed"
-                ThreadView(
+            thread != null && cs != null -> {
+                // a deletion's case is read on the way out, and a closed one is closed until the team opens it again
+                val closed = cs.action == "delete" || cs.status == "closed"
+                ThreadChat(
                     lines = thread.messages.map { it.line() },
+                    staff = false,
+                    fileKind = "cases",
                     action = cs.action,
-                    header = { NoticeCard(cs) },
-                    emptyNote = t("nexa.thread.emptyMember"),
                     placeholder = t("nexa.thread.placeholder"),
-                    composerNote = t("nexa.thread.notEncrypted"),
-                    closedNote = if (cs.status == "closed") t("nexa.thread.closedMember") else null,
-                    upload = true,
-                    onSend = if (writable) ({ body, files -> NexaInbox.reply(caseId, body, files) }) else null,
+                    intro = { ThreadIntro({ NexaAvatar(80.dp) }, t("nexa.notice.caseNumber", "number" to cs.number), noticeTitle(cs.action, cs.details), t("nexa.chat.caseStart")) },
+                    opener = ThreadOpener("nexa", cs.createdAt) { NoticeCard(cs) },
+                    onSend = if (closed) null else ({ body, files -> NexaInbox.reply(caseId, body, files) }),
+                    uploadPath = "/nexa/cases/attachments",
+                    locked = if (cs.status == "closed") ({ LockNote(t("nexa.thread.closedMember")) }) else null,
+                    note = { NotE2E() },
                     onSeen = { NexaInbox.markThreadRead(caseId) },
                 )
             }
@@ -1248,9 +955,16 @@ fun NexaCasePage(caseId: String) {
     }
 }
 
+/**
+ * One bug report, as the member who sent it sees it: a conversation with the
+ * Nexa team that opens with the report, where the team answers and the member
+ * can add anything that helps, pictures and recordings too, until the team
+ * finishes it.
+ */
 @Composable
 fun NexaBugPage(reportId: String) {
     val threads by NexaInbox.bugThreads.collectAsState()
+    val me by Nexa.users.me.collectAsState()
     val thread = threads[reportId]
     var failed by remember(reportId) { mutableStateOf(false) }
     var attempt by remember(reportId) { mutableStateOf(0) }
@@ -1260,25 +974,31 @@ fun NexaBugPage(reportId: String) {
         runCatching { NexaInbox.loadBugThread(reportId) }.onFailure { failed = true }
     }
     Column(Modifier.fillMaxSize()) {
+        val r = thread?.report
         NexaHeader(
             back = true,
-            title = thread?.let { t("bugs.page.title", "number" to bugNumber(it.report.number)) } ?: t("bugs.page.titleLoading"),
-            sub = thread?.report?.subject ?: "",
-        ) { thread?.let { BugStatusChip(it.report.status) } }
+            title = r?.let { t("bugs.page.title", "number" to bugNumber(it.number)) } ?: t("bugs.page.titleLoading"),
+            sub = r?.subject ?: "",
+        ) { r?.let { BugStatusChip(it.status) } }
+        val mine = me
         when {
-            thread != null -> {
-                val r = thread.report
+            thread != null && r != null && mine != null -> {
                 val finished = r.status == "resolved" || r.status == "wont_fix" || r.status == "closed"
-                ThreadView(
+                ThreadChat(
                     lines = thread.messages.map { it.line() },
-                    action = null,
-                    header = { BugReportCard(r) },
-                    emptyNote = t("bugs.thread.emptyMember"),
+                    staff = false,
+                    fileKind = "bugs",
                     placeholder = t("bugs.thread.placeholder"),
-                    composerNote = t("bugs.thread.notEncrypted") + if (finished) " " + t("bugs.thread.finishedNote", "status" to bugStatusLabel(r.status)) else "",
-                    closedNote = null,
-                    upload = false,
-                    onSend = { body, _ -> NexaInbox.replyBug(reportId, body) },
+                    intro = { ThreadIntro({ NexaAvatar(80.dp) }, t("bugs.page.title", "number" to bugNumber(r.number)), r.subject, t("nexa.chat.reportStart")) },
+                    opener = ThreadOpener(mine.id, r.createdAt) { ReportOpener(r.subject, r.description, r.attachments, r.context, null) },
+                    onSend = if (finished) null else ({ body, files -> NexaInbox.replyBug(reportId, body, files) }),
+                    uploadPath = "/bugs/attachments",
+                    locked = {
+                        LockNote(t("nexa.chat.reportFinished", "status" to bugStatusLabel(r.status))) {
+                            NxButton(t("bugs.report"), { openBugReport("nexa") }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM)
+                        }
+                    },
+                    note = { NotE2E() },
                     onSeen = { NexaInbox.markBugRead(reportId) },
                 )
             }
@@ -1288,20 +1008,22 @@ fun NexaBugPage(reportId: String) {
     }
 }
 
-/** The ban screen's appeal: the case's thread, words only. */
+/** The ban screen's appeal: the case's thread, opening with its notice. */
 @Composable
 fun BanThread(thread: NexaInbox.CaseThread) {
     val cs = thread.case
-    ThreadView(
+    val closed = cs.status == "closed"
+    ThreadChat(
         lines = thread.messages.map { it.line() },
+        staff = false,
+        fileKind = "cases",
         action = cs.action,
-        header = { NoticeCard(cs) },
-        emptyNote = t("nexa.thread.emptyMember"),
         placeholder = t("nexa.thread.placeholder"),
-        composerNote = t("nexa.thread.notEncrypted"),
-        closedNote = if (cs.status == "closed") t("nexa.thread.closedMember") else null,
-        upload = false,
-        onSend = if (cs.status != "closed") ({ body, _ -> NexaInbox.reply(cs.id, body, emptyList()) }) else null,
+        opener = ThreadOpener("nexa", cs.createdAt) { NoticeCard(cs) },
+        onSend = if (closed) null else ({ body, files -> NexaInbox.reply(cs.id, body, files) }),
+        uploadPath = "/nexa/cases/attachments",
+        locked = if (closed) ({ LockNote(t("nexa.thread.closedMember")) }) else null,
+        note = { NotE2E() },
         onSeen = { NexaInbox.markThreadRead(cs.id) },
     )
 }
@@ -1317,4 +1039,3 @@ private fun Missing(text: String, retry: () -> Unit) {
         }
     }
 }
-

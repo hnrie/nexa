@@ -267,7 +267,57 @@ class KeyManager(
         }
     }
 
-    fun markWaiting(conv: String) = _waiting.update { if (conv in it) it else it + conv }
+    /**
+     * A message here could not be read for want of its conversation's key:
+     * wait for it, and ask the holders for it again now and then.
+     */
+    fun markWaiting(conv: String) {
+        if (userId == null) return
+        _waiting.update { if (conv in it) it else it + conv }
+        askAgain(conv)
+    }
+
+    /**
+     * Asking the holders of a conversation's keys again while this device
+     * waits for them: soon after it finds it lacks them, then now and then, a
+     * few times (stores/keys.ts askAgain). The ask made as it came in can be
+     * missed (nobody holding them was online, or their app had not heard of
+     * the newcomer yet), and nothing else asked again until a holder next
+     * connected. A server without the route only says no.
+     */
+    private val asking = HashMap<String, Job>()
+
+    private fun askAgain(conv: String) {
+        synchronized(asking) {
+            if (asking[conv]?.isActive == true) return
+            asking[conv] = scope.launch {
+                for (wait in Timings.askAgainMs) {
+                    delay(wait)
+                    // got them meanwhile, or signed out: nothing to ask for
+                    if (conv !in _waiting.value || userId == null) break
+                    try {
+                        api.request("POST", "/keys/request", buildJsonObject { put("conv_id", conv) })
+                    } catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                    }
+                }
+                val self = coroutineContext[Job]
+                synchronized(asking) { if (asking[conv] === self) asking.remove(conv) }
+            }
+        }
+    }
+
+    private fun stopAsking(convs: Collection<String>? = null) {
+        synchronized(asking) {
+            val it = asking.entries.iterator()
+            while (it.hasNext()) {
+                val (c, job) = it.next()
+                if (convs != null && c !in convs) continue
+                job.cancel()
+                it.remove()
+            }
+        }
+    }
 
     /** The channel key for a message: HKDF(root of conv/epoch, "chan:" + channel). */
     fun channelKey(conv: String, epoch: Int, channelId: String): ByteArray? = ring.get(conv, epoch)?.let { Conv.channelKey(it, channelId) }
@@ -302,6 +352,7 @@ class KeyManager(
         if (changed.isNotEmpty()) {
             saveRoots()
             _waiting.update { it - changed }
+            stopAsking(changed)
             onKeysArrived?.invoke(changed)
         }
         return changed
@@ -323,22 +374,30 @@ class KeyManager(
         return Triple(true, st.membersComplete, st.members.keys)
     }
 
-    /** Narrows a server-supplied recipient list to accounts this device knows are in the conversation. */
-    private fun recipientsFor(conv: String, epoch: Int, userIds: List<String>): List<String> {
+    /**
+     * Narrows a server-supplied recipient list to accounts this device knows
+     * are in the conversation. Anyone outside it is set aside and looked at
+     * again a few times (`later`), in case this device has not heard of them
+     * joining yet, and only then refused and written down: the ask can outrun
+     * the event that says someone joined, and refusing them at once left a
+     * newcomer without keys until a holder next connected.
+     */
+    private fun recipientsFor(conv: String, epoch: Int, userIds: List<String>, attempt: Int): Pair<List<String>, List<String>> {
         val (known, complete, members) = membershipOf(conv)
         val me = userId
         if (!known || !complete) {
             if (userIds.isNotEmpty()) alerts.report("unchecked", conv = conv, epoch = epoch, count = userIds.size)
-            return userIds
+            return userIds to emptyList()
         }
         val allowed = ArrayList<String>()
         val outsiders = ArrayList<String>()
         for (id in userIds) if (id in members || id == me) allowed += id else outsiders += id
-        if (outsiders.isNotEmpty()) {
+        val retrying = attempt < Timings.outsiderRetryMs.size
+        if (outsiders.isNotEmpty() && !retrying) {
             Log.w(TAG, "refusing to wrap $conv epoch $epoch for ${outsiders.joinToString()}: not in this conversation")
             alerts.report("outsider_refused", conv = conv, epoch = epoch, count = outsiders.size, userId = outsiders.singleOrNull())
         }
-        return allowed
+        return allowed to if (retrying) outsiders else emptyList()
     }
 
     private suspend fun publicKeyOf(uid: String): String {
@@ -356,8 +415,18 @@ class KeyManager(
     }
 
     /** The one path every grant takes: recipients checked, keys judged against pins, then uploaded. */
-    private suspend fun putGrantsFor(conv: String, epoch: Int, root: ByteArray, wanted: List<String>) {
-        val ids = recipientsFor(conv, epoch, wanted)
+    private suspend fun putGrantsFor(conv: String, epoch: Int, root: ByteArray, wanted: List<String>, attempt: Int = 0) {
+        val (ids, later) = recipientsFor(conv, epoch, wanted, attempt)
+        if (later.isNotEmpty()) scope.launch {
+            delay(Timings.outsiderRetryMs[attempt])
+            // the same root, if this session still holds it
+            val still = ring.get(conv, epoch) ?: return@launch
+            try {
+                putGrantsFor(conv, epoch, still, later, attempt + 1)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+            }
+        }
         val uploads = java.util.Collections.synchronizedList(ArrayList<JsonObject>())
         suspend fun wrap(uid: String): Boolean = try {
             val pub = sealingKeyOf(uid)
@@ -498,11 +567,21 @@ class KeyManager(
     fun reset() {
         ring.clear()
         pendingEnsure.clear()
+        stopAsking()
         pins.close()
         alerts.reset()
         userId = null
         identity = null
         _waiting.value = emptySet()
+    }
+
+    /**
+     * When to look again at someone this device did not know as a member, and
+     * when to ask the holders again while waiting (stores/keys.ts keyTimings).
+     */
+    object Timings {
+        var outsiderRetryMs = longArrayOf(1500, 5000, 15000)
+        var askAgainMs = longArrayOf(2000, 20000, 60000, 180000, 600000)
     }
 
     companion object {

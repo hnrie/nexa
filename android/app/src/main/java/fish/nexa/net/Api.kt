@@ -35,6 +35,8 @@ class ApiError(
     message: String,
     val retryAfter: Int? = null,
     val details: JsonObject? = null,
+    /** On a refusal for want of a captcha, the action one has to be solved for. */
+    val captchaAction: String? = null,
 ) : Exception(message) {
     val isNetwork get() = status == 0
     /** Worth trying again later rather than telling the person it was refused. */
@@ -47,6 +49,12 @@ class Api(val baseUrl: String) {
 
     /** A 401 `unauthorized` on a request that carried the token: the session is gone. */
     @Volatile var onUnauthorized: (() -> Unit)? = null
+
+    /**
+     * Solves a captcha for an action the server named (X-Captcha-Action) on a
+     * request sent without one; null when none can be solved here. Set by Auth.
+     */
+    @Volatile var captchaSolver: (suspend (action: String) -> String?)? = null
 
     val userAgent: String = "NexaAndroid/${BuildConfig.VERSION_NAME} (Linux; Android ${Build.VERSION.RELEASE}; ${Build.MODEL})"
 
@@ -100,7 +108,17 @@ class Api(val baseUrl: String) {
         val b = requestBuilder(path, auth).method(method, rb)
         if (captcha != null) b.header("X-Captcha-Token", captcha)
         for ((k, v) in headers) b.header(k, v)
-        return execute(http, b.build(), auth && token != null)
+        try {
+            return execute(http, b.build(), auth && token != null)
+        } catch (e: ApiError) {
+            // A request a captcha guards, sent without one: the server names
+            // the action, so it is solved and the request sent again, once.
+            val action = e.captchaAction
+            val solver = captchaSolver
+            if (e.code != "captcha_required" || action == null || solver == null || captcha != null || headers.keys.any { it.equals("X-Captcha-Token", ignoreCase = true) }) throw e
+            val solved = solver(action) ?: throw e
+            return request(method, path, body, solved, headers, auth)
+        }
     }
 
     suspend fun <T> request(
@@ -135,11 +153,11 @@ class Api(val baseUrl: String) {
                     throw ApiError(r.code, "bad_response", "The server's answer could not be read.")
                 }
             }
-            throw errorOf(r.code, text, r.header("Retry-After"), carriedToken)
+            throw errorOf(r.code, text, r.header("Retry-After"), carriedToken, r.header("X-Captcha-Action"))
         }
     }
 
-    fun errorOf(status: Int, text: String, retryAfterHeader: String?, carriedToken: Boolean): ApiError {
+    fun errorOf(status: Int, text: String, retryAfterHeader: String?, carriedToken: Boolean, captchaAction: String? = null): ApiError {
         val retry = retryAfterHeader?.trim()?.toIntOrNull()
         var code = "http_$status"
         var message = when {
@@ -158,7 +176,7 @@ class Api(val baseUrl: String) {
             }
         } catch (_: Exception) {
         }
-        val e = ApiError(status, code, message, retry, details)
+        val e = ApiError(status, code, message, retry, details, captchaAction?.trim()?.takeIf { it.isNotEmpty() })
         if (status == 401 && code == "unauthorized" && carriedToken) onUnauthorized?.invoke()
         return e
     }

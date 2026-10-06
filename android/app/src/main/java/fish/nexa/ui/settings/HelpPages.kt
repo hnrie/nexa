@@ -293,7 +293,7 @@ fun AdminPage() {
     DeviceRow(t("moderation.title"), t("settings.admin.panelMoved"), "Shield", actions = {
         NxButton(t("settings.admin.openPanel"), {
             fish.nexa.ui.layers.Layers.clear()
-            fish.nexa.ui.nav.Nav.go(fish.nexa.ui.nav.Route.Admin)
+            fish.nexa.ui.nav.Nav.go(fish.nexa.ui.nav.Route.Admin())
         }, size = ButtonSize.SM)
     })
 

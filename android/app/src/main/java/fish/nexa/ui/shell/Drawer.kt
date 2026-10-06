@@ -241,8 +241,16 @@ fun Rail(modifier: Modifier = Modifier) {
             onClick = { Nav.go(Route.Friends, keepDrawer = true) },
         ) { NexaMark(if (home) c.onBrand else c.textSubtle, 30.dp) }
         if (me?.isAdmin == true) {
-            RailItem(t("moderation.title"), route is Route.Admin, false, 0, false, onClick = { Nav.go(Route.Admin) }) {
-                Icon("Shield", if (route is Route.Admin) c.onBrand else c.textSubtle, size = 24.dp)
+            // case threads and bug reports waiting on the staff that hold something this person has not read
+            val waitingOnStaff = fish.nexa.data.Moderation.unread.collectAsState().value.count
+            val inPanel = route is Route.Admin
+            RailItem(
+                if (waitingOnStaff > 0) t("moderation.railWithCount", "count" to waitingOnStaff) else t("moderation.title"),
+                inPanel, waitingOnStaff > 0 && !inPanel, waitingOnStaff, false,
+                onLongClick = { fish.nexa.ui.moderation.openModerationMenu() },
+                onClick = { Nav.go(Route.Admin()) },
+            ) {
+                Icon("Shield", if (inPanel) c.onBrand else c.textSubtle, size = 24.dp)
             }
         }
         for (w in waiting) {

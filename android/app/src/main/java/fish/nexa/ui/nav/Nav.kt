@@ -22,8 +22,20 @@ sealed interface Route {
     data class Notes(val noteId: String? = null) : Route
     /** `/channels/<server>/<channel>`. */
     data class Server(val serverId: String, val channelId: String? = null, val jumpTo: String? = null) : Route
-    /** `/channels/@admin`: staff only. */
-    data object Admin : Route
+    /**
+     * `/channels/@admin/<path>`: the staff's panel, staff only. The path is the
+     * web's own below @admin: "users", "users/<id>[/cases[/<case>]]",
+     * "servers[/<id>]", "expressions[/uploads|/packs/<id>]", "cases[/<id>]",
+     * "bugs[/<id>]", "logs", "announcements".
+     */
+    data class Admin(val path: String = "users") : Route {
+        val parts: List<String> get() = path.split('/').filter { it.isNotEmpty() }
+        val tab: String get() = parts.firstOrNull()?.takeIf { it in TABS } ?: "users"
+
+        companion object {
+            val TABS = listOf("users", "servers", "expressions", "cases", "bugs", "logs", "announcements")
+        }
+    }
     /** `/channels/@discover`: servers anyone can join. */
     data object Discover : Route
 
@@ -38,7 +50,7 @@ sealed interface Route {
         is NexaBug -> "/channels/@me/nexa/bugs/$reportId"
         is Notes -> if (noteId != null) "/channels/@me/notes/$noteId" else "/channels/@me/notes"
         is Server -> if (channelId != null) "/channels/$serverId/$channelId" else "/channels/$serverId"
-        Admin -> "/channels/@admin"
+        is Admin -> "/channels/@admin/$path"
         Discover -> "/channels/@discover"
     }
 }
@@ -119,7 +131,7 @@ object Nav {
                 id.matches(parts[2]) -> Route.Dm(parts[2], parts.getOrNull(3)?.takeIf { id.matches(it) })
                 else -> return false
             }
-            "@admin" -> Route.Admin
+            "@admin" -> Route.Admin(parts.drop(2).filter { Regex("^[a-z]+$|^\\d{1,20}$").matches(it) }.joinToString("/").ifEmpty { "users" })
             "@discover" -> Route.Discover
             else -> if (id.matches(parts[1])) Route.Server(parts[1], parts.getOrNull(2)?.takeIf { id.matches(it) }, parts.getOrNull(3)?.takeIf { id.matches(it) }) else return false
         }

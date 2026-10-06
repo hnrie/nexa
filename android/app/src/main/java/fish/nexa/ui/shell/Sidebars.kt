@@ -104,9 +104,14 @@ fun ServerSidebar(serverId: String, channelId: String?) {
     val joinedThreads by Nexa.threads.joined.collectAsState()
     // read so the list redraws when read marks, settings or voice states change
     @Suppress("UNUSED_VARIABLE") val touch = reads.size + doc.size + voices.size
-    // the threads this account is in (or has open), still going, under the channel they belong to
+    // The threads this account is in, still going, under the channel they
+    // belong to: ones it started, wrote in or was brought into. Looking at a
+    // thread or a forum post is not joining it, so it does not stand here
+    // while it is open; its channel is shown as the place it is in instead.
     fun threadsUnder(ch: Channel): List<Channel> =
-        if (!ch.holdsThreads) emptyList() else threadsOf(channels.values, ch.id).filter { th -> th.thread?.archived != true && (th.id in joinedThreads || th.id == channelId) }
+        if (!ch.holdsThreads) emptyList() else threadsOf(channels.values, ch.id).filter { th -> th.thread?.archived != true && th.id in joinedThreads }
+    val open = channelId?.let { channels[it] }
+    fun inside(ch: Channel) = open != null && open.parentId == ch.id && open.id !in joinedThreads && (open.type == "thread" || open.type == "private_thread")
     val st = servers[serverId] ?: return
     val tree = remember(channels, serverId) { ChannelTree.of(serverId, channels.values) }
     val collapsed = Nexa.settings.collapsedCategories
@@ -126,15 +131,15 @@ fun ServerSidebar(serverId: String, channelId: String?) {
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).height(138.dp).offset(x = 0.dp).clip(RoundedCornerShape(topStart = Radii.lg, topEnd = Radii.lg)),
                 )
             } else item("top") { Spacer(Modifier.height(52.dp + 12.dp)) }
-            items(tree.loose, key = { it.id }) { ch -> ChannelRow(st.server.id, ch, ch.id == channelId, threadsUnder(ch), channelId) }
+            items(tree.loose, key = { it.id }) { ch -> ChannelRow(st.server.id, ch, ch.id == channelId || inside(ch), threadsUnder(ch), channelId) }
             for (cat in tree.categories) {
                 val isCollapsed = cat.channel.id in collapsed
                 item(cat.channel.id) { CategoryHeader(serverId, cat.channel, isCollapsed) }
                 val shown = if (!isCollapsed) cat.children else cat.children.filter { ch ->
-                    ch.id == channelId || (ch.isTextLike && Unread.isUnread(Nexa.readStates.get(ch.id), ch.lastMessageId) && !Unread.isMuted(ch.id, serverId)) || (Nexa.readStates.get(ch.id)?.mentions ?: 0) > 0 ||
+                    ch.id == channelId || inside(ch) || (ch.isTextLike && Unread.isUnread(Nexa.readStates.get(ch.id), ch.lastMessageId) && !Unread.isMuted(ch.id, serverId)) || (Nexa.readStates.get(ch.id)?.mentions ?: 0) > 0 ||
                         threadsUnder(ch).any { it.id == channelId }
                 }
-                items(shown, key = { it.id }) { ch -> ChannelRow(st.server.id, ch, ch.id == channelId, threadsUnder(ch), channelId) }
+                items(shown, key = { it.id }) { ch -> ChannelRow(st.server.id, ch, ch.id == channelId || inside(ch), threadsUnder(ch), channelId) }
             }
             if (tree.loose.isEmpty() && tree.categories.isEmpty()) item("empty") {
                 Txt(t("sidebar.serverSidebar.noChannelsYouCanSeeYet"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, align = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 24.dp))
@@ -309,10 +314,11 @@ private fun ChannelRow(serverId: String, ch: Channel, selected: Boolean, threads
 
 /**
  * A thread under its channel (ServerSidebar.module.css .threadRow): a line
- * leaves from just below the channel's icon and curves into each thread,
- * whose name lines up with the channel's; the thread's own tile starts after
- * the curve, so the line never runs under a highlight or through the icon.
- * Along the row, the icon's middle is 18 dp in and the channel's name 35.
+ * drops from the bottom edge of the channel's row, straight down from the
+ * middle of its icon, and curves into each thread, whose name lines up with
+ * the channel's; the thread's own tile starts after the curve, so the line
+ * never runs through a highlight or the icon. Along the row, the icon's
+ * middle is 18 dp in and the channel's name 35.
  */
 @Composable
 private fun ThreadRow(serverId: String, th: Channel, selected: Boolean, first: Boolean, last: Boolean) {
@@ -324,26 +330,29 @@ private fun ThreadRow(serverId: String, th: Channel, selected: Boolean, first: B
     val unread = !selected && Unread.isUnread(read, th.lastMessageId) && !muted
     val mentions = read?.mentions ?: 0
     // opaque, mixed with the panel, so where two pieces meet the line does not darken
-    val spine = mixSrgb(c.textMuted, c.bgBase, 0.62f)
+    val spine = mixSrgb(c.textMuted, c.bgBase, 0.54f)
+    val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     Box(
         Modifier
             .fillMaxWidth()
             .drawBehind {
                 val w = 2.dp.toPx()
-                val x = 18.dp.toPx()
                 val mid = size.height / 2f
-                val r = 8.dp.toPx()
-                val end = 26.dp.toPx()
-                // the first starts 3 dp under the channel's icon (its bottom is 12 dp above this row)
-                val top = if (first) -9.dp.toPx() else 0f
+                val r = 9.dp.toPx()
+                fun x(v: Float) = if (rtl) size.width - v else v
+                val at = 18.dp.toPx()
+                val end = 27.dp.toPx()
+                // the first leaves from the channel row's own bottom edge, outside its tile
+                val top = if (first) -2.dp.toPx() else 0f
                 val path = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(x, top)
-                    lineTo(x, mid - r)
-                    quadraticTo(x, mid, x + r, mid)
-                    lineTo(end, mid)
+                    moveTo(x(at), top)
+                    lineTo(x(at), mid - r)
+                    quadraticTo(x(at), mid, x(at + r), mid)
+                    lineTo(x(end), mid)
+                    // a thread with more under it carries the line on down to the next
                     if (!last) {
-                        moveTo(x, mid - r)
-                        lineTo(x, size.height)
+                        moveTo(x(at), mid - r)
+                        lineTo(x(at), size.height)
                     }
                 }
                 drawPath(path, spine, style = androidx.compose.ui.graphics.drawscope.Stroke(width = w))
@@ -370,11 +379,11 @@ private fun ThreadRow(serverId: String, th: Channel, selected: Boolean, first: B
         ) {
             Txt(
                 th.name,
-                style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(500)),
+                style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(500)),
                 color = when {
                     selected || unread -> c.textStrong
                     pressed -> c.text
-                    else -> c.textChannel
+                    else -> c.textMuted
                 },
                 maxLines = 1,
                 modifier = Modifier.weight(1f),

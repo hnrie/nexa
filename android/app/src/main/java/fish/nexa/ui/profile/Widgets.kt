@@ -45,6 +45,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -252,10 +258,28 @@ object Widgets {
 
 /**
  * previews.ts: one 30-second song preview at a time, played through Nexa's
- * server (it fetches from Deezer, so nobody's address reaches them).
+ * server (it fetches from Deezer, so nobody's address reaches them), at a
+ * volume of its own that every list's slider sets (starting from the one
+ * voice notes and videos play at), kept on this device.
  */
 @OptIn(UnstableApi::class)
 object SongPreviews {
+    private fun prefs() = Nexa.app.getSharedPreferences("media", android.content.Context.MODE_PRIVATE)
+
+    /** How loud previews play, 0 to 1, and whether they are muted: this device's, kept. */
+    var volume by mutableFloatStateOf(prefs().takeIf { it.contains("songVolume") }?.getFloat("songVolume", 1f)?.coerceIn(0f, 1f) ?: fish.nexa.media.MediaPrefs.get().volume)
+        private set
+    var muted by mutableStateOf(if (prefs().contains("songVolume")) prefs().getBoolean("songMuted", false) else fish.nexa.media.MediaPrefs.get().muted)
+        private set
+
+    /** Sets how loud previews play, on the one playing now too, and keeps it on this device. */
+    fun setVolume(v: Float, mute: Boolean) {
+        volume = v.coerceIn(0f, 1f)
+        muted = mute
+        player?.volume = if (mute) 0f else volume
+        prefs().edit().putFloat("songVolume", volume).putBoolean("songMuted", mute).apply()
+    }
+
     var playingId by mutableStateOf<String?>(null)
         private set
     var owner by mutableStateOf<String?>(null)
@@ -311,6 +335,7 @@ object SongPreviews {
         owner = by
         state = "loading"
         progress = 0f
+        p.volume = if (muted) 0f else volume
         p.setMediaItem(MediaItem.fromUri("${Nexa.api.baseUrl}/media/music/preview/$id"))
         p.prepare()
         p.play()
@@ -471,11 +496,67 @@ fun ChipButton(icon: String?, label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Heading(text: String, count: Int? = null, countLabel: String? = null) {
+private fun Heading(text: String, count: Int? = null, countLabel: String? = null, extra: (@Composable () -> Unit)? = null) {
     val c = Nx.colors
-    Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Txt(text, style = Nx.type.label.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(700)), color = c.textMuted)
+    Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Txt(text, style = Nx.type.label.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(700)), color = c.textMuted, modifier = if (extra != null) Modifier.weight(1f) else Modifier)
+        extra?.invoke()
         if (count != null) Txt(count.toString(), style = Nx.type.label.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(600), fontFeatureSettings = "tnum"), color = c.textMuted, modifier = Modifier.semantics { if (countLabel != null) contentDescription = countLabel })
+    }
+}
+
+/**
+ * How loud the songs' previews play (SongVolume): the speaker mutes them and
+ * brings them back, and the slider sets the volume, for every list of songs
+ * at once and the one playing now.
+ */
+@Composable
+private fun SongVolume() {
+    val c = Nx.colors
+    val volume = SongPreviews.volume
+    val muted = SongPreviews.muted
+    val silent = muted || volume == 0f
+    val label = if (silent) t("chat.media.unmute") else t("chat.media.mute")
+    val shown = if (muted) 0f else volume
+    Row(Modifier.padding(end = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        Box(
+            Modifier
+                .size(36.dp)
+                .clip(Radii.Xs)
+                // muted at nothing, it comes back at half rather than staying silent
+                .pressable(remember { MutableInteractionSource() }) { if (silent) SongPreviews.setVolume(if (volume == 0f) 0.5f else volume, false) else SongPreviews.setVolume(volume, true) }
+                .semantics { contentDescription = label },
+            contentAlignment = Alignment.Center,
+        ) { Icon(if (silent) "VolumeX" else if (volume < 0.5f) "Volume1" else "Volume2", if (silent) c.textSubtle else c.textMuted, size = 16.dp) }
+        var width by remember { mutableStateOf(1f) }
+        fun at(x: Float) = (x / width).coerceIn(0f, 1f)
+        Box(
+            Modifier
+                .size(96.dp, 32.dp)
+                .onSizeChanged { width = it.width.toFloat() }
+                .pointerInput(Unit) { detectTapGestures { pos -> SongPreviews.setVolume(at(pos.x), false) } }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures { change, _ ->
+                        change.consume()
+                        SongPreviews.setVolume(at(change.position.x), false)
+                    }
+                }
+                .semantics {
+                    contentDescription = t("chat.audioPlayer.volume")
+                    stateDescription = "${Math.round(shown * 100)}%"
+                },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Box(Modifier.fillMaxWidth().height(4.dp).background(c.bgActive, RoundedCornerShape(2.dp)))
+            Box(Modifier.fillMaxWidth(shown).height(4.dp).background(c.brand, RoundedCornerShape(2.dp)))
+            Box(
+                Modifier
+                    .graphicsLayer { translationX = shown * (width - 18.dp.toPx()) }
+                    .size(18.dp)
+                    .dropShadow(CircleShape, androidx.compose.ui.graphics.shadow.Shadow(radius = 3.dp, color = c.shadeAt(0.7f), offset = androidx.compose.ui.unit.DpOffset(0.dp, 1.dp)))
+                    .background(c.textStrong, CircleShape),
+            )
+        }
     }
 }
 
@@ -698,7 +779,7 @@ private fun Songs(w: Widgets.MusicWidget, onShowAll: (() -> Unit)?) {
     val cap = 5
     val shown = if (all) w.music else w.music.take(cap)
     Column {
-        Heading(Widgets.title(w.type), w.music.size, Widgets.musicCount(w.type, w.music.size))
+        Heading(Widgets.title(w.type), w.music.size, Widgets.musicCount(w.type, w.music.size), extra = if (w.music.any { it.id != null }) ({ SongVolume() }) else null)
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             shown.forEachIndexed { i, m -> SongRow(m, i, owner) }
         }

@@ -218,10 +218,18 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                 MessageBody(item, ctx, failed)
                 if (failed && p != null) FailedRow(ctx.channel.id, p.tmpId)
                 val sid = ctx.server?.server?.id
-                cm?.m?.thread?.let { th -> if (sid != null) fish.nexa.ui.threads.ThreadChip(sid, th) }
                 // an announcement not yet sent on to the channels following this one
                 if (cm != null && canPublish(cm)) PublishButton { publish(cm) }
                 if (cm != null) ReactionsRow(cm, ctx)
+                // the thread it started, under everything else, its line from the avatar (or the row's top)
+                cm?.m?.thread?.let { th ->
+                    if (sid != null) fish.nexa.ui.threads.ThreadChip(sid, th, spineFrom = when {
+                        ctx.compact || ctx.selecting -> null
+                        start && reply != null -> 68.dp
+                        start -> 44.dp
+                        else -> 2.dp
+                    })
+                }
             }
         }
     }

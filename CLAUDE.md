@@ -640,6 +640,15 @@ notes.
   `search` (the web's index, ported), `voice` (calls: transports, audio routing, the call service,
   picture in picture, notifications), `notify` (alerts over the live connection), `ui/...` (screens
   by area, `ui/theme` with tokens from `tokens.css`, `ui/markdown` with the ported parser).
+- Nexa and moderation: `data/NexaInbox` is a member's side (standing, the Nexa conversation, case
+  and bug report threads) and `data/Moderation` the staff's (what waits on them, `mod_unread`, the
+  panel's requests, and `events` its open views follow). `ui/nexa/ThreadChat` draws a case thread or
+  a bug report as a conversation for both sides, as the web's does. The staff panel is native
+  (`ui/moderation`: `Panel` with its tabs, `Users`, `Person`, `Moderate` and the other takedown
+  sheets, `Cases`, `Bugs`, `Servers`, `Expressions`, `Logs`, `Parts`, `Words`), at
+  `Route.Admin(path)`, whose path is the web's below `/channels/@admin`.
+- `data/ThreadLast` keeps each thread's newest message for the card under the message it hangs from
+  (the web's `threadLast`), and `KeyManager` asks the holders again (`/keys/request`) while it waits.
 - There is no push service: `notify/ConnectionService` keeps the connection open in the background
   (on unless turned off) and `Notifier` raises alerts on the device.
 - The build's `copyWebAssets` task copies the web's locale files, sounds, emoji sprites,

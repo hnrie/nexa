@@ -214,6 +214,8 @@ data class ThreadSummary(
     @SerialName("last_message_id") val lastMessageId: Snowflake? = null,
     val archived: Boolean = false,
     val locked: Boolean = false,
+    /** A public thread's newest message, sealed, for the card under the message it hangs from. */
+    @SerialName("last_message") val lastMessage: Message? = null,
 )
 
 /** On a copy of a post published from an announcement channel: where it came from. */

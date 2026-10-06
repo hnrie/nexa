@@ -29,6 +29,7 @@ import fish.nexa.ui.nav.Nav
 import fish.nexa.ui.nav.Route
 import fish.nexa.ui.shell.Names
 import fish.nexa.ui.shell.openProfile
+import fish.nexa.ui.components.pressable
 import fish.nexa.ui.t
 import fish.nexa.ui.theme.Nx
 
@@ -124,10 +125,18 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
         append(text)
         withStyle(SpanStyle(fontSize = Nx.type.sp(12f), color = c.textMuted)) { append("  " + Time.timestamp(m.createdAt)) }
     }
+    // Someone's own "joined the server" line is theirs to take down, and so is it
+    // for whoever may delete messages there, as with any message in the channel.
+    val removable = m.type == "system_join" && canDelete(m)
     Box(
         Modifier
             .fillMaxWidth()
             .padding(top = 17.dp)
+            .then(
+                if (removable) Modifier.pressable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, onLongClick = {
+                    fish.nexa.ui.layers.openMenu(listOf(fish.nexa.ui.layers.MenuItem.Action(t("chat.messageMenu.deleteMessage"), danger = true) { confirmDelete(cm) }))
+                }) {} else Modifier,
+            )
             .heightIn(min = 26.dp)
             .padding(start = if (ctx.selecting) 98.dp else 64.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
     ) {

@@ -220,6 +220,11 @@ class Session(private val nx: Nexa) {
             }
             "thread_create", "thread_update" -> decode(d, Channel.serializer())?.let { th ->
                 nx.channels.upsert(listOf(th))
+                // started from a message: the message says so under it at once
+                val starter = th.thread?.starterId
+                if (e.t == "thread_create" && starter != null && th.parentId != null) {
+                    nx.messages.setThread(th.parentId, starter, fish.nexa.net.ThreadSummary(th.id, th.name, th.thread.messageCount, th.lastMessageId, th.thread.archived, th.thread.locked))
+                }
                 th.memberCount?.let { nx.threads.membersChanged(th.id, emptyList(), emptyList(), it, meId) }
             }
             "thread_delete" -> {
@@ -326,7 +331,11 @@ class Session(private val nx: Nexa) {
                 (d as? JsonObject)?.get("state")?.let { nx.misc.nexa.value = it }
                 NexaInbox.onEvent(e.t, d)
             }
-            "nexa_announcement", "nexa_announcement_delete" -> NexaInbox.onEvent(e.t, d)
+            "nexa_announcement", "nexa_announcement_delete" -> {
+                NexaInbox.onEvent(e.t, d)
+                Moderation.onEvent(e.t, d)
+            }
+            "mod_case", "mod_log", "mod_bug", "mod_unread" -> Moderation.onEvent(e.t, d)
             "note_update", "note_delete", "note_invite", "note_invite_delete", "note_presence", "note_cursor", "note_crdt" -> fish.nexa.notes.Notes.onEvent(e.t, d)
             "session_expired" -> onSignedOut?.invoke(d.str("reason") ?: "expired")
             // the socket was shut on a ban; what the ban screen needs comes over REST
@@ -423,6 +432,13 @@ class Session(private val nx: Nexa) {
         else nx.messages.insert(m.channelId, listOf(dec))
         val lastBefore = nx.channels.get(m.channelId)?.lastMessageId
         nx.channels.setLastMessage(m.channelId, m.id)
+        // a thread counts what is said in it, for the message it hangs from, and shows the newest under it
+        val inThread = nx.channels.get(m.channelId)
+        val meta = inThread?.thread
+        if (inThread != null && meta != null && !m.type.startsWith("system_") && lastBefore != m.id) {
+            nx.channels.upsert(listOf(inThread.copy(thread = meta.copy(messageCount = meta.messageCount + 1, archived = false))))
+            if (inThread.type == "thread") ThreadLast.noteMessage(m.channelId, dec)
+        }
         nx.typing.remove(m.channelId, m.authorId)
         if (dec.error == DecryptFail.NO_KEY && m.keyConvId != null) nx.keys.markWaiting(m.keyConvId)
         ensureUsers(listOf(m.authorId))
@@ -461,6 +477,8 @@ class Session(private val nx: Nexa) {
     }
 
     private fun onDeleted(ch: String, ids: List<String>, d: JsonElement?, single: Boolean) {
+        // a thread's newest message gone: its card stops quoting it
+        for (id in ids) ThreadLast.forget(ch, id)
         val o = d as? JsonObject
         if (o != null && o.containsKey("last_message_id")) nx.channels.resetLastMessage(ch, o.str("last_message_id"))
         val meId = nx.users.meId
@@ -537,6 +555,7 @@ class Session(private val nx: Nexa) {
 
     fun reset() {
         stop()
+        ThreadLast.clear()
         nx.messages.clear()
         nx.users.clear()
         nx.channels.replaceAll(emptyList())

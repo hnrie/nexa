@@ -26,7 +26,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +49,7 @@ import fish.nexa.ui.components.NxButton
 import fish.nexa.ui.components.Spinner
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
+import fish.nexa.ui.layers.Layers
 import fish.nexa.ui.markdown.Markdown
 import fish.nexa.ui.nav.Nav
 import fish.nexa.ui.nav.Route
@@ -61,6 +61,7 @@ import fish.nexa.ui.theme.Radii
 import fish.nexa.ui.theme.ring
 import fish.nexa.ui.theme.shadowHigh
 import fish.nexa.ui.theme.topEdge
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -109,6 +110,8 @@ fun NoticePopupHost() {
     val queue = standing?.pending?.filter { it.action != "delete" } ?: emptyList()
     val head = queue.firstOrNull() ?: return
     if (NexaInbox.ban() != null) return
+    // the Terms come first, as TermsGate sits above NexaNotices on the web
+    if (Layers.stack.any { it.key == "terms" }) return
     val route = Nav.route
     if (route is Route.NexaCase && route.caseId == head.id) return
     NoticeSheet(head, queue.size)
@@ -117,17 +120,21 @@ fun NoticePopupHost() {
 @Composable
 private fun NoticeSheet(c: MemberCase, count: Int) {
     val col = Nx.colors
-    val scope = rememberCoroutineScope()
     val reduced = Nx.motion.reduced
     val ease = Nx.motion.easeOut
     val enter = remember(c.id) { Animatable(if (reduced) 1f else 0f) }
     val density = LocalDensity.current.density
     LaunchedEffect(c.id) { if (!reduced) enter.animateTo(1f, tween(280, easing = ease)) }
+    // The ack takes the notice out of the queue at once, which takes this
+    // sheet (and its scope) away, so it runs on the app's scope; the way
+    // into the thread does not wait for it, as on the web.
     fun ack(then: () -> Unit = {}) {
-        scope.launch {
+        then()
+        Nexa.scope.launch {
             try {
                 NexaInbox.ack(c.id)
-                then()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Nexa.ui.toast((e as? ApiError)?.message?.takeIf { it.isNotBlank() } ?: t("nexa.thread.couldNotSend"), "error")
             }

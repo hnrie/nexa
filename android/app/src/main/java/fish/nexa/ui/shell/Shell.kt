@@ -200,7 +200,7 @@ fun MainShell() {
                     is Route.NexaBug -> fish.nexa.ui.nexa.NexaBugPage(route.reportId)
                     is Route.Notes -> fish.nexa.ui.notes.NotesPage(route)
                     is Route.Discover -> fish.nexa.ui.discovery.DiscoverPage()
-                    else -> PlaceholderPage(route)
+                    is Route.Admin -> fish.nexa.ui.moderation.AdminPanel(route)
                 }
             }
         }
@@ -280,12 +280,5 @@ private fun ConnectionBanner() {
     if (online && state.status == Gateway.Status.CONNECTING && note == null && !Nexa.session.ready.value) return
     Box(Modifier.fillMaxWidth().background(bg).padding(horizontal = 12.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
         Txt(text, style = Nx.type.label.copy(fontSize = Nx.type.sp(13f)), color = fg, align = androidx.compose.ui.text.style.TextAlign.Center)
-    }
-}
-
-@Composable
-private fun PlaceholderPage(route: Route) {
-    Column(Modifier.fillMaxSize()) {
-        PageHeader(title = route.toString())
     }
 }

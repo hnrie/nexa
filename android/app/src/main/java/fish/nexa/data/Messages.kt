@@ -118,7 +118,7 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
         val conv = msg.keyConvId
         val epoch = msg.keyEpoch
         if (env == null || conv == null || epoch == null) return ChatMessage(msg, error = DecryptFail.BAD)
-        val key = keys.channelKey(conv, epoch, msg.channelId) ?: return ChatMessage(msg, error = DecryptFail.NO_KEY)
+        val key = keys.channelKey(conv, epoch, msg.channelId) ?: return waitFor(msg, conv)
         return try {
             ChatMessage(msg, payload = MessageCrypto.decrypt(key, env, fish.nexa.crypto.Aad(conv, epoch, msg.channelId, msg.authorId)))
         } catch (_: DecryptError) {
@@ -126,12 +126,18 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
         }
     }
 
+    /** A message this device lacks the key for: it waits, and the holders are asked for it (lib/decrypt.ts). */
+    private fun waitFor(msg: Message, conv: String): ChatMessage {
+        keys.markWaiting(conv)
+        return ChatMessage(msg, error = DecryptFail.NO_KEY)
+    }
+
     /** A call's line: sealed with the channel key, bound to the line itself (voice/callSummary.ts). */
     private fun decryptCallLine(msg: Message): ChatMessage {
         val env = Envelope.from(msg.ciphertext) ?: return ChatMessage(msg)
         val conv = msg.keyConvId ?: return ChatMessage(msg)
         val epoch = msg.keyEpoch ?: return ChatMessage(msg)
-        val key = keys.channelKey(conv, epoch, msg.channelId) ?: return ChatMessage(msg, error = DecryptFail.NO_KEY)
+        val key = keys.channelKey(conv, epoch, msg.channelId) ?: return waitFor(msg, conv)
         return try {
             val aad = Bytes.utf8("call|$conv|$epoch|${msg.channelId}|${msg.authorId}|${msg.id}")
             val pt = Bytes.gcmDecrypt(key, Bytes.unb64(env.iv), Bytes.unb64(env.ct), aad)
@@ -213,6 +219,13 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
             m = m.copy(pollResults = nr.copy(answerCounts = nr.answerCounts.map { it.copy(meVoted = it.id in mine) }))
         }
         c.copy(byId = c.byId.put(msg.id, msg.copy(m = m)))
+    }
+
+    /** A thread started from a message: the message says so under it at once. */
+    fun setThread(ch: String, id: String, thread: fish.nexa.net.ThreadSummary) = with(ch) { c ->
+        val prev = c.byId[id] ?: return@with c
+        if (prev.m.thread?.id == thread.id) return@with c
+        c.copy(byId = c.byId.put(id, prev.copy(m = prev.m.copy(thread = thread))))
     }
 
     fun removeMany(ch: String, ids: Collection<String>) {

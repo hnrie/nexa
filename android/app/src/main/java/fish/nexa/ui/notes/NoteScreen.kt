@@ -110,7 +110,6 @@ import fish.nexa.ui.format.Toolbar
 import fish.nexa.ui.format.Tray
 import fish.nexa.ui.format.TrayBody
 import fish.nexa.ui.format.topHairline
-import fish.nexa.ui.format.trayShown
 import fish.nexa.ui.layers.openMenu
 import fish.nexa.ui.markdown.MarkdownView
 import fish.nexa.ui.markdown.RenderCtx
@@ -801,7 +800,7 @@ private fun NoteEditor(noteId: String, note: OpenNote, bridge: NoteBridge, narro
             }
         }
         // what the caret is in, or the tray asked for, then the tools
-        val shown = trayShown(tray, state)
+        val shown = fish.nexa.ui.format.settledTray(tray, state)
         if (shown != null) {
             Column(Modifier.fillMaxWidth().background(c.bgSurface).topHairline(c.borderSubtle)) {
                 TrayBody(shown, state, surface, setTray = { tray = it })

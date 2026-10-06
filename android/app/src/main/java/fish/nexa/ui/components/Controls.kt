@@ -183,7 +183,8 @@ fun Modifier.sink(pressed: Boolean): Modifier {
 }
 
 enum class ButtonKind { PRIMARY, SECONDARY, DANGER, POSITIVE, GHOST, LINK }
-enum class ButtonSize(val height: Dp, val pad: Dp) { SM(32.dp, 14.dp), MD(38.dp, 18.dp), LG(46.dp, 24.dp) }
+/** TOUCH: a small button's words at a finger's height, as the web's buttons grow on a touch screen (min-height 40). */
+enum class ButtonSize(val height: Dp, val pad: Dp) { SM(32.dp, 14.dp), TOUCH(40.dp, 14.dp), MD(38.dp, 18.dp), LG(46.dp, 24.dp) }
 
 /** Button.module.css: fills that catch the light from above, a lit top edge, a shadow in their own colour; pressed, they sink. */
 @Composable
@@ -199,6 +200,8 @@ fun NxButton(
     block: Boolean = false,
     /** A link set in a line of text: no padding of its own, so it lines up with the words. */
     inline: Boolean = false,
+    /** After the words: a count in its own pill (`.btnCount`). */
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val c = Nx.colors
     val type = Nx.type
@@ -214,7 +217,7 @@ fun NxButton(
         ButtonKind.LINK -> c.link
     }
     val style = when (size) {
-        ButtonSize.SM -> type.buttonSmall
+        ButtonSize.SM, ButtonSize.TOUCH -> type.buttonSmall
         ButtonSize.MD -> type.button
         ButtonSize.LG -> type.buttonLarge
     }
@@ -259,8 +262,9 @@ fun NxButton(
         contentAlignment = Alignment.Center,
     ) {
         Row(Modifier.alpha(if (loading) 0f else 1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (icon != null) Icon(icon, fg, size = if (size == ButtonSize.LG) 20.dp else 18.dp)
+            if (icon != null) Icon(icon, fg, size = if (size == ButtonSize.LG) 20.dp else if (size == ButtonSize.TOUCH) 15.dp else 18.dp)
             Txt(text, style = if (kind == ButtonKind.LINK) style.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)) else style, color = fg, maxLines = 1)
+            trailing?.invoke()
         }
         if (loading) LoadingDots(fg)
     }

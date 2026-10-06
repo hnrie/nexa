@@ -131,15 +131,24 @@ fun Attachments(list: List<AttachmentMeta>, cm: ChatMessage?, ctx: ListCtx?, fil
 /** The six-column grid of pictures, its shapes fixed before anything loads (mosaicLayout). */
 @Composable
 private fun Mosaic(pictures: List<AttachmentMeta>, tiles: List<Fit.Tile>, cm: ChatMessage?, open: (AttachmentMeta) -> Unit) {
+    MosaicGrid(tiles) {
+        pictures.forEachIndexed { i, att ->
+            ImageAttachment(att, cm, tile = tiles[i], onOpen = { open(att) })
+        }
+    }
+}
+
+/**
+ * Lays one tile per child into the six-column grid Fit.mosaic describes, as
+ * CSS grid places them: each at the first free place, row by row, the rows
+ * as tall as their tiles' shapes say. A message's pictures, and a case
+ * thread's.
+ */
+@Composable
+fun MosaicGrid(tiles: List<Fit.Tile>, content: @Composable () -> Unit) {
     val gap = 4.dp
     Box(Modifier.widthIn(max = 550.dp).fillMaxWidth().clip(Radii.Md)) {
-        Layout(
-            content = {
-                pictures.forEachIndexed { i, att ->
-                    ImageAttachment(att, cm, tile = tiles[i], onOpen = { open(att) })
-                }
-            },
-        ) { measurables, constraints ->
+        Layout(content = content) { measurables, constraints ->
             val w = constraints.maxWidth
             val g = gap.roundToPx()
             val cw = (w - 5 * g) / 6f
