@@ -1,5 +1,5 @@
 import { ChevronLeft, CircleCheck, FolderOpen, Gavel, Inbox, LockOpen, RotateCcw, UserRound } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { moderation as modApi, type CaseCounts, type CaseMessage, type CaseView, type ModUser, type People, type StaffCase } from "@/api/moderation";
 import { Avatar } from "@/components/common/Avatar";
@@ -289,14 +289,18 @@ export function CasesTab() {
   const [people, setPeople] = useState<People>({});
   const [more, setMore] = useState(false);
   const [loading, setLoading] = useState(false);
+  // only the newest request may fill the list: a slower answer for the view picked before would land in this one
+  const request = useRef(0);
 
   const load = useCallback(
     async (after?: StaffCase) => {
+      const id = ++request.current;
       setLoading(true);
       setFailed(false);
       try {
         const r = await modApi.cases({ view, before_at: after?.last_activity_at, before_id: after?.id, limit: 50 });
-        setCases((cur) => (after ? [...(cur ?? []), ...r.cases] : r.cases));
+        if (id !== request.current) return;
+        setCases((cur) => (after ? [...(cur ?? []), ...r.cases.filter((x) => !cur?.some((y) => y.id === x.id))] : r.cases));
         setCounts(r.counts);
         setPeople((p) => ({ ...p, ...r.people }));
         mergePeople(r.people);
@@ -304,9 +308,9 @@ export function CasesTab() {
       } catch {
         // said as a failure, never as an empty queue: "all caught up" during
         // an outage tells staff nobody is waiting when somebody is
-        setFailed(true);
+        if (id === request.current) setFailed(true);
       } finally {
-        setLoading(false);
+        if (id === request.current) setLoading(false);
       }
     },
     [view, mergePeople],

@@ -57,6 +57,7 @@ export function UserGrid() {
   const [moderating, setModerating] = useState<ModUser | null>(null);
   const request = useRef(0);
   const sentinel = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
 
   const load = useCallback(
     async (from: string) => {
@@ -68,6 +69,8 @@ export function UserGrid() {
         if (id !== request.current) return;
         setUsers((cur) => (from ? [...(cur ?? []), ...r.users.filter((u) => !cur?.some((x) => x.id === u.id))] : r.users));
         setCursor(r.next_cursor);
+        // a list that starts again is read from its top, not from where the old one was left
+        if (!from) scroller.current?.scrollTo({ top: 0 });
       } catch {
         if (id === request.current) setFailed(true);
       } finally {
@@ -77,11 +80,14 @@ export function UserGrid() {
     [q, show, sort],
   );
 
-  // a new search, filter or order starts the list again (typing waits a moment)
+  // A new search, filter or order starts the list again (typing waits a
+  // moment). The old list's pages stop at once: its cursor means nothing in
+  // the new order, and a page still coming would land in the new list.
   useEffect(() => {
+    request.current++;
+    setCursor("");
     const h = setTimeout(() => {
       setUsers(null);
-      setCursor("");
       void load("");
     }, q ? 250 : 0);
     return () => clearTimeout(h);
@@ -186,7 +192,7 @@ export function UserGrid() {
   ];
 
   return (
-    <div className={m.scroll} data-testid="user-grid">
+    <div className={m.scroll} ref={scroller} data-testid="user-grid">
       <div className={m.toolbar}>
         <label className={m.search}>
           <Search size={17} aria-hidden="true" />

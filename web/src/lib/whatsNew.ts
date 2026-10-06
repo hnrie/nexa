@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { AudioLines, BadgeCheck, Compass, Megaphone, Pause, ScrollText, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, FolderPlus, Gamepad2, Globe, Headphones, House, IdCard, ImagePlay, ImagePlus, Images, Keyboard, LayoutGrid, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessageSquareText, MessagesSquare, MousePointerClick, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, Tag, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
+import { AudioLines, BadgeCheck, Compass, KeyRound, Megaphone, Pause, ScrollText, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, FolderPlus, Gamepad2, Globe, Headphones, House, IdCard, ImagePlay, ImagePlus, Images, Keyboard, LayoutGrid, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessageSquareText, MessagesSquare, MousePointerClick, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, Tag, Trash2, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Volume2, Vote, Webhook, ZoomIn, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,18 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-10-06",
+    items: [
+      { icon: MessagesSquare, title: "whatsNew.r20261006.caseChatsTitle", body: "whatsNew.r20261006.caseChatsBody" },
+      { icon: MessageSquareText, title: "whatsNew.r20261006.threadCardsTitle", body: "whatsNew.r20261006.threadCardsBody" },
+      { icon: KeyRound, title: "whatsNew.r20261006.historyTitle", body: "whatsNew.r20261006.historyBody" },
+      { icon: Trash2, title: "whatsNew.r20261006.joinDeleteTitle", body: "whatsNew.r20261006.joinDeleteBody" },
+      { icon: Volume2, title: "whatsNew.r20261006.songVolumeTitle", body: "whatsNew.r20261006.songVolumeBody" },
+      { icon: ZoomIn, title: "whatsNew.r20261006.zoomTitle", body: "whatsNew.r20261006.zoomBody" },
+      { icon: ShieldCheck, title: "whatsNew.r20261006.checksTitle", body: "whatsNew.r20261006.checksBody" },
+    ],
+  },
   {
     id: "2026-10-05",
     items: [

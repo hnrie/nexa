@@ -161,11 +161,16 @@
 .uploadWhere span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 button.uploadWhere:hover { color: var(--text-strong); }
 .uploadWhen { font-size: 11.5px; color: var(--text-muted); }
-/* take it down from here: over the picture's corner, shown on hover and focus, always on a touch screen */
-.uploadTake {
+/* take it down from here: over the picture's corner, shown on hover and focus, always on a touch screen.
+   The tooltip's wrapper is what sits in the corner: placed on the button inside it, the corner was
+   the wrapper's, and the button landed over the name under the picture instead. (Doubled to
+   outrank the tooltip wrapper's own position.) */
+.uploadTakeAt.uploadTakeAt {
   position: absolute;
   top: 8px;
   inset-inline-end: 8px;
+}
+.uploadTake {
   width: 30px;
   height: 30px;
   border-radius: 50%;

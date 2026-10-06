@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, ChevronRight, Copy, Eraser, FolderOpen, Gavel, Hash, ImageOff, Smile, Users } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Compass, Copy, Eraser, Eye, FolderOpen, Gavel, Hash, ImageOff, Smile, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { moderation as modApi, type ModPack, type ModServer, type People, type ServerField, type StaffCase } from "@/api/moderation";
@@ -10,9 +10,11 @@ import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { profileTheme } from "@/lib/avatarColor";
 import { copyAndSay } from "@/lib/copyText";
+import { describeError } from "@/lib/errors";
 import { actionIcon, actionLabel, expressionSummary, fieldLabel, fullDate, personName, previewText, severity } from "@/lib/moderation";
 import { formatRelative, formatShortDate } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
+import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
 import { ExpressionPic, PackRows } from "./ExpressionsTab";
 import { ModerateEmojiModal } from "./ModerateEmojiModal";
@@ -32,6 +34,8 @@ export function ServerPage() {
   const { serverId = "" } = useParams();
   const nav = useNavigate();
   const mergePeople = useModeration((s) => s.mergePeople);
+  const toast = useUI((u) => u.toast);
+  const openModal = useUI((u) => u.openModal);
   const [server, setServer] = useState<ModServer | null>(null);
   const [cases, setCases] = useState<StaffCase[]>([]);
   const [people, setPeople] = useState<People>({});
@@ -88,7 +92,23 @@ export function ServerPage() {
   const owner = people[server.owner_id];
   const blocked = serverBlockedText(server.blocked);
   const banner = bannerUrl(server.banner_id, 680);
-  const rows: { field: ServerField; value: ReactNode; empty: boolean; action: string; icon: ReactNode }[] = [
+  // a server the staff hid from Discover is shown again here; one its owner lists is hidden through the case dialog
+  const showOnDiscover = (sv: ModServer) =>
+    openModal("confirm", {
+      title: t("moderation.servers.discoveryShowTitle", { name: sv.name }),
+      body: t("moderation.servers.discoveryShowBody"),
+      confirmLabel: t("moderation.servers.discoveryShow"),
+      onConfirm: async () => {
+        try {
+          await modApi.showOnDiscover(sv.id);
+          toast(t("moderation.servers.discoveryShown", { name: sv.name }), "success");
+          void load();
+        } catch (err) {
+          toast(describeError(err, t("moderation.failed")), "error");
+        }
+      },
+    });
+  const rows: { field: ServerField; value: ReactNode; empty: boolean; action: string; icon: ReactNode; onAction?: () => void }[] = [
     { field: "icon", value: server.icon_id ? <ServerIcon id={server.id} iconId={server.icon_id} name={server.name} size={36} /> : t("moderation.sheet.notSet"), empty: !server.icon_id, action: t("moderation.sheet.remove"), icon: <ImageOff size={15} aria-hidden="true" /> },
     {
       field: "banner",
@@ -112,6 +132,15 @@ export function ServerPage() {
       action: t("moderation.sheet.remove"),
       icon: <Eraser size={15} aria-hidden="true" />,
     },
+    server.discovery_hidden
+      ? { field: "discovery", value: t("moderation.servers.discoveryHeld"), empty: false, action: t("moderation.servers.discoveryShow"), icon: <Eye size={15} aria-hidden="true" />, onAction: () => showOnDiscover(server) }
+      : {
+          field: "discovery",
+          value: server.discoverable ? t("moderation.servers.discoveryListed") : t("moderation.servers.discoveryNotListed"),
+          empty: !server.discoverable,
+          action: t("moderation.servers.discoveryHide"),
+          icon: <Compass size={15} aria-hidden="true" />,
+        },
   ];
 
   return (
@@ -175,7 +204,7 @@ export function ServerPage() {
                   <li key={r.field} className={p.row} data-empty={r.empty || undefined} onMouseEnter={() => setHl(r.field)} onMouseLeave={() => setHl(null)} onFocus={() => setHl(r.field)} onBlur={() => setHl(null)}>
                     <span className={p.rowLabel}>{fieldLabel(r.field)}</span>
                     <span className={p.rowValue}>{r.value}</span>
-                    <Button size="sm" variant="secondary" className={p.rowAction} disabled={!!blocked || r.empty} onClick={() => setModerating([r.field])} data-testid={`server-sheet-${r.field}`} aria-label={`${r.action}: ${fieldLabel(r.field)}`}>
+                    <Button size="sm" variant="secondary" className={p.rowAction} disabled={!!blocked || r.empty} onClick={r.onAction ?? (() => setModerating([r.field]))} data-testid={`server-sheet-${r.field}`} aria-label={`${r.action}: ${fieldLabel(r.field)}`}>
                       {r.icon} {r.action}
                     </Button>
                   </li>

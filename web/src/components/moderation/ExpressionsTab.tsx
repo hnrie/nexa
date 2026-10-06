@@ -1,5 +1,5 @@
 import { CalendarDays, ChevronRight, Download, Gavel, Search, Server, Smile, Sticker as StickerIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { moderation as modApi, type ModPack, type ModServerRef, type ModUpload, type PackScope, type PackSort, type People } from "@/api/moderation";
 import type { Emoji, Sticker } from "@/api/types";
@@ -119,8 +119,13 @@ export function ExpressionsTab() {
   const loc = useLocation();
   const nav = useNavigate();
   const view = loc.pathname.startsWith(`${BASE}/uploads`) ? "uploads" : "packs";
+  const scroller = useRef<HTMLDivElement>(null);
+  // the other view starts at its top, not as far down as this one was read
+  useEffect(() => {
+    scroller.current?.scrollTo({ top: 0 });
+  }, [view]);
   return (
-    <div className={m.scroll} data-testid="expressions-tab">
+    <div className={m.scroll} ref={scroller} data-testid="expressions-tab">
       <div className={x.views} role="tablist" aria-label={t("moderation.tabs.expressions")}>
         <button type="button" role="tab" aria-selected={view === "packs"} className={m.chip} data-selected={view === "packs"} onClick={() => nav(BASE)} data-testid="expressions-view-packs">
           <StickerIcon size={15} aria-hidden="true" /> {t("moderation.packs.viewPacks")}
@@ -129,12 +134,12 @@ export function ExpressionsTab() {
           <Smile size={15} aria-hidden="true" /> {t("moderation.packs.viewUploads")}
         </button>
       </div>
-      {view === "packs" ? <PackList /> : <UploadWall />}
+      {view === "packs" ? <PackList scroller={scroller} /> : <UploadWall />}
     </div>
   );
 }
 
-function PackList() {
+function PackList({ scroller }: { scroller: RefObject<HTMLDivElement> }) {
   const nav = useNavigate();
   const mergePeople = useModeration((s) => s.mergePeople);
   const [q, setQ] = useState("");
@@ -163,17 +168,22 @@ function PackList() {
         setServers((cur) => ({ ...cur, ...r.servers }));
         mergePeople(r.people);
         setMore(r.has_more);
+        // a list that starts again is read from its top, not from where the old one was left
+        if (!offset) scroller.current?.scrollTo({ top: 0 });
       } catch {
         if (id === request.current) setFailed(true);
       } finally {
         if (id === request.current) setLoading(false);
       }
     },
-    [q, scope, sort, mergePeople],
+    [q, scope, sort, mergePeople, scroller],
   );
 
-  // a new search, filter or order starts the list again (typing waits a moment)
+  // A new search, filter or order starts the list again (typing waits a
+  // moment). The old list's pages stop at once, so none lands in the new one.
   useEffect(() => {
+    request.current++;
+    setMore(false);
     const h = setTimeout(() => {
       setPacks(null);
       void load(0);
@@ -449,7 +459,7 @@ function UploadWall() {
                   <ExpressionPic kind={u.kind} blobId={u.blob_id} format={u.format} name={u.name} size={u.kind === "emoji" ? 64 : 160} />
                 </div>
                 <span className={`${m.flag} ${x.kindTag}`}>{u.kind === "emoji" ? t("moderation.packs.kindEmoji") : t("moderation.packs.kindSticker")}</span>
-                <Tooltip text={t("moderation.packs.takeDownNamed", { name: u.name })}>
+                <Tooltip text={t("moderation.packs.takeDownNamed", { name: u.name })} className={x.uploadTakeAt}>
                   <button type="button" className={x.uploadTake} onClick={() => void takeDown(u)} disabled={opening === u.id} aria-label={t("moderation.packs.takeDownNamed", { name: u.name })} data-testid="upload-take-down">
                     <Gavel size={15} aria-hidden="true" />
                   </button>

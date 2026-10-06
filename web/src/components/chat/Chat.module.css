@@ -517,6 +517,8 @@ button.sysName:hover { text-decoration: underline; }
 .threadCard:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .threadSpine { position: absolute; inset-inline-start: -37px; top: calc(-1 * var(--spine-up)); bottom: calc(50% - 1px); width: 36px; border-inline-start: 2px solid var(--thread-spine); border-bottom: 2px solid var(--thread-spine); border-end-start-radius: 10px; pointer-events: none; }
 .compact .threadSpine { display: none; }
+/* a phone's avatar sits 4px further in, and the line still leaves from its middle */
+@media (max-width: 767px) { .threadSpine { inset-inline-start: -33px; width: 32px; } }
 .threadTop { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .threadName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 650; line-height: 20px; color: var(--text-strong); }
 .threadClosed { flex: none; font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--bg-active); color: var(--text-muted); }

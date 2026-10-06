@@ -1,5 +1,5 @@
 import { Bug, ChevronDown, ChevronLeft, CircleCheck, Inbox, Paperclip, RotateCcw, UserRound } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { BUG_STATUSES, staffBugs, type BugCounts, type BugMessage, type BugSort, type BugStatus, type BugView, type StaffBug } from "@/api/bugs";
 import type { People } from "@/api/moderation";
@@ -87,13 +87,18 @@ export function BugsTab() {
     return () => clearTimeout(h);
   }, [query]);
 
+  // only the newest request may fill the list: a slower answer for the filters picked before would land in this one
+  const request = useRef(0);
+
   const load = useCallback(
     async (after?: StaffBug) => {
+      const id = ++request.current;
       setLoading(true);
       setFailed(false);
       try {
         const r = await staffBugs.list({ view, files, q, sort, before: after, limit: PAGE });
-        setReports((cur) => (after ? [...(cur ?? []), ...r.reports] : r.reports));
+        if (id !== request.current) return;
+        setReports((cur) => (after ? [...(cur ?? []), ...r.reports.filter((x) => !cur?.some((y) => y.id === x.id))] : r.reports));
         setCounts(r.counts);
         useModeration.getState().setBugCounts(r.counts);
         setPeople((p) => ({ ...p, ...r.people }));
@@ -102,9 +107,9 @@ export function BugsTab() {
       } catch {
         // said as a failure, never as an empty list: "nothing waiting" during
         // an outage tells staff nobody is waiting when somebody is
-        setFailed(true);
+        if (id === request.current) setFailed(true);
       } finally {
-        setLoading(false);
+        if (id === request.current) setLoading(false);
       }
     },
     [view, files, q, sort, mergePeople],
@@ -366,17 +371,17 @@ function StaffBugPane({ reportId, onBack, onChanged }: { reportId: string; onBac
   const finished = bugFinished(r.status);
   return (
     <>
-      <div className={m.paneHeader}>
+      <div className={[m.paneHeader, b.paneHead].join(" ")}>
         <button type="button" className={[m.iconBtn, m.mobileBack].join(" ")} onClick={onBack} aria-label={t("moderation.back")}>
           <ChevronLeft size={18} className={m.flip} />
         </button>
-        <span className={m.paneTitle}>
+        <span className={[m.paneTitle, b.paneTitle].join(" ")}>
           <span className={b.paneIcon} aria-hidden="true">
             <Bug size={16} />
           </span>
           <span dir="auto">{`${bugNumber(r.number)} ${r.subject}`}</span>
         </span>
-        <span className={m.paneActions}>
+        <span className={[m.paneActions, b.paneActs].join(" ")}>
           <Button size="sm" variant="secondary" disabled={busy} onClick={(e) => statusMenu(e.currentTarget)} aria-haspopup="menu" title={bugStatusHint(r.status)} data-testid="bug-status-menu">
             {t("bugs.staff.statusIs", { status: bugStatusLabel(r.status) })}
             <ChevronDown size={14} aria-hidden="true" />
@@ -391,8 +396,8 @@ function StaffBugPane({ reportId, onBack, onChanged }: { reportId: string; onBac
             </Button>
           )}
           {!gone ? (
-            <Button size="sm" variant="ghost" onClick={() => nav(`/channels/@admin/users/${r.user_id}`)} title={t("bugs.staff.openMember")}>
-              <UserRound size={15} aria-hidden="true" /> {personName(reporter)}
+            <Button size="sm" variant="ghost" onClick={() => nav(`/channels/@admin/users/${r.user_id}`)} title={t("bugs.staff.openMember")} aria-label={t("moderation.case.openPerson", { name: personName(reporter) })}>
+              <UserRound size={15} aria-hidden="true" /> <span className={m.btnLabel}>{personName(reporter)}</span>
             </Button>
           ) : null}
         </span>

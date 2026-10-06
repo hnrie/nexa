@@ -62,6 +62,7 @@ export function actionIcon(action: string): LucideIcon {
     case "unmute":
     case "unban":
     case "expression_relist":
+    case "discovery_restore":
       return LockOpen;
     case "announcement":
     case "announcement_delete":
@@ -90,6 +91,8 @@ export function actionLabel(action: string): string {
       return t("moderation.action.expressionTakedown");
     case "expression_relist":
       return t("moderation.action.expressionRelist");
+    case "discovery_restore":
+      return t("moderation.action.discoveryRestore");
     case "mute":
       return t("moderation.action.mute");
     case "ban":
@@ -161,8 +164,13 @@ export function fieldLabel(f: ResetField | ServerField): string {
       return t("moderation.field.serverName");
     case "description":
       return t("moderation.field.serverDescription");
-    default:
+    case "discovery":
+      return t("moderation.field.serverDiscovery");
+    case "status":
       return t("moderation.field.status");
+    default:
+      // every field has its words above; one a newer server sends is shown as it came
+      return f as string;
   }
 }
 
@@ -207,7 +215,8 @@ export function noticeTitle(action: ModAction, d: CaseDetails): string {
     case "field_reset":
       return t("nexa.notice.titleFieldReset");
     case "server_reset":
-      return t("nexa.notice.titleServerReset");
+      // hiding a server from Discover alone takes nothing down, so it is said as what it is
+      return onlyDiscover(d) ? t("nexa.notice.titleServerDiscover") : t("nexa.notice.titleServerReset");
     case "expression_takedown":
       if (d.deleted) return d.pack_kind === "emoji" ? t("nexa.notice.titleEmojiPackRemoved") : t("nexa.notice.titleStickerPackRemoved");
       if (d.emojis?.length) return t("nexa.notice.titleServerEmoji");
@@ -222,6 +231,11 @@ export function noticeTitle(action: ModAction, d: CaseDetails): string {
   }
 }
 
+/** Whether a server_reset did nothing but hide the server from Discover. */
+function onlyDiscover(d: CaseDetails): boolean {
+  return d.fields?.length === 1 && d.fields[0] === "discovery";
+}
+
 /** What an action means for the member, in a sentence under the headline. */
 export function noticeExplainer(c: Pick<MemberCase, "action" | "details" | "expires_at">): string {
   switch (c.action) {
@@ -229,8 +243,12 @@ export function noticeExplainer(c: Pick<MemberCase, "action" | "details" | "expi
       return t("nexa.notice.explainAvatar");
     case "field_reset":
       return c.details.fields?.includes("username") ? t("nexa.notice.explainUsername") : t("nexa.notice.explainFields");
-    case "server_reset":
-      return t("nexa.notice.explainServer", { name: c.details.server_name ?? "" });
+    case "server_reset": {
+      // a server hidden from Discover stays hidden until staff show it again, whatever the owner does
+      const name = c.details.server_name ?? "";
+      if (onlyDiscover(c.details)) return t("nexa.notice.explainServerDiscover", { name });
+      return c.details.fields?.includes("discovery") ? t("nexa.notice.explainServerWithDiscover", { name }) : t("nexa.notice.explainServer", { name });
+    }
     case "expression_takedown": {
       const d = c.details;
       if (d.deleted) return t("nexa.notice.explainPackRemoved", { name: d.pack_name ?? "" });
@@ -337,6 +355,8 @@ export function logDetail(e: ModLogEntry): string {
       const name = (e.details as { pack_name?: string }).pack_name;
       return name ? `“${name}”` : "";
     }
+    case "discovery_restore":
+      return d.server_name ? `“${d.server_name}”` : "";
     case "delete":
       return d.counts ? t("moderation.log.deleteCounts", { messages: d.counts.messages, servers: d.counts.owned_servers }) : "";
     case "announcement":
@@ -363,7 +383,7 @@ export function expressionSummary(d: CaseDetails): string {
 /** Log filters as the panel groups them. */
 export const LOG_GROUPS: Record<string, string[]> = {
   punishments: ["avatar_remove", "field_reset", "server_reset", "expression_takedown", "mute", "ban", "delete", "account_delete_profile"],
-  lifts: ["unmute", "unban", "expression_relist"],
+  lifts: ["unmute", "unban", "expression_relist", "discovery_restore"],
   announcements: ["announcement", "announcement_delete"],
   access: ["admin_grant", "admin_revoke", "account_disable", "account_enable"],
 };

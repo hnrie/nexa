@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Compass, X } from "lucide-react";
 import { useState } from "react";
 import { moderation as modApi, type ModServer, type Person, type ServerField, type StaffCase } from "@/api/moderation";
 import { bannerUrl } from "@/api/users";
@@ -15,16 +15,18 @@ import { ServerTagChip } from "@/components/servertag/ServerTagChip";
 import m from "./Moderation.module.css";
 
 const MAX_REASON = 1000;
-const FIELDS: ServerField[] = ["icon", "banner", "name", "description", "tag"];
+const FIELDS: ServerField[] = ["icon", "banner", "name", "description", "tag", "discovery"];
 
 /**
- * Taking down parts of what a server shows everyone: its icon, banner, name
- * or description. The reason goes to the server's owner, word for word, with
- * the moderator's name, and opens a case they can answer in.
+ * Taking down parts of what a server shows everyone: its icon, banner, name,
+ * description or tag, or its place on Discover. The reason goes to the
+ * server's owner, word for word, with the moderator's name, and opens a case
+ * they can answer in.
  */
 export function ModerateServerModal({ server, owner, preset, onClose, onDone }: { server: ModServer; owner: Person | undefined; preset?: ServerField[] | undefined; onClose: () => void; onDone: (c: StaffCase) => void }) {
   const toast = useUI((u) => u.toast);
-  const empty: Record<ServerField, boolean> = { icon: !server.icon_id, banner: !server.banner_id, name: false, description: !server.description, tag: !server.tag };
+  // Discover can only be taken from a server listed there and not hidden already
+  const empty: Record<ServerField, boolean> = { icon: !server.icon_id, banner: !server.banner_id, name: false, description: !server.description, tag: !server.tag, discovery: !server.discoverable || !!server.discovery_hidden };
   const [fields, setFields] = useState<ServerField[]>((preset ?? []).filter((f) => !empty[f]));
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -59,11 +61,14 @@ export function ModerateServerModal({ server, owner, preset, onClose, onDone }: 
         return server.tag ? <ServerTagChip tag={{ server_id: server.id, text: server.tag.text, badge: server.tag.badge, color: server.tag.color ?? null }} open={false} /> : null;
       case "banner":
         return <span className={m.bannerPreview} style={server.banner_id ? { backgroundImage: `url(${bannerUrl(server.banner_id, 160)})` } : { background: profileTheme(null, null, server.id) }} aria-hidden="true" />;
+      case "discovery":
+        return <Compass size={22} aria-hidden="true" />;
       default:
         return null;
     }
   };
   const value = (f: ServerField) => {
+    if (f === "discovery") return server.discovery_hidden ? t("moderation.servers.discoveryHeld") : server.discoverable ? t("moderation.servers.discoveryListed") : t("moderation.servers.discoveryNotListed");
     if (empty[f]) return t("moderation.form.none");
     if (f === "name") return server.name;
     if (f === "description") return previewText(server.description);
@@ -105,6 +110,7 @@ export function ModerateServerModal({ server, owner, preset, onClose, onDone }: 
               ))}
             </div>
             <p className={m.note}>{t("moderation.servers.takeNote")}</p>
+            {fields.includes("discovery") ? <p className={m.note}>{t("moderation.servers.discoveryNote")}</p> : null}
           </div>
 
           <div className={m.section}>

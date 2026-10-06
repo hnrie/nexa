@@ -52,6 +52,7 @@ export function ServersTab() {
   const [moderating, setModerating] = useState<ModServer | null>(null);
   const request = useRef(0);
   const sentinel = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
 
   const load = useCallback(
     async (offset: number) => {
@@ -66,6 +67,8 @@ export function ServersTab() {
         mergePeople(r.people);
         setTotal(r.total);
         setMore(r.has_more);
+        // a list that starts again is read from its top, not from where the old one was left
+        if (!offset) scroller.current?.scrollTo({ top: 0 });
       } catch {
         if (id === request.current) setFailed(true);
       } finally {
@@ -75,8 +78,12 @@ export function ServersTab() {
     [q, sort, mergePeople],
   );
 
-  // a new search or order starts the list again (typing waits a moment)
+  // A new search or order starts the list again (typing waits a moment). The
+  // old order's pages stop at once: one still coming, or asked for by the end
+  // of the list in view, would land in the new list.
   useEffect(() => {
+    request.current++;
+    setMore(false);
     const h = setTimeout(() => {
       setServers(null);
       void load(0);
@@ -111,7 +118,7 @@ export function ServersTab() {
   });
 
   return (
-    <div className={m.scroll} data-testid="servers-tab">
+    <div className={m.scroll} ref={scroller} data-testid="servers-tab">
       <div className={m.toolbar}>
         <label className={m.search}>
           <Search size={17} aria-hidden="true" />

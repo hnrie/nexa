@@ -215,6 +215,19 @@
   .workspace {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* A report's header on two rows: what it is, then what can be done about
+     it. Its status and Mark as Resolved keep their words, which on one row
+     pushed the title out of sight and the reporter's button off the edge. */
+  .paneHead {
+    flex-wrap: wrap;
+  }
+  .paneTitle {
+    flex: 1 1 calc(100% - 60px);
+  }
+  .paneActs {
+    flex: 1 1 100%;
+    margin-inline-start: 0;
+  }
 }
 /* finger-sized targets */
 @media (pointer: coarse) {

@@ -14,7 +14,7 @@ import type { Activity, Emoji, PublicUser, ServerTag, Snowflake, StickerPack } f
 export type ModAction = "avatar_remove" | "field_reset" | "mute" | "ban" | "delete" | "server_reset" | "expression_takedown";
 export type ResetField = "username" | "display_name" | "about_me" | "pronouns" | "status" | "nicknames" | "server_profiles" | "typing_style" | "widgets" | "server_tag";
 /** What a server_reset can take back of what a server shows everyone. */
-export type ServerField = "icon" | "banner" | "name" | "description" | "tag";
+export type ServerField = "icon" | "banner" | "name" | "description" | "tag" | "discovery";
 /** What an expression_takedown can take back of a pack: its name, its description, its public listing. */
 export type PackField = "name" | "description" | "public";
 
@@ -264,6 +264,10 @@ export interface ModServer {
   channel_count: number;
   /** Its server tag, if it has one (absent from older servers). */
   tag?: ServerTag | null;
+  /** Its owner lists it on Discover. */
+  discoverable?: boolean;
+  /** Staff hid it from Discover, and it stays hidden until they show it again. */
+  discovery_hidden?: boolean;
   /** Why the viewer cannot act on it: its owner is out of their reach ("" when they can). */
   blocked: BlockReason;
 }
@@ -428,6 +432,10 @@ export const moderation = {
   },
   actOnServer(id: Snowflake, body: { fields: ServerField[]; reason: string }): Promise<{ case: StaffCase; people: People }> {
     return api.request("POST", `/moderation/servers/${id}/actions`, body);
+  },
+  /** Lets a server the staff hid from Discover show up there again. */
+  showOnDiscover(id: Snowflake): Promise<void> {
+    return api.request("DELETE", `/moderation/servers/${id}/discovery-hold`);
   },
   /** Puts one file up for a staff line not sent yet. */
   upload(file: Blob, name: string, opts?: Pick<UploadOptions, "onProgress" | "signal">): Promise<CaseFile> {

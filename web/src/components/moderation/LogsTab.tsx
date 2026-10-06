@@ -1,5 +1,5 @@
 import { LockKeyhole, ScrollText, Search } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { moderation as modApi, type ModLogEntry, type People } from "@/api/moderation";
 import { Button } from "@/components/common/Button";
@@ -30,25 +30,32 @@ export function LogsTab() {
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
 
+  // only the newest request may fill the table: a slower answer for the filter picked before would land in this one
+  const request = useRef(0);
+
   const load = useCallback(
     async (before?: string) => {
+      const id = ++request.current;
       setLoading(true);
       setFailed(false);
       try {
         const r = await modApi.log({ action: group === "all" ? undefined : LOG_GROUPS[group], q, before, limit: PAGE });
-        setEntries((cur) => (before ? [...(cur ?? []), ...r.entries] : r.entries));
+        if (id !== request.current) return;
+        setEntries((cur) => (before ? [...(cur ?? []), ...r.entries.filter((x) => !cur?.some((y) => y.id === x.id))] : r.entries));
         setPeople((p) => ({ ...p, ...r.people }));
         setMore(r.entries.length === PAGE);
       } catch {
-        setFailed(true);
+        if (id === request.current) setFailed(true);
       } finally {
-        setLoading(false);
+        if (id === request.current) setLoading(false);
       }
     },
     [group, q],
   );
 
   useEffect(() => {
+    request.current++;
+    setMore(false);
     const h = setTimeout(() => {
       setEntries(null);
       void load();

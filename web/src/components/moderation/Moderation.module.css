@@ -979,10 +979,16 @@
 }
 .logAction {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   font-weight: 600;
-  white-space: nowrap;
+  /* a longer action ("Let a pack be public again") wraps in its own column
+     instead of running on into the member's */
+  overflow-wrap: anywhere;
+}
+.logAction svg {
+  flex: none;
+  margin-top: 2px;
 }
 .logAction[data-tone="warn"] svg {
   color: var(--warning);
