@@ -22,6 +22,19 @@ def login(page, base, username, password):
     page.fill("input[type=password]", password)
     page.click("button[type=submit]")
     page.wait_for_url("**/channels/**", timeout=30000)
+    # the Terms sheet every account sees on a new device, and What's New, as e2e.py's Session gets past them
+    try:
+        page.wait_for_selector("[data-testid=terms-gate]", timeout=5000)
+        page.check("[data-testid=terms-check]")
+        page.click("[data-testid=terms-agree]")
+        page.wait_for_selector("[data-testid=terms-gate]", state="detached", timeout=5000)
+    except Exception:
+        pass
+    try:
+        page.click("[data-testid=whats-new-done]", timeout=3000)
+        page.wait_for_selector("[data-testid=whats-new]", state="detached", timeout=5000)
+    except Exception:
+        pass
 
 
 def main():
