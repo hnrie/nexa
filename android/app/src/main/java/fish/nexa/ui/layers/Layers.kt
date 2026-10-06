@@ -1,5 +1,6 @@
 package fish.nexa.ui.layers
 
+import android.os.Build
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
@@ -32,16 +33,20 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -80,6 +85,9 @@ class Layer(
 ) {
     /** Set by the host: animates the layer out, then removes it. */
     var dismiss: (() -> Unit)? = null
+
+    /** How far this layer dims and blurs what is under it, 0 to 1: a sheet's or dialog's scrim as it comes and goes. */
+    var dim by mutableFloatStateOf(0f)
 }
 
 object Layers {
@@ -110,14 +118,34 @@ object Layers {
     val isEmpty get() = stack.isEmpty()
 
     fun clear() = stack.clear()
+
+    /** How far the sheets and dialogs over the page dim it (the most of any of them). */
+    val dim: Float get() = stack.maxOfOrNull { it.dim } ?: 0f
+}
+
+/** Modal.module.css: what is behind a dialog or sheet blurs by 6px as its scrim shows. */
+val SCRIM_BLUR = 6.dp
+
+/**
+ * Blurs this by [radius], as the web's `backdrop-filter` blurs what is behind an
+ * overlay. Read while drawing, so a scrim fading in only redraws. Android 12 and
+ * up; before that it only dims, as it always did.
+ */
+fun Modifier.blurredBy(radius: () -> Dp): Modifier = graphicsLayer {
+    val r = radius().toPx()
+    renderEffect = if (Build.VERSION.SDK_INT >= 31 && r >= 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
 }
 
 /** Draws the layer stack; mounted once, over the shell. */
 @Composable
 fun LayerHost() {
-    for (layer in Layers.stack.toList()) {
+    val stack = Layers.stack.toList()
+    for ((i, layer) in stack.withIndex()) {
         androidx.compose.runtime.key(layer.key) {
-            layer.content { layer.dismiss?.invoke() ?: Layers.remove(layer) }
+            // a sheet or dialog over this one blurs it too, as the web's overlay blurs everything behind it
+            Box(Modifier.blurredBy { SCRIM_BLUR * (stack.subList(i + 1, stack.size).maxOfOrNull { it.dim } ?: 0f) }) {
+                layer.content { layer.dismiss?.invoke() ?: Layers.remove(layer) }
+            }
         }
     }
 }
@@ -142,6 +170,8 @@ fun Sheet(
     padding: Dp = 16.dp,
     /** The sheet's own colour, for content that brings its own (a profile in its colours). */
     fill: Color? = null,
+    /** Whether what is behind blurs as well as dims; a menu only dims, as on the web (ContextMenu.module.css). */
+    blur: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = Nx.colors
@@ -150,6 +180,7 @@ fun Sheet(
     val offset = remember { Animatable(if (reduced) 0f else 40f) }
     val shown = remember { Animatable(if (reduced) 1f else 0.4f) }
     val scrim = remember { Animatable(if (reduced) 1f else 0f) }
+    if (blur) LaunchedEffect(Unit) { snapshotFlow { scrim.value }.collect { layer.dim = it } }
     var height by remember { mutableStateOf(1f) }
     var closing by remember { mutableStateOf(false) }
     val density = androidx.compose.ui.platform.LocalDensity.current.density
@@ -361,7 +392,7 @@ private fun MenuSheet(
     var stackOfMenus by remember { mutableStateOf(listOf<MenuItem.Submenu>()) }
     val current = stackOfMenus.lastOrNull()
     val shown = current?.items ?: items
-    Sheet(layer, title = null, closeButton = false, padding = 8.dp) {
+    Sheet(layer, title = null, closeButton = false, padding = 8.dp, blur = false) {
         Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
             if (current != null) {
                 MenuRow(MenuItem.Action(t("contextMenu.back"), onClick = {}), back = true) { stackOfMenus = stackOfMenus.dropLast(1) }

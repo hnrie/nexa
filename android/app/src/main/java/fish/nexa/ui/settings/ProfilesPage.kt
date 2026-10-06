@@ -493,10 +493,10 @@ private fun MainDesigner(anchor: String?) {
         Modifier
             .fillMaxWidth()
             .padding(bottom = 12.dp)
+            .ring(Radii.Md, c.borderSubtle)
             .clip(Radii.Md)
             .background(c.bgSurface)
             .background(sheen(c))
-            .ring(Radii.Md, c.borderSubtle)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -527,10 +527,10 @@ private fun MainDesigner(anchor: String?) {
                 Column(
                     Modifier
                         .fillMaxWidth()
+                        .ring(Radii.Lg, c.borderSubtle)
                         .clip(Radii.Lg)
                         .background(c.bgSurface)
                         .background(sheen(c))
-                        .ring(Radii.Lg, c.borderSubtle)
                         .topEdge(Radii.Lg, c.edgeLight)
                         .padding(18.dp),
                 ) {
@@ -680,10 +680,10 @@ internal fun CardAside(tools: WidgetDesign?, widgets: List<Widgets.Widget> = Pro
     Column(
         Modifier
             .fillMaxWidth()
+            .ring(Radii.Md, c.borderSubtle)
             .clip(Radii.Md)
             .background(c.bgSurface)
             .background(sheen(c))
-            .ring(Radii.Md, c.borderSubtle)
             .topEdge(Radii.Md, c.edgeLight)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),

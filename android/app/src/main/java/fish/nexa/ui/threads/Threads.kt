@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -47,7 +48,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import fish.nexa.Nexa
 import fish.nexa.data.ChatMessage
-import fish.nexa.data.Ids
 import fish.nexa.data.P
 import fish.nexa.net.ApiError
 import fish.nexa.net.Channel
@@ -68,7 +68,6 @@ import fish.nexa.ui.components.ChoiceCard
 import fish.nexa.ui.components.NxButton
 import fish.nexa.ui.components.NxTextField
 import fish.nexa.ui.components.SelectField
-import fish.nexa.ui.components.TabStrip
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
 import fish.nexa.ui.describeError
@@ -225,8 +224,8 @@ fun ThreadChip(serverId: String, summary: ThreadSummary) {
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 44.dp)
-                .clip(shape)
                 .ring(shape, if (pressed) c.border else c.borderSubtle)
+                .clip(shape)
                 .background(if (pressed) c.bgHover else c.bgSurface, shape)
                 .pressable(interaction) { Nav.go(Route.Server(serverId, summary.id)) }
                 .semantics { contentDescription = t("threads.chip.open") + ", " + name }
@@ -454,8 +453,8 @@ private fun StarterCard(serverId: String, parentId: String, messageId: String) {
             .padding(top = 14.dp)
             .widthIn(max = 560.dp)
             .fillMaxWidth()
-            .clip(shape)
             .ring(shape, if (pressed) c.border else c.borderSubtle)
+            .clip(shape)
             .background(if (pressed) c.bgHover else c.bgSurface, shape)
             .pressable(interaction) {
                 when {
@@ -558,36 +557,51 @@ fun ThreadStateBar(thread: Channel) {
 @Composable
 fun BoxScope.ThreadsPanel(channel: Channel) {
     val c = Nx.colors
-    var tab by remember(channel.id) { mutableStateOf("active") }
-    var page by remember(channel.id, tab) { mutableStateOf<List<ThreadListing>?>(null) }
-    var more by remember(channel.id, tab) { mutableStateOf(false) }
-    var failed by remember(channel.id, tab) { mutableStateOf(false) }
+    var q by remember(channel.id) { mutableStateOf("") }
+    // the ones still going and the closed ones, both asked for again as the search changes
+    var active by remember(channel.id) { mutableStateOf<List<ThreadListing>?>(null) }
+    var activeMore by remember(channel.id) { mutableStateOf(false) }
+    var closed by remember(channel.id) { mutableStateOf<List<ThreadListing>?>(null) }
+    var closedMore by remember(channel.id) { mutableStateOf(false) }
+    var failed by remember(channel.id) { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     val joined by Nexa.threads.joined.collectAsState()
     val sid = channel.serverId
-    LaunchedEffect(channel.id, tab, reload) {
+    LaunchedEffect(channel.id, q, reload) {
+        // a moment after typing stops
+        if (q.isNotEmpty()) kotlinx.coroutines.delay(300)
         failed = false
+        val term = q.trim().ifEmpty { null }
         try {
-            val p = ThreadsUi.list(channel.id, archived = tab == "closed")
-            page = p.threads
-            more = p.hasMore
+            val a = ThreadsUi.list(channel.id, archived = false, q = term, limit = 100)
+            active = a.threads
+            activeMore = a.hasMore
+            val b = ThreadsUi.list(channel.id, archived = true, q = term)
+            closed = b.threads
+            closedMore = b.hasMore
         } catch (_: Exception) {
             failed = true
         }
     }
-    fun loadMore() {
-        val list = page ?: return
+    fun loadMore(archived: Boolean) {
+        val list = (if (archived) closed else active) ?: return
         if (busy) return
         busy = true
         scope.launch {
             try {
                 val last = list.lastOrNull()?.channel
-                val before = if (tab == "closed") last?.thread?.archivedAt?.toString() else last?.let { it.lastMessageId ?: it.id }
-                val p = ThreadsUi.list(channel.id, archived = tab == "closed", before = before)
-                page = list + p.threads.filter { n -> list.none { it.channel.id == n.channel.id } }
-                more = p.hasMore
+                val before = if (archived) last?.thread?.archivedAt?.toString() else last?.let { it.lastMessageId ?: it.id }
+                val p = ThreadsUi.list(channel.id, archived = archived, before = before, q = q.trim().ifEmpty { null }, limit = if (archived) 25 else 100)
+                val merged = list + p.threads.filter { n -> list.none { it.channel.id == n.channel.id } }
+                if (archived) {
+                    closed = merged
+                    closedMore = p.hasMore
+                } else {
+                    active = merged
+                    activeMore = p.hasMore
+                }
             } catch (_: Exception) {
                 failed = true
             } finally {
@@ -617,46 +631,63 @@ fun BoxScope.ThreadsPanel(channel: Channel) {
             }, size = ButtonSize.SM, icon = "Plus")
             PanelClose(t("threads.panel.close"), 18) { ChatUi.panel = null }
         }
-        Box(Modifier.padding(horizontal = 12.dp)) {
-            TabStrip(listOf("active" to t("threads.panel.active"), "closed" to t("threads.panel.closed")), tab, t("threads.panel.title")) { tab = it }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
+        Box(Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp)) {
+            fish.nexa.ui.server.SearchBox(q, { q = it }, t("threads.panel.search"))
         }
-        Box(Modifier.fillMaxWidth().padding(top = 8.dp).height(1.dp).background(c.borderSubtle))
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            val list = page
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val now = active
+            val gone = closed
+            // the ones this account is in first, then the rest
+            val mine = now.orEmpty().filter { it.channel.id in joined || it.joined }
+            val others = now.orEmpty().filter { it !in mine }
+            if (mine.isNotEmpty()) Group(t("threads.panel.joined")) {
+                for (th in mine) ThreadListRow(sid, th)
+            }
+            if (others.isNotEmpty()) Group(if (mine.isNotEmpty()) t("threads.panel.otherActive") else t("threads.panel.active")) {
+                for (th in others) ThreadListRow(sid, th)
+                if (activeMore) MoreButton(busy) { loadMore(false) }
+            }
+            if (!gone.isNullOrEmpty()) Group(t("threads.panel.closed")) {
+                for (th in gone) ThreadListRow(sid, th)
+                if (closedMore) MoreButton(busy) { loadMore(true) }
+            }
             when {
-                failed && list == null -> Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    PanelNote(if (tab == "closed") t("threads.panel.closedFailed") else t("forum.failed"))
+                failed -> Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    PanelNote(if (now != null) t("threads.panel.closedFailed") else t("forum.failed"))
                     NxButton(t("chat.messageList.tryAgain"), { reload += 1 }, kind = ButtonKind.LINK, inline = true)
                 }
-                list == null -> PanelNote(t("forum.loading"))
-                list.isEmpty() -> Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon("MessageSquareText", c.textMuted, size = 32.dp)
-                    Txt(t("threads.panel.none"), style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, align = TextAlign.Center)
-                    Txt(t("threads.panel.noneHint"), style = Nx.type.bodySmall, color = c.textMuted, align = TextAlign.Center, modifier = Modifier.widthIn(max = 300.dp))
-                }
-                else -> {
-                    // the ones this account is in first, then the rest
-                    val mine = list.filter { it.channel.id in joined || it.joined }
-                    val rest = list.filter { it !in mine }
-                    if (tab == "active" && mine.isNotEmpty() && rest.isNotEmpty()) GroupHead(t("threads.panel.joined"))
-                    for (th in mine) ThreadListRow(sid, th)
-                    if (tab == "active" && mine.isNotEmpty() && rest.isNotEmpty()) GroupHead(t("threads.panel.otherActive"))
-                    for (th in rest) ThreadListRow(sid, th)
-                    if (more) Box(Modifier.fillMaxWidth().padding(top = 6.dp), contentAlignment = Alignment.Center) {
-                        NxButton(t("threads.panel.loadMore"), ::loadMore, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, loading = busy)
-                    }
+                now == null || gone == null -> PanelNote(t("forum.loading"))
+                now.isEmpty() && gone.isEmpty() -> Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon("MessageSquareText", c.textMuted, size = 28.dp)
+                    Txt(if (q.isNotBlank()) t("threads.panel.noMatches") else t("threads.panel.none"), style = Nx.type.body.copy(fontWeight = FontWeight(600)), color = c.text, align = TextAlign.Center)
+                    if (q.isBlank() && ThreadsUi.canStart(channel)) Txt(t("threads.panel.noneHint"), style = Nx.type.bodySmall, color = c.textMuted, align = TextAlign.Center, modifier = Modifier.widthIn(max = 300.dp))
                 }
             }
         }
     }
 }
 
+/** `.group`: a heading and its rows, set apart from the group above. */
+@Composable
+private fun Group(title: String, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        GroupHead(title)
+        content()
+    }
+}
+
+@Composable
+private fun MoreButton(busy: Boolean, onClick: () -> Unit) = Box(Modifier.fillMaxWidth().padding(top = 6.dp), contentAlignment = Alignment.Center) {
+    NxButton(t("threads.panel.loadMore"), onClick, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, loading = busy)
+}
+
 @Composable
 private fun GroupHead(text: String) = Txt(
     text,
-    style = Nx.type.label.copy(fontSize = Nx.type.sp(13f)),
+    style = Nx.type.label.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(650)),
     color = Nx.colors.textMuted,
-    modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 4.dp),
+    modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 2.dp).semantics { heading() },
 )
 
 @Composable
@@ -693,7 +724,5 @@ private fun ThreadListRow(serverId: String?, th: ThreadListing) {
                 Txt(if (count == 0) t("threads.chip.noMessages") else t("threads.chip.messages", "count" to count), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
             }
         }
-        val at = ch.lastMessageId?.let { Ids.createdAt(it) } ?: ch.createdAt
-        Txt(Time.relative(at), style = Nx.type.hint, color = c.textMuted, maxLines = 1)
     }
 }

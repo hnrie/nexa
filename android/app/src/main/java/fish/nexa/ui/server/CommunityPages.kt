@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -220,6 +221,8 @@ fun DiscoverySettingsPage(serverId: String) {
                 SelectField(listOf("" to t("discovery.anyLanguage")) + I18n.languages.map { it.tag to it.endonym }, lang, { language = it }, title = t("discovery.settings.language"))
             }
             Field(t("discovery.settings.preview"), hint = if (server.description.isBlank()) t("discovery.settings.noDescription") else null) {
+                // a card as wide as it is on Discover, not the whole page (the web's 340)
+                Box(Modifier.widthIn(max = 340.dp)) {
                 fish.nexa.ui.discovery.ServerCard(
                     fish.nexa.ui.discovery.DiscoveryCard(
                         id = server.id, name = server.name, iconId = server.iconId, bannerId = server.bannerId, description = server.description,
@@ -233,6 +236,7 @@ fun DiscoverySettingsPage(serverId: String) {
                     onTag = {},
                     onOpen = {},
                 )
+                }
             }
         }
     }

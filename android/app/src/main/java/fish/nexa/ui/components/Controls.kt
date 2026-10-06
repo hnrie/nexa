@@ -336,6 +336,8 @@ fun NxTextField(
     autoCorrect: Boolean = false,
     capitalize: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
+    /** Drawn inside the box before the words (`.iconInput`): an icon 10dp in, the words 32dp in. */
+    leading: (@Composable () -> Unit)? = null,
     mono: Boolean = false,
     /** The monospace text's size; AutoMod's lists of words are a little smaller, as the web's are. */
     monoSize: Float = 15f,
@@ -393,7 +395,7 @@ fun NxTextField(
                 keyboardActions = if (onIme != null) KeyboardActions(onAny = { onIme() }) else KeyboardActions.Default,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 12.dp, end = if (password || trailing != null) 46.dp else 12.dp, top = if (singleLine) 0.dp else 10.dp, bottom = if (singleLine) 0.dp else 10.dp)
+                    .padding(start = if (leading != null) 32.dp else 12.dp, end = if (password || trailing != null) 46.dp else 12.dp, top = if (singleLine) 0.dp else 10.dp, bottom = if (singleLine) 0.dp else 10.dp)
                     .semantics { if (label != null) contentDescription = label },
                 decorationBox = { inner ->
                     // a box of several lines starts at the top, its placeholder wrapping as the web's textarea does
@@ -417,6 +419,7 @@ fun NxTextField(
             } else if (trailing != null) {
                 Box(Modifier.align(Alignment.CenterEnd)) { trailing() }
             }
+            if (leading != null) Box(Modifier.align(Alignment.CenterStart).padding(start = 10.dp)) { leading() }
         }
         if (error != null) Txt(error, style = type.hint.copy(fontWeight = FontWeight(500)), color = c.textDanger)
         else if (hint != null) Txt(hint, style = type.hint, color = c.textMuted)

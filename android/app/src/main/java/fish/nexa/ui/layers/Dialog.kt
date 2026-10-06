@@ -76,6 +76,7 @@ private fun CenterDialog(
     val scope = rememberCoroutineScope()
     val shown = remember { Animatable(if (reduced) 1f else 0f) }
     LaunchedEffect(Unit) { shown.animateTo(1f, tween(240, easing = ease)) }
+    LaunchedEffect(Unit) { androidx.compose.runtime.snapshotFlow { shown.value }.collect { layer.dim = it.coerceIn(0f, 1f) } }
     layer.dismiss = {
         scope.launch {
             if (!reduced) shown.animateTo(0f, tween(160, easing = ease))

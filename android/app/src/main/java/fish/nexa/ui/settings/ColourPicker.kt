@@ -164,7 +164,7 @@ fun openColourPicker(name: String, value: String, alpha: Boolean, onChange: (Str
             Txt(t("settings.themeBuilder.opacity", "value" to (opacity * 100).toInt()), style = Nx.type.hint, color = c.textMuted)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.size(48.dp).clip(Radii.Sm).ring(Radii.Sm, c.borderSubtle)) {
+            Box(Modifier.size(48.dp).ring(Radii.Sm, c.borderSubtle).clip(Radii.Sm)) {
                 Canvas(Modifier.fillMaxSize()) {
                     checkerboard(6.dp.toPx(), c.bgSurface, c.bgActive)
                     drawRect(Looks.color(current()))
@@ -240,7 +240,7 @@ private fun Strip(label: String, fraction: Float, valueText: String, onChange: (
             },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.fillMaxWidth().height(28.dp).clip(shape).ring(shape, c.borderSubtle)) {
+        Box(Modifier.fillMaxWidth().height(28.dp).ring(shape, c.borderSubtle).clip(shape)) {
             Canvas(Modifier.fillMaxSize()) { paint() }
         }
         Canvas(Modifier.fillMaxSize()) {

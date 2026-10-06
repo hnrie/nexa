@@ -292,8 +292,9 @@ private fun CategoryChip(label: String, n: Int?, on: Boolean, onClick: () -> Uni
     Row(
         Modifier
             .heightIn(min = 40.dp)
+            .then(if (on) Modifier else Modifier.ring(shape, c.borderSubtle))
             .clip(shape)
-            .then(if (on) Modifier.background(brandGradient(c)) else Modifier.ring(shape, c.borderSubtle).background(c.bgSurface))
+            .then(if (on) Modifier.background(brandGradient(c)) else Modifier.background(c.bgSurface))
             .pressable(remember { MutableInteractionSource() }, onClick = onClick)
             .semantics { selected = on }
             .padding(horizontal = 14.dp),
@@ -392,8 +393,8 @@ internal fun ServerCard(card: DiscoveryCard, onTag: (String) -> Unit, onOpen: ()
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(shape)
             .ring(shape, if (pressed) c.border else c.borderSubtle)
+            .clip(shape)
             .background(c.bgRaised, shape)
             .topEdge(shape, c.edgeLight)
             .pressable(interaction, onClick = onOpen)
@@ -474,10 +475,19 @@ private fun ServerSheet(layer: Layer, card: DiscoveryCard, close: () -> Unit) {
         Box(Modifier.padding(start = 20.dp).offset(y = (-36).dp)) { ServerIconTile(card, 80.dp, 24.dp, c.bgFloating) }
         Column(Modifier.fillMaxWidth().offset(y = (-24).dp).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Txt(card.name, style = Nx.type.title.copy(fontSize = Nx.type.sp(24f), lineHeight = Nx.type.sp(28f)), color = c.textStrong)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Stats(card)
-                if (card.category.isNotEmpty()) Txt(t("discovery.cat.${card.category}"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted)
-                if (card.language.isNotEmpty()) Txt(languageName(card.language), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted)
+            // `.facts`: who is about, how many belong, and what it is
+            val fact = Nx.type.hint.copy(fontSize = Nx.type.sp(13.5f))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(Modifier.size(8.dp).background(c.statusOnline, CircleShape))
+                    Txt(t("discovery.online", "count" to card.onlineCount, "shown" to count(card.onlineCount)), style = fact, color = c.textMuted, maxLines = 1)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon("Users", c.textMuted, size = 14.dp)
+                    Txt(t("discovery.members", "count" to card.memberCount, "shown" to count(card.memberCount)), style = fact, color = c.textMuted, maxLines = 1)
+                }
+                if (card.category.isNotEmpty()) Txt(t("discovery.cat.${card.category}"), style = fact, color = c.textMuted)
+                if (card.language.isNotEmpty()) Txt(languageName(card.language), style = fact, color = c.textMuted)
             }
             if (card.description.isNotBlank()) fish.nexa.ui.markdown.MarkdownView(card.description, fish.nexa.ui.markdown.RenderCtx(surface = c.bgFloating))
             if (card.tags.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {

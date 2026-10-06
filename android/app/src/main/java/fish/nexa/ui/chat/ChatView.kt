@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import fish.nexa.Nexa
 import fish.nexa.data.KeyPins
 import fish.nexa.net.Channel
@@ -177,7 +178,7 @@ fun ChatHeader(channel: Channel) {
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Icon("ChevronLeft", c.textMuted, size = 14.dp)
-                            Txt(t("chat.chatView.inConversation", "name" to (parent?.let { Names.channel(it) } ?: "")), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
+                            Txt(t("chat.chatView.inConversation", "name" to (parent?.let { Names.channel(it) } ?: "")), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1, modifier = GoneWhenSqueezed)
                         }
                     }
                 }
@@ -197,7 +198,7 @@ fun ChatHeader(channel: Channel) {
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Icon("ChevronLeft", c.textMuted, size = 14.dp)
-                        Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
+                        Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1, modifier = GoneWhenSqueezed)
                     }
                 }
             }
@@ -309,10 +310,16 @@ private fun openMoreMenu(channel: Channel) {
 }
 
 /**
- * Two things side by side that share what room there is the way CSS flex
- * shrinking shares it: the second gives way four times as fast as the first
- * and never takes more than 40% (Chat.module.css `.hParent`).
+ * A name and the way back to where it lives, side by side (Chat.module.css
+ * `.hName` and `.hParent`): the name keeps its room, and the second takes at
+ * most 40% and gives way first, down to its arrow.
  */
+/** Squeezed past a few letters, the words go and the arrow before them stays. */
+private val GoneWhenSqueezed = Modifier.layout { m, cons ->
+    if (cons.maxWidth < 24.dp.roundToPx()) layout(0, 0) {}
+    else m.measure(cons).let { p -> layout(p.width, p.height) { p.place(0, 0) } }
+}
+
 @Composable
 private fun ShrinkPair(modifier: Modifier, content: @Composable () -> Unit) {
     Layout(content, modifier) { measurables, constraints ->
@@ -324,11 +331,10 @@ private fun ShrinkPair(modifier: Modifier, content: @Composable () -> Unit) {
         val b = minOf(second?.maxIntrinsicWidth(h) ?: 0, (w * 0.4f).toInt())
         var aw = a
         var bw = b
-        val over = a + b - w
-        if (over > 0) {
-            val share = a + 4f * b
-            aw = (a - over * (a / share)).toInt().coerceAtLeast(0)
-            bw = (w - aw).coerceAtLeast(0)
+        if (a + b > w) {
+            // the second gives way first, down to its arrow (its 8 of space and 14 of chevron); then the first
+            bw = minOf(b, maxOf(w - a, 22.dp.roundToPx()))
+            aw = (w - bw).coerceAtLeast(0)
         }
         val pa = first?.measure(Constraints(maxWidth = aw, maxHeight = h))
         val pb = second?.measure(Constraints(maxWidth = bw, maxHeight = h))

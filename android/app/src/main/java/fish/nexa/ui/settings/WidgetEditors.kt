@@ -937,9 +937,8 @@ private fun openCardEditor(initial: Widgets.CardWidget, isNew: Boolean, onDone: 
                     val (id, shape) = img
                     AsyncImage(
                         Media.widgetUrl(id, if (shape == "wide") 300 else 104, density), null, Media.loader,
-                        (if (shape == "wide") Modifier.widthIn(max = 300.dp).fillMaxWidth().aspectRatio(12f / 5f).clip(Radii.Sm) else Modifier.size(104.dp).clip(RoundedCornerShape(16.dp)))
-                            .background(c.bgActive)
-                            .ring(if (shape == "wide") Radii.Sm else RoundedCornerShape(16.dp), c.borderSubtle),
+                        (if (shape == "wide") Modifier.widthIn(max = 300.dp).fillMaxWidth().aspectRatio(12f / 5f).ring(Radii.Sm, c.borderSubtle).clip(Radii.Sm) else Modifier.size(104.dp).ring(RoundedCornerShape(16.dp), c.borderSubtle).clip(RoundedCornerShape(16.dp)))
+                            .background(c.bgActive),
                         contentScale = ContentScale.Crop,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

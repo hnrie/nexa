@@ -363,8 +363,15 @@ private fun DoChip(label: String, kind: String) {
 @Composable
 private fun KindPicker(existing: List<AutomodRule>, onPick: (String) -> Unit, onCancel: () -> Unit) {
     val c = Nx.colors
-    for ((head, kinds) in listOf(t("automod.page.appKinds") to KINDS.filter { !it.server }, t("automod.page.serverKinds") to KINDS.filter { it.server })) {
-        H5(head, top = 6.dp)
+    for ((i, group) in listOf(t("automod.page.appKinds") to KINDS.filter { !it.server }, t("automod.page.serverKinds") to KINDS.filter { it.server }).withIndex()) {
+        val (head, kinds) = group
+        // `.kindGroup`: 14/650 in the muted colour
+        Txt(
+            head,
+            style = Nx.type.body.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(650)),
+            color = c.textMuted,
+            modifier = Modifier.padding(top = if (i == 0) 0.dp else 18.dp, bottom = 8.dp).semantics { heading() },
+        )
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             for (k in kinds) {
                 val has = existing.count { it.kind == k.kind }
@@ -786,8 +793,9 @@ private fun AutomodLog(serverId: String) {
     when {
         failed && list == null -> LoadFailed(t("automod.log.failed")) { reload += 1 }
         list == null -> Loading(t("chat.pins.loading"))
-        list.isEmpty() -> Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Txt(t("automod.log.empty"), style = Nx.type.body.copy(fontWeight = FontWeight(700)), color = c.textStrong)
+        // `.empty`: a display-face heading over a short muted line
+        list.isEmpty() -> Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Txt(t("automod.log.empty"), style = Nx.type.headerTitle.copy(fontSize = Nx.type.sp(18f), fontWeight = FontWeight(700)), color = c.textStrong, align = androidx.compose.ui.text.style.TextAlign.Center)
             Txt(t("automod.log.emptyHint"), style = Nx.type.bodySmall, color = c.textMuted, align = androidx.compose.ui.text.style.TextAlign.Center)
         }
         else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

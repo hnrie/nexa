@@ -77,17 +77,18 @@ private fun FollowSheet(layer: Layer, channelId: String, close: () -> Unit) {
     Sheet(layer, title = t("follows.dialog.title", "name" to source.name), maxWidth = 460.dp, footer = {
         FooterButtons(t("follows.dialog.follow"), ::follow, close, enabled = targetId.isNotEmpty(), busy = busy)
     }) {
+        // `.keyNote`: set into the sheet, in small muted words
         Row(
             Modifier
                 .fillMaxWidth()
-                .ring(Radii.Md, Nx.colors.borderSubtle)
-                .background(Nx.colors.bgSurface, Radii.Md)
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .ring(Radii.Sm, Nx.colors.borderSubtle)
+                .background(androidx.compose.ui.graphics.lerp(Nx.colors.bgFloating, Nx.colors.bgBase, 0.6f), Radii.Sm)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            Icon("Megaphone", Nx.colors.positive, size = 16.dp, modifier = Modifier.padding(top = 2.dp))
-            Txt(t("follows.dialog.what"), style = Nx.type.bodySmall, color = Nx.colors.text)
+            Icon("Megaphone", Nx.colors.positive, size = 16.dp, modifier = Modifier.padding(top = 1.dp))
+            Txt(t("follows.dialog.what"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18.2f)), color = Nx.colors.textMuted)
         }
         if (targets.isEmpty()) DialogHint(t("follows.dialog.nowhere"))
         else {

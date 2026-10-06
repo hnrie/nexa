@@ -77,6 +77,10 @@ Swipe a message right to reply. Calls: a full stage with the controls in a float
 Alignment: text left-aligned (mirrored in Arabic); titles start-aligned in headers, centred only in
 empty states and sign-in, as the web does.
 
+Overlays: a dialog or sheet dims what is behind it and blurs it by 6 dp as its scrim shows
+(Modal.module.css), an open drawer blurs the page by 2 dp, and a menu only dims, as on the web.
+The blur needs Android 12; older phones only dim.
+
 ## 4. Principles
 
 1. **One product, two surfaces.** The same tokens, type, words (the web's own translation

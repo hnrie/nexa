@@ -566,10 +566,10 @@ private fun Notice(text: String, action: String, onAction: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .padding(bottom = 12.dp)
+            .ring(Radii.Md, c.borderSubtle)
             .clip(Radii.Md)
             .background(c.bgSurface)
             .background(sheen(c))
-            .ring(Radii.Md, c.borderSubtle)
             .padding(horizontal = 14.dp, vertical = 10.dp)
             .semantics { liveRegion = LiveRegionMode.Polite },
         horizontalArrangement = Arrangement.spacedBy(12.dp),

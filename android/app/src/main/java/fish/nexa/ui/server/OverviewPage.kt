@@ -30,7 +30,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import fish.nexa.Nexa
@@ -177,13 +176,14 @@ fun OverviewPage(serverId: String) {
                 }
             }
             NxTextField(name, { name = it.take(100) }, label = t("modals.createServer.serverName"), required = true, capitalize = true)
-            NxTextField(
-                description, { description = it.take(1000) },
-                label = t("server.serverOverview.serverDescription"),
-                hint = t("server.serverOverview.shownOnInvitePagesSoPeople"),
-                placeholder = t("server.serverOverview.whatIsThisServerAbout"),
-                singleLine = false, minLines = 3, imeAction = ImeAction.Default, capitalize = true, autoCorrect = true,
-            )
+            Field(t("server.serverOverview.serverDescription"), hint = t("server.serverOverview.shownOnInvitePagesSoPeople")) {
+                fish.nexa.ui.format.FormattedTextField(
+                    description, { description = it }, 1000,
+                    placeholder = t("server.serverOverview.whatIsThisServerAbout"),
+                    title = t("server.serverOverview.serverDescription"),
+                    serverId = serverId,
+                )
+            }
             Field(t("server.serverOverview.systemMessagesChannel"), hint = t("server.serverOverview.joinMessagesArePostedHere")) {
                 SelectField(
                     listOf("" to t("server.serverOverview.noSystemMessages")) + texts.map { it.id to "#${it.name}" },

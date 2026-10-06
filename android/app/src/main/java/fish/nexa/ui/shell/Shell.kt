@@ -48,6 +48,8 @@ import fish.nexa.ui.chat.ServerPage
 import fish.nexa.ui.chat.DmPage
 import fish.nexa.ui.components.pressable
 import fish.nexa.ui.layers.LayerHost
+import fish.nexa.ui.layers.SCRIM_BLUR
+import fish.nexa.ui.layers.blurredBy
 import fish.nexa.ui.layers.Layers
 import fish.nexa.ui.nav.Nav
 import fish.nexa.ui.nav.Route
@@ -185,7 +187,8 @@ fun MainShell() {
             }
         }
 
-        Column(Modifier.fillMaxSize().statusBarsPadding().then(swipe)) {
+        // what is behind a dialog or sheet blurs, and a little behind an open drawer (AppShell.module.css)
+        Column(Modifier.fillMaxSize().blurredBy { maxOf(SCRIM_BLUR * Layers.dim, 2.dp * maxOf(drawer.value, members.value)) }.statusBarsPadding().then(swipe)) {
             ConnectionBanner()
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (route) {
@@ -221,7 +224,8 @@ fun MainShell() {
                 .graphicsLayer {
                     translationX = -dir * (1f - drawer.value) * size.width
                     alpha = if (drawer.value <= 0.001f) 0f else 1f
-                },
+                }
+                .blurredBy { SCRIM_BLUR * Layers.dim },
         ) {
             NavDrawer(open = drawer.value > 0.5f)
         }
@@ -239,7 +243,8 @@ fun MainShell() {
                     .width(min(screenW.value - 56f, 320f).dp)
                     .fillMaxHeight()
                     .align(if (rtl) Alignment.CenterStart else Alignment.CenterEnd)
-                    .graphicsLayer { translationX = dir * (1f - members.value) * size.width },
+                    .graphicsLayer { translationX = dir * (1f - members.value) * size.width }
+                    .blurredBy { SCRIM_BLUR * Layers.dim },
             ) {
                 MemberDrawer()
             }

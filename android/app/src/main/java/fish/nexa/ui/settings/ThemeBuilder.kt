@@ -493,7 +493,7 @@ private fun Specimen() {
     val c = Nx.colors
     val shape = Radii.Md
     val small = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18.2f))
-    Column(Modifier.fillMaxWidth().clip(shape).ring(shape, c.borderSubtle).background(c.bgRaised, shape)) {
+    Column(Modifier.fillMaxWidth().ring(shape, c.borderSubtle).clip(shape).background(c.bgRaised, shape)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Icon("Hash", c.icon, size = 15.dp)
             Txt(t("settings.themeBuilder.sampleChannel"), style = small.copy(fontWeight = FontWeight(600)), color = c.textStrong)

@@ -45,7 +45,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -382,8 +381,8 @@ private fun Tools(q: String, onQ: (String) -> Unit, sort: String, layout: String
         Box(
             Modifier
                 .size(46.dp)
-                .clip(Radii.Sm)
                 .ring(Radii.Sm, c.borderSubtle)
+                .clip(Radii.Sm)
                 .background(if (pressed) c.bgHover else c.bgSurface)
                 .pressable(interaction, onClick = onView)
                 .semantics { contentDescription = t("forum.view.title") + ": " + (if (sort == "created") t("forum.sort.created") else t("forum.sort.activity")) + ", " + (if (layout == "gallery") t("forum.layout.gallery") else t("forum.layout.list")) },
@@ -410,8 +409,9 @@ private fun TagFilter(all: List<ForumTag>, on: List<String>, toggle: (String) ->
             Row(
                 Modifier
                     .heightIn(min = 36.dp)
+                    .then(if (chosen) Modifier else Modifier.ring(shape, c.borderSubtle))
                     .clip(shape)
-                    .then(if (chosen) Modifier.background(brandGradient(c)) else Modifier.ring(shape, c.borderSubtle).background(c.bgSurface))
+                    .then(if (chosen) Modifier.background(brandGradient(c)) else Modifier.background(c.bgSurface))
                     .pressable(remember { MutableInteractionSource() }) { toggle(tag.id) }
                     .semantics { selected = chosen }
                     .padding(horizontal = 12.dp),
@@ -450,8 +450,8 @@ private fun PostCard(post: Post, allTags: List<ForumTag>, layout: String, pinned
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(shape)
             .ring(shape, if (pressed) c.border else c.borderSubtle)
+            .clip(shape)
             .background(if (pressed) c.bgHover else c.bgRaised, shape)
             .topEdge(shape, c.edgeLight)
             .pressable(interaction, onClick = onOpen)
@@ -555,6 +555,7 @@ private fun NewPostSheet(layer: Layer, forumId: String, close: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val manage = Nexa.servers.canI(st, P.MANAGE_THREADS, forumId)
+    val canAttach = Nexa.servers.canI(st, P.ATTACH_FILES, forumId)
     val tags = forum.forum?.tags ?: emptyList()
     val notice = AutomodNotices.byChannel[forumId]
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -627,8 +628,9 @@ private fun NewPostSheet(layer: Layer, forumId: String, close: () -> Unit) {
                     Row(
                         Modifier
                             .heightIn(min = 36.dp)
+                            .then(if (chosen) Modifier else Modifier.ring(shape, c.borderSubtle))
                             .clip(shape)
-                            .then(if (chosen) Modifier.background(brandGradient(c)) else Modifier.ring(shape, c.borderSubtle).background(c.bgSurface))
+                            .then(if (chosen) Modifier.background(brandGradient(c)) else Modifier.background(c.bgSurface))
                             .pressable(remember { MutableInteractionSource() }) {
                                 when {
                                     locked -> Nexa.ui.toast(t("forum.post.moderatedTag"))
@@ -649,27 +651,35 @@ private fun NewPostSheet(layer: Layer, forumId: String, close: () -> Unit) {
             }
             Txt(t("forum.post.tagsHint", "count" to 5), style = Nx.type.hint, color = c.textMuted)
         }
-        NxTextField(text, { text = it.take(Send.MAX_MESSAGE_LENGTH) }, label = t("forum.post.message"), placeholder = t("forum.post.messagePlaceholder"), singleLine = false, minLines = 4, imeAction = ImeAction.Default, capitalize = true, autoCorrect = true)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NxButton(t("forum.post.addFiles"), { pick.launch(arrayOf("*/*")) }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "Paperclip", enabled = files.size < MAX_POST_FILES)
-            Spacer(Modifier.weight(1f))
-            Txt(t("composer.limit.left", "count" to (Send.MAX_MESSAGE_LENGTH - text.length)), style = Nx.type.hint, color = c.textMuted)
+        fish.nexa.ui.server.Field(t("forum.post.message")) {
+            fish.nexa.ui.format.FormattedTextField(
+                text, { text = it }, Send.MAX_MESSAGE_LENGTH,
+                placeholder = t("forum.post.messagePlaceholder"),
+                title = t("forum.post.message"),
+                serverId = serverId,
+                minLines = 6,
+            )
         }
-        if (files.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        // `.files`: the picked files as small cards, with the button after them
+        if (canAttach) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
             for (f in files.toList()) Row(
-                Modifier.fillMaxWidth().ring(Radii.Sm, c.borderSubtle).background(c.bgSurface, Radii.Sm).padding(start = 12.dp, end = 4.dp),
+                Modifier.heightIn(min = 40.dp).ring(Radii.Sm, c.borderSubtle).background(c.bgSurface, Radii.Sm).padding(start = 8.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(if (f.type.startsWith("image/")) "Image" else "File", c.textMuted, size = 16.dp)
-                Txt(f.name, style = Nx.type.bodySmall, color = c.text, maxLines = 1, modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
+                if (f.preview != null && f.type.startsWith("image/")) AsyncImage(java.io.File(f.preview), null, Modifier.size(32.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop)
+                else Icon("File", c.textMuted, size = 20.dp)
+                Txt(f.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.text, maxLines = 1, modifier = Modifier.widthIn(max = 150.dp))
+                Txt(fish.nexa.ui.Time.bytes(f.size), style = Nx.type.hint.copy(fontSize = Nx.type.sp(12f)), color = c.textMuted, maxLines = 1)
                 Box(
-                    Modifier.size(44.dp).pressable(remember { MutableInteractionSource() }) {
+                    Modifier.size(36.dp).clip(RoundedCornerShape(6.dp)).pressable(remember { MutableInteractionSource() }) {
                         files.remove(f)
                         f.file.delete()
-                    }.semantics { contentDescription = t("composer.composer.remove") },
+                    }.semantics { contentDescription = t("composer.composer.removeNamed", "name" to f.name) },
                     contentAlignment = Alignment.Center,
-                ) { Icon("X", c.textMuted, size = 16.dp) }
+                ) { Icon("X", c.icon, size = 14.dp) }
             }
+            if (files.size < MAX_POST_FILES) NxButton(t("forum.post.addFiles"), { pick.launch(arrayOf("*/*")) }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "Paperclip")
         }
         problem?.let { Txt(it, style = Nx.type.bodySmall, color = c.textDanger) }
     }

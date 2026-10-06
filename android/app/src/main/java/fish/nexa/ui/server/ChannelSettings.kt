@@ -36,7 +36,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import fish.nexa.Nexa
@@ -262,24 +261,26 @@ private fun ChannelOverviewPage(ch: Channel) {
                 label = nameLabel,
                 required = true,
                 capitalize = !slugged,
-                trailing = {
+                leading = {
                     // what the channel list will show, as it is being picked below
-                    Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
-                        ChannelGlyph(ch.copy(type = if (textLike) (if (announce) "announcement" else "text") else ch.type, glyph = glyph), 18.dp, Nx.colors.textMuted, cut = Nx.colors.bgInput)
-                    }
+                    ChannelGlyph(ch.copy(type = if (textLike) (if (announce) "announcement" else "text") else ch.type, glyph = glyph), 16.dp, Nx.colors.textMuted, cut = Nx.colors.bgInput)
                 },
             )
             if (!thread) Field(
                 if (ch.isCategory) t("server.channelIcon.categoryTitle") else t("server.channelIcon.title"),
                 hint = if (ch.isCategory) t("server.channelIcon.categoryHint") else t("server.channelIcon.hint"),
             ) { ChannelIconPicker(ch, glyph) { glyphEdit = it } }
-            if (textLike || forum) NxTextField(
-                topic, { topicEdit = it.take(1024) },
-                label = if (forum) t("forum.settings.guidelines") else t("server.channelSettings.channelTopic"),
-                hint = (if (forum) t("forum.settings.guidelinesHint") + " " else "") + t("server.channelSettings.charactersLeft", "count" to 1024 - topic.length),
-                placeholder = if (forum) t("forum.settings.guidelinesPlaceholder") else t("server.channelSettings.letEveryoneKnowHowToUse"),
-                singleLine = false, minLines = 3, imeAction = ImeAction.Default, capitalize = true, autoCorrect = true,
-            )
+            if (textLike || forum) Field(
+                if (forum) t("forum.settings.guidelines") else t("server.channelSettings.channelTopic"),
+                hint = if (forum) t("forum.settings.guidelinesHint") else null,
+            ) {
+                fish.nexa.ui.format.FormattedTextField(
+                    topic, { topicEdit = it }, 1024,
+                    placeholder = if (forum) t("forum.settings.guidelinesPlaceholder") else t("server.channelSettings.letEveryoneKnowHowToUse"),
+                    title = if (forum) t("forum.settings.guidelines") else t("server.channelSettings.channelTopic"),
+                    serverId = ch.serverId,
+                )
+            }
             if (textLike) ToggleLine(t("follows.settings.announcement"), announce, { announceEdit = it }, description = t("follows.settings.announcementDesc"))
             if (forum) ForumTagsEditor(tags) { tagsEdit = it }
             if (forum) ToggleLine(t("forum.settings.requireTag"), requireTag, { requireTagEdit = it }, description = t("forum.settings.requireTagDesc"))

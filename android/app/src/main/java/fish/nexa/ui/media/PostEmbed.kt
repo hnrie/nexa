@@ -259,7 +259,7 @@ private fun Face(avatar: String?, icon: String?, name: String, size: Int, tint: 
     val c = Nx.colors
     var broken by remember(avatar) { mutableStateOf(false) }
     if (!avatar.isNullOrEmpty() && !broken) {
-        AsyncImage(avatar, null, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.size(size.dp).clip(CircleShape).ring(CircleShape, c.borderSubtle).background(c.bgInput), onError = { broken = true })
+        AsyncImage(avatar, null, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.size(size.dp).ring(CircleShape, c.borderSubtle).clip(CircleShape).background(c.bgInput), onError = { broken = true })
         return
     }
     Box(Modifier.size(size.dp).clip(CircleShape).background(mixSrgb(c.bgSurface, tint, 0.18f)), contentAlignment = Alignment.Center) {

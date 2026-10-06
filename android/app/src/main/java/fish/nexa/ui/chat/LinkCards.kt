@@ -551,7 +551,7 @@ private fun PackCard(pack: StickerPack) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(
-                Modifier.size(56.dp).clip(RoundedCornerShape(17.dp)).background(c.bgActive).ring(RoundedCornerShape(17.dp), c.borderSubtle),
+                Modifier.size(56.dp).ring(RoundedCornerShape(17.dp), c.borderSubtle).clip(RoundedCornerShape(17.dp)).background(c.bgActive),
                 contentAlignment = Alignment.Center,
             ) {
                 if (cover != null) PackItem(cover, emoji, if (emoji) 32.dp else 56.dp)

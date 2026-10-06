@@ -47,6 +47,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import fish.nexa.Nexa
@@ -430,9 +431,9 @@ private fun FilterChip(label: String, icon: String? = null, on: Boolean, menu: B
     Row(
         Modifier
             .heightIn(min = 36.dp)
+            .ring(shape, if (on) c.brand.copy(alpha = 0.7f) else c.borderSubtle)
             .clip(shape)
             .background(if (on) mixSrgb(c.brand, c.bgSurface, 0.78f) else if (pressed) c.bgHover else c.bgSurface, shape)
-            .ring(shape, if (on) c.brand.copy(alpha = 0.7f) else c.borderSubtle)
             .pressable(interaction, role = if (toggle) Role.Switch else Role.Button, onClick = onClick)
             .semantics { if (toggle) stateDescription = if (on) "on" else "off" else if (on) selected = true }
             .padding(start = if (icon != null) 10.dp else 12.dp, end = if (menu) 8.dp else 12.dp),
@@ -751,8 +752,9 @@ private fun ModViewSheet(layer: Layer, serverId: String, userId: String, onChang
                     d.join?.let { j ->
                         Fact(
                             t("members.col.joinMethod"),
-                            joinMethodLabel(j.joinMethod) + (j.joinCode.ifEmpty { null }?.let { " $it" } ?: ""),
+                            joinMethodLabel(j.joinMethod),
                             j.invitedBy?.let { t("members.mod.invitedBy", "name" to Names.display(users[it])) },
+                            code = j.joinCode.ifEmpty { null },
                         )
                     }
                     Fact(t("members.mod.messages"), d.messageCount.toString())
@@ -797,15 +799,23 @@ private fun Block(head: String, content: @Composable () -> Unit) {
     }
 }
 
-/** One fact about the member: what it is on the left, the answer beside it. */
+/** One fact about the member: what it is on the left, the answer beside it (with an invite's code in code type). */
 @Composable
-private fun Fact(label: String, value: String, sub: String? = null, last: Boolean = false) {
+private fun Fact(label: String, value: String, sub: String? = null, last: Boolean = false, code: String? = null) {
     val c = Nx.colors
     Column {
         Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, modifier = Modifier.weight(0.42f))
             Column(Modifier.weight(0.58f)) {
-                Txt(value, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text)
+                if (code == null) Txt(value, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text)
+                else androidx.compose.foundation.text.BasicText(
+                    androidx.compose.ui.text.buildAnnotatedString {
+                        append(value)
+                        append(" ")
+                        withStyle(androidx.compose.ui.text.SpanStyle(fontFamily = Nx.type.code.fontFamily, fontSize = Nx.type.sp(13f))) { append(code) }
+                    },
+                    style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), color = c.text),
+                )
                 if (sub != null) Txt(sub, style = Nx.type.hint, color = c.textMuted)
             }
         }

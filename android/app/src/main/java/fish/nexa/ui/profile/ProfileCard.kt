@@ -381,7 +381,8 @@ private fun ProfileTop(
                         Modifier
                             .boxShadow(CircleShape, 8f, 16f, c.shadeAt(0.55f))
                             .then(
-                                if (onAvatar != null) Modifier.clip(CircleShape).pressable(remember { MutableInteractionSource() }, onClick = onAvatar)
+                                // not clipped to the circle: the status dot sits over its edge
+                                if (onAvatar != null) Modifier.pressable(remember { MutableInteractionSource() }, onClick = onAvatar)
                                     .semantics { contentDescription = t("profile.profileCard.viewFullProfileOf", "name" to Names.display(user)) }
                                 else Modifier,
                             ),
