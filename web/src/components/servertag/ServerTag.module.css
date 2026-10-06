@@ -1,8 +1,9 @@
 /*
  * A server tag beside a name: a small pill in the tag's own colour, its
- * badge and its letters. The colour is the tag's, mixed toward the theme's
- * strongest text for the letters and toward nothing for the pill, so it reads
- * on every panel in every theme without the admins having to think about it.
+ * badge and its letters. The letters are white. On dark themes the pill is a
+ * faint tint of the tag's colour; on light ones, where white would vanish on
+ * a faint tint, it is filled with the colour, darkened enough for white to
+ * read even when the tag is pale.
  * --tag is the colour; the accent when the tag has none.
  */
 .chip {
@@ -30,6 +31,9 @@
 }
 .chip[data-size="sm"] { --h: 16px; font-size: 10.5px; padding-inline: 3px 5px; border-radius: 5px; }
 .chip[data-size="lg"] { --h: 24px; gap: 5px; font-size: 13.5px; padding-inline: 6px 9px; border-radius: 8px; }
+[data-theme="light"] .chip { background: color-mix(in oklab, var(--tag), black 28%); box-shadow: none; }
+[data-theme="light"] .chip .badge { color: rgb(255, 255, 255); }
+[data-theme="light"] button.chip:hover { background: color-mix(in oklab, var(--tag), black 40%); box-shadow: none; }
 button.chip { cursor: pointer; transition: background-color var(--transition), box-shadow var(--transition); }
 button.chip:hover { background: color-mix(in oklab, var(--tag) 30%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tag) 60%, transparent); }
 button.chip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }

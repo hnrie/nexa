@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -110,24 +111,27 @@ fun ServerTagChip(tag: WornTag, small: Boolean = false, size: String = if (small
     val shape = RoundedCornerShape(s.radius.dp)
     val ref = remember { AnchorRef() }
     val label = t("serverTag.chipLabel", "tag" to tag.text)
+    // white letters (ServerTag.module.css): a faint tint of the colour on dark themes, and on light
+    // ones a fill of it darkened enough for white to read even when the tag is pale
+    val fill = if (c.isLight) mixOklab(color, Color.Black, 0.28f) else color.copy(alpha = 0.20f)
     Row(
         Modifier
             .anchor(ref)
             // as tall as its words when the phone's text is set large
             .heightIn(min = s.height.dp)
-            .ring(shape, color.copy(alpha = 0.42f), 1.dp)
-            .background(color.copy(alpha = 0.20f), shape)
+            .then(if (c.isLight) Modifier else Modifier.ring(shape, color.copy(alpha = 0.42f), 1.dp))
+            .background(fill, shape)
             .then(if (open && tag.serverId.isNotEmpty()) Modifier.pressable(remember { MutableInteractionSource() }) { openTagPopout(tag, ref) } else Modifier)
             .semantics { contentDescription = label }
             .padding(start = s.padStart.dp, end = s.padEnd.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(s.gap.dp),
     ) {
-        TagBadge(tag.badge.ifEmpty { "icon:sparkles" }, s.height - 6, mixOklab(color, c.textStrong, 0.18f), s.badge)
+        TagBadge(tag.badge.ifEmpty { "icon:sparkles" }, s.height - 6, if (c.isLight) Color.White else mixOklab(color, c.textStrong, 0.18f), s.badge)
         Txt(
             tag.text,
             style = Nx.type.hint.copy(fontSize = Nx.type.sp(s.text), fontWeight = FontWeight(700), letterSpacing = 0.01.em, fontFeatureSettings = "tnum"),
-            color = mixOklab(color, c.textStrong, 0.40f), maxLines = 1,
+            color = Color.White, maxLines = 1,
         )
     }
 }
