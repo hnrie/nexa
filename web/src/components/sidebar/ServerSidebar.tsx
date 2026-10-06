@@ -7,8 +7,10 @@ import { servers as serversApi, type ChannelPositionPatch } from "@/api/servers"
 import { bannerUrl } from "@/api/users";
 import { ChannelGlyph } from "@/components/common/ChannelGlyph";
 import { VoiceParticipants } from "@/components/voice/VoiceParticipants";
+import { moveMember, moveTargets } from "@/components/voice/voiceModeration";
 import { joinVoice } from "@/voice/session";
 import { useVoice } from "@/stores/voice";
+import { useVoiceDrag } from "@/stores/voiceDrag";
 import { Tooltip } from "@/components/common/Tooltip";
 import { P, isPrivateChannel } from "@/lib/perms";
 import { isMuted } from "@/lib/unread";
@@ -18,6 +20,10 @@ import { holdsThreads } from "@/lib/threads";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { canI, useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
+import { useAuth } from "@/stores/auth";
+import { useTypingIn } from "@/stores/typing";
+import { useUsers } from "@/stores/users";
+import { memberName } from "@/lib/names";
 import { useUI } from "@/stores/ui";
 import { categoryMenuItems, channelMenuItems, serverMenuItems } from "./serverMenu";
 import s from "./ServerSidebar.module.css";
@@ -55,6 +61,9 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const [drop, setDrop] = useState<Drop | null>(null);
   const voiceByChannel = useVoice((v) => v.byChannel);
+  // someone being dragged out of a voice channel by a moderator, and where they would land
+  const memberDrag = useVoiceDrag((d) => d.drag);
+  const memberOver = useVoiceDrag((d) => d.over);
   const headRef = useRef<HTMLButtonElement>(null);
   // A banner scrolls away with the channels under the name, which sits over
   // it until the list has scrolled past it and then takes the plain header's
@@ -131,6 +140,8 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   // the whole channel tree, every tooltip and every call's participant rows
   const dropAt = (id: string, where: Drop["where"]) => setDrop((d) => (d && d.id === id && d.where === where ? d : { id, where }));
   const onDragOver = (e: DragEvent, target: Channel) => {
+    // a person being moved is the voice channel's to take, below
+    if (memberDrag) return;
     if (!drag || drag.id === target.id) return;
     if (drag.kind === "category" && target.type !== "category" && !target.parent_id) return;
     e.preventDefault();
@@ -197,6 +208,36 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
     setDrop(null);
   };
 
+  // --- moving someone in a call to another voice channel (Move Members) ---
+  /** The drop handlers of a voice channel's block, its row and the people under it: a person dragged there is moved there. */
+  const memberDrop = (ch: Channel) => {
+    const lands = () => !!memberDrag && memberDrag.serverId === serverId && memberDrag.from !== ch.id && moveTargets(serverId, memberDrag.userId, memberDrag.from).some((c) => c.id === ch.id);
+    return {
+      onDragOver: (e: DragEvent) => {
+        if (!memberDrag) return;
+        if (!lands()) {
+          useVoiceDrag.getState().hover(null);
+          return;
+        }
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        useVoiceDrag.getState().hover(ch.id);
+      },
+      onDragLeave: (e: DragEvent) => {
+        // out of the block altogether, not onto something inside it
+        if (memberOver === ch.id && !e.currentTarget.contains(e.relatedTarget as Node | null)) useVoiceDrag.getState().hover(null);
+      },
+      onDrop: (e: DragEvent) => {
+        if (!memberDrag) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const d = memberDrag;
+        useVoiceDrag.getState().end();
+        if (lands()) void moveMember(serverId, d.userId, ch.id);
+      },
+    };
+  };
+
   if (!st) return <div className={s.sidebar} />;
 
   /** A thread under its channel, joined or open: the line from the channel says whose it is. */
@@ -229,6 +270,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
           <span className={s.name} dir="auto">{th.name}</span>
           {mentions > 0 ? <span className="visually-hidden">{`, ${t("sidebar.serverSidebar.mentionsCount", { count: mentions })}`}</span> : unread && !selected ? <span className="visually-hidden">{`, ${t("sidebar.serverSidebar.unread")}`}</span> : null}
         </button>
+        <ChannelTyping channelId={th.id} serverId={serverId} />
         {mentions > 0 ? <span className={s.mention} aria-hidden="true">{mentions > 99 ? "99+" : mentions}</span> : null}
       </div>
     );
@@ -248,7 +290,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
     const priv = isPrivateChannel(serverId, ch.overwrites);
     const muted = settings.notifications.muted.includes(ch.id);
     return (
-      <div key={ch.id}>
+      <div key={ch.id} className={ch.type === "voice" ? s.voiceBlock : undefined} data-member-drop={(ch.type === "voice" && memberOver === ch.id) || undefined} {...(ch.type === "voice" ? memberDrop(ch) : {})}>
       <div
         className={s.row}
         data-selected={selected}
@@ -293,6 +335,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
             </Tooltip>
           ) : null}
         </span>
+        <ChannelTyping channelId={ch.id} serverId={serverId} />
         {mentions > 0 ? <span className={s.mention} aria-hidden="true">{mentions > 99 ? "99+" : mentions}</span> : null}
       </div>
       {ch.type === "voice" ? <VoiceParticipants channelId={ch.id} serverId={serverId} /> : null}
@@ -342,5 +385,37 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
         {tree.loose.length === 0 && tree.categories.length === 0 ? <div className={s.empty}>{t("sidebar.serverSidebar.noChannelsYouCanSeeYet")}</div> : null}
       </div>
     </div>
+  );
+}
+
+/** "Alice is typing…", "Alice and Bob are typing…", as the typing line under a conversation says it. */
+export function typingSentence(names: string[]): string {
+  if (names.length === 1) return t("chat.typingBar.oneTyping", { a: names[0]! });
+  if (names.length === 2) return t("chat.typingBar.twoTyping", { a: names[0]!, b: names[1]! });
+  if (names.length === 3) return t("chat.typingBar.threeTyping", { a: names[0]!, b: names[1]!, c: names[2]! });
+  return t("chat.typingBar.severalPeopleAreTyping");
+}
+
+/**
+ * Dots at the end of a channel's row while someone types in it, so a server
+ * shows where people are talking before anything is sent. Each row listens to
+ * its own channel only. Settings, Chat turns them off.
+ */
+function ChannelTyping({ channelId, serverId }: { channelId: string; serverId: string }) {
+  const meId = useAuth((a) => a.me?.id);
+  const on = useSettings((x) => x.settings.typingChannels !== false);
+  const typers = useTypingIn(on ? channelId : null, meId);
+  if (typers.length === 0) return null;
+  const members = useServers.getState().byId[serverId]?.members;
+  const users = useUsers.getState().byId;
+  const label = typingSentence(typers.map((id) => memberName(members?.[id]?.nickname, users[id], t("names.unknownUser"))));
+  return (
+    <Tooltip text={label} side="top">
+      <span className={s.typing} role="img" aria-label={label} data-testid="channel-typing">
+        <i />
+        <i />
+        <i />
+      </span>
+    </Tooltip>
   );
 }

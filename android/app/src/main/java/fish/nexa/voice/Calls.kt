@@ -83,7 +83,7 @@ object Calls {
             VoiceLocal.state.collect { st ->
                 if (st.muted != prev.muted) Sounds.play(if (st.muted) Sounds.Name.MUTE else Sounds.Name.UNMUTE)
                 prev = st
-                Engine.setOutputMuted(st.deafened)
+                Engine.setOutputMuted(Engine.outputSilenced())
                 Engine.applyTransmit()
                 val cur = Engine.current()
                 if (cur?.announced == true) sendState(cur.channelId)
@@ -413,7 +413,9 @@ object Calls {
                     return
                 }
                 // a join this device has since given up on; its leave is on the way
+                val was = Voice.state.value.mine
                 if (cur == null || !Engine.onMine(vs)) return
+                moderatorNotice(was, vs, cur)
                 checkAlone(ch)
                 CallService.update()
                 return
@@ -422,6 +424,9 @@ object Calls {
             if (vs.reason == "moved") {
                 leaveNow(false)
                 Nexa.ui.toast(t("session.yourCallMovedToAnotherDevice"))
+            } else if (vs.reason == "disconnected") {
+                leaveNow(false)
+                Nexa.ui.toast(t("voice.moderation.youWereDisconnected"))
             } else if (!elsewhere) {
                 // put out by the server: a kick, a deleted channel, a moderator
                 leaveNow(false)
@@ -438,6 +443,25 @@ object Calls {
             "left" -> Sounds.play(Sounds.Name.LEAVE)
         }
         checkAlone(cur)
+    }
+
+    /**
+     * Says what a moderator just did to this account's own call: moved it to
+     * another channel, muted or deafened it, or lifted either (session.ts
+     * moderatorNotice). A channel that lets nobody speak mutes too, but that
+     * is the channel's doing and is said nowhere here.
+     */
+    private fun moderatorNotice(was: VoiceState?, now: VoiceState, cur: String) {
+        val ch = now.channelId ?: return
+        if (ch != cur) {
+            val name = Nexa.channels.get(ch)?.name
+            Nexa.ui.toast(if (name != null) t("voice.moderation.youWereMovedTo", "channel" to name) else t("voice.moderation.youWereMoved"))
+            return
+        }
+        if (was == null || was.channelId != ch) return
+        fun modMute(v: VoiceState) = v.serverMute && !v.suppress
+        if (modMute(now) != modMute(was)) Nexa.ui.toast(if (modMute(now)) t("voice.moderation.youWereMuted") else t("voice.moderation.youWereUnmuted"))
+        if (now.serverDeaf != was.serverDeaf) Nexa.ui.toast(if (now.serverDeaf) t("voice.moderation.youWereDeafened") else t("voice.moderation.youWereUndeafened"))
     }
 
     private suspend fun onVoiceError(code: String, message: String) {

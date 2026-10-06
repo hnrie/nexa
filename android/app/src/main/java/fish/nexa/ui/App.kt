@@ -165,9 +165,9 @@ fun App() {
                 is AuthState.Offline -> OfflineScreen(s)
                 // while banned, the ban screen stands in place of the whole app
                 is AuthState.Ready -> {
-                    // a newer build of the app is offered once in, and again on coming back after a while
+                    // the app's own updates: looked for soon after it opens, every minute while it is in front, and on coming back
                     val visible by Nexa.ui.visible.collectAsState()
-                    LaunchedEffect(visible) { if (visible) AppUpdate.check() }
+                    LaunchedEffect(visible) { if (visible) AppUpdate.resume() }
                     val isBanned = banned()
                     // back from a ban: the connection the server shut is opened again
                     var wasBanned by remember { mutableStateOf(false) }

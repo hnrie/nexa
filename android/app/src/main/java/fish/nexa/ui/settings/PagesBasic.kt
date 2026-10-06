@@ -129,11 +129,21 @@ fun ChatSettingsPage() {
         t("settings.appearance.smartEmojiHint"), anchor = "smartEmoji",
     )
 
-    SectionHeading(t("settings.chat.reading"))
+    SectionHeading(t("settings.chat.typingHeading"))
     ToggleRow(
         t("settings.chat.customTyping"), doc.bool("customTyping", true), { setSetting("customTyping", it) },
         t("settings.chat.customTypingHint"), anchor = "customTyping",
     )
+    ToggleRow(
+        t("settings.chat.typingAvatars"), doc.bool("typingAvatars", true), { setSetting("typingAvatars", it) },
+        t("settings.chat.typingAvatarsHint"), anchor = "typingAvatars",
+    )
+    ToggleRow(
+        t("settings.chat.typingChannels"), doc.bool("typingChannels", true), { setSetting("typingChannels", it) },
+        t("settings.chat.typingChannelsHint"), anchor = "typingChannels",
+    )
+
+    SectionHeading(t("settings.chat.reading"))
     ToggleRow(
         t("settings.notifications.readTtsAloud"), doc.bool("tts", true), { setSetting("tts", it) },
         t("settings.notifications.readTtsAloudHint"), anchor = "tts",

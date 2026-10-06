@@ -89,8 +89,10 @@ class SfuTransport(
     private var audioTrack: AudioTrack? = null
     private var videoTrack: VideoTrack? = null
     private var screenTrack: VideoTrack? = null
-    private var screenBitrate = 5_000_000
+    private var screenBitrate = 6_000_000
     private var screenFps = 30
+    /** How the share is sized to what the link carries; made again for every share. */
+    private var shareAdapter = ShareAdapter(30)
     /** Whether the screen's transceiver was published in H.264 (preferH264) rather than VP8. */
     private var screenH264 = false
     /** A republishScreen waiting its turn (done, too, when a reconnect skipped it). */
@@ -142,7 +144,7 @@ class SfuTransport(
         refreshKeys()
         timers += scope.launch { while (isActive) { delay(KEY_CHECK_MS); refreshKeys() } }
         timers += scope.launch { while (isActive) { delay(1_000); checkReceivers() } }
-        timers += scope.launch { while (isActive) { delay(LOSS_CHECK_MS); runCatching { checkLoss() }; recapSenders() } }
+        timers += scope.launch { while (isActive) { delay(LOSS_CHECK_MS); runCatching { checkLoss() }; retuneShare() } }
     }
 
     private fun slot(userId: String, kind: PubKind) = "$userId:${kind.wire}"
@@ -577,7 +579,7 @@ class SfuTransport(
             tr.sender.setFrameEncryptor(encryptor)
             encryptors[kind] = encryptor
             if (kind == PubKind.VIDEO) VideoCap.capSender(tr.sender, VideoCap.CAMERA_BPS)
-            if (kind == PubKind.SCREEN) VideoCap.capSender(tr.sender, screenBitrate, fps = screenFps, degradation = VideoCap.shareDegradation(screenFps))
+            if (kind == PubKind.SCREEN) VideoCap.capShare(tr.sender, screenBitrate, screenFps)
             senders[kind] = tr
             added += kind
         }
@@ -674,6 +676,7 @@ class SfuTransport(
         screenTrack = track
         screenBitrate = VideoCap.clampShareBitrate(bitrate)
         if (fps > 0) screenFps = fps
+        if (track != null) shareAdapter = ShareAdapter(screenFps)
         val tr = senders[PubKind.SCREEN]
         // a share starting on a transceiver of the other codec is published again in the one the call can watch
         if (tr != null && track != null && wantsH264() != screenH264) {
@@ -682,14 +685,19 @@ class SfuTransport(
         }
         if (tr != null) {
             runCatching { tr.sender.setTrack(track, false) }
-            if (track != null) VideoCap.capSender(tr.sender, screenBitrate, fps = screenFps, degradation = VideoCap.shareDegradation(screenFps))
+            if (track != null) VideoCap.capShare(tr.sender, screenBitrate, screenFps)
         } else if (track != null) publish(listOf(PubKind.SCREEN))
     }
 
-    /** Pictures going out stay within the size cap whatever comes in. */
-    private fun recapSenders() {
-        // capture sizes are fixed at the source here (1280x720 cameras, shares within their box),
-        // so the encodings keep the cap's frame rate and scale from capSender
+    /**
+     * A share in motion is sized to what the link carries (ShareAdapt). The
+     * camera needs nothing: capture sizes are fixed at the source here
+     * (1280x720, shares within their box), inside the cap.
+     */
+    private suspend fun retuneShare() {
+        val tr = senders[PubKind.SCREEN] ?: return
+        if (screenTrack == null) return
+        VideoCap.retuneShare(pc, tr.sender, shareAdapter)
     }
 
     private fun pauseVideo(message: String) {

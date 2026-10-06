@@ -423,8 +423,11 @@ export interface VoiceState {
   self_deaf: boolean;
   video: boolean;
   streaming: boolean;
+  /** A moderator's mute, or a channel that lets nobody speak (then `suppress` is set too). */
   server_mute: boolean;
   server_deaf: boolean;
+  /** The channel denies Speak: server_mute is set for that, not for anything a moderator did. */
+  suppress?: boolean;
   joined_at: number;
   /**
    * What this participant publishes through the SFU: each kind (audio, video,
@@ -441,8 +444,8 @@ export interface VoiceState {
   user?: CallUser;
   /** Set for someone in through a guest link, with the key epoch their link carried. */
   guest?: { epoch: number };
-  /** On a leave: "moved" when another device of the same account picked the call up. */
-  reason?: "moved";
+  /** On a leave: "moved" when another device of the same account picked the call up, "disconnected" when a moderator put them out. */
+  reason?: "moved" | "disconnected";
 }
 
 /** The flag on a user who is a guest in a call rather than an account. */

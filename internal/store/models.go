@@ -403,6 +403,11 @@ const (
 	// profile in the server says: they can look, and do nothing else, until
 	// a moderator lets them out or they change it.
 	MemberQuarantined int64 = 1
+	// MemberVoiceMuted and MemberVoiceDeafened are a moderator's server mute
+	// and deafen. They stay on the member, so leaving the call and joining it
+	// again does not lift them; only a moderator does.
+	MemberVoiceMuted    int64 = 2
+	MemberVoiceDeafened int64 = 4
 )
 
 // MemberJoin is how someone came into a server, for the people who may see

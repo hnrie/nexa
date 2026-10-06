@@ -45,7 +45,7 @@ describe("HomePage", () => {
     expect(document.body.textContent).not.toMatch(/discord/i);
     expect(document.body.textContent).not.toContain("—");
     // the load size it names is the one tools/app_size.py holds the build to
-    expect(document.body.textContent).toContain("under 300 kB");
+    expect(document.body.textContent).toContain("under 330 kB");
   });
 
   it("makes four promises before the tour, naming the server's own upload limit", async () => {

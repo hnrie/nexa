@@ -241,7 +241,12 @@ All start their own throwaway chatd: `tools/webhook_e2e.py` (every kind of webho
 sizes), `tools/discord_e2e.py` (Discord activity sync against the fake Discord in
 `internal/discordsync/fakediscord/cmd/fakediscord`), `tools/sfu_call.py` and `tools/sfu_guest.py`
 (real calls and a guest through Cloudflare Realtime, keys from `chatd.env`), `tools/call_quality.py`
-(calls over bad networks made by `tools/netsim`).
+(calls over bad networks made by `tools/netsim`), `tools/share_quality.py` (a screen share of hard
+motion through Cloudflare, timed frame by frame as the viewer sees it; the sharer is Chromium,
+Firefox or the desktop app's Electron in a hidden window, `--up-kbps`, `--loss` and `--down-loss`
+shape the links through netsim, results in `tools/out/share-quality`). Whatever a test starts must
+make no sound: Playwright's headless Chromium is muted, Electron and Firefox are muted by the
+scripts, and the emulator runs with `-no-audio`.
 
 ## Repository layout
 
@@ -452,6 +457,30 @@ who may pull which track. The usage meter pauses video near `REALTIME_MONTHLY_GB
 just short of it. A call through the SFU outlives a dropped socket for `voiceGrace`. Guest links let
 someone without an account into one call. Frames are encrypted in the apps.
 
+Moderators act on people in a server's voice channels with `PATCH /servers/{id}/members/{uid}/voice`
+(`mute`, `deaf`, `channel_id`, null to disconnect), checked against the permissions in the channel
+the person is in (Mute Members, Deafen Members, Move Members; a move also needs View Channel on the
+destination) and the role hierarchy; a guest can be muted or disconnected but not moved. A server
+mute or deafen is kept in the member's `server_members.flags` (2 muted, 4 deafened; 1 is AutoMod's
+quarantine) and applied again whenever they join a voice channel of that server. A voice state's
+`suppress` says the channel denies Speak (`server_mute` is set too, for older apps), and the leave
+of someone a moderator put out carries `reason: "disconnected"` ("moved" is another device of theirs
+taking the call). The menus are `components/voice/voiceModeration.ts` on the web, which also drags
+people between channels (`stores/voiceDrag.ts`), and `ui/voice/VoiceModeration.kt` on Android.
+
+How a screen share is sent was measured through the SFU with `tools/share_quality.py`, and the
+findings decide it (web `voice/media.ts`, `shareQuality.ts`, `shareAdapt.ts`; Android `VideoCap`,
+`ShareAdapt`). The track's content hint follows the chosen rate: none at 60 fps, `detail` at 30,
+`text` at 15. Chromium's `motion` hint shrinks a share while the bandwidth estimate is still low at
+the start and never grows it back (1080p60 stayed 480x270, 320x180 in Electron), and asking for
+`maintain-framerate` does the same, so a 60 fps share is sized by `ShareAdapter` instead: every few
+seconds it reads the encoder's `targetBitrate` and scales the picture just far enough for about 0.06
+bits a pixel a frame, growing back when there is room. A share's sender has high priority and the bitrate
+`shareBitrate` gives (9.9 Mbit/s at 1080p60). A watched share whose picture is stuck behind a lost
+frame asks its sender for a keyframe within about half a second (`stallWatch.ts`, read by `sfu.ts`
+`watchStalls`, through `FrameCrypto.requestKeyFrame` and the transform's `sendKeyFrameRequest`)
+where the browser waits about 3 s; Android's WebRTC has no way to ask.
+
 ### Nexa, moderation and safety
 
 - Nexa is the account the service speaks as: notices, announcements, and case threads where a
@@ -567,7 +596,9 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   `discord`, `desktop`, `ui` (modals), `tabs`, `selection`, `pick`, `uploads`, `unsaved`,
   `replyTargets`, `serverNav`, `slowmode`, `profilePopout`, `automodNotices`, `groupAddNotices`,
   `keyAlerts`, `threadLast` (each thread's newest message, for the card under the message it hangs
-  from).
+  from), `voiceDrag` (someone being dragged to another voice channel). `typing` keeps who is typing
+  where, for the status dot's typing pill and the dots beside server channels, both of which the
+  account's settings can turn off (`typingAvatars`, `typingChannels`).
 - `lib/decrypt.ts` turns a message into what the stores keep (webhook messages pass through
   `lib/webhookMessage.ts` instead). `lib/keyring.ts` holds the roots in memory and caches channel keys.
 
@@ -581,7 +612,9 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   `lib/search.ts` reads the query and its filters.
 - `voice/`: calls (`session.ts` for the app, `engine.ts`, `transport.ts` with `mesh.ts` and
   `sfu.ts`, `frameCrypto` and its worker, `playback.ts` per-person volume, `denoise.ts` RNNoise,
-  `opus.ts`, `redundancy.ts`, `videoCap.ts`, `shareQuality.ts`, `callRecord.ts` for DM call lines).
+  `opus.ts`, `redundancy.ts`, `videoCap.ts`, `shareQuality.ts`, `shareAdapt.ts` (sizing a 60 fps
+  share to the link), `stallWatch.ts` (a watched share stuck behind a lost frame), `callRecord.ts`
+  for DM call lines).
 - `lib/`: everything else, one concern per file. Notable groups: `look/` (themes, presets, the theme
   builder's maths, custom CSS and plugins with their API in `look/plugins`), `notes/` (the Yjs
   document, sessions, sharing, history), `automod/` (the client side of AutoMod), `spell/` (Hunspell
@@ -651,6 +684,24 @@ notes.
   (the web's `threadLast`), and `KeyManager` asks the holders again (`/keys/request`) while it waits.
 - There is no push service: `notify/ConnectionService` keeps the connection open in the background
   (on unless turned off) and `Notifier` raises alerts on the device.
+- Updates (`ui/AppUpdate`) work the way the desktop app's do: a look at `/api/v1/android/latest` ten
+  seconds after the app opens and every minute while it is in front (failures back off to fifteen
+  minutes), then the build for the phone's processor downloads in the background, resuming a broken
+  download with a Range request (If-Range on the SHA-256 the server sends as its ETag), and is
+  checked against its SHA-256 before it is offered. Install hands it to a `PackageInstaller` session
+  whose result comes back to `UpdateInstallReceiver`; while Android's screens for it are open,
+  `voice/Pip.held` keeps a call from floating over their buttons, which Android would then refuse to
+  press. Settings, About shows where it stands and the user panel a green button while a build
+  waits. Debug builds (`fish.nexa.debug`) never update themselves. To try it end to end, build two
+  releases with `tools/android_release.py --server http://10.0.2.2:$PORT --to <scratch dir>` (the
+  second with a higher versionCode, both with the debug network config copied into
+  `src/release/res/xml/` for that build only) and serve the newer folder with `ANDROID_DIR`.
+- Calls (`voice/`): `ShareAdapt` sizes a 60 fps share as the web's `shareAdapt.ts` does, and
+  `ui/voice/VoiceModeration.kt` is the moderators' voice menu (see Calls).
+- Compose redraws a composable only for state it collected: `Nexa.settings`' getters and the stores'
+  `get(...)` are plain reads, and a row that reads them can keep an old answer when its own
+  arguments did not change. Read what a composable shows through `collectAsState()` (or
+  `ui.shell.settingOn(key)` for a yes or no setting), in the composable that shows it.
 - The build's `copyWebAssets` task copies the web's locale files, sounds, emoji sprites,
   `whatsNew.ts` and the legal documents into the app; `assets/lucide.json`, `assets/emoji/` and
   `assets/licenses.json` come from `android/tools`.
@@ -665,8 +716,8 @@ notes.
 ## Tools (`tools/`)
 
 - Testing: `check.sh`, `e2e.py`, `screenshot.py`, `seed.py`, `webhook_e2e.py`, `discord_e2e.py`,
-  `sfu_call.py`, `sfu_guest.py`, `call_quality.py` with `netsim/`, `ios_sim.py` with `ios/`,
-  `app_size.py`.
+  `sfu_call.py`, `sfu_guest.py`, `call_quality.py` and `share_quality.py` with `netsim/`, `ios_sim.py`
+  with `ios/`, `app_size.py`.
 - i18n: `i18n_check.py`, `i18n_keys_used.py`, `i18n_apply.py` (write or merge a language's
   values), `i18n_extract.py` (pull hardcoded English into keys); `android/tools/add_strings.py`.
 - Releases: `android_release.py`, `mac_package.py`, `publish_desktop.py`, `licenses.py`.

@@ -100,6 +100,9 @@ import fish.nexa.ui.theme.positiveGradient
 import fish.nexa.ui.theme.ring
 import fish.nexa.ui.theme.brandGradient
 import fish.nexa.ui.theme.topEdge
+import fish.nexa.ui.theme.NexaColors
+import fish.nexa.ui.nav.Nav
+import fish.nexa.ui.nav.Route
 import fish.nexa.voice.AudioRoute
 import fish.nexa.voice.CallConnection
 import fish.nexa.voice.CallState
@@ -185,11 +188,16 @@ internal fun showsStream(t: Tile, state: CallState): Boolean = t.track != null &
 
 private fun isLive(t: Tile) = t.kind == Tile.Kind.SCREEN && !t.me
 
-/** The stage's own background: dark in every theme, lit faintly from above in the accent. */
-private fun Modifier.stageBackground(brand: Color): Modifier = drawBehind {
-    val base = Color(0xFF040307)
-    drawRect(base)
-    // radial-gradient(120% 70% at 50% -10%, brand 16% on #06040b, #040307 72%);
+/** The stage's ground: the theme's canvas (its surface colour in a light theme, where the tiles are raised white). */
+private fun stageBase(c: NexaColors): Color = if (c.isLight) c.bgSurface else c.bgCanvas
+
+/**
+ * The stage wears the theme that is on (Voice.module.css): its canvas, a step
+ * below the panels, lit faintly from above in the accent.
+ */
+private fun Modifier.stageBackground(c: NexaColors): Modifier = drawBehind {
+    drawRect(stageBase(c))
+    // radial-gradient(120% 70% at 50% -10%, canvas-glow, transparent 72%);
     // the glow's circle starts above the stage, so it is kept to the stage's box
     val ry = size.height * 0.7f
     val rx = size.width * 1.2f
@@ -197,13 +205,7 @@ private fun Modifier.stageBackground(brand: Color): Modifier = drawBehind {
     clipRect {
         scale(scaleX = rx / ry, scaleY = 1f, pivot = center) {
             drawCircle(
-                Brush.radialGradient(
-                    0f to mixOklab(Color(0xFF06040B), brand, 0.16f),
-                    0.72f to base,
-                    1f to base,
-                    center = center,
-                    radius = ry,
-                ),
+                Brush.radialGradient(0f to c.canvasGlow, 0.72f to Color.Transparent, 1f to Color.Transparent, center = center, radius = ry),
                 radius = ry,
                 center = center,
             )
@@ -214,22 +216,31 @@ private fun Modifier.stageBackground(brand: Color): Modifier = drawBehind {
 /**
  * A call (VoiceView.tsx). In a server's voice channel it fills the page,
  * with a lobby before joining; above a DM or group conversation it takes a
- * share of the height (see CallArea). The stage is dark in every theme.
+ * share of the height (see CallArea). It wears the theme people chose.
  */
 @Composable
 fun VoiceView(channelId: String, modifier: Modifier = Modifier, embedded: Boolean = false, full: Boolean = false) {
     val state by Voice.state.collectAsState()
     val byUser by Nexa.voiceStates.byUser.collectAsState()
     val connected = state.mine?.channelId == channelId
-    DarkScope {
-        if (!connected) Lobby(channelId, state, byUser, modifier)
-        else Stage(channelId, state, byUser, modifier, embedded, full)
-    }
+    if (!connected) Lobby(channelId, state, byUser, modifier)
+    else Stage(channelId, state, byUser, modifier, embedded, full)
 }
 
 /** ServerPage.tsx's VoiceRoom: a server's voice channel, its header with the channel's glyph, and the call filling the rest. */
 @Composable
 fun VoiceChannelPage(channel: Channel) {
+    // A moderator moved the call to another voice channel of the server while
+    // this one was on screen: the screen follows it there, rather than leave
+    // its owner looking at the lobby they were taken out of.
+    val callAt = Voice.state.collectAsState().value.mine?.channelId
+    var callWas by remember { mutableStateOf(callAt) }
+    LaunchedEffect(callAt) {
+        val was = callWas
+        callWas = callAt
+        val sid = channel.serverId
+        if (sid != null && was == channel.id && callAt != null && callAt != channel.id && Nexa.channels.get(callAt)?.serverId == sid) Nav.go(Route.Server(sid, callAt))
+    }
     Column(Modifier.fillMaxSize()) {
         PageHeader(channel.name, icon = { ChannelGlyph(channel, 22.dp, Nx.colors.textMuted) })
         VoiceView(channel.id, Modifier.weight(1f).fillMaxWidth())
@@ -325,7 +336,7 @@ private fun Stage(channelId: String, state: CallState, byUser: Map<String, Voice
         onDispose { Pip.callOnScreen = false }
     }
 
-    Column(modifier.fillMaxSize().stageBackground(c.brand)) {
+    Column(modifier.fillMaxSize().stageBackground(c)) {
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(GAP)) {
             val stageH = maxHeight
             if (focusedTile != null) {
@@ -396,9 +407,9 @@ private fun StageNote(text: String, bad: Boolean = false) {
     val c = Nx.colors
     Box(
         Modifier
-            .ring(Radii.Pill, Color.White.copy(alpha = 0.06f))
-            .background(Color(0xA80C0816), Radii.Pill)
-            .topEdge(Radii.Pill, Color.White.copy(alpha = 0.08f))
+            .ring(Radii.Pill, c.panelEdge)
+            .background(c.bgFloating.copy(alpha = 0.84f), Radii.Pill)
+            .topEdge(Radii.Pill, c.edgeLight)
             .padding(horizontal = 12.dp, vertical = 5.dp)
             .semantics { contentDescription = text },
     ) {
@@ -411,9 +422,9 @@ private fun MicBlockedNote(onHide: () -> Unit) {
     val c = Nx.colors
     Column(
         Modifier
-            .ring(Radii.Md, Color.White.copy(alpha = 0.06f))
-            .background(Color(0xA80C0816), Radii.Md)
-            .topEdge(Radii.Md, Color.White.copy(alpha = 0.08f))
+            .ring(Radii.Md, c.panelEdge)
+            .background(c.bgFloating.copy(alpha = 0.84f), Radii.Md)
+            .topEdge(Radii.Md, c.edgeLight)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -432,7 +443,7 @@ private fun NoteButton(label: String, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     Box(Modifier.heightIn(min = 36.dp).clip(Radii.Xs).pressable(interaction, onClick = onClick).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
-        Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f), textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline), color = if (pressed) Color.White else c.textStrong)
+        Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f), textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline), color = if (pressed) c.textBrand else c.textStrong)
     }
 }
 
@@ -466,19 +477,20 @@ private fun TileView(
     val roleColor = serverId?.let { sid -> Nexa.servers.memberColor(Nexa.servers.get(sid), t.userId)?.let { fish.nexa.ui.theme.rgbColor(it) } }
     val avatarSize = if (place == Place.STRIP) 40.dp else (height.value * 0.36f).coerceIn(40f, 112f).dp
     var zoomed by remember { mutableStateOf(false) }
-    val surface = if (place == Place.FOCUS) Color.Black else c.bgSurface
+    // a lit tile of the theme's surface; in a light theme a raised white one
+    val surface = if (place == Place.FOCUS) c.bgCanvas else if (c.isLight) c.bgRaised else c.bgSurface
 
     Box(
         Modifier
             .size(width, height)
-            .boxShadow(shape, 12f, 30f, Color.Black.copy(alpha = 0.8f), spread = -16f)
-            .ring(shape, Color.White.copy(alpha = 0.05f))
+            .boxShadow(shape, 12f, 30f, c.shadeAt(0.8f), spread = -16f)
+            .ring(shape, c.panelEdge)
             .clip(shape)
             .background(surface)
-            .then(if (place != Place.FOCUS) Modifier.drawBehind {
-                drawRect(Brush.radialGradient(0f to mixOklab(c.bgSurface, Color.White, 0.05f), 1f to c.bgSurface, center = Offset(size.width * 0.5f, size.height * 0.2f), radius = max(size.width, size.height) * 0.9f))
+            .then(if (place != Place.FOCUS && !c.isLight) Modifier.drawBehind {
+                drawRect(Brush.radialGradient(0f to mixOklab(c.bgSurface, c.textStrong, 0.04f), 1f to c.bgSurface, center = Offset(size.width * 0.5f, size.height * 0.2f), radius = max(size.width, size.height) * 0.9f))
             } else Modifier)
-            .topEdge(shape, Color.White.copy(alpha = 0.07f))
+            .topEdge(shape, c.edgeLight)
             .pointerInput(t.key, place, playing) {
                 detectTapGestures(
                     onTap = {
@@ -608,24 +620,30 @@ private fun NameBar(
     Row(
         modifier
             .padding(if (strip) 4.dp else 8.dp)
-            .background(Color(0x990A0614), Radii.Pill)
-            .topEdge(Radii.Pill, Color.White.copy(alpha = 0.08f))
+            .ring(Radii.Pill, c.panelEdge)
+            .background(c.bgFloating.copy(alpha = 0.8f), Radii.Pill)
+            .topEdge(Radii.Pill, c.edgeLight)
             .padding(horizontal = if (strip) 6.dp else 10.dp, vertical = if (strip) 2.dp else 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         val fs = if (strip) 11f else 13f
-        if (t.kind == Tile.Kind.SCREEN) Tag(t("voice.voice.live"), c.danger, Color.White)
+        if (t.kind == Tile.Kind.SCREEN) Tag(t("voice.voice.live"), c.danger, c.onDanger)
         val label = when {
             t.kind != Tile.Kind.SCREEN -> name
             t.me -> t("voice.voice.yourScreen")
             else -> t("voice.voice.theirScreen", "name" to name)
         }
-        Txt(label, Modifier.weight(1f, fill = false), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(fs), fontWeight = FontWeight(600)), color = roleColor ?: Color.White, maxLines = 1)
-        if (t.kind != Tile.Kind.SCREEN && isGuestUser(t.userId)) Tag(t("voice.voiceParticipants.guest"), Color.White.copy(alpha = 0.18f), Color.White)
-        if (t.kind != Tile.Kind.SCREEN && (vs?.selfMute == true || vs?.serverMute == true || (t.me && state.micBlocked))) Icon("MicOff", if (vs?.serverMute == true) c.danger else Color.White, size = 14.dp)
-        if (t.kind != Tile.Kind.SCREEN && (vs?.selfDeaf == true || vs?.serverDeaf == true)) Icon("HeadphoneOff", if (vs?.serverDeaf == true) c.danger else Color.White, size = 14.dp)
-        if (if (t.kind == Tile.Kind.SCREEN) t.userId in streamMutes else t.userId in localMutes) Icon("VolumeX", Color.White, size = 14.dp)
+        Txt(label, Modifier.weight(1f, fill = false), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(fs), fontWeight = FontWeight(600)), color = roleColor ?: c.textStrong, maxLines = 1)
+        val guest = isGuestUser(t.userId)
+        if (t.kind != Tile.Kind.SCREEN && guest) Tag(t("voice.voiceParticipants.guest"), c.bgActive, c.textStrong)
+        // their server tag, as beside their name everywhere else
+        if (t.kind != Tile.Kind.SCREEN && t.kind != Tile.Kind.RINGING && !guest) (if (t.me) Nexa.users.me.value?.serverTag else Nexa.users.get(t.userId)?.serverTag)?.takeIf { it.text.isNotEmpty() }?.let { fish.nexa.ui.chat.ServerTagChip(it, small = true) }
+        // a moderator's mute or deafen in red, wherever the person is shown
+        val modMute = vs?.let { VoiceModeration.modMuted(it) } == true
+        if (t.kind != Tile.Kind.SCREEN && (vs?.selfMute == true || vs?.serverMute == true || (t.me && state.micBlocked))) Icon("MicOff", if (modMute) c.textDanger else c.textStrong, size = 14.dp)
+        if (t.kind != Tile.Kind.SCREEN && (vs?.selfDeaf == true || vs?.serverDeaf == true)) Icon("HeadphoneOff", if (vs?.serverDeaf == true) c.textDanger else c.textStrong, size = 14.dp)
+        if (if (t.kind == Tile.Kind.SCREEN) t.userId in streamMutes else t.userId in localMutes) Icon("VolumeX", c.textStrong, size = 14.dp)
         if (t.kind == Tile.Kind.RINGING) Txt(t("voice.voice.ringing"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(11f)), color = c.textMuted, maxLines = 1)
         if (!t.me && peerState != PeerState.CONNECTED && t.kind != Tile.Kind.SCREEN) Txt(
             if (peerState == PeerState.FAILED || peerState == PeerState.DISCONNECTED) t("voice.voice.reconnecting") else t("voice.voice.connectingEllipsis"),
@@ -667,12 +685,12 @@ private fun TileButton(icon: String, label: String, onClick: () -> Unit) {
         Modifier
             .size(44.dp)
             .clip(CircleShape)
-            .background(if (pressed) c.brand else Color(0x990A0614))
-            .topEdge(CircleShape, Color.White.copy(alpha = 0.1f))
+            .background(if (pressed) c.brand else c.bgFloating.copy(alpha = 0.8f))
+            .topEdge(CircleShape, c.edgeLight)
             .pressable(interaction, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, if (pressed) c.onBrand else Color.White, size = 18.dp) }
+    ) { Icon(icon, if (pressed) c.onBrand else c.textStrong, size = 18.dp) }
 }
 
 /** One stream full screen on its own, turned sideways for a wide picture; Back or the button brings it back. */
@@ -735,8 +753,8 @@ private fun HoldToTalk(held: Boolean) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         ) {
-            Icon("Mic", if (held) Color.White else c.textStrong, size = 20.dp)
-            Txt(if (held) t("voice.voice.talking") else t("voice.voice.holdToTalk"), style = Nx.type.buttonLarge.copy(fontWeight = FontWeight(600)), color = if (held) Color.White else c.textStrong)
+            Icon("Mic", if (held) c.onPositive else c.textStrong, size = 20.dp)
+            Txt(if (held) t("voice.voice.talking") else t("voice.voice.holdToTalk"), style = Nx.type.buttonLarge.copy(fontWeight = FontWeight(600)), color = if (held) c.onPositive else c.textStrong)
         }
     }
 }
@@ -760,23 +778,33 @@ private fun Controls(channelId: String, state: CallState, muted: Boolean, deafen
         val ctl = floor(max(32f, min(min(if (landscape) 42f else 52f, w * 0.115f), (w - 16 - 16 - (count - 1) * gap) / count))).dp
         Row(
             Modifier
-                .boxShadow(Radii.Pill, 16f, 40f, Color.Black.copy(alpha = 0.8f), spread = -16f)
-                .ring(Radii.Pill, Color.White.copy(alpha = 0.06f))
-                .background(Color.White.copy(alpha = 0.05f), Radii.Pill)
-                .topEdge(Radii.Pill, Color.White.copy(alpha = 0.08f))
+                .boxShadow(Radii.Pill, 16f, 40f, c.shadeAt(0.8f), spread = -16f)
+                .ring(Radii.Pill, c.panelEdge)
+                .background(c.bgFloating.copy(alpha = 0.72f), Radii.Pill)
+                .topEdge(Radii.Pill, c.edgeLight)
                 .padding(8.dp),
             horizontalArrangement = Arrangement.spacedBy(gap.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // a moderator's mute and deafen hold whatever these buttons say, so the buttons say so
+            val modMute = state.mine?.let { VoiceModeration.modMuted(it) } == true
+            val modDeaf = state.mine?.serverDeaf == true
             val micLabel = when {
+                modMute -> t("voice.moderation.mutedByModerator")
                 state.micBlocked -> t("voice.voice.microphoneBlockedTryAgain")
                 muted -> t("voice.voice.unmute")
                 else -> t("voice.voice.mute")
             }
-            ControlButton(if (muted || state.micBlocked) "MicOff" else "Mic", micLabel, ctl, off = muted || state.micBlocked, menuLabel = t("voice.voice.microphoneOptions"), onMenu = { openMicMenu() }) {
-                if (state.micBlocked) Calls.retryMic() else VoiceLocal.toggleMute()
+            ControlButton(if (muted || state.micBlocked || modMute) "MicOff" else "Mic", micLabel, ctl, off = muted || state.micBlocked || modMute, menuLabel = t("voice.voice.microphoneOptions"), onMenu = { openMicMenu() }) {
+                when {
+                    modMute -> Nexa.ui.toast(t("voice.moderation.mutedHint"))
+                    state.micBlocked -> Calls.retryMic()
+                    else -> VoiceLocal.toggleMute()
+                }
             }
-            ControlButton(if (deafened) "HeadphoneOff" else "Headphones", if (deafened) t("voice.voice.undeafen") else t("voice.voice.deafen"), ctl, off = deafened) { VoiceLocal.toggleDeafen() }
+            ControlButton(if (deafened || modDeaf) "HeadphoneOff" else "Headphones", if (modDeaf) t("voice.moderation.deafenedByModerator") else if (deafened) t("voice.voice.undeafen") else t("voice.voice.deafen"), ctl, off = deafened || modDeaf) {
+                if (modDeaf) Nexa.ui.toast(t("voice.moderation.deafenedHint")) else VoiceLocal.toggleDeafen()
+            }
             ControlButton(routeIcon(route?.kind), t("voice.deviceMenus.outputDevice"), ctl) { openOutputMenu() }
             ControlButton(if (state.localVideo != null) "Video" else "VideoOff", if (state.localVideo != null) t("voice.voice.turnOffCamera") else t("voice.voice.turnOnCamera"), ctl, on = state.localVideo != null, menuLabel = t("voice.voice.cameraOptions"), onMenu = { openCameraMenu() }) { Calls.toggleCamera() }
             if (canFlip) ControlButton("SwitchCamera", t("voice.voice.switchCamera"), ctl) { Calls.flipCamera() }
@@ -816,13 +844,15 @@ private fun ControlButton(
     val pressed by interaction.collectIsPressedAsState()
     val bg = when {
         danger -> Color.Transparent
-        on -> if (pressed) Color(0xFFE3E3E6) else Color.White
+        // on (camera, sharing): the theme turned over, its text colour as the fill
+        on -> if (pressed) mixOklab(c.textStrong, c.bgBase, 0.14f) else c.textStrong
         off -> mixOklab(c.bgSurface, c.danger, if (pressed) 0.34f else 0.24f)
-        else -> mixOklab(c.bgSurface, Color.White, if (pressed) 0.16f else 0.04f)
+        // a shade towards the text colour: lighter on a dark theme, darker on a light one
+        else -> mixOklab(c.bgSurface, c.textStrong, if (pressed) 0.14f else 0.04f)
     }
     val tint = when {
         danger -> c.onDanger
-        on -> Color.Black
+        on -> c.bgBase
         off -> c.textDanger
         else -> c.textStrong
     }
@@ -832,7 +862,7 @@ private fun ControlButton(
                 .fillMaxSize()
                 .scale(if (pressed) 0.94f else 1f)
                 .then(if (danger) Modifier.boxShadow(CircleShape, 8f, 22f, c.danger.copy(alpha = 0.9f), spread = -8f).background(dangerGradient(c), CircleShape) else Modifier.background(bg, CircleShape))
-                .topEdge(CircleShape, Color.White.copy(alpha = if (danger) 0.2f else 0.1f))
+                .topEdge(CircleShape, if (danger) Color.White.copy(alpha = 0.2f) else c.edgeLight)
                 .clip(CircleShape)
                 .pressable(interaction, onLongClick = onMenu, onClick = onClick)
                 .semantics { contentDescription = label },
@@ -848,7 +878,7 @@ private fun ControlButton(
                     .offset(x = 6.dp, y = 4.dp)
                     .size(24.dp)
                     .boxShadow(CircleShape, 1f, 2f, c.shadeAt(0.55f))
-                    .background(Color(0xFF120E1A), CircleShape)
+                    .background(c.bgCanvas, CircleShape)
                     .padding(2.dp)
                     .background(c.bgFloating, CircleShape)
                     .clip(CircleShape)
@@ -864,7 +894,7 @@ private fun ControlButton(
 private fun openCallFull(channelId: String) {
     Layers.open(Layer("call-full") {
         Immersive()
-        Box(Modifier.fillMaxSize().background(Color.Black).statusBarsPadding()) {
+        Box(Modifier.fillMaxSize().background(stageBase(Nx.colors)).statusBarsPadding()) {
             VoiceView(channelId, Modifier.fillMaxSize(), embedded = false, full = true)
         }
     })
@@ -981,9 +1011,9 @@ fun PipStage() {
     val lead = tiles.firstOrNull { it.key == state.focused && showsStream(it, state) }
         ?: tiles.firstOrNull { it.kind == Tile.Kind.SCREEN && showsStream(it, state) }
         ?: tiles.firstOrNull { it.kind == Tile.Kind.VIDEO && !it.me }
-    DarkScope {
+    run {
         val c = Nx.colors
-        BoxWithConstraints(Modifier.fillMaxSize().stageBackground(c.brand).padding(4.dp), contentAlignment = Alignment.Center) {
+        BoxWithConstraints(Modifier.fillMaxSize().stageBackground(c).padding(4.dp), contentAlignment = Alignment.Center) {
             if (lead != null) TileView(lead, channelId, state, byUser, speaking, mix.localMutes, mix.streamMutes, Place.GRID, maxWidth, maxHeight)
             else {
                 val people = tiles.filter { it.kind != Tile.Kind.SCREEN }.take(4)

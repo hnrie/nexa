@@ -36,6 +36,13 @@
 .sep { width: 28px; height: 2px; border-radius: 1px; background: var(--border); margin: 0; flex: none; }
 .badge { position: absolute; inset-inline-end: 6px; bottom: -3px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--grad-danger); color: var(--on-danger); font-size: 12px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px var(--bg-canvas), 0 2px 6px color-mix(in srgb, var(--danger) 50%, transparent); font-variant-numeric: tabular-nums; animation: badgeIn var(--dur-slow) var(--ease-spring); }
 @keyframes badgeIn { from { transform: scale(0.4); opacity: 0; } }
+/* People are in a voice channel here that this account could join: a speaker
+   on a green disc, cut out of the canvas like the count, sitting just above
+   the count when there is one. */
+.voiceBadge { position: absolute; inset-inline-end: 6px; bottom: -3px; width: 20px; height: 20px; border-radius: 50%; background: var(--grad-positive); color: var(--on-positive); display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px var(--bg-canvas), 0 2px 6px color-mix(in srgb, var(--positive) 50%, transparent); animation: badgeIn var(--dur-slow) var(--ease-spring); pointer-events: none; }
+[dir="rtl"] .voiceBadge svg { transform: scaleX(-1); }
+.item[data-mentioned="true"] .voiceBadge { bottom: 19px; }
+.folder[data-open="true"] .voiceBadge { inset-inline-end: -2px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--folder) 16%, var(--bg-canvas)); }
 .server .btn { font-size: 16px; font-weight: 700; color: var(--text-strong); }
 .server .btn.hasIcon { background: transparent; }
 .initials { padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; font-family: var(--font-display); letter-spacing: -0.005em; }

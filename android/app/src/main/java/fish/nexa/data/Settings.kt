@@ -195,6 +195,10 @@ class SettingsStore(private val api: Api, private val scope: CoroutineScope) {
     val imagePreviews get() = bool("imagePreviews", true)
     val developerMode get() = bool("developerMode", false)
     val customTyping get() = bool("customTyping", true)
+    /** Someone typing turns their presence dot into a pill of dots (DM list, member lists). */
+    val typingAvatars get() = bool("typingAvatars", true)
+    /** Dots on a server's channels while someone types in them. */
+    val typingChannels get() = bool("typingChannels", true)
     val smartEmoji get() = bool("smartEmoji", true)
     val skinTone get() = (_doc.value["skinTone"] as? JsonPrimitive)?.intOrNull ?: 0
     val whatsNewSeen get() = str("whatsNewSeen")
@@ -232,7 +236,7 @@ class SettingsStore(private val api: Api, private val scope: CoroutineScope) {
             put("spellcheck", true); put("spellWords", JsonArray(emptyList())); put("sendButton", false)
             put("linkPreviews", true); put("imagePreviews", true); put("tts", true); put("developerMode", false)
             put("shareActivity", true); put("autoIdle", true); put("keybinds", JsonObject(emptyMap())); put("backgroundKeybinds", true)
-            put("customTyping", true); put("sidebarWidth", 240); put("showMembers", true)
+            put("customTyping", true); put("typingAvatars", true); put("typingChannels", true); put("sidebarWidth", 240); put("showMembers", true)
             put("recentEmoji", JsonArray(emptyList())); put("smartEmoji", true); put("emojiUsage", JsonObject(emptyMap())); put("emojiLearned", false)
             put("favoriteGifs", JsonArray(emptyList())); put("skinTone", 0)
             put("notifications", DEFAULT_NOTIFICATIONS)

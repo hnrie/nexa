@@ -43,6 +43,19 @@ object Pip {
             update()
         }
 
+    /**
+     * Android's own screens for an update (allowing installs, the installer's
+     * question) open over the app, and a call floating over them would sit on
+     * their buttons, which Android then will not let anyone press. While this
+     * is set (AppUpdate.install, until the app is back in front) a call does
+     * not float by itself.
+     */
+    @Volatile var held = false
+        set(v) {
+            field = v
+            update()
+        }
+
     private val listener = Consumer<PictureInPictureModeChangedInfo> { info -> changed(info.isInPictureInPictureMode) }
 
     fun install(app: Application) {
@@ -82,14 +95,20 @@ object Pip {
         return b.build()
     }
 
-    /** Keeps the window's floating rules in step with the call: it floats by itself only while a call is on screen. */
+    /**
+     * Keeps the window's floating rules in step with the call: it floats by
+     * itself only while a call is on screen. On the main thread it takes
+     * effect at once, so a screen opened right after cannot float the call.
+     */
     fun update() {
-        main.post {
-            val a = activity?.get() ?: return@post
-            if (!supported(a)) return@post
-            val auto = Engine.current() != null && callOnScreen
-            runCatching { a.setPictureInPictureParams(params(auto)) }.onFailure { Log.w(TAG, "could not set the picture in picture", it) }
+        val apply = {
+            activity?.get()?.takeIf { supported(it) }?.let { a ->
+                val auto = Engine.current() != null && callOnScreen && !held
+                runCatching { a.setPictureInPictureParams(params(auto)) }.onFailure { Log.w(TAG, "could not set the picture in picture", it) }
+            }
+            Unit
         }
+        if (Looper.myLooper() == Looper.getMainLooper()) apply() else main.post(apply)
     }
 
     /** Floats the app now (a tile's Picture in Picture button). False where the phone cannot. */

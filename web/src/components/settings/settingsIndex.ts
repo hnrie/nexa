@@ -64,6 +64,8 @@ export function settingsIndex(opts: { pageLabels: Record<string, string> }): Set
     e("chat", t("settings.appearance.smartEmoji"), "smartEmoji"),
     e("chat", t("settings.notifications.readTtsAloud"), "tts"),
     e("chat", t("settings.chat.customTyping"), "customTyping"),
+    e("chat", t("settings.chat.typingAvatars"), "typingAvatars"),
+    e("chat", t("settings.chat.typingChannels"), "typingChannels"),
     e("stickers", t("modals.customStatus.emoji"), "packs"),
     e("notifications", t("settings.notifications.enableDesktopNotifications"), "desktopNotifications"),
     e("notifications", t("settings.notifications.sounds"), "sounds"),

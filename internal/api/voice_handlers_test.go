@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/perms"
+	"evilion.xyz/chat/internal/store"
 )
 
 // op sends a gateway op frame from a test client.
@@ -609,4 +611,125 @@ func TestVoiceStateCodecs(t *testing.T) {
 	if !found {
 		t.Errorf("roster without alice's codecs: %v", roster)
 	}
+}
+
+// TestVoiceModerationTools checks the moderation a voice channel's people
+// get from the apps: permissions are read in the channel the person is in, so
+// an overwrite can make someone a channel's own moderator; nobody moves people
+// into a channel they cannot see; a disconnect says a moderator did it; and a
+// channel that denies Speak is told apart from a moderator's mute.
+func TestVoiceModerationTools(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	tokC, idC := register(t, ts, "carol")
+	view := createServer(t, ts, tokA, "Voice")
+	sid := view["id"].(string)
+	general := channelNamed(view, "general")["id"].(string)
+	voiceCh := channelNamed(view, "General")["id"].(string)
+	code := inviteFor(t, ts, tokA, general)
+	join(t, ts, tokB, code)
+	join(t, ts, tokC, code)
+	// carol holds a role, which puts her above bob, but no moderation anywhere but General
+	mods := createRole(t, ts, tokA, sid, "Helpers", 0)
+	if res, body := do(t, ts, "PUT", "/api/v1/servers/"+sid+"/members/"+idC+"/roles/"+mods, tokA, nil); res.StatusCode != 200 {
+		t.Fatalf("give role: %d %v", res.StatusCode, body)
+	}
+	newVoice := func(name string) string {
+		res, body := do(t, ts, "POST", "/api/v1/servers/"+sid+"/channels", tokA, map[string]any{"type": "voice", "name": name})
+		if res.StatusCode >= 300 {
+			t.Fatalf("%s: %d %v", name, res.StatusCode, body)
+		}
+		return body["id"].(string)
+	}
+	lounge := newVoice("Lounge")
+	hidden := newVoice("Hidden")
+	if res, body := do(t, ts, "PUT", "/api/v1/channels/"+hidden+"/permissions/"+mods, tokA, map[string]any{"type": "role", "deny": permStr(perms.ViewChannel)}); res.StatusCode != 200 {
+		t.Fatalf("hide: %d %v", res.StatusCode, body)
+	}
+	gb := connectGW(t, ts, tokB)
+	gb.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	if ev := gb.nextVoice(idB, voiceCh, 3*time.Second); ev == nil || ev["suppress"] != nil {
+		t.Fatalf("bob joins, not suppressed: %v", ev)
+	}
+	// without the permission in General, carol cannot mute
+	if res, body := do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/members/"+idB+"/voice", tokC, map[string]any{"mute": true}); res.StatusCode != 403 {
+		t.Fatalf("mute without permission: %d %v", res.StatusCode, body)
+	}
+	// an overwrite on General makes her its moderator
+	grant := permStr(perms.MuteMembers | perms.DeafenMembers | perms.MoveMembers)
+	if res, body := do(t, ts, "PUT", "/api/v1/channels/"+voiceCh+"/permissions/"+idC, tokA, map[string]any{"type": "member", "allow": grant}); res.StatusCode != 200 {
+		t.Fatalf("grant: %d %v", res.StatusCode, body)
+	}
+	res, body := do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/members/"+idB+"/voice", tokC, map[string]any{"mute": true, "deaf": true})
+	if res.StatusCode != 200 || body["server_mute"] != true || body["server_deaf"] != true {
+		t.Fatalf("mute and deafen through the overwrite: %d %v", res.StatusCode, body)
+	}
+	if ev := gb.nextVoice(idB, voiceCh, 3*time.Second); ev == nil || ev["server_mute"] != true || ev["server_deaf"] != true || ev["suppress"] != nil {
+		t.Fatalf("bob hears he is muted and deafened by a moderator: %v", ev)
+	}
+	// a channel carol cannot see is no destination, and saying so is the same as for no channel at all
+	if res, body := do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/members/"+idB+"/voice", tokC, map[string]any{"channel_id": hidden}); res.StatusCode != 400 || errCode(body) != "invalid_channel" {
+		t.Fatalf("move into a hidden channel: %d %v", res.StatusCode, body)
+	}
+	res, body = do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/members/"+idB+"/voice", tokC, map[string]any{"channel_id": lounge})
+	if res.StatusCode != 200 || body["channel_id"] != lounge || body["server_mute"] != true {
+		t.Fatalf("move to Lounge, mute and all: %d %v", res.StatusCode, body)
+	}
+	if ev := gb.nextVoice(idB, lounge, 3*time.Second); ev == nil {
+		t.Fatal("bob is told he was moved")
+	}
+	// in Lounge carol has no overwrite, so bob is out of her reach there
+	if res, body := do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/members/"+idB+"/voice", tokC, map[string]any{"channel_id": nil}); res.StatusCode != 403 {
+		t.Fatalf("disconnect from a channel she does not moderate: %d %v", res.StatusCode, body)
+	}
+	// the owner disconnects him: the leave says a moderator did it
+	if res, body := do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/members/"+idB+"/voice", tokA, map[string]any{"channel_id": nil}); res.StatusCode != 204 {
+		t.Fatalf("disconnect: %d %v", res.StatusCode, body)
+	}
+	if ev := gb.nextVoice(idB, "", 3*time.Second); ev == nil || ev["reason"] != "disconnected" || ev["old_channel_id"] != lounge {
+		t.Fatalf("the leave names the moderator's disconnect: %v", ev)
+	}
+	// joining again does not lift a moderator's mute and deafen: they are kept on the member
+	gb.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	if ev := gb.nextVoice(idB, voiceCh, 3*time.Second); ev == nil || ev["server_mute"] != true || ev["server_deaf"] != true {
+		t.Fatalf("still muted and deafened after joining again: %v", ev)
+	}
+	res, body = do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/members/"+idB+"/voice", tokC, map[string]any{"mute": false, "deaf": false})
+	if res.StatusCode != 200 || body["server_mute"] != false || body["server_deaf"] != false {
+		t.Fatalf("lifted: %d %v", res.StatusCode, body)
+	}
+	gb.nextVoice(idB, voiceCh, 3*time.Second)
+	gb.op(t, "voice_state", map[string]any{"channel_id": nil})
+	gb.nextVoice(idB, "", 3*time.Second)
+	gb.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	if ev := gb.nextVoice(idB, voiceCh, 3*time.Second); ev == nil || ev["server_mute"] != false || ev["server_deaf"] != false {
+		t.Fatalf("lifted for good: %v", ev)
+	}
+	// AutoMod's hold and the voice mute sit on the same flags without undoing each other
+	if res, body := do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/members/"+idB+"/voice", tokA, map[string]any{"mute": true}); res.StatusCode != 200 {
+		t.Fatalf("mute again: %d %v", res.StatusCode, body)
+	}
+	if m, err := srv.Store.Member(context.Background(), mustSnowflake(t, sid), mustSnowflake(t, idB)); err != nil || m.Flags != store.MemberVoiceMuted {
+		t.Fatalf("flags after the mute: %v %v", m, err)
+	}
+	gb.op(t, "voice_state", map[string]any{"channel_id": nil})
+	gb.nextVoice(idB, "", 3*time.Second)
+	// a channel that denies Speak silences, and says it is the channel
+	if res, body := do(t, ts, "PUT", "/api/v1/channels/"+lounge+"/permissions/"+sid, tokA, map[string]any{"type": "role", "deny": permStr(perms.Speak)}); res.StatusCode != 200 {
+		t.Fatalf("deny speak: %d %v", res.StatusCode, body)
+	}
+	gb.op(t, "voice_state", map[string]any{"channel_id": lounge})
+	if ev := gb.nextVoice(idB, lounge, 3*time.Second); ev == nil || ev["server_mute"] != true || ev["suppress"] != true {
+		t.Fatalf("suppressed, not muted by anyone: %v", ev)
+	}
+}
+
+func mustSnowflake(t *testing.T, s string) ids.ID {
+	t.Helper()
+	id, err := ids.Parse(s)
+	if err != nil {
+		t.Fatalf("parse %q: %v", s, err)
+	}
+	return id
 }

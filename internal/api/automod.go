@@ -971,7 +971,12 @@ func (s *Server) setQuarantine(r *http.Request, srv *store.Server, uid ids.ID, o
 	if err != nil {
 		return false
 	}
-	if err := s.Store.UpdateMember(ctx, srv.ID, uid, store.MemberPatch{Flags: &flags}); err != nil {
+	// only this bit: the member's other flags (a moderator's server mute) may change meanwhile
+	set, clear := int64(0), store.MemberQuarantined
+	if on {
+		set, clear = store.MemberQuarantined, 0
+	}
+	if err := s.Store.SetMemberFlags(ctx, srv.ID, uid, set, clear); err != nil {
 		return false
 	}
 	if on {

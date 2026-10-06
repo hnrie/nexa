@@ -325,7 +325,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       {showHeader ? (
         <>
           {/* the same way to the profile as the name beside it, for a pointer only: one stop for the keyboard is enough */}
-          <button type="button" className={s.avatar} data-group-start={showHeader} onClick={profile} tabIndex={-1} aria-hidden="true">
+          <button type="button" className={s.avatar} data-group-start={showHeader} data-avatar="" onClick={profile} tabIndex={-1} aria-hidden="true">
             {copy ? <Avatar id={copy.server_id} avatarId={copy.server_icon_id} name={copy.server_name} size={40} kind="icon" /> : hook && msg.webhook_id ? <HookAvatar hook={hook} webhookId={msg.webhook_id} /> : <Avatar id={msg.author_id} avatarId={avatarId} name={name} size={40} />}
           </button>
           <div className={s.headerRow} id={whoId}>

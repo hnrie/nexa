@@ -14,8 +14,8 @@ import { useUsers } from "@/stores/users";
 import { useShownName } from "./useShownName";
 import s from "./Chat.module.css";
 
-/** Where the line from the avatar starts: just under it, or the top of a row that has none. */
-const UNDER_AVATAR = 46;
+/** Where the line from the avatar starts: this far under it, or the top of a row that has none. */
+const AVATAR_GAP = 4;
 const ROW_TOP = 4;
 
 /**
@@ -44,8 +44,11 @@ export function ThreadChip({ serverId, summary }: { serverId: string; summary: T
     const row = card?.closest<HTMLElement>("[data-row]");
     if (!card || !row) return;
     const measure = () => {
-      const from = row.dataset.groupStart === "true" ? UNDER_AVATAR : ROW_TOP;
-      const up = card.getBoundingClientRect().top - row.getBoundingClientRect().top - from;
+      // from wherever the avatar really ends: a reply's sits lower, under the line it quotes
+      const top = row.getBoundingClientRect().top;
+      const avatar = row.querySelector<HTMLElement>(":scope > [data-avatar]");
+      const from = avatar ? avatar.getBoundingClientRect().bottom - top + AVATAR_GAP : ROW_TOP;
+      const up = card.getBoundingClientRect().top - top - from;
       card.style.setProperty("--spine-up", `${Math.max(0, Math.round(up))}px`);
     };
     measure();

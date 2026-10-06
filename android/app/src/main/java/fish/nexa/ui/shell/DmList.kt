@@ -642,7 +642,7 @@ private fun ConversationRow(ch: Channel, selected: Boolean, parentSelected: Bool
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (picking) PickMark(picked, t("pick.pickNamed", "name" to name))
-            ConversationAvatar(ch, 32.dp, status = other?.let { Nexa.presence.statusOf(it) })
+            ConversationAvatar(ch, 32.dp, status = other?.let { Nexa.presence.statusOf(it) }, showTyping = true)
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Txt(

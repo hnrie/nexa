@@ -28,6 +28,7 @@ interface StreamOptions {
 export type FrameCryptoMessage =
   | { type: "keys"; keys: { index: number; raw: Uint8Array }[]; send: number }
   | { type: "redundancy"; depth: number }
+  | { type: "keyframe"; id: string }
   | ({ type: "stream"; readable: ReadableStream; writable: WritableStream } & StreamOptions);
 
 export interface FrameCryptoStats {
@@ -76,8 +77,16 @@ interface EncodedFrame {
 }
 
 interface TransformEvent {
-  transformer: { readable: ReadableStream<EncodedFrame>; writable: WritableStream<EncodedFrame>; options: StreamOptions };
+  transformer: { readable: ReadableStream<EncodedFrame>; writable: WritableStream<EncodedFrame>; options: StreamOptions; sendKeyFrameRequest?: () => Promise<void> };
 }
+
+/**
+ * The receivers that can ask their sender for a keyframe, by id
+ * (RTCRtpScriptTransformer.sendKeyFrameRequest), for a picture stuck on a
+ * frame that will never arrive (sfu.ts watchStalls). A receiver that has gone
+ * is let go when asking fails.
+ */
+const askers = new Map<string, () => Promise<void>>();
 
 interface WorkerScope {
   onmessage: ((e: MessageEvent<FrameCryptoMessage>) => void) | null;
@@ -263,10 +272,13 @@ function transformer({ op, kind, id, voice = false, codec }: StreamOptions): Tra
   });
 }
 
-function pipe(readable: ReadableStream<EncodedFrame>, writable: WritableStream<EncodedFrame>, options: StreamOptions): void {
-  readable.pipeThrough(transformer(options)).pipeTo(writable).catch(() => {
-    /* the track ended */
-  });
+function pipe(readable: ReadableStream<EncodedFrame>, writable: WritableStream<EncodedFrame>, options: StreamOptions): Promise<void> {
+  return readable
+    .pipeThrough(transformer(options))
+    .pipeTo(writable)
+    .catch(() => {
+      /* the track ended */
+    });
 }
 
 scope.onmessage = (e) => {
@@ -281,15 +293,23 @@ scope.onmessage = (e) => {
     });
   } else if (msg.type === "redundancy") {
     redundancy = Math.max(0, Math.min(2, msg.depth | 0));
+  } else if (msg.type === "keyframe") {
+    const ask = askers.get(msg.id);
+    if (ask) ask().catch(() => askers.delete(msg.id));
   } else if (msg.type === "stream") {
     const { readable, writable, op, kind, id, voice, codec } = msg;
-    pipe(readable, writable, { op, kind, id, voice, codec });
+    void pipe(readable, writable, { op, kind, id, voice, codec });
   }
 };
 
 scope.onrtctransform = (e) => {
-  const { readable, writable, options } = e.transformer;
-  pipe(readable, writable, options);
+  const t = e.transformer;
+  const { readable, writable, options } = t;
+  const id = options.op !== "encrypt" && options.kind === "video" && typeof t.sendKeyFrameRequest === "function" ? options.id : undefined;
+  if (id) askers.set(id, () => t.sendKeyFrameRequest!());
+  void pipe(readable, writable, options).finally(() => {
+    if (id) askers.delete(id);
+  });
 };
 
 setInterval(() => scope.postMessage(stats), 2000);

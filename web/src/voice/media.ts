@@ -139,10 +139,15 @@ export async function getScreen(res: ShareResolution, fps: ShareFps, withAudio =
   const opts = { video, audio, systemAudio: withAudio ? "include" : "exclude", surfaceSwitching: "include", selfBrowserSurface: "exclude" } as DisplayMediaStreamOptions & { systemAudio: string; surfaceSwitching: string; selfBrowserSurface: string };
   shareAudioAsked = withAudio;
   const stream = await navigator.mediaDevices.getDisplayMedia(opts);
-  // Under a squeezed connection the encoder gives up detail or smoothness.
-  // Whoever picked 60 fps wants motion kept; anything slower is usually text.
+  // How the encoder treats the picture. 15 fps is for slides and text, 30 for
+  // a page or an app; both keep their full size and give up frames when the
+  // link is short. 60 fps is for motion, and gets no hint at all: "motion"
+  // made Chromium scale the capture down when the share started and never back
+  // up (1080p reached people as 480x270, tools/share_quality.py). Without it
+  // the share keeps its size, and shareAdapt.ts steps it down and up by what
+  // the link can carry, so the frames keep coming.
   const track = stream.getVideoTracks()[0];
-  if (track && "contentHint" in track) track.contentHint = rate >= 60 ? "motion" : "detail";
+  if (track && "contentHint" in track) track.contentHint = rate >= 60 ? "" : rate >= 30 ? "detail" : "text";
   return stream;
 }
 

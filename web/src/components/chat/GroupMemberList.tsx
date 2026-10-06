@@ -10,6 +10,8 @@ import { isInstanceAdmin } from "@/stores/servers";
 import { StatusLine } from "@/components/activity/StatusLine";
 import { friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
+import { useSettings } from "@/stores/settings";
+import { useTypingIn } from "@/stores/typing";
 import { activitiesOf, statusOf, usePresence } from "@/stores/presence";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
@@ -39,6 +41,9 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
   const presence = usePresence((p) => p.byUser);
   const rels = useRelationships((r) => r.byUser);
   const me = useAuth((a) => a.me);
+  // whoever types in the group shows it on their dot
+  const typingOn = useSettings((x) => x.settings.typingAvatars !== false);
+  const typers = useTypingIn(typingOn ? channel.id : null, me?.id);
   const openModal = useUI((u) => u.openModal);
   const openContextMenu = useUI((u) => u.openContextMenu);
   const nav = useNavigate();
@@ -97,7 +102,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
             aria-pressed={isPicking ? picked.includes(row.id) : undefined}
           >
             {isPicking ? <PickMark on={picked.includes(row.id)} label={t("pick.pickNamed", { name: row.name })} /> : null}
-            <Avatar id={row.id} avatarId={users[row.id]?.avatar_id ?? null} name={row.name} size={32} status={statusOf(p)} />
+            <Avatar id={row.id} avatarId={users[row.id]?.avatar_id ?? null} name={row.name} size={32} status={statusOf(p)} typing={typingOn ? typers.includes(row.id) : undefined} />
             <span className={s.text}>
               <span className={s.name}>
                 <span className={s.nameText}>{row.name}</span>

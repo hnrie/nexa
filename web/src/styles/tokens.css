@@ -166,8 +166,8 @@
   --danger-hover: #b02a31;
   --text-danger: #ab1e29;
   /* The presence colours darkened until the words read: the header under a
-     DM's name prints the status in them. The call stage puts the bright ones
-     back below. */
+     DM's name prints the status in them. A guest's call page puts the bright
+     ones back below. */
   --status-online: #2a7044;
   --status-idle: #845a06;
   --status-dnd: #c0222c;
@@ -195,11 +195,12 @@
   color-scheme: light;
 }
 
-/* A call's stage is black in every theme. In the light theme its controls,
-   tiles and labels keep the dark palette, or they come out pale on black:
-   grey buttons whose muted state barely differs and whose icons vanish on
-   hover. Only what the light theme changes is put back; the accent colour
-   carries through. */
+/* A guest's call page is dark in every theme (a guest has no theme of their
+   own to follow). In the light theme its controls, tiles and labels keep the
+   dark palette, or they come out pale on black: grey buttons whose muted
+   state barely differs and whose icons vanish on hover. Only what the light
+   theme changes is put back; the accent colour carries through. A member's
+   call wears their theme (components/voice/Voice.module.css). */
 [data-theme="light"] [data-dark-scope] {
   --bg-base: #1c1825;
   --bg-raised: #221d2b;

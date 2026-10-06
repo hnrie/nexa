@@ -183,7 +183,8 @@ function stopRelay(): void {
 function shouldTransmit(): boolean {
   const local = useVoiceLocal.getState();
   const mine = useVoice.getState().mine;
-  if (local.muted || local.deafened || mine?.server_mute) return false;
+  // a moderator's deafen takes the voice away too, as it does the sound
+  if (local.muted || local.deafened || mine?.server_mute || mine?.server_deaf) return false;
   if (useSettings.getState().settings.voice.mode === "ptt") return !!session?.pttHeld;
   return true;
 }
@@ -198,6 +199,11 @@ function gateOpen(): boolean {
   // frozen; it stays open there rather than cut the speaker off mid-sentence.
   if (typeof document !== "undefined" && document.visibilityState === "hidden") return true;
   return s.vadOpen;
+}
+
+/** Whether nothing of the call may be heard here: deafened by this person, or by a moderator. */
+export function outputSilenced(): boolean {
+  return useVoiceLocal.getState().deafened || !!useVoice.getState().mine?.server_deaf;
 }
 
 export function applyTransmit(): void {
@@ -376,7 +382,7 @@ export async function join(channelId: string, ice: { servers: RTCIceServer[]; sf
   for (const [uid, pct] of Object.entries(voiceStore.streamVolumes)) transport.setStreamVolume(uid, pct);
   for (const [uid, on] of Object.entries(voiceStore.streamMutes)) if (on) transport.setStreamMuted(uid, true);
   for (const uid of Object.keys(voiceStore.watching)) transport.setWatching(uid, true);
-  transport.setOutputMuted(useVoiceLocal.getState().deafened);
+  transport.setOutputMuted(outputSilenced());
   transport.setMasterVolume(useSettings.getState().settings.voice.outputVolume);
   // Always set, "default" included: the audio output lives as long as the
   // page, so a speaker chosen in an earlier call stayed chosen after
@@ -810,7 +816,7 @@ export async function toggleScreen(quality?: { resolution: ShareResolution; fps:
     s.screen = stream;
     const video = stream.getVideoTracks()[0];
     if (video) video.onended = () => void toggleScreen();
-    s.transport.setLocalScreen(stream, shareBitrate(res, fps));
+    s.transport.setLocalScreen(stream, shareBitrate(res, fps), fps);
     useVoice.getState().setLocalScreen(stream);
   }
   sendState(s.channelId);
@@ -864,8 +870,16 @@ function syncPeers(): void {
   const s = session;
   const myId = me();
   if (!s || !myId) return;
-  const wanted = new Set(participantsOf(useVoice.getState().byChannel, s.channelId).map((p) => p.user_id).filter((id) => id !== myId));
+  const everyone = participantsOf(useVoice.getState().byChannel, s.channelId);
+  const wanted = new Set(everyone.map((p) => p.user_id).filter((id) => id !== myId));
   for (const id of s.transport.peerIds()) if (!wanted.has(id)) s.transport.removePeer(id), useVoice.getState().removePeer(id);
+  syncModMutes(s, everyone);
+}
+
+/** Whoever a moderator muted or deafened stays silent here (a channel that denies Speak is the same). */
+function syncModMutes(s: Session, everyone: VoiceState[]): void {
+  const myId = me();
+  for (const p of everyone) if (p.user_id !== myId) s.transport.setModMuted(p.user_id, p.server_mute || p.server_deaf);
 }
 
 /**
@@ -907,6 +921,8 @@ export function onMine(vs: VoiceState): boolean {
   }
   s.transport.setRoster(everyone);
   s.transport.joined(vs);
+  syncModMutes(s, everyone);
+  s.transport.setOutputMuted(outputSilenced());
   applyTransmit();
   relayGuestKeys(s);
   return true;

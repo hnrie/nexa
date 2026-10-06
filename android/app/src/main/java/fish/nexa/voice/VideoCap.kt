@@ -1,11 +1,15 @@
 package fish.nexa.voice
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import org.webrtc.MediaStreamTrack
+import org.webrtc.PeerConnection
+import org.webrtc.Priority
 import org.webrtc.RtpCapabilities
 import org.webrtc.RtpParameters
 import org.webrtc.RtpSender
 import org.webrtc.RtpTransceiver
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -107,16 +111,22 @@ object VideoCap {
 
     /**
      * A sender's single encoding: this bitrate, at most `fps` (never above
-     * 60), scaled down under the size cap, and what it gives up first when
-     * the phone or the connection cannot keep up.
+     * 60), scaled down under the size cap, what it gives up first when the
+     * phone or the connection cannot keep up, and with `high` served first
+     * when the link is shared with a camera and a voice.
      */
-    fun capSender(sender: RtpSender, maxBitrate: Int, width: Int = 0, height: Int = 0, fps: Int = FPS, degradation: RtpParameters.DegradationPreference? = null) {
+    fun capSender(sender: RtpSender, maxBitrate: Int, width: Int = 0, height: Int = 0, fps: Int = FPS, degradation: RtpParameters.DegradationPreference? = null, high: Boolean = false) {
         try {
             val params = sender.parameters ?: return
             if (params.encodings.isEmpty()) return
             if (degradation != null) params.degradationPreference = degradation
             val enc = params.encodings[0]
             if (maxBitrate > 0) enc.maxBitrateBps = maxBitrate
+            if (high) {
+                // what "high" is on the web (RTCPriorityType), for the bitrate and for the packets' marking
+                enc.bitratePriority = 4.0
+                enc.networkPriority = Priority.HIGH
+            }
             enc.maxFramerate = min(FPS, fps)
             enc.scaleResolutionDownBy = if (width > 0 && height > 0) scaleFor(width, height) else max(1.0, enc.scaleResolutionDownBy ?: 1.0)
             if (!sender.setParameters(params)) {
@@ -146,8 +156,9 @@ object VideoCap {
         else -> SIDE to SIDE
     }
 
-    private val BPS_AT_30 = mapOf("720p" to 2_500_000, "1080p" to 5_000_000, "1440p" to 8_000_000, "source" to 10_000_000)
-    private val FPS_SCALE = mapOf(15 to 0.6, 30 to 1.0, 60 to 1.5)
+    /** What a share may use at 30 fps, and at the other rates; 1080p at 60 fps gets just under 10 Mbit/s (shareQuality.ts). */
+    private val BPS_AT_30 = mapOf("720p" to 3_000_000, "1080p" to 6_000_000, "1440p" to 9_000_000, "source" to 10_000_000)
+    private val FPS_SCALE = mapOf(15 to 0.6, 30 to 1.0, 60 to 1.65)
 
     /** The bitrate cap for a share, which the SFU's meter also charges it at. */
     fun shareBitrate(res: String, fps: Int): Int {
@@ -156,14 +167,42 @@ object VideoCap {
         return (BPS_AT_30.getValue(r) * FPS_SCALE.getValue(f)).toInt().coerceIn(MIN_SHARE_BPS, MAX_SHARE_BPS)
     }
 
-    fun clampShareBitrate(bps: Int): Int = if (bps <= 0) 5_000_000 else bps.coerceIn(MIN_SHARE_BPS, MAX_SHARE_BPS)
+    fun clampShareBitrate(bps: Int): Int = if (bps <= 0) 6_000_000 else bps.coerceIn(MIN_SHARE_BPS, MAX_SHARE_BPS)
 
     /**
-     * What a share gives up first when the connection or the encoder cannot
-     * keep up, as the web's content hint decides it (media.ts getScreen):
-     * whoever picked 60 fps wants motion kept, anything slower is usually text
-     * and keeps its sharpness.
+     * A screen share's sender: its bitrate and frame rate, served before a
+     * camera, and keeping its resolution whatever its rate. Keeping the frame
+     * rate instead lets libwebrtc shrink the picture while the bandwidth
+     * estimate is still low at the start, and a screen is never grown back
+     * (measured on the web, where 1080p at 60 fps stayed 480x270 for a whole
+     * share); a share in motion is sized by ShareAdapt instead.
      */
-    fun shareDegradation(fps: Int): RtpParameters.DegradationPreference =
-        if (fps >= 60) RtpParameters.DegradationPreference.MAINTAIN_FRAMERATE else RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
+    fun capShare(sender: RtpSender, maxBitrate: Int, fps: Int) =
+        capSender(sender, maxBitrate, fps = fps, degradation = RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION, high = true)
+
+    /**
+     * Looks at a screen share's sender and changes its scale when ShareAdapt
+     * calls for it: smaller while the link cannot carry 60 frames a second of
+     * it, larger again once it can, and always within the size cap. Called
+     * every few seconds while a share runs.
+     */
+    suspend fun retuneShare(pc: PeerConnection, sender: RtpSender, adapter: ShareAdapter) {
+        try {
+            val track = sender.track() ?: return
+            if (track.kind() != MediaStreamTrack.VIDEO_TRACK_KIND || track.state() != MediaStreamTrack.State.LIVE) return
+            val have = max(1.0, sender.parameters?.encodings?.firstOrNull()?.scaleResolutionDownBy ?: 1.0)
+            val report = WebRtc.stats(pc, sender) ?: return
+            val sample = ShareAdapt.readStats(report.statsMap.values.map { it.type to it.members }, have) ?: return
+            val want = adapter.scaleFor(sample)
+            if (abs(want - have) / have < 0.01) return
+            val params = sender.parameters ?: return
+            val enc = params.encodings.firstOrNull() ?: return
+            enc.scaleResolutionDownBy = want
+            sender.setParameters(params)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            // the sender went away, or cannot say
+        }
+    }
 }

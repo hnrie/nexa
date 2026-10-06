@@ -94,7 +94,8 @@ internal object Engine {
     private fun shouldTransmit(): Boolean {
         val local = VoiceLocal.state.value
         val st = Voice.state.value
-        if (local.muted || local.deafened || st.mine?.serverMute == true || st.interrupted) return false
+        // a moderator's deafen takes the voice away too, as it does the sound
+        if (local.muted || local.deafened || st.mine?.serverMute == true || st.mine?.serverDeaf == true || st.interrupted) return false
         if (Voice.setting("mode") == "ptt") return session?.pttHeld == true
         return true
     }
@@ -331,7 +332,7 @@ internal object Engine {
         s.micTrack?.let { transport.setLocalAudio(it) }
         transport.playback.setVolumes(Voice.mix.value)
         for (uid in Voice.state.value.watching) transport.setWatching(uid, true)
-        transport.playback.setOutputMuted(VoiceLocal.state.value.deafened)
+        transport.playback.setOutputMuted(outputSilenced())
         transport.playback.setMasterVolume(Voice.settingInt("outputVolume", 100))
         applyTransmit()
         s.announced = true
@@ -704,6 +705,15 @@ internal object Engine {
         session?.transport?.playback?.setOutputMuted(on)
     }
 
+    /** Whether nothing of the call may be heard here: deafened by this person, or by a moderator. */
+    fun outputSilenced(): Boolean = VoiceLocal.state.value.deafened || Voice.state.value.mine?.serverDeaf == true
+
+    /** Whoever a moderator muted or deafened stays silent here (a channel that denies Speak is the same). */
+    private fun syncModMutes(s: Session, everyone: List<VoiceState>) {
+        val myId = me()
+        for (p in everyone) if (p.userId != myId) s.transport.playback.setModMuted(p.userId, p.serverMute || p.serverDeaf)
+    }
+
     fun setMasterVolume(pct: Int) {
         session?.transport?.playback?.setMasterVolume(pct)
     }
@@ -719,11 +729,13 @@ internal object Engine {
     private fun syncPeers() {
         val s = session ?: return
         val myId = me() ?: return
-        val wanted = Voice.participants(s.channelId).map { it.userId }.filter { it != myId }.toSet()
+        val everyone = Voice.participants(s.channelId)
+        val wanted = everyone.map { it.userId }.filter { it != myId }.toSet()
         for (id in s.transport.peerIds()) if (id !in wanted) {
             s.transport.removePeer(id)
             Voice.removePeer(id)
         }
+        syncModMutes(s, everyone)
     }
 
     /**
@@ -753,6 +765,8 @@ internal object Engine {
         for (p in everyone) if (p.userId != me()) s.transport.addPeer(p.userId)
         s.transport.setRoster(everyone)
         s.transport.joined(vs)
+        syncModMutes(s, everyone)
+        s.transport.playback.setOutputMuted(outputSilenced())
         applyTransmit()
         relayGuestKeys(s)
         return true

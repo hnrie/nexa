@@ -48,6 +48,11 @@ export class Playback {
   private masterVolume = 100;
   private volumes = new Map<string, number>();
   private localMutes = new Set<string>();
+  /**
+   * People a moderator muted or deafened in the server. Their own app sends
+   * nothing then; this keeps them silent here too, should an app keep sending.
+   */
+  private modMutes = new Set<string>();
   /** A screen share's sound has its own level and mute, apart from the person's voice. */
   private streamVolumes = new Map<string, number>();
   private streamMutes = new Set<string>();
@@ -102,7 +107,7 @@ export class Playback {
       // lit whenever their sound can be heard: a microphone that is shut sends silence
       const loud = gate.update(meter.level() > AUDIBLE_LEVEL, Date.now());
       // someone muted just here shows no ring, straight away, and neither does sound not yet known to be theirs
-      const on = loud && !this.localMutes.has(userId) && !this.held.has(`voice:${userId}`);
+      const on = loud && !this.localMutes.has(userId) && !this.modMutes.has(userId) && !this.held.has(`voice:${userId}`);
       if (on !== out.speaking) {
         out.speaking = on;
         this.onSpeaking(userId, on);
@@ -201,7 +206,7 @@ export class Playback {
   }
 
   private effectiveGain(userId: string): number {
-    if (this.outputMuted || this.localMutes.has(userId) || this.held.has(`voice:${userId}`)) return 0;
+    if (this.outputMuted || this.localMutes.has(userId) || this.modMutes.has(userId) || this.held.has(`voice:${userId}`)) return 0;
     return ((this.volumes.get(userId) ?? 100) / 100) * (this.masterVolume / 100);
   }
 
@@ -234,6 +239,14 @@ export class Playback {
   setLocalMute(userId: string, on: boolean): void {
     if (on) this.localMutes.add(userId);
     else this.localMutes.delete(userId);
+    this.applyGains();
+  }
+
+  /** A moderator's mute or deafen of someone, from the call's voice states. */
+  setModMuted(userId: string, on: boolean): void {
+    if (on === this.modMutes.has(userId)) return;
+    if (on) this.modMutes.add(userId);
+    else this.modMutes.delete(userId);
     this.applyGains();
   }
 

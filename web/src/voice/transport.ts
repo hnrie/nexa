@@ -45,7 +45,8 @@ export interface VoiceTransport {
   /** The voice to send: a copy of the microphone that voiceSend.ts silences between phrases, never taken away for them. */
   setLocalAudio(track: MediaStreamTrack | null): void;
   setLocalVideo(track: MediaStreamTrack | null): void;
-  setLocalScreen(stream: MediaStream | null, bitrate?: number): void;
+  /** `fps` is the share's chosen rate: a share at 60 is steered to keep moving (shareAdapt.ts). */
+  setLocalScreen(stream: MediaStream | null, bitrate?: number, fps?: number): void;
   addPeer(userId: string): void;
   removePeer(userId: string): void;
   peerIds(): string[];
@@ -73,6 +74,8 @@ export interface VoiceTransport {
   setStreamVolume(userId: string, pct: number): void;
   setStreamMuted(userId: string, on: boolean): void;
   setOutputMuted(on: boolean): void;
+  /** Keeps someone a moderator muted or deafened silent here, whatever their app sends. */
+  setModMuted(userId: string, on: boolean): void;
   setMasterVolume(pct: number): void;
   setOutputDevice(deviceId: string | null): Promise<void>;
   stats(): Promise<{ rtt: number; loss: number }>;

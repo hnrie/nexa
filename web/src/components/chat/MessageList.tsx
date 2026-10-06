@@ -199,6 +199,8 @@ function shouldGroup(prev: DecryptedMessage | undefined, cur: DecryptedMessage):
   if (cur.type !== "default" && cur.type !== "reply") return false;
   if (prev.type.startsWith("system_")) return false;
   if (cur.reply_to_id) return false;
+  // a message that started a thread shows its own avatar, which the line to the thread's card hangs from
+  if (cur.thread) return false;
   if (cur.created_at - prev.created_at > GROUP_MS) return false;
   return sameDay(prev.created_at, cur.created_at);
 }

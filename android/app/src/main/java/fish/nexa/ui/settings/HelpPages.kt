@@ -166,6 +166,8 @@ fun AboutPage() {
         SubText(t("android.settings.about.app", "version" to BuildConfig.VERSION_NAME))
         SubText(t("settings.about.server", "version" to (server ?: "…")) + " · " + t("settings.about.terms", "version" to Legal.version))
     })
+    // the app's own updates, as the desktop app's settings show its own (Settings, Desktop App)
+    InfoRow("Download", t("settings.desktop.updates"), { fish.nexa.ui.AppUpdate.StatusLine(Modifier.padding(top = 2.dp)) })
     InfoRow("Sparkles", t("whatsNew.title"), { SubText(t("settings.about.whatsNewSub")) }) {
         NxButton(t("settings.about.show"), { fish.nexa.ui.WhatsNew.openAll() }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM)
     }

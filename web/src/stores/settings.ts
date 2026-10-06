@@ -114,6 +114,10 @@ export interface Settings {
   backgroundKeybinds: boolean;
   /** Show others' own typing styles (lib/typingStyle); off, everyone is shown with the plain dots. */
   customTyping: boolean;
+  /** Someone typing turns their presence dot into a pill of dots, in the DM list and member lists (Avatar). */
+  typingAvatars: boolean;
+  /** Dots on a server's channels while someone types in them (ServerSidebar). */
+  typingChannels: boolean;
   sidebarWidth: number;
   showMembers: boolean;
   recentEmoji: string[];
@@ -219,6 +223,8 @@ export const DEFAULT_SETTINGS: Settings = {
   keybinds: {},
   backgroundKeybinds: true,
   customTyping: true,
+  typingAvatars: true,
+  typingChannels: true,
   sidebarWidth: 240,
   showMembers: true,
   recentEmoji: [],
@@ -309,6 +315,8 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     keybinds: "keybinds" in inc ? sanitizeKeybinds(inc.keybinds) : base.keybinds,
     backgroundKeybinds: typeof inc.backgroundKeybinds === "boolean" ? inc.backgroundKeybinds : base.backgroundKeybinds,
     customTyping: typeof inc.customTyping === "boolean" ? inc.customTyping : base.customTyping,
+    typingAvatars: typeof inc.typingAvatars === "boolean" ? inc.typingAvatars : base.typingAvatars,
+    typingChannels: typeof inc.typingChannels === "boolean" ? inc.typingChannels : base.typingChannels,
 
     searchIndex: typeof inc.searchIndex === "boolean" ? inc.searchIndex : base.searchIndex,
     // no more than search/recent.ts keeps, whatever an older or odd copy holds

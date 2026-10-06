@@ -188,19 +188,50 @@ private fun volumeItems(userId: String): List<MenuItem> {
     )
 }
 
-/** The long-press menu of someone listed under a voice channel (VoiceParticipants.tsx). */
+/** Adds a group of items after a line, when there is anything to add. */
+private fun appendSection(items: MutableList<MenuItem>, more: List<MenuItem>) {
+    if (more.isEmpty()) return
+    when (val last = items.lastOrNull()) {
+        is MenuItem.Action -> items[items.lastIndex] = last.copy(separatorAfter = true)
+        is MenuItem.Submenu -> items[items.lastIndex] = last.copy(separatorAfter = true)
+        else -> Unit
+    }
+    items += more
+}
+
+/**
+ * The long-press menu of someone listed under a voice channel
+ * (VoiceParticipants.tsx personMenu): their profile and the member's usual
+ * choices, how loud they are here, and a moderator's tools where this account
+ * has them (Server Mute, Server Deafen, Move To, Disconnect, then Time Out,
+ * Kick and Ban). A guest's has their volume and, for whoever may move members,
+ * Remove From Call.
+ */
 fun voicePersonMenu(userId: String, channelId: String): List<MenuItem> {
-    val guest = isGuestUser(userId)
-    val items = ArrayList<MenuItem>()
     val profile = MenuItem.Action(t("profile.profile.profile")) { openProfile(userId) }
     if (userId == Nexa.users.meId) return listOf(profile)
-    if (!guest) items += profile.copy(separatorAfter = true)
-    val vol = volumeItems(userId)
-    items += vol.dropLast(1)
-    val canRemove = guest && canRemoveGuests(channelId)
-    items += (vol.last() as MenuItem.Action).copy(separatorAfter = canRemove)
-    if (canRemove) items += MenuItem.Action(t("voice.voiceParticipants.removeFromCall"), danger = true) { removeGuest(channelId, userId) }
-    if (!guest && Nexa.settings.developerMode) items += MenuItem.Action(t("chat.groupMemberMenu.copyUserId")) { copy(userId) }
+    val serverId = Nexa.channels.get(channelId)?.serverId
+    val vs = Voice.participants(channelId).firstOrNull { it.userId == userId }
+    val voice = if (serverId != null && vs != null) VoiceModeration.items(serverId, channelId, vs) else emptyList()
+    if (isGuestUser(userId)) {
+        val items = ArrayList<MenuItem>(volumeItems(userId))
+        appendSection(items, voice)
+        if (canRemoveGuests(channelId)) appendSection(items, listOf(MenuItem.Action(t("voice.voiceParticipants.removeFromCall"), danger = true) { removeGuest(channelId, userId) }))
+        return items
+    }
+    if (serverId == null) {
+        val items = ArrayList<MenuItem>(listOf(profile.copy(separatorAfter = true)))
+        items += volumeItems(userId)
+        if (Nexa.settings.developerMode) appendSection(items, listOf(MenuItem.Action(t("chat.groupMemberMenu.copyUserId")) { copy(userId) }))
+        return items
+    }
+    // the member's own menu, with the call's choices after who they are (after Mention)
+    val member = fish.nexa.ui.chat.memberMenuItems(serverId, userId)
+    val at = (member.indexOfFirst { it.separatorAfter } + 1).coerceAtLeast(1).coerceAtMost(member.size)
+    val items = ArrayList<MenuItem>(member.take(at))
+    appendSection(items, volumeItems(userId))
+    appendSection(items, voice)
+    appendSection(items, member.drop(at))
     return items
 }
 
@@ -239,6 +270,13 @@ internal fun tileMenu(t: Tile, channelId: String, state: CallState) {
     } else if (!t.me) {
         sep()
         items += volumeItems(t.userId)
+    }
+    // a moderator's tools, on the person's own tile: Server Mute, Server Deafen, Move To, Disconnect, then Time Out, Kick and Ban
+    val sid = Nexa.channels.get(channelId)?.serverId
+    val tileState = Voice.participants(channelId).firstOrNull { it.userId == t.userId }
+    if (!t.me && t.kind != Tile.Kind.SCREEN && sid != null && tileState != null) {
+        appendSection(items, VoiceModeration.items(sid, channelId, tileState))
+        if (!guestTile) appendSection(items, fish.nexa.ui.chat.memberModerationItems(sid, t.userId))
     }
     if (guestTile && t.kind != Tile.Kind.SCREEN && canRemoveGuests(channelId)) {
         sep()

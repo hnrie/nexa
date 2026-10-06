@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"evilion.xyz/chat/internal/realtime"
+	"evilion.xyz/chat/internal/voice"
 )
 
 // realtimeStandIn answers like Cloudflare Realtime and remembers what it was asked.
@@ -360,7 +361,14 @@ func TestCallSurvivesAGatewayReconnect(t *testing.T) {
 	if ev := ga3.next("voice_resumed", 3*time.Second); ev == nil || ev["kept"] != false {
 		t.Fatalf("a wrong session was kept: %v", ev)
 	}
-	if st, _ := srv.Voice.Get(mustParseID(t, idA)); st.SFUSession != "" {
+	// the join itself follows the message: give it a moment
+	var st voice.State
+	for end := time.Now().Add(2 * time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+		if st, _ = srv.Voice.Get(mustParseID(t, idA)); st.SFUSession == "" {
+			break
+		}
+	}
+	if st.SFUSession != "" {
 		t.Errorf("the start-over kept the old session: %+v", st)
 	}
 

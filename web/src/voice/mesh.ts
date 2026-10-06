@@ -17,7 +17,8 @@ import { Playback } from "./playback";
 import { MAX_SHARE_BPS, MIN_SHARE_BPS } from "./shareQuality";
 import type { MediaKind, SignalPayload, TransportEvents, VoiceTransport } from "./transport";
 import { RecentLoss, type LossTotals } from "./recentLoss";
-import { acceptCallVideo, capSender, clampBitrate, preferVp8, recapSender } from "./videoCap";
+import { acceptCallVideo, capSender, clampBitrate, preferVp8, recapSender, trackSize } from "./videoCap";
+import { ShareAdapter, retuneShare } from "./shareAdapt";
 
 export type { MediaKind, SignalPayload, TransportEvents } from "./transport";
 
@@ -32,6 +33,8 @@ interface Peer {
   audioSender: RTCRtpSender | null;
   videoSender: RTCRtpSender | null;
   screenSenders: RTCRtpSender[];
+  /** Each peer's link is its own, so each steers the share's size for itself (shareAdapt.ts). */
+  shareAdapter: ShareAdapter | null;
   restartTimer: ReturnType<typeof setTimeout> | null;
   /** ICE restarts tried since the connection last worked. */
   restarts: number;
@@ -87,7 +90,8 @@ export class MeshTransport implements VoiceTransport {
   /** Signals that beat the roster: an offer can arrive before we know the sender. */
   private early = new Map<string, SignalPayload[]>();
   private playback: Playback;
-  private screenBitrate = 5_000_000;
+  private screenBitrate = 6_000_000;
+  private screenFps = 30;
   private closed = false;
   /** The peers this device has been connected to, so losing them reads as reconnecting rather than a first connect. */
   private upBefore = new Set<string>();
@@ -128,9 +132,10 @@ export class MeshTransport implements VoiceTransport {
     for (const p of this.peers.values()) this.syncSenders(p);
   }
 
-  setLocalScreen(stream: MediaStream | null, bitrate = 5_000_000): void {
+  setLocalScreen(stream: MediaStream | null, bitrate = 6_000_000, fps = 30): void {
     this.screen = stream;
-    this.screenBitrate = clampBitrate(bitrate, MIN_SHARE_BPS, MAX_SHARE_BPS, 5_000_000);
+    this.screenBitrate = clampBitrate(bitrate, MIN_SHARE_BPS, MAX_SHARE_BPS, 6_000_000);
+    this.screenFps = fps;
     this.screenStream = stream ?? new MediaStream();
     for (const p of this.peers.values()) this.syncSenders(p);
   }
@@ -145,7 +150,7 @@ export class MeshTransport implements VoiceTransport {
   addPeer(userId: string, attempts = 0): void {
     if (this.closed || this.peers.has(userId) || userId === this.meId) return;
     const pc = new RTCPeerConnection({ iceServers: this.ice, bundlePolicy: "max-bundle" });
-    const peer: Peer = { userId, pc, polite: lower(this.meId, userId), makingOffer: false, ignoreOffer: false, remoteStreams: {}, pendingCandidates: [], audioSender: null, videoSender: null, screenSenders: [], restartTimer: null, restarts: 0, offerTimer: null, renegotiate: false, watchdog: null, attempts, ops: Promise.resolve() };
+    const peer: Peer = { userId, pc, polite: lower(this.meId, userId), makingOffer: false, ignoreOffer: false, remoteStreams: {}, pendingCandidates: [], audioSender: null, videoSender: null, screenSenders: [], shareAdapter: null, restartTimer: null, restarts: 0, offerTimer: null, renegotiate: false, watchdog: null, attempts, ops: Promise.resolve() };
     this.peers.set(userId, peer);
     pc.onicecandidate = (e) => this.events.onSignal(userId, { candidate: e.candidate ? e.candidate.toJSON() : null });
     pc.onnegotiationneeded = () => this.enqueue(peer, () => this.negotiate(peer));
@@ -452,7 +457,8 @@ export class MeshTransport implements VoiceTransport {
         const sender = pc.addTrack(t, this.screenStream);
         if (t.kind === "video") {
           this.sendVp8(pc, sender);
-          capSender(sender, this.screenBitrate);
+          capSender(sender, this.screenBitrate, trackSize(t), "high");
+          peer.shareAdapter = new ShareAdapter(this.screenFps);
         }
         peer.screenSenders.push(sender);
       }
@@ -560,6 +566,10 @@ export class MeshTransport implements VoiceTransport {
     this.playback.setOutputMuted(on);
   }
 
+  setModMuted(userId: string, on: boolean): void {
+    this.playback.setModMuted(userId, on);
+  }
+
   /** Master output level for every peer, 0–200 %. */
   setMasterVolume(pct: number): void {
     this.playback.setMasterVolume(pct);
@@ -575,8 +585,10 @@ export class MeshTransport implements VoiceTransport {
     let n = 0;
     const streams = new Map<string, LossTotals>();
     for (const [peerId, p] of this.peers) {
-      // what is sent stays within the size cap even when the picture going in grows
-      for (const sender of [p.videoSender, ...p.screenSenders]) if (sender?.track?.kind === "video") void recapSender(sender);
+      // what is sent stays within the size cap even when the picture going in grows,
+      // and a share in motion is sized to what this peer's link carries
+      if (p.videoSender?.track?.kind === "video") void recapSender(p.videoSender);
+      for (const sender of p.screenSenders) if (sender.track?.kind === "video") void retuneShare(sender, p.shareAdapter ?? (p.shareAdapter = new ShareAdapter(this.screenFps)));
       const report = await p.pc.getStats().catch(() => null);
       if (!report) continue;
       report.forEach((r) => {

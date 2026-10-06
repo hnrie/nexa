@@ -138,7 +138,7 @@ private fun GroupHead(label: String, count: Int) {
 
 /** MemberList.module.css .row: 46 high, the picture (dimmed while offline), the name in its role's colour, the status under it. */
 @Composable
-private fun PersonRow(row: MemberRow.Person, list: String, ownerLabel: String, onTap: () -> Unit, onLongPress: () -> Unit) {
+private fun PersonRow(row: MemberRow.Person, list: String, ownerLabel: String, onTap: () -> Unit, onLongPress: () -> Unit, typing: Boolean? = null) {
     val c = Nx.colors
     val haptics = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
@@ -171,7 +171,7 @@ private fun PersonRow(row: MemberRow.Person, list: String, ownerLabel: String, o
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (picking) PickMark(picked, t("pick.pickNamed", "name" to row.name))
-        Avatar(row.userId, row.name, row.avatarId, 32.dp, Modifier.alpha(if (row.offline && !pressed) 0.5f else 1f), status = status)
+        Avatar(row.userId, row.name, row.avatarId, 32.dp, Modifier.alpha(if (row.offline && !pressed) 0.5f else 1f), status = status, typing = typing)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 // in their roles' colours: one, a gradient or a shimmer, and their highest role's icon
@@ -299,6 +299,9 @@ fun MemberList(serverId: String, channelId: String?) {
 
     val list = "members:$serverId"
     val ownerLabel = t("chat.memberList.serverOwner")
+    // whoever types in the channel open beside the list shows it on their dot
+    val typers = if (channelId != null) fish.nexa.ui.shell.typersIn(channelId) else emptyList()
+    val typingOn = channelId != null && fish.nexa.ui.shell.settingOn("typingAvatars")
     Box(Modifier.fillMaxSize().semantics { contentDescription = t("chat.chat.memberList") }) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = if (Pick.picking(list)) 120.dp else 16.dp)) {
             items(rows, key = { it.key }) { row ->
@@ -308,6 +311,7 @@ fun MemberList(serverId: String, channelId: String?) {
                         row, list, ownerLabel,
                         onTap = { Profiles.open(row.userId, serverId) },
                         onLongPress = { openMemberMenu(serverId, row.userId, row.name, list) },
+                        typing = if (typingOn) row.userId in typers else null,
                     )
                 }
             }
@@ -327,6 +331,19 @@ fun outranks(serverId: String, userId: String): Boolean {
     val actor = Nexa.servers.memberHighest(st, me)
     val target = Nexa.servers.memberHighest(st, userId)
     return Perms.canActOn(actor.first, target.first, actor.second, target.second)
+}
+
+/** Time Out, Kick and Ban, each where you may and outrank the member; nothing for yourself (memberModerationItems). */
+fun memberModerationItems(serverId: String, userId: String): List<MenuItem.Action> {
+    val st = Nexa.servers.get(serverId) ?: return emptyList()
+    if (userId == Nexa.users.meId || !outranks(serverId, userId)) return emptyList()
+    val until = st.members[userId]?.timeoutUntil
+    val timedOut = until != null && until > System.currentTimeMillis()
+    val mod = ArrayList<MenuItem.Action>()
+    if (Nexa.servers.canI(st, P.MODERATE_MEMBERS)) mod += MenuItem.Action(if (timedOut) t("server.memberAction.removeTimeout") else t("server.members.timeout"), danger = true) { MemberActions.open(serverId, userId, MemberActions.Kind.TIMEOUT) }
+    if (Nexa.servers.canI(st, P.KICK_MEMBERS)) mod += MenuItem.Action(t("server.members.kick"), danger = true) { MemberActions.open(serverId, userId, MemberActions.Kind.KICK) }
+    if (Nexa.servers.canI(st, P.BAN_MEMBERS)) mod += MenuItem.Action(t("server.members.ban"), danger = true) { MemberActions.open(serverId, userId, MemberActions.Kind.BAN) }
+    return mod
 }
 
 /** memberMenuItems: profile, mention; friends and blocking; nickname, roles; timeout, kick, ban; the ID. */
@@ -352,17 +369,10 @@ fun memberMenuItems(serverId: String, userId: String): List<MenuItem.Action> {
         if (self) fish.nexa.ui.shell.openServerProfile(serverId) else Dialogs.serverProfile(serverId, userId)
     }
     if (Nexa.servers.canI(st, P.MANAGE_ROLES) && above) items += MenuItem.Action(t("server.members.roles")) { MemberActions.open(serverId, userId, MemberActions.Kind.ROLES) }
-    if (!self && above) {
-        val until = st.members[userId]?.timeoutUntil
-        val timedOut = until != null && until > System.currentTimeMillis()
-        val mod = ArrayList<MenuItem.Action>()
-        if (Nexa.servers.canI(st, P.MODERATE_MEMBERS)) mod += MenuItem.Action(if (timedOut) t("server.memberAction.removeTimeout") else t("server.members.timeout"), danger = true) { MemberActions.open(serverId, userId, MemberActions.Kind.TIMEOUT) }
-        if (Nexa.servers.canI(st, P.KICK_MEMBERS)) mod += MenuItem.Action(t("server.members.kick"), danger = true) { MemberActions.open(serverId, userId, MemberActions.Kind.KICK) }
-        if (Nexa.servers.canI(st, P.BAN_MEMBERS)) mod += MenuItem.Action(t("server.members.ban"), danger = true) { MemberActions.open(serverId, userId, MemberActions.Kind.BAN) }
-        if (mod.isNotEmpty()) {
-            items[items.lastIndex] = items.last().copy(separatorAfter = true)
-            items += mod
-        }
+    val mod = memberModerationItems(serverId, userId)
+    if (mod.isNotEmpty()) {
+        items[items.lastIndex] = items.last().copy(separatorAfter = true)
+        items += mod
     }
     if (Nexa.settings.developerMode) {
         items[items.lastIndex] = items.last().copy(separatorAfter = true)
@@ -505,6 +515,9 @@ fun GroupMemberList(channel: Channel) {
     }
     val list = "members:${ch.id}"
     val ownerLabel = t("chat.groupMemberList.groupOwner")
+    // whoever types in the group shows it on their dot
+    val typers = fish.nexa.ui.shell.typersIn(ch.id)
+    val typingOn = fish.nexa.ui.shell.settingOn("typingAvatars")
     Box(Modifier.fillMaxSize().semantics { contentDescription = t("chat.chat.memberList") }) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = if (Pick.picking(list)) 120.dp else 16.dp)) {
             item(key = "head") {
@@ -520,6 +533,7 @@ fun GroupMemberList(channel: Channel) {
                     row, list, ownerLabel,
                     onTap = { Profiles.open(row.userId) },
                     onLongPress = { openGroupMemberMenu(ch.id, row.userId, row.name, list) },
+                    typing = if (typingOn) row.userId in typers else null,
                 )
             }
         }

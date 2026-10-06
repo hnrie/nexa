@@ -106,17 +106,30 @@ export function canReceiveH264(): boolean {
   return !!RTCRtpReceiver.getCapabilities?.("video")?.codecs.some((c) => /^video\/h264$/i.test(c.mimeType));
 }
 
+/** The size a track's frames come in at, as its settings say; null where they do not. */
+export function trackSize(track: MediaStreamTrack | null | undefined): PictureSize | null {
+  try {
+    const { width, height } = track?.getSettings() ?? {};
+    return typeof width === "number" && typeof height === "number" && width > 0 && height > 0 ? { width, height } : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Holds a video sender inside the cap: at most `maxBitrate`, at most 60 frames
  * a second, and scaled down in proportion when `size`, the picture going in,
  * is larger than the cap. Without a size the scale already set is kept.
  */
-export function capSender(sender: RTCRtpSender, maxBitrate: number, size?: PictureSize | null): void {
+export function capSender(sender: RTCRtpSender, maxBitrate: number, size?: PictureSize | null, priority?: RTCPriorityType): void {
   const bitrate = Number.isFinite(maxBitrate) && maxBitrate > 0 ? Math.round(maxBitrate) : undefined;
   const withBitrate = () => {
     const params = sender.getParameters();
     if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
     if (bitrate !== undefined) params.encodings[0]!.maxBitrate = bitrate;
+    // a screen share is what people are there to look at: it is served first
+    // when the link is shared with a camera and a voice, and marked so on the way
+    if (priority) Object.assign(params.encodings[0]!, { priority, networkPriority: priority });
     return params;
   };
   try {

@@ -56,6 +56,8 @@ class Playback(private val scope: CoroutineScope, private val onSpeaking: (Strin
     private var masterVolume = 100
     private var volumes = mapOf<String, Int>()
     private var localMutes = setOf<String>()
+    /** People a moderator muted or deafened in the server: silent here too, should their app keep sending. */
+    private val modMutes = HashSet<String>()
     private var streamVolumes = mapOf<String, Int>()
     private var streamMutes = setOf<String>()
     private val watching = HashSet<String>()
@@ -65,7 +67,7 @@ class Playback(private val scope: CoroutineScope, private val onSpeaking: (Strin
     private var interrupted = false
 
     private fun effectiveGain(userId: String): Double {
-        if (outputMuted || interrupted || userId in localMutes || "voice:$userId" in held) return 0.0
+        if (outputMuted || interrupted || userId in localMutes || userId in modMutes || "voice:$userId" in held) return 0.0
         return ((volumes[userId] ?: 100) / 100.0) * (masterVolume / 100.0)
     }
 
@@ -135,6 +137,13 @@ class Playback(private val scope: CoroutineScope, private val onSpeaking: (Strin
         apply()
     }
 
+    /** A moderator's mute or deafen of someone, from the call's voice states. */
+    fun setModMuted(userId: String, on: Boolean) {
+        if (on == userId in modMutes) return
+        if (on) modMutes += userId else modMutes -= userId
+        apply()
+    }
+
     /** Something else took the audio: quiet until it comes back. */
     fun setInterrupted(on: Boolean) {
         interrupted = on
@@ -155,7 +164,7 @@ class Playback(private val scope: CoroutineScope, private val onSpeaking: (Strin
                 val now = System.currentTimeMillis()
                 for ((id, out) in voices) {
                     val loud = out.gate.update(out.sink.take() > SpeakingGate.AUDIBLE_LEVEL, now)
-                    val on = loud && id !in localMutes && "voice:$id" !in held
+                    val on = loud && id !in localMutes && id !in modMutes && "voice:$id" !in held
                     if (on != out.speaking) {
                         out.speaking = on
                         onSpeaking(id, on)

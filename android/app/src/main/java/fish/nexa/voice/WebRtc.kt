@@ -17,6 +17,7 @@ import org.webrtc.MediaConstraints
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
 import org.webrtc.RTCStatsReport
+import org.webrtc.RtpSender
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
 import org.webrtc.audio.JavaAudioDeviceModule
@@ -180,6 +181,17 @@ object WebRtc {
         suspendCancellableCoroutine { cont ->
             try {
                 pc.getStats { report -> if (cont.isActive) cont.resume(report) }
+            } catch (e: Throwable) {
+                if (cont.isActive) cont.resumeWithException(e)
+            }
+        }
+    }
+
+    /** One sender's stats report, or null when the connection does not answer within 2 s. */
+    suspend fun stats(pc: PeerConnection, sender: RtpSender): RTCStatsReport? = withTimeoutOrNull(2_000) {
+        suspendCancellableCoroutine { cont ->
+            try {
+                pc.getStats(sender) { report -> if (cont.isActive) cont.resume(report) }
             } catch (e: Throwable) {
                 if (cont.isActive) cont.resumeWithException(e)
             }

@@ -511,14 +511,18 @@ data class VoiceState(
     @SerialName("self_deaf") val selfDeaf: Boolean = false,
     val video: Boolean = false,
     val streaming: Boolean = false,
+    /** A moderator's mute, or a channel that lets nobody speak (then `suppress` is set too). */
     @SerialName("server_mute") val serverMute: Boolean = false,
     @SerialName("server_deaf") val serverDeaf: Boolean = false,
+    /** The channel denies Speak: serverMute is set for that, not for anything a moderator did. */
+    val suppress: Boolean = false,
     @SerialName("joined_at") val joinedAt: Long = 0,
     val media: Map<String, String>? = null,
     /** The video codecs besides VP8 the participant's device can watch: "h264" for a phone's screen share. */
     val codecs: List<String>? = null,
     val user: CallUser? = null,
     val guest: GuestEpoch? = null,
+    /** On a leave: "moved" when another device of the account picked the call up, "disconnected" when a moderator put them out. */
     val reason: String? = null,
 )
 

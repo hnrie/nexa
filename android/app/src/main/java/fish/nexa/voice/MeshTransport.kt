@@ -56,6 +56,8 @@ class MeshTransport(
         var audioSender: RtpSender? = null
         var videoSender: RtpSender? = null
         val screenSenders = ArrayList<RtpSender>()
+        /** How this link's share is sized to what it carries (ShareAdapt); made again with the share's senders. */
+        var shareAdapter: ShareAdapter? = null
         var restartJob: Job? = null
         var restarts = 0
         var offerJob: Job? = null
@@ -74,7 +76,7 @@ class MeshTransport(
     private val audioStreamId = UUID.randomUUID().toString()
     private val videoStreamId = UUID.randomUUID().toString()
     private var screenStreamId = UUID.randomUUID().toString()
-    private var screenBitrate = 5_000_000
+    private var screenBitrate = 6_000_000
     private var screenFps = 30
     private val early = HashMap<String, MutableList<JsonObject>>()
     private val upBefore = HashSet<String>()
@@ -479,8 +481,9 @@ class MeshTransport(
         if (sc != null && peer.screenSenders.isEmpty()) {
             runCatching { pc.addTrack(sc, listOf(screenStreamId)) }.getOrNull()?.let { s ->
                 transceiverOf(pc, s)?.let { VideoCap.preferVp8(it, sending = true) }
-                VideoCap.capSender(s, screenBitrate, fps = screenFps, degradation = VideoCap.shareDegradation(screenFps))
+                VideoCap.capShare(s, screenBitrate, screenFps)
                 peer.screenSenders += s
+                peer.shareAdapter = ShareAdapter(screenFps)
             }
         }
     }
@@ -547,6 +550,8 @@ class MeshTransport(
         var n = 0
         val streams = HashMap<String, Pair<Long, Long>>()
         for ((peerId, p) in peers.toMap()) {
+            // a share in motion is sized to what this peer's link carries
+            for (s in p.screenSenders.toList()) VideoCap.retuneShare(p.pc, s, p.shareAdapter ?: ShareAdapter(screenFps).also { p.shareAdapter = it })
             val report = WebRtc.stats(p.pc) ?: continue
             for (r in report.statsMap.values) {
                 if (r.type == "candidate-pair" && r.members["state"] == "succeeded") num(r.members["currentRoundTripTime"])?.let {

@@ -8,12 +8,89 @@
   -webkit-mask-image: radial-gradient(circle at calc(100% - var(--dot) / 2) calc(100% - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
   mask-image: radial-gradient(circle at calc(100% - var(--dot) / 2) calc(100% - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
 }
+/*
+ * Where typing can show, the dot grows into a pill (--pill wide, --pill-h
+ * high, a little taller than the dot so its dots read in a list) and the cut
+ * grows with it: the picture minus a circle at each end of the pill and the
+ * band between them, each as wide again as the ring round the dot (--ring).
+ * Both are registered lengths so the pill and its cut move together; while
+ * nobody types the pill is just the dot.
+ */
+@property --pill { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --pill-h { syntax: "<length>"; inherits: true; initial-value: 0px; }
+.typable { --pill: var(--dot, 0px); --pill-h: var(--dot, 0px); transition: --pill 220ms var(--ease-out), --pill-h 220ms var(--ease-out); }
+.typable[data-typing="true"] { --pill: calc(var(--dot) * 2.6); --pill-h: calc(var(--dot) * 1.2); }
+.cutPill {
+  --pill-cut: calc(var(--pill-h) / 2 + var(--ring));
+  -webkit-mask:
+    linear-gradient(#000 0 0),
+    radial-gradient(circle at calc(100% - var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
+    radial-gradient(circle at calc(100% - var(--pill) + var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
+    linear-gradient(#000 0 0) right calc(var(--pill-h) / 2) bottom calc(0px - var(--ring)) / calc(var(--pill) - var(--pill-h)) calc(var(--pill-cut) * 2) no-repeat;
+  -webkit-mask-composite: source-out, source-over, source-over;
+  mask:
+    linear-gradient(#000 0 0),
+    radial-gradient(circle at calc(100% - var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
+    radial-gradient(circle at calc(100% - var(--pill) + var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
+    linear-gradient(#000 0 0) right calc(var(--pill-h) / 2) bottom calc(0px - var(--ring)) / calc(var(--pill) - var(--pill-h)) calc(var(--pill-cut) * 2) no-repeat;
+  mask-composite: subtract, add, add;
+}
+[dir="rtl"] .cutPill {
+  -webkit-mask:
+    linear-gradient(#000 0 0),
+    radial-gradient(circle at calc(var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
+    radial-gradient(circle at calc(var(--pill) - var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
+    linear-gradient(#000 0 0) left calc(var(--pill-h) / 2) bottom calc(0px - var(--ring)) / calc(var(--pill) - var(--pill-h)) calc(var(--pill-cut) * 2) no-repeat;
+  -webkit-mask-composite: source-out, source-over, source-over;
+  mask:
+    linear-gradient(#000 0 0),
+    radial-gradient(circle at calc(var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
+    radial-gradient(circle at calc(var(--pill) - var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
+    linear-gradient(#000 0 0) left calc(var(--pill-h) / 2) bottom calc(0px - var(--ring)) / calc(var(--pill) - var(--pill-h)) calc(var(--pill-cut) * 2) no-repeat;
+  mask-composite: subtract, add, add;
+}
+/* a group's glyph, cut like a picture */
+.face { display: flex; width: 100%; height: 100%; border-radius: 50%; }
+/* the dot as a pill: the status's own colour, three dots taking turns inside it */
+.typable .status { width: var(--pill); height: var(--pill-h); border-radius: calc(var(--pill-h) / 2); }
+.status[data-typing="true"] { display: flex; align-items: center; justify-content: center; -webkit-mask: none; mask: none; }
+.status.online[data-typing="true"] { background: var(--status-online); color: var(--on-positive); }
+.status.idle[data-typing="true"] { background: var(--status-idle); color: var(--on-warning); }
+.status.dnd[data-typing="true"] { background: var(--status-dnd); color: var(--on-danger); }
+/* dots near two fifths of the pill's height, so they read at a glance in a list */
+.typingDots { display: inline-flex; align-items: center; gap: max(1px, calc(var(--pill-h) * 0.18)); }
+.typingDots i { width: max(3px, calc(var(--pill-h) * 0.38)); height: max(3px, calc(var(--pill-h) * 0.38)); border-radius: 50%; background: currentColor; animation: pillDot 1.2s ease-in-out infinite; }
+.typingDots i:nth-child(2) { animation-delay: 0.16s; }
+.typingDots i:nth-child(3) { animation-delay: 0.32s; }
+@keyframes pillDot { 0%, 60%, 100% { opacity: 0.45; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1.1); } }
+/* someone typing is news, so with less motion the dots still breathe, in place, and the pill does not grow */
+@keyframes pillDotCalm { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .typable { transition: none; }
+  .typingDots i { animation-name: pillDotCalm; transform: none; }
+}
+[data-reduced-motion="true"] .typable { transition: none; }
+[data-reduced-motion="true"] .typingDots i { animation-name: pillDotCalm; transform: none; }
 /* the dot sits at the end of the line, so in a right-to-left page the ring is cut on the left */
 [dir="rtl"] .cut {
   -webkit-mask-image: radial-gradient(circle at calc(var(--dot) / 2) calc(100% - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
   mask-image: radial-gradient(circle at calc(var(--dot) / 2) calc(100% - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
 }
 .status { position: absolute; inset-inline-end: 0; bottom: 0; width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--status-offline); }
+/* The speaking ring, just outside the picture: on quickly, fading out gently
+   between words. Beside a presence dot it is cut away round the dot as the
+   picture is, so it never runs through the dot. */
+.wrap[data-speaking]::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--positive); opacity: 0; pointer-events: none; transition: opacity 240ms ease-out; }
+.wrap[data-speaking="true"]::after { opacity: 1; transition-duration: 80ms; }
+.hasDot[data-speaking]::after {
+  -webkit-mask-image: radial-gradient(circle at calc(100% - 2px - var(--dot) / 2) calc(100% - 2px - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
+  mask-image: radial-gradient(circle at calc(100% - 2px - var(--dot) / 2) calc(100% - 2px - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
+}
+[dir="rtl"] .hasDot[data-speaking]::after {
+  -webkit-mask-image: radial-gradient(circle at calc(2px + var(--dot) / 2) calc(100% - 2px - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
+  mask-image: radial-gradient(circle at calc(2px + var(--dot) / 2) calc(100% - 2px - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
+}
+@media (prefers-reduced-motion: reduce) { .wrap[data-speaking]::after { transition-duration: 240ms; } }
 .alone { position: static; display: inline-block; flex: none; }
 .online { background: var(--status-online); }
 /* idle is a crescent moon */

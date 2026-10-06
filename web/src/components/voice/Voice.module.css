@@ -1,5 +1,8 @@
-/* the stage is dark in every theme, lit faintly from above in the accent */
-.root { display: flex; flex-direction: column; height: 100%; min-height: 0; background: radial-gradient(120% 70% at 50% -10%, color-mix(in srgb, var(--brand) 16%, #06040b), #040307 72%); color: #fff; position: relative; }
+/* The stage wears the theme that is on: its canvas, a step below the panels,
+   lit faintly from above in the accent. A light theme raises white tiles off
+   its surface colour instead, so nothing in a call is drawn in colours of its own. */
+.root { display: flex; flex-direction: column; height: 100%; min-height: 0; background: radial-gradient(120% 70% at 50% -10%, var(--canvas-glow), transparent 72%), var(--bg-canvas); color: var(--text); position: relative; }
+[data-theme="light"] .root { background: radial-gradient(120% 70% at 50% -10%, var(--canvas-glow), transparent 72%), var(--bg-surface); }
 /* above a conversation the call takes the share of its height the grab bar was dragged to (lib/callPanel.ts keeps the numbers) */
 .root[data-embedded="true"] { flex: none; height: calc(var(--call-share, 0.5) * 100%); min-height: 150px; max-height: calc(100% - 240px); border-bottom: 1px solid var(--border-subtle); }
 /* where the browser cannot go full screen itself (iPhone), the call covers the app, clear of the notch and home indicator */
@@ -24,13 +27,13 @@
 .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px; position: relative; }
 /* what the call has to say (calling, reconnecting, a blocked microphone): one column over the top of the stage */
 .stageNotes { position: absolute; top: 12px; inset-inline: 12px; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
-.stageNote { pointer-events: auto; padding: 5px 12px; border-radius: 999px; background: rgba(12, 8, 22, 0.66); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.06); font-size: 12.5px; line-height: 18px; color: var(--text-muted); white-space: normal; text-align: center; max-width: 100%; }
+.stageNote { pointer-events: auto; padding: 5px 12px; border-radius: 999px; background: color-mix(in srgb, var(--bg-floating) 84%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-low); font-size: 12.5px; line-height: 18px; color: var(--text-muted); white-space: normal; text-align: center; max-width: 100%; }
 .stageNote[data-tone="bad"] { color: var(--text-danger); font-weight: 600; }
 /* "Tap to turn the sound on": the whole note is the button */
 .stageNote[data-action] { display: inline-flex; align-items: center; gap: 6px; color: var(--text-strong); cursor: pointer; }
-.stageNote[data-action]:hover { background: rgba(0, 0, 0, 0.8); }
+.stageNote[data-action]:hover { background: var(--bg-floating); }
 .noteBtn { color: var(--text-strong); text-decoration: underline; font-size: inherit; line-height: inherit; padding-inline: 2px; border-radius: 4px; }
-.noteBtn:hover { color: #fff; }
+.noteBtn:hover { color: var(--text-brand); }
 .stageNote:focus-visible, .noteBtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .grid { flex: 1; min-height: 0; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 8px; overflow: hidden; }
 .focus { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
@@ -38,14 +41,15 @@
 .strip::-webkit-scrollbar { display: none; }
 
 /* a person in the call: a lit tile, their picture in the middle of it when there is no video */
-.tile { position: relative; flex: none; border-radius: var(--radius-md); background: radial-gradient(90% 90% at 50% 20%, color-mix(in srgb, var(--bg-surface), #fff 5%), var(--bg-surface)); overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 0 1px rgba(255, 255, 255, 0.05), 0 12px 30px -16px rgba(0, 0, 0, 0.8); transition: box-shadow 120ms ease; cursor: default; }
-.tile[data-place="focus"] { width: 100%; height: 100%; background: #000; }
+.tile { position: relative; flex: none; border-radius: var(--radius-md); background: radial-gradient(90% 90% at 50% 20%, color-mix(in oklab, var(--bg-surface), var(--text-strong) 4%), var(--bg-surface)); overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium); transition: box-shadow 120ms ease; cursor: default; }
+[data-theme="light"] .tile { background: var(--sheen), var(--bg-raised); }
+.tile[data-place="focus"] { width: 100%; height: 100%; background: var(--bg-canvas); }
 .tile[data-place="strip"] { width: 171px; height: 96px; }
 /* the speaking ring comes on quickly and fades out gently, so the gaps between words never make it flash */
 .tile::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 2.5px var(--status-online), inset 0 0 22px color-mix(in srgb, var(--status-online) 40%, transparent); pointer-events: none; opacity: 0; transition: opacity 240ms ease-out; }
 .tile[data-speaking="true"]::after { opacity: 1; transition-duration: 80ms; }
 .tile[data-kind="video"], .tile[data-kind="screen"] { cursor: pointer; }
-.video { display: block; width: 100%; height: 100%; object-fit: cover; background: #000; -webkit-touch-callout: none; }
+.video { display: block; width: 100%; height: 100%; object-fit: cover; background: transparent; -webkit-touch-callout: none; }
 /* what a stream's picture sits in; a focused share can be pinched into (StreamSurface) */
 .surface { position: absolute; inset: 0; overflow: hidden; }
 .surface[data-zoomable="true"] { touch-action: none; }
@@ -67,21 +71,23 @@
 .tile[data-place="strip"] .offer { gap: 4px; padding: 4px 4px 22px; }
 .tile[data-place="strip"] .watchBtn { height: 24px; padding: 0 8px; font-size: 12px; }
 
-.tileBar { position: absolute; inset-inline-start: 8px; bottom: 8px; display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: rgba(10, 6, 20, 0.6); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); font-size: 13px; font-weight: 600; color: #fff; max-width: calc(100% - 16px); }
+/* who it is, on a pill of the theme's floating colour, frosted so it reads over a picture too */
+.tileBar { position: absolute; inset-inline-start: 8px; bottom: 8px; display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--bg-floating) 80%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge); font-size: 13px; font-weight: 600; color: var(--text-strong); max-width: calc(100% - 16px); }
 .tile[data-place="strip"] .tileBar { inset-inline-start: 4px; bottom: 4px; padding: 2px 6px; font-size: 11px; max-width: calc(100% - 8px); }
-.live { flex: none; padding: 0 5px; border-radius: 3px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 16px; text-transform: uppercase; }
-.tileName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live { flex: none; padding: 0 5px; border-radius: 3px; background: var(--danger); color: var(--on-danger); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 16px; text-transform: uppercase; }
+.tileName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* someone in through a guest link */
-.guestTag { flex: none; padding: 0 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.18); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 16px; text-transform: uppercase; }
-.tileIcon { color: #fff; flex: none; }
-.tileIcon[data-server="true"] { color: var(--danger); }
+.guestTag { flex: none; padding: 0 5px; border-radius: 3px; background: var(--bg-active); color: var(--text-strong); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 16px; text-transform: uppercase; }
+.tileIcon { color: var(--text-strong); flex: none; }
+/* a moderator's mute or deafen, in red wherever the person is shown */
+.tileIcon[data-server="true"] { color: var(--text-danger); }
 .tileState { font-size: 11px; color: var(--text-warning); white-space: nowrap; }
 /* someone being called: their avatar keeps ringing until they pick up */
 .tileRinging { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 .ringingAvatar { display: inline-flex; border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; }
 .tileBtns { position: absolute; top: 8px; inset-inline-end: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity 120ms ease; }
 .tile:hover .tileBtns, .tile:focus-within .tileBtns { opacity: 1; }
-.tileBtn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: rgba(10, 6, 20, 0.6); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1); color: #fff; }
+.tileBtn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: color-mix(in srgb, var(--bg-floating) 80%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge); color: var(--text-strong); }
 .tileBtn:hover { background: var(--brand); color: var(--on-brand); }
 
 /* the control bar */
@@ -91,18 +97,19 @@
 .controlsSide { display: flex; align-items: center; min-width: 0; }
 .controlsEnd { justify-content: flex-end; }
 /* the controls sit together on a dock of glass over the stage */
-.controlsMain { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.05); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 16px 40px -16px rgba(0, 0, 0, 0.8); }
-.ctl { width: 52px; height: 52px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--bg-surface), #fff 4%); color: var(--text-strong); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1); transition: background-color 120ms ease, transform 120ms var(--ease-out); }
-/* hover lifts a control a shade lighter; the translucent active colour darkened it against the black stage */
-.ctl:hover { background: color-mix(in srgb, var(--bg-surface), #fff 16%); }
+.controlsMain { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 8px; border-radius: 999px; background: color-mix(in srgb, var(--bg-floating) 72%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); }
+.ctl { width: 52px; height: 52px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: color-mix(in oklab, var(--bg-surface), var(--text-strong) 4%); color: var(--text-strong); box-shadow: inset 0 1px 0 var(--edge-light); transition: background-color 120ms ease, transform 120ms var(--ease-out); }
+/* hover moves a control a shade towards the text colour: lighter on a dark theme, darker on a light one */
+.ctl:hover { background: color-mix(in oklab, var(--bg-surface), var(--text-strong) 14%); }
 .ctl:active { transform: scale(0.94); }
 /* a control with choices: the button, and a small arrow on its corner that opens them */
 .ctlGroup { position: relative; display: inline-flex; flex: none; }
 .ctlGroup > .ctlMenuWrap { position: absolute; inset-inline-end: -6px; bottom: -4px; }
-.ctlMenu { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-floating); color: var(--text-strong); border: 2px solid #120e1a; box-shadow: var(--shadow-low); }
-.ctlMenu:hover { background: color-mix(in srgb, var(--bg-floating), #fff 14%); }
-.ctl[data-on="true"] { background: #fff; color: #000; }
-.ctl[data-on="true"]:hover { background: #e3e3e6; }
+.ctlMenu { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-floating); color: var(--text-strong); border: 2px solid var(--bg-canvas); box-shadow: var(--shadow-low); }
+.ctlMenu:hover { background: color-mix(in oklab, var(--bg-floating), var(--text-strong) 14%); }
+/* on (camera, sharing): the theme turned over, its text colour as the fill */
+.ctl[data-on="true"] { background: var(--text-strong); color: var(--bg-base); }
+.ctl[data-on="true"]:hover { background: color-mix(in oklab, var(--text-strong) 86%, var(--bg-base)); }
 /* off — muted, deafened, a blocked microphone — is red, so "am I muted" never rests on the shape of a small icon */
 .ctl[data-off="true"] { background: color-mix(in srgb, var(--danger) 24%, var(--bg-surface)); color: var(--text-danger); }
 .ctl[data-off="true"]:hover { background: color-mix(in srgb, var(--danger) 34%, var(--bg-surface)); }
@@ -112,7 +119,7 @@
 .hangUp { transform: rotate(135deg); }
 .leave:hover { background: linear-gradient(180deg, color-mix(in oklab, var(--danger-hover), #fff 12%), var(--danger-hover) 60%); }
 .sideBtn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--text-muted); }
-.sideBtn:hover { color: #fff; background: var(--bg-surface); }
+.sideBtn:hover { color: var(--text-strong); background: var(--bg-hover); }
 .quality { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .qualityDot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
 .quality[data-level="good"] .qualityDot { background: var(--positive); }
@@ -164,13 +171,19 @@
 
 /* participants under a voice channel in the sidebar */
 .participants { display: flex; flex-direction: column; padding-block: 0 4px; padding-inline-start: 22px; }
-.participant { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: var(--radius-sm); color: var(--text-channel); font-size: 14px; width: 100%; text-align: start; }
+.participant { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: var(--radius-sm); color: var(--text-channel); font-size: 14px; width: 100%; text-align: start; cursor: pointer; }
 .participant:hover { background: var(--bg-hover); color: var(--text); }
+.participant:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+/* a moderator can pick them up and drop them on another voice channel */
+.participant[data-draggable="true"] { cursor: grab; }
+.participant[data-draggable="true"]:active { cursor: grabbing; }
+.participant[data-dragging="true"] { opacity: 0.45; }
 .pAvatar { border-radius: 50%; flex: none; box-shadow: 0 0 0 2px transparent; transition: box-shadow 240ms ease-out; }
 .participant[data-speaking="true"] .pAvatar { box-shadow: 0 0 0 2px var(--positive); transition-duration: 80ms; }
-.pName { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the name, then their server tag right after it, then the state icons at the end */
+.pName { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pGuest { flex: none; padding: 0 4px; border-radius: 3px; background: var(--bg-active); color: var(--text-muted); font-size: 10px; font-weight: 700; line-height: 15px; text-transform: uppercase; }
-.pIcons { display: flex; gap: 4px; color: var(--text-muted); }
+.pIcons { display: flex; gap: 4px; margin-inline-start: auto; flex: none; color: var(--text-muted); }
 .pIcons [data-server="true"] { color: var(--danger); }
 .channelCount { margin-inline-start: auto; font-size: 12px; color: var(--text-muted); }
 
@@ -297,7 +310,7 @@
 /* push to talk on a touch screen: a wide button to hold, above the controls */
 .pttRow { flex: none; display: flex; justify-content: center; padding: 6px 12px 0; }
 .pttBtn { width: min(100%, 420px); height: 56px; border-radius: 28px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--bg-surface); color: var(--text-strong); font-size: 16px; font-weight: 600; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: background-color 80ms ease; }
-.pttBtn[data-held] { background: var(--positive); color: #fff; }
+.pttBtn[data-held] { background: var(--positive); color: var(--on-positive); }
 .pttBtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 /*
@@ -317,7 +330,7 @@
 
 /* "Call back" at the end of a call's line in a conversation */
 .callAgain { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding-inline: 10px; border-radius: 14px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; transition: background-color var(--transition), color var(--transition); }
-.callAgain:hover { background: var(--positive); border-color: transparent; color: #fff; }
+.callAgain:hover { background: var(--positive); border-color: transparent; color: var(--on-positive); }
 .callAgain:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 @media (pointer: coarse) {

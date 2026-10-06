@@ -11,6 +11,8 @@ import { memberBulk } from "@/components/server/memberBulk";
 import { PickBar, PickMark } from "@/components/common/Pick";
 import { pickClick, usePick } from "@/stores/pick";
 import { useAuth } from "@/stores/auth";
+import { useSettings } from "@/stores/settings";
+import { useTypingIn } from "@/stores/typing";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
 import { StatusLine } from "@/components/activity/StatusLine";
 import { useChannels } from "@/stores/channels";
@@ -49,6 +51,9 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
   const upsertUsers = useUsers((u) => u.upsert);
   const presence = usePresence((p) => p.byUser);
   const meId = useAuth((a) => a.me?.id);
+  // whoever types in the channel open beside the list shows it on their dot
+  const typingOn = useSettings((x) => x.settings.typingAvatars !== false);
+  const typers = useTypingIn(typingOn ? channelId : null, meId);
   const openModal = useUI((u) => u.openModal);
   const openContextMenu = useUI((u) => u.openContextMenu);
   const ref = useRef<HTMLElement>(null);
@@ -259,7 +264,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
             aria-pressed={isPicking ? picked.includes(row.member.user_id) : undefined}
           >
             {isPicking ? <PickMark on={picked.includes(row.member.user_id)} label={t("pick.pickNamed", { name })} /> : null}
-            <Avatar id={row.member.user_id} avatarId={row.member.avatar_id ?? row.user?.avatar_id ?? null} name={name} size={32} status={statusOf(p)} />
+            <Avatar id={row.member.user_id} avatarId={row.member.avatar_id ?? row.user?.avatar_id ?? null} name={name} size={32} status={statusOf(p)} typing={typingOn ? typers.includes(row.member.user_id) : undefined} />
             <span className={s.text}>
               <span className={s.name} style={row.look?.color ? { color: row.look.color } : undefined}>
                 <span className={[s.nameText, nameClass(row.look)].join(" ")} style={nameStyle(row.look)}>{name}</span>

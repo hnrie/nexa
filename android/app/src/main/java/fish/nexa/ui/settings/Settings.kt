@@ -679,6 +679,8 @@ private fun settingsIndex(groups: List<SettingsGroup>): List<SettingResult> {
         Triple("chat", "smartEmoji", "settings.appearance.smartEmoji"),
         Triple("chat", "tts", "settings.notifications.readTtsAloud"),
         Triple("chat", "customTyping", "settings.chat.customTyping"),
+        Triple("chat", "typingAvatars", "settings.chat.typingAvatars"),
+        Triple("chat", "typingChannels", "settings.chat.typingChannels"),
         Triple("stickers", "packs", "modals.customStatus.emoji"),
         Triple("notifications", "desktopNotifications", "android.settings.notifications.show"),
         Triple("notifications", "sounds", "settings.notifications.sounds"),

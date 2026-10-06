@@ -20,6 +20,19 @@ export function outranks(serverId: string, userId: string): boolean {
   return canActOn(actor.highest, target.highest, actor.isOwner, target.isOwner);
 }
 
+/** Time Out, Kick and Ban, each where this account may and outranks the member; nothing for itself. */
+export function memberModerationItems(serverId: string, userId: string, ctx: { openModal: (kind: string, props?: Record<string, unknown>) => void }): ContextMenuItem[] {
+  const st = useServers.getState().byId[serverId];
+  const me = useAuth.getState().me;
+  if (!st || !me || userId === me.id || !outranks(serverId, userId)) return [];
+  const timedOut = !!st.members[userId]?.timeout_until && st.members[userId]!.timeout_until! > Date.now();
+  const mod: ContextMenuItem[] = [];
+  if (canI(st, P.MODERATE_MEMBERS)) mod.push({ id: "timeout", label: timedOut ? t("server.memberAction.removeTimeout") : t("server.members.timeout"), danger: true, onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "timeout" }) });
+  if (canI(st, P.KICK_MEMBERS)) mod.push({ id: "kick", label: t("server.members.kick"), danger: true, onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "kick" }) });
+  if (canI(st, P.BAN_MEMBERS)) mod.push({ id: "ban", label: t("server.members.ban"), danger: true, onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "ban" }) });
+  return mod;
+}
+
 /** Context menu for a member row: profile, mention, nickname, roles, moderation. */
 export function memberMenuItems(serverId: string, userId: string, ctx: { openModal: (kind: string, props?: Record<string, unknown>) => void }): ContextMenuItem[] {
   const st = useServers.getState().byId[serverId];
@@ -49,16 +62,10 @@ export function memberMenuItems(serverId: string, userId: string, ctx: { openMod
   const canNick = self || (canI(st, P.MANAGE_NICKNAMES) && above);
   if (canNick) items.push({ id: "nick", label: self ? t("sidebar.serverMenu.editServerProfile") : t("server.memberMenu.changeTheirNickname"), onSelect: () => (self ? ctx.openModal("settings", { page: "profiles", serverId }) : ctx.openModal("serverProfile", { serverId, userId })) });
   if (canI(st, P.MANAGE_ROLES) && above) items.push({ id: "roles", label: t("server.members.roles"), onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "roles" }) });
-  if (!self && above) {
-    const timedOut = !!st.members[userId]?.timeout_until && st.members[userId]!.timeout_until! > Date.now();
-    const mod: ContextMenuItem[] = [];
-    if (canI(st, P.MODERATE_MEMBERS)) mod.push({ id: "timeout", label: timedOut ? t("server.memberAction.removeTimeout") : t("server.members.timeout"), danger: true, onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "timeout" }) });
-    if (canI(st, P.KICK_MEMBERS)) mod.push({ id: "kick", label: t("server.members.kick"), danger: true, onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "kick" }) });
-    if (canI(st, P.BAN_MEMBERS)) mod.push({ id: "ban", label: t("server.members.ban"), danger: true, onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "ban" }) });
-    if (mod.length) {
-      items[items.length - 1]!.separatorAfter = true;
-      items.push(...mod);
-    }
+  const mod = memberModerationItems(serverId, userId, ctx);
+  if (mod.length) {
+    items[items.length - 1]!.separatorAfter = true;
+    items.push(...mod);
   }
   if (useSettings.getState().settings.developerMode) {
     items[items.length - 1]!.separatorAfter = true;

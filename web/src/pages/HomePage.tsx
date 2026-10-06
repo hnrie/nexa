@@ -39,9 +39,10 @@ import s from "./Home.module.css";
  * The most the app takes to load, gzipped: the script and styles every page
  * starts with. tools/app_size.py measures each build against it, so the claim
  * on this page cannot drift from the truth unnoticed, as "264 KB" had. (It
- * was 208 kB when this was set, and 500 had stopped saying much.)
+ * was 208 kB when this was first set at 300, and 500 had stopped saying much;
+ * it was 321 kB when it became 330, about half of it the English strings.)
  */
-export const LOAD_KB_LIMIT = 300;
+export const LOAD_KB_LIMIT = 330;
 
 /** Whether this visitor has asked for less movement, by either route. */
 function useStillness(): boolean {

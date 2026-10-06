@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -257,11 +258,15 @@ private fun ChannelRow(serverId: String, ch: Channel, selected: Boolean, threads
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val read = Nexa.readStates.get(ch.id)
+    // collected by the row itself: a row whose own arguments did not change is
+    // skipped when the list redraws, and would keep an old read mark or call
+    val reads by Nexa.readStates.byChannel.collectAsState()
+    val voices by Nexa.voiceStates.byUser.collectAsState()
+    val read = reads[ch.id]
     val muted = Unread.isMuted(ch.id, serverId)
     val unread = ch.isTextLike && !selected && Unread.isUnread(read, ch.lastMessageId) && !muted
     val mentions = read?.mentions ?: 0
-    val people = if (ch.isVoice) Nexa.voiceStates.inChannel(ch.id) else emptyList()
+    val people = if (ch.isVoice) voices.values.filter { it.channelId == ch.id }.sortedBy { it.joinedAt } else emptyList()
     Column {
         Box(Modifier.fillMaxWidth().padding(vertical = 2.dp).alpha(if (ch.id in Unread.mutedIds()) 0.6f else 1f)) {
             if (unread) UnreadEdge(Modifier.align(Alignment.CenterStart))
@@ -300,6 +305,7 @@ private fun ChannelRow(serverId: String, ch: Channel, selected: Boolean, threads
                     modifier = Modifier.weight(1f),
                 )
                 if (ch.isVoice && ch.userLimit > 0) Txt("${people.size}/${ch.userLimit}", style = Nx.type.hint, color = c.textMuted)
+                ChannelTyping(serverId, ch.id, lit = selected || unread)
                 if (mentions > 0) CountBadge(mentions, Modifier.padding(start = 4.dp))
             }
         }
@@ -388,7 +394,46 @@ private fun ThreadRow(serverId: String, th: Channel, selected: Boolean, first: B
                 maxLines = 1,
                 modifier = Modifier.weight(1f),
             )
+            ChannelTyping(serverId, th.id, lit = selected || unread)
             if (mentions > 0) CountBadge(mentions, Modifier.padding(start = 4.dp))
+        }
+    }
+}
+
+/** "Alice is typing…", as the typing line under a conversation says it (TypingBar.kt). */
+private fun typingSentence(names: List<String>): String = when (names.size) {
+    1 -> t("chat.typingBar.oneTyping", "a" to names[0])
+    2 -> t("chat.typingBar.twoTyping", "a" to names[0], "b" to names[1])
+    3 -> t("chat.typingBar.threeTyping", "a" to names[0], "b" to names[1], "c" to names[2])
+    else -> t("chat.typingBar.severalPeopleAreTyping")
+}
+
+/**
+ * Dots at the end of a channel's row while someone types in it
+ * (ServerSidebar.tsx ChannelTyping), so a server shows where people are
+ * talking before anything is sent; brighter on a row that is lit. Settings,
+ * Chat turns them off.
+ */
+@Composable
+private fun ChannelTyping(serverId: String, channelId: String, lit: Boolean) {
+    val on = settingOn("typingChannels")
+    val typers = typersIn(channelId)
+    if (!on || typers.isEmpty()) return
+    val c = Nx.colors
+    val label = typingSentence(typers.map { Names.member(serverId, it) })
+    val reduced = Nx.motion.reduced
+    val turns = androidx.compose.animation.core.rememberInfiniteTransition(label = "channelTyping")
+    val phase by turns.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.LinearEasing)), label = "phase")
+    val color = if (lit) c.text else c.textMuted
+    androidx.compose.foundation.Canvas(Modifier.size(22.dp, 20.dp).semantics { contentDescription = label }) {
+        val r = 2.dp.toPx()
+        val gap = 2.5.dp.toPx()
+        val x0 = (size.width - (6 * r + 2 * gap)) / 2 + r
+        for (i in 0..2) {
+            // each dot brightest a little after the one before it, rising a touch unless motion is reduced
+            val local = ((phase - i * 0.133f) % 1f + 1f) % 1f
+            val beat = if (local < 0.3f) local / 0.3f else if (local < 0.6f) 1f - (local - 0.3f) / 0.3f else 0f
+            drawCircle(color.copy(alpha = 0.35f + 0.65f * beat), r, androidx.compose.ui.geometry.Offset(x0 + i * (2 * r + gap), size.height / 2 - if (reduced) 0f else 1.5.dp.toPx() * beat))
         }
     }
 }
@@ -412,15 +457,21 @@ private fun VoiceParticipantRow(serverId: String, v: fish.nexa.net.VoiceState) {
     ) {
         val speaking = fish.nexa.voice.Speaking.isSpeaking(v.userId)
         Avatar(v.userId, name, v.user?.avatarId ?: Nexa.users.get(v.userId)?.avatarId, 24.dp, speaking = speaking)
-        Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textChannel, maxLines = 1, modifier = Modifier.weight(1f))
-        if (guest) Box(Modifier.background(c.bgActive, RoundedCornerShape(3.dp)).padding(horizontal = 4.dp)) {
-            Txt(t("voice.voiceParticipants.guest").uppercase(), style = Nx.type.hint.copy(fontSize = Nx.type.sp(10f), fontWeight = FontWeight(700)), color = c.textMuted)
+        // the name, then their server tag right after it, then the state icons at the end
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textChannel, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+            if (guest) Box(Modifier.background(c.bgActive, RoundedCornerShape(3.dp)).padding(horizontal = 4.dp)) {
+                Txt(t("voice.voiceParticipants.guest").uppercase(), style = Nx.type.hint.copy(fontSize = Nx.type.sp(10f), fontWeight = FontWeight(700)), color = c.textMuted)
+            }
+            else (if (v.userId == Nexa.users.meId) Nexa.users.me.value?.serverTag else Nexa.users.get(v.userId)?.serverTag)?.takeIf { it.text.isNotEmpty() }?.let { fish.nexa.ui.chat.ServerTagChip(it, small = true) }
         }
+        val modMute = fish.nexa.ui.voice.VoiceModeration.modMuted(v)
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (v.video) Icon("Video", c.textMuted, size = 14.dp)
             if (v.streaming) Icon("MonitorUp", c.textMuted, size = 14.dp)
-            if (v.selfMute || v.serverMute) Icon("MicOff", if (v.serverMute) c.danger else c.textMuted, size = 14.dp)
-            if (v.selfDeaf || v.serverDeaf) Icon("HeadphoneOff", if (v.serverDeaf) c.danger else c.textMuted, size = 14.dp)
+            // a moderator's mute or deafen in red, wherever the person is shown
+            if (v.selfMute || v.serverMute) Icon("MicOff", if (modMute) c.textDanger else c.textMuted, size = 14.dp)
+            if (v.selfDeaf || v.serverDeaf) Icon("HeadphoneOff", if (v.serverDeaf) c.textDanger else c.textMuted, size = 14.dp)
         }
     }
 }

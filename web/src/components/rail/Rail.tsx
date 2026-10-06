@@ -1,4 +1,4 @@
-import { Pin, Plus, Shield, Users, Compass } from "lucide-react";
+import { Pin, Plus, Shield, Users, Compass, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
@@ -18,7 +18,9 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useReadStates } from "@/stores/readStates";
 import { useRelationships } from "@/stores/relationships";
-import { useServers } from "@/stores/servers";
+import { canI, useServers } from "@/stores/servers";
+import { useVoice } from "@/stores/voice";
+import { P } from "@/lib/perms";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
@@ -98,6 +100,18 @@ export function Rail() {
   // messages waiting already stands under it with its own count, and a second
   // number on home for the same messages was one badge too many.
   const friendRequests = useMemo(() => Object.values(rels).filter((r) => r.type === "incoming").length, [rels]);
+  // The servers where people are in a voice channel this account could join
+  // too: there is a call going, and the speaker on the icon says so.
+  const voiceByChannel = useVoice((v) => v.byChannel);
+  const voiceLive = useMemo(() => {
+    const live = new Set<string>();
+    for (const [chId, people] of Object.entries(voiceByChannel)) {
+      const ch = channels[chId];
+      if (!ch?.server_id || ch.type !== "voice" || live.has(ch.server_id) || Object.keys(people).length === 0) continue;
+      if (canI(servers[ch.server_id], P.VIEW_CHANNEL | P.CONNECT, chId)) live.add(ch.server_id);
+    }
+    return live;
+  }, [voiceByChannel, channels, servers]);
   // what Nexa sent waits under home like any conversation; once its conversation is closed, only something new counts
   const nexaClosed = settings.nexaClosed;
   const nexaState = useNexa((n) => n.state);
@@ -254,11 +268,15 @@ export function Rail() {
     const u = serverUnread(id, channels, reads, settings);
     const selected = activeServer === id;
     const muted = settings.notifications.muted.includes(id);
+    const inVoice = voiceLive.has(id);
+    const label = u.mentions > 0 ? t("rail.rail.serverWithMentions", { name: st.server.name, count: u.mentions }) : st.server.name;
     return (
       <div
         key={id}
         className={[s.item, s.server].join(" ")}
         data-selected={selected}
+        data-voice={inVoice || undefined}
+        data-mentioned={u.mentions > 0 || undefined}
         data-unread={u.unread && !selected}
         data-muted={muted}
         data-drop={dropOf(id)}
@@ -280,7 +298,7 @@ export function Rail() {
             // Home and Waiting already fold their count into the name and
             // hide the badge; the servers did neither, so a badge announced
             // itself as a loose "3".
-            aria-label={u.mentions > 0 ? t("rail.rail.serverWithMentions", { name: st.server.name, count: u.mentions }) : st.server.name}
+            aria-label={inVoice ? t("rail.rail.serverInVoice", { server: label }) : label}
             aria-current={selected ? "page" : undefined}
             aria-pressed={isPicking ? picked.includes(id) : undefined}
             onClick={(e) => {
@@ -292,6 +310,11 @@ export function Rail() {
             {url ? <img src={url} alt="" draggable={false} /> : <span className={s.initials}>{initials(st.server.name)}</span>}
           </button>
         </Tooltip>
+        {inVoice ? (
+          <span className={s.voiceBadge} aria-hidden="true" data-testid="rail-voice">
+            <Volume2 size={12} strokeWidth={2.6} />
+          </span>
+        ) : null}
         {u.mentions > 0 ? <span className={s.badge} aria-hidden="true">{u.mentions > 99 ? "99+" : u.mentions}</span> : null}
         {isPicking ? <span className={s.pickMark}><PickMark on={picked.includes(id)} label={t("pick.pickNamed", { name: st.server.name })} /></span> : null}
       </div>
@@ -309,8 +332,9 @@ export function Rail() {
       if (u.unread) fUnread = true;
       mentions += u.mentions;
     }
-    // a closed folder stands in for the server open inside it
+    // a closed folder stands in for the server open inside it, and for a call going on in any of them
     const holdsActive = !!activeServer && ids.includes(activeServer);
+    const inVoice = !open && ids.some((id) => voiceLive.has(id));
     const name = folderName(f);
     const label = t("organize.rail.folderLabel", { name, count: ids.length });
     const drop = dropOf(f.id);
@@ -333,6 +357,8 @@ export function Rail() {
           className={[s.item, s.folderItem].join(" ")}
           data-selected={!open && holdsActive}
           data-unread={!open && fUnread && !holdsActive}
+          data-voice={inVoice || undefined}
+          data-mentioned={(!open && mentions > 0) || undefined}
           data-drop={drop === "combine" ? "combine" : undefined}
           data-rail-row={f.id}
           data-rail-folder=""
@@ -347,13 +373,18 @@ export function Rail() {
             <button
               className={[s.btn, s.folderBtn].join(" ")}
               aria-expanded={open}
-              aria-label={!open && mentions > 0 ? t("rail.rail.serverWithMentions", { name: label, count: mentions }) : label}
+              aria-label={((l: string) => (inVoice ? t("rail.rail.serverInVoice", { server: l }) : l))(!open && mentions > 0 ? t("rail.rail.serverWithMentions", { name: label, count: mentions }) : label)}
               onClick={() => toggleFolder(f)}
               data-testid="folder-button"
             >
               <FolderFace serverIds={ids} open={open} />
             </button>
           </Tooltip>
+          {inVoice ? (
+            <span className={s.voiceBadge} aria-hidden="true" data-testid="rail-voice">
+              <Volume2 size={12} strokeWidth={2.6} />
+            </span>
+          ) : null}
           {!open && mentions > 0 ? <span className={s.badge} aria-hidden="true">{badgeText(mentions)}</span> : null}
         </div>
         {open ? ids.map((id) => renderServer(id, f)) : null}

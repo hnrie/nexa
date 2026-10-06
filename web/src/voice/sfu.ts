@@ -15,7 +15,9 @@ import { tunedRemote } from "./opus";
 import { Playback } from "./playback";
 import { MAX_SHARE_BPS, MIN_SHARE_BPS } from "./shareQuality";
 import type { SignalPayload, TransportEvents, VoiceTransport } from "./transport";
-import { acceptCallVideo, capSender, clampBitrate, preferVp8, recapSender } from "./videoCap";
+import { acceptCallVideo, capSender, clampBitrate, preferVp8, recapSender, trackSize } from "./videoCap";
+import { ShareAdapter, retuneShare } from "./shareAdapt";
+import { STALL_CHECK_MS, type StallWatch, watchStall } from "./stallWatch";
 
 import { t as tr_ } from "@/i18n";
 import { RecentLoss, type LossTotals } from "./recentLoss";
@@ -154,6 +156,7 @@ const LOSS_GRACE_MS = 4_000;
 const VIDEO_PAUSE_MS = 10 * 60_000;
 
 
+
 /** Thrown by a step whose connection was replaced or closed while it waited. */
 class Stale extends Error {}
 
@@ -203,7 +206,9 @@ export class SfuTransport implements VoiceTransport {
   private audioTrack: MediaStreamTrack | null = null;
   private videoTrack: MediaStreamTrack | null = null;
   private screen: MediaStream | null = null;
-  private screenBitrate = 5_000_000;
+  private screenBitrate = 6_000_000;
+  /** Steers the share's size by what the link carries (shareAdapt.ts), made anew for each share. */
+  private shareAdapter = new ShareAdapter(30);
   private senders: Partial<Record<PubKind, RTCRtpTransceiver>> = {};
   private published = new Set<PubKind>();
 
@@ -242,6 +247,10 @@ export class SfuTransport implements VoiceTransport {
   private lastFailure = 0;
   private videoPausedUntil = 0;
   private lossTimer: ReturnType<typeof setInterval>;
+  private stallTimer: ReturnType<typeof setInterval>;
+  /** Each watched share's StallWatch, by its receiver's crypto id. */
+  private stalls = new Map<string, StallWatch>();
+  private stallBusy = false;
   /** Per pulled voice (by mid), the counters at the last few checks, oldest first. */
   private lossSeen = new Map<string, VoiceCounts[]>();
   /** When this device last told each speaker about losses. */
@@ -266,12 +275,12 @@ export class SfuTransport implements VoiceTransport {
     this.bypassTimer = setInterval(() => void this.checkBypass(), 1_000);
     this.lossTimer = setInterval(() => {
       void this.checkLoss();
-      // what is sent stays within the size cap even when the picture going in grows
-      for (const kind of ["video", "screen"] as const) {
-        const tr = this.senders[kind];
-        if (tr) void recapSender(tr.sender);
-      }
+      // what is sent stays within the size cap even when the picture going in grows,
+      // and a share in motion is sized to what the link carries
+      if (this.senders.video) void recapSender(this.senders.video.sender);
+      if (this.senders.screen) void retuneShare(this.senders.screen.sender, this.shareAdapter);
     }, LOSS_CHECK_MS);
+    this.stallTimer = setInterval(() => void this.watchStalls(), STALL_CHECK_MS);
   }
 
   // --- the connection ----------------------------------------------------
@@ -624,7 +633,7 @@ export class SfuTransport implements VoiceTransport {
       // the microphone's frames carry copies of the ones before when listeners lose packets
       this.crypto.protectSender(tr.sender, media(kind), kind === "audio");
       if (kind === "video") capSender(tr.sender, CAMERA_BPS);
-      if (kind === "screen") capSender(tr.sender, this.screenBitrate);
+      if (kind === "screen") capSender(tr.sender, this.screenBitrate, undefined, "high");
       this.senders[kind] = tr;
       added.push(kind);
     }
@@ -678,17 +687,19 @@ export class SfuTransport implements VoiceTransport {
     else if (track) this.publish(["video"]);
   }
 
-  setLocalScreen(stream: MediaStream | null, bitrate = 5_000_000): void {
+  setLocalScreen(stream: MediaStream | null, bitrate = 6_000_000, fps = 30): void {
     this.screen = stream;
     // the server charges pulls of the share at this rate and holds it to the same bounds
-    this.screenBitrate = clampBitrate(bitrate, MIN_SHARE_BPS, MAX_SHARE_BPS, 5_000_000);
+    this.screenBitrate = clampBitrate(bitrate, MIN_SHARE_BPS, MAX_SHARE_BPS, 6_000_000);
+    if (stream) this.shareAdapter = new ShareAdapter(fps);
     const missing: PubKind[] = [];
     for (const kind of ["screen", "screen_audio"] as const) {
       const tr = this.senders[kind];
       const track = this.trackFor(kind);
       if (tr) {
         void tr.sender.replaceTrack(track).catch(() => {});
-        if (kind === "screen" && track) capSender(tr.sender, this.screenBitrate);
+        // a new share starts at its own full size, whatever the last one had been stepped down to
+        if (kind === "screen" && track) capSender(tr.sender, this.screenBitrate, trackSize(track) ?? { width: 1, height: 1 }, "high");
       } else if (track) missing.push(kind);
     }
     if (missing.length) this.publish(missing);
@@ -1001,6 +1012,45 @@ export class SfuTransport implements VoiceTransport {
    * Finds pulled tracks whose packets arrive but never reach the decryption
    * worker, and pulls them again. Their sound was held silent all along.
    */
+  /** Asks for a keyframe for a watched share whose picture is stuck behind a lost frame (stallWatch.ts). */
+  private async watchStalls(): Promise<void> {
+    if (this.closed || this.stallBusy) return;
+    this.stallBusy = true;
+    try {
+      await this.checkStalls();
+    } finally {
+      this.stallBusy = false;
+    }
+  }
+
+  private async checkStalls(): Promise<void> {
+    const pc = this.pc;
+    // only a share that has played: one still waiting on its keys, or over the size cap, is held on purpose
+    const screens = [...this.pulled.values()].filter((p) => p.kind === "screen" && p.track && p.cryptoId && p.opened && !p.tooLarge);
+    const now = Date.now();
+    const next = new Map<string, StallWatch>();
+    for (const p of screens) {
+      const receiver = pc.getTransceivers().find((t) => t.mid === p.mid)?.receiver;
+      const report = receiver ? await receiver.getStats().catch(() => null) : null;
+      if (!report || pc !== this.pc || this.closed) return;
+      let packets = 0;
+      let frames = 0;
+      report.forEach((r) => {
+        const s = r as RTCInboundRtpStreamStats;
+        if (s.type === "inbound-rtp" && s.kind === "video") {
+          packets = s.packetsReceived ?? 0;
+          frames = s.framesDecoded ?? 0;
+        }
+      });
+      const id = p.cryptoId!;
+      const { watch, ask } = watchStall(this.stalls.get(id) ?? null, packets, frames, now);
+      // a picture stuck behind a lost frame: the sender is asked for a keyframe now, not in three seconds
+      if (ask) this.crypto.requestKeyFrame(id);
+      next.set(id, watch);
+    }
+    this.stalls = next;
+  }
+
   private async checkBypass(): Promise<void> {
     if (this.closed || !this.sessionId) return;
     const now = Date.now();
@@ -1106,6 +1156,10 @@ export class SfuTransport implements VoiceTransport {
     this.playback.setOutputMuted(on);
   }
 
+  setModMuted(userId: string, on: boolean): void {
+    this.playback.setModMuted(userId, on);
+  }
+
   setMasterVolume(pct: number): void {
     this.playback.setMasterVolume(pct);
   }
@@ -1143,6 +1197,7 @@ export class SfuTransport implements VoiceTransport {
     clearInterval(this.keyTimer);
     clearInterval(this.bypassTimer);
     clearInterval(this.lossTimer);
+    clearInterval(this.stallTimer);
     if (this.sendSwitch) clearTimeout(this.sendSwitch);
     if (this.recoverTimer) clearTimeout(this.recoverTimer);
     if (this.retry) clearTimeout(this.retry.timer);

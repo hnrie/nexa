@@ -52,6 +52,7 @@ import fish.nexa.data.P
 import fish.nexa.net.Channel
 import fish.nexa.ui.Icon
 import fish.nexa.ui.components.Avatar
+import fish.nexa.ui.components.showsTyping
 import fish.nexa.ui.components.CountBadge
 import fish.nexa.ui.components.NexaMark
 import fish.nexa.ui.components.Txt
@@ -69,11 +70,14 @@ import fish.nexa.ui.theme.glowBrand
 import fish.nexa.ui.theme.liftLow
 import fish.nexa.ui.theme.mixOklab
 import fish.nexa.ui.theme.panel
+import fish.nexa.ui.theme.positiveGradient
 import fish.nexa.ui.theme.ring
 import fish.nexa.ui.theme.sheen
 import fish.nexa.ui.theme.shadowMedium
 import fish.nexa.ui.theme.topEdge
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 
 /**
  * The navigation drawer (AppShell .drawer on a phone): the rail standing on
@@ -148,6 +152,7 @@ private fun RailItem(
     picture: Boolean,
     circle: Boolean = false,
     muted: Boolean = false,
+    voice: Boolean = false,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
     content: @Composable () -> Unit,
@@ -158,7 +163,7 @@ private fun RailItem(
     val radius by animateDpAsState(if (circle) 24.dp else if (selected) 14.dp else 16.dp, tween(Nx.motion.normal, easing = Nx.motion.easeOut), label = "radius")
     val scale by animateFloatAsState(if (pressed && !Nx.motion.reduced) 0.96f else 1f, tween(80), label = "press")
     val shape = RoundedCornerShape(radius)
-    Box(Modifier.fillMaxWidth().height(48.dp).semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxWidth().height(48.dp).semantics { contentDescription = if (voice) t("rail.rail.serverInVoice", "server" to label) else label }, contentAlignment = Alignment.Center) {
         Box(Modifier.align(Alignment.CenterStart)) { RailPill(selected, unread && !selected) }
         Box(
             Modifier
@@ -191,7 +196,43 @@ private fun RailItem(
                 .pressable(interaction, onLongClick = onLongClick, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) { content() }
+        // people are in a voice channel here this account could join: a speaker on a green disc, cut out of
+        // the canvas like the count, sitting just above the count when there is one (Rail.module.css .voiceBadge)
+        if (voice) Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 6.dp)
+                .offset(y = if (badge > 0) (-19).dp else 3.dp)
+                .size(26.dp)
+                .background(c.bgCanvas, CircleShape)
+                .padding(3.dp)
+                .background(positiveGradient(c), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) { Icon("Volume2", c.onPositive, size = 12.dp, stroke = 2.6f) }
         if (badge > 0) Box(Modifier.align(Alignment.BottomEnd).padding(end = 6.dp).offset(y = 3.dp)) { CountBadge(badge, cut = c.bgCanvas) }
+    }
+}
+
+/**
+ * The servers where people are in a voice channel this account could join
+ * too (Rail.tsx voiceLive): there is a call going, and the speaker on the
+ * icon says so.
+ */
+@Composable
+private fun voiceLiveServers(): Set<String> {
+    val voice by Nexa.voiceStates.byUser.collectAsState()
+    val channels by Nexa.channels.byId.collectAsState()
+    val servers by Nexa.servers.byId.collectAsState()
+    return remember(voice, channels, servers) {
+        val live = HashSet<String>()
+        for (v in voice.values) {
+            val chId = v.channelId ?: continue
+            val ch = channels[chId] ?: continue
+            val sid = ch.serverId ?: continue
+            if (ch.type != "voice" || sid in live) continue
+            if (Nexa.servers.canI(servers[sid], fish.nexa.data.P.VIEW_CHANNEL or fish.nexa.data.P.CONNECT, chId)) live += sid
+        }
+        live
     }
 }
 
@@ -212,6 +253,7 @@ fun Rail(modifier: Modifier = Modifier) {
     val route = Nav.route
     val requests = rels.values.count { it.type == "incoming" }
     val home = route.isHome
+    val liveVoice = voiceLiveServers()
     val layout = remember(doc, order) {
         RailLayout.resolve(doc["rail"], order, (doc["serverPositions"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } ?: emptyList())
     }
@@ -290,12 +332,12 @@ fun Rail(modifier: Modifier = Modifier) {
                         RailItem(
                             label = if (u.mentions > 0) t("rail.rail.serverWithMentions", "name" to st.server.name, "count" to u.mentions) else st.server.name,
                             selected = selected, unread = u.unread && !mutedServer, badge = u.mentions, picture = st.server.iconId != null,
-                            muted = mutedServer,
+                            muted = mutedServer, voice = e.id in liveVoice,
                             onLongClick = { openMenu(serverMenu(e.id, fromRail = true), st.server.name) },
                             onClick = { Nav.go(Route.Server(e.id), keepDrawer = true) },
                         ) { ServerTileFace(e.id, st.server.name, st.server.iconId, selected) }
                     }
-                    is RailLayout.Entry.FolderEntry -> FolderTile(e.folder, route)
+                    is RailLayout.Entry.FolderEntry -> FolderTile(e.folder, route, liveVoice)
                 }
             }
         }
@@ -331,7 +373,7 @@ private fun ServerTileFace(id: String, name: String, iconId: String?, selected: 
 }
 
 @Composable
-private fun FolderTile(f: RailLayout.Folder, route: Route) {
+private fun FolderTile(f: RailLayout.Folder, route: Route, liveVoice: Set<String>) {
     val c = Nx.colors
     val folder = fish.nexa.ui.theme.parseHex(f.color) ?: c.brand
     val servers = Nexa.servers.byId.value
@@ -344,6 +386,8 @@ private fun FolderTile(f: RailLayout.Folder, route: Route) {
         RailItem(
             label = t("organize.rail.folderLabel", "name" to name, "count" to f.servers.size),
             selected = activeHere, unread = unread && !activeHere, badge = mentions, picture = true,
+            // a closed folder stands in for a call going on in any of its servers
+            voice = f.servers.any { it in liveVoice },
             onLongClick = { openMenu(listOf(MenuItem.Action(t("organize.rail.deleteFolder")) { Rail.deleteFolder(f.id) }), name) },
             onClick = { toggle() },
         ) {
@@ -381,6 +425,7 @@ private fun FolderTile(f: RailLayout.Folder, route: Route) {
                 val u = Unread.server(sid)
                 RailItem(
                     st.server.name, selected, u.unread, u.mentions, st.server.iconId != null,
+                    voice = sid in liveVoice,
                     onLongClick = { openMenu(serverMenu(sid, fromRail = true), st.server.name) },
                     onClick = { Nav.go(Route.Server(sid), keepDrawer = true) },
                 ) { ServerTileFace(sid, st.server.name, st.server.iconId, selected) }
@@ -446,19 +491,46 @@ object Rail {
 
 /** A conversation's picture: the other person, the group's icon, or a group glyph on the accent. */
 @Composable
-fun ConversationAvatar(ch: Channel, size: Dp, status: String? = null) {
+fun ConversationAvatar(ch: Channel, size: Dp, status: String? = null, showTyping: Boolean = false) {
     val c = Nx.colors
+    // DMSidebar.tsx TypingAvatar: while someone in it types, the presence dot becomes a pill of dots
+    val typers = if (showTyping) typersIn(ch.id) else emptyList()
+    val on = showTyping && settingOn("typingAvatars")
     when {
         ch.type == "dm" -> {
             val other = Names.otherOf(ch) ?: ""
             val u = Nexa.users.get(other)
-            Avatar(other, Names.shown(other), u?.avatarId, size, status = status)
+            Avatar(other, Names.shown(other), u?.avatarId, size, status = status, typing = if (on) other in typers else null)
         }
-        ch.iconId != null -> Avatar(ch.id, Names.channel(ch), ch.iconId, size, icon = true)
-        else -> Box(Modifier.size(size).clip(CircleShape).background(brandGradient(c)).topEdge(CircleShape, Color.White.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
-            Icon("Users", c.onBrand, size = size * 0.5f)
+        else -> {
+            // a group: a dot that only shows while someone types, in the colour of the first of them who shows as present
+            val typer = typers.map { Nexa.presence.statusOf(it) }.firstOrNull { showsTyping(it) }
+            val face: (@Composable () -> Unit)? = if (ch.iconId != null) null else {
+                { Box(Modifier.fillMaxSize().background(brandGradient(c)).topEdge(CircleShape, Color.White.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) { Icon("Users", c.onBrand, size = size * 0.5f) } }
+            }
+            Avatar(ch.id, Names.channel(ch), ch.iconId, size, icon = true, status = typer, typing = if (on) typer != null else null, face = face)
         }
     }
+}
+
+/**
+ * A yes or no setting, read so the composable redraws when it changes:
+ * Nexa.settings' getters are plain reads, and a row that read one keeps the
+ * old answer until something else redraws it.
+ */
+@Composable
+fun settingOn(key: String, default: Boolean = true): Boolean {
+    val doc by Nexa.settings.doc.collectAsState()
+    return (doc[key] as? JsonPrimitive)?.booleanOrNull ?: default
+}
+
+/** Who is typing in one channel, apart from this account (stores/typing.ts useTypingIn). */
+@Composable
+fun typersIn(channelId: String): List<String> {
+    val all by Nexa.typing.byChannel.collectAsState()
+    val me = Nexa.users.meId
+    val now = System.currentTimeMillis()
+    return all[channelId]?.filter { (u, exp) -> exp > now && u != me }?.keys?.toList() ?: emptyList()
 }
 
 /** The server menu (serverMenu.ts serverMenuItems), from the rail or the sidebar header. */

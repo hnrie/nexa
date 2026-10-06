@@ -21,11 +21,15 @@ import {
   VolumeX,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { guests as guestsApi } from "@/api/guests";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
+import { memberModerationItems } from "@/components/server/memberMenu";
+import { UserTag } from "@/components/servertag/UserTag";
 import { cameraMenuItems, micMenuItems } from "./deviceMenus";
+import { voiceModerationItems } from "./voiceModeration";
 import { HangUp } from "./HangUp";
 import { Tooltip } from "@/components/common/Tooltip";
 import { useIsMobile, useMediaQuery } from "@/hooks/useIsMobile";
@@ -41,6 +45,7 @@ import { bindText, keybindsOf } from "@/lib/keybinds";
 import { storage } from "@/lib/storage";
 import { containedSize, pinchView, type Size, type View } from "@/lib/zoomPan";
 import { useAuth } from "@/stores/auth";
+import { useChannels } from "@/stores/channels";
 import { canI, memberColor, useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
@@ -405,6 +410,9 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const [micNoteDismissed, setMicNoteDismissed] = useState(false);
   const muted = useVoiceLocal((v) => v.muted);
   const deafened = useVoiceLocal((v) => v.deafened);
+  // a moderator's mute and deafen hold whatever these buttons say, so the buttons say so
+  const modMute = !!mine?.server_mute && !mine.suppress;
+  const modDeaf = !!mine?.server_deaf;
   const toggleMute = useVoiceLocal((v) => v.toggleMute);
   const toggleDeafen = useVoiceLocal((v) => v.toggleDeafen);
   // the account's keys for these two, said in their tooltips (Settings, Keybinds)
@@ -442,6 +450,19 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   );
   const connected = mine?.channel_id === channel.id;
   const participants = useMemo(() => participantsOf(byChannel, channel.id), [byChannel, channel.id]);
+
+  // A moderator moved this call to another voice channel of the server while
+  // this one was on screen: the screen follows the call there, rather than
+  // leave its owner looking at the lobby of the channel they were taken out of.
+  const nav = useNavigate();
+  const callAt = mine?.channel_id ?? null;
+  const callWas = useRef(callAt);
+  useEffect(() => {
+    const was = callWas.current;
+    callWas.current = callAt;
+    if (embedded || guest || !channel.server_id || was !== channel.id || !callAt || callAt === channel.id) return;
+    if (useChannels.getState().byId[callAt]?.server_id === channel.server_id) nav(`/channels/${channel.server_id}/${callAt}`);
+  }, [callAt, channel.id, channel.server_id, embedded, guest, nav]);
 
   useEffect(() => {
     let alive = true;
@@ -682,6 +703,12 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
         { id: "reset", label: tr_("voice.voiceParticipants.resetVolume"), disabled: vol === 100, onSelect: () => setUserVolume(t.userId, 100) },
       );
     }
+    // a moderator's tools, on the person's own tile: Server Mute, Server Deafen, Move To, Disconnect, then the server's Time Out, Kick and Ban
+    const tileState = byChannel[channel.id]?.[t.userId];
+    if (!guest && !t.me && t.kind !== "screen" && channel.server_id && tileState) {
+      appendSection(items, voiceModerationItems(channel.server_id, channel.id, tileState));
+      if (!guestTile) appendSection(items, memberModerationItems(channel.server_id, t.userId, { openModal }));
+    }
     if (guestTile && canRemoveGuests && t.kind !== "screen") {
       if (items.length) items[items.length - 1]!.separatorAfter = true;
       items.push({ id: "remove-guest", label: tr_("voice.voiceParticipants.removeFromCall"), danger: true, onSelect: () => removeGuest(t.userId) });
@@ -813,7 +840,9 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
             {t.kind === "screen" ? (t.me ? tr_("voice.voice.yourScreen") : tr_("voice.voice.theirScreen", { name: nameOf(t.userId) })) : nameOf(t.userId)}
           </span>
           {t.kind !== "screen" && isGuest(users[t.userId]) ? <span className={s.guestTag}>{tr_("voice.voiceParticipants.guest")}</span> : null}
-          {t.kind !== "screen" && (vs?.self_mute || vs?.server_mute || (t.me && micBlocked)) ? <MicOff size={14} className={s.tileIcon} data-server={!!vs?.server_mute} /> : null}
+          {/* their server tag, as beside their name everywhere else (none on a guest's page, which knows nobody) */}
+          {t.kind !== "screen" && t.kind !== "ringing" && !guest && !isGuest(users[t.userId]) ? <UserTag userId={t.userId} size="sm" /> : null}
+          {t.kind !== "screen" && (vs?.self_mute || vs?.server_mute || (t.me && micBlocked)) ? <MicOff size={14} className={s.tileIcon} data-server={!!vs?.server_mute && !vs.suppress} /> : null}
           {t.kind !== "screen" && (vs?.self_deaf || vs?.server_deaf) ? <HeadphoneOff size={14} className={s.tileIcon} data-server={!!vs?.server_deaf} /> : null}
           {(t.kind === "screen" ? streamMutes[t.userId] : localMutes[t.userId]) ? <VolumeX size={14} className={s.tileIcon} /> : null}
           {t.kind === "ringing" ? <span className={s.tileRinging}>{tr_("voice.voice.ringing")}</span> : null}
@@ -858,7 +887,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
 
   if (!connected) {
     return (
-      <div className={s.root} ref={rootRef} data-embedded={embedded} data-dark-scope="">
+      <div className={s.root} ref={rootRef} data-embedded={embedded}>
         <div className={s.lobby}>
           <div className={s.lobbyTitle}>{channel.type === "voice" ? channel.name : tr_("guestCall.voiceCall")}</div>
           <div className={s.lobbySub}>{participants.length === 0 ? tr_("voice.voice.noOneIsHereYet") : tr_("voice.voice.inVoiceCount", { count: participants.length })}</div>
@@ -879,7 +908,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
 
   const level = quality ? (quality.loss > 0.05 || quality.rtt > 400 ? "bad" : quality.rtt > 150 ? "ok" : "good") : "unknown";
   return (
-    <div className={s.root} ref={rootRef} data-embedded={embedded} data-dark-scope="" data-full={callFull || undefined} data-page-full={pageFull || undefined} data-no-swipe={callFull || undefined} data-compact={compact || undefined}>
+    <div className={s.root} ref={rootRef} data-embedded={embedded} data-full={callFull || undefined} data-page-full={pageFull || undefined} data-no-swipe={callFull || undefined} data-compact={compact || undefined}>
       <div
         className={s.stage}
         ref={stageRef}
@@ -943,8 +972,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           ) : null}
         </div>
         <div className={s.controlsMain}>
-          <ControlButton label={micBlocked ? tr_("voice.voice.microphoneBlockedTryAgain") : muted ? tr_("voice.voice.unmute") : tr_("voice.voice.mute")} keys={micBlocked ? undefined : bindText(binds.mute)} off={muted || micBlocked} onClick={micBlocked ? () => void retryMic() : toggleMute} testId="voice-mute" menu={{ label: tr_("voice.voice.microphoneOptions"), open: (r) => void openDeviceMenu("mic", r), testId: "mic-menu" }}>{muted || micBlocked ? <MicOff size={22} /> : <Mic size={22} />}</ControlButton>
-          <ControlButton label={deafened ? tr_("voice.voice.undeafen") : tr_("voice.voice.deafen")} keys={bindText(binds.deafen)} off={deafened} onClick={toggleDeafen}>{deafened ? <HeadphoneOff size={22} /> : <Headphones size={22} />}</ControlButton>
+          <ControlButton label={modMute ? tr_("voice.moderation.mutedByModerator") : micBlocked ? tr_("voice.voice.microphoneBlockedTryAgain") : muted ? tr_("voice.voice.unmute") : tr_("voice.voice.mute")} keys={micBlocked || modMute ? undefined : bindText(binds.mute)} off={muted || micBlocked || modMute} onClick={modMute ? () => useUI.getState().toast(tr_("voice.moderation.mutedHint")) : micBlocked ? () => void retryMic() : toggleMute} testId="voice-mute" menu={{ label: tr_("voice.voice.microphoneOptions"), open: (r) => void openDeviceMenu("mic", r), testId: "mic-menu" }}>{muted || micBlocked || modMute ? <MicOff size={22} /> : <Mic size={22} />}</ControlButton>
+          <ControlButton label={modDeaf ? tr_("voice.moderation.deafenedByModerator") : deafened ? tr_("voice.voice.undeafen") : tr_("voice.voice.deafen")} keys={modDeaf ? undefined : bindText(binds.deafen)} off={deafened || modDeaf} onClick={modDeaf ? () => useUI.getState().toast(tr_("voice.moderation.deafenedHint")) : toggleDeafen} testId="voice-deafen">{deafened || modDeaf ? <HeadphoneOff size={22} /> : <Headphones size={22} />}</ControlButton>
           <ControlButton label={localVideo ? tr_("voice.voice.turnOffCamera") : tr_("voice.voice.turnOnCamera")} on={!!localVideo} onClick={() => void toggleCamera()} menu={{ label: tr_("voice.voice.cameraOptions"), open: (r) => void openDeviceMenu("camera", r), testId: "camera-menu" }}>{localVideo ? <Video size={22} /> : <VideoOff size={22} />}</ControlButton>
           {localVideo && canFlip ? (
             <ControlButton label={tr_("voice.voice.switchCamera")} onClick={() => void flipCamera()} testId="flip-camera"><SwitchCamera size={22} /></ControlButton>

@@ -51,8 +51,11 @@ export default function ChatPage() {
       ) : null}
       <Toggle setting="sendButton" checked={st.sendButton} onChange={(v) => patch({ sendButton: v })} label={t("settings.appearance.sendButton")} description={t("settings.appearance.sendButtonHint")} />
       <Toggle setting="smartEmoji" checked={st.smartEmoji} onChange={(v) => patch({ smartEmoji: v })} label={t("settings.appearance.smartEmoji")} description={t("settings.appearance.smartEmojiHint")} />
-      <h3 className={s.h5}>{t("settings.chat.reading")}</h3>
+      <h3 className={s.h5}>{t("settings.chat.typingHeading")}</h3>
       <Toggle setting="customTyping" checked={st.customTyping !== false} onChange={(v) => patch({ customTyping: v })} label={t("settings.chat.customTyping")} description={t("settings.chat.customTypingHint")} />
+      <Toggle setting="typingAvatars" checked={st.typingAvatars !== false} onChange={(v) => patch({ typingAvatars: v })} label={t("settings.chat.typingAvatars")} description={t("settings.chat.typingAvatarsHint")} />
+      <Toggle setting="typingChannels" checked={st.typingChannels !== false} onChange={(v) => patch({ typingChannels: v })} label={t("settings.chat.typingChannels")} description={t("settings.chat.typingChannelsHint")} />
+      <h3 className={s.h5}>{t("settings.chat.reading")}</h3>
       <Toggle
         setting="tts"
         checked={st.tts}

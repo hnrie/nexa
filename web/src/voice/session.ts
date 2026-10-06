@@ -401,6 +401,25 @@ function clearRing(channelId: string, missed: boolean): void {
   else closeRingNotice(channelId);
 }
 
+/**
+ * Says what a moderator just did to this account's own call: moved it to
+ * another channel, muted or deafened it, or lifted either. `was` is the state
+ * before, `cur` the channel the call was in. A channel that lets nobody speak
+ * mutes too, but that is the channel's doing and is said nowhere here.
+ */
+function moderatorNotice(was: VoiceState | null, now: VoiceState, cur: string): void {
+  const toast = useUI.getState().toast;
+  if (now.channel_id && now.channel_id !== cur) {
+    const name = useChannels.getState().byId[now.channel_id]?.name;
+    toast(name ? tr_("voice.moderation.youWereMovedTo", { channel: name }) : tr_("voice.moderation.youWereMoved"));
+    return;
+  }
+  if (!was || was.channel_id !== now.channel_id) return;
+  const modMute = (v: VoiceState) => v.server_mute && !v.suppress;
+  if (modMute(now) !== modMute(was)) toast(modMute(now) ? tr_("voice.moderation.youWereMuted") : tr_("voice.moderation.youWereUnmuted"));
+  if (now.server_deaf !== was.server_deaf) toast(now.server_deaf ? tr_("voice.moderation.youWereDeafened") : tr_("voice.moderation.youWereUndeafened"));
+}
+
 export function handleVoiceEvent(e: GatewayEvent): void {
   const myId = me();
   const store = useVoice.getState();
@@ -426,6 +445,7 @@ export function handleVoiceEvent(e: GatewayEvent): void {
           }
           // a join this device has since given up on; its leave is on the way
           if (!cur || !engine?.onMine(vs)) return;
+          moderatorNotice(store.mine, vs, cur);
           checkAlone(vs.channel_id);
           return;
         }
@@ -434,6 +454,9 @@ export function handleVoiceEvent(e: GatewayEvent): void {
         if (vs.reason === "moved") {
           void leaveVoice(false);
           useUI.getState().toast(tr_("session.yourCallMovedToAnotherDevice"));
+        } else if (vs.reason === "disconnected") {
+          void leaveVoice(false);
+          useUI.getState().toast(tr_("voice.moderation.youWereDisconnected"));
         } else if (!elsewhere) {
           // disconnected server-side (kick, channel deleted, moderator)
           void leaveVoice(false);
@@ -565,7 +588,7 @@ export function installVoice(): void {
   dispatchHooks.onMessage.push((m) => callLine(m));
   useVoiceLocal.subscribe((st, prev) => {
     if (st.muted !== prev.muted) playSound(st.muted ? "mute" : "unmute");
-    engine?.setOutputMuted(st.deafened);
+    engine?.setOutputMuted(engine.outputSilenced());
     engine?.applyTransmit();
     // Only a call the server has been told about: during the microphone
     // prompt the join is not sent yet, and a mute there sent it early — ringing

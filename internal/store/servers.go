@@ -556,6 +556,33 @@ func (s *Store) MemberCount(ctx context.Context, serverID ids.ID) (int, error) {
 	return n, err
 }
 
+// MemberFlags reads a member's flags alone, for checks made on every voice
+// state change, where loading the whole member would be waste.
+func (s *Store) MemberFlags(ctx context.Context, serverID, uid ids.ID) (int64, error) {
+	var flags int64
+	err := s.db.R.QueryRowContext(ctx, `SELECT flags FROM server_members WHERE server_id = ? AND user_id = ?`, int64(serverID), int64(uid)).Scan(&flags)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	return flags, err
+}
+
+// SetMemberFlags turns the bits in on and off on a member's flags in one
+// statement, so two changes to different bits at the same moment (AutoMod
+// holding someone while a moderator mutes them in a call) both stick.
+func (s *Store) SetMemberFlags(ctx context.Context, serverID, uid ids.ID, on, off int64) error {
+	res, err := s.db.W.ExecContext(ctx, `UPDATE server_members SET flags = (flags & ~CAST(? AS BIGINT)) | CAST(? AS BIGINT) WHERE server_id = ? AND user_id = ?`, off|on, on, int64(serverID), int64(uid))
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	// a hold changes what the member may do (permcache.go reads the flags)
+	s.serverChanged(serverID)
+	return nil
+}
+
 // UpdateMember applies p.
 func (s *Store) UpdateMember(ctx context.Context, serverID, uid ids.ID, p MemberPatch) error {
 	var sets []string

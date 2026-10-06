@@ -131,6 +131,16 @@ export class FrameCrypto {
     return true;
   }
 
+  /**
+   * Asks the sender of a video receiver for a keyframe now, rather than when
+   * the browser would (seconds later): for a picture stuck behind a packet
+   * that is not coming. Only where the browser's transform can ask (Chromium,
+   * Firefox); elsewhere nothing happens and the browser's own request comes.
+   */
+  requestKeyFrame(id: string): void {
+    this.post({ type: "keyframe", id });
+  }
+
   stats(): FrameCryptoStats {
     return this.latest;
   }

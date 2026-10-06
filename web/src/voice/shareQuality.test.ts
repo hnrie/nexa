@@ -30,8 +30,10 @@ describe("screen share quality", () => {
   });
 
   it("gives bigger and smoother shares more bits, within what the SFU meter accepts", () => {
-    expect(shareBitrate("720p", 30)).toBe(2_500_000);
-    expect(shareBitrate("1080p", 30)).toBe(5_000_000);
+    expect(shareBitrate("720p", 30)).toBe(3_000_000);
+    expect(shareBitrate("1080p", 30)).toBe(6_000_000);
+    // 1080p in motion gets what it was measured to need (shareAdapt.ts MOTION_BITS_PER_PIXEL)
+    expect(shareBitrate("1080p", 60)).toBe(9_900_000);
     expect(shareBitrate("1080p", 60)).toBeGreaterThan(shareBitrate("1080p", 30));
     expect(shareBitrate("1080p", 15)).toBeLessThan(shareBitrate("1080p", 30));
     for (const res of ["720p", "1080p", "1440p", "source"] as const) {

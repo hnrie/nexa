@@ -1,6 +1,6 @@
 import { ChevronDown, GripVertical, Lock, MessageCircle, MoreHorizontal, NotebookPen, Pin, Plus, Search, Shield, Users, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Avatar } from "@/components/common/Avatar";
+import { Avatar, showsTyping } from "@/components/common/Avatar";
 import { menuAnchor } from "@/components/common/ContextMenu";
 import { AdminHammer, OwnerCrown } from "@/components/common/OwnerBadge";
 import { PickBar, PickMark } from "@/components/common/Pick";
@@ -13,7 +13,8 @@ import { useOwnerId } from "@/lib/owner";
 import { isInstanceAdmin } from "@/stores/servers";
 import { useAuth } from "@/stores/auth";
 import { selectDMs, selectSubchats, useChannels } from "@/stores/channels";
-import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
+import { activitiesOf, customStatus, statusOf, usePresence, type StatusKind } from "@/stores/presence";
+import { useTypingIn } from "@/stores/typing";
 import { StatusLine } from "@/components/activity/StatusLine";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
@@ -448,13 +449,12 @@ export function DMSidebar() {
       const st = customStatus(presence[other]);
       const act = activitiesOf(presence[other])[0];
       sub = <StatusLine className={s.sub} status={st} activity={act} more={Math.max(0, activitiesOf(presence[other]).length - 1)} />;
-      avatar = <Avatar id={other} avatarId={u?.avatar_id ?? null} name={name} size={32} status={statusOf(presence[other])} />;
+      avatar = <TypingAvatar channelId={ch.id} id={other} avatarId={u?.avatar_id ?? null} name={name} status={statusOf(presence[other])} />;
       crowned = other === ownerId;
       admin = !crowned && isInstanceAdmin(other);
     } else {
       sub = <span className={s.sub}>{t("chat.groupMemberList.membersOnly", { count: ch.recipient_ids.length })}</span>;
-      const url = iconUrl(ch.icon_id, 32);
-      avatar = url ? <Avatar id={ch.id} avatarId={ch.icon_id} name={name} size={32} kind="icon" /> : <span className={s.groupIcon}><Users size={18} /></span>;
+      avatar = <TypingAvatar channelId={ch.id} id={ch.id} avatarId={ch.icon_id} name={name} group />;
     }
     const subs = activeConvo === ch.id && !isPicking ? selectSubchats(channels, ch.id) : [];
     return (
@@ -757,4 +757,27 @@ function SearchButton({ onOpen }: { onOpen: () => void }) {
       <kbd className={s.searchKeys} aria-hidden="true" data-hidden={fit.keys ? undefined : ""}>{keys}</kbd>
     </button>
   );
+}
+
+/**
+ * A conversation's picture in the list. While someone in it types, the
+ * presence dot becomes a pill of dots in their status's colour: the other
+ * person's own dot in a DM, and in a group a dot that only shows then, in the
+ * colour of whoever is typing. Nobody who shows as offline (or is invisible)
+ * shows it, and the setting turns it off (Settings, Chat).
+ */
+function TypingAvatar({ channelId, id, avatarId, name, status = null, group = false }: { channelId: string; id: string; avatarId: string | null; name: string; status?: StatusKind | null; group?: boolean }) {
+  const meId = useAuth((a) => a.me?.id);
+  const on = useSettings((x) => x.settings.typingAvatars !== false);
+  const typers = useTypingIn(on ? channelId : null, meId);
+  const presence = usePresence((p) => (group && typers.length ? p.byUser : null));
+  if (!group) return <Avatar id={id} avatarId={avatarId} name={name} size={32} status={status} typing={on ? typers.includes(id) : undefined} />;
+  // the first of them who shows as present, in their own colour
+  const typer = presence ? typers.map((uid) => statusOf(presence[uid])).find(showsTyping) : undefined;
+  const face = iconUrl(avatarId, 32) ? undefined : (
+    <span className={s.groupIcon}>
+      <Users size={18} />
+    </span>
+  );
+  return <Avatar id={id} avatarId={avatarId} name={name} size={32} kind="icon" face={face} status={typer ?? null} typing={on ? !!typer : undefined} />;
 }

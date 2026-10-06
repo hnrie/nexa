@@ -42,7 +42,11 @@ type voiceStatePayload struct {
 	Streaming    bool    `json:"streaming"`
 	ServerMute   bool    `json:"server_mute"`
 	ServerDeaf   bool    `json:"server_deaf"`
-	JoinedAt     int64   `json:"joined_at"`
+	// Suppress is set when the channel denies Speak. server_mute carries it
+	// too, for apps that know nothing else; this says which of the two it is,
+	// so a moderator's menu does not offer to lift a mute nobody gave.
+	Suppress bool  `json:"suppress,omitempty"`
+	JoinedAt int64 `json:"joined_at"`
 	// Media maps the kinds this participant publishes through the SFU to a
 	// tag that changes whenever that track is published again.
 	Media map[string]string `json:"media,omitempty"`
@@ -56,7 +60,8 @@ type voiceStatePayload struct {
 	// link carried, so the people in the call can hand them newer keys.
 	Guest *guestMark `json:"guest,omitempty"`
 	// Reason is "moved" on the leave sent to a device whose call another
-	// device of the same account picked up, so it can say where it went.
+	// device of the same account picked up, so it can say where it went, and
+	// "disconnected" when a moderator put the person out of the call.
 	Reason string `json:"reason,omitempty"`
 }
 
@@ -73,7 +78,7 @@ type guestMark struct {
 
 func statePayload(st voice.State) voiceStatePayload {
 	ch := st.ChannelID
-	out := voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, JoinedAt: st.JoinedAt, Media: st.Tracks.Tags(), Codecs: st.Codecs,
+	out := voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, Suppress: st.Suppress, JoinedAt: st.JoinedAt, Media: st.Tracks.Tags(), Codecs: st.Codecs,
 		User: &callUser{ID: st.UserID, DisplayName: st.Name, AvatarID: st.AvatarID}}
 	if st.Guest {
 		out.User.Flags = store.FlagGuest
@@ -180,6 +185,11 @@ func (s *Server) voiceAudience(ctx context.Context, ch *store.Channel) []ids.ID 
 }
 
 func (s *Server) broadcastVoiceLeave(ctx context.Context, st voice.State) {
+	s.broadcastVoiceLeaveFor(ctx, st, "")
+}
+
+// broadcastVoiceLeaveFor is broadcastVoiceLeave with a reason on the leave.
+func (s *Server) broadcastVoiceLeaveFor(ctx context.Context, st voice.State, reason string) {
 	s.closeSFUSession(st.SFUSession)
 	ch, err := s.Store.ChannelByID(ctx, st.ChannelID)
 	if err != nil {
@@ -190,7 +200,9 @@ func (s *Server) broadcastVoiceLeave(ctx context.Context, st voice.State) {
 		// a guest who was put out of the call hears it too
 		audience = append(audience, st.UserID)
 	}
-	s.Bcast.EmitUsers(audience, "voice_state", leavePayload(st))
+	leave := leavePayload(st)
+	leave.Reason = reason
+	s.Bcast.EmitUsers(audience, "voice_state", leave)
 	if s.isDM(ch) && s.Voice.Count(ch.ID) == 0 {
 		s.Bcast.EmitUsers(audience, "call_end", map[string]any{"channel_id": ch.ID, "reason": "ended"})
 	}
@@ -302,6 +314,18 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 			}
 			return
 		}
+		// A member's server mute and deafen are kept on the member, so hanging
+		// up and joining again does not lift them: what is written there holds,
+		// in every voice channel of the server. Read before the page hears how
+		// a resume went, so nothing waits on the database between that and the
+		// join below.
+		var memberFlags int64
+		haveFlags := false
+		if guest == nil && ch.ServerID != nil {
+			if flags, err := s.Store.MemberFlags(ctx, *ch.ServerID, me.ID); err == nil {
+				memberFlags, haveFlags = flags, true
+			}
+		}
 		// The device holding this call through the SFU, back on a new gateway
 		// connection: the call is handed to it as it is, media and all, rather
 		// than ended and started over. The page hears first whether that worked.
@@ -337,6 +361,10 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 		next := voice.State{UserID: me.ID, ChannelID: ch.ID, SessionID: c.SessionID(), ConnID: c.ID(), SelfMute: req.SelfMute, SelfDeaf: req.SelfDeaf, Video: req.Video, Streaming: req.Streaming, Suppress: !p.Has(perms.Speak), Name: me.DisplayName, AvatarID: me.AvatarID, Codecs: callCodecs(req.Codecs)}
 		if guest != nil {
 			next.Guest, next.GuestEpoch = true, guest.Epoch
+		} else if haveFlags {
+			next.ServerMute = memberFlags&store.MemberVoiceMuted != 0
+			next.ServerDeaf = memberFlags&store.MemberVoiceDeafened != 0
+			keep = false
 		}
 		old, started := s.Voice.Join(next, keep)
 		if old != nil && old.ChannelID != ch.ID {
@@ -721,7 +749,7 @@ func (s *Server) handleCallSummary(w http.ResponseWriter, r *http.Request) {
 
 // handleVoiceModerate server-mutes, deafens, moves or disconnects a member.
 func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
-	srv, me, actorPerms := s.serverCtx(w, r, 0)
+	srv, me, _ := s.serverCtx(w, r, 0)
 	if srv == nil {
 		return
 	}
@@ -759,8 +787,11 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Moderating someone in a channel you cannot see would also tell you they
-	// are in it, which is the one thing a private voice channel hides.
-	if callerPerms, _, err := s.Store.ChannelPerms(r.Context(), cur.ID, me.ID); err != nil || !callerPerms.Has(perms.ViewChannel) {
+	// are in it, which is the one thing a private voice channel hides. The
+	// permissions are the ones in that channel, as for everything else said
+	// there: an overwrite can give a channel's own moderators Mute Members.
+	actorPerms, _, err := s.Store.ChannelPerms(r.Context(), cur.ID, me.ID)
+	if err != nil || !actorPerms.Has(perms.ViewChannel) {
 		WriteError(w, E(http.StatusBadRequest, "not_in_voice", "That member is not in a voice channel of this server."))
 		return
 	}
@@ -816,8 +847,19 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 				WriteError(w, E(http.StatusBadRequest, "invalid_channel", "channel_id is malformed."))
 				return
 			}
+			// a guest's link is for one call; anywhere else is a channel that does not exist for them
+			if st.Guest {
+				WriteError(w, E(http.StatusBadRequest, "guest_call", "A guest can only be in the call their link is for."))
+				return
+			}
 			dest, err = s.Store.ChannelByID(r.Context(), target)
 			if err != nil || dest.ServerID == nil || *dest.ServerID != srv.ID || dest.Type != "voice" {
+				WriteError(w, E(http.StatusBadRequest, "invalid_channel", "The destination must be a voice channel of this server."))
+				return
+			}
+			// nobody moves people into a channel they cannot see themselves:
+			// that would also say a private channel is there
+			if mine, _, err := s.Store.ChannelPerms(r.Context(), dest.ID, me.ID); err != nil || !mine.Has(perms.ViewChannel) {
 				WriteError(w, E(http.StatusBadRequest, "invalid_channel", "The destination must be a voice channel of this server."))
 				return
 			}
@@ -826,6 +868,27 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			changes["channel_id"] = dest.ID
+		}
+	}
+	if (mute != nil || deaf != nil) && !st.Guest {
+		// kept on the member, where the next join reads it (handleVoiceOp)
+		var on, off int64
+		for _, x := range []struct {
+			v   *bool
+			bit int64
+		}{{mute, store.MemberVoiceMuted}, {deaf, store.MemberVoiceDeafened}} {
+			if x.v == nil {
+				continue
+			}
+			if *x.v {
+				on |= x.bit
+			} else {
+				off |= x.bit
+			}
+		}
+		if err := s.Store.SetMemberFlags(r.Context(), srv.ID, uid, on, off); err != nil {
+			WriteError(w, err)
+			return
 		}
 	}
 	if mute != nil || deaf != nil {
@@ -850,7 +913,8 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 			s.endGuest(r.Context(), g, "removed")
 			s.rotateAfterGuests(r.Context(), cur)
 		} else if left, ok := s.Voice.Leave(uid); ok {
-			s.broadcastVoiceLeave(r.Context(), left)
+			// their app says a moderator did it, rather than leave them wondering
+			s.broadcastVoiceLeaveFor(r.Context(), left, "disconnected")
 		}
 	} else if dest != nil && dest.ID != cur.ID {
 		if latest, ok := s.Voice.Get(uid); ok && latest.ChannelID == cur.ID {

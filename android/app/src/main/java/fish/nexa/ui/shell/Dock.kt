@@ -98,11 +98,26 @@ fun UserPanel() {
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            DockButton(if (local.muted) "MicOff" else "Mic", if (local.muted) t("voice.voice.unmute") else t("voice.voice.mute"), off = local.muted) { VoiceLocal.toggleMute() }
-            DockButton(if (local.deafened) "HeadphoneOff" else "Headphones", if (local.deafened) t("shell.user.undeafen") else t("shell.user.deafen"), off = local.deafened) { VoiceLocal.toggleDeafen() }
+            // a moderator's mute and deafen hold whatever these buttons say, so the buttons say so
+            val call by fish.nexa.voice.Voice.state.collectAsState()
+            val modMute = call.mine?.let { fish.nexa.ui.voice.VoiceModeration.modMuted(it) } == true
+            val modDeaf = call.mine?.serverDeaf == true
+            DockButton(if (local.muted || modMute) "MicOff" else "Mic", if (modMute) t("voice.moderation.mutedByModerator") else if (local.muted) t("voice.voice.unmute") else t("voice.voice.mute"), off = local.muted || modMute) {
+                if (modMute) Nexa.ui.toast(t("voice.moderation.mutedHint")) else VoiceLocal.toggleMute()
+            }
+            DockButton(if (local.deafened || modDeaf) "HeadphoneOff" else "Headphones", if (modDeaf) t("voice.moderation.deafenedByModerator") else if (local.deafened) t("shell.user.undeafen") else t("shell.user.deafen"), off = local.deafened || modDeaf) {
+                if (modDeaf) Nexa.ui.toast(t("voice.moderation.deafenedHint")) else VoiceLocal.toggleDeafen()
+            }
             val sharing = (Nexa.settings.doc.value["shareActivity"] as? kotlinx.serialization.json.JsonPrimitive)?.content != "false"
             DockButton("Gamepad2", t("settings.privacy.shareMyActivity"), off = !sharing) { Nexa.settings.patch(buildJsonObject { put("shareActivity", !sharing) }) }
             DockButton("Settings", t("settings.settings.userSettings"), off = false) { openSettings() }
+            // a new version of the app is downloaded: a green button to install it, as the desktop app's restart button is
+            val update by fish.nexa.ui.AppUpdate.state.collectAsState()
+            (update as? fish.nexa.ui.AppUpdate.State.Ready)?.let { r ->
+                Box(Modifier.size(40.dp).clip(Radii.Sm), contentAlignment = Alignment.Center) {
+                    IconButton("Download", t("android.update.installVersion", "version" to r.version), { fish.nexa.ui.AppUpdate.install() }, tint = c.positive, size = 40.dp, iconSize = 20.dp)
+                }
+            }
         }
     }
 }

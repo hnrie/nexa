@@ -96,6 +96,11 @@
             android:name=".notify.NotifyActions"
             android:exported="false" />
 
+        <!-- what Android's package installer says of an update the app handed it (ui/AppUpdate.kt) -->
+        <receiver
+            android:name=".ui.UpdateInstallReceiver"
+            android:exported="false" />
+
         <receiver
             android:name=".notify.BootReceiver"
             android:exported="true">

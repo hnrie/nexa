@@ -48,6 +48,10 @@ export function UserPanel() {
   const keys = keybindsOf(useSettings((x) => x.settings.keybinds));
   // in a call, the ring the call draws round whoever talks goes round your own picture here too
   const speaking = useVoice((v) => !!me && !!v.mine && !!v.speaking[me.id]);
+  // a moderator's mute and deafen hold whatever these buttons say, so the buttons say so
+  const modMute = useVoice((v) => !!v.mine?.server_mute && !v.mine.suppress);
+  const modDeaf = useVoice((v) => !!v.mine?.server_deaf);
+  const toast = useUI((u) => u.toast);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -109,12 +113,12 @@ export function UserPanel() {
         </span>
       </button>
       <div className={s.btns}>
-        <Tooltip text={muted ? t("settings.notifications.unmute") : t("settings.notifications.mute")} keys={bindText(keys.mute) || undefined}>
+        <Tooltip text={modMute ? t("voice.moderation.mutedByModerator") : muted ? t("settings.notifications.unmute") : t("settings.notifications.mute")} keys={modMute ? undefined : bindText(keys.mute) || undefined}>
           <button
             className={s.icon}
-            data-on={!muted}
-            onClick={toggleMute}
-            aria-label={muted ? t("voice.voice.unmute") : t("voice.voice.mute")}
+            data-on={!muted && !modMute}
+            onClick={() => (modMute ? toast(t("voice.moderation.mutedHint")) : toggleMute())}
+            aria-label={modMute ? t("voice.moderation.mutedByModerator") : muted ? t("voice.voice.unmute") : t("voice.voice.mute")}
             onContextMenu={(e) => {
               // a right click chooses the microphone, as the arrow on the call's mute button does
               e.preventDefault();
@@ -130,12 +134,12 @@ export function UserPanel() {
               openMicMenu({ x: document.documentElement.dir === "rtl" ? r.right : r.left, y: r.top });
             }}
           >
-            {muted ? <MicOff size={20} /> : <Mic size={20} />}
+            {muted || modMute ? <MicOff size={20} /> : <Mic size={20} />}
           </button>
         </Tooltip>
-        <Tooltip text={deafened ? t("shell.user.undeafen") : t("shell.user.deafen")} keys={bindText(keys.deafen) || undefined}>
-          <button className={s.icon} data-on={!deafened} onClick={toggleDeafen} aria-label={deafened ? t("shell.user.undeafen") : t("shell.user.deafen")}>
-            {deafened ? <HeadphoneOff size={20} /> : <Headphones size={20} />}
+        <Tooltip text={modDeaf ? t("voice.moderation.deafenedByModerator") : deafened ? t("shell.user.undeafen") : t("shell.user.deafen")} keys={modDeaf ? undefined : bindText(keys.deafen) || undefined}>
+          <button className={s.icon} data-on={!deafened && !modDeaf} onClick={() => (modDeaf ? toast(t("voice.moderation.deafenedHint")) : toggleDeafen())} aria-label={modDeaf ? t("voice.moderation.deafenedByModerator") : deafened ? t("shell.user.undeafen") : t("shell.user.deafen")}>
+            {deafened || modDeaf ? <HeadphoneOff size={20} /> : <Headphones size={20} />}
           </button>
         </Tooltip>
         <ActivityToggle className={s.icon} />

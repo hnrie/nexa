@@ -137,12 +137,16 @@ private fun hookKey(cm: ChatMessage?): String? {
     return "${cm!!.m.webhookId}|${h.name}|${h.avatarId ?: h.avatarUrl ?: ""}"
 }
 
-/** shouldGroup: same author within 7 minutes on the same day, a plain message, no reply, after no system line. */
-private fun groups(prev: Prev?, authorId: String, at: Long, type: String, reply: String?, hook: String?): Boolean {
+/**
+ * shouldGroup: same author within 7 minutes on the same day, a plain message, no reply, after no system line.
+ * A message that started a thread shows its own avatar, which the line to the thread's card hangs from.
+ */
+private fun groups(prev: Prev?, authorId: String, at: Long, type: String, reply: String?, hook: String?, thread: Boolean = false): Boolean {
     if (prev == null || prev.system) return false
     if (prev.authorId != authorId || prev.hook != hook) return false
     if (type != "default" && type != "reply") return false
     if (reply != null) return false
+    if (thread) return false
     if (at - prev.at > GROUP_MS) return false
     return sameDay(prev.at, at)
 }
@@ -226,7 +230,7 @@ private fun buildRows(
         }
         closeRun()
         val hook = hookKey(cm)
-        val start = !groups(prev, m.authorId, at, m.type, m.replyToId, hook)
+        val start = !groups(prev, m.authorId, at, m.type, m.replyToId, hook, thread = m.thread != null)
         val mentioned = m.authorId != meId && mentionsMe(m, meId)
         out += ListRow.Msg(MsgItem(id, cm, groupStart = start, mentionsMe = mentioned))
         prev = Prev(m.authorId, at, m.type == "system_call", hook)

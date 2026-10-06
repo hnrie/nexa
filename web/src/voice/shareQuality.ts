@@ -51,8 +51,14 @@ export function shareVideoConstraints(res: ShareResolution, fps: ShareFps): Medi
 export const MIN_SHARE_BPS = 1_000_000;
 export const MAX_SHARE_BPS = 12_000_000;
 
-const BPS_AT_30: Record<ShareResolution, number> = { "720p": 2_500_000, "1080p": 5_000_000, "1440p": 8_000_000, source: 10_000_000 };
-const FPS_SCALE: Record<ShareFps, number> = { 15: 0.6, 30: 1, 60: 1.5 };
+/**
+ * What a share may use at 30 fps. Hard motion needs about 0.06 bits a pixel
+ * a frame in VP8 to look clean (shareAdapt.ts), so 1080p at 60 fps gets just
+ * under 10 Mbit/s, room to spare on a good link, and a 60 fps share is shrunk
+ * when the link cannot carry it whole.
+ */
+const BPS_AT_30: Record<ShareResolution, number> = { "720p": 3_000_000, "1080p": 6_000_000, "1440p": 9_000_000, source: 10_000_000 };
+const FPS_SCALE: Record<ShareFps, number> = { 15: 0.6, 30: 1, 60: 1.65 };
 
 /** The bitrate cap for a share, which the SFU meter also charges it at. */
 export function shareBitrate(res: ShareResolution, fps: ShareFps): number {
