@@ -1,9 +1,77 @@
-# Nexa: working notes
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 Nexa is the end-to-end encrypted chat app served at https://nexa.fish (also https://mathtest.lol;
-https://chat.evilion.xyz is its old address, which moves browsers on): a Go server
-(`cmd/`, `internal/`) and a React + TypeScript web app (`web/src`) that the desktop app also runs.
-README.md has the architecture.
+https://chat.evilion.xyz is its old address, which moves browsers on). This repository is all of it:
+the Go server (`cmd/`, `internal/`), the React + TypeScript web app (`web/`), the Electron desktop
+app that runs the web app (`desktop/`) and the native Android app (`android/`, Kotlin + Jetpack
+Compose). README.md describes the features and how the encryption works; the original design spec is
+`docs/superpowers/specs/2026-09-11-chat-design.md` (section 6 is the cryptography).
+
+The rules come first, then commands and testing, then how each part is built.
+
+## Rules that always apply
+
+### Keep this file current
+
+This file is how every future session learns the codebase, so it has to stay true and complete.
+Whenever a change makes anything here wrong or incomplete, the same change updates CLAUDE.md: a new,
+renamed or removed package, module, route group, gateway event, table, setting, command, tool,
+test helper, build or release step, workflow or convention, and every standing rule the owner
+gives. When you notice something here that is already wrong, fix it then. Write what you checked in
+the code, in the style of the rest of the file (plain sentences, no em dashes), and commit it with
+the change it describes.
+
+### Building is deploying
+
+`web/dist` and `bin/chatd` are what the live instance serves, so `npm run build`, `make web`,
+`make server` and `make build` publish immediately. Never run them to check a change; use the
+commands under Commands, which write nothing live. Never test against port 8090, `data/` or the
+repo's `chatd.env`. On this server, never start chatd from the repository root either (`make run`,
+`go run ./cmd/chatd`): it reads the live `chatd.env` and `./data`, and chatd migrates its database
+before it listens, so an unreleased build would migrate the live database. Deploy only when the
+owner says "deploy" (see Deploying).
+
+### All UI design goes through the frontend-design skill
+
+Before any UI design work on this project, invoke the `frontend-design:frontend-design` skill and
+follow it, however small the change: a new screen or component, a redesign, or a change to layout,
+spacing, colour, type or motion, on the web, the desktop app or Android. No exceptions.
+`android/DESIGN.md` is that process applied to the Android app; read it too before Android UI work.
+
+### Web and mobile: both implemented, both tested
+
+Every feature and change is implemented properly on both the web app and the Android app, and the
+web at phone width and the Android app look and behave as alike as possible (same layout, sizes,
+colours, words and order of things). A phone improvement made on one side is brought to the other
+(`android/DESIGN.md` section 7 keeps the list). Nothing is done until it has been seen working:
+
+1. Web: on a throwaway server, drive it in a headless browser (Playwright) at a desktop size
+   (1366x768) and a phone size (411x914, the emulator's screen in CSS pixels). Look at the
+   screenshots.
+2. Android: build the debug app against the same throwaway server and use it in the Android
+   emulator: every screen touched, in Dark, Light and one preset.
+3. Put the phone-size web screenshots next to the emulator's and fix whichever side is off.
+
+Passing unit tests do not replace looking at the screens. How to do each step is under Testing.
+
+### Build what was asked
+
+Build the literal request. "Custom" packs or themes mean letting people make their own, not adding
+new built-in ones. If an extra seems worth having, suggest it instead of shipping it.
+
+### When the work is done
+
+1. Run the checks (`tools/check.sh` covers most of them) and the web and Android testing above,
+   and update this file if the change touched anything it describes.
+2. Commit on `main` and push it to GitHub: `git push origin main`. The owner also works on another
+   machine and pulls from GitHub, so unpushed work is lost to them. Never commit `chatd.env`,
+   `android/keystore.properties` or any token.
+3. After a round of app changes, leave a throwaway server with the new build running and give the
+   owner its address so they can try it. WebCrypto needs https or localhost, so from another machine
+   it is reached through an SSH tunnel to localhost, not the plain LAN address. Do not deploy until
+   they say "deploy".
 
 ## Every major feature gets a What's New entry
 
@@ -17,6 +85,9 @@ they open the app after an update, and it is how they find out what changed.
 - Each item is a lucide-react icon, a title and one or two plain sentences. Title and body are i18n
   keys named after the release id without its dashes and dots (`whatsNew.r20260926.<name>Title`
   and `...Body` for release `2026-09-26`), translated into all eleven locales.
+- Keep every item in the shape `{ icon: Name, title: "...", body: "..." }` (that order, double
+  quotes): the Android app reads this same file with a regex (`fish.nexa.ui.WhatsNew`) and silently
+  skips anything shaped differently.
 - Say what people can do now and where to find it. Small fixes and polish do not need an entry.
 - The popup is `web/src/components/shell/WhatsNewDialog.tsx`. It shows the releases an account has
   not seen yet (tracked in its synced settings) and skips releases older than the account.
@@ -24,41 +95,564 @@ they open the app after an update, and it is how they find out what changed.
 ## Writing UI text
 
 - Labels use Title Case: buttons, menu items, tabs, navigation, dialog and page titles, headings
-  and column headers ("Add Friends", "Create Group", "Mark as Read", "Add to Group").
+  and column headers ("Add Friends", "Create Group", "Mark as Read", "Add to Group"). Short
+  articles, conjunctions and prepositions stay lowercase unless first or last. English only; the
+  other locales follow their own language's capitalization.
 - Checkbox and toggle labels use sentence case ("Hide their messages completely").
-  Short articles, conjunctions and prepositions stay lowercase unless first or last. English only;
-  the other locales follow their own language's capitalization.
 - Descriptions, hints, toasts and errors are short, plain sentences that sound like a person.
 - Avoid em dashes; use a comma, a full stop or parentheses.
 - Never describe the owner in the third person or sell Nexa as run by one person, in the app, the
   home page or the Terms. Contact details read "Contact the owner (nora) here: ...".
 - Describe Nexa on its own terms. Do not compare it to Discord. Naming Discord is fine only where a
   feature really talks to the Discord program (the desktop app's Rich Presence relay).
-- Never hardcode user-visible English: use `t("key")` / `<Tr>` from `@/i18n`, and add every new key
-  to all eleven files in `web/src/i18n/locales/` with real translations.
+- Never hardcode user-visible English. The web uses `t("key")` / `<Tr>` from `@/i18n`; Android uses
+  `t("key")` on the same catalogues (its own keys start with `android.`). Add every new key to all
+  eleven files in `web/src/i18n/locales/` with real translations
+  (`python3 android/tools/add_strings.py strings.json` writes a batch into all eleven, in order).
   `python3 tools/i18n_check.py` must pass.
+- Text about what Nexa stores or sends (the Terms, the privacy policy, settings) is checked against
+  the code that runs (handlers, the SQL in `internal/store`, the client crypto), not comments. Say
+  "not end-to-end encrypted" rather than "not encrypted" when the server seals something itself.
 
-## Building is deploying
+## Commands
 
-`web/dist` and `bin/chatd` are what the live instance serves, so `npm run build`, `make web`,
-`make server` and `make build` publish immediately. To check a change, use `npm run typecheck`,
-`npx vitest run`, `go test ./...`, or build somewhere else:
-`npx vite build --outDir <scratch dir> --emptyOutDir` and `go build -o <scratch dir>/chatd ./cmd/chatd`.
-Deploy only when the owner asks, after backing up `data/`.
+Each line on its own, from the repository root. None of these write anything live.
 
-## Checking UI changes
+```
+tools/check.sh                    # the whole pre-publish check: Go build/vet/tests, web typecheck, tests
+                                  # and a scratch build, app size, desktop typecheck/tests, i18n keys
+go build ./... && go vet ./...
+go test ./...                     # `make test-go` adds -race; the api package then takes minutes
+go test ./internal/api -run TestEditKeepsTheKeyThatOpensIt -count=1
+CHAT_TEST_POSTGRES=postgres://... go test ./internal/store ./internal/api    # the same suites on Postgres
+cd web && npm run typecheck
+cd web && npx vitest run          # one file: npx vitest run src/lib/perms.test.ts -t "test name"
+cd desktop && npm run typecheck && npm test
+python3 tools/i18n_check.py       # every locale has every key, placeholder and plural form
+python3 tools/i18n_keys_used.py   # must say "web: ... 0 missing"; Android's keys built at runtime are listed, as expected
+```
 
-Look at every UI change at desktop and phone sizes. `tools/screenshot.py` and `tools/e2e.py` drive
-the app with Playwright from Python (setup in `tools/README.md`); test on a throwaway server, never
-on port 8090.
+`make test` runs the Go suite with `-race` plus the web and desktop suites. `internal/db`'s Postgres
+tests start an embedded Postgres, downloaded the first time (`SKIP_PG_TESTS=1` skips them). For hot
+reload, `cd web && VITE_API_TARGET=http://127.0.0.1:$PORT npm run dev` serves the web app on :5173;
+without `VITE_API_TARGET` it proxies to :8090, the live server.
 
-## Other facts
+Building without deploying, into a scratch directory `$S`:
 
-- SQLite is live and the Postgres dialect must keep working: a new migration goes in both
-  `internal/db/migrations` and `internal/db/migrations-postgres` with the same number.
-- The Android app in `android/` is native (Kotlin + Jetpack Compose; the old WebView app is gone).
-  It talks to the server as deployed, so it never depends on unreleased server changes. Read
-  `android/DESIGN.md` before any of its UI work. Build it with `cd android && ./gradlew :app:assembleDebug`
-  (that publishes nothing).
-- The desktop (Electron) source is not checked out on this machine; keep `web/src/lib/desktopBridge.ts`
-  compatible with the app people already have installed.
+```
+(cd web && npx vite build --outDir $S/dist --emptyOutDir)
+go build -o $S/chatd ./cmd/chatd
+```
+
+Android (publishes nothing). On this server the JDK and SDK live in `~/android` and are not on the
+PATH, and the Bash tool keeps no variables between calls, so set them in every command:
+
+```
+export JAVA_HOME=$HOME/android/jdk ANDROID_HOME=$HOME/android/sdk
+(cd android && ./gradlew :app:assembleDebug)   # -PserverUrl=http://127.0.0.1:$PORT points it at a local chatd
+(cd android && ./gradlew :app:testDebugUnitTest)
+```
+
+Work that goes with certain changes:
+
+- Dependencies added or upgraded in any build: `make licenses` rewrites `web/src/data/licenses.json`
+  (Settings, Licenses); `android/tools/android_licenses.py` does the same for the Android app
+  (its header has the steps).
+- The web app's first load grew: `tools/app_size.py` (in `check.sh`) fails once the gzipped first
+  load passes `LOAD_KB_LIMIT` in `web/src/pages/HomePage.tsx`, the number the front page prints.
+  Keep that claim true.
+- The web's markdown, search, themes, formatting editor or webhook messages changed: regenerate the
+  Android test vectors (`android/tools/*_vectors.ts`) and make the Kotlin port pass them.
+- lucide-react upgraded: `python3 android/tools/lucide_assets.py`. emojibase-data or `@twemoji/svg`
+  upgraded: `node android/tools/emoji_assets.mjs`, `tools/twemoji_sprites.py`, `tools/twemoji_font.py`
+  and then `tools/twemoji_font_check.py`.
+
+## Testing
+
+### A throwaway server
+
+chatd reads `chatd.env` from its working directory, and the repo's copy is the live configuration
+(live keys and bot tokens, and `./data` is the live database). So run the scratch build from its own
+directory with its settings in the environment (`$S` an absolute path, `$PORT` anything but 8090):
+
+```
+(cd web && npx vite build --outDir $S/dist --emptyOutDir) && go build -o $S/chatd ./cmd/chatd
+(cd $S && LISTEN=127.0.0.1:$PORT PUBLIC_URL=http://127.0.0.1:$PORT DATA_DIR=$S/data \
+  WEB_DIST=$S/dist EGRESS_PROXY=off ./chatd)        # in the background
+tools/.venv/bin/python tools/seed.py http://127.0.0.1:$PORT
+```
+
+`seed.py` registers alice and bob (password `correct horse battery staple`), makes a server whose
+#general bob joins, posts one message of every kind of formatting and prints the ids. Registration
+is open by default, the first account becomes the Nexa admin, and captchas, calls through the SFU,
+GIF search and the other keyed services stay off without their keys.
+
+### Web in a headless browser
+
+Playwright runs from `tools/.venv` (setup in `tools/README.md`). Screenshots at both sizes:
+
+```
+tools/.venv/bin/python tools/screenshot.py http://127.0.0.1:$PORT $S/shots \
+  --login "alice:correct horse battery staple" \
+  --paths /channels/@me /channels/<server id>/<channel id> --viewports 1366x768 411x914
+```
+
+Widths under 768 get a mobile, touch context, and the app switches to its phone layout below 768 px.
+For flows (clicking, typing, two people at once) script Playwright with `tools/e2e.py`'s `Session`
+(`register`, `login`, `send`, `open_dm_with`, `shot`, ...) or run `tools/e2e.py` itself (`--flows`,
+`--serve`). Set `E2E_WEB_DIST` and `E2E_CHATD` to the scratch build; otherwise e2e.py tests the
+deployed `web/dist` and `bin/chatd`, not your changes. A new account in a new browser gets the Terms
+sheet first; `Session` and `screenshot.py --login` agree to it. Stable selectors are the
+`data-testid` attributes and aria labels the scripts already use. iPhone keyboard and viewport
+behaviour needs `tools/ios_sim.py` on a Mac (`tools/README.md`).
+
+### Android in the emulator
+
+The AVD is `nexa_test`: a Pixel 7, 1080x2400 at 420 dpi, which is 411x914 for the web comparison.
+It boots headless in about 30 seconds.
+
+```
+ADB=$HOME/android/sdk/platform-tools/adb
+(cd android && ./gradlew :app:assembleDebug -PserverUrl=http://127.0.0.1:$PORT)   # JAVA_HOME, ANDROID_HOME as above
+$HOME/android/sdk/emulator/emulator -avd nexa_test -no-window -no-audio -no-boot-anim \
+  -no-snapshot-save -gpu swiftshader_indirect       # in the background
+$ADB wait-for-device                                # then poll until `$ADB shell getprop sys.boot_completed` is 1
+$ADB install -r android/app/build/outputs/apk/debug/app-x86_64-debug.apk
+$ADB reverse tcp:$PORT tcp:$PORT
+$ADB shell am start -n fish.nexa.debug/fish.nexa.MainActivity
+$ADB exec-out screencap -p > $S/android.png
+$ADB emu kill                                       # when finished
+```
+
+- `-no-snapshot-save` throws away everything from the session, the installed app included, so
+  install after every boot.
+- Debug builds allow plain http only to 127.0.0.1, localhost and 10.0.2.2, hence the `serverUrl`
+  on 127.0.0.1 plus `adb reverse`.
+- Driving it: `$ADB shell uiautomator dump /sdcard/ui.xml && $ADB exec-out cat /sdcard/ui.xml` lists
+  every element with its bounds; then `$ADB shell input tap X Y`, `input text` (`%s` for a space)
+  and `input keyevent 4` (Back, which also closes the keyboard).
+- Before trusting a screenshot, check `$ADB shell dumpsys window | grep mCurrentFocus` names
+  `fish.nexa.debug`. After a cold boot, Play Services' "Sign in with ease" screen or a launcher
+  "isn't responding" dialog can sit on top; dismiss it and start the app again.
+
+### Other end-to-end runs
+
+All start their own throwaway chatd: `tools/webhook_e2e.py` (every kind of webhook message, both
+sizes), `tools/discord_e2e.py` (Discord activity sync against the fake Discord in
+`internal/discordsync/fakediscord/cmd/fakediscord`), `tools/sfu_call.py` and `tools/sfu_guest.py`
+(real calls and a guest through Cloudflare Realtime, keys from `chatd.env`), `tools/call_quality.py`
+(calls over bad networks made by `tools/netsim`).
+
+## Repository layout
+
+```
+cmd/chatd/          the server's main: wiring, the log file, the maintenance loop
+cmd/chatmigrate/    copies a SQLite database into Postgres in one transaction, all or nothing
+internal/           the server's packages (below)
+web/                the web app: src/, public/ (manifest, icons, sounds, front-page media), scripts/deploy-guard.mjs
+desktop/            the Electron app
+android/            the Android app; android/ydoc is the notes CRDT in Rust, android/tools its generators
+downloads/android/  the published APKs and manifest.json (committed), served at /android/
+deploy/             systemd and launchd templates, install.sh, route-dns.sh, warp-proxy.sh
+tools/              test drivers, release scripts, i18n and asset generators (below)
+docs/               design spec and plans, STATUS.md, legal/ (the Terms and Privacy Policy the apps
+                    show word for word), plugins.md (the plugin API), design/reference captures
+audit/              two rounds of code audits: findings, triage and progress per area
+prompt.txt          the 2026-10-01 handoff to another machine, with the owner's messages word for word
+run.sh, backup.sh   what the service starts (bin/chatd -env chatd.env); the backup of data/
+```
+
+Not in git: `data/` (database, media, server secret), `logs/`, `bin/` (chatd and chatd.prev),
+`backup/`, `chatd.env`, `web/dist`, `web/node_modules`, `tools/.venv`, `tools/out`, `.claude/`.
+
+## Server (Go)
+
+### Startup
+
+`cmd/chatd/main.go` reads `-env` (default `chatd.env`; the process environment wins over the file),
+loads `internal/config`, sets the snowflake node id, opens the database (`DATA_DIR/chat.db`, or
+`DATABASE_URL`), runs the migrations, makes the store, the media store (`DATA_DIR/media`), the
+server secret (`DATA_DIR/server.secret`) and the optional Redis cache, then builds `api.Server` and
+attaches the egress proxy, link previews, Rich Presence apps, games and music. It makes the gateway
+hub (`srv.Bcast`), calls `WireServers`, `WireVoice`, `WireActivities`, `WireDiscord` and last
+`WireModeration`, mounts `/gateway`, starts the background loops (`StartLimiters`, `StartGuests`,
+`StartModeration`, `StartPolls`, `StartThreads`, `StartDiscord`, `StartAccountSweep`, the WARP
+keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGTERM.
+
+### Packages (`internal/`)
+
+| Package | What it is |
+|---|---|
+| `api` | REST handlers, middleware, rate limits, static pages; one file per area (below) |
+| `auth` | Argon2id of the client's auth key, bearer tokens (only SHA-256 hashes stored), the middleware that turns a token into a user or a guest, client IP behind the tunnel |
+| `automod` | AutoMod matching (text read past disguises, words with wildcards, patterns, presets); `testdata/vectors.json` binds every implementation |
+| `cache` | optional Redis: shared rate limits, presence and events between processes |
+| `config` | settings from the environment with defaults and validation |
+| `db` | SQLite or Postgres pools (`W` single writer, `R` readers), `Tx`, the dialect helpers, embedded forward-only migrations |
+| `discordsync` | Discord activity sync: OAuth link, a bot in a small Discord server reads linked members' presence; `fakediscord` stands in for tests |
+| `egress` | the SOCKS5 proxy (WARP) for every request a person can point the server at; fails closed |
+| `games`, `music` | IGDB games and Deezer music for profile widgets; art kept here, previews streamed through |
+| `gateway` | the WebSocket hub: connections, presence, typing, voice signalling, fan-out |
+| `ids` | snowflakes: 41 bits of milliseconds, 10 of node, 12 of sequence; decimal strings in JSON |
+| `media` | blob storage, upload validation, sized variants, metadata scrub, private and plain files |
+| `perms` | Discord's permission model and bit values: roles, @everyone, overwrites, timeouts, hierarchy |
+| `ratelimit` | keyed token buckets, optionally shared through Redis |
+| `realtime` | Cloudflare Realtime SFU client and the monthly usage meter |
+| `rpcapps` | names and art of Discord Rich Presence applications, looked up once and kept |
+| `store` | every SQL query, grouped by domain; models; the permission cache |
+| `telegram` | the Bot API calls a sticker set import needs |
+| `textutil` | cleaning user text, shared by REST and gateway |
+| `totp` | RFC 6238 codes for two-factor sign-in |
+| `unfurl` | link previews with SSRF protection (public addresses only, redirects checked, bodies capped) |
+| `voice` | the in-memory registry of who is in which call and what each device publishes |
+
+### HTTP API (`internal/api`)
+
+- Everything is JSON under `/api/v1` with `Authorization: Bearer <token>`. Errors are
+  `{"error": {"code", "message"}}`, built with `E(status, code, message)` and `WriteError`;
+  `WriteJSON` and `ReadJSON(w, r, dst, maxBytes)` do the rest. `Handler()` chains `RequestID`,
+  `Recover`, `SecurityHeaders` and `Logging`; `GET /api/health` answers `{ok, version}`.
+- Route groups are listed in `groups.go` (`routeGroups`); each file registers its own with
+  `mux.Handle("METHOD /path", ...)`. A new group goes in that list.
+- Wrappers: `authed` (token, the generic per-user limit, and the mute/ban gate), `callAuthed`
+  (accounts and guests, for call routes), `guestAuthed`, `userLimited(limiter, h)` and
+  `ipLimited(limiter, h)`. Every limiter is made in `NewServer` and named in `limiters()`; one
+  missing from that map is never swept or shared.
+- `moderation_gate.go` lists what a muted or banned account may still do. A new signed-in route is
+  closed to them until it is added there.
+- Areas, by file: `auth_handlers` and `mfa_handlers` (register, KDF parameters, login, recovery,
+  password, sessions, TOTP and backup codes), `user_handlers` (me, encrypted settings, keys, search,
+  profiles, deletion), `relationship_handlers`, `channel_handlers` (DMs, groups, icons, recipients,
+  typing, attachments, pins), `group_handlers`, `subchat_handlers` (sub-conversations of a DM, with an
+  optional password), `message_handlers` (history, send, edit, delete, bulk delete, ack, reactions),
+  `poll_handlers`, `key_handlers` (grants, needs, epochs), `server_handlers` (servers, channels,
+  overwrites, roles, members, bans, invites, audit log), `member_admin` (member search, prune, bulk
+  ban, server profiles, role icons), `threads` (threads and forum posts), `follows` (announcement
+  follows and crossposts), `automod`, `discovery`, `server_tags`, `expression_handlers` (server
+  emoji, sticker packs, recents, Telegram import, Klipy GIF search), `voice_glue` and `sfu_handlers`
+  (ICE servers, voice states, ringing, the SFU), `guest_handlers` (guest links), `webhook_*`,
+  `note_handlers`, `sound_handlers`, `widgets` (profile widgets, game and music search),
+  `typing_style`, `profile_links`, `discord_handlers`, `activity_glue`, `nexa` (a member's side of
+  Nexa) and `moderation*` (the staff's side), `bugs`, `crash_handlers` (client errors),
+  `admin_handlers` (instance stats, users, runtime settings), `legal_handlers` (the admin's legal
+  report), `desktop_handlers` and `android_handlers` (downloads and update manifests),
+  `media_handlers`, `upload_handlers` (resumable uploads), `proxy_handlers` (the signed media proxy),
+  `youtube_proxy`, `handoff` (moving sign-ins from a `MOVED_FROM` address), `unfurl_handlers`,
+  `static` (the SPA).
+- Webhooks are used with their token at `/api/webhooks/{wid}/{token}` and at the versioned paths
+  Discord's libraries build (`/api/v1`, `/api/v6` to `/api/v10`), with `/slack` and `/github`
+  variants, taking Discord's JSON.
+- `static.go` serves `web/dist`: hashed assets immutable, `index.html` for any other path, and its
+  own page heads (for link previews elsewhere) at `/invite/{code}`, `/call/{code}`, `/note/{token}`,
+  `/@{username}` and `/`. The Content-Security-Policy is there too (plugins load from `blob:`,
+  Turnstile from Cloudflare).
+- `ChannelAccess`, `ConvForChannel`, `ServerChannelPatch` and `CanRotate` on `Server` are hooks the
+  server-channel code (`server_glue.go`) installs; DM access is built in.
+
+### Gateway (`internal/gateway`, `web/src/gateway`)
+
+- One WebSocket at `GET /gateway`. The client sends `{op, d}`, the server `{t, s, d}`. The first
+  frame is `identify` with the token, answered by `ready`: `session_id`, `user`, `users`,
+  `channels`, `relationships`, `read_states`, `presences`, `key_grants`, `settings`, `servers`,
+  `emojis`, `sticker_packs`, `voice_states`, `group_add_notices`, `guest`, `nexa`.
+- Client ops: `identify`, `heartbeat` (every 25 s, answered by `heartbeat_ack`), `presence`,
+  `typing`, `voice_state`, `voice_signal`, `subscribe_members`, `activities` (the desktop app's
+  Rich Presence), `away`, `note_cursor`. The server also pings every 12 s at the protocol level.
+- Close codes: 4001 session revoked (the client signs out), 4003 banned, 4008 rate limited,
+  4009 too many connections. A connection may send 20 ops a second, in bursts of 100.
+- Events are the `Ev*` constants in `protocol.go`: messages, reactions, typing, channels and their
+  positions, servers, members, roles, presence, users, relationships, read states, voice and calls,
+  keys (`key_grant`, `keys_needed`, `key_rotation_needed`), emoji and stickers, pins, bans, invites,
+  webhooks, polls, settings, threads, follows, AutoMod, the audit log, notes (`note_*`), Nexa and
+  moderation (`nexa_*`, `mod_*`), guests and sessions.
+- Handlers emit through the `Broadcaster` interface in `api/router.go` (`EmitUsers`, `EmitChannel`,
+  ...); the hub sends an event only to members allowed to see it (`store/permcache.go` answers that)
+  and encodes it once for all of them.
+- A new event touches: the constant in `protocol.go`, the emit in the handler, its type in
+  `web/src/gateway/events.ts`, its handling in `web/src/gateway/dispatch.ts` (which updates the
+  stores), and the same on Android (`fish.nexa.data.Session`).
+
+### Database (`internal/db`, `internal/store`)
+
+- Every query lives in `internal/store`; handlers never touch `database/sql`. Queries are written
+  once with `?` placeholders; `internal/db` rebinds them for Postgres, and `db.Dialect` covers the
+  few places the two differ (JSON arrays, greatest/max, case folding with the `ulower()` the store
+  registers on SQLite, unique violations).
+- Ids are snowflakes, times Unix milliseconds, booleans 0 and 1, JSON kept as text.
+- SQLite is live and Postgres must keep working: a new migration goes in both
+  `internal/db/migrations` and `internal/db/migrations-postgres` with the same number (Postgres
+  starts at `0013_init.sql`). Migrations are embedded, forward only, one transaction each.
+  `tools/gen_pg_schema.sh` prints the Postgres schema the SQLite migrations add up to, to diff
+  against. chatd refuses to start on a database a newer build has migrated, so a release with a
+  migration cannot roll back to `bin/chatd.prev`.
+- The tables, by area: accounts (`users`, `sessions`, `user_settings`, `user_mfa`,
+  `mfa_backup_codes`, `user_sounds`, `username_holds`), people (`relationships`), conversations
+  (`channels` for every kind, `dm_participants`, `channel_overwrites`, `channel_unlocks`,
+  `thread_members`, `channel_follows`, `crossposts`), messages (`messages` with `ciphertext`, and
+  `plain` for webhook and system text; `attachments`, `reactions`, `pins`, `read_states`, `polls`,
+  `poll_votes`), keys (`key_epochs`, `key_grants`, `key_flags`), servers (`servers`,
+  `server_members`, `roles`, `member_roles`, `invites`, `bans`, `audit_log`, `automod_rules`,
+  `automod_events`), expressions (`emojis`, `sticker_packs`, `stickers`, `sticker_installs`,
+  `recent_stickers`, `blocked_images`), files (`blobs`, `uploads`), calls (`guest_links`, `guests`,
+  `realtime_usage`), integrations (`webhooks`, `discord_links`), notes (`notes`, `note_members`,
+  `note_invites`, `note_links`, `note_files`, `note_versions`, `note_version_files`, `note_keys`,
+  `note_updates`, `note_uploads`), Nexa and moderation (`mod_cases`, `mod_messages`,
+  `mod_message_files`, `mod_restrictions`, `mod_announcements`, `mod_log`, `nexa_reads`,
+  `bug_reports`, `bug_attachments`, `bug_messages`, `client_errors`), the instance
+  (`instance_settings`).
+- Channel types: `dm`, `group_dm`, `subchat`, `text`, `voice`, `category`, `announcement`, `forum`,
+  `thread`, `private_thread`. A channel's `key_conv_id` names the conversation whose keys encrypt
+  it: itself for DMs and private channels, the server otherwise.
+- `cmd/chatmigrate` copies a SQLite database into Postgres (`DATABASE_URL`).
+
+### Permissions
+
+`internal/perms` is Discord's algorithm with Discord's bit values. `web/src/lib/perms.ts` mirrors it
+(BigInt, decimal strings on the wire), and so does Android's `fish.nexa.data.Perms`. Server channel
+access goes through the hooks `server_glue.go` installs, answered from `store/permcache.go`.
+
+### Media and uploads (`internal/media`)
+
+- Files are content-addressed on disk under `DATA_DIR/media`, described by the `blobs` table.
+- Public kinds (`avatar`, `banner`, `icon`, `emoji`, `sticker`, `tag`, `widget`, `typing`) are
+  served at `/media/{kind}/{id}`, immutable, and at a requested size as a variant made once (the next
+  power of two). The kind in the address must match the stored one, and a picture the staff blocked
+  is served to nobody.
+- Attachments are opaque encrypted blobs, served only to people in the conversation
+  (`/media/attachments/{id}`). Files of bug reports and case threads are private to their people
+  and the staff. Webhook files are plain.
+- The server strips hidden metadata from the pictures and videos it keeps readable (`scrub.go`);
+  the apps do the same before encrypting (web `lib/scrubMetadata.ts`, Android `MetadataScrub`), all
+  checked against `internal/media/testdata/scrub`.
+- Small files go up in one request (`POST /channels/{id}/attachments`); big ones through
+  `/api/v1/uploads` in pieces (Cloudflare caps a request at 100 MB), with disk headroom and
+  per-account caps (`roomForUpload`).
+
+### Outbound requests
+
+Everything a person can make the server fetch goes through `internal/egress` (WARP's SOCKS5 proxy,
+`EGRESS_PROXY=warp|off|socks5://...`): link previews (`unfurl`, asked for by the sender's app,
+which puts the preview inside the encrypted message), the media proxy (only addresses the server
+signed; `POST /proxy/refresh` re-signs old ones), the YouTube player (`/yt/...`), IGDB, Deezer and
+Discord's Rich Presence apps. Discord's gateway, Cloudflare Realtime and the tunnel go out directly.
+
+### Calls
+
+`internal/voice` tracks who is in each call. Without Realtime keys calls are peer to peer (a mesh,
+signalled over the gateway's `voice_signal`); with `REALTIME_APP_ID`/`REALTIME_APP_SECRET` every call
+goes through Cloudflare's SFU, with chatd as its signalling proxy (`/api/v1/voice/sfu/*`) deciding
+who may pull which track. The usage meter pauses video near `REALTIME_MONTHLY_GB` and stops calls
+just short of it. A call through the SFU outlives a dropped socket for `voiceGrace`. Guest links let
+someone without an account into one call. Frames are encrypted in the apps.
+
+### Nexa, moderation and safety
+
+- Nexa is the account the service speaks as: notices, announcements, and case threads where a
+  member can appeal (not end-to-end encrypted, and the app says so). The staff are Nexa admins (user
+  flag bit 1: the first account, or `ADMIN_USERNAME` while nobody has been admin yet). Their panel is
+  `/channels/@admin` (`/api/v1/moderation/*`); the member's side is `/api/v1/nexa/*`.
+- Staff can act on accounts (mutes, bans, purges, removing pictures, resetting fields), servers
+  (including Discovery holds), sticker packs, emoji and uploads (`moderation_actions.go` and the
+  other `moderation_*` files). Actions are recorded in `mod_log`; one on an account comes with a case
+  (`mod_cases`) whose thread the member sees.
+- Bug reports (`/api/v1/bugs`), client crash reports (`/api/v1/client-errors`) and the admin's
+  instance settings (registration mode and key, which override `chatd.env` until cleared).
+- AutoMod: the server applies a server's rules to what it can read (names, profiles, thread and
+  post titles); the members' apps apply the same rules to encrypted messages and report what they
+  held (`POST /servers/{id}/automod/report`).
+
+### Configuration
+
+Every setting is documented in `chatd.env.example`; `internal/config` loads them. Groups:
+addresses (`LISTEN`, `PUBLIC_URL`, `ALT_URLS`, `MOVED_FROM`), storage (`DATA_DIR`, `DATABASE_URL`,
+`REDIS_URL`, `WEB_DIST`, `DESKTOP_DIR`, `ANDROID_DIR`, `NODE_ID`), limits (`MAX_UPLOAD_BYTES`,
+`MAX_AVATAR_BYTES`, `MAX_EMOJI_BYTES`, `MAX_STICKER_BYTES`, `SESSION_TTL_DAYS`), sign-up
+(`REGISTRATION` open/invite/closed, `REGISTRATION_KEY`, `ADMIN_USERNAME`, `TURNSTILE_SITE_KEY`,
+`TURNSTILE_SECRET_KEY`), calls (`REALTIME_APP_ID`, `REALTIME_APP_SECRET`, `REALTIME_MONTHLY_GB`,
+`GUEST_LINKS_P2P`, `STUN_URLS`, `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL`, `TURN_KEY_ID`,
+`TURN_API_TOKEN`), outbound (`EGRESS_PROXY`, `WARP_PROXY_PORT`), integrations (`KLIPY_API_KEY`,
+`IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `TELEGRAM_BOT_TOKEN`, `DISCORD_CLIENT_ID`,
+`DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`, `DISCORD_ACTIVITY_GUILD_ID`, `DISCORD_REDIRECT_URL`
+left empty, `DISCORD_API_URL` for the fake), logging (`LOG_LEVEL`, `LOG_FILE`). A new setting goes
+in `config.go`, `chatd.env.example` and this list.
+
+### Go tests
+
+- `internal/api`: `newTestServer(t)` (`testutil_test.go`) is a real `httptest` server with the
+  gateway wired in, on a fresh database (SQLite, or a Postgres schema with `CHAT_TEST_POSTGRES`).
+  `register(t, ts, username)` (`auth_handlers_test.go`) returns a token and id;
+  `do(t, ts, method, path, token, body)` makes a JSON request; `errCode` reads an error;
+  `connectGWReady` / `connectGW` open a gateway socket and `gw.next(event, timeout)` waits for an event.
+- `internal/store`: `newStore(t)`, `mkUser(t, s, name)`.
+- Tests against live services run only with their variables set (`UNFURL_LIVE`, `REALTIME_LIVE`,
+  `TELEGRAM_LIVE_TOKEN`, `DISCORD_BOT_TOKEN`); the Discord tests otherwise use `fakediscord`.
+
+## End-to-end encryption
+
+The client does all of it (`web/src/crypto`; Android ports it in `fish.nexa.crypto`, checked
+against `web-crypto-vectors.json`). The server stores ciphertext plus the metadata it needs to
+deliver: author, channel, mentions, reactions, sizes.
+
+- Accounts: Argon2id stretches the password on the device; HKDF splits it into an auth key (the
+  only thing sent, hashed again on the server) and an encryption key that wraps the account's X25519
+  identity. The client checks the KDF parameters the server hands out (`lib/serverKdf.ts`) so a
+  server cannot weaken them. A recovery key shown once at registration can restore the identity.
+- Conversations have a root key per epoch, handed to each member as a sealed box to their identity
+  key (`key_grants`). Channel keys derive from the root, so one grant covers every channel of a
+  server. When someone needs keys the server sends `keys_needed` and an online holder wraps them;
+  when membership shrinks it sends `key_rotation_needed` and an online holder makes a new epoch.
+  Invite links can carry the root key in the URL fragment (`#k=<epoch>.<key>`), which never reaches
+  the server.
+- Messages are AES-256-GCM envelopes with the channel and author bound in. Attachments are chunked
+  (`crypto/fileChunks.ts`: "ECF1", a base IV, then length-prefixed chunks), each file with its own
+  key inside the message; pictures also send a small copy of their own. Downloads and video play
+  decrypt as they stream, in `download-sw.ts`.
+- Call frames are sealed again with a key derived from the conversation's (`voice/frameCrypto.ts`;
+  Android in native code, `cpp/frame`), because the SFU ends the transport encryption. Guest links
+  carry the call key in their fragment.
+- Notes have a key of their own, sealed to each member; a share link carries a second key in its
+  fragment. Announcement follows are sealed to the follow's key. The settings blob, sound packs and
+  the search index on the device are sealed too.
+- Keys on the device: IndexedDB (`crypto/keystore.ts`), cleared on sign-out; with a passcode lock
+  the device keeps neither the identity nor any roots in the clear. Identity keys are pinned the
+  first time they are seen (`lib/keyPins.ts`) and safety numbers (`crypto/fingerprint.ts`) let two
+  people compare them.
+- Not end-to-end encrypted: webhook messages (`messages.plain`; the app marks them), Nexa's case
+  threads, poll and AutoMod notices the server writes, and everything public (profiles, avatars,
+  server names, emoji and stickers).
+
+## Web app (`web/src`)
+
+React 18, TypeScript, Vite, zustand and react-router; `@/` is `web/src`. `main.tsx` mounts `App` and
+registers the two service workers: `sw.ts` (no fetch handler; a new copy taking over means a
+deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.ts` (scoped to
+`/__download/`, streams and decrypts large downloads and videos). Pages load lazily
+(`lib/lazyChunk.ts`).
+
+### Routes (`routes.tsx`)
+
+`/` (home), `/login`, `/register`, `/recover`, `/invite/:code`, `/note/:token`, `/download`,
+`/terms`, `/privacy`, `/about`, `/call/:code` (guest call), `/stickers/pack/:packId`,
+`/connected/discord`, and inside the signed-in shell `/channels/@me` (friends), `@me/nexa` (with
+`cases/:caseId`, `bugs/:reportId`), `@me/notes[/:noteId]`, `@admin/*` (the staff panel),
+`@discover`, `@me/:channelId[/:messageId]` (DMs), `:serverId[/:channelId[/:messageId]]`, then
+`/:handle` (a profile link, `/@name`).
+
+### State and data flow
+
+- `api/` is the typed REST client (`api/client.ts` adds the token, a timeout and the error
+  envelope); `api/types.ts` holds the wire types.
+- `gateway/client.ts` keeps the socket (backoff, heartbeat), `gateway/session.ts` starts it after
+  sign-in, and `gateway/dispatch.ts` applies every event to the stores.
+- Stores (`stores/`, zustand): `auth` (sign-in status: idle, loading, offline, anonymous, locked,
+  pinlocked, ready), `keys`, `settings` (the account's settings, sealed and synced with an optimistic
+  version), `messages`, `channels`, `servers`, `users`, `presence`, `relationships`, `readStates`,
+  `typing`, `threads`, `voice`, `voiceLocal`, `expressions`, `notes`, `nexa`, `moderation`,
+  `discord`, `desktop`, `ui` (modals), `tabs`, `selection`, `pick`, `uploads`, `unsaved`,
+  `replyTargets`, `serverNav`, `slowmode`, `profilePopout`, `automodNotices`, `groupAddNotices`,
+  `keyAlerts`.
+- `lib/decrypt.ts` turns a message into what the stores keep (webhook messages pass through
+  `lib/webhookMessage.ts` instead). `lib/keyring.ts` holds the roots in memory and caches channel keys.
+
+### Main folders
+
+- `crypto/`: KDF, identity and sealed boxes, conversation keys, message envelopes, files, notes,
+  safety numbers, the IndexedDB keystore, streaming decryption.
+- `markdown/`: the message parser (`parse.ts`: the chat syntax people know plus GitHub's blocks,
+  coloured text `[words]{red}`, timestamps, mentions) and renderer.
+- `search/`: a full-text index of what this device has decrypted, in a worker, sealed on disk;
+  `lib/search.ts` reads the query and its filters.
+- `voice/`: calls (`session.ts` for the app, `engine.ts`, `transport.ts` with `mesh.ts` and
+  `sfu.ts`, `frameCrypto` and its worker, `playback.ts` per-person volume, `denoise.ts` RNNoise,
+  `opus.ts`, `redundancy.ts`, `videoCap.ts`, `shareQuality.ts`, `callRecord.ts` for DM call lines).
+- `lib/`: everything else, one concern per file. Notable groups: `look/` (themes, presets, the theme
+  builder's maths, custom CSS and plugins with their API in `look/plugins`), `notes/` (the Yjs
+  document, sessions, sharing, history), `automod/` (the client side of AutoMod), `spell/` (Hunspell
+  in a worker for Nexa's own text menu), and single files for attachments, uploads, notifications,
+  sounds, keybinds, the app lock, away detection, moving domains, invites, export, time, links,
+  server tags, widgets and the rest.
+- `components/` by area: `shell` (app frame, tabs, banners, What's New, update dialog), `sidebar`,
+  `rail`, `chat` (message list, message item, embeds, attachments, players, pins, member list),
+  `composer` (the box, autocomplete, commands, and `format/`, the formatting editor), `modals`,
+  `settings` (every Settings page), `server` (Server Settings pages), `voice`, `profile`, `pickers`
+  (emoji, GIFs, stickers), `notes`, `threads`, `forum`, `search`, `moderation` (staff panel), `nexa`,
+  `bugs`, `legal` (Terms gate), `invite`, `discovery`, `follows`, `friends`, `stickers`,
+  `servertag`, `activity`, `desktop`, `common` (shared controls: Modal, Popout, ContextMenu, Button,
+  Toggle, Select, Avatar, Twemoji and more).
+- `pages/`: one per route. `styles/`: `tokens.css` (every theme token: colour, radius, shadow,
+  motion), `base.css`, `markdown.css`, `fonts.css` (Wix Madefor) and `fonts-classic.css` (Onest,
+  Mona Sans). `lib/theme.ts` applies a theme; `lib/look/` derives presets and custom themes.
+- `i18n/`: `useT()`, `t()` (usable outside components), `<Tr>`; English is bundled and the other
+  ten catalogues (ar, de, es, fr, hi, ja, ko, pt-BR, ru, zh-CN) load when chosen. Keys are flat and
+  dotted by area (`settings.*`, `server.*`, `chat.*`, `whatsNew.*`, `android.*`, ...).
+- Tests sit beside the code (`*.test.ts[x]`). Vitest runs in node with `fake-indexeddb`; component
+  tests start with `// @vitest-environment jsdom`.
+
+## Desktop app (`desktop/`)
+
+Electron (version in `desktop/package.json`, bumped for every release). `src/main/index.ts` opens one
+window on the live site (`config.ts`: https://nexa.fish, or `EVILION_URL` in an unpackaged app
+while developing; `npm start` builds and runs it), with a tray, system-wide keybinds (`shortcuts.ts`), the screen picker
+(`displayPicker.ts`, `src/picker/`), window sound sharing (`appAudio.ts`), permissions limited to
+Nexa's origin, takeover from an older Mac copy (`succession.ts`) and updates from Nexa's own server
+(`update/`, with a Mac updater of its own since the app is signed ad hoc). `src/main/rpc/` is a Rich
+Presence server speaking Discord's IPC and local WebSocket protocols, passing programs through to the
+real Discord when it runs, and handing activities to the page, which sends them to chatd.
+`src/preload/index.ts` puts `window.evilionDesktop` on Nexa's pages; `src/shared/bridge.ts` and
+`web/src/lib/desktopBridge.ts` describe it and must stay in step, compatible with the apps people
+already have installed (anything new is optional and checked before use). `build.mjs` bundles with
+esbuild, `electron-builder.yml` packs (`sign-mac.cjs` signs Mac builds ad hoc), and
+`tools/mac_package.py` and `tools/publish_desktop.py` finish a release.
+
+## Android app (`android/`)
+
+Native Kotlin and Jetpack Compose (package `fish.nexa`, minSdk 26, targetSdk 36; debug builds are
+`fish.nexa.debug`). It talks to the server as deployed, so it never depends on unreleased server
+changes. Libraries: OkHttp, kotlinx.serialization, Coil 3, Media3 ExoPlayer, Lottie, BouncyCastle,
+argon2kt, ZXing and webrtc-sdk. Native code: `app/src/main/cpp` (call frame crypto and H.264 in
+`frame/`, RNNoise) through CMake, and `android/ydoc` (yrs, the Rust Yjs, built with cargo-ndk) for
+notes.
+
+- `Nexa.kt` is the object graph; `data/State.kt` keeps each store as an immutable snapshot in a
+  StateFlow, mirroring the web's zustand stores; `data/Session.kt` handles the gateway's events.
+- Packages: `crypto` (the web's crypto), `net` (`Api`, `Gateway`, `Models` as the wire types),
+  `data` (stores and logic ported from `web/src/lib` and `stores`), `media` (pictures through Coil,
+  encrypted downloads and streaming, Twemoji, sounds), `notes` (CRDT documents, sessions, sharing),
+  `search` (the web's index, ported), `voice` (calls: transports, audio routing, the call service,
+  picture in picture, notifications), `notify` (alerts over the live connection), `ui/...` (screens
+  by area, `ui/theme` with tokens from `tokens.css`, `ui/markdown` with the ported parser).
+- There is no push service: `notify/ConnectionService` keeps the connection open in the background
+  (on unless turned off) and `Notifier` raises alerts on the device.
+- The build's `copyWebAssets` task copies the web's locale files, sounds, emoji sprites,
+  `whatsNew.ts` and the legal documents into the app; `assets/lucide.json`, `assets/emoji/` and
+  `assets/licenses.json` come from `android/tools`.
+- Logic ported from the web (markdown, search, themes, the formatting editor, webhook messages,
+  crypto, metadata scrubbing, the notes CRDT) is tested against vectors produced by the web's own
+  code (`app/src/test/resources/web-*-vectors.json*`; most are regenerated by
+  `android/tools/*_vectors.ts`, and each file's header says how).
+- Releases: raise `versionCode` and `versionName` in `app/build.gradle.kts`, then
+  `make publish-android` (needs `android/keystore.properties`), commit `downloads/android`, push,
+  and pull on the server; chatd offers it at once (`downloads/android/README.md`).
+
+## Tools (`tools/`)
+
+- Testing: `check.sh`, `e2e.py`, `screenshot.py`, `seed.py`, `webhook_e2e.py`, `discord_e2e.py`,
+  `sfu_call.py`, `sfu_guest.py`, `call_quality.py` with `netsim/`, `ios_sim.py` with `ios/`,
+  `app_size.py`.
+- i18n: `i18n_check.py`, `i18n_keys_used.py`, `i18n_apply.py` (write or merge a language's
+  values), `i18n_extract.py` (pull hardcoded English into keys); `android/tools/add_strings.py`.
+- Releases: `android_release.py`, `mac_package.py`, `publish_desktop.py`, `licenses.py`.
+- Assets: `twemoji_font.py`, `twemoji_font_check.py`, `twemoji_sprites.py`, `trace_wordmark.py`,
+  `home_shots.py` and `home_gifs.py` (the front page's pictures and loops), `trailer.py`.
+- Schema: `gen_pg_schema.sh`, `pg_schema.py`.
+
+## Deploying (only when the owner says "deploy")
+
+- A web-only change: `make web`. chatd reads `web/dist` from disk on every request, so it is live at
+  once, with no restart.
+- A server change: `make server` (it keeps the binary it replaces as `bin/chatd.prev`), then
+  `sudo systemctl restart xyz.evilion.chat` (the unit runs `run.sh`). `make build` builds both. Say
+  so when the deploy runs a database migration.
+- Back up first (`bash backup.sh`, which keeps only the newest set) only when the request asks for it.
+- To roll back: `cp bin/chatd.prev bin/chatd` and restart (not across a migration, see Database).
+- Desktop and Android releases are published separately (see their sections).
