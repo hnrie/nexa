@@ -89,6 +89,10 @@ func (s *Server) handleUnlock(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, http.StatusOK, map[string]any{"unlocked": true})
 		return
 	}
+	// a password is checked here, so guessing at it is a captcha away each time
+	if !s.requireCaptcha(w, r, "subchat_unlock") {
+		return
+	}
 	if ok, retry := s.limPass.Allow("pw:" + auth.UserFrom(r.Context()).ID.String()); !ok {
 		w.Header().Set("Retry-After", retryAfter(retry))
 		WriteError(w, ErrRateLimited)

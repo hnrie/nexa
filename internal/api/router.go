@@ -99,11 +99,14 @@ type Server struct {
 	limNoteLink     *ratelimit.Limiter
 	limNotePresence *ratelimit.Limiter
 	limBugFile      *ratelimit.Limiter
-	limHook         *ratelimit.Limiter
-	limHookCh       *ratelimit.Limiter
-	limHookMgr      *ratelimit.Limiter
-	limVote         *ratelimit.Limiter
-	limDiscord      *ratelimit.Limiter
+	// limKeyAsk paces a device asking the holders of a conversation's keys
+	// for them again, per account and conversation
+	limKeyAsk  *ratelimit.Limiter
+	limHook    *ratelimit.Limiter
+	limHookCh  *ratelimit.Limiter
+	limHookMgr *ratelimit.Limiter
+	limVote    *ratelimit.Limiter
+	limDiscord *ratelimit.Limiter
 	// limTag paces changes to a server's tag, which reach everyone wearing it
 	limTag *ratelimit.Limiter
 	// limMusic paces someone's music searches, which share what Deezer allows this server
@@ -274,6 +277,9 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		// files for bug reports, per account: five to a report, a few reports,
 		// and room to add one again after taking it out
 		limBugFile: ratelimit.New(ratelimit.Every(30, time.Hour), 15, 2*time.Hour),
+		// asking for a conversation's keys again: a few right away, then one
+		// every twenty seconds, while a device waits for someone holding them
+		limKeyAsk: ratelimit.New(ratelimit.Every(3, time.Minute), 3, 30*time.Minute),
 		// Each webhook: five requests every two seconds, and each channel
 		// thirty webhook messages a minute, whichever webhooks send them:
 		// Discord's limits, which programs written for its webhooks pace
@@ -312,7 +318,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"generic": s.limGeneric, "auth-ip": s.limAuthIP, "auth-user": s.limAuthUsr, "register": s.limReg, "message": s.limMsg,
 		"upload": s.limUpload, "unfurl": s.limUnfurl, "proxy": s.limProxy, "youtube": s.limYouTube, "refresh": s.limRefresh, "voice": s.limVoice,
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
-		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile,
+		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile, "key-ask": s.limKeyAsk,
 		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord, "server-tag": s.limTag, "music-search": s.limMusic, "music-preview": s.limPreview,
 		"automod": s.limAutomod, "publish": s.limPublish, "thread": s.limThread, "discover": s.limDiscover,
 		"note": s.limNote, "note-save": s.limNoteSave, "note-update": s.limNoteUpdate, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,

@@ -102,7 +102,7 @@ func TestBugThreadMovesTheReportAlong(t *testing.T) {
 	alice := mkUser(t, s, "alice")
 	r := newBug(t, s, bob, "Calls drop")
 
-	reply, got, err := s.AddBugMessage(ctx, r.ID, alice.ID, ModMsgStaff, "Which browser?")
+	reply, got, err := s.AddBugMessage(ctx, r.ID, alice.ID, ModMsgStaff, "Which browser?", nil)
 	if err != nil || got.Awaiting != AwaitMember || reply.ReportID != r.ID {
 		t.Fatalf("staff reply: %+v %v", got, err)
 	}
@@ -117,7 +117,7 @@ func TestBugThreadMovesTheReportAlong(t *testing.T) {
 	}
 
 	// a change of status is news too, and answers a report that was waiting
-	mine, got, err := s.AddBugMessage(ctx, r.ID, bob.ID, ModMsgMember, "Firefox")
+	mine, got, err := s.AddBugMessage(ctx, r.ID, bob.ID, ModMsgMember, "Firefox", nil)
 	if err != nil || got.Awaiting != AwaitStaff {
 		t.Fatalf("member reply: %+v %v", got, err)
 	}
@@ -144,19 +144,28 @@ func TestBugThreadMovesTheReportAlong(t *testing.T) {
 	if _, _, err := s.SetBugStatus(ctx, r.ID, alice.ID, "fixed"); err == nil {
 		t.Error("an unknown status was taken")
 	}
-	// a reply on a finished report keeps its status and waits on staff
-	_, got, _ = s.AddBugMessage(ctx, r.ID, bob.ID, ModMsgMember, "Still happens")
-	if got.Status != BugResolved || got.Awaiting != AwaitStaff {
-		t.Errorf("reply on a resolved report: %+v", got)
+	// a finished report is closed to everyone, staff too, until staff set it going again
+	if _, _, err := s.AddBugMessage(ctx, r.ID, bob.ID, ModMsgMember, "Still happens", nil); !errors.Is(err, ErrBugClosed) {
+		t.Errorf("reply on a resolved report: %v", err)
+	}
+	if _, _, err := s.AddBugMessage(ctx, r.ID, alice.ID, ModMsgStaff, "One more thing", nil); !errors.Is(err, ErrBugClosed) {
+		t.Errorf("staff reply on a resolved report: %v", err)
+	}
+	if got, _, _ := s.SetBugStatus(ctx, r.ID, alice.ID, BugOpen); got.Status != BugOpen {
+		t.Fatalf("reopened: %+v", got)
+	}
+	_, got, _ = s.AddBugMessage(ctx, r.ID, bob.ID, ModMsgMember, "Still happens", nil)
+	if got.Status != BugOpen || got.Awaiting != AwaitStaff {
+		t.Errorf("reply on a reopened report: %+v", got)
 	}
 	// a status change while waiting on the member leaves them the one to answer
-	_, _, _ = s.AddBugMessage(ctx, r.ID, alice.ID, ModMsgStaff, "Can you send a recording?")
+	_, _, _ = s.AddBugMessage(ctx, r.ID, alice.ID, ModMsgStaff, "Can you send a recording?", nil)
 	if got, _, _ := s.SetBugStatus(ctx, r.ID, alice.ID, BugInProgress); got.Awaiting != AwaitMember {
 		t.Errorf("status change took the question away: %+v", got)
 	}
 
 	msgs, err := s.BugMessages(ctx, r.ID, 0, 0)
-	if err != nil || len(msgs) != 6 {
+	if err != nil || len(msgs) != 7 {
 		t.Fatalf("thread: %d lines %v", len(msgs), err)
 	}
 	if err := s.MarkBugRead(ctx, r.ID, bob.ID, msgs[len(msgs)-1].ID); err != nil {
@@ -173,7 +182,7 @@ func TestBugThreadMovesTheReportAlong(t *testing.T) {
 		t.Errorf("last line %+v", last[r.ID])
 	}
 	news, err := s.BugNewsForUser(ctx, bob.ID, 0, 10)
-	if err != nil || len(news) != 4 {
+	if err != nil || len(news) != 5 {
 		t.Fatalf("news: %d %v", len(news), err)
 	}
 	for _, m := range news {
@@ -283,7 +292,7 @@ func TestDeletingAnAccountTakesItsBugReports(t *testing.T) {
 	f := bugFile(t, s, bob.ID)
 	r := newBug(t, s, bob, "Calls drop", f)
 	keep := newBug(t, s, carol, "Menu cut off")
-	if _, _, err := s.AddBugMessage(ctx, r.ID, carol.ID, ModMsgStaff, "Thanks"); err != nil {
+	if _, _, err := s.AddBugMessage(ctx, r.ID, carol.ID, ModMsgStaff, "Thanks", nil); err != nil {
 		t.Fatal(err)
 	}
 	var ctxJSON map[string]string

@@ -221,6 +221,9 @@ func (s *Server) handleTOTPSetup(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	if !s.requireCaptcha(w, r, "mfa_setup") {
+		return
+	}
 	if err := s.requirePassword(w, u, req.AuthKey, "Your password is wrong."); err != nil {
 		WriteError(w, err)
 		return
@@ -300,6 +303,10 @@ func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	// turning two-factor off is what a stolen session would want most
+	if !s.requireCaptcha(w, r, "mfa_disable") {
+		return
+	}
 	if err := s.requirePassword(w, u, req.AuthKey, "Your password is wrong."); err != nil {
 		WriteError(w, err)
 		return
@@ -318,6 +325,9 @@ func (s *Server) handleBackupCodes(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := ReadJSON(w, r, &req, 4<<10); err != nil {
 		WriteError(w, err)
+		return
+	}
+	if !s.requireCaptcha(w, r, "mfa_backup") {
 		return
 	}
 	if err := s.requirePassword(w, u, req.AuthKey, "Your password is wrong."); err != nil {

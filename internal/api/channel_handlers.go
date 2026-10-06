@@ -132,6 +132,15 @@ func (s *Server) handleDMCreate(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
+			// a first message to a stranger is what spam is made of
+			exists, err := s.Store.DMExists(ctx, me.ID, target.ID)
+			if err != nil {
+				WriteError(w, err)
+				return
+			}
+			if !exists && !s.requireCaptcha(w, r, "dm") {
+				return
+			}
 		}
 		// The other person is not shown the conversation yet: it reaches their
 		// sidebar with the first message or call (revealDM), not the moment

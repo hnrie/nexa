@@ -325,7 +325,7 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   profiles, deletion), `relationship_handlers`, `channel_handlers` (DMs, groups, icons, recipients,
   typing, attachments, pins), `group_handlers`, `subchat_handlers` (sub-conversations of a DM, with an
   optional password), `message_handlers` (history, send, edit, delete, bulk delete, ack, reactions),
-  `poll_handlers`, `key_handlers` (grants, needs, epochs), `server_handlers` (servers, channels,
+  `poll_handlers`, `key_handlers` (grants, needs, epochs, asking again), `server_handlers` (servers, channels,
   overwrites, roles, members, bans, invites, audit log), `member_admin` (member search, prune, bulk
   ban, server profiles, role icons), `threads` (threads and forum posts), `follows` (announcement
   follows and crossposts), `automod`, `discovery`, `server_tags`, `expression_handlers` (server
@@ -339,6 +339,12 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   `media_handlers`, `upload_handlers` (resumable uploads), `proxy_handlers` (the signed media proxy),
   `youtube_proxy`, `handoff` (moving sign-ins from a `MOVED_FROM` address), `unfurl_handlers`,
   `static` (the SPA).
+- Captchas (`captcha.go`, Cloudflare Turnstile, off until both keys are set): `requireCaptcha(w, r,
+  action)` guards what a script would abuse (sign-up, sign-in, recovery, friend requests, a first DM
+  to a stranger, creating and joining servers, joining notes and guest calls, bug reports, Discovery
+  and public sticker packs, Telegram imports) and every password check and username change. A
+  refusal names the action in `X-Captcha-Action`; the web's `api.captchaSolver` (`lib/captcha.ts`)
+  and the Android app solve it and send the request again, so a guarded call needs nothing of its own.
 - Webhooks are used with their token at `/api/webhooks/{wid}/{token}` and at the versioned paths
   Discord's libraries build (`/api/v1`, `/api/v6` to `/api/v10`), with `/slack` and `/github`
   variants, taking Discord's JSON.
@@ -397,9 +403,9 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   `realtime_usage`), integrations (`webhooks`, `discord_links`), notes (`notes`, `note_members`,
   `note_invites`, `note_links`, `note_files`, `note_versions`, `note_version_files`, `note_keys`,
   `note_updates`, `note_uploads`), Nexa and moderation (`mod_cases`, `mod_messages`,
-  `mod_message_files`, `mod_restrictions`, `mod_announcements`, `mod_log`, `nexa_reads`,
-  `bug_reports`, `bug_attachments`, `bug_messages`, `client_errors`), the instance
-  (`instance_settings`).
+  `mod_message_files`, `mod_restrictions`, `mod_announcements`, `mod_log`, `mod_reads`, `nexa_reads`,
+  `bug_reports`, `bug_attachments`, `bug_messages`, `bug_message_files`, `client_errors`), the
+  instance (`instance_settings`).
 - Channel types: `dm`, `group_dm`, `subchat`, `text`, `voice`, `category`, `announcement`, `forum`,
   `thread`, `private_thread`. A channel's `key_conv_id` names the conversation whose keys encrypt
   it: itself for DMs and private channels, the server otherwise.
@@ -457,6 +463,13 @@ someone without an account into one call. Frames are encrypted in the apps.
   (`mod_cases`) whose thread the member sees.
 - Bug reports (`/api/v1/bugs`), client crash reports (`/api/v1/client-errors`) and the admin's
   instance settings (registration mode and key, which override `chatd.env` until cleared).
+- Case threads and bug reports are conversations: either side writes and sends pictures and
+  recordings (private blobs of kind `case` and `bug`, `/media/cases/{id}` and `/media/bugs/{id}`).
+  A closed case, and a bug report staff set to resolved, won't fix or closed, takes nothing more
+  from anyone, staff included, until staff open it again. What each member of staff has read of
+  them is kept in `mod_reads` (`moderation_reads.go`): the panel's badges count the threads waiting
+  on the staff that hold something new to that person, `mod_unread` keeps their devices in step,
+  and `POST /moderation/read` is Mark as Read.
 - AutoMod: the server applies a server's rules to what it can read (names, profiles, thread and
   post titles); the members' apps apply the same rules to encrypted messages and report what they
   held (`POST /servers/{id}/automod/report`).
@@ -499,8 +512,10 @@ deliver: author, channel, mentions, reactions, sizes.
   server cannot weaken them. A recovery key shown once at registration can restore the identity.
 - Conversations have a root key per epoch, handed to each member as a sealed box to their identity
   key (`key_grants`). Channel keys derive from the root, so one grant covers every channel of a
-  server. When someone needs keys the server sends `keys_needed` and an online holder wraps them;
-  when membership shrinks it sends `key_rotation_needed` and an online holder makes a new epoch.
+  server. When someone needs keys the server sends `keys_needed` and an online holder wraps them,
+  for every epoch they lack, so someone who joins reads what was said before they came; a device
+  still waiting asks again with `POST /keys/request`. When membership shrinks it sends
+  `key_rotation_needed` and an online holder makes a new epoch.
   Invite links can carry the root key in the URL fragment (`#k=<epoch>.<key>`), which never reaches
   the server.
 - Messages are AES-256-GCM envelopes with the channel and author bound in. Attachments are chunked
@@ -550,7 +565,8 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   `typing`, `threads`, `voice`, `voiceLocal`, `expressions`, `notes`, `nexa`, `moderation`,
   `discord`, `desktop`, `ui` (modals), `tabs`, `selection`, `pick`, `uploads`, `unsaved`,
   `replyTargets`, `serverNav`, `slowmode`, `profilePopout`, `automodNotices`, `groupAddNotices`,
-  `keyAlerts`.
+  `keyAlerts`, `threadLast` (each thread's newest message, for the card under the message it hangs
+  from).
 - `lib/decrypt.ts` turns a message into what the stores keep (webhook messages pass through
   `lib/webhookMessage.ts` instead). `lib/keyring.ts` holds the roots in memory and caches channel keys.
 
@@ -575,8 +591,10 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   `rail`, `chat` (message list, message item, embeds, attachments, players, pins, member list),
   `composer` (the box, autocomplete, commands, and `format/`, the formatting editor), `modals`,
   `settings` (every Settings page), `server` (Server Settings pages), `voice`, `profile`, `pickers`
-  (emoji, GIFs, stickers), `notes`, `threads`, `forum`, `search`, `moderation` (staff panel), `nexa`,
-  `bugs`, `legal` (Terms gate), `invite`, `discovery`, `follows`, `friends`, `stickers`,
+  (emoji, GIFs, stickers), `notes`, `threads`, `forum`, `search`, `moderation` (staff panel), `nexa`
+  (the member's Nexa pages, and `ThreadChat`, which draws a case thread or a bug report as a
+  conversation with the chat's own rows, attachments and box, for both sides), `bugs`, `legal`
+  (Terms gate), `invite`, `discovery`, `follows`, `friends`, `stickers`,
   `servertag`, `activity`, `desktop`, `common` (shared controls: Modal, Popout, ContextMenu, Button,
   Toggle, Select, Avatar, Twemoji and more).
 - `pages/`: one per route. `styles/`: `tokens.css` (every theme token: colour, radius, shadow,

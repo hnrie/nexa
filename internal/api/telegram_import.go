@@ -59,6 +59,11 @@ func (s *Server) handleTelegramImport(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	// every import has this server fetch a whole set from Telegram, under a
+	// bot whose limits everyone here shares: a script must not run through them
+	if !s.requireCaptcha(w, r, "sticker_import") {
+		return
+	}
 	name, err := telegram.ParseSetName(req.URL)
 	if err != nil {
 		WriteError(w, E(http.StatusBadRequest, "invalid_pack_link", err.Error()))

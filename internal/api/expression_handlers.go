@@ -529,6 +529,10 @@ func (s *Server) handlePackPatch(w http.ResponseWriter, r *http.Request) {
 				WriteError(w, E(http.StatusForbidden, "discover_blocked", "Nexa took this pack out of Discover, so it can't be made public. It still works for you and everyone who installed it."))
 				return
 			}
+			// a public pack is listed for everyone to find: a captcha away, as Discovery is
+			if !s.requireCaptcha(w, r, "pack_publish") {
+				return
+			}
 		}
 		patch.Public = &pub
 	}

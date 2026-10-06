@@ -136,6 +136,19 @@ func (s *Store) StartDM(ctx context.Context, a, b ids.ID) (*Channel, bool, error
 	return s.createDM(ctx, a, b, true)
 }
 
+// DMExists reports whether a and b already have a conversation of their own.
+func (s *Store) DMExists(ctx context.Context, a, b ids.ID) (bool, error) {
+	var id int64
+	err := s.db.R.QueryRowContext(ctx, `SELECT c.id FROM channels c
+		JOIN dm_participants p1 ON p1.channel_id = c.id AND p1.user_id = ?
+		JOIN dm_participants p2 ON p2.channel_id = c.id AND p2.user_id = ?
+		WHERE c.type = 'dm' LIMIT 1`, int64(a), int64(b)).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 func (s *Store) createDM(ctx context.Context, a, b ids.ID, quiet bool) (*Channel, bool, error) {
 	c := &Channel{Type: "dm"}
 	var existing int64

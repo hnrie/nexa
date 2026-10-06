@@ -781,29 +781,38 @@ func (h *Hub) refreshUser(u *store.User) {
 	}
 }
 
-// KeysMaybeNeeded tells online holders of a conversation's latest key about
-// members who still lack a grant (api.Broadcaster).
+// KeysMaybeNeeded tells the online holders of each of a conversation's keys
+// about members who still lack it (api.Broadcaster). Every epoch, not only
+// the newest: someone who arrives after a key was replaced needs the older
+// ones to read what was said before them.
 func (h *Hub) KeysMaybeNeeded(convID ids.ID) {
 	ctx, cancel := background()
 	defer cancel()
-	epoch, ok, err := h.st.LatestEpoch(ctx, convID)
-	if err != nil || !ok {
+	epochs, err := h.st.Epochs(ctx, convID)
+	if err != nil || len(epochs) == 0 {
 		return
 	}
 	entitled, err := h.st.Entitled(ctx, convID)
 	if err != nil {
 		return
 	}
-	// the holders are read once, and serve both questions
-	holders, err := h.st.HoldersOf(ctx, convID, epoch)
-	if err != nil {
-		return
+	// newest first: what is being said now matters before what was said
+	for i := len(epochs) - 1; i >= 0; i-- {
+		epoch := epochs[i].Epoch
+		holders, err := h.st.HoldersOf(ctx, convID, epoch)
+		if err != nil {
+			return
+		}
+		lacking := store.Lacking(entitled, holders)
+		if len(lacking) == 0 {
+			continue
+		}
+		sharers, err := h.st.SharersOf(ctx, convID, epoch)
+		if err != nil {
+			return
+		}
+		h.EmitUsers(h.OnlineAmong(sharers), EvKeysNeeded, store.KeyNeed{ConvID: convID, Epoch: epoch, UserIDs: lacking})
 	}
-	lacking := store.Lacking(entitled, holders)
-	if len(lacking) == 0 {
-		return
-	}
-	h.EmitUsers(h.OnlineAmong(holders), EvKeysNeeded, store.KeyNeed{ConvID: convID, Epoch: epoch, UserIDs: lacking})
 }
 
 // PresenceOf computes a user's presence as others see it.

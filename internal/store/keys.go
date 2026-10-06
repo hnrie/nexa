@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"slices"
 	"strings"
 
 	"evilion.xyz/chat/internal/db"
@@ -246,23 +247,27 @@ type KeyNeed struct {
 	Rotate bool `json:"rotate,omitempty"`
 }
 
-// heldKey is a conversation whose latest key a user holds.
+// heldKey is one epoch of a conversation's key a user holds.
 type heldKey struct {
 	KeyEpoch
-	rotate bool
+	// latest is whether it is the conversation's newest epoch; rotate whether
+	// the conversation's key is waiting to be replaced.
+	latest, rotate bool
 }
 
-// heldLatest lists the conversations (and their latest epoch) that uid holds
-// a grant for at that latest epoch, and whether each still needs rotating. A
-// grant the user wrapped for themselves only counts on an epoch they created:
-// the server cannot tell a key from an invite link from junk, so such a
-// holder is not asked to share it.
-func (s *Store) heldLatest(ctx context.Context, uid ids.ID) ([]heldKey, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT g.conv_id, g.epoch, coalesce(f.needs_rotation, 0) FROM key_grants g
+// heldKeys lists every epoch of every conversation that uid holds a grant
+// for, whether each is the conversation's latest, and whether the
+// conversation still needs rotating. A grant the user wrapped for themselves
+// only counts on an epoch they created: the server cannot tell a key from an
+// invite link from junk, so such a holder is not asked to share it.
+func (s *Store) heldKeys(ctx context.Context, uid ids.ID) ([]heldKey, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT g.conv_id, g.epoch, coalesce(f.needs_rotation, 0),
+		CASE WHEN g.epoch = (SELECT max(m.epoch) FROM key_epochs m WHERE m.conv_id = g.conv_id) THEN 1 ELSE 0 END
+		FROM key_grants g
 		JOIN key_epochs e ON e.conv_id = g.conv_id AND e.epoch = g.epoch
 		LEFT JOIN key_flags f ON f.conv_id = g.conv_id
-		WHERE g.user_id = ? AND g.epoch = (SELECT max(m.epoch) FROM key_epochs m WHERE m.conv_id = g.conv_id)
-		AND (g.wrapped_by != g.user_id OR e.created_by = g.user_id)`, int64(uid))
+		WHERE g.user_id = ? AND (g.wrapped_by != g.user_id OR e.created_by = g.user_id)
+		ORDER BY g.conv_id, g.epoch`, int64(uid))
 	if err != nil {
 		return nil, err
 	}
@@ -270,32 +275,38 @@ func (s *Store) heldLatest(ctx context.Context, uid ids.ID) ([]heldKey, error) {
 	out := []heldKey{}
 	for rows.Next() {
 		var h heldKey
-		var rot int64
-		if err := rows.Scan(&h.ConvID, &h.Epoch, &rot); err != nil {
+		var rot, latest int64
+		if err := rows.Scan(&h.ConvID, &h.Epoch, &rot, &latest); err != nil {
 			return nil, err
 		}
-		h.rotate = rot == 1
+		h.rotate, h.latest = rot == 1, latest == 1
 		out = append(out, h)
 	}
 	return out, rows.Err()
 }
 
-// Needs computes, for every conversation uid holds the latest key of and is
-// still part of, which entitled users lack a grant and whether the key is
-// waiting to be rotated.
+// Needs computes, for every conversation uid holds keys of and is still part
+// of, which entitled users lack each epoch uid holds, and whether the key is
+// waiting to be rotated. Every epoch, not only the newest: someone who joined
+// after a key was replaced needs the older ones to read what was said before
+// they came, and everyone who joins a server reads its past.
 //
 // Every client asks on connect and after every keys_needed, and an account
 // can hold hundreds of conversations' keys, so the conversations, their
-// participants and the holders of their latest keys are each read in one
-// query for all of them rather than two or three queries apiece.
+// participants and the holders of their keys are each read in one query for
+// all of them rather than two or three queries apiece.
 func (s *Store) Needs(ctx context.Context, uid ids.ID) ([]KeyNeed, error) {
-	held, err := s.heldLatest(ctx, uid)
+	held, err := s.heldKeys(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
-	convs := make([]ids.ID, len(held))
-	for i, e := range held {
-		convs[i] = e.ConvID
+	seen := map[ids.ID]bool{}
+	convs := make([]ids.ID, 0, len(held))
+	for _, e := range held {
+		if !seen[e.ConvID] {
+			seen[e.ConvID] = true
+			convs = append(convs, e.ConvID)
+		}
 	}
 	kinds, err := s.convKinds(ctx, convs)
 	if err != nil {
@@ -311,43 +322,47 @@ func (s *Store) Needs(ctx context.Context, uid ids.ID) ([]KeyNeed, error) {
 	if err != nil {
 		return nil, err
 	}
-	holders, err := s.latestHolders(ctx, convs)
+	holders, err := s.epochHolders(ctx, convs)
 	if err != nil {
 		return nil, err
 	}
+	entitledOf := map[ids.ID][]ids.ID{}
+	gone := map[ids.ID]bool{}
 	out := []KeyNeed{}
 	for _, e := range held {
-		var entitled []ids.ID
-		k, isChannel := kinds[e.ConvID]
-		switch {
-		case isChannel && IsDMLike(k.typ):
-			entitled = participants[e.ConvID]
-		case isChannel && !k.server.IsZero():
-			entitled, err = s.channelViewers(ctx, k.server, e.ConvID)
-		default:
-			// a server's own conversation, or one the hook knows about
-			entitled, err = s.Entitled(ctx, e.ConvID)
-		}
-		if err != nil {
-			if errors.Is(err, ErrNotFound) {
-				continue
-			}
-			return nil, err
-		}
-		member := false
-		for _, id := range entitled {
-			if id == uid {
-				member = true
-				break
-			}
-		}
-		if !member {
-			// a key kept from a conversation the user has left is not theirs to share
+		if gone[e.ConvID] {
 			continue
 		}
-		lacking := Lacking(entitled, holders[e.ConvID])
-		if len(lacking) > 0 || e.rotate {
-			out = append(out, KeyNeed{ConvID: e.ConvID, Epoch: e.Epoch, UserIDs: lacking, Rotate: e.rotate})
+		entitled, ok := entitledOf[e.ConvID]
+		if !ok {
+			k, isChannel := kinds[e.ConvID]
+			switch {
+			case isChannel && IsDMLike(k.typ):
+				entitled = participants[e.ConvID]
+			case isChannel && !k.server.IsZero():
+				entitled, err = s.channelViewers(ctx, k.server, e.ConvID)
+			default:
+				// a server's own conversation, or one the hook knows about
+				entitled, err = s.Entitled(ctx, e.ConvID)
+			}
+			if err != nil {
+				if errors.Is(err, ErrNotFound) {
+					gone[e.ConvID] = true
+					continue
+				}
+				return nil, err
+			}
+			if !slices.Contains(entitled, uid) {
+				// a key kept from a conversation the user has left is not theirs to share
+				gone[e.ConvID] = true
+				continue
+			}
+			entitledOf[e.ConvID] = entitled
+		}
+		lacking := Lacking(entitled, holders[e.ConvID][e.Epoch])
+		rotate := e.latest && e.rotate
+		if len(lacking) > 0 || rotate {
+			out = append(out, KeyNeed{ConvID: e.ConvID, Epoch: e.Epoch, UserIDs: lacking, Rotate: rotate})
 		}
 	}
 	return out, nil
@@ -417,27 +432,39 @@ func (s *Store) participantsOf(ctx context.Context, convs []ids.ID) (map[ids.ID]
 	return out, err
 }
 
-// latestHolders lists, for each conversation, who holds a grant for its
-// latest epoch.
-func (s *Store) latestHolders(ctx context.Context, convs []ids.ID) (map[ids.ID][]ids.ID, error) {
-	out := map[ids.ID][]ids.ID{}
+// epochHolders lists, for each conversation and each of its epochs, who
+// holds a grant for it.
+func (s *Store) epochHolders(ctx context.Context, convs []ids.ID) (map[ids.ID]map[int][]ids.ID, error) {
+	out := map[ids.ID]map[int][]ids.ID{}
 	err := chunked(convs, func(part []ids.ID) error {
-		rows, err := s.db.R.QueryContext(ctx, `SELECT g.conv_id, g.user_id FROM key_grants g
-			WHERE g.conv_id IN (`+placeholders(len(part))+`) AND g.epoch = (SELECT max(e.epoch) FROM key_epochs e WHERE e.conv_id = g.conv_id)`, idArgs(part)...)
+		rows, err := s.db.R.QueryContext(ctx, `SELECT conv_id, epoch, user_id FROM key_grants WHERE conv_id IN (`+placeholders(len(part))+`)`, idArgs(part)...)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var conv, u ids.ID
-			if err := rows.Scan(&conv, &u); err != nil {
+			var epoch int
+			if err := rows.Scan(&conv, &epoch, &u); err != nil {
 				return err
 			}
-			out[conv] = append(out[conv], u)
+			if out[conv] == nil {
+				out[conv] = map[int][]ids.ID{}
+			}
+			out[conv][epoch] = append(out[conv][epoch], u)
 		}
 		return rows.Err()
 	})
 	return out, err
+}
+
+// SharersOf lists who may hand out a conversation epoch's key: whoever
+// another member granted it to, and the epoch's creator. A grant someone
+// wrapped for themselves (from an invite link) is not proof of the key, and
+// the server refuses to take grants from it.
+func (s *Store) SharersOf(ctx context.Context, conv ids.ID, epoch int) ([]ids.ID, error) {
+	return s.idList(ctx, `SELECT g.user_id FROM key_grants g JOIN key_epochs e ON e.conv_id = g.conv_id AND e.epoch = g.epoch
+		WHERE g.conv_id = ? AND g.epoch = ? AND (g.wrapped_by != g.user_id OR e.created_by = g.user_id)`, int64(conv), epoch)
 }
 
 // SetKeyFlags updates the per-conversation flags (nil leaves a flag alone).

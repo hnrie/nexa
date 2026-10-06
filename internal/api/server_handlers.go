@@ -406,6 +406,11 @@ func (s *Server) handleServerPatch(w http.ResponseWriter, r *http.Request) {
 	if !s.discoveryPatch(w, raw, &p, changes) {
 		return
 	}
+	// Discovery shows a server to everyone on Nexa: putting one there is a
+	// captcha away, so a script cannot fill it with servers made for spam
+	if p.Discoverable != nil && *p.Discoverable && !srv.Discoverable && !s.requireCaptcha(w, r, "discovery_list") {
+		return
+	}
 	if err := s.Store.UpdateServer(r.Context(), srv.ID, p); err != nil {
 		WriteError(w, err)
 		return

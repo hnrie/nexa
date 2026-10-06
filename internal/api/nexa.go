@@ -227,6 +227,9 @@ type staffSummary struct {
 	// Bugs counts the bug reports in each view of their tab (nil when they
 	// could not be read).
 	Bugs *store.BugCounts `json:"bugs,omitempty"`
+	// Unread is the threads waiting on the staff this person has not read,
+	// which the panel's badges count.
+	Unread store.ModUnread `json:"unread"`
 }
 
 func (s *Server) nexaState(ctx context.Context, u *store.User) (*nexaState, error) {
@@ -275,7 +278,7 @@ func (s *Server) nexaState(ctx context.Context, u *store.User) (*nexaState, erro
 		if err != nil {
 			return nil, err
 		}
-		st.Staff = &staffSummary{Counts: counts, OwnerID: st.OwnerID, Bugs: s.bugCountsFor(ctx)}
+		st.Staff = &staffSummary{Counts: counts, OwnerID: st.OwnerID, Bugs: s.bugCountsFor(ctx), Unread: s.modUnreadFor(ctx, u.ID)}
 	}
 	st.People = s.people(ctx, who...)
 	return st, nil

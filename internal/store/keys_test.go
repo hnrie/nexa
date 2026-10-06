@@ -66,13 +66,20 @@ func TestKeyEpochsGrantsNeeds(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.PutGrants(ctx, []KeyGrant{{ConvID: g.ID, Epoch: 1, UserID: a.ID, WrappedKey: []byte{4}, WrappedBy: a.ID}})
+	// after a rotation every epoch is still handed on: c came in after epoch
+	// 0 and needs it to read what was said before, and b and c both need 1
 	needs, _ = s.Needs(ctx, a.ID)
-	if len(needs) != 1 || needs[0].Epoch != 1 || len(needs[0].UserIDs) != 2 {
+	if len(needs) != 2 || needs[0].Epoch != 0 || len(needs[0].UserIDs) != 1 || needs[0].UserIDs[0] != c.ID || needs[1].Epoch != 1 || len(needs[1].UserIDs) != 2 {
 		t.Errorf("after rotation: %+v", needs)
 	}
+	// b holds only the old key, and can still hand that one to c
 	needs, _ = s.Needs(ctx, b.ID)
-	if len(needs) != 0 {
-		t.Error("b only holds epoch 0, which is not latest")
+	if len(needs) != 1 || needs[0].Epoch != 0 || len(needs[0].UserIDs) != 1 || needs[0].UserIDs[0] != c.ID {
+		t.Errorf("b's old key for c: %+v", needs)
+	}
+	s.PutGrants(ctx, []KeyGrant{{ConvID: g.ID, Epoch: 0, UserID: c.ID, WrappedKey: []byte{5}, WrappedBy: b.ID}})
+	if needs, _ = s.Needs(ctx, b.ID); len(needs) != 0 {
+		t.Errorf("c holds the old key now: %+v", needs)
 	}
 	mine, _ := s.GrantsForUser(ctx, a.ID)
 	if len(mine) != 2 {

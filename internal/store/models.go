@@ -377,13 +377,13 @@ type ServerPatch struct {
 // of their account's own. How they joined is kept from everyone but those who
 // may see the server's invites (MemberJoin).
 type Member struct {
-	ServerID     ids.ID   `json:"server_id"`
-	UserID       ids.ID   `json:"user_id"`
-	Nickname     string   `json:"nickname"`
-	AvatarID     *ids.ID  `json:"avatar_id"`
-	BannerID     *ids.ID  `json:"banner_id"`
-	Bio          string   `json:"bio"`
-	Pronouns     string   `json:"pronouns"`
+	ServerID ids.ID  `json:"server_id"`
+	UserID   ids.ID  `json:"user_id"`
+	Nickname string  `json:"nickname"`
+	AvatarID *ids.ID `json:"avatar_id"`
+	BannerID *ids.ID `json:"banner_id"`
+	Bio      string  `json:"bio"`
+	Pronouns string  `json:"pronouns"`
 	// AccentColor and AccentColor2 are the profile's theme in this server, as
 	// the account's own are (nil uses those).
 	AccentColor  *int     `json:"accent_color,omitempty"`
@@ -614,6 +614,10 @@ type ThreadSummary struct {
 	LastMessageID *ids.ID `json:"last_message_id"`
 	Archived      bool    `json:"archived"`
 	Locked        bool    `json:"locked"`
+	// LastMessage is the newest thing said in a public thread, sealed as it
+	// was sent, for the line under the message it hangs from: who said what,
+	// and when. A private thread's is left out, being its members' alone.
+	LastMessage *Message `json:"last_message,omitempty"`
 }
 
 // PollOutcome is how a person's poll went, as the line that closes it carries

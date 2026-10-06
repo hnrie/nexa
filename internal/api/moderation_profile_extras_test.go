@@ -118,3 +118,55 @@ func TestStaffClearTypingWidgetsAndTags(t *testing.T) {
 		t.Errorf("wore a tag that is gone: %d %v", res.StatusCode, body)
 	}
 }
+
+// A profile in one server is as public there as the account's own: staff can
+// clear its bio and pronouns, and taking the banner takes the servers' banners.
+func TestStaffClearServerProfiles(t *testing.T) {
+	srv, ts := newTestServer(t)
+	modTok, _ := register(t, ts, "owner")
+	tok, id := register(t, ts, "loud")
+	view := createServer(t, ts, tok, "Loud Club")
+	sid := view["id"].(string)
+	if res, body := do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/members/@me", tok, map[string]any{"bio": "something hateful here", "pronouns": "rude/words"}); res.StatusCode != 200 {
+		t.Fatalf("server profile: %d %v", res.StatusCode, body)
+	}
+	png := pngBytes(64, 32)
+	res, raw := rawPut(t, ts.URL+"/api/v1/servers/"+sid+"/members/@me/banner", tok, "image/png", png)
+	if res.StatusCode >= 300 {
+		t.Fatalf("server banner: %d %s", res.StatusCode, raw)
+	}
+
+	// the account page names the server and what is set there
+	_, detail := do(t, ts, "GET", "/api/v1/moderation/users/"+id, modTok, nil)
+	var found map[string]any
+	for _, s := range detail["servers"].([]any) {
+		if s.(map[string]any)["server_id"] == sid {
+			found = s.(map[string]any)
+		}
+	}
+	if found == nil || found["bio"] != "something hateful here" || found["pronouns"] != "rude/words" || found["banner_id"] == nil {
+		t.Fatalf("the panel's servers: %v", detail["servers"])
+	}
+
+	c := mustAct(t, ts, modTok, id, map[string]any{"action": "field_reset", "reason": "hateful profile", "fields": []string{"server_profiles"}})
+	m, err := srv.Store.Member(context.Background(), modID(sid), modID(id))
+	if err != nil || m.Bio != "" || m.Pronouns != "" {
+		t.Fatalf("server profile left: %+v %v", m, err)
+	}
+	var details struct {
+		Old map[string]string `json:"old"`
+	}
+	rawCase, _ := json.Marshal(c["details"])
+	_ = json.Unmarshal(rawCase, &details)
+	if details.Old["server_profiles"] != "Loud Club: rude/words / something hateful here" {
+		t.Errorf("the case keeps: %q", details.Old)
+	}
+	if res, body := modAct(t, ts, modTok, id, map[string]any{"action": "field_reset", "reason": "again", "fields": []string{"server_profiles"}}); errCode(body) != "field_empty" {
+		t.Errorf("second reset: %d %v", res.StatusCode, body)
+	}
+	// their own banner is unset, but the server's is enough to take down
+	mustAct(t, ts, modTok, id, map[string]any{"action": "avatar_remove", "reason": "banner", "images": map[string]bool{"banner": true}})
+	if m, _ := srv.Store.Member(context.Background(), modID(sid), modID(id)); m.BannerID != nil {
+		t.Errorf("the server banner is still there: %v", m.BannerID)
+	}
+}

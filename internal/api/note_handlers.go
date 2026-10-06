@@ -867,6 +867,10 @@ func (s *Server) handleNoteLinkJoin(w http.ResponseWriter, r *http.Request) {
 	if me == nil {
 		return
 	}
+	// joining from a link, as joining a server from an invite is
+	if !s.requireCaptcha(w, r, "note_join") {
+		return
+	}
 	var req struct {
 		KeySealed string `json:"key_sealed"`
 	}

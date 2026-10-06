@@ -350,7 +350,8 @@ func (s *Store) DueThreads(ctx context.Context, now int64, limit int) ([]*Channe
 }
 
 // ThreadSummaries finds the threads started from any of msgs, keyed by the
-// message they started from.
+// message they hang from, and fills in each message's Thread, with the
+// newest message of a public thread.
 func (s *Store) ThreadSummaries(ctx context.Context, msgs []*Message) error {
 	byID := map[ids.ID]*Message{}
 	list := make([]ids.ID, 0, len(msgs))
@@ -361,9 +362,11 @@ func (s *Store) ThreadSummaries(ctx context.Context, msgs []*Message) error {
 		byID[m.ID] = m
 		list = append(list, m.ID)
 	}
+	public := []ids.ID{}
+	byThread := map[ids.ID]*ThreadSummary{}
 	for len(list) > 0 {
 		n := min(len(list), 500)
-		rows, err := s.db.R.QueryContext(ctx, `SELECT id, name, message_count, last_message_id, archived, thread_locked, starter_id FROM channels WHERE starter_id IN (`+placeholders(n)+`)`, idArgs(list[:n])...)
+		rows, err := s.db.R.QueryContext(ctx, `SELECT id, name, message_count, last_message_id, archived, thread_locked, starter_id, type FROM channels WHERE starter_id IN (`+placeholders(n)+`)`, idArgs(list[:n])...)
 		if err != nil {
 			return err
 		}
@@ -371,13 +374,18 @@ func (s *Store) ThreadSummaries(ctx context.Context, msgs []*Message) error {
 			var t ThreadSummary
 			var last sql.NullInt64
 			var archived, locked, starter int64
-			if err := rows.Scan(&t.ID, &t.Name, &t.Messages, &last, &archived, &locked, &starter); err != nil {
+			var typ string
+			if err := rows.Scan(&t.ID, &t.Name, &t.Messages, &last, &archived, &locked, &starter, &typ); err != nil {
 				rows.Close()
 				return err
 			}
 			t.LastMessageID, t.Archived, t.Locked = idPtr(last), archived == 1, locked == 1
 			if m := byID[ids.ID(starter)]; m != nil {
 				m.Thread = &t
+				if typ == ChannelThread {
+					public = append(public, t.ID)
+					byThread[t.ID] = &t
+				}
 			}
 		}
 		rows.Close()
@@ -385,6 +393,37 @@ func (s *Store) ThreadSummaries(ctx context.Context, msgs []*Message) error {
 			return err
 		}
 		list = list[n:]
+	}
+	if len(public) == 0 {
+		return nil
+	}
+	// what people said, not the lines the server writes about the thread
+	var lasts []*Message
+	err := chunked(public, func(part []ids.ID) error {
+		rows, err := s.db.R.QueryContext(ctx, `SELECT `+messageCols+` FROM messages WHERE id IN (SELECT max(id) FROM messages WHERE channel_id IN (`+placeholders(len(part))+`) AND type IN ('default', 'reply') GROUP BY channel_id)`, idArgs(part)...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			m, err := scanMessage(rows)
+			if err != nil {
+				return err
+			}
+			lasts = append(lasts, m)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return err
+	}
+	if err := s.hydrate(ctx, lasts, 0); err != nil {
+		return err
+	}
+	for _, m := range lasts {
+		if t := byThread[m.ChannelID]; t != nil {
+			t.LastMessage = m
+		}
 	}
 	return nil
 }

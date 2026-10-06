@@ -51,6 +51,16 @@ func ValidBugStatus(s string) bool {
 // reporter uploaded for a report and has not sent with one yet.
 var ErrBugAttachment = errors.New("bug attachment not available")
 
+// ErrBugClosed means a report's thread was written in after staff finished it
+// (resolved, won't fix or closed). Nobody writes in it until staff set it
+// back to open or in progress.
+var ErrBugClosed = errors.New("bug report closed")
+
+// BugFinished reports whether a status ends a report's conversation.
+func BugFinished(status string) bool {
+	return status == BugResolved || status == BugWontFix || status == BugClosed
+}
+
 // BugReport is one report, without its files and thread.
 type BugReport struct {
 	ID                  ids.ID          `json:"id"`
@@ -71,15 +81,17 @@ type BugReport struct {
 	CreatedAt           int64           `json:"created_at"`
 }
 
-// BugAttachment is one file sent with a report, with what its blob says about it.
+// BugAttachment is one file sent with a report, or with a line of its
+// thread, with what its blob says about it.
 type BugAttachment struct {
-	ReportID ids.ID `json:"-"`
-	BlobID   ids.ID `json:"id"`
-	Name     string `json:"name"`
-	Mime     string `json:"mime"`
-	Size     int64  `json:"size"`
-	Width    *int   `json:"width"`
-	Height   *int   `json:"height"`
+	ReportID  ids.ID `json:"-"`
+	MessageID ids.ID `json:"-"`
+	BlobID    ids.ID `json:"id"`
+	Name      string `json:"name"`
+	Mime      string `json:"mime"`
+	Size      int64  `json:"size"`
+	Width     *int   `json:"width"`
+	Height    *int   `json:"height"`
 }
 
 // BugMessage is one line of a report's thread.
@@ -91,6 +103,8 @@ type BugMessage struct {
 	Event     string `json:"event"`
 	Body      string `json:"body"`
 	CreatedAt int64  `json:"created_at"`
+	// Files are the pictures and recordings sent with the line.
+	Files []BugAttachment `json:"files,omitempty"`
 }
 
 // bugNews is the lines of a report's thread that are news to its reporter:
@@ -355,11 +369,14 @@ func (s *Store) BugAttachments(ctx context.Context, reportIDs []ids.ID) (map[ids
 }
 
 // BugFileOwner says whose a report file is, and whether it has been sent: the
-// reporter of the report it went with, or, before it is sent, whoever
-// uploaded it. Anything that is not a report file is not found.
+// reporter of the report it went with (in the report itself or a line of its
+// thread, whoever wrote that), or, before it is sent, whoever uploaded it.
+// Anything that is not a report file is not found.
 func (s *Store) BugFileOwner(ctx context.Context, blobID ids.ID) (owner ids.ID, sent bool, err error) {
 	var reporter sql.NullInt64
-	err = s.db.R.QueryRowContext(ctx, `SELECT r.user_id FROM bug_attachments a JOIN bug_reports r ON r.id = a.report_id WHERE a.blob_id = ?`, int64(blobID)).Scan(&reporter)
+	err = s.db.R.QueryRowContext(ctx, `SELECT r.user_id FROM bug_attachments a JOIN bug_reports r ON r.id = a.report_id WHERE a.blob_id = ?
+		UNION ALL SELECT r.user_id FROM bug_message_files f JOIN bug_reports r ON r.id = f.report_id WHERE f.blob_id = ?
+		LIMIT 1`, int64(blobID), int64(blobID)).Scan(&reporter)
 	if err == nil && reporter.Valid {
 		return ids.ID(reporter.Int64), true, nil
 	}
@@ -418,7 +435,86 @@ func (s *Store) BugMessages(ctx context.Context, reportID, after ids.ID, limit i
 	if limit <= 0 || limit > MaxBugMessages {
 		limit = MaxBugMessages
 	}
-	return s.queryBugMessages(ctx, `SELECT `+bugMsgCols+` FROM bug_messages WHERE report_id = ? AND id > ? ORDER BY id LIMIT ?`, int64(reportID), int64(after), limit)
+	out, err := s.queryBugMessages(ctx, `SELECT `+bugMsgCols+` FROM bug_messages WHERE report_id = ? AND id > ? ORDER BY id LIMIT ?`, int64(reportID), int64(after), limit)
+	if err != nil {
+		return nil, err
+	}
+	return out, s.withBugFiles(ctx, out)
+}
+
+// attachBugFilesTx takes the files a new line names: each must be a report
+// file its writer uploaded and has not sent before. Their details come from
+// the blobs themselves, never from what the writer said about them.
+func attachBugFilesTx(ctx context.Context, tx *db.Tx, m *BugMessage, files []BugAttachment) error {
+	if len(files) > MaxCaseFiles {
+		return ErrCaseFile
+	}
+	m.Files = nil
+	for i, f := range files {
+		res, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = ref_count + 1 WHERE id = ? AND kind = ? AND owner_id = ? AND ref_count = 0`,
+			int64(f.BlobID), BugBlobKind, int64(m.AuthorID))
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrCaseFile
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO bug_message_files (message_id, report_id, blob_id, position, name) VALUES (?,?,?,?,?)`,
+			int64(m.ID), int64(m.ReportID), int64(f.BlobID), i, f.Name); err != nil {
+			if db.IsUniqueViolation(err) {
+				return ErrCaseFile
+			}
+			return err
+		}
+		got := BugAttachment{ReportID: m.ReportID, MessageID: m.ID, BlobID: f.BlobID, Name: f.Name}
+		var w, h sql.NullInt64
+		if err := tx.QueryRowContext(ctx, `SELECT mime, size, width, height FROM blobs WHERE id = ?`, int64(f.BlobID)).Scan(&got.Mime, &got.Size, &w, &h); err != nil {
+			return err
+		}
+		got.Width, got.Height = intPtr(w), intPtr(h)
+		m.Files = append(m.Files, got)
+	}
+	return nil
+}
+
+// withBugFiles fills in the files of the lines given, which may come from
+// several reports.
+func (s *Store) withBugFiles(ctx context.Context, msgs []*BugMessage) error {
+	byID := make(map[ids.ID]*BugMessage, len(msgs))
+	list := make([]ids.ID, 0, len(msgs))
+	for _, m := range msgs {
+		if m == nil || m.Kind == ModMsgSystem {
+			continue
+		}
+		byID[m.ID] = m
+		list = append(list, m.ID)
+	}
+	for start := 0; start < len(list); start += 200 {
+		chunk := list[start:min(start+200, len(list))]
+		rows, err := s.db.R.QueryContext(ctx, `SELECT f.message_id, f.report_id, f.blob_id, f.name, b.mime, b.size, b.width, b.height
+			FROM bug_message_files f JOIN blobs b ON b.id = f.blob_id
+			WHERE f.message_id IN (`+placeholders(len(chunk))+`) ORDER BY f.message_id, f.position`, idArgs(chunk)...)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var f BugAttachment
+			var w, h sql.NullInt64
+			if err := rows.Scan(&f.MessageID, &f.ReportID, &f.BlobID, &f.Name, &f.Mime, &f.Size, &w, &h); err != nil {
+				rows.Close()
+				return err
+			}
+			f.Width, f.Height = intPtr(w), intPtr(h)
+			if m := byID[f.MessageID]; m != nil {
+				m.Files = append(m.Files, f)
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func insertBugMessageTx(ctx context.Context, tx *db.Tx, m *BugMessage) error {
@@ -433,12 +529,14 @@ func insertBugMessageTx(ctx context.Context, tx *db.Tx, m *BugMessage) error {
 	return err
 }
 
-// AddBugMessage writes one line to a report's thread and moves the report
-// along: whoever wrote is no longer the one being waited on. Unlike a
-// moderation case, a report the reporter writes in keeps its status (staff
-// decide whether it is fixed), but it waits on staff again, so the reply is
-// seen.
-func (s *Store) AddBugMessage(ctx context.Context, reportID, author ids.ID, kind, body string) (*BugMessage, *BugReport, error) {
+// AddBugMessage writes one line to a report's thread, with the files it
+// names, and moves the report along: whoever wrote is no longer the one being
+// waited on. Unlike a moderation case, a report the reporter writes in keeps
+// its status (staff decide whether it is fixed), but it waits on staff again,
+// so the reply is seen. A finished report (resolved, won't fix or closed) is
+// closed to everyone, staff included, until staff set it going again
+// (ErrBugClosed), as a closed case is.
+func (s *Store) AddBugMessage(ctx context.Context, reportID, author ids.ID, kind, body string, files []BugAttachment) (*BugMessage, *BugReport, error) {
 	var msg *BugMessage
 	var r *BugReport
 	err := s.Tx(ctx, func(tx *db.Tx) error {
@@ -450,6 +548,9 @@ func (s *Store) AddBugMessage(ctx context.Context, reportID, author ids.ID, kind
 		if err != nil {
 			return err
 		}
+		if BugFinished(cur.Status) {
+			return ErrBugClosed
+		}
 		now := nowMs()
 		awaiting := cur.Awaiting
 		switch kind {
@@ -460,6 +561,9 @@ func (s *Store) AddBugMessage(ctx context.Context, reportID, author ids.ID, kind
 		}
 		msg = &BugMessage{ReportID: reportID, AuthorID: author, Kind: kind, Body: body, CreatedAt: now}
 		if err := insertBugMessageTx(ctx, tx, msg); err != nil {
+			return err
+		}
+		if err := attachBugFilesTx(ctx, tx, msg, files); err != nil {
 			return err
 		}
 		readID := int64(cur.MemberReadID)
@@ -565,7 +669,12 @@ func (s *Store) LastBugMessages(ctx context.Context, reportIDs []ids.ID) (map[id
 			out[m.ReportID] = m
 		}
 	}
-	return out, nil
+	// a preview of a line that is only a picture says so
+	list := make([]*BugMessage, 0, len(out))
+	for _, m := range out {
+		list = append(list, m)
+	}
+	return out, s.withBugFiles(ctx, list)
 }
 
 // BugNewsForUser returns what the team said in the member's reports (their
@@ -583,7 +692,11 @@ func (s *Store) BugNewsForUser(ctx context.Context, uid ids.ID, before int64, li
 		args = append(args, before)
 	}
 	args = append(args, limit)
-	return s.queryBugMessages(ctx, q+` ORDER BY m.created_at DESC, m.id DESC LIMIT ?`, args...)
+	out, err := s.queryBugMessages(ctx, q+` ORDER BY m.created_at DESC, m.id DESC LIMIT ?`, args...)
+	if err != nil {
+		return nil, err
+	}
+	return out, s.withBugFiles(ctx, out)
 }
 
 // deleteUserBugReportsTx removes every report an account sent, with its
@@ -591,11 +704,14 @@ func (s *Store) BugNewsForUser(ctx context.Context, uid ids.ID, before int64, li
 // are the account's own words and pictures, and go with it like its crash
 // reports do.
 func deleteUserBugReportsTx(ctx context.Context, tx *db.Tx, uid int64) error {
-	if err := releaseBlobRefs(ctx, tx, `SELECT a.blob_id FROM bug_attachments a JOIN bug_reports r ON r.id = a.report_id WHERE r.user_id = ?`, uid); err != nil {
+	if err := releaseBlobRefs(ctx, tx, `SELECT a.blob_id FROM bug_attachments a JOIN bug_reports r ON r.id = a.report_id WHERE r.user_id = ?
+		UNION ALL SELECT f.blob_id FROM bug_message_files f JOIN bug_reports r ON r.id = f.report_id WHERE r.user_id = ?`, uid, uid); err != nil {
 		return err
 	}
 	for _, q := range []string{
 		`DELETE FROM bug_attachments WHERE report_id IN (SELECT id FROM bug_reports WHERE user_id = ?)`,
+		`DELETE FROM bug_message_files WHERE report_id IN (SELECT id FROM bug_reports WHERE user_id = ?)`,
+		`DELETE FROM mod_reads WHERE kind = 'bug' AND item_id IN (SELECT id FROM bug_reports WHERE user_id = ?)`,
 		`DELETE FROM bug_messages WHERE report_id IN (SELECT id FROM bug_reports WHERE user_id = ?)`,
 		`DELETE FROM bug_reports WHERE user_id = ?`,
 	} {

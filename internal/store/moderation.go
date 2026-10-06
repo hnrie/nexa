@@ -567,10 +567,10 @@ type ModImages struct {
 
 // ModRemoveImages takes an account's avatar and/or banner away and opens the
 // case for it, in one transaction. Taking the avatar takes the per-server
-// avatars too, which are the same picture in another place; the servers whose
-// member lists changed come back, so they can be told. The pictures'
-// references are let go, so the files go with the next sweep unless something
-// else still uses them.
+// avatars too, and the banner the per-server banners, which are the same kind
+// of picture in another place; the servers whose member lists changed come
+// back, so they can be told. The pictures' references are let go, so the
+// files go with the next sweep unless something else still uses them.
 func (s *Store) ModRemoveImages(ctx context.Context, c *ModCase, which ModImages, log *ModLogEntry) ([]ids.ID, error) {
 	var servers []ids.ID
 	err := s.Tx(ctx, func(tx *db.Tx) error {
@@ -585,16 +585,27 @@ func (s *Store) ModRemoveImages(ctx context.Context, c *ModCase, which ModImages
 			return err
 		}
 		servers = nil
-		if which.Avatar {
-			list, err := idsTx(ctx, tx, `SELECT server_id FROM server_members WHERE user_id = ? AND avatar_id IS NOT NULL`, int64(c.UserID))
+		changed := map[ids.ID]bool{}
+		// The per-server pictures are the same picture in another place: the
+		// avatar takes the servers' avatars, the banner the servers' banners.
+		for col, on := range map[string]bool{"avatar_id": which.Avatar, "banner_id": which.Banner} {
+			if !on {
+				continue
+			}
+			list, err := idsTx(ctx, tx, `SELECT server_id FROM server_members WHERE user_id = ? AND `+col+` IS NOT NULL`, int64(c.UserID))
 			if err != nil {
 				return err
 			}
-			servers = list
-			if err := releaseBlobRefs(ctx, tx, `SELECT avatar_id FROM server_members WHERE user_id = ? AND avatar_id IS NOT NULL`, int64(c.UserID)); err != nil {
+			for _, id := range list {
+				if !changed[id] {
+					changed[id] = true
+					servers = append(servers, id)
+				}
+			}
+			if err := releaseBlobRefs(ctx, tx, `SELECT `+col+` FROM server_members WHERE user_id = ? AND `+col+` IS NOT NULL`, int64(c.UserID)); err != nil {
 				return err
 			}
-			if _, err := tx.ExecContext(ctx, `UPDATE server_members SET avatar_id = NULL WHERE user_id = ?`, int64(c.UserID)); err != nil {
+			if _, err := tx.ExecContext(ctx, `UPDATE server_members SET `+col+` = NULL WHERE user_id = ? AND `+col+` IS NOT NULL`, int64(c.UserID)); err != nil {
 				return err
 			}
 		}
@@ -652,6 +663,9 @@ type ModFieldReset struct {
 	StatusText string
 	// Nicknames clears the nickname the account goes by in every server.
 	Nicknames bool
+	// ServerProfiles clears the bio, pronouns and widgets of the account's
+	// profile in every server, and lets the widgets' pictures go.
+	ServerProfiles bool
 	// TypingStyle puts the account's typing line back to the plain one.
 	TypingStyle bool
 	// Widgets takes every widget off the profile and lets their pictures go.
@@ -698,7 +712,7 @@ func (s *Store) ModResetFields(ctx context.Context, c *ModCase, f ModFieldReset,
 		set("tag_badge", "")
 		set("tag_color", nil)
 	}
-	if len(sets) == 0 && !f.Nicknames {
+	if len(sets) == 0 && !f.Nicknames && !f.ServerProfiles {
 		return errors.New("field reset: nothing to reset")
 	}
 	set("updated_at", nowMs())
@@ -735,6 +749,14 @@ func (s *Store) ModResetFields(ctx context.Context, c *ModCase, f ModFieldReset,
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrNotFound
+		}
+		if f.ServerProfiles {
+			if err := releaseWidgetRefs(ctx, tx, `SELECT widgets FROM server_members WHERE user_id = ? AND widgets IS NOT NULL`, int64(c.UserID)); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `UPDATE server_members SET bio = '', pronouns = '', widgets = NULL WHERE user_id = ? AND (bio <> '' OR pronouns <> '' OR widgets IS NOT NULL)`, int64(c.UserID)); err != nil {
+				return err
+			}
 		}
 		for id := range WidgetImages(widgets) {
 			if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - 1")+` WHERE id = ?`, int64(id)); err != nil {

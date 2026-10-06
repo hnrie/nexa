@@ -25,7 +25,7 @@ type modActionReq struct {
 		Banner bool `json:"banner"`
 	} `json:"images"`
 	// field_reset: username, display_name, about_me, pronouns, status,
-	// nicknames, typing_style, widgets, server_tag
+	// nicknames, server_profiles, typing_style, widgets, server_tag
 	Fields []string `json:"fields"`
 	// mute and ban: how long; a ban can be permanent instead
 	DurationMS int64 `json:"duration_ms"`
@@ -51,10 +51,11 @@ const (
 )
 
 // resetFields are the profile fields a field_reset can take back. Nicknames
-// are the names the account goes by in its servers, all of them at once; the
-// typing style, the widgets and the server tag worn are cleared rather than
-// overwritten, as a status is.
-var resetFields = []string{"username", "display_name", "about_me", "pronouns", "status", "nicknames", "typing_style", "widgets", "server_tag"}
+// are the names the account goes by in its servers, all of them at once, and
+// server profiles the bios, pronouns and widgets of its profiles there; those,
+// the typing style, the widgets and the server tag worn are cleared rather
+// than overwritten, as a status is.
+var resetFields = []string{"username", "display_name", "about_me", "pronouns", "status", "nicknames", "server_profiles", "typing_style", "widgets", "server_tag"}
 
 // readReason checks a moderator's reason, which the member reads.
 func readReason(w http.ResponseWriter, raw string) (string, bool) {
@@ -144,14 +145,28 @@ func (s *Server) actRemoveImages(w http.ResponseWriter, r *http.Request, target 
 	if req.Images != nil {
 		which = store.ModImages{Avatar: req.Images.Avatar, Banner: req.Images.Banner}
 	}
+	// a picture of theirs counts wherever it is shown: on their profile, or on
+	// their profile in one of their servers
+	serverAvatar, serverBanner := false, false
+	if which.Avatar || which.Banner {
+		all, err := s.Store.ModMemberships(ctx, target.ID)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		for _, m := range all {
+			serverAvatar = serverAvatar || m.AvatarID != nil
+			serverBanner = serverBanner || m.BannerID != nil
+		}
+	}
 	switch {
 	case !which.Avatar && !which.Banner:
 		WriteError(w, E(http.StatusBadRequest, "nothing_selected", "Choose the profile picture, the banner, or both."))
 		return
-	case which.Avatar && target.AvatarID == nil:
+	case which.Avatar && target.AvatarID == nil && !serverAvatar:
 		WriteError(w, E(http.StatusBadRequest, "no_avatar", "They have no profile picture to remove."))
 		return
-	case which.Banner && target.BannerID == nil:
+	case which.Banner && target.BannerID == nil && !serverBanner:
 		WriteError(w, E(http.StatusBadRequest, "no_banner", "They have no banner to remove."))
 		return
 	}
@@ -179,7 +194,7 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 	var fields []string
 	for _, f := range req.Fields {
 		if !OneOf(f, resetFields...) {
-			WriteError(w, E(http.StatusBadRequest, "unknown_field", "Only the username, display name, about me, pronouns, custom status, server nicknames, typing indicator, widgets and server tag can be reset."))
+			WriteError(w, E(http.StatusBadRequest, "unknown_field", "Only the username, display name, about me, pronouns, custom status, server nicknames, server profiles, typing indicator, widgets and server tag can be reset."))
 			return
 		}
 		if !chosen[f] {
@@ -191,17 +206,21 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 		WriteError(w, E(http.StatusBadRequest, "nothing_selected", "Choose at least one field to reset."))
 		return
 	}
-	// the servers they go by a nickname in, which a nickname reset clears
-	var nicknamed []store.ModMembership
-	if chosen["nicknames"] {
+	// the servers they go by a nickname in, which a nickname reset clears, and
+	// the ones they have a bio, pronouns or widgets of their own in
+	var nicknamed, profiled []store.ModMembership
+	if chosen["nicknames"] || chosen["server_profiles"] {
 		all, err := s.Store.ModMemberships(ctx, target.ID)
 		if err != nil {
 			WriteError(w, err)
 			return
 		}
 		for _, m := range all {
-			if m.Nickname != "" {
+			if m.Nickname != "" && chosen["nicknames"] {
 				nicknamed = append(nicknamed, m)
+			}
+			if m.HasProfile() && chosen["server_profiles"] {
+				profiled = append(profiled, m)
 			}
 		}
 	}
@@ -214,7 +233,7 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 		}
 		widgets = raw
 	}
-	empty := map[string]bool{"about_me": target.AboutMe == "", "pronouns": target.Pronouns == "", "status": target.StatusText == "" && target.StatusEmoji == "", "nicknames": len(nicknamed) == 0,
+	empty := map[string]bool{"about_me": target.AboutMe == "", "pronouns": target.Pronouns == "", "status": target.StatusText == "" && target.StatusEmoji == "", "nicknames": len(nicknamed) == 0, "server_profiles": len(profiled) == 0,
 		"typing_style": target.TypingStyle == "", "widgets": widgets == "", "server_tag": target.WornTag() == nil}
 	for _, f := range fields {
 		if empty[f] {
@@ -260,6 +279,24 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 					was = append(was, m.Name+": "+m.Nickname)
 				}
 				oldVals[field], newVals[field] = clipRunes(strings.Join(was, "\n"), maxKeptOldValue), ""
+			case "server_profiles":
+				// cleared, so each server shows the profile they have everywhere
+				f.ServerProfiles = true
+				var was []string
+				for _, m := range profiled {
+					var parts []string
+					if m.Pronouns != "" {
+						parts = append(parts, m.Pronouns)
+					}
+					if m.Bio != "" {
+						parts = append(parts, m.Bio)
+					}
+					if m.Widgets != "" {
+						parts = append(parts, widgetsText(m.Widgets))
+					}
+					was = append(was, m.Name+": "+strings.Join(parts, " / "))
+				}
+				oldVals[field], newVals[field] = clipRunes(strings.Join(was, "\n"), maxKeptOldValue), ""
 			case "typing_style":
 				f.TypingStyle = true
 				oldVals[field], newVals[field] = typingStyleText(target.TypingStyle), ""
@@ -286,7 +323,12 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 	if updated, err := s.Store.UserByID(ctx, target.ID); err == nil {
 		s.Bcast.UserUpdated(updated)
 	}
-	for _, m := range nicknamed {
+	told := map[ids.ID]bool{}
+	for _, m := range append(nicknamed, profiled...) {
+		if told[m.ServerID] {
+			continue
+		}
+		told[m.ServerID] = true
 		if mem, err := s.Store.Member(ctx, m.ServerID, target.ID); err == nil {
 			s.emitServer(ctx, m.ServerID, "member_update", mem)
 		}
@@ -381,4 +423,6 @@ func (s *Server) emitCaseStaff(ctx context.Context, c *store.ModCase, lines ...*
 	}
 	counts, _ := s.Store.CountModCases(ctx, time.Now().UnixMilli())
 	s.emitStaff(ctx, "mod_case", map[string]any{"case": toStaffCase(c, s.caseStateFor(ctx, c.UserID), last), "messages": lines, "people": s.people(ctx, who...), "counts": counts})
+	// what waits on the staff, and so what each of them has not read, may have changed
+	s.emitModUnreadAll(ctx)
 }

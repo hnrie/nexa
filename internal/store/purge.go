@@ -284,7 +284,8 @@ func (s *Store) idList(ctx context.Context, q string, args ...any) ([]ids.ID, er
 // PurgeUserLeftovers removes what the other steps do not reach: poll votes,
 // the invites and guest links it made, its unfinished uploads, its read
 // positions, recent stickers and installed packs, its per-server avatars
-// (whose pictures are let go), its Nexa read position, the crash reports its
+// (whose pictures are let go), its Nexa read position and, for staff, what it
+// read of the case threads and bug reports, the crash reports its
 // devices sent and the bug reports it wrote (whose files are let go), the
 // files of its sound packs, the
 // notes it owns (with their versions and files) and its place in the ones it
@@ -333,6 +334,7 @@ func (s *Store) PurgeUserLeftovers(ctx context.Context, uid ids.ID) error {
 			`DELETE FROM recent_stickers WHERE user_id = ?`,
 			`DELETE FROM sticker_installs WHERE user_id = ?`,
 			`DELETE FROM nexa_reads WHERE user_id = ?`,
+			`DELETE FROM mod_reads WHERE user_id = ?`,
 			`DELETE FROM client_errors WHERE user_id = ?`,
 			`DELETE FROM bans WHERE user_id = ?`,
 			`DELETE FROM channel_overwrites WHERE target_id = ? AND target_type = 'member'`,

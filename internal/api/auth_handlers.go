@@ -499,6 +499,10 @@ func (s *Server) handlePasswordChange(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	// a session someone else got hold of cannot guess its way to the password
+	if !s.requireCaptcha(w, r, "password") {
+		return
+	}
 	if err := s.requirePassword(w, u, req.AuthKey, "The current password is wrong."); err != nil {
 		WriteError(w, err)
 		return
@@ -531,6 +535,9 @@ func (s *Server) handleRecoveryReplace(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := ReadJSON(w, r, &req, 16<<10); err != nil {
 		WriteError(w, err)
+		return
+	}
+	if !s.requireCaptcha(w, r, "recovery_key") {
 		return
 	}
 	if err := s.requirePassword(w, u, req.AuthKey, "The current password is wrong."); err != nil {

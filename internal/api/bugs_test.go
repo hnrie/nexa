@@ -21,7 +21,13 @@ var fakeMP4 = append([]byte{0, 0, 0, 0x18, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm
 // bugUpload sends one file for a report and returns what the server said.
 func bugUpload(t *testing.T, ts *httptest.Server, tok, name, ctype string, body []byte) (int, map[string]any) {
 	t.Helper()
-	res, raw := rawPost(t, ts.URL+"/api/v1/bugs/attachments?name="+name, tok, ctype, body)
+	return bugUploadAt(t, ts, "/api/v1/bugs/attachments", tok, name, ctype, body)
+}
+
+// bugUploadAt sends one file to an upload route (the reporter's or the staff's).
+func bugUploadAt(t *testing.T, ts *httptest.Server, path, tok, name, ctype string, body []byte) (int, map[string]any) {
+	t.Helper()
+	res, raw := rawPost(t, ts.URL+path+"?name="+name, tok, ctype, body)
 	out := map[string]any{}
 	_ = json.Unmarshal(raw, &out)
 	return res.StatusCode, out
@@ -197,18 +203,68 @@ func TestBugReportsFromFormToThread(t *testing.T) {
 		t.Errorf("reporter event for a status: %v", ev)
 	}
 
-	// the reporter answers: it keeps its status and waits on staff again
-	res, out = do(t, ts, "POST", "/api/v1/bugs/"+id+"/messages", bobTok, map[string]any{"body": "Firefox, and it still happens"})
-	if res.StatusCode != 201 || out["report"].(map[string]any)["status"] != "resolved" || out["report"].(map[string]any)["awaiting"] != "staff" {
+	// a finished report is closed to everyone until staff set it going again
+	if res, out := do(t, ts, "POST", "/api/v1/bugs/"+id+"/messages", bobTok, map[string]any{"body": "Firefox, and it still happens"}); res.StatusCode != 409 || errCode(out) != "report_closed" {
+		t.Fatalf("reply on a resolved report: %d %v", res.StatusCode, out)
+	}
+	if res, out := do(t, ts, "POST", "/api/v1/moderation/bugs/"+id+"/messages", aliceTok, map[string]any{"body": "One more thing"}); res.StatusCode != 409 || errCode(out) != "report_closed" {
+		t.Fatalf("staff reply on a resolved report: %d %v", res.StatusCode, out)
+	}
+	if res, out := do(t, ts, "POST", "/api/v1/moderation/bugs/"+id+"/status", aliceTok, map[string]any{"status": "in_progress"}); res.StatusCode != 200 {
+		t.Fatalf("reopen: %d %v", res.StatusCode, out)
+	}
+	gb.next("nexa_bug", 3*time.Second)
+
+	// the reporter answers with a picture: it waits on staff again, and is new to them
+	pic := mustBugUpload(t, ts, bobTok, "again.png", "image/png", pngBytes(24, 24))
+	res, out = do(t, ts, "POST", "/api/v1/bugs/"+id+"/messages", bobTok, map[string]any{"body": "Firefox, and it still happens", "files": []map[string]any{{"id": pic, "name": "again.png"}}})
+	if res.StatusCode != 201 || out["report"].(map[string]any)["status"] != "in_progress" || out["report"].(map[string]any)["awaiting"] != "staff" {
 		t.Fatalf("reporter reply: %d %v", res.StatusCode, out)
+	}
+	if files := out["message"].(map[string]any)["files"].([]any); len(files) != 1 || files[0].(map[string]any)["mime"] != "image/png" {
+		t.Errorf("reply files: %v", out["message"])
 	}
 	if ev := ga.next("mod_bug", 3*time.Second); ev == nil {
 		t.Error("the staff did not hear the reply")
 	}
+	if ev := ga.nextWhere("mod_unread", 3*time.Second, func(d map[string]any) bool { return len(d["bugs"].([]any)) == 1 && d["bugs"].([]any)[0] == id }); ev == nil {
+		t.Error("the reply did not reach the staff's unread")
+	}
+	if code, _, _ := fetch(t, ts, "/media/bugs/"+pic, aliceTok); code != 200 {
+		t.Errorf("staff fetching the reply's picture: %d", code)
+	}
+	// staff answer with a picture of their own, through their own upload route
+	code, up := bugUploadAt(t, ts, "/api/v1/moderation/bugs/attachments", aliceTok, "fix.png", "image/png", pngBytes(16, 16))
+	if code != 201 {
+		t.Fatalf("staff upload: %d %v", code, up)
+	}
+	if code, _ := bugUploadAt(t, ts, "/api/v1/moderation/bugs/attachments", bobTok, "x.png", "image/png", pngBytes(8, 8)); code != 403 {
+		t.Errorf("a member used the staff upload: %d", code)
+	}
+	res, out = do(t, ts, "POST", "/api/v1/moderation/bugs/"+id+"/messages", aliceTok, map[string]any{"body": "", "files": []map[string]any{{"id": up["id"], "name": "fix.png"}}})
+	if res.StatusCode != 201 {
+		t.Fatalf("staff picture reply: %d %v", res.StatusCode, out)
+	}
+	if code, _, _ := fetch(t, ts, "/media/bugs/"+up["id"].(string), bobTok); code != 200 {
+		t.Errorf("reporter fetching the staff's picture: %d", code)
+	}
+	if code, _, _ := fetch(t, ts, "/media/bugs/"+up["id"].(string), carolTok); code != 404 {
+		t.Errorf("a stranger fetching a thread picture: %d", code)
+	}
+	if res, out := do(t, ts, "POST", "/api/v1/bugs/"+id+"/messages", bobTok, map[string]any{"body": "Thanks"}); res.StatusCode != 201 {
+		t.Fatalf("reporter thanks: %d %v", res.StatusCode, out)
+	}
+	// reading it takes it off the staff member's count, on every device
+	if res, out := do(t, ts, "POST", "/api/v1/moderation/bugs/"+id+"/read", aliceTok, nil); res.StatusCode != 200 || len(out["bugs"].([]any)) != 0 {
+		t.Errorf("staff read: %d %v", res.StatusCode, out)
+	}
+	if res, _ := do(t, ts, "POST", "/api/v1/moderation/bugs/"+id+"/read", bobTok, nil); res.StatusCode != 403 {
+		t.Errorf("a member reading as staff: %d", res.StatusCode)
+	}
 	res, thread := do(t, ts, "GET", "/api/v1/bugs/"+id, bobTok, nil)
 	msgs := thread["messages"].([]any)
-	if res.StatusCode != 200 || len(msgs) != 3 || thread["people"].(map[string]any)[bobID] == nil {
-		t.Fatalf("thread: %d %v", res.StatusCode, thread)
+	if res.StatusCode != 200 || len(msgs) != 6 || thread["people"].(map[string]any)[bobID] == nil {
+		t.Fatalf("thread: %d %d %v", res.StatusCode, len(msgs), thread)
 	}
 	last := msgs[len(msgs)-1].(map[string]any)["id"].(string)
 	if res, _ := do(t, ts, "POST", "/api/v1/bugs/"+id+"/read", bobTok, map[string]any{"message_id": last}); res.StatusCode != 204 {

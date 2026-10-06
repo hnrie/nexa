@@ -118,25 +118,37 @@ func (s *Store) CountServers(ctx context.Context) (int, error) {
 }
 
 // ModMembership is a server an account owns or has a profile of its own in
-// (a nickname or a picture): the parts of their profile people see there.
+// (a nickname, a picture, a banner, a bio, pronouns or widgets): the parts of
+// their profile people see there.
 type ModMembership struct {
-	ServerID    ids.ID  `json:"server_id"`
-	Name        string  `json:"name"`
-	IconID      *ids.ID `json:"icon_id"`
-	Owner       bool    `json:"owner"`
-	Nickname    string  `json:"nickname"`
-	AvatarID    *ids.ID `json:"avatar_id"`
-	MemberCount int     `json:"member_count"`
-	JoinedAt    int64   `json:"joined_at"`
+	ServerID ids.ID  `json:"server_id"`
+	Name     string  `json:"name"`
+	IconID   *ids.ID `json:"icon_id"`
+	Owner    bool    `json:"owner"`
+	Nickname string  `json:"nickname"`
+	AvatarID *ids.ID `json:"avatar_id"`
+	BannerID *ids.ID `json:"banner_id"`
+	Bio      string  `json:"bio"`
+	Pronouns string  `json:"pronouns"`
+	// Widgets is the widgets of their profile in this server, as kept.
+	Widgets     string `json:"widgets,omitempty"`
+	MemberCount int    `json:"member_count"`
+	JoinedAt    int64  `json:"joined_at"`
+}
+
+// HasProfile reports whether the membership carries words of its own that a
+// server_profiles reset clears: a bio, pronouns or widgets.
+func (m ModMembership) HasProfile() bool {
+	return m.Bio != "" || m.Pronouns != "" || m.Widgets != ""
 }
 
 // ModMemberships lists the servers an account owns or has a server profile in,
 // the ones it owns first.
 func (s *Store) ModMemberships(ctx context.Context, uid ids.ID) ([]ModMembership, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT s.id, s.name, s.icon_id, s.owner_id, m.nickname, m.avatar_id, m.joined_at,
+	rows, err := s.db.R.QueryContext(ctx, `SELECT s.id, s.name, s.icon_id, s.owner_id, m.nickname, m.avatar_id, m.banner_id, m.bio, m.pronouns, coalesce(m.widgets, ''), m.joined_at,
 		(SELECT count(*) FROM server_members x WHERE x.server_id = s.id)
 		FROM server_members m JOIN servers s ON s.id = m.server_id
-		WHERE m.user_id = ? AND (s.owner_id = ? OR m.nickname <> '' OR m.avatar_id IS NOT NULL)
+		WHERE m.user_id = ? AND (s.owner_id = ? OR m.nickname <> '' OR m.avatar_id IS NOT NULL OR m.banner_id IS NOT NULL OR m.bio <> '' OR m.pronouns <> '' OR (m.widgets IS NOT NULL AND m.widgets <> ''))
 		ORDER BY CASE WHEN s.owner_id = ? THEN 0 ELSE 1 END, m.joined_at, s.id LIMIT 200`, int64(uid), int64(uid), int64(uid))
 	if err != nil {
 		return nil, err
@@ -145,12 +157,15 @@ func (s *Store) ModMemberships(ctx context.Context, uid ids.ID) ([]ModMembership
 	out := []ModMembership{}
 	for rows.Next() {
 		var m ModMembership
-		var icon, avatar sql.NullInt64
+		var icon, avatar, banner sql.NullInt64
 		var owner int64
-		if err := rows.Scan(&m.ServerID, &m.Name, &icon, &owner, &m.Nickname, &avatar, &m.JoinedAt, &m.MemberCount); err != nil {
+		if err := rows.Scan(&m.ServerID, &m.Name, &icon, &owner, &m.Nickname, &avatar, &banner, &m.Bio, &m.Pronouns, &m.Widgets, &m.JoinedAt, &m.MemberCount); err != nil {
 			return nil, err
 		}
-		m.IconID, m.AvatarID, m.Owner = idPtr(icon), idPtr(avatar), ids.ID(owner) == uid
+		m.IconID, m.AvatarID, m.BannerID, m.Owner = idPtr(icon), idPtr(avatar), idPtr(banner), ids.ID(owner) == uid
+		if m.Widgets == "[]" {
+			m.Widgets = ""
+		}
 		out = append(out, m)
 	}
 	return out, rows.Err()

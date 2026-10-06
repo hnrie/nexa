@@ -21,6 +21,35 @@ func (s *Server) keyRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/keys/grants", s.authed(s.handleKeyGrantsPut))
 	mux.Handle("POST /api/v1/keys/epochs", s.authed(s.handleKeyEpochCreate))
 	mux.Handle("GET /api/v1/keys/epochs", s.authed(s.handleKeyEpochs))
+	mux.Handle("POST /api/v1/keys/request", s.authed(s.handleKeyRequest))
+}
+
+// handleKeyRequest is a device still waiting for a conversation's keys asking
+// for them again: the online members holding them are told who lacks them,
+// as they were when that person came in. The first ask can be missed (nobody
+// holding the key was online, or their app had not heard of the newcomer
+// yet), and nothing else asked again until a holder next connected.
+func (s *Server) handleKeyRequest(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	var req struct {
+		ConvID ids.ID `json:"conv_id"`
+	}
+	if err := ReadJSON(w, r, &req, 1<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	set, err := s.entitledSet(r, req.ConvID)
+	if err != nil || !set[me.ID] {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	if ok, retry := s.limKeyAsk.Allow("keyask:" + me.ID.String() + ":" + req.ConvID.String()); !ok {
+		w.Header().Set("Retry-After", retryAfter(retry))
+		WriteError(w, ErrRateLimited)
+		return
+	}
+	s.Bcast.KeysMaybeNeeded(req.ConvID)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleKeyGrants(w http.ResponseWriter, r *http.Request) {

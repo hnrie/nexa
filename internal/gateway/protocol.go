@@ -139,6 +139,9 @@ const (
 	// Bug reports, the same two ways: to the reporter through Nexa, and to staff.
 	EvNexaBug = "nexa_bug"
 	EvModBug  = "mod_bug"
+	// EvModUnread tells one member of staff which case threads and bug
+	// reports waiting on the staff they have not read (moderation_reads.go).
+	EvModUnread = "mod_unread"
 	// Nexa's note to someone a friend put in a group directly, and its
 	// dismissal on another of their devices. Only that person is sent either.
 	EvGroupAddNotice       = "group_add_notice"

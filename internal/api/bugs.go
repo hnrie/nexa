@@ -22,9 +22,12 @@ import (
 // read it, and the form says so.
 //
 // Files go up first, one request each (POST /bugs/attachments, the bytes as
-// the body, as the app sends avatars and emoji), and the report names them
-// when it is sent. They are private blobs: only the reporter and the staff
-// can fetch them, through /media/bugs/{id}.
+// the body, as the app sends avatars and emoji; staff use
+// /moderation/bugs/attachments), and the report or the line of its thread
+// that carries them names them when it is sent. They are private blobs: only
+// the reporter and the staff can fetch them, through /media/bugs/{id}. A
+// report staff finish (resolved, won't fix or closed) is closed to everyone
+// until they set it going again.
 
 // Who may file reports, and when. A muted account still can: a report goes to
 // the staff alone, never to anyone the mute protects, and the limits below
@@ -63,6 +66,7 @@ func (s *Server) bugRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/bugs/{id}/read", s.authed(s.handleBugRead))
 	mux.Handle("GET /media/bugs/{id}", s.authed(s.handleBugFile))
 
+	mux.Handle("POST /api/v1/moderation/bugs/attachments", s.admin(s.handleBugUpload))
 	mux.Handle("GET /api/v1/moderation/bugs", s.admin(s.handleModBugs))
 	mux.Handle("GET /api/v1/moderation/bugs/{id}", s.admin(s.handleModBug))
 	mux.Handle("POST /api/v1/moderation/bugs/{id}/messages", s.admin(s.handleModBugReply))
@@ -221,6 +225,8 @@ func (s *Server) emitBug(ctx context.Context, r *store.BugReport, lines ...*stor
 		counts, _ := s.Store.CountBugReports(ctx)
 		s.emitStaff(ctx, "mod_bug", map[string]any{"report": view, "messages": lines, "people": people, "counts": counts})
 	}
+	// what waits on the staff, and so what each of them has not read, may have changed
+	s.emitModUnreadAll(ctx)
 	u, err := s.Store.UserByID(ctx, r.UserID)
 	if err != nil || u.Flags&store.FlagDeleted != 0 {
 		return
@@ -384,6 +390,10 @@ func (s *Server) handleBugCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusRequestEntityTooLarge, "files_too_large", "The files come to more than 100 MB. Remove one and try again."))
 		return
 	}
+	// a report lands in front of the staff, so a script cannot send them a flood
+	if !s.requireCaptcha(w, r, "bug_report") {
+		return
+	}
 	// counted once the report is sound, so a few mistakes in the form do not
 	// use up someone's reports for the hour
 	if ok, retry := s.limBug.Allow("bug:" + me.ID.String()); !ok {
@@ -410,6 +420,26 @@ func (s *Server) handleBugCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 var errBugFileGone = E(http.StatusBadRequest, "attachment_gone", "One of the files is no longer there. Remove it, add it again, then send.")
+
+// bugFiles names the files of a line for a report's thread.
+func bugFiles(files []store.CaseFile) []store.BugAttachment {
+	out := make([]store.BugAttachment, 0, len(files))
+	for _, f := range files {
+		out = append(out, store.BugAttachment{BlobID: f.BlobID, Name: f.Name})
+	}
+	return out
+}
+
+// bugWriteError says why a line could not be written in a report's thread.
+func bugWriteError(err error) error {
+	switch {
+	case errors.Is(err, store.ErrBugClosed):
+		return E(http.StatusConflict, "report_closed", "This report is finished, so nobody can write in it.")
+	case errors.Is(err, store.ErrCaseFile):
+		return E(http.StatusBadRequest, "bad_file", "A file could not be sent with this. Add it again and send.")
+	}
+	return err
+}
 
 // handleBugsMine lists the caller's own reports, newest first.
 func (s *Server) handleBugsMine(w http.ResponseWriter, r *http.Request) {
@@ -487,13 +517,13 @@ func (s *Server) handleBugReply(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrRateLimited)
 		return
 	}
-	body, ok := readCaseMessage(w, r)
+	line, ok := readCaseLine(w, r)
 	if !ok {
 		return
 	}
-	msg, updated, err := s.Store.AddBugMessage(r.Context(), b.ID, me.ID, store.ModMsgMember, body)
+	msg, updated, err := s.Store.AddBugMessage(r.Context(), b.ID, me.ID, store.ModMsgMember, line.Body, bugFiles(line.Files))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, bugWriteError(err))
 		return
 	}
 	s.emitBug(r.Context(), updated, msg)
@@ -651,13 +681,13 @@ func (s *Server) handleModBugReply(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusGone, "reporter_deleted", "That account has been deleted, so nobody would read a reply."))
 		return
 	}
-	body, ok := readCaseMessage(w, r)
+	line, ok := readCaseLine(w, r)
 	if !ok {
 		return
 	}
-	msg, updated, err := s.Store.AddBugMessage(ctx, b.ID, me.ID, store.ModMsgStaff, body)
+	msg, updated, err := s.Store.AddBugMessage(ctx, b.ID, me.ID, store.ModMsgStaff, line.Body, bugFiles(line.Files))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, bugWriteError(err))
 		return
 	}
 	s.emitBug(ctx, updated, msg)
@@ -717,4 +747,3 @@ func (s *Server) bugCountsFor(ctx context.Context) *store.BugCounts {
 	}
 	return &c
 }
-

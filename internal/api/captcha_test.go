@@ -159,3 +159,98 @@ func TestCaptchaUnreachableIsNotAPass(t *testing.T) {
 		t.Errorf("unreachable verifier: %d %v", res.StatusCode, body)
 	}
 }
+
+// What a stolen session would be used for, and the abusable writes of a
+// signed-in account, each want a captcha made for them.
+func TestCaptchaGuardsAccountChanges(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice") // before captchas are on
+	_, bobID := register(t, ts, "bob")
+	srv.Cfg.TurnstileSiteKey = "site-key"
+	srv.Cfg.TurnstileSecretKey = "secret-key"
+	srv.Cfg.PublicURL = "https://chat.example"
+	defer turnstileStandIn(t, "secret-key")()
+
+	for _, c := range []struct {
+		name, method, path, action string
+		body                       any
+	}{
+		{"new username", "PATCH", "/api/v1/users/@me", "username", map[string]any{"username": "alice2"}},
+		{"new password", "POST", "/api/v1/auth/password", "password", map[string]any{"auth_key": b64(key32)}},
+		{"new recovery key", "POST", "/api/v1/auth/recovery", "recovery_key", map[string]any{"auth_key": b64(key32)}},
+		{"two-factor off", "POST", "/api/v1/auth/mfa/disable", "mfa_disable", map[string]any{"auth_key": b64(key32)}},
+		{"account deletion", "POST", "/api/v1/users/@me/delete", "delete_account", map[string]any{"auth_key": b64(key32)}},
+		{"first message to a stranger", "POST", "/api/v1/users/@me/channels", "dm", map[string]any{"recipient_ids": []string{bobID}}},
+		{"bug report", "POST", "/api/v1/bugs", "bug_report", bugBody("Broken thing")},
+	} {
+		if res, body := withCaptcha(t, ts, c.method, c.path, tokA, "", c.body); res.StatusCode != 403 || errCode(body) != "captcha_required" || res.Header.Get(CaptchaActionHeader) != c.action {
+			t.Errorf("%s without a token: %d %v, action %q", c.name, res.StatusCode, body, res.Header.Get(CaptchaActionHeader))
+		}
+		if res, body := withCaptcha(t, ts, c.method, c.path, tokA, "good-login", c.body); res.StatusCode != 403 || errCode(body) != "captcha_failed" {
+			t.Errorf("%s with another action's token: %d %v", c.name, res.StatusCode, body)
+		}
+	}
+	// the right token lets each through to its own checks
+	if res, body := withCaptcha(t, ts, "PATCH", "/api/v1/users/@me", tokA, "good-username", map[string]any{"username": "alice2"}); res.StatusCode != 200 {
+		t.Errorf("new username with a good token: %d %v", res.StatusCode, body)
+	}
+	if res, body := withCaptcha(t, ts, "POST", "/api/v1/users/@me/delete", tokA, "good-delete_account", map[string]any{"auth_key": b64(key32b)}); res.StatusCode != 401 || errCode(body) != "invalid_credentials" {
+		t.Errorf("deletion with a good token and a wrong password: %d %v", res.StatusCode, body)
+	}
+	res, dm := withCaptcha(t, ts, "POST", "/api/v1/users/@me/channels", tokA, "good-dm", map[string]any{"recipient_ids": []string{bobID}})
+	if res.StatusCode != 201 {
+		t.Fatalf("first message with a good token: %d %v", res.StatusCode, dm)
+	}
+	// an existing conversation, and a profile save that keeps the name, never ask
+	if res, body := do(t, ts, "POST", "/api/v1/users/@me/channels", tokA, map[string]any{"recipient_ids": []string{bobID}}); res.StatusCode >= 300 {
+		t.Errorf("opening the conversation again: %d %v", res.StatusCode, body)
+	}
+	if res, body := do(t, ts, "PATCH", "/api/v1/users/@me", tokA, map[string]any{"username": "alice2", "display_name": "Alice"}); res.StatusCode != 200 {
+		t.Errorf("a save that keeps the username: %d %v", res.StatusCode, body)
+	}
+}
+
+// Every other check of a password, and what puts something in front of
+// everyone on Nexa, ask for a captcha too; what was already public does not.
+func TestCaptchaGuardsPublishingAndPasswords(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice") // before captchas are on
+	view := createServer(t, ts, tokA, "Spam Club")
+	sid := view["id"].(string)
+	res, pack := do(t, ts, "POST", "/api/v1/stickers/packs", tokA, map[string]any{"name": "Pack"})
+	if res.StatusCode != 201 {
+		t.Fatalf("pack: %d %v", res.StatusCode, pack)
+	}
+	pid := pack["id"].(string)
+	srv.Cfg.TurnstileSiteKey = "site-key"
+	srv.Cfg.TurnstileSecretKey = "secret-key"
+	srv.Cfg.PublicURL = "https://chat.example"
+	defer turnstileStandIn(t, "secret-key")()
+
+	for _, c := range []struct {
+		name, method, path, action string
+		body                       any
+	}{
+		{"two-factor setup", "POST", "/api/v1/auth/mfa/totp/setup", "mfa_setup", map[string]any{"auth_key": b64(key32)}},
+		{"new backup codes", "POST", "/api/v1/auth/mfa/backup", "mfa_backup", map[string]any{"auth_key": b64(key32)}},
+		{"a server on Discovery", "PATCH", "/api/v1/servers/" + sid, "discovery_list", map[string]any{"discoverable": true}},
+		{"a public pack", "PATCH", "/api/v1/stickers/packs/" + pid, "pack_publish", map[string]any{"public": true}},
+	} {
+		if res, body := withCaptcha(t, ts, c.method, c.path, tokA, "", c.body); res.StatusCode != 403 || errCode(body) != "captcha_required" || res.Header.Get(CaptchaActionHeader) != c.action {
+			t.Errorf("%s without a token: %d %v, action %q", c.name, res.StatusCode, body, res.Header.Get(CaptchaActionHeader))
+		}
+	}
+	if res, body := withCaptcha(t, ts, "PATCH", "/api/v1/servers/"+sid, tokA, "good-discovery_list", map[string]any{"discoverable": true}); res.StatusCode != 200 {
+		t.Fatalf("listing with a good token: %d %v", res.StatusCode, body)
+	}
+	// already listed, the rest of its settings change without one
+	if res, body := do(t, ts, "PATCH", "/api/v1/servers/"+sid, tokA, map[string]any{"discoverable": true, "discovery_tags": []string{"games"}}); res.StatusCode != 200 {
+		t.Errorf("a listed server's settings: %d %v", res.StatusCode, body)
+	}
+	if res, body := withCaptcha(t, ts, "PATCH", "/api/v1/stickers/packs/"+pid, tokA, "good-pack_publish", map[string]any{"public": true}); res.StatusCode != 200 {
+		t.Fatalf("publishing with a good token: %d %v", res.StatusCode, body)
+	}
+	if res, body := do(t, ts, "PATCH", "/api/v1/stickers/packs/"+pid, tokA, map[string]any{"name": "Renamed"}); res.StatusCode != 200 {
+		t.Errorf("renaming a public pack: %d %v", res.StatusCode, body)
+	}
+}

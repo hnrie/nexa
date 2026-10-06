@@ -12,13 +12,25 @@ import (
 )
 
 // Captchas guard the actions a bot would abuse: creating accounts, guessing
-// passwords, recovering accounts, friend request spam, joining servers en
-// masse and creating them. They use Cloudflare Turnstile, which is free and
-// usually never shows a person anything; it only asks for a click when it is
-// unsure. Nothing asks for one until both keys are configured.
+// passwords, recovering accounts, friend request spam, a first message to a
+// stranger, joining servers en masse and creating them, joining notes from a
+// link and inviting people to them, guest calls, bug reports, putting a
+// server on Discovery or a sticker pack in front of everyone, and Telegram
+// imports, which spend a limit everyone shares. Every check of a password
+// asks for one (a new password or recovery key, two-factor set up, turned off
+// or given new backup codes, a locked subchat, deleting the account), and so
+// does a new username, so a stolen session cannot be scripted into either.
+// They use Cloudflare Turnstile, which is free and usually never shows a
+// person anything; it only asks for a click when it is unsure. Nothing asks
+// for one until both keys are configured. A refusal names the action in
+// X-Captcha-Action, and the apps solve it and send the request again.
 
 // CaptchaHeader carries the Turnstile token for the one request it was made for.
 const CaptchaHeader = "X-Captcha-Token"
+
+// CaptchaActionHeader names, on a request a captcha guards, the action a
+// token has to be solved for.
+const CaptchaActionHeader = "X-Captcha-Action"
 
 var captchaClient = &http.Client{Timeout: 8 * time.Second}
 
@@ -35,6 +47,9 @@ func (s *Server) requireCaptcha(w http.ResponseWriter, r *http.Request, action s
 	if !s.captchaEnabled() {
 		return true
 	}
+	// what to solve, for an app that sent the request without knowing it
+	// would be asked: it solves the captcha for that action and sends again
+	w.Header().Set(CaptchaActionHeader, action)
 	token := strings.TrimSpace(r.Header.Get(CaptchaHeader))
 	if token == "" || len(token) > 2048 {
 		WriteError(w, E(http.StatusForbidden, "captcha_required", "Please complete the captcha."))

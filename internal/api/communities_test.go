@@ -90,6 +90,18 @@ func TestThreadLifecycle(t *testing.T) {
 	if res, body := sendMsg(t, c.ts, c.tokA, tid, c.server, 0, "in the thread", "", nil); res.StatusCode != 201 {
 		t.Fatalf("send in thread: %d %v", res.StatusCode, body)
 	}
+	// and the message it hangs from carries what was said last, sealed, for the line under it
+	_, page = do(t, c.ts, "GET", "/api/v1/channels/"+c.general+"/messages", c.tokA, nil)
+	for _, m := range listOf(page, "_list") {
+		if m.(map[string]any)["id"] != c.message {
+			continue
+		}
+		sum := m.(map[string]any)["thread"].(map[string]any)
+		last, _ := sum["last_message"].(map[string]any)
+		if last == nil || last["channel_id"] != tid || last["author_id"] != c.idA || last["ciphertext"] == nil || sum["message_count"].(float64) != 1 {
+			t.Errorf("thread summary's last message: %v", sum)
+		}
+	}
 	_, list := do(t, c.ts, "GET", "/api/v1/channels/"+c.general+"/threads", c.tokA, nil)
 	threads := listOf(list, "threads")
 	if len(threads) != 1 || threads[0].(map[string]any)["joined"] != true || threads[0].(map[string]any)["thread"].(map[string]any)["message_count"].(float64) != 1 {

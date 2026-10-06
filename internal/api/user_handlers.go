@@ -98,6 +98,11 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 			bad("reserved_username", "That username belongs to the official Nexa account.")
 			return
 		}
+		// a new name is a captcha away, so nobody can cycle through names or
+		// snap up a stream of them with a script
+		if v != u.Username && !s.requireCaptcha(w, r, "username") {
+			return
+		}
 		p.Username = &v
 	}
 	if v, present, null := getString("display_name"); present {
@@ -268,6 +273,9 @@ func (s *Server) handleMeDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := ReadJSON(w, r, &req, 4<<10); err != nil {
 		WriteError(w, err)
+		return
+	}
+	if !s.requireCaptcha(w, r, "delete_account") {
 		return
 	}
 	if err := s.requirePassword(w, u, req.AuthKey, "The password is wrong."); err != nil {

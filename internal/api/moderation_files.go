@@ -153,25 +153,3 @@ func caseWriteError(err error) error {
 	}
 	return err
 }
-
-// readCaseMessage checks a line of words alone, for the threads that carry no
-// files of their own (a bug report's replies).
-func readCaseMessage(w http.ResponseWriter, r *http.Request) (string, bool) {
-	var req struct {
-		Body string `json:"body"`
-	}
-	if err := ReadJSON(w, r, &req, 32<<10); err != nil {
-		WriteError(w, err)
-		return "", false
-	}
-	body, ok := CleanText(req.Body, maxCaseMessage)
-	if !ok {
-		WriteError(w, E(http.StatusBadRequest, "too_long", "Messages here are at most 2000 characters."))
-		return "", false
-	}
-	if body == "" {
-		WriteError(w, E(http.StatusBadRequest, "empty_message", "Write something first."))
-		return "", false
-	}
-	return body, true
-}
