@@ -337,14 +337,15 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   `admin_handlers` (instance stats, users, runtime settings), `legal_handlers` (the admin's legal
   report), `desktop_handlers` and `android_handlers` (downloads and update manifests),
   `media_handlers`, `upload_handlers` (resumable uploads), `proxy_handlers` (the signed media proxy),
-  `youtube_proxy`, `handoff` (moving sign-ins from a `MOVED_FROM` address), `unfurl_handlers`,
+  `youtube_proxy`, `unfurl_handlers`,
   `static` (the SPA).
 - Captchas (`captcha.go`, Cloudflare Turnstile, off until both keys are set): `requireCaptcha(w, r,
   action)` guards what a script would abuse (sign-up, sign-in, recovery, friend requests, a first DM
   to a stranger, creating and joining servers, joining notes and guest calls, bug reports, Discovery
   and public sticker packs, Telegram imports) and every password check and username change. A
   refusal names the action in `X-Captcha-Action`; the web's `api.captchaSolver` (`lib/captcha.ts`)
-  and the Android app solve it and send the request again, so a guarded call needs nothing of its own.
+  and Android's `Api.captchaSolver` (set by `Auth.solveCaptcha`) solve it and send the request
+  again, so a guarded call needs nothing of its own.
 - Webhooks are used with their token at `/api/webhooks/{wid}/{token}` and at the versioned paths
   Discord's libraries build (`/api/v1`, `/api/v6` to `/api/v10`), with `/slack` and `/github`
   variants, taking Discord's JSON.

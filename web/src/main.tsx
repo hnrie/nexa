@@ -13,7 +13,7 @@ import { applyRememberedAppearance } from "./lib/theme";
 import { initSafeMode } from "./lib/look/safeMode";
 import { applyRememberedSheets } from "./lib/look/styles";
 import { ensureTwemojiIndex } from "./lib/twemoji";
-import { movedTo, moveTo, stayForOldDesktop, takeHandoff } from "./lib/move";
+import { movedTo, moveTo, stayForOldDesktop } from "./lib/move";
 import "./styles/base.css";
 
 function registerWorkers(): void {
@@ -76,13 +76,13 @@ function start(): void {
   );
 }
 
-// At an address Nexa moved away from, the app moves the browser on to the
-// new one, signed in, and draws nothing here (lib/move.ts). A desktop app from
-// before the move stays: it can open no other address until it updates.
+// At an address Nexa moved away from, the app sends the browser on to the
+// same page at the new one, where it signs in again, and draws nothing here
+// (lib/move.ts). A desktop app from before the move stays: it can open no
+// other address until it updates.
 const moving = movedTo();
 if (moving && !stayForOldDesktop()) {
-  void moveTo(moving);
+  moveTo(moving);
 } else {
-  // a page opened from the old address may carry its sign-in
-  void takeHandoff().finally(start);
+  start();
 }

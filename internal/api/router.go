@@ -122,9 +122,6 @@ type Server struct {
 	// limDiscover paces Discovery searches, each a query over every listed server
 	limDiscover *ratelimit.Limiter
 
-	// handoffs are sealed sign-ins on their way from a moved address to Nexa's own (handoff.go)
-	handoffs handoffStore
-
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
 	// Egress is the proxy that requests a person can point this server at go

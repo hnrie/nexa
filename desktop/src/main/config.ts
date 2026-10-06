@@ -27,21 +27,6 @@ export const BASE = baseUrl();
 export const ORIGIN = BASE.origin;
 export const START_URL = new URL("/channels/@me", BASE).toString();
 
-/**
- * Where Nexa was before nexa.fish. Copies of this app from before the move
- * signed in there, and a browser keeps a sign-in per address, so the first
- * time this one starts it opens the old address once: the page there seals
- * its sign-in and moves on to the new address with it (web/src/lib/move.ts),
- * and from then on the app opens the new one (window.ts). Only for the public
- * site; a development address has nothing to move.
- */
-export const MOVED_FROM: string[] = ORIGIN === "https://nexa.fish" ? ["https://chat.evilion.xyz"] : [];
-export const MOVE_URL: string | null = MOVED_FROM[0] ? new URL("/channels/@me", MOVED_FROM[0]).toString() : null;
-
-export function isMovedUrl(url: string | undefined | null): boolean {
-  return MOVED_FROM.includes(originOf(url));
-}
-
 /** The origin of any URL, or "" when it is not one. */
 export function originOf(url: string | undefined | null): string {
   if (!url) return "";

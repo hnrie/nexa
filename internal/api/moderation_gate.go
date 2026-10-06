@@ -24,8 +24,6 @@ var banAllowed = map[string]bool{
 	"GET /api/v1/auth/sessions":         true,
 	"DELETE /api/v1/auth/sessions/{id}": true,
 	"POST /api/v1/client-errors":        true,
-	// moving a sign-in to Nexa's new address, where the ban is shown just the same
-	"POST /api/v1/handoffs": true,
 }
 
 // muteAllowed is what a muted account can still change besides reading, which
@@ -36,7 +34,6 @@ var banAllowed = map[string]bool{
 // their handlers ask mutedFor for that part (see there).
 var muteAllowed = map[string]bool{
 	"POST /api/v1/auth/logout":                                          true,
-	"POST /api/v1/handoffs":                                             true,
 	"DELETE /api/v1/auth/sessions/{id}":                                 true,
 	"POST /api/v1/auth/password":                                        true,
 	"POST /api/v1/auth/recovery":                                        true,

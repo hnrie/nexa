@@ -24,8 +24,6 @@ export interface Stored {
   strings: NativeStrings | null;
   /** A copy outside Applications whose offer to move there was turned down (macOS), so it is not made again. */
   declinedMove: string | null;
-  /** Whether the sign-in at Nexa's old address has been carried over to the new one (or there was none to carry). */
-  addressMoved: boolean;
 }
 
 export const DEFAULTS: Stored = {
@@ -41,7 +39,6 @@ export const DEFAULTS: Stored = {
   lastUpdateSeen: null,
   strings: null,
   declinedMove: null,
-  addressMoved: false,
 };
 
 export class SettingsStore {

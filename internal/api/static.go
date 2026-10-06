@@ -207,10 +207,10 @@ func (s *Server) staticHandler() http.Handler {
 }
 
 // movedTag is what a page carries at an address Nexa moved away from: where
-// Nexa is now. The app moves the browser on, still signed in, before it draws
-// anything (web/src/lib/move.ts), except inside a desktop app from before the
-// move, which goes on working at the old address until it updates. Elsewhere
-// it is nothing.
+// Nexa is now. The app sends the browser on to the same page there before it
+// draws anything (web/src/lib/move.ts), where it signs in again, except inside
+// a desktop app from before the move, which goes on working at the old address
+// until it updates. Elsewhere it is nothing.
 func (s *Server) movedTag(r *http.Request) string {
 	if _, kind := s.requestAddress(r); kind != ourMoved {
 		return ""

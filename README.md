@@ -8,7 +8,8 @@ a long "about me", display names with plain unique usernames, and big uploads. I
 at `https://nexa.fish` (and `https://mathtest.lol`) through the Cloudflare tunnel that already
 fronts this box. `https://chat.evilion.xyz`, its address before, still answers: the desktop
 apps installed from there and old webhooks keep working, and a browser that opens it is
-moved on to nexa.fish, still signed in (`ALT_URLS`, `MOVED_FROM` in `chatd.env.example`).
+sent on to the same page at nexa.fish, where it signs in again (`ALT_URLS`, `MOVED_FROM` in
+`chatd.env.example`).
 
 ```
 chat/

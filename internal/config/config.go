@@ -26,8 +26,9 @@ type Config struct {
 	AltURLs []string
 	// MovedFrom are addresses Nexa used to be at (MOVED_FROM). They keep
 	// working for whatever still calls them, the installed desktop apps and
-	// webhooks among them, while a browser that opens one is moved on to
-	// PublicURL, still signed in (api/handoff.go).
+	// webhooks among them, while a browser that opens one is sent on to the
+	// same page at PublicURL, where it signs in again: a sign-in never moves
+	// between addresses.
 	MovedFrom []string
 	DataDir   string
 	WebDist   string
