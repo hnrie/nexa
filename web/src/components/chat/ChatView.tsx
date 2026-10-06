@@ -1,6 +1,6 @@
 import { AtSign, BellPlus, ChevronLeft, MessageCircle, MessageSquareText, MoreVertical, Phone, Pin, Search, UserPlus, UserRound, Users, Video, X } from "lucide-react";
 import { ThreadsPanel } from "@/components/threads/ThreadsPanel";
-import { ThreadActions, ThreadParentLink, ThreadStateBar } from "@/components/threads/ThreadBar";
+import { ThreadActions, ThreadParentLink, ThreadStateBar, useThreadMenu } from "@/components/threads/ThreadBar";
 import { isThread } from "@/stores/threads";
 import { holdsThreads } from "@/lib/threads";
 import { parse, plainText } from "@/markdown";
@@ -132,6 +132,8 @@ export function ChatView({ channel }: { channel: Channel }) {
   // threads start in text and announcement channels (a forum's posts are its threads)
   const threadsHere = !!channel.server_id && holdsThreads(channel) && channel.type !== "forum";
   const isServer = !!serverId && !!serverState;
+  // on a phone a thread's choices are at the top of the More menu (ThreadBar)
+  const threadMenu = useThreadMenu(isServer && thread ? channel : null, true);
   const inThisCall = useVoice((v) => v.mine?.channel_id === convo.id);
   const startCall = async (video: boolean) => {
     await joinVoice(convo.id);
@@ -320,7 +322,7 @@ export function ChatView({ channel }: { channel: Channel }) {
             onKeyDown={(e) => void searchKeys.current?.(e)}
           />
         )}
-        {isServer && thread ? <ThreadActions thread={channel} compact={mobile} /> : null}
+        {isServer && thread && !mobile ? <ThreadActions thread={channel} /> : null}
         {!mobile && threadsHere ? (
           <Tooltip text={tr_("threads.panel.title")} side="bottom">
             <button className={s.hBtn} data-on={threadsOpen} aria-label={tr_("threads.panel.title")} onClick={() => setThreadsOpen((v) => !v)} data-pop-toggle="threads" data-testid="threads-button"><MessageSquareText size={22} /></button>
@@ -365,7 +367,10 @@ export function ChatView({ channel }: { channel: Channel }) {
             data-testid="chat-more"
             onClick={(e) => {
               const anchor = menuAnchor(e.currentTarget);
+              // a thread's own choices come first: joining it, closing, locking, its settings
+              const own = threadMenu.items.map((it, i, all) => (i === all.length - 1 ? { ...it, separatorAfter: true } : it));
               const items: ContextMenuItem[] = [
+                ...own,
                 { id: "pins", label: tr_("chat.chat.pinnedMessages"), onSelect: () => setPins(true) },
                 ...(threadsHere ? [{ id: "threads", label: tr_("threads.panel.title"), onSelect: () => setThreadsOpen(true) }] : []),
                 ...(isServer && channel.type === "announcement" ? [{ id: "follow", label: tr_("follows.follow"), onSelect: () => openModal("follow", { channelId: channel.id }) }] : []),

@@ -7,6 +7,7 @@ import type { AuditEntry, AutomodEvent, MemberDetail } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { LoadError } from "@/components/common/LoadError";
+import { isTopLayer } from "@/components/common/Modal";
 import { Spinner } from "@/components/common/Spinner";
 import { useFocusTrap } from "@/components/common/useFocusTrap";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
@@ -35,6 +36,14 @@ export function joinMethodLabel(method: string | undefined): string {
     default:
       return t("members.method.unknown");
   }
+}
+
+/** A role's dot: its colour, or the gradient its name is drawn in. */
+export function roleDot(r: { color: number; color2?: number | null; color3?: number | null }): string {
+  if (!r.color) return "var(--text-muted)";
+  const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
+  if (r.color2 == null) return hex(r.color);
+  return `linear-gradient(135deg, ${[r.color, r.color2, ...(r.color3 != null ? [r.color3] : [])].map(hex).join(", ")})`;
 }
 
 /** A signal's words, and what to do about it. */
@@ -94,9 +103,11 @@ export function ModView({ serverId, userId, onClose, onChanged }: { serverId: st
     if (live) void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live?.timeout_until, live?.flags, live?.role_ids.join(",")]);
+  // Escape (and a phone's back, which goes through Escape) closes Mod View when
+  // it is on top: not the settings under it, nor it under a dialog it opened
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !document.querySelector("[role='dialog'][aria-modal='true']:not([data-modview])")) onClose();
+      if (e.key === "Escape" && isTopLayer(ref.current)) onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -125,7 +136,7 @@ export function ModView({ serverId, userId, onClose, onChanged }: { serverId: st
   return createPortal(
     <>
       <div className={s.scrim} onClick={onClose} aria-hidden="true" />
-      <div ref={ref} className={s.sheet} role="dialog" aria-modal="true" aria-label={t("members.mod.title", { name })} data-modview="" data-testid="mod-view">
+      <div ref={ref} className={s.sheet} role="dialog" aria-modal="true" aria-label={t("members.mod.title", { name })} data-modview="" data-modal-layer="" data-testid="mod-view">
         <div className={s.sheetHead}>
           <h2 className={s.sheetTitle}>{t("members.mod.heading")}</h2>
           <button type="button" className={s.sheetClose} onClick={onClose} aria-label={t("members.mod.close")}><X size={20} /></button>
@@ -181,7 +192,7 @@ export function ModView({ serverId, userId, onClose, onChanged }: { serverId: st
                     if (!r) return null;
                     return (
                       <span key={id} className={s.role}>
-                        <span className={s.dot} style={{ background: r.color ? `#${r.color.toString(16).padStart(6, "0")}` : "var(--text-muted)" }} />
+                        <span className={s.dot} style={{ background: roleDot(r) }} />
                         <span dir="auto">{r.name}</span>
                       </span>
                     );

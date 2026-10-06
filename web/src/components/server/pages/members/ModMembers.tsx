@@ -24,7 +24,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import { outranks } from "../../memberMenu";
-import { joinMethodLabel, ModView, SignalIcon, signalLabel } from "./ModView";
+import { joinMethodLabel, ModView, roleDot, SignalIcon, signalLabel } from "./ModView";
 import s from "./Members.module.css";
 
 const PAGE = 50;
@@ -56,7 +56,7 @@ function RoleChips({ serverId, ids }: { serverId: string; ids: string[] }) {
     <span className={s.roles}>
       {shown.slice(0, 3).map((r) => (
         <span key={r!.id} className={s.role}>
-          <span className={s.dot} style={{ background: r!.color ? `#${r!.color.toString(16).padStart(6, "0")}` : "var(--text-muted)" }} />
+          <span className={s.dot} style={{ background: roleDot(r!) }} />
           <span dir="auto">{r!.name}</span>
         </span>
       ))}
@@ -361,6 +361,7 @@ export function ModMembers({ serverId }: { serverId: string }) {
           <Button size="sm" variant="secondary" loading={loading} onClick={() => void load(rows.length)}>{t("members.more", { count: total - rows.length })}</Button>
         </div>
       ) : null}
+      {picked.size ? <div className={s.bulkSpace} aria-hidden="true" /> : null}
       {picked.size ? (
         <div className={s.bulk} role="region" aria-label={t("members.bulk.label")}>
           <span className={s.bulkText}>{t("members.bulk.picked", { count: picked.size })}</span>

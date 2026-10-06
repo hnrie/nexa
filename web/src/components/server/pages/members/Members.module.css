@@ -92,7 +92,12 @@
   .sheetHead { border-bottom: 0; padding-inline: 16px 10px; }
   .sheetTitle { font-size: 21px; font-weight: 700; }
   .sheetBody { padding: 4px 16px calc(16px + env(safe-area-inset-bottom)); gap: 18px; }
-  .bulk { bottom: 8px; }
+  /* what is picked floats at the bottom of the screen in one row, as in the phone app */
+  .bulk { position: fixed; z-index: 30; inset-inline: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); flex-wrap: nowrap; margin: 0; padding: 8px 8px 8px 16px; }
+  .bulkText { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bulkBtns { flex-wrap: nowrap; }
+  /* room under the last member for that bar */
+  .bulkSpace { height: 72px; }
 }
 @keyframes sheetUp { from { transform: translateY(40px); opacity: 0.4; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .sheet, [dir="rtl"] .sheet { animation: none; } }

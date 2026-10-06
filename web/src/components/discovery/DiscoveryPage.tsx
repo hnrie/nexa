@@ -131,7 +131,20 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
     }
   };
   return (
-    <Modal open onClose={onClose} ariaLabel={card.name} width={560}>
+    <Modal
+      open
+      onClose={onClose}
+      ariaLabel={card.name}
+      width={560}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>{t("discovery.close")}</Button>
+          <Button onClick={() => void join()} loading={busy} disabled={card.joins_paused && !card.member} data-testid="discovery-join">
+            {card.member ? t("discovery.open") : t("discovery.join")}
+          </Button>
+        </>
+      }
+    >
       <div className={s.sheetBand} style={band} />
       <div className={s.sheetHead}>
         <ServerIcon card={card} className={s.sheetIcon} />
@@ -163,12 +176,6 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
         ) : null}
         {owner ? <div className={s.facts}>{t("discovery.ownedBy", { name: owner.display_name })}</div> : null}
         {card.joins_paused && !card.member ? <div className={s.facts}>{t("discovery.pausedLong")}</div> : null}
-        <div className={s.sheetFoot}>
-          <Button variant="ghost" onClick={onClose}>{t("discovery.close")}</Button>
-          <Button onClick={() => void join()} loading={busy} disabled={card.joins_paused && !card.member} data-testid="discovery-join">
-            {card.member ? t("discovery.open") : t("discovery.join")}
-          </Button>
-        </div>
       </div>
     </Modal>
   );

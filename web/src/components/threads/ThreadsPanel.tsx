@@ -7,9 +7,11 @@ import { SearchBox } from "@/components/common/SearchBox";
 import { useLayerPresence } from "@/components/chat/useLayerPresence";
 import { t } from "@/i18n";
 import { idTime } from "@/lib/ids";
+import { memberName } from "@/lib/names";
 import { canStartThread } from "@/lib/threads";
 import { formatRelative } from "@/lib/time";
 import { useChannels } from "@/stores/channels";
+import { useServers } from "@/stores/servers";
 import { useThreads } from "@/stores/threads";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
@@ -24,13 +26,15 @@ function lastActive(th: Channel): number {
 function ThreadRow({ thread, onOpen }: { thread: Channel; onOpen: () => void }) {
   const count = thread.thread?.message_count ?? 0;
   const owner = useUsers((u) => (thread.owner_id ? u.byId[thread.owner_id] : undefined));
+  // their name in this server, as the chat shows it
+  const nickname = useServers((st) => (thread.server_id && thread.owner_id ? st.byId[thread.server_id]?.members[thread.owner_id]?.nickname : undefined));
   return (
     <button type="button" className={s.row} onClick={onOpen} data-testid="thread-row" data-thread={thread.id}>
       <span className={s.rowIcon} aria-hidden="true">{thread.type === "private_thread" ? <Lock size={18} /> : <MessageSquareText size={18} />}</span>
       <span className={s.rowMain}>
         <span className={s.rowName} dir="auto">{thread.name}</span>
         <span className={s.rowMeta}>
-          {owner ? <span dir="auto">{t("threads.panel.startedBy", { name: owner.display_name })}</span> : null}
+          {owner ? <span dir="auto">{t("threads.panel.startedBy", { name: memberName(nickname, owner) })}</span> : null}
           <span>{count === 0 ? t("threads.chip.noMessages") : t("threads.chip.messages", { count })}</span>
         </span>
       </span>
