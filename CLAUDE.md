@@ -597,8 +597,9 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   `replyTargets`, `serverNav`, `slowmode`, `profilePopout`, `automodNotices`, `groupAddNotices`,
   `keyAlerts`, `threadLast` (each thread's newest message, for the card under the message it hangs
   from), `voiceDrag` (someone being dragged to another voice channel). `typing` keeps who is typing
-  where, for the status dot's typing pill and the dots beside server channels, both of which the
-  account's settings can turn off (`typingAvatars`, `typingChannels`).
+  where, for the status dot's typing pill (the dot stretched sideways, never taller) and the dots
+  just after a server channel's name, both of which the account's settings can turn off
+  (`typingAvatars`, `typingChannels`).
 - `lib/decrypt.ts` turns a message into what the stores keep (webhook messages pass through
   `lib/webhookMessage.ts` instead). `lib/keyring.ts` holds the roots in memory and caches channel keys.
 

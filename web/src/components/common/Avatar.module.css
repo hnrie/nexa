@@ -9,60 +9,62 @@
   mask-image: radial-gradient(circle at calc(100% - var(--dot) / 2) calc(100% - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
 }
 /*
- * Where typing can show, the dot grows into a pill (--pill wide, --pill-h
- * high, a little taller than the dot so its dots read in a list) and the cut
- * grows with it: the picture minus a circle at each end of the pill and the
- * band between them, each as wide again as the ring round the dot (--ring).
- * Both are registered lengths so the pill and its cut move together; while
- * nobody types the pill is just the dot.
+ * Where typing can show, the dot stretches sideways into a pill (--pill wide)
+ * and the cut stretches with it: the picture minus a circle at each end of
+ * the pill and the band between them, each as wide again as the ring round
+ * the dot. The pill keeps the dot's height, so it takes no more of the
+ * picture's height than the dot does, and it is 2.2 dots wide: three dots of
+ * two fifths of its height, a fifth apart, with the ring's width of room all
+ * round. A quarter of what it grows goes out past the picture's edge (--over,
+ * 0.3 of a dot at full width), so less of the face is covered and the pill
+ * stays centred near where the dot was. --pill is a registered length so the
+ * pill and its cut move together; while nobody types it is just the dot.
  */
 @property --pill { syntax: "<length>"; inherits: true; initial-value: 0px; }
-@property --pill-h { syntax: "<length>"; inherits: true; initial-value: 0px; }
-.typable { --pill: var(--dot, 0px); --pill-h: var(--dot, 0px); transition: --pill 220ms var(--ease-out), --pill-h 220ms var(--ease-out); }
-.typable[data-typing="true"] { --pill: calc(var(--dot) * 2.6); --pill-h: calc(var(--dot) * 1.2); }
+.typable { --pill: var(--dot, 0px); --over: calc((var(--pill) - var(--dot, 0px)) / 4); transition: --pill 220ms var(--ease-out); }
+.typable[data-typing="true"] { --pill: calc(var(--dot) * 2.2); }
 .cutPill {
-  --pill-cut: calc(var(--pill-h) / 2 + var(--ring));
   -webkit-mask:
     linear-gradient(#000 0 0),
-    radial-gradient(circle at calc(100% - var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
-    radial-gradient(circle at calc(100% - var(--pill) + var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
-    linear-gradient(#000 0 0) right calc(var(--pill-h) / 2) bottom calc(0px - var(--ring)) / calc(var(--pill) - var(--pill-h)) calc(var(--pill-cut) * 2) no-repeat;
+    radial-gradient(circle at calc(100% - var(--dot) / 2 + var(--over)) calc(100% - var(--dot) / 2), #000 var(--cut), transparent calc(var(--cut) + 0.5px)),
+    radial-gradient(circle at calc(100% - var(--pill) + var(--dot) / 2 + var(--over)) calc(100% - var(--dot) / 2), #000 var(--cut), transparent calc(var(--cut) + 0.5px)),
+    linear-gradient(#000 0 0) right calc(var(--dot) / 2 - var(--over)) bottom calc(var(--dot) / 2 - var(--cut)) / calc(var(--pill) - var(--dot)) calc(var(--cut) * 2) no-repeat;
   -webkit-mask-composite: source-out, source-over, source-over;
   mask:
     linear-gradient(#000 0 0),
-    radial-gradient(circle at calc(100% - var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
-    radial-gradient(circle at calc(100% - var(--pill) + var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
-    linear-gradient(#000 0 0) right calc(var(--pill-h) / 2) bottom calc(0px - var(--ring)) / calc(var(--pill) - var(--pill-h)) calc(var(--pill-cut) * 2) no-repeat;
+    radial-gradient(circle at calc(100% - var(--dot) / 2 + var(--over)) calc(100% - var(--dot) / 2), #000 var(--cut), transparent calc(var(--cut) + 0.5px)),
+    radial-gradient(circle at calc(100% - var(--pill) + var(--dot) / 2 + var(--over)) calc(100% - var(--dot) / 2), #000 var(--cut), transparent calc(var(--cut) + 0.5px)),
+    linear-gradient(#000 0 0) right calc(var(--dot) / 2 - var(--over)) bottom calc(var(--dot) / 2 - var(--cut)) / calc(var(--pill) - var(--dot)) calc(var(--cut) * 2) no-repeat;
   mask-composite: subtract, add, add;
 }
 [dir="rtl"] .cutPill {
   -webkit-mask:
     linear-gradient(#000 0 0),
-    radial-gradient(circle at calc(var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
-    radial-gradient(circle at calc(var(--pill) - var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
-    linear-gradient(#000 0 0) left calc(var(--pill-h) / 2) bottom calc(0px - var(--ring)) / calc(var(--pill) - var(--pill-h)) calc(var(--pill-cut) * 2) no-repeat;
+    radial-gradient(circle at calc(var(--dot) / 2 - var(--over)) calc(100% - var(--dot) / 2), #000 var(--cut), transparent calc(var(--cut) + 0.5px)),
+    radial-gradient(circle at calc(var(--pill) - var(--dot) / 2 - var(--over)) calc(100% - var(--dot) / 2), #000 var(--cut), transparent calc(var(--cut) + 0.5px)),
+    linear-gradient(#000 0 0) left calc(var(--dot) / 2 - var(--over)) bottom calc(var(--dot) / 2 - var(--cut)) / calc(var(--pill) - var(--dot)) calc(var(--cut) * 2) no-repeat;
   -webkit-mask-composite: source-out, source-over, source-over;
   mask:
     linear-gradient(#000 0 0),
-    radial-gradient(circle at calc(var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
-    radial-gradient(circle at calc(var(--pill) - var(--pill-h) / 2) calc(100% - var(--pill-h) / 2), #000 var(--pill-cut), transparent calc(var(--pill-cut) + 0.5px)),
-    linear-gradient(#000 0 0) left calc(var(--pill-h) / 2) bottom calc(0px - var(--ring)) / calc(var(--pill) - var(--pill-h)) calc(var(--pill-cut) * 2) no-repeat;
+    radial-gradient(circle at calc(var(--dot) / 2 - var(--over)) calc(100% - var(--dot) / 2), #000 var(--cut), transparent calc(var(--cut) + 0.5px)),
+    radial-gradient(circle at calc(var(--pill) - var(--dot) / 2 - var(--over)) calc(100% - var(--dot) / 2), #000 var(--cut), transparent calc(var(--cut) + 0.5px)),
+    linear-gradient(#000 0 0) left calc(var(--dot) / 2 - var(--over)) bottom calc(var(--dot) / 2 - var(--cut)) / calc(var(--pill) - var(--dot)) calc(var(--cut) * 2) no-repeat;
   mask-composite: subtract, add, add;
 }
 /* a group's glyph, cut like a picture */
 .face { display: flex; width: 100%; height: 100%; border-radius: 50%; }
 /* the dot as a pill: the status's own colour, three dots taking turns inside it */
-.typable .status { width: var(--pill); height: var(--pill-h); border-radius: calc(var(--pill-h) / 2); }
+.typable .status { width: var(--pill); inset-inline-end: calc(0px - var(--over)); border-radius: calc(var(--dot) / 2); }
 .status[data-typing="true"] { display: flex; align-items: center; justify-content: center; -webkit-mask: none; mask: none; }
 .status.online[data-typing="true"] { background: var(--status-online); color: var(--on-positive); }
 .status.idle[data-typing="true"] { background: var(--status-idle); color: var(--on-warning); }
 .status.dnd[data-typing="true"] { background: var(--status-dnd); color: var(--on-danger); }
-/* dots near two fifths of the pill's height, so they read at a glance in a list */
-.typingDots { display: inline-flex; align-items: center; gap: max(1px, calc(var(--pill-h) * 0.18)); }
-.typingDots i { width: max(3px, calc(var(--pill-h) * 0.38)); height: max(3px, calc(var(--pill-h) * 0.38)); border-radius: 50%; background: currentColor; animation: pillDot 1.2s ease-in-out infinite; }
+/* dots two fifths of the pill's height, a fifth apart, so they read at a glance in a list */
+.typingDots { display: inline-flex; align-items: center; gap: max(1px, calc(var(--dot) * 0.2)); }
+.typingDots i { width: max(3px, calc(var(--dot) * 0.4)); height: max(3px, calc(var(--dot) * 0.4)); border-radius: 50%; background: currentColor; animation: pillDot 1.2s ease-in-out infinite; }
 .typingDots i:nth-child(2) { animation-delay: 0.16s; }
 .typingDots i:nth-child(3) { animation-delay: 0.32s; }
-@keyframes pillDot { 0%, 60%, 100% { opacity: 0.45; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1.1); } }
+@keyframes pillDot { 0%, 60%, 100% { opacity: 0.45; transform: scale(0.85); } 30% { opacity: 1; transform: scale(1.05); } }
 /* someone typing is news, so with less motion the dots still breathe, in place, and the pill does not grow */
 @keyframes pillDotCalm { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {

@@ -115,9 +115,8 @@ fun Avatar(
     val statusColor = status?.let { c.statusColor(it) }
     val pill = typing == true && showsTyping(status)
     val reduced = Nx.motion.reduced
-    // the pill's width and height, in dots: 1 is the plain dot; a little taller than the dot, so its dots read in a list
-    val grow by androidx.compose.animation.core.animateFloatAsState(if (pill) 2.6f else 1f, if (reduced) androidx.compose.animation.core.snap() else androidx.compose.animation.core.tween(220, easing = Nx.motion.easeOut), label = "typing")
-    val growH by androidx.compose.animation.core.animateFloatAsState(if (pill) 1.2f else 1f, if (reduced) androidx.compose.animation.core.snap() else androidx.compose.animation.core.tween(220, easing = Nx.motion.easeOut), label = "typingHeight")
+    // the pill's width, in dots (1 is the plain dot); it keeps the dot's height (Avatar.module.css .typable)
+    val grow by androidx.compose.animation.core.animateFloatAsState(if (pill) 2.2f else 1f, if (reduced) androidx.compose.animation.core.snap() else androidx.compose.animation.core.tween(220, easing = Nx.motion.easeOut), label = "typing")
     // the three dots take turns: a phase from 0 to 1, over and over, while the pill shows
     val phase = if (pill) {
         val turns = androidx.compose.animation.core.rememberInfiniteTransition(label = "typingDots")
@@ -128,15 +127,19 @@ fun Avatar(
         "dnd" -> c.onDanger
         else -> c.onPositive
     }
-    /** The rounded box the dot (or pill) takes, grown by `by` on every side. */
+    /**
+     * The rounded box the dot (or pill) takes, grown by `by` on every side. A
+     * quarter of what the pill grows goes out past the picture's edge
+     * (Avatar.module.css --over), so less of the face is covered.
+     */
     fun DrawScope.dotBox(by: Float, offset: Float = 0f): androidx.compose.ui.geometry.RoundRect {
         val d = dotDp * density.density
         val w = d * grow
-        val h = d * growH
-        val right = if (rtl) w + offset else this.size.width - offset
+        val over = (w - d) / 4
+        val right = if (rtl) w + offset - over else this.size.width - offset + over
         val bottom = this.size.height - offset
-        val r = h / 2 + by
-        return androidx.compose.ui.geometry.RoundRect(right - w - by, bottom - h - by, right + by, bottom + by, androidx.compose.ui.geometry.CornerRadius(r, r))
+        val r = d / 2 + by
+        return androidx.compose.ui.geometry.RoundRect(right - w - by, bottom - d - by, right + by, bottom + by, androidx.compose.ui.geometry.CornerRadius(r, r))
     }
     Box(
         modifier
@@ -155,42 +158,51 @@ fun Avatar(
                     else -> Modifier.ring(shape, c.positive, 2.dp)
                 },
             )
+            // the pill, over the picture's layer rather than in it: the layer ends at the
+            // picture's edge, and the pill reaches a little past it (a plain dot stays in
+            // the layer, where its idle and do-not-disturb shapes are cut out of it)
+            .drawWithContent {
+                drawContent()
+                // a pill, or the dot on its way to and from one
+                if (statusColor != null && typing != null && (pill || grow > 1.001f)) {
+                    val d = dotDp * density.density
+                    val box = dotBox(0f)
+                    drawRoundRect(statusColor, Offset(box.left, box.top), Size(box.width, box.height), androidx.compose.ui.geometry.CornerRadius(d / 2))
+                    if (pill) {
+                        val p = phase?.value ?: 0f
+                        // dots two fifths of the pill's height, a fifth apart, so they read at a glance in a list
+                        val dotR = max(1.5f, d * 0.2f)
+                        val gap = max(1f, d * 0.2f)
+                        val cy = box.top + box.height / 2
+                        val cx0 = box.left + box.width / 2 - (2 * dotR + gap)
+                        for (i in 0..2) {
+                            // each dot brightest a third of a turn after the one before it
+                            val local = ((p - i * 0.133f) % 1f + 1f) % 1f
+                            val beat = if (local < 0.3f) local / 0.3f else if (local < 0.6f) 1f - (local - 0.3f) / 0.3f else 0f
+                            val alpha = 0.45f + 0.55f * beat
+                            val scale = if (reduced) 1f else 0.85f + 0.2f * beat
+                            drawCircle(onStatus.copy(alpha = alpha), radius = dotR * scale, center = Offset(cx0 + i * (2 * dotR + gap), cy))
+                        }
+                    }
+                }
+            }
+            // the ring round the dot (or the pill) cut out of the picture, and a plain dot,
+            // in a layer of their own: both are cut with Clear
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawWithContent {
                 drawContent()
                 if (statusColor != null) {
                     val d = dotDp * density.density
                     val r = ringDp * density.density
+                    val center = Offset(if (rtl) d / 2 else this.size.width - d / 2, this.size.height - d / 2)
                     if (typing == null) {
-                        val center = Offset(if (rtl) d / 2 else this.size.width - d / 2, this.size.height - d / 2)
                         drawCircle(Color.Black, radius = d / 2 + r, center = center, blendMode = BlendMode.Clear)
                         drawPresence(status ?: "offline", statusColor, center, d)
                     } else {
                         // the cut grows with the pill, so the pill keeps the ring the dot has
                         val cut = dotBox(r)
                         drawRoundRect(Color.Black, Offset(cut.left, cut.top), Size(cut.width, cut.height), androidx.compose.ui.geometry.CornerRadius(cut.topLeftCornerRadius.x), blendMode = BlendMode.Clear)
-                        if (!pill && grow <= 1.001f && growH <= 1.001f) {
-                            drawPresence(status ?: "offline", statusColor, Offset(if (rtl) d / 2 else this.size.width - d / 2, this.size.height - d / 2), d)
-                        } else {
-                            val box = dotBox(0f)
-                            drawRoundRect(statusColor, Offset(box.left, box.top), Size(box.width, box.height), androidx.compose.ui.geometry.CornerRadius(box.height / 2))
-                            if (pill) {
-                                val p = phase?.value ?: 0f
-                                // dots near two fifths of the pill's height, so they read at a glance in a list
-                                val dotR = max(1.5f, box.height * 0.19f)
-                                val gap = max(1f, box.height * 0.18f)
-                                val cy = box.top + box.height / 2
-                                val cx0 = box.left + box.width / 2 - (2 * dotR + gap)
-                                for (i in 0..2) {
-                                    // each dot brightest a third of a turn after the one before it
-                                    val local = ((p - i * 0.133f) % 1f + 1f) % 1f
-                                    val beat = if (local < 0.3f) local / 0.3f else if (local < 0.6f) 1f - (local - 0.3f) / 0.3f else 0f
-                                    val alpha = 0.45f + 0.55f * beat
-                                    val scale = if (reduced) 1f else 0.8f + 0.3f * beat
-                                    drawCircle(onStatus.copy(alpha = alpha), radius = dotR * scale, center = Offset(cx0 + i * (2 * dotR + gap), cy))
-                                }
-                            }
-                        }
+                        if (!pill && grow <= 1.001f) drawPresence(status ?: "offline", statusColor, center, d)
                     }
                 }
             },

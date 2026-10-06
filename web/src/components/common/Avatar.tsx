@@ -54,7 +54,7 @@ export function Avatar({ id, avatarId, name, size = 32, status = null, className
   const dot = dotSize ?? geometry.dot;
   const ring = dotSize ? Math.max(2, Math.round(dotSize * 0.28)) : geometry.ring;
   // the dot sits in the corner and bites a ring out of the picture, so it reads on any background
-  const vars = status ? ({ "--dot": `${dot}px`, "--cut": `${dot / 2 + ring}px`, "--ring": `${ring}px` } as CSSProperties) : undefined;
+  const vars = status ? ({ "--dot": `${dot}px`, "--cut": `${dot / 2 + ring}px` } as CSSProperties) : undefined;
   // where typing can show, the cut is the one that grows into a pill with the dot (Avatar.module.css)
   const typable = typing !== undefined;
   const pill = !!typing && showsTyping(status);

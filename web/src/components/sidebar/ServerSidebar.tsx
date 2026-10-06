@@ -268,9 +268,9 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
           data-testid="sidebar-thread"
         >
           <span className={s.name} dir="auto">{th.name}</span>
+          <ChannelTyping channelId={th.id} serverId={serverId} />
           {mentions > 0 ? <span className="visually-hidden">{`, ${t("sidebar.serverSidebar.mentionsCount", { count: mentions })}`}</span> : unread && !selected ? <span className="visually-hidden">{`, ${t("sidebar.serverSidebar.unread")}`}</span> : null}
         </button>
-        <ChannelTyping channelId={th.id} serverId={serverId} />
         {mentions > 0 ? <span className={s.mention} aria-hidden="true">{mentions > 99 ? "99+" : mentions}</span> : null}
       </div>
     );
@@ -318,6 +318,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
         >
           <span className={s.icon}><ChannelGlyph channel={ch} size={20} locked={priv && ch.type !== "voice"} /></span>
           <span className={s.name}>{ch.name}</span>
+          <ChannelTyping channelId={ch.id} serverId={serverId} />
           {/* The dot and the count sit outside the button, so the button said
               nothing about either; they are said as part of its name now. */}
           {mentions > 0 ? <span className="visually-hidden">{`, ${t("sidebar.serverSidebar.mentionsCount", { count: mentions })}`}</span> : unread && !selected ? <span className="visually-hidden">{`, ${t("sidebar.serverSidebar.unread")}`}</span> : null}
@@ -335,7 +336,6 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
             </Tooltip>
           ) : null}
         </span>
-        <ChannelTyping channelId={ch.id} serverId={serverId} />
         {mentions > 0 ? <span className={s.mention} aria-hidden="true">{mentions > 99 ? "99+" : mentions}</span> : null}
       </div>
       {ch.type === "voice" ? <VoiceParticipants channelId={ch.id} serverId={serverId} /> : null}
@@ -397,7 +397,7 @@ export function typingSentence(names: string[]): string {
 }
 
 /**
- * Dots at the end of a channel's row while someone types in it, so a server
+ * Dots just after a channel's name while someone types in it, so a server
  * shows where people are talking before anything is sent. Each row listens to
  * its own channel only. Settings, Chat turns them off.
  */

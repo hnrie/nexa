@@ -293,19 +293,22 @@ private fun ChannelRow(serverId: String, ch: Channel, selected: Boolean, threads
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 ChannelGlyph(ch, 20.dp, if (selected) c.textBrand else c.textMuted, cut = if (selected) c.bgBase else c.bgBase)
-                Txt(
-                    ch.name,
-                    style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), fontWeight = FontWeight(550)),
-                    color = when {
-                        selected || unread -> c.textStrong
-                        pressed -> c.text
-                        else -> c.textChannel
-                    },
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f),
-                )
+                // the name and, just after it, whoever is typing there; counts stay at the end of the row
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Txt(
+                        ch.name,
+                        style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), fontWeight = FontWeight(550)),
+                        color = when {
+                            selected || unread -> c.textStrong
+                            pressed -> c.text
+                            else -> c.textChannel
+                        },
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    ChannelTyping(serverId, ch.id, lit = selected || unread)
+                }
                 if (ch.isVoice && ch.userLimit > 0) Txt("${people.size}/${ch.userLimit}", style = Nx.type.hint, color = c.textMuted)
-                ChannelTyping(serverId, ch.id, lit = selected || unread)
                 if (mentions > 0) CountBadge(mentions, Modifier.padding(start = 4.dp))
             }
         }
@@ -383,18 +386,20 @@ private fun ThreadRow(serverId: String, th: Channel, selected: Boolean, first: B
                 },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Txt(
-                th.name,
-                style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(500)),
-                color = when {
-                    selected || unread -> c.textStrong
-                    pressed -> c.text
-                    else -> c.textMuted
-                },
-                maxLines = 1,
-                modifier = Modifier.weight(1f),
-            )
-            ChannelTyping(serverId, th.id, lit = selected || unread)
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Txt(
+                    th.name,
+                    style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(500)),
+                    color = when {
+                        selected || unread -> c.textStrong
+                        pressed -> c.text
+                        else -> c.textMuted
+                    },
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                ChannelTyping(serverId, th.id, lit = selected || unread)
+            }
             if (mentions > 0) CountBadge(mentions, Modifier.padding(start = 4.dp))
         }
     }
@@ -409,7 +414,7 @@ private fun typingSentence(names: List<String>): String = when (names.size) {
 }
 
 /**
- * Dots at the end of a channel's row while someone types in it
+ * Dots just after a channel's name while someone types in it
  * (ServerSidebar.tsx ChannelTyping), so a server shows where people are
  * talking before anything is sent; brighter on a row that is lit. Settings,
  * Chat turns them off.
@@ -425,7 +430,8 @@ private fun ChannelTyping(serverId: String, channelId: String, lit: Boolean) {
     val turns = androidx.compose.animation.core.rememberInfiniteTransition(label = "channelTyping")
     val phase by turns.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.LinearEasing)), label = "phase")
     val color = if (lit) c.text else c.textMuted
-    androidx.compose.foundation.Canvas(Modifier.size(22.dp, 20.dp).semantics { contentDescription = label }) {
+    // exactly the dots' width, so the gap after the name is the row's own (ServerSidebar.module.css .typing)
+    androidx.compose.foundation.Canvas(Modifier.size(17.dp, 20.dp).semantics { contentDescription = label }) {
         val r = 2.dp.toPx()
         val gap = 2.5.dp.toPx()
         val x0 = (size.width - (6 * r + 2 * gap)) / 2 + r

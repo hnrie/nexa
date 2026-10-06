@@ -54,8 +54,8 @@
 .action { display: flex; padding: 2px; color: var(--text-muted); border-radius: var(--radius-xs); }
 .action:hover { color: var(--text-strong); }
 .mention { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--grad-danger); color: var(--on-danger); font-size: 12px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; margin-inline-start: 4px; flex: none; font-variant-numeric: tabular-nums; box-shadow: 0 2px 6px color-mix(in srgb, var(--danger) 40%, transparent); }
-/* someone typing in the channel: three dots taking turns at the end of its row, brighter on a row that is lit */
-.typing { flex: none; display: inline-flex; align-items: center; gap: 2.5px; height: 20px; padding-inline: 4px 2px; color: var(--text-muted); }
+/* someone typing in the channel: three dots taking turns just after its name, brighter on a row that is lit */
+.typing { flex: none; display: inline-flex; align-items: center; gap: 2.5px; height: 20px; margin-inline-start: -1px; color: var(--text-muted); }
 .row[data-selected="true"] .typing, .row[data-unread="true"] .typing { color: var(--text); }
 .typing i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: rowTyping 1.2s ease-in-out infinite; }
 .typing i:nth-child(2) { animation-delay: 0.16s; }
@@ -73,13 +73,13 @@
 @media (hover: hover) {
   .catHead:hover .catAdd { opacity: 1; }
   .row:hover .actions { display: flex; }
-  .row:hover .mention, .row:hover .typing { display: none; }
+  .row:hover .mention { display: none; }
 }
 @media (hover: none) { .catAdd { display: none; } }
 /* and from the keyboard: whatever a row or a category offers shows while focus
    is on it, so Tab can reach Invite, Edit and the category's "+" */
 .row:focus-within .actions { display: flex; }
-.row:focus-within .mention, .row:focus-within .typing { display: none; }
+.row:focus-within .mention { display: none; }
 .catHead:focus-within .catAdd { opacity: 1; }
 
 @media (pointer: coarse) {
