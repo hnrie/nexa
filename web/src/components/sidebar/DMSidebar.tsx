@@ -34,7 +34,8 @@ import { menuPoint } from "./ServerSidebar";
 import { NexaAvatar, OfficialBadge } from "@/components/nexa/NexaBits";
 import { useNexa } from "@/stores/nexa";
 import { useNotes } from "@/stores/notes";
-import { useModeration } from "@/stores/moderation";
+import { unreadCount, useModeration } from "@/stores/moderation";
+import { moderationMenuItems } from "@/components/moderation/modMenu";
 import { UserTag } from "@/components/servertag/UserTag";
 import s from "./Sidebar.module.css";
 
@@ -76,7 +77,8 @@ export function DMSidebar() {
   const nexaShown = !!nexa && nexa.latest > 0 && (nexaListed(nexa.latest, settings.nexaClosed) || nexaOpen);
   const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
   // cases the member wrote in last, and bug reports waiting for an answer
-  const needsReply = useModeration((m) => (m.counts?.needs_reply ?? 0) + (m.bugCounts?.waiting ?? 0));
+  // case threads and bug reports waiting on the staff that hold something this person has not read
+  const needsReply = useModeration((m) => unreadCount(m.unread));
   const active = loc.pathname.match(/^\/channels\/@me\/(\d+)/)?.[1];
   // A subchat keeps its conversation highlighted, with its siblings listed
   // underneath, so you can see where you are.
@@ -652,7 +654,16 @@ export function DMSidebar() {
           ) : null}
         </button>
         {isAdmin ? (
-          <button className={s.nav} data-selected={loc.pathname.startsWith("/channels/@admin")} onClick={() => go("/channels/@admin")} data-testid="nav-moderation">
+          <button
+            className={s.nav}
+            data-selected={loc.pathname.startsWith("/channels/@admin")}
+            onClick={() => go("/channels/@admin")}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              openContextMenu({ ...menuPoint(e), label: t("moderation.title"), items: moderationMenuItems() });
+            }}
+            data-testid="nav-moderation"
+          >
             <span className={s.navIcon}><Shield size={22} /></span>
             <span style={{ flex: 1, textAlign: "start" }}>{t("moderation.navLabel")}</span>
             {needsReply > 0 ? <span className={s.mention} aria-label={t("moderation.waitingCount", { count: needsReply })}>{badgeText(needsReply)}</span> : null}

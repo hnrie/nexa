@@ -4,7 +4,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { nexa as nexaApi } from "@/api/moderation";
-import { CaseThread, ClosedNote } from "@/components/nexa/CaseThread";
+import { LockNote, ThreadChat } from "@/components/nexa/ThreadChat";
+import { ThreadIntro } from "@/components/nexa/ThreadParts";
 import { NexaAvatar } from "@/components/nexa/NexaBits";
 import { NoticeCard } from "@/components/nexa/NoticeCard";
 import { caseStanding, noticeTitle } from "@/lib/moderation";
@@ -13,8 +14,8 @@ import { t } from "@/i18n";
 import s from "@/components/nexa/Nexa.module.css";
 
 /**
- * One case, as the member it is about sees it: the notice at the top, and the
- * thread with the moderation team below, where they can appeal or ask.
+ * One case, as the member it is about sees it: a conversation with the Nexa
+ * team that opens with the notice, where they can appeal or ask.
  */
 export default function NexaCasePage() {
   const { caseId = "" } = useParams();
@@ -43,7 +44,10 @@ export default function NexaCasePage() {
   }, [acknowledged, caseId]);
 
   const back = () => nav("/channels/@me/nexa");
-  const standing = thread ? caseStanding(thread.case) : null;
+  const c = thread?.case;
+  const standing = c ? caseStanding(c) : null;
+  // a deletion's case is read on the way out, and a closed one is closed until the team opens it again
+  const closed = !!c && (c.action === "delete" || c.status === "closed");
 
   return (
     <div className={s.page} data-testid="nexa-case-page">
@@ -53,8 +57,8 @@ export default function NexaCasePage() {
         </button>
         <NexaAvatar size={24} />
         <span className={s.headerText}>
-          <span className={s.headerName}>{thread ? t("nexa.notice.caseNumber", { number: thread.case.number }) : t("nexa.caseTitle")}</span>
-          {thread ? <span className={s.headerSub}>{noticeTitle(thread.case.action, thread.case.details)}</span> : null}
+          <span className={s.headerName}>{c ? t("nexa.notice.caseNumber", { number: c.number }) : t("nexa.caseTitle")}</span>
+          {c ? <span className={s.headerSub}>{noticeTitle(c.action, c.details)}</span> : null}
         </span>
         <span className={s.spacer} />
         {standing ? (
@@ -63,23 +67,32 @@ export default function NexaCasePage() {
           </span>
         ) : null}
       </header>
-      {thread ? (
-        <CaseThread
-          messages={thread.messages}
+      {thread && c ? (
+        <ThreadChat
+          lines={thread.messages}
           people={people}
           perspective="member"
-          action={thread.case.action}
-          header={<NoticeCard c={thread.case} people={people} perspective="member" />}
-          // a closed case is closed until the team opens it again: nothing can be written in it
-          onSend={thread.case.action === "delete" || thread.case.status === "closed" ? undefined : (body, files) => useNexa.getState().reply(caseId, body, files)}
-          upload={nexaApi.upload}
-          closedNote={thread.case.status === "closed" ? <ClosedNote text={t("nexa.thread.closedMember")} /> : undefined}
-          composerNote={
-            <>
-              <ShieldAlert size={14} aria-hidden="true" />
-              {t("nexa.thread.notEncrypted")}
-            </>
+          fileKind="cases"
+          action={c.action}
+          intro={
+            <ThreadIntro avatar={<NexaAvatar size={80} />} title={t("nexa.notice.caseNumber", { number: c.number })} sub={noticeTitle(c.action, c.details)}>
+              {t("nexa.chat.caseStart")}
+            </ThreadIntro>
           }
+          opener={{ from: "nexa", at: c.created_at, body: <NoticeCard c={c} people={people} perspective="member" /> }}
+          onSend={closed ? undefined : (body, files) => useNexa.getState().reply(caseId, body, files)}
+          upload={nexaApi.upload}
+          locked={c.status === "closed" ? <LockNote text={t("nexa.thread.closedMember")} /> : undefined}
+          note={
+            closed ? undefined : (
+              <>
+                <ShieldAlert size={14} aria-hidden="true" />
+                {t("nexa.chat.notE2E")}
+              </>
+            )
+          }
+          placeholder={t("nexa.thread.placeholder")}
+          dropName={t("nexa.notice.caseNumber", { number: c.number })}
           onSeen={() => useNexa.getState().markThreadRead(caseId)}
         />
       ) : failed ? (

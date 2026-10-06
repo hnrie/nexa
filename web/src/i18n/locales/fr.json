@@ -6266,6 +6266,7 @@
   "android.update.body": "Une nouvelle version de l'application Android est sortie. Mettre à jour la télécharge, puis Android vous demande de l'installer.",
   "android.update.failed": "Impossible de télécharger la nouvelle version. Réessayez dans un instant.",
   "bugs.context.appAndroid": "Application Android",
+  "bugs.staff.finishedLocked": "Ce signalement est marqué « {status} », personne ne peut donc y écrire. Rouvre-le pour répondre.",
   "whatsNew.r202610028.swipeBody": "Sur téléphone, faites glisser un message vers la gauche et relâchez quand la flèche s'allume pour y répondre.",
   "whatsNew.r202610028.swipeTitle": "Glisser pour répondre",
   "whatsNew.r20261004.statusEmojiTitle": "Emojis personnalisés dans ton statut",
@@ -6280,5 +6281,24 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Si Nexa y est déjà activé, la permission désigne encore une ancienne copie de l’application. Choisissez Réinitialiser la permission, puis réactivez Nexa.",
   "desktop.displayPicker.theOldPermissionIsCleared": "L’ancienne permission est effacée.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Activez Nexa dans Enregistrement de l’écran. macOS propose de rouvrir Nexa. Sinon, redémarrez-le ici.",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS n’a pas réinitialisé la permission. Retirez Nexa d’Enregistrement de l’écran avec le bouton moins, rajoutez-le et redémarrez."
+  "desktop.displayPicker.couldNotResetThePermission": "macOS n’a pas réinitialisé la permission. Retirez Nexa d’Enregistrement de l’écran avec le bouton moins, rajoutez-le et redémarrez.",
+  "moderation.chat.caseStart": "Voici la conversation avec {name} à propos de ce dossier. Ce que tu écris lui parvient au nom de Nexa, avec ton nom affiché, et rien ici n'est chiffré de bout en bout.",
+  "moderation.chat.reportStart": "Voici la conversation avec {name} à propos de son signalement. Ce que tu écris lui parvient au nom de Nexa, avec ton nom affiché, et rien ici n'est chiffré de bout en bout.",
+  "moderation.field.serverProfiles": "Profils sur les serveurs",
+  "moderation.form.bannerAlso": "Ses bannières par serveur partent aussi",
+  "moderation.form.inServersOnly": "Seulement sur ses serveurs",
+  "moderation.sheet.inServers": {
+    "one": "Sur {count} serveur",
+    "other": "Sur {count} serveurs"
+  },
+  "nexa.chat.caseStart": "Voici ta conversation avec l'équipe Nexa à propos de ce dossier. Les messages et fichiers ici ne sont pas chiffrés de bout en bout : l'équipe peut les voir.",
+  "nexa.chat.fileTooBig": "Les images peuvent faire jusqu'à 10 Mo et les enregistrements jusqu'à 50 Mo.",
+  "nexa.chat.notE2E": "Pas de chiffrement de bout en bout : l'équipe Nexa peut lire cette conversation.",
+  "nexa.chat.reportFinished": "Ce signalement est marqué « {status} », il n'est donc plus possible d'y écrire. Si ça se reproduit, envoie un nouveau signalement.",
+  "nexa.chat.reportStart": "Voici ta conversation avec l'équipe Nexa à propos de ce signalement. Les signalements de bug ne sont pas chiffrés de bout en bout : l'équipe peut les lire.",
+  "nexa.chat.uploading": "Envoi en cours, {percent} %",
+  "threads.card.count": {
+    "one": "{count} message",
+    "other": "{count} messages"
+  }
 }

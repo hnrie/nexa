@@ -5,6 +5,7 @@ import { ApiError } from "@/api/client";
 import { logoutHooks, useAuth } from "@/stores/auth";
 import { useKeys } from "@/stores/keys";
 import { useMessages } from "@/stores/messages";
+import { useThreadLast } from "@/stores/threadLast";
 import { useReplyTargets } from "@/stores/replyTargets";
 import { useNotes } from "@/stores/notes";
 import { useSettings } from "@/stores/settings";
@@ -200,6 +201,8 @@ function forgetReadable(): void {
   // loads the conversations again.
   useMessages.getState().clearAll();
   useReplyTargets.getState().clear();
+  // what each thread said last, opened for the cards under the messages they hang from
+  useThreadLast.getState().clear();
   // notes are opened with keys of their own, which go with the rest
   useNotes.getState().clear();
   clearMediaCache();

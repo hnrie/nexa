@@ -1,4 +1,4 @@
-import { ArrowLeftFromLine, ArrowRightToLine, ChartBar, Crown, MessageSquareText, Pin } from "lucide-react";
+import { ArrowLeftFromLine, ArrowRightToLine, ChartBar, Crown, MessageSquareText, Pin, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useChannels } from "@/stores/channels";
 import { AutomodAlert } from "./AutomodAlert";
@@ -10,6 +10,8 @@ import { openProfilePopout } from "@/stores/profilePopout";
 import { formatTimestamp } from "@/lib/time";
 import { pollVerdict, type PollVerdict } from "@/lib/poll";
 import { usePollOf } from "./usePollOf";
+import { Tooltip } from "@/components/common/Tooltip";
+import { canDelete, confirmDelete, deleteMessageNow } from "./messageMenu";
 import s from "./Chat.module.css";
 
 import { t, Tr } from "@/i18n";
@@ -99,13 +101,44 @@ function PlainSystemMessage({ msg }: { msg: DecryptedMessage }) {
     default:
       body = <Tr id="chat.systemMessage.didSomething" values={{ actor: A }} />;
   }
+  // Someone's own "joined the server" line is theirs to take down, and so is it
+  // for whoever may delete messages there, as with any message in the channel.
+  const removable = msg.type === "system_join" && canDelete(msg);
+  const remove = (shift: boolean) => (shift ? void deleteMessageNow(msg) : confirmDelete(msg));
   return (
-    <div className={s.system} data-id={msg.id}>
+    <div
+      className={s.system}
+      data-id={msg.id}
+      data-removable={removable || undefined}
+      tabIndex={removable ? -1 : undefined}
+      onContextMenu={
+        removable
+          ? (e) => {
+              e.preventDefault();
+              const r = e.currentTarget.getBoundingClientRect();
+              useUI.getState().openContextMenu({
+                x: e.clientX || r.left + 72,
+                y: e.clientY || r.top + 8,
+                items: [{ id: "delete", label: t("chat.messageMenu.deleteMessage"), danger: true, onSelect: () => remove(false) }],
+              });
+            }
+          : undefined
+      }
+    >
       <span className={s.sysIcon}>{icon}</span>
       <span>
         {body}
         <span className={s.time}>{formatTimestamp(msg.created_at)}</span>
       </span>
+      {removable ? (
+        <div className={s.toolbar} role="toolbar" aria-label={t("chat.messageItem.messageActions")}>
+          <Tooltip text={t("chat.messageMenu.deleteMessage")} side="top">
+            <button className={[s.tBtn, s.tDanger].join(" ")} aria-label={t("chat.messageMenu.deleteMessage")} onClick={(e) => remove(e.shiftKey)} data-testid="delete-join">
+              <Trash2 size={18} />
+            </button>
+          </Tooltip>
+        </div>
+      ) : null}
     </div>
   );
 }

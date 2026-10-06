@@ -191,6 +191,13 @@ export function useFormatBench(o: BenchOptions): Bench {
   const [tray, setTray] = useState<Tray | null>(null);
   const [simplified, setSimplified] = useState(false);
   const frame = useRef(0);
+  // While a selection is being dragged out with the pointer, what the caret
+  // is in does not change the tray: dragging from a list into the text under
+  // it took the list's tray away, which moved the text under the pointer,
+  // which moved the selection back into the list, and the tools flickered in
+  // and out for as long as the button was held. It settles when it is let go.
+  const [selecting, setSelecting] = useState(false);
+  const settled = useRef<"list" | "code" | "table" | "link" | null>(null);
 
   // the controller's callbacks read these, so they never go stale
   const latest = useRef(o);
@@ -230,9 +237,21 @@ export function useFormatBench(o: BenchOptions): Bench {
     ctl.current = c;
     setSimplified(c.load(o.initial));
     setMarkdown(c.markdown());
+    const down = (e: PointerEvent) => {
+      if (e.button === 0 && e.pointerType !== "touch") setSelecting(true);
+    };
+    const up = () => setSelecting(false);
+    el.addEventListener("pointerdown", down);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    window.addEventListener("blur", up);
     if (o.focus !== false) c.focus();
     return () => {
       if (frame.current) cancelAnimationFrame(frame.current);
+      el.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      window.removeEventListener("blur", up);
       c.destroy();
       ctl.current = null;
     };
@@ -273,7 +292,10 @@ export function useFormatBench(o: BenchOptions): Bench {
   const kind = state?.kind ?? "p";
 
   // what the tray under (or on a phone, above) the toolbar shows: what was asked for, or what the caret is in
-  const shown: Tray | "list" | "code" | "table" | null = tray ?? (inTable ? "table" : inCode ? "code" : state?.link ? "link" : state?.kind === "li" ? "list" : null);
+  // (as it was when a pointer started selecting, until it is let go)
+  const caretIn: "list" | "code" | "table" | "link" | null = inTable ? "table" : inCode ? "code" : state?.link ? "link" : state?.kind === "li" ? "list" : null;
+  if (!selecting) settled.current = caretIn;
+  const shown: Tray | "list" | "code" | "table" | null = tray ?? (selecting ? settled.current : caretIn);
 
   const flag = (f: Flag, icon: LucideIcon, label: string, keys?: string) => (
     <ToolButton key={f} icon={icon} label={label} keys={keys} pressed={!!marks[f]} disabled={inCode} onPress={() => run({ t: "mark", flag: f })} />

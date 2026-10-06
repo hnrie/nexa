@@ -151,6 +151,8 @@ export interface ThreadSummary {
   last_message_id: Snowflake | null;
   archived: boolean;
   locked: boolean;
+  /** The newest thing said in a public thread, sealed as it was sent (absent for a private thread, and from older servers). */
+  last_message?: Message;
 }
 
 /** A thread in a channel's list of them, or a forum's posts. */

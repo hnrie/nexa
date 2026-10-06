@@ -5,7 +5,7 @@ import { nexa as nexaApi } from "@/api/moderation";
 import { NexaWordmark } from "@/components/common/Brand";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
-import { CaseThread } from "@/components/nexa/CaseThread";
+import { LockNote, ThreadChat } from "@/components/nexa/ThreadChat";
 import { NoticeCard } from "@/components/nexa/NoticeCard";
 import { fullDate, relativeTo } from "@/lib/moderation";
 import { useAuth } from "@/stores/auth";
@@ -88,18 +88,25 @@ export default function BannedPage() {
               <MessagesSquare size={18} aria-hidden="true" />
               {t("nexa.ban.appealTitle")}
             </div>
-            <CaseThread
-              messages={thread.messages}
+            <ThreadChat
+              lines={thread.messages}
               people={people}
               perspective="member"
+              fileKind="cases"
               action="ban"
-              onSend={(body) => useNexa.getState().reply(caseId, body)}
-              composerNote={
-                <>
-                  <ShieldAlert size={14} aria-hidden="true" />
-                  {t("nexa.thread.notEncrypted")}
-                </>
+              onSend={thread.case.status === "closed" ? undefined : (body, files) => useNexa.getState().reply(caseId, body, files)}
+              upload={nexaApi.upload}
+              locked={thread.case.status === "closed" ? <LockNote text={t("nexa.thread.closedMember")} /> : undefined}
+              note={
+                thread.case.status === "closed" ? undefined : (
+                  <>
+                    <ShieldAlert size={14} aria-hidden="true" />
+                    {t("nexa.chat.notE2E")}
+                  </>
+                )
               }
+              placeholder={t("nexa.thread.placeholder")}
+              dropName={t("nexa.ban.appealTitle")}
               onSeen={() => useNexa.getState().markThreadRead(caseId)}
             />
           </section>

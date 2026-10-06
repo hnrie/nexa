@@ -4,6 +4,7 @@ import { useChannels } from "@/stores/channels";
 import { keysGoneHooks, useKeys } from "@/stores/keys";
 import { useMessages } from "@/stores/messages";
 import { isThread, useThreads } from "@/stores/threads";
+import { noteThreadMessage, useThreadLast } from "@/stores/threadLast";
 import { clearAutomod, forgetAutomodRules, heldBy, onArrive, warmAutomod } from "@/lib/automod/rules";
 import { forgetFollows } from "@/lib/follows";
 import { usePresence } from "@/stores/presence";
@@ -91,6 +92,7 @@ function applyNexaState(st: NexaState | undefined): void {
     useModeration.getState().setCounts(st.staff.counts);
     useModeration.getState().setOwner(st.staff.owner_id);
     useModeration.getState().setBugCounts(st.staff.bugs);
+    useModeration.getState().setUnread(st.staff.unread);
   }
 }
 
@@ -319,10 +321,11 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       // what was newest before this one, to tell whether the conversation had been read
       const lastBefore = useChannels.getState().byId[m.channel_id]?.last_message_id ?? null;
       useChannels.getState().setLastMessage(m.channel_id, m.id);
-      // a thread counts what is said in it, for the message it hangs from
+      // a thread counts what is said in it, for the message it hangs from, and shows the newest under it
       const thread = useChannels.getState().byId[m.channel_id];
       if (thread?.thread && !m.type.startsWith("system_") && lastBefore !== m.id) {
         useChannels.getState().upsert({ ...thread, thread: { ...thread.thread, message_count: thread.thread.message_count + 1, archived: false } });
+        if (thread.type === "thread") noteThreadMessage(m.channel_id, decrypted);
       }
       useTyping.getState().remove(m.channel_id, m.author_id);
       if (decrypted.decryptError === "no_key" && m.key_conv_id) useKeys.getState().markWaiting(m.key_conv_id);
@@ -381,6 +384,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const uncounted = quietMessage(e.d.channel_id, e.d.id, e.d.author_id);
       const was = useMessages.getState().channels[e.d.channel_id]?.byId[e.d.id];
       useMessages.getState().remove(e.d.channel_id, e.d.id);
+      // a thread's newest message gone: its card stops quoting it
+      useThreadLast.getState().forget(e.d.channel_id, e.d.id);
       // the newest message gone, the channel's last is an older one: read up to that, it is read
       if (e.d.last_message_id !== undefined) useChannels.getState().resetLastMessage(e.d.channel_id, e.d.last_message_id);
       if (!uncounted) useReadStates.getState().dropUnread(e.d.channel_id, e.d.id);
@@ -436,6 +441,11 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "thread_update": {
       const { member_count, ...thread } = e.d;
       useChannels.getState().upsert(thread);
+      // started from a message: the message says so under it at once
+      const starter = thread.thread?.starter_id;
+      if (e.t === "thread_create" && starter && thread.parent_id) {
+        useMessages.getState().setThread(thread.parent_id, starter, { id: thread.id, name: thread.name, message_count: thread.thread?.message_count ?? 0, last_message_id: thread.last_message_id ?? null, archived: !!thread.thread?.archived, locked: !!thread.thread?.locked });
+      }
       if (typeof member_count === "number") useThreads.getState().membersChanged(thread.id, [], [], member_count, meId);
       for (const h of dispatchHooks.onUnhandled) h(e);
       return;
@@ -668,6 +678,9 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       // a new report, or the reporter writing, is what the staff are waiting for
       if (!e.d.report.last_message) for (const h of bugAlertHooks) h({ kind: "staff", report: e.d.report, isNew: true });
       else if (e.d.messages.some((m) => m.kind === "member")) for (const h of bugAlertHooks) h({ kind: "staff", report: e.d.report, isNew: false });
+      return;
+    case "mod_unread":
+      useModeration.getState().setUnread(e.d);
       return;
     case "account_banned":
       // the socket was shut on a ban; what the ban screen needs comes over REST

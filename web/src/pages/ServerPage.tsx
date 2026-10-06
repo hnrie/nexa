@@ -49,17 +49,22 @@ export default function ServerPage() {
   const [attempt, setAttempt] = useState(0);
   const seen = useRef<string | null>(null);
   const channel = channelId ? channels[channelId] : undefined;
-  // a thread that has closed is not among the ones this app is sent: fetched once by its link
-  const [asked, setAsked] = useState<string | null>(null);
+  // A thread this app does not hold yet (a closed one, or one opened from a
+  // link before the server's threads arrived) is fetched once by its link, and
+  // waited for: falling back to the first channel while the answer was still
+  // on its way sent a thread's link to #general.
+  const [asked, setAsked] = useState<{ id: string; done: boolean } | null>(null);
   useEffect(() => {
-    if (!st || !channelId || channel || asked === channelId || !/^\d+$/.test(channelId)) return;
-    setAsked(channelId);
+    if (!st || !channelId || channel || asked?.id === channelId || !/^\d+$/.test(channelId)) return;
+    const id = channelId;
+    setAsked({ id, done: false });
     channelsApi
-      .get(channelId)
+      .get(id)
       .then((ch) => {
         if (ch.server_id === serverId && isThread(ch)) upsert(ch);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setAsked((a) => (a?.id === id ? { id, done: true } : a)));
   }, [st, channelId, channel, asked, serverId, upsert]);
 
   // an unknown server (deep link before ready, or one we were just added to) is fetched once;
@@ -151,7 +156,7 @@ export default function ServerPage() {
   }
   if (!st) return <PaneSpinner text={tr_("server.openingServer")} />;
   // a thread asked for by its link is waited for before falling back to the first channel
-  if (channelId && !channel && asked !== channelId && /^\d+$/.test(channelId)) return <PaneSpinner text={tr_("server.openingServer")} />;
+  if (channelId && !channel && !(asked?.id === channelId && asked.done) && /^\d+$/.test(channelId)) return <PaneSpinner text={tr_("server.openingServer")} />;
   if (!channelId || (channelId && !channel && firstText)) {
     if (firstText) return <Navigate to={`/channels/${serverId}/${firstText}`} replace state={navState} />;
     if (!channelId) return <NoChannels />;

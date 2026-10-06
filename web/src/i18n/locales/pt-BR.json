@@ -6267,6 +6267,7 @@
   "android.update.body": "Saiu uma nova versão do app para Android. Atualizar faz o download e depois o Android pede para você instalar.",
   "android.update.failed": "Não foi possível baixar a nova versão. Tente de novo em instantes.",
   "bugs.context.appAndroid": "App para Android",
+  "bugs.staff.finishedLocked": "Este relatório está marcado como \"{status}\", então ninguém pode escrever nele. Reabra-o para responder.",
   "whatsNew.r202610028.swipeBody": "No celular, deslize uma mensagem para a esquerda e solte quando a seta acender para respondê-la.",
   "whatsNew.r202610028.swipeTitle": "Deslize para responder",
   "whatsNew.r20261004.statusEmojiTitle": "Emojis personalizados no seu status",
@@ -6281,5 +6282,24 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Se o Nexa já estiver ativado lá, a permissão ainda aponta para uma cópia antiga do app. Escolha Redefinir Permissão e ative o Nexa de novo.",
   "desktop.displayPicker.theOldPermissionIsCleared": "A permissão antiga foi apagada.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Ative o Nexa em Gravação de Tela. O macOS oferece reabrir o Nexa; se não oferecer, reinicie o app aqui.",
-  "desktop.displayPicker.couldNotResetThePermission": "O macOS não redefiniu a permissão. Remova o Nexa de Gravação de Tela com o botão de menos, adicione de novo e reinicie."
+  "desktop.displayPicker.couldNotResetThePermission": "O macOS não redefiniu a permissão. Remova o Nexa de Gravação de Tela com o botão de menos, adicione de novo e reinicie.",
+  "moderation.chat.caseStart": "Esta é a conversa com {name} sobre este caso. O que você escrever chega como Nexa, com o seu nome visível, e nada aqui tem criptografia de ponta a ponta.",
+  "moderation.chat.reportStart": "Esta é a conversa com {name} sobre o relatório. O que você escrever chega como Nexa, com o seu nome visível, e nada aqui tem criptografia de ponta a ponta.",
+  "moderation.field.serverProfiles": "Perfis nos servidores",
+  "moderation.form.bannerAlso": "Os banners de cada servidor também saem",
+  "moderation.form.inServersOnly": "Só nos servidores dessa pessoa",
+  "moderation.sheet.inServers": {
+    "one": "Em {count} servidor",
+    "other": "Em {count} servidores"
+  },
+  "nexa.chat.caseStart": "Esta é a sua conversa com a equipe do Nexa sobre este caso. As mensagens e arquivos aqui não têm criptografia de ponta a ponta: a equipe pode vê-los.",
+  "nexa.chat.fileTooBig": "As imagens podem ter até 10 MB e as gravações até 50 MB.",
+  "nexa.chat.notE2E": "Sem criptografia de ponta a ponta: a equipe do Nexa pode ler esta conversa.",
+  "nexa.chat.reportFinished": "Este relatório está marcado como \"{status}\", então não dá mais para escrever nele. Se acontecer de novo, envie um novo relatório.",
+  "nexa.chat.reportStart": "Esta é a sua conversa com a equipe do Nexa sobre este relatório. Os relatórios de bug não têm criptografia de ponta a ponta: a equipe pode lê-los.",
+  "nexa.chat.uploading": "Enviando, {percent}%",
+  "threads.card.count": {
+    "one": "{count} mensagem",
+    "other": "{count} mensagens"
+  }
 }

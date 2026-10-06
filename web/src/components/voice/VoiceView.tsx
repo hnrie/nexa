@@ -39,7 +39,7 @@ import { callFullscreenWay, enterElementFullscreen, enterVideoFullscreen, exitEl
 import { memberName } from "@/lib/names";
 import { bindText, keybindsOf } from "@/lib/keybinds";
 import { storage } from "@/lib/storage";
-import { pinchView, type View } from "@/lib/zoomPan";
+import { containedSize, pinchView, type Size, type View } from "@/lib/zoomPan";
 import { useAuth } from "@/stores/auth";
 import { canI, memberColor, useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
@@ -239,10 +239,12 @@ const spread = (list: { x: number; y: number }[]) => (list.length < 2 ? 0 : Math
 /**
  * Holds a stream's picture. When `zoomable` (whatever is focused, a share or a
  * camera) two fingers pinch into it and one drags it around once zoomed in; a
- * mouse zooms with the wheel and drags to pan. A desktop share is unreadable
- * on a phone otherwise, and a camera is worth a closer look too. The view is
- * written straight onto the video rather than through React, so it keeps up
- * with the fingers.
+ * mouse zooms with the wheel (a trackpad with a pinch) and drags to pan. A
+ * desktop share is unreadable on a phone otherwise, and a camera is worth a
+ * closer look too. The view is written straight onto the video rather than
+ * through React, so it keeps up with the fingers. The picture can be moved
+ * only as far as its own edges reach the tile's: a wide share on a tall phone
+ * has bars above and below it, and the tile's size let it be dragged off.
  */
 function StreamSurface({ zoomable, children }: { zoomable: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -255,9 +257,25 @@ function StreamSurface({ zoomable, children }: { zoomable: boolean; children: Re
     const video = el?.querySelector("video");
     if (!el || !video) return;
     const v = view.current;
-    video.style.transform = v.scale > 1 ? `translate(${v.x}px, ${v.y}px) scale(${v.scale})` : "";
+    // your own camera is shown mirrored, and stays mirrored zoomed in
+    const mirror = video.dataset.mirror === "true" ? " scaleX(-1)" : "";
+    video.style.transform = v.scale > 1 ? `translate(${v.x}px, ${v.y}px) scale(${v.scale})${mirror}` : "";
     el.dataset.zoomed = String(v.scale > 1);
   }, []);
+
+  const box = (): Size => ({ width: ref.current?.clientWidth ?? 0, height: ref.current?.clientHeight ?? 0 });
+  /** The picture as drawn in the tile, fitted to it with bars at the sides or top and bottom. */
+  const content = (): Size => {
+    const video = ref.current?.querySelector("video");
+    const b = box();
+    if (!video || !video.videoWidth || !video.videoHeight) return b;
+    return containedSize({ width: video.videoWidth, height: video.videoHeight }, b, true);
+  };
+
+  const restart = () => {
+    const list = [...points.current.values()];
+    gesture.current = list.length ? { start: { ...view.current }, from: middle(list), spread: spread(list) } : null;
+  };
 
   const reset = useCallback(() => {
     view.current = { scale: 1, x: 0, y: 0 };
@@ -283,17 +301,16 @@ function StreamSurface({ zoomable, children }: { zoomable: boolean; children: Re
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const pt = at(e);
-      const factor = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.03 : 0.0015));
-      view.current = pinchView(view.current, pt, pt, factor, { width: el.clientWidth, height: el.clientHeight });
+      // a trackpad pinch arrives as ctrl+wheel, and wants a firmer response
+      const step = e.deltaMode === 1 ? 0.03 : e.ctrlKey ? 0.01 : 0.0018;
+      view.current = pinchView(view.current, pt, pt, Math.exp(-e.deltaY * step), box(), content());
       apply();
+      // a drag going on while the wheel zooms goes on from the new view
+      restart();
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, [zoomable, apply]);
-  const restart = () => {
-    const list = [...points.current.values()];
-    gesture.current = list.length ? { start: { ...view.current }, from: middle(list), spread: spread(list) } : null;
-  };
   const lift = (e: ReactPointerEvent) => {
     if (!points.current.delete(e.pointerId)) return;
     restart();
@@ -307,21 +324,38 @@ function StreamSurface({ zoomable, children }: { zoomable: boolean; children: Re
       data-no-swipe={zoomable || undefined}
       onPointerDown={(e) => {
         if (!zoomable) return;
-        // a mouse only takes part once there is something to drag around
-        if (e.pointerType !== "touch" && view.current.scale <= 1) return;
+        // a mouse's main button, held from the start, so a zoom with the wheel while it is down can be dragged at once
+        if (e.pointerType !== "touch" && e.button !== 0) return;
         points.current.set(e.pointerId, at(e));
-        if (points.current.size > 1 || view.current.scale > 1) e.currentTarget.setPointerCapture?.(e.pointerId);
+        if (e.pointerType === "touch" ? points.current.size > 1 || view.current.scale > 1 : view.current.scale > 1) e.currentTarget.setPointerCapture?.(e.pointerId);
         restart();
       }}
       onPointerMove={(e) => {
         if (!points.current.has(e.pointerId)) return;
-        points.current.set(e.pointerId, at(e));
+        const now = at(e);
+        if (e.pointerType !== "touch") {
+          // let go somewhere this never heard of: not a drag any more
+          if ((e.buttons & 1) === 0) {
+            points.current.delete(e.pointerId);
+            restart();
+            return;
+          }
+          // at the whole view a mouse is only pointing
+          if (view.current.scale <= 1) {
+            points.current.set(e.pointerId, now);
+            restart();
+            return;
+          }
+          if (!ref.current?.hasPointerCapture?.(e.pointerId)) ref.current?.setPointerCapture?.(e.pointerId);
+        } else if (points.current.size > 1 && !ref.current?.hasPointerCapture?.(e.pointerId)) {
+          ref.current?.setPointerCapture?.(e.pointerId);
+        }
+        points.current.set(e.pointerId, now);
         const g = gesture.current;
-        const el = ref.current;
-        if (!g || !el) return;
+        if (!g) return;
         const list = [...points.current.values()];
         const factor = list.length > 1 && g.spread > 0 ? spread(list) / g.spread : 1;
-        view.current = pinchView(g.start, g.from, middle(list), factor, { width: el.clientWidth, height: el.clientHeight });
+        view.current = pinchView(g.start, g.from, middle(list), factor, box(), content());
         apply();
       }}
       onPointerUp={lift}

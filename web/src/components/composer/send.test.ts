@@ -7,7 +7,7 @@ import { useMessages } from "@/stores/messages";
 import { discardPending, retryPending, sendMessage, sendWithFiles } from "./send";
 
 vi.mock("@/crypto/message", () => ({ encryptMessage: vi.fn(async () => "sealed") }));
-vi.mock("@/lib/keyring", () => ({ channelKeyFor: vi.fn(() => new Uint8Array(32)) }));
+vi.mock("@/lib/keyring", () => ({ channelKeyFor: vi.fn(() => new Uint8Array(32)), missingKeyListeners: new Set() }));
 vi.mock("@/lib/decrypt", () => ({ decryptForStore: vi.fn(async (m: { id: string }) => ({ ...m, payload: null })) }));
 vi.mock("@/lib/attachments", async (orig) => ({ ...(await orig<typeof import("@/lib/attachments")>()), uploadStaged: vi.fn() }));
 

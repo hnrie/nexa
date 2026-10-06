@@ -11,7 +11,7 @@ import { hasLock } from "@/lib/appLock";
 import { checkRecipients } from "@/lib/convMembers";
 import { clearFollows } from "@/lib/follows";
 import { closePins, openPins } from "@/lib/keyPins";
-import { clearKeyring, ring } from "@/lib/keyring";
+import { clearKeyring, missingKeyListeners, ring } from "@/lib/keyring";
 import { judgeKey, useKeyAlerts } from "./keyAlerts";
 import { useMessages } from "./messages";
 import { redecryptReplyTargets } from "./replyTargets";
@@ -32,6 +32,44 @@ interface KeysState {
 }
 
 const pendingEnsure = new Map<string, Promise<{ epoch: number; root: Uint8Array } | null>>();
+
+/**
+ * Asking the holders of a conversation's keys again, while this device waits
+ * for them: soon after it finds it lacks them, then now and then, a few times.
+ * The ask made for it as it came in can be missed (nobody holding them was
+ * online, or their app had not heard of the newcomer yet), and nothing else
+ * asked again until a holder next connected.
+ */
+const asking = new Map<string, { timer: ReturnType<typeof setTimeout>; tries: number }>();
+
+function askAgain(conv: string): void {
+  if (asking.has(conv)) return;
+  const next = (tries: number) => {
+    if (tries >= keyTimings.askAgainMs.length) {
+      asking.delete(conv);
+      return;
+    }
+    const timer = setTimeout(() => {
+      // got them meanwhile, or signed out: nothing to ask for
+      if (!useKeys.getState().waiting[conv] || !useKeys.getState().userId) {
+        asking.delete(conv);
+        return;
+      }
+      void keysApi.request(conv).catch(() => undefined);
+      next(tries + 1);
+    }, keyTimings.askAgainMs[tries]);
+    asking.set(conv, { timer, tries });
+  };
+  next(0);
+}
+
+function stopAsking(conv?: string): void {
+  for (const [c, a] of asking) {
+    if (conv && c !== conv) continue;
+    clearTimeout(a.timer);
+    asking.delete(c);
+  }
+}
 
 /**
  * Called when the keys are forgotten (a lock, a sign-out). The search index
@@ -80,6 +118,16 @@ async function persistRoot(userId: string, conv: string, epoch: number, root: Ui
 const UNWRAP_BATCH = 32;
 
 /**
+ * How long to wait before trying again someone this device did not know as a
+ * member when it was asked to hand them a key. The ask can outrun the event
+ * that says they joined: it is handled beside the event queue, and someone
+ * who has just come into a server is not in this device's list of its members
+ * for a moment yet. Refusing them for good left them without the keys until
+ * a holder next connected.
+ */
+export const keyTimings = { outsiderRetryMs: [1500, 5000, 15000], askAgainMs: [2000, 20000, 60000, 180000, 600000] };
+
+/**
  * Narrows a server-supplied recipient list to the accounts this device is
  * willing to hand a conversation key to.
  *
@@ -87,9 +135,11 @@ const UNWRAP_BATCH = 32;
  * `user_ids` in a `keys_needed` event, in `/keys/needs` and in the answer to
  * creating an epoch went straight into the wrapping. Here they are held against
  * the membership this device already knows and draws, and anything outside it
- * is dropped and written down where it can be seen.
+ * is set aside: looked at again a few times, in case this device has not heard
+ * of them joining yet, and only then refused and written down where it can be
+ * seen.
  */
-function recipientsFor(conv: string, epoch: number, userIds: string[]): string[] {
+function recipientsFor(conv: string, epoch: number, userIds: string[], attempt: number): { allowed: string[]; later: string[] } {
   const seen = checkRecipients(conv, userIds);
   // Never this account. A membership list that has not caught up with a join
   // would otherwise leave a device holding a root with no grant of its own,
@@ -98,7 +148,7 @@ function recipientsFor(conv: string, epoch: number, userIds: string[]): string[]
   const me = useKeys.getState().userId;
   const outsiders = me ? seen.outsiders.filter((id) => id !== me) : seen.outsiders;
   const allowed = me && userIds.includes(me) && !seen.allowed.includes(me) ? [...seen.allowed, me] : seen.allowed;
-  if (outsiders.length > 0) {
+  if (outsiders.length > 0 && attempt >= keyTimings.outsiderRetryMs.length) {
     console.warn(`keys: refusing to wrap ${conv} epoch ${epoch} for ${outsiders.join(", ")} — not in this conversation`);
     useKeyAlerts.getState().report({ kind: "outsider_refused", conv, epoch, count: outsiders.length, ...(outsiders.length === 1 ? { userId: outsiders[0]! } : {}) });
   }
@@ -107,15 +157,23 @@ function recipientsFor(conv: string, epoch: number, userIds: string[]): string[]
   // refusing there would leave real members unable to read messages they are
   // entitled to, which is the worse of the two failures.
   if (!seen.checked && userIds.length > 0) useKeyAlerts.getState().report({ kind: "unchecked", conv, epoch, count: userIds.length });
-  return allowed;
+  return { allowed, later: attempt < keyTimings.outsiderRetryMs.length ? outsiders : [] };
 }
 
 /** Wraps a root for each user and uploads the grants; users without a public key are skipped. */
-async function putGrantsFor(conv: string, epoch: number, root: Uint8Array, wanted: string[]): Promise<void> {
+async function putGrantsFor(conv: string, epoch: number, root: Uint8Array, wanted: string[], attempt = 0): Promise<void> {
   // The one place every grant this client ever makes passes through, so the
   // recipient check cannot be forgotten by a path added later: createEpoch,
   // /keys/needs and the keys_needed event all end up here.
-  const userIds = recipientsFor(conv, epoch, wanted);
+  const { allowed: userIds, later } = recipientsFor(conv, epoch, wanted, attempt);
+  if (later.length > 0) {
+    const wait = keyTimings.outsiderRetryMs[attempt]!;
+    setTimeout(() => {
+      // the same root, if this session still holds it
+      const still = ring.get(conv, epoch);
+      if (still) void putGrantsFor(conv, epoch, still, later, attempt + 1).catch(() => undefined);
+    }, wait);
+  }
   const uploads: { conv_id: string; epoch: number; user_id: string; wrapped_key: string }[] = [];
   const wrap = async (uid: string): Promise<boolean> => {
     try {
@@ -233,6 +291,7 @@ export const useKeys = create<KeysState>()((set, get) => ({
         for (const c of changed) delete waiting[c];
         return { waiting };
       });
+      for (const c of changed) stopAsking(c);
       await useMessages.getState().redecrypt((m) => m.decryptError === "no_key" && !!m.key_conv_id && set_.has(m.key_conv_id));
       await redecryptReplyTargets((m) => m.decryptError === "no_key" && !!m.key_conv_id && set_.has(m.key_conv_id));
     }
@@ -312,12 +371,17 @@ export const useKeys = create<KeysState>()((set, get) => ({
       throw err;
     }
   },
-  markWaiting: (conv) => set((s) => (s.waiting[conv] ? s : { waiting: { ...s.waiting, [conv]: true } })),
+  markWaiting: (conv) => {
+    if (!get().userId) return;
+    if (!get().waiting[conv]) set((s) => ({ waiting: { ...s.waiting, [conv]: true } }));
+    askAgain(conv);
+  },
   reset: () => {
     clearKeyring();
     clearFollows();
     for (const h of keysGoneHooks) h();
     pendingEnsure.clear();
+    stopAsking();
     // The pins themselves stay on the device — that is the point of them — but
     // this session's unanswered questions and its log go with the session.
     closePins();
@@ -325,3 +389,9 @@ export const useKeys = create<KeysState>()((set, get) => ({
     set({ userId: null, identity: null, waiting: {} });
   },
 }));
+
+// a message this device could not read for want of its key: wait for it, and ask for it
+missingKeyListeners.add((conv) => {
+  const st = useKeys.getState();
+  if (st.userId && !st.waiting[conv]) queueMicrotask(() => useKeys.getState().markWaiting(conv));
+});

@@ -38,8 +38,7 @@ function tabOf(path: string): Tab {
  */
 export default function AdminPanelPage() {
   const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & FLAG_ADMIN) !== 0);
-  const counts = useModeration((s) => s.counts);
-  const bugCounts = useModeration((s) => s.bugCounts);
+  const unread = useModeration((s) => s.unread);
   const loc = useLocation();
   const nav = useNavigate();
   const tab = tabOf(loc.pathname);
@@ -52,6 +51,7 @@ export default function AdminPanelPage() {
         const st = useModeration.getState();
         st.setCounts(r.counts);
         st.setBugCounts(r.bugs);
+        st.setUnread(r.unread);
         st.setOwner(r.owner_id);
         st.mergePeople(r.people);
       })
@@ -76,8 +76,9 @@ export default function AdminPanelPage() {
     { id: "users", label: t("moderation.tabs.users"), icon: <LayoutGrid size={17} /> },
     { id: "servers", label: t("moderation.tabs.servers"), icon: <Server size={17} /> },
     { id: "expressions", label: t("moderation.tabs.expressions"), icon: <Sticker size={17} /> },
-    { id: "cases", label: t("moderation.tabs.cases"), icon: <FolderOpen size={17} />, badge: counts?.needs_reply || undefined },
-    { id: "bugs", label: t("moderation.tabs.bugs"), icon: <Bug size={17} />, badge: bugCounts?.waiting || undefined, badgeLabel: bugCounts?.waiting ? t("bugs.staff.waitingCount", { count: bugCounts.waiting }) : undefined },
+    // what waits on the staff and is new to this person; reading it, or Mark as Read, takes it off
+    { id: "cases", label: t("moderation.tabs.cases"), icon: <FolderOpen size={17} />, badge: unread.cases.length || undefined },
+    { id: "bugs", label: t("moderation.tabs.bugs"), icon: <Bug size={17} />, badge: unread.bugs.length || undefined, badgeLabel: unread.bugs.length ? t("bugs.staff.waitingCount", { count: unread.bugs.length }) : undefined },
     { id: "logs", label: t("moderation.tabs.logs"), icon: <ScrollText size={17} /> },
     { id: "announcements", label: t("moderation.tabs.announcements"), icon: <Megaphone size={17} /> },
   ];

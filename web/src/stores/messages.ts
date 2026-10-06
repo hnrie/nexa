@@ -134,6 +134,8 @@ interface MessagesState {
   /** A poll's standing as the server just counted it for this account. */
   setPollResults: (channelId: string, messageId: string, results: PollTally) => void;
   setFlags: (channelId: string, id: string, flags: number) => void;
+  /** A thread was started from a message: it says so under it. */
+  setThread: (channelId: string, id: string, thread: NonNullable<DecryptedMessage["thread"]>) => void;
   setLoading: (channelId: string, loading: boolean) => void;
   setHasOlder: (channelId: string, hasOlder: boolean) => void;
   addPending: (p: PendingMessage) => void;
@@ -409,6 +411,14 @@ export const useMessages = create<MessagesState>()((set, get) => ({
         const m = c.byId[id];
         if (!m) return c;
         return { ...c, byId: { ...c.byId, [id]: { ...m, flags } } };
+      }),
+    ),
+  setThread: (channelId, id, thread) =>
+    set((s) =>
+      withChannel(s, channelId, (c) => {
+        const prev = c.byId[id];
+        if (!prev || prev.thread?.id === thread.id) return c;
+        return { ...c, byId: { ...c.byId, [id]: { ...prev, thread } } };
       }),
     ),
   setLoading: (channelId, loading) => set((s) => withChannel(s, channelId, (c) => ({ ...c, loading }))),

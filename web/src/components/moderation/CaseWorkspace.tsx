@@ -6,7 +6,8 @@ import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { promptText } from "@/components/modals/PromptModal";
-import { CaseThread, ClosedNote } from "@/components/nexa/CaseThread";
+import { LockNote, ThreadChat } from "@/components/nexa/ThreadChat";
+import { ThreadIntro } from "@/components/nexa/ThreadParts";
 import { NoticeCard } from "@/components/nexa/NoticeCard";
 import { describeError } from "@/lib/errors";
 import { actionIcon, actionLabel, caseStanding, FLAG_ADMIN, FLAG_DELETED, personName, previewText, relativeTo, severity, systemLineText } from "@/lib/moderation";
@@ -50,15 +51,17 @@ function preview(c: StaffCase, people: People): string {
 }
 
 export function CaseList({ cases, people, selected, onPick, showTarget }: { cases: StaffCase[]; people: People; selected?: string; onPick: (id: string) => void; showTarget: boolean }) {
+  const unread = useModeration((st) => st.unread.cases);
   return (
     <ul className={m.caseList} data-testid="case-list">
       {cases.map((c) => {
         const Icon = actionIcon(c.action);
         const standing = caseStanding(c);
         const target = people[c.user_id];
+        const fresh = unread.includes(c.id);
         return (
           <li key={c.id}>
-            <button type="button" className={m.caseItem} data-selected={selected === c.id} onClick={() => onPick(c.id)} data-case={c.id}>
+            <button type="button" className={m.caseItem} data-selected={selected === c.id} data-unread={fresh || undefined} onClick={() => onPick(c.id)} data-case={c.id}>
               {showTarget ? (
                 <Avatar id={c.user_id} avatarId={target?.avatar_id ?? null} name={target?.display_name ?? c.target_display_name} size={34} />
               ) : (
@@ -69,6 +72,11 @@ export function CaseList({ cases, people, selected, onPick, showTarget }: { case
               <span className={m.caseText}>
                 <span className={m.caseTop}>
                   <span className={m.caseTitle}>{showTarget ? personName(target) || c.target_display_name : t("moderation.case.titled", { number: c.number, action: actionLabel(c.action) })}</span>
+                  {fresh ? (
+                    <span className={m.unreadDot}>
+                      <span className="visually-hidden">{t("sidebar.serverSidebar.unread")}</span>
+                    </span>
+                  ) : null}
                   <span className={m.caseTime}>{formatRelative(c.last_activity_at)}</span>
                 </span>
                 {showTarget ? <span className={m.caseSub}>{t("moderation.case.titled", { number: c.number, action: actionLabel(c.action) })}</span> : null}
@@ -224,12 +232,18 @@ export function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: 
           )}
         </span>
       </div>
-      <CaseThread
-        messages={data.messages}
+      <ThreadChat
+        lines={data.messages}
         people={data.people}
         perspective="staff"
+        fileKind="cases"
         action={c.action}
-        header={<NoticeCard c={c} people={data.people} perspective="staff" />}
+        intro={
+          <ThreadIntro avatar={<Avatar id={c.user_id} avatarId={target?.avatar_id ?? null} name={personName(target) || c.target_display_name} size={80} />} title={t("nexa.notice.caseNumber", { number: c.number })} sub={target && !target.deleted ? `@${target.username}` : c.target_username}>
+            {t("moderation.chat.caseStart", { name: personName(target) || c.target_display_name })}
+          </ThreadIntro>
+        }
+        opener={{ from: "nexa", at: c.created_at, body: <NoticeCard c={c} people={data.people} perspective="staff" /> }}
         // a closed case is closed to staff too, until one of them opens it again
         onSend={
           gone || c.status === "closed"
@@ -241,12 +255,14 @@ export function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: 
         }
         upload={modApi.upload}
         placeholder={t("moderation.case.replyPlaceholder")}
-        composerNote={t("moderation.case.replyNote", { name: personName(target) })}
-        closedNote={
+        note={gone || c.status === "closed" ? undefined : t("moderation.case.replyNote", { name: personName(target) })}
+        dropName={t("nexa.notice.caseNumber", { number: c.number })}
+        onSeen={(lastId) => useModeration.getState().readThread("case", caseId, lastId)}
+        locked={
           gone ? (
-            <ClosedNote text={t("moderation.case.goneNote")} />
-          ) : c.status === "closed" ? (
-            <ClosedNote
+            <LockNote text={t("moderation.case.goneNote")} />
+          ) : (
+            <LockNote
               text={t("moderation.case.closedNote")}
               action={
                 <Button size="sm" variant="secondary" disabled={busy} onClick={() => void setClosed(false)} data-testid="case-reopen-locked">
@@ -254,7 +270,7 @@ export function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: 
                 </Button>
               }
             />
-          ) : undefined
+          )
         }
       />
     </>

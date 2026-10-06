@@ -1,8 +1,13 @@
 /**
  * Captchas for the actions a bot would abuse: signing up, logging in,
  * recovering an account, sending friend requests, creating and joining
- * servers. They use Cloudflare Turnstile, which is free and usually shows a
- * person nothing at all; it only puts up a click when it is unsure.
+ * servers, a first message to a stranger, bug reports; and for what a stolen
+ * session would be used for: a new username, password or recovery key,
+ * turning two-factor off, deleting the account. They use Cloudflare
+ * Turnstile, which is free and usually shows a person nothing at all; it only
+ * puts up a click when it is unsure. The routes that ask for one name the
+ * action on their refusal, and the API client solves it and asks again
+ * (api.captchaSolver), so a guarded request needs no handling of its own.
  *
  * The server says in /instance whether they are on and with which public
  * site key. Each guarded request carries a fresh token, good for that one
@@ -175,6 +180,18 @@ export async function captchaToken(action: string): Promise<string | null> {
     }
   });
 }
+
+/**
+ * A token for an action the server asked one for, on a request sent without
+ * one (api.captchaSolver): null when captchas are off here, in which case the
+ * server's refusal stands.
+ */
+async function solveFor(action: string): Promise<string | null> {
+  if (siteKey === undefined) await loadCaptchaConfig();
+  if (!siteKey) return null;
+  return captchaToken(action);
+}
+api.captchaSolver = solveFor;
 
 /**
  * Sends a guarded request with a token when captchas are on. If the server

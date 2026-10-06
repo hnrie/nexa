@@ -137,6 +137,10 @@
 .row[data-waiting] .rowSubject {
   font-weight: 700;
 }
+/* new to this member of staff, until they read it or Mark as Read */
+.row[data-unread] .rowSubject {
+  font-weight: 750;
+}
 .rowTime {
   flex: none;
   font-size: 12px;

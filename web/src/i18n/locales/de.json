@@ -6165,6 +6165,7 @@
   "android.update.body": "Eine neue Version der Android-App ist erschienen. Aktualisieren lädt sie herunter, dann fragt Android, ob du sie installieren möchtest.",
   "android.update.failed": "Die neue Version konnte nicht heruntergeladen werden. Versuch es gleich noch einmal.",
   "bugs.context.appAndroid": "Android-App",
+  "bugs.staff.finishedLocked": "Diese Meldung ist als „{status}“ markiert, deshalb kann niemand darin schreiben. Öffne sie wieder, um zu antworten.",
   "whatsNew.r202610028.swipeBody": "Wische auf dem Handy eine Nachricht nach links und lass los, sobald der Pfeil aufleuchtet, um darauf zu antworten.",
   "whatsNew.r202610028.swipeTitle": "Zum Antworten wischen",
   "whatsNew.r20261004.statusEmojiTitle": "Eigene Emojis im Status",
@@ -6179,5 +6180,24 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Wenn Nexa dort schon eingeschaltet ist, zeigt die Berechtigung noch auf eine ältere Kopie der App. Wähle „Berechtigung zurücksetzen“ und schalte Nexa dann wieder ein.",
   "desktop.displayPicker.theOldPermissionIsCleared": "Die alte Berechtigung ist gelöscht.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Schalte Nexa unter Bildschirmaufnahme ein. macOS bietet an, Nexa neu zu öffnen; wenn nicht, starte es hier neu.",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS hat die Berechtigung nicht zurückgesetzt. Entferne Nexa unter Bildschirmaufnahme mit dem Minus-Knopf, füge es wieder hinzu und starte neu."
+  "desktop.displayPicker.couldNotResetThePermission": "macOS hat die Berechtigung nicht zurückgesetzt. Entferne Nexa unter Bildschirmaufnahme mit dem Minus-Knopf, füge es wieder hinzu und starte neu.",
+  "moderation.chat.caseStart": "Das ist die Unterhaltung mit {name} zu diesem Fall. Was du schreibst, erreicht die Person als Nexa, mit deinem Namen dabei, und nichts hier ist Ende-zu-Ende-verschlüsselt.",
+  "moderation.chat.reportStart": "Das ist die Unterhaltung mit {name} zu der Meldung. Was du schreibst, erreicht die Person als Nexa, mit deinem Namen dabei, und nichts hier ist Ende-zu-Ende-verschlüsselt.",
+  "moderation.field.serverProfiles": "Profile auf Servern",
+  "moderation.form.bannerAlso": "Die Banner pro Server werden ebenfalls entfernt",
+  "moderation.form.inServersOnly": "Nur auf ihren Servern",
+  "moderation.sheet.inServers": {
+    "one": "Auf {count} Server",
+    "other": "Auf {count} Servern"
+  },
+  "nexa.chat.caseStart": "Das ist deine Unterhaltung mit dem Nexa-Team zu diesem Fall. Nachrichten und Dateien hier sind nicht Ende-zu-Ende-verschlüsselt: Das Team kann sie sehen.",
+  "nexa.chat.fileTooBig": "Bilder dürfen bis zu 10 MB groß sein, Aufnahmen bis zu 50 MB.",
+  "nexa.chat.notE2E": "Nicht Ende-zu-Ende-verschlüsselt: Das Nexa-Team kann diese Unterhaltung lesen.",
+  "nexa.chat.reportFinished": "Diese Meldung ist als „{status}“ markiert, deshalb kann hier nicht mehr geschrieben werden. Wenn es wieder passiert, sende eine neue Meldung.",
+  "nexa.chat.reportStart": "Das ist deine Unterhaltung mit dem Nexa-Team zu dieser Meldung. Fehlermeldungen sind nicht Ende-zu-Ende-verschlüsselt: Das Team kann sie lesen.",
+  "nexa.chat.uploading": "Wird hochgeladen, {percent} %",
+  "threads.card.count": {
+    "one": "{count} Nachricht",
+    "other": "{count} Nachrichten"
+  }
 }

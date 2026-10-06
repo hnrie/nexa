@@ -207,6 +207,10 @@
 .system:hover { background: var(--bg-message-hover); }
 /* centred on the first line: 4px of padding and half of what the 22px line has over the 18px icon */
 .sysIcon { position: absolute; inset-inline-start: var(--sys-icon); top: 6px; color: var(--text-muted); display: flex; }
+/* a join line its author or a moderator may take down: the message toolbar's Delete, on hover or from the keyboard */
+.system[data-removable] .toolbar { top: -14px; }
+.system[data-removable]:focus-visible .toolbar, .system[data-removable]:has(:focus-visible) .toolbar { display: flex; }
+@media (hover: hover) { .system[data-removable]:hover .toolbar { display: flex; } }
 .sysName { color: var(--text-strong); font-weight: 500; font-size: inherit; line-height: inherit; }
 button.sysName { cursor: pointer; }
 button.sysName:hover { text-decoration: underline; }
@@ -502,14 +506,28 @@ button.sysName:hover { text-decoration: underline; }
 @media (max-width: 767px) { .amAlert { padding-inline-end: 8px; } .amBtn { min-height: 36px; } }
 
 /* the thread a message started, under it (ThreadChip.tsx) */
-.threadChip { display: flex; align-items: center; gap: 8px; margin-top: 6px; max-width: min(520px, 100%); min-height: 40px; padding: 6px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text); font-size: 14px; text-align: start; }
-.threadChip:hover { border-color: var(--border); background: color-mix(in srgb, var(--bg-surface) 85%, var(--brand)); }
-.threadChipIcon { flex: none; color: var(--text-muted); }
-.threadChipName { font-weight: 600; color: var(--text-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.threadChipMeta { flex: none; color: var(--text-muted); font-size: 13px; }
-.threadChipClosed { flex: none; font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--bg-active); color: var(--text-muted); }
-.threadChipGo { flex: none; margin-inline-start: auto; display: inline-flex; align-items: center; gap: 2px; color: var(--link); font-size: 13px; font-weight: 600; }
-@media (max-width: 479px) { .threadChipMeta { display: none; } }
+/* The thread a message started (ThreadChip.tsx). A line runs down from the
+   middle of the message's avatar (28px into the row; the card starts at the
+   text, 64px in) and turns into the card, which says the thread's name, how
+   many messages it holds, and the newest: who, a line of it, and when. The
+   line is opaque, mixed with the panel, so where it meets the card it does
+   not darken. */
+.threadCard { --thread-spine: color-mix(in srgb, var(--text-muted) 46%, var(--bg-raised)); position: relative; display: flex; flex-direction: column; gap: 4px; width: fit-content; min-width: min(300px, 100%); max-width: min(560px, 100%); margin-top: 8px; padding: 9px 12px 10px; border-radius: var(--radius-sm); background: var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); color: var(--text); text-align: start; }
+.threadCard:hover { background: color-mix(in srgb, var(--bg-surface) 88%, var(--text-strong)); }
+.threadCard:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.threadSpine { position: absolute; inset-inline-start: -37px; top: calc(-1 * var(--spine-up)); bottom: calc(50% - 1px); width: 36px; border-inline-start: 2px solid var(--thread-spine); border-bottom: 2px solid var(--thread-spine); border-end-start-radius: 10px; pointer-events: none; }
+.compact .threadSpine { display: none; }
+.threadTop { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.threadName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 650; line-height: 20px; color: var(--text-strong); }
+.threadClosed { flex: none; font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--bg-active); color: var(--text-muted); }
+.threadCount { flex: none; display: inline-flex; align-items: center; margin-inline-start: auto; color: var(--link); font-size: 14px; font-weight: 650; white-space: nowrap; }
+.threadCard:hover .threadCount { text-decoration: underline; }
+[dir="rtl"] .threadChev { transform: scaleX(-1); }
+.threadLast { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 14px; line-height: 20px; }
+.threadWho { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--text-strong); }
+.threadWords { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.threadWhen { flex: none; color: var(--text-muted); font-size: 12.5px; }
+.threadQuiet { font-size: 14px; color: var(--text-muted); }
 
 /* what AutoMod holds back, in its place */
 .heldLine { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--text-muted); font-style: italic; font-size: 15px; }

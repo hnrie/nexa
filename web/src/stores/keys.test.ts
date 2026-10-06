@@ -14,7 +14,7 @@ import { useAuth } from "./auth";
 import { useChannels } from "./channels";
 import { closePins } from "@/lib/keyPins";
 import { useKeyAlerts } from "./keyAlerts";
-import { useKeys } from "./keys";
+import { keyTimings, useKeys } from "./keys";
 import { useMessages } from "./messages";
 import { useUsers } from "./users";
 
@@ -95,6 +95,9 @@ describe("key manager", () => {
   };
 
   beforeEach(async () => {
+    // a newcomer this device has not heard of is looked at again, quickly here
+    keyTimings.outsiderRetryMs = [20, 20, 20];
+    keyTimings.askAgainMs = [10_000];
     // Anything still in flight from the last test belongs to the last test.
     await settled();
     putGrants.length = 0;
@@ -114,6 +117,7 @@ describe("key manager", () => {
         return Promise.resolve({ inserted: (body as unknown[]).length } as T);
       }
       if (method === "GET" && path === "/keys/needs") return Promise.resolve([] as T);
+      if (method === "POST" && path === "/keys/request") return Promise.resolve(undefined as T);
       return Promise.reject(new Error(`unexpected ${method} ${path}`));
     };
   });
@@ -265,7 +269,25 @@ describe("key manager", () => {
     await applyEvent({ t: "keys_needed", d: { conv_id: "conv1", epoch: 0, user_ids: ["B", "Z"] } });
     await settled();
     expect(putGrants.map((g) => g.user_id)).toEqual(["B"]);
-    expect(useKeyAlerts.getState().events.some((e) => e.kind === "outsider_refused")).toBe(true);
+    // looked at again in case its join had not arrived yet, never sealed for, then refused and said so
+    await vi.waitFor(() => expect(useKeyAlerts.getState().events.some((e) => e.kind === "outsider_refused")).toBe(true));
+    expect(putGrants.map((g) => g.user_id)).toEqual(["B"]);
+  });
+
+  it("hands the key to someone whose join arrives after the ask for it", async () => {
+    // A group of A and B; C is asked for before this device has heard C was added.
+    useChannels.setState({ byId: { conv1: dm("conv1", ["A", "B"]) } });
+    useUsers.getState().upsert(user("C", mallory.publicKey));
+    await useKeys.getState().init("A", alice);
+    await useKeys.getState().ensureConvKey("conv1");
+    putGrants.length = 0;
+    await applyEvent({ t: "keys_needed", d: { conv_id: "conv1", epoch: 0, user_ids: ["C"] } });
+    await settled();
+    expect(putGrants).toEqual([]);
+    // the join lands, and the next look hands C the key
+    useChannels.setState({ byId: { conv1: dm("conv1", ["A", "B", "C"]) } });
+    await vi.waitFor(() => expect(putGrants.map((g) => g.user_id)).toEqual(["C"]));
+    expect(useKeyAlerts.getState().events.some((e) => e.kind === "outsider_refused")).toBe(false);
   });
 
   it("still grants when the membership cannot be checked, and says it could not", async () => {

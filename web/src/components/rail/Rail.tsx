@@ -28,7 +28,8 @@ import { serverMenuItems } from "@/components/sidebar/serverMenu";
 import { menuPoint } from "@/components/sidebar/ServerSidebar";
 import { lastChannelOf } from "@/stores/serverNav";
 import { useNexa } from "@/stores/nexa";
-import { useModeration } from "@/stores/moderation";
+import { unreadCount, useModeration } from "@/stores/moderation";
+import { moderationMenuItems } from "@/components/moderation/modMenu";
 import { NexaAvatar } from "@/components/nexa/NexaBits";
 import { FolderFace } from "./FolderFace";
 import { adoptRail, changeRail, folderMenuItems, folderName, serverArrangeItems, toggleFolder } from "./railActions";
@@ -103,8 +104,8 @@ export function Rail() {
   const nexaOpen = loc.pathname.startsWith("/channels/@me/nexa");
   const nexaUnread = nexaState && !nexaOpen && nexaListed(nexaState.latest, nexaClosed) ? nexaState.unread : 0;
   const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
-  // cases the member wrote in last, and bug reports waiting for an answer
-  const needsReply = useModeration((m) => (m.counts?.needs_reply ?? 0) + (m.bugCounts?.waiting ?? 0));
+  // case threads and bug reports waiting on the staff that hold something this person has not read
+  const needsReply = useModeration((m) => unreadCount(m.unread));
   const inPanel = loc.pathname.startsWith("/channels/@admin");
   // like the people themselves waiting at the door: who sent something, and how much; Nexa among them, by when it spoke
   const waiting: Waiting[] = unreadConversations(channels, reads, settings, openConvo).map((w) => ({ ...w, at: w.channel.last_message_id ?? w.channel.id }));
@@ -379,7 +380,15 @@ export function Rail() {
         <div className={s.item} data-selected={inPanel} data-unread={needsReply > 0 && !inPanel} data-testid="rail-moderation">
           <span className={s.pill} />
           <Tooltip text={t("moderation.title")} side="right">
-            <button className={s.btn} aria-label={needsReply > 0 ? t("moderation.railWithCount", { count: needsReply }) : t("moderation.title")} onClick={() => nav("/channels/@admin")}>
+            <button
+              className={s.btn}
+              aria-label={needsReply > 0 ? t("moderation.railWithCount", { count: needsReply }) : t("moderation.title")}
+              onClick={() => nav("/channels/@admin")}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                openContextMenu({ ...menuPoint(e), label: t("moderation.title"), items: moderationMenuItems() });
+              }}
+            >
               <Shield size={24} />
             </button>
           </Tooltip>

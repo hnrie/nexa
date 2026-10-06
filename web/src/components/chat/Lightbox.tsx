@@ -85,6 +85,8 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
   const root = useRef<HTMLDivElement>(null);
   const closeBtn = useRef<HTMLButtonElement>(null);
   const swipe = useRef<{ x: number; y: number; t: number; down: boolean } | null>(null);
+  /** The fingers on the picture: a second one makes it a pinch, never a swipe. */
+  const touches = useRef(new Set<number>());
   const stageRef = useRef<HTMLDivElement>(null);
   /** The picture follows a finger pulling it down, and the dark behind it lifts, until it is let go. */
   const follow = (dy: number | null, ms = 0) => {
@@ -175,6 +177,13 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
         // sideways swipe, and is put away with one up or down, as a phone's
         // photos are. Not over a clip, where a drag is the scrubber's.
         onPointerDown={(e) => {
+          if (e.pointerType === "touch") touches.current.add(e.pointerId);
+          if (touches.current.size > 1) {
+            // a second finger: the picture is being pinched, so it goes back where it was
+            if (swipe.current?.down) follow(null, 160);
+            swipe.current = null;
+            return;
+          }
           swipe.current = e.pointerType === "touch" && scale <= 1 && !video ? { x: e.clientX, y: e.clientY, t: e.timeStamp, down: false } : null;
         }}
         onPointerMove={(e) => {
@@ -186,6 +195,7 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
           if (from.down) follow(dy);
         }}
         onPointerUp={(e) => {
+          touches.current.delete(e.pointerId);
           const from = swipe.current;
           swipe.current = null;
           if (!from) return;
@@ -202,7 +212,8 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
           if (count < 2 || Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
           step((dx < 0) !== rtl ? 1 : -1);
         }}
-        onPointerCancel={() => {
+        onPointerCancel={(e) => {
+          touches.current.delete(e.pointerId);
           if (swipe.current?.down) follow(null, 220);
           swipe.current = null;
         }}

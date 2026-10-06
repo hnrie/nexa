@@ -176,6 +176,15 @@ export const api = {
   /** Called once for every 401 that came back from an authenticated request. */
   onUnauthorized: null as (() => void) | null,
 
+  /**
+   * Solves a captcha for the action the server named, or answers null when
+   * captchas are off (lib/captcha sets it). A request sent without a token
+   * that the server turns down for want of one is sent again once with one:
+   * a new username, a first message to a stranger and the rest are guarded
+   * wherever in the app they are asked for.
+   */
+  captchaSolver: null as ((action: string) => Promise<string | null>) | null,
+
   fetchImpl: defaultFetch,
 
   XHRImpl: (typeof XMLHttpRequest !== "undefined" ? XMLHttpRequest : null) as
@@ -244,6 +253,11 @@ export const api = {
       // factor and deleting an account all answer 401 for a password typed
       // wrong, and signing out over a typo would be worse than the bug.
       if (res.status === 401 && auth && err.code === "unauthorized") this.onUnauthorized?.();
+      const action = err.code === "captcha_required" && !hasHeader(headers, "x-captcha-token") ? res.headers.get("X-Captcha-Action") : null;
+      if (action && this.captchaSolver) {
+        const solved = await this.captchaSolver(action);
+        if (solved) return this.request<T>(method, path, body, { ...opts, headers: { ...opts?.headers, "X-Captcha-Token": solved } });
+      }
       throw err;
     }
     if (!raw) return undefined as T;

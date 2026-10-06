@@ -237,10 +237,14 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   const renderChannel = (ch: Channel) => {
     const rs = reads[ch.id];
     const unread = (ch.type === "text" || ch.type === "announcement") && isUnread(rs, ch.last_message_id) && !isMuted(settings, ch.id, serverId);
-    // the threads this account is in (or has open), still going, under the channel they belong to
-    const threads = holdsThreads(ch) ? selectThreads(channels, ch.id).filter((th) => !th.thread?.archived && (joinedThreads[th.id] || th.id === active)) : [];
+    // The threads this account is in, still going, under the channel they
+    // belong to: ones it started, wrote in or was brought into. Looking at a
+    // thread or a forum post is not joining it, so it does not stand here
+    // while it is open; its channel is shown as the place it is in instead.
+    const threads = holdsThreads(ch) ? selectThreads(channels, ch.id).filter((th) => !th.thread?.archived && joinedThreads[th.id]) : [];
     const mentions = rs?.mentions ?? 0;
-    const selected = active === ch.id;
+    const inside = !!active && channels[active]?.parent_id === ch.id && !joinedThreads[active] && (channels[active]?.type === "thread" || channels[active]?.type === "private_thread");
+    const selected = active === ch.id || inside;
     const priv = isPrivateChannel(serverId, ch.overwrites);
     const muted = settings.notifications.muted.includes(ch.id);
     return (
@@ -268,7 +272,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
             useUI.getState().setLeftOpen(false);
             if (ch.type === "voice") void joinVoice(ch.id);
           }}
-          aria-current={selected ? "page" : undefined}
+          aria-current={active === ch.id ? "page" : undefined}
         >
           <span className={s.icon}><ChannelGlyph channel={ch} size={20} locked={priv && ch.type !== "voice"} /></span>
           <span className={s.name}>{ch.name}</span>

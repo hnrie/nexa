@@ -6165,6 +6165,7 @@
   "android.update.body": "Android ऐप का नया संस्करण आ गया है। अपडेट करें इसे डाउनलोड करता है, फिर Android आपसे इसे इंस्टॉल करने को कहता है।",
   "android.update.failed": "नया संस्करण डाउनलोड नहीं हो सका। थोड़ी देर में फिर कोशिश करें।",
   "bugs.context.appAndroid": "Android ऐप",
+  "bugs.staff.finishedLocked": "यह रिपोर्ट \"{status}\" के रूप में चिह्नित है, इसलिए इसमें कोई नहीं लिख सकता। जवाब देने के लिए इसे फिर से खोलें।",
   "whatsNew.r202610028.swipeBody": "फ़ोन पर किसी संदेश का जवाब देने के लिए उसे बाईं ओर स्वाइप करें और तीर के चमकते ही छोड़ दें।",
   "whatsNew.r202610028.swipeTitle": "जवाब देने के लिए स्वाइप करें",
   "whatsNew.r20261004.statusEmojiTitle": "आपकी स्थिति में कस्टम इमोजी",
@@ -6179,5 +6180,24 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "अगर वहाँ Nexa पहले से चालू है, तो अनुमति अब भी ऐप की पुरानी प्रति की ओर इशारा करती है। अनुमति रीसेट करें चुनें, फिर Nexa को दोबारा चालू करें।",
   "desktop.displayPicker.theOldPermissionIsCleared": "पुरानी अनुमति हटा दी गई है।",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Screen Recording में Nexa को चालू करें। macOS, Nexa को फिर से खोलने का विकल्प देगा; अगर न दे, तो यहाँ से उसे दोबारा शुरू करें।",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS ने अनुमति रीसेट नहीं की। माइनस बटन से Nexa को Screen Recording से हटाएँ, फिर से जोड़ें और दोबारा शुरू करें।"
+  "desktop.displayPicker.couldNotResetThePermission": "macOS ने अनुमति रीसेट नहीं की। माइनस बटन से Nexa को Screen Recording से हटाएँ, फिर से जोड़ें और दोबारा शुरू करें।",
+  "moderation.chat.caseStart": "यह इस मामले के बारे में {name} के साथ बातचीत है। आप जो लिखते हैं वह उन्हें Nexa के रूप में आपके नाम के साथ पहुँचता है, और यहाँ कुछ भी एंड-टू-एंड एन्क्रिप्टेड नहीं है।",
+  "moderation.chat.reportStart": "यह {name} के साथ उनकी रिपोर्ट के बारे में बातचीत है। आप जो लिखते हैं वह उन्हें Nexa के रूप में आपके नाम के साथ पहुँचता है, और यहाँ कुछ भी एंड-टू-एंड एन्क्रिप्टेड नहीं है।",
+  "moderation.field.serverProfiles": "सर्वर पर प्रोफ़ाइल",
+  "moderation.form.bannerAlso": "हर सर्वर के उनके बैनर भी हट जाएँगे",
+  "moderation.form.inServersOnly": "केवल उनके सर्वर पर",
+  "moderation.sheet.inServers": {
+    "one": "{count} सर्वर पर",
+    "other": "{count} सर्वर पर"
+  },
+  "nexa.chat.caseStart": "यह इस मामले के बारे में Nexa टीम के साथ आपकी बातचीत है। यहाँ के संदेश और फ़ाइलें एंड-टू-एंड एन्क्रिप्टेड नहीं हैं: टीम उन्हें देख सकती है।",
+  "nexa.chat.fileTooBig": "तस्वीरें 10 MB तक और रिकॉर्डिंग 50 MB तक हो सकती हैं।",
+  "nexa.chat.notE2E": "एंड-टू-एंड एन्क्रिप्टेड नहीं: Nexa टीम यह बातचीत पढ़ सकती है।",
+  "nexa.chat.reportFinished": "यह रिपोर्ट \"{status}\" के रूप में चिह्नित है, इसलिए इसमें अब नहीं लिखा जा सकता। अगर यह फिर से होता है, तो नई रिपोर्ट भेजें।",
+  "nexa.chat.reportStart": "यह इस रिपोर्ट के बारे में Nexa टीम के साथ आपकी बातचीत है। बग रिपोर्ट एंड-टू-एंड एन्क्रिप्टेड नहीं होतीं: टीम उन्हें पढ़ सकती है।",
+  "nexa.chat.uploading": "अपलोड हो रहा है, {percent}%",
+  "threads.card.count": {
+    "one": "{count} संदेश",
+    "other": "{count} संदेश"
+  }
 }

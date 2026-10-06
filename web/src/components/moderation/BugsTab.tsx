@@ -10,8 +10,9 @@ import { LoadError } from "@/components/common/LoadError";
 import { SearchBox } from "@/components/common/SearchBox";
 import { Select } from "@/components/common/Select";
 import { Spinner } from "@/components/common/Spinner";
-import { BugReportCard, BugStatusChip, BugThumbStrip } from "@/components/bugs/BugReportCard";
-import { CaseThread } from "@/components/nexa/CaseThread";
+import { BugStatusChip, BugThumbStrip } from "@/components/bugs/BugReportCard";
+import { LockNote, ThreadChat } from "@/components/nexa/ThreadChat";
+import { ReportOpener, ThreadIntro } from "@/components/nexa/ThreadParts";
 import { bugFinished, bugNumber, bugStatusHint, bugStatusLabel } from "@/lib/bugs";
 import { describeError } from "@/lib/errors";
 import { personName, systemLineText } from "@/lib/moderation";
@@ -222,6 +223,7 @@ export function BugsTab() {
  */
 function BugRow({ r, people, selected, onPick }: { r: StaffBug; people: People; selected: boolean; onPick: () => void }) {
   const openModal = useUI((u) => u.openModal);
+  const fresh = useModeration((st) => st.unread.bugs.includes(r.id));
   const who = people[r.user_id];
   const name = who ? personName(who) : r.reporter_display_name || r.reporter_username;
   const gone = !who || who.deleted;
@@ -229,7 +231,7 @@ function BugRow({ r, people, selected, onPick }: { r: StaffBug; people: People; 
     if (!gone) openModal("profile", { userId: r.user_id });
   };
   return (
-    <li className={b.row} data-selected={selected || undefined} data-waiting={r.awaiting === "staff" || undefined} data-report={r.id}>
+    <li className={b.row} data-selected={selected || undefined} data-waiting={r.awaiting === "staff" || undefined} data-unread={fresh || undefined} data-report={r.id}>
       <span className={b.rowAvatar} onClick={openProfile} aria-hidden="true">
         <Avatar id={r.user_id} avatarId={who?.avatar_id ?? null} name={name} size={36} />
       </span>
@@ -238,6 +240,11 @@ function BugRow({ r, people, selected, onPick }: { r: StaffBug; people: People; 
         <span className={b.rowSubject} dir="auto">
           {r.subject}
         </span>
+        {fresh ? (
+          <span className={m.unreadDot}>
+            <span className="visually-hidden">{t("sidebar.serverSidebar.unread")}</span>
+          </span>
+        ) : null}
         <time className={b.rowTime} dateTime={new Date(r.last_activity_at).toISOString()}>
           {formatRelative(r.last_activity_at)}
         </time>
@@ -390,23 +397,44 @@ function StaffBugPane({ reportId, onBack, onChanged }: { reportId: string; onBac
           ) : null}
         </span>
       </div>
-      <CaseThread
-        messages={data.messages}
+      <ThreadChat
+        lines={data.messages}
         people={data.people}
         perspective="staff"
-        header={<BugReportCard report={r} people={data.people} />}
-        emptyNote={t("bugs.thread.emptyStaff")}
-        placeholder={t("bugs.thread.staffPlaceholder")}
+        fileKind="bugs"
+        intro={
+          <ThreadIntro avatar={<Avatar id={r.user_id} avatarId={reporter?.avatar_id ?? null} name={personName(reporter) || r.reporter_display_name} size={80} />} title={t("bugs.page.title", { number: bugNumber(r.number) })} sub={r.subject}>
+            {t("moderation.chat.reportStart", { name: personName(reporter) || r.reporter_display_name || r.reporter_username })}
+          </ThreadIntro>
+        }
+        opener={{ from: r.user_id, at: r.created_at, body: <ReportOpener report={r} /> }}
         onSend={
-          gone
+          gone || finished
             ? undefined
-            : async (body) => {
-                const res = await staffBugs.reply(reportId, body);
+            : async (body, files) => {
+                const res = await staffBugs.reply(reportId, body, files);
                 apply(res.report, res.messages);
               }
         }
-        composerNote={t("moderation.case.replyNote", { name: personName(reporter) })}
-        closedNote={gone ? t("moderation.case.goneNote") : undefined}
+        upload={staffBugs.upload}
+        placeholder={t("bugs.thread.staffPlaceholder")}
+        note={gone || finished ? undefined : t("moderation.case.replyNote", { name: personName(reporter) })}
+        dropName={t("bugs.page.title", { number: bugNumber(r.number) })}
+        onSeen={(lastId) => useModeration.getState().readThread("bug", reportId, lastId)}
+        locked={
+          gone ? (
+            <LockNote text={t("moderation.case.goneNote")} />
+          ) : (
+            <LockNote
+              text={t("bugs.staff.finishedLocked", { status: bugStatusLabel(r.status) })}
+              action={
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void setStatus("open")} data-testid="bug-reopen-locked">
+                  <RotateCcw size={15} aria-hidden="true" /> {t("bugs.staff.reopen")}
+                </Button>
+              }
+            />
+          )
+        }
       />
     </>
   );

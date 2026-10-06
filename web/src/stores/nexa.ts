@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { nexa as nexaApi, type Announcement, type CaseFile, type CaseMessage, type FeedItem, type MemberCase, type NexaState, type People, type Restriction } from "@/api/moderation";
-import { bugs as bugsApi, type BugMessage, type MemberBug } from "@/api/bugs";
+import { bugs as bugsApi, type BugFile, type BugMessage, type MemberBug } from "@/api/bugs";
 import { clearBugFiles } from "@/lib/bugMedia";
 
 /**
@@ -65,7 +65,7 @@ interface NexaStore {
   loadBugThread: (reportId: string) => Promise<BugThread>;
   /** A report of this account's moved: sent from another device, answered, or given a new status. */
   onBug: (report: MemberBug, messages: BugMessage[], people: People, st: NexaState) => void;
-  replyBug: (reportId: string, body: string) => Promise<void>;
+  replyBug: (reportId: string, body: string, files?: BugFile[]) => Promise<void>;
   markBugRead: (reportId: string) => void;
   dismissDeleted: () => void;
   /** Forgets the account's Nexa state on sign-out; a deletion notice stays. */
@@ -303,8 +303,8 @@ export const useNexa = create<NexaStore>()((set, get) => ({
     });
   },
 
-  replyBug: async (reportId, body) => {
-    const r = await bugsApi.reply(reportId, body);
+  replyBug: async (reportId, body, files = []) => {
+    const r = await bugsApi.reply(reportId, body, files);
     set((s) => {
       const open = s.bugThreads[reportId];
       return {

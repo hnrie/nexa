@@ -6266,6 +6266,7 @@
   "android.update.body": "Ha salido una versión nueva de la app para Android. Actualizar la descarga y después Android te pide instalarla.",
   "android.update.failed": "No se pudo descargar la versión nueva. Vuelve a intentarlo en un momento.",
   "bugs.context.appAndroid": "App de Android",
+  "bugs.staff.finishedLocked": "Este informe está marcado como «{status}», así que nadie puede escribir en él. Vuelve a abrirlo para responder.",
   "whatsNew.r202610028.swipeBody": "En el móvil, desliza un mensaje hacia la izquierda y suéltalo cuando se ilumine la flecha para responderlo.",
   "whatsNew.r202610028.swipeTitle": "Desliza para responder",
   "whatsNew.r20261004.statusEmojiTitle": "Emojis personalizados en tu estado",
@@ -6280,5 +6281,24 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Si Nexa ya está activado ahí, el permiso sigue apuntando a una copia anterior de la aplicación. Elige Restablecer permiso y vuelve a activar Nexa.",
   "desktop.displayPicker.theOldPermissionIsCleared": "El permiso antiguo se ha borrado.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Activa Nexa en Grabación de pantalla. macOS ofrecerá volver a abrir Nexa; si no lo hace, reinícialo aquí.",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS no restableció el permiso. Quita Nexa de Grabación de pantalla con el botón menos, vuelve a añadirlo y reinicia."
+  "desktop.displayPicker.couldNotResetThePermission": "macOS no restableció el permiso. Quita Nexa de Grabación de pantalla con el botón menos, vuelve a añadirlo y reinicia.",
+  "moderation.chat.caseStart": "Esta es la conversación con {name} sobre este caso. Lo que escribas le llega como Nexa, con tu nombre visible, y nada de aquí tiene cifrado de extremo a extremo.",
+  "moderation.chat.reportStart": "Esta es la conversación con {name} sobre su informe. Lo que escribas le llega como Nexa, con tu nombre visible, y nada de aquí tiene cifrado de extremo a extremo.",
+  "moderation.field.serverProfiles": "Perfiles en servidores",
+  "moderation.form.bannerAlso": "También se quitan sus banners de cada servidor",
+  "moderation.form.inServersOnly": "Solo en sus servidores",
+  "moderation.sheet.inServers": {
+    "one": "En {count} servidor",
+    "other": "En {count} servidores"
+  },
+  "nexa.chat.caseStart": "Esta es tu conversación con el equipo de Nexa sobre este caso. Los mensajes y archivos de aquí no tienen cifrado de extremo a extremo: el equipo puede verlos.",
+  "nexa.chat.fileTooBig": "Las imágenes pueden ocupar hasta 10 MB y las grabaciones hasta 50 MB.",
+  "nexa.chat.notE2E": "Sin cifrado de extremo a extremo: el equipo de Nexa puede leer esta conversación.",
+  "nexa.chat.reportFinished": "Este informe está marcado como «{status}», así que ya no se puede escribir en él. Si vuelve a pasar, envía un informe nuevo.",
+  "nexa.chat.reportStart": "Esta es tu conversación con el equipo de Nexa sobre este informe. Los informes de errores no tienen cifrado de extremo a extremo: el equipo puede leerlos.",
+  "nexa.chat.uploading": "Subiendo, {percent} %",
+  "threads.card.count": {
+    "one": "{count} mensaje",
+    "other": "{count} mensajes"
+  }
 }

@@ -1,6 +1,6 @@
 import { CalendarDays, ChevronRight, Clock, Copy, Crown, Eraser, ImageOff, ShieldCheck, UserRoundX } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import type { ModMembership, ModPack, ModUser, ResetField } from "@/api/moderation";
+import { hasServerProfile, type ModMembership, type ModPack, type ModUser, type ResetField } from "@/api/moderation";
 import { bannerUrl } from "@/api/users";
 import { StatusEmoji, statusEmojiText } from "@/components/activity/StatusEmoji";
 import { Avatar } from "@/components/common/Avatar";
@@ -64,6 +64,10 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
   const reset = (f: ResetField) => onModerate({ action: "field_reset", preset: { fields: [f] } });
   const status = [statusEmojiText(user.status_emoji), user.status_text].filter(Boolean).join(" ");
   const nicknamed = servers.filter((s) => s.nickname);
+  const profiled = servers.filter(hasServerProfile);
+  // the same pictures in another place: what Remove takes as well
+  const serverAvatars = servers.filter((s) => s.avatar_id).length;
+  const serverBanners = servers.filter((s) => s.banner_id).length;
   const typing = typingStyleText(readTypingStyle(user.typing_style));
   const widgets = widgetsText(readWidgets(user.widgets), widgetTitle);
   const owned = servers.filter((s) => s.owner);
@@ -72,8 +76,8 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
     {
       part: "avatar",
       label: t("moderation.field.avatar"),
-      value: user.avatar_id ? <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={36} /> : t("moderation.sheet.notSet"),
-      empty: !user.avatar_id,
+      value: user.avatar_id ? <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={36} /> : serverAvatars ? t("moderation.sheet.inServers", { count: serverAvatars }) : t("moderation.sheet.notSet"),
+      empty: !user.avatar_id && !serverAvatars,
       action: t("moderation.sheet.remove"),
       icon: <ImageOff size={15} aria-hidden="true" />,
       run: () => onModerate({ action: "avatar_remove", preset: { images: { avatar: true, banner: false } } }),
@@ -82,8 +86,8 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
     {
       part: "banner",
       label: t("moderation.field.banner"),
-      value: user.banner_id ? <span className={p.bannerThumb} style={{ backgroundImage: `url(${bannerUrl(user.banner_id, 240)})` }} role="img" aria-label={t("moderation.field.banner")} /> : t("moderation.sheet.notSet"),
-      empty: !user.banner_id,
+      value: user.banner_id ? <span className={p.bannerThumb} style={{ backgroundImage: `url(${bannerUrl(user.banner_id, 240)})` }} role="img" aria-label={t("moderation.field.banner")} /> : serverBanners ? t("moderation.sheet.inServers", { count: serverBanners }) : t("moderation.sheet.notSet"),
+      empty: !user.banner_id && !serverBanners,
       action: t("moderation.sheet.remove"),
       icon: <ImageOff size={15} aria-hidden="true" />,
       run: () => onModerate({ action: "avatar_remove", preset: { images: { avatar: false, banner: true } } }),
@@ -139,6 +143,27 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
       icon: <Eraser size={15} aria-hidden="true" />,
       run: () => reset("nicknames"),
       testid: "sheet-nicknames",
+    },
+    {
+      part: null,
+      label: fieldLabel("server_profiles"),
+      value: profiled.length ? (
+        <ul className={p.nickList}>
+          {profiled.map((s) => (
+            <li key={s.server_id}>
+              <span className={p.nickServer}>{s.name}</span>
+              <bdi className={p.nick}>{[s.pronouns, s.bio ? previewText(s.bio) : "", s.widgets ? t("moderation.field.widgets") : ""].filter(Boolean).join(" / ")}</bdi>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        t("moderation.sheet.none")
+      ),
+      empty: profiled.length === 0,
+      action: t("moderation.sheet.resetAll"),
+      icon: <Eraser size={15} aria-hidden="true" />,
+      run: () => reset("server_profiles"),
+      testid: "sheet-server_profiles",
     },
     {
       part: null,

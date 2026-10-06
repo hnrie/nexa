@@ -6,7 +6,7 @@
  * up with the pointer.
  */
 import { useCallback, useEffect, useImperativeHandle, useRef, type ReactNode, type Ref } from "react";
-import { clampView, pinchView, type View } from "@/lib/zoomPan";
+import { clampView, pinchView, type Size, type View } from "@/lib/zoomPan";
 
 /** Where a double click lands when the picture is at its own size. */
 const STEP = 2.5;
@@ -71,7 +71,14 @@ export function ZoomPan({
     report.current?.(v.scale);
   }, []);
 
-  const box = () => ({ width: ref.current?.clientWidth ?? 0, height: ref.current?.clientHeight ?? 0 });
+  const box = (): Size => ({ width: ref.current?.clientWidth ?? 0, height: ref.current?.clientHeight ?? 0 });
+  /** The picture's own size as drawn at the whole view (a transform leaves the layout alone), centred in the box. */
+  const content = (): Size => {
+    const target = ref.current?.firstElementChild as HTMLElement | null;
+    const b = box();
+    if (!target || !target.offsetWidth || !target.offsetHeight) return b;
+    return { width: Math.min(target.offsetWidth, b.width), height: Math.min(target.offsetHeight, b.height) };
+  };
   const reset = useCallback(() => {
     view.current = { scale: 1, x: 0, y: 0 };
     points.current.clear();
@@ -80,8 +87,12 @@ export function ZoomPan({
   }, [apply]);
   const zoomAt = useCallback(
     (pt: { x: number; y: number }, factor: number) => {
-      view.current = pinchView(view.current, pt, pt, factor, box());
+      view.current = pinchView(view.current, pt, pt, factor, box(), content());
       apply();
+      // A drag going on while the wheel zooms goes on from the new view: it
+      // kept the view it started from, and the next move undid the zoom.
+      const list = [...points.current.values()];
+      gesture.current = list.length ? { start: { ...view.current }, from: middle(list), spread: spread(list) } : null;
     },
     [apply],
   );
@@ -90,7 +101,7 @@ export function ZoomPan({
     (fx: number, fy: number) => {
       if (view.current.scale <= 1) return false;
       const b = box();
-      view.current = clampView({ ...view.current, x: view.current.x + fx * b.width, y: view.current.y + fy * b.height }, b);
+      view.current = clampView({ ...view.current, x: view.current.x + fx * b.width, y: view.current.y + fy * b.height }, b, content());
       apply();
       return true;
     },
@@ -131,7 +142,7 @@ export function ZoomPan({
   const toggle = (pt: { x: number; y: number }) => {
     if (view.current.scale > 1) reset();
     else {
-      view.current = clampView({ scale: STEP, x: -pt.x * (STEP - 1), y: -pt.y * (STEP - 1) }, box());
+      view.current = clampView({ scale: STEP, x: -pt.x * (STEP - 1), y: -pt.y * (STEP - 1) }, box(), content());
       apply();
     }
   };
@@ -141,23 +152,38 @@ export function ZoomPan({
       ref={ref}
       className={className}
       onPointerDown={(e) => {
-        if (e.pointerType !== "touch" && view.current.scale <= 1) return;
+        // a mouse's main button is held from the start, so a picture zoomed
+        // with the wheel while it is down can be dragged at once
+        if (e.pointerType !== "touch" && e.button !== 0) return;
         points.current.set(e.pointerId, at(e));
         moved.current = false;
-        e.currentTarget.setPointerCapture?.(e.pointerId);
+        if (e.pointerType === "touch" || view.current.scale > 1) e.currentTarget.setPointerCapture?.(e.pointerId);
         restart();
       }}
       onPointerMove={(e) => {
         if (!points.current.has(e.pointerId)) return;
         const before = points.current.get(e.pointerId)!;
         const now = at(e);
+        // the button let go somewhere this never heard of: not a drag any more
+        if (e.pointerType !== "touch" && (e.buttons & 1) === 0) {
+          points.current.delete(e.pointerId);
+          restart();
+          return;
+        }
+        // a mouse at the whole view is not dragging anything: it is pointing
+        if (e.pointerType !== "touch" && view.current.scale <= 1) {
+          points.current.set(e.pointerId, now);
+          restart();
+          return;
+        }
         if (Math.hypot(now.x - before.x, now.y - before.y) > 2) moved.current = true;
         points.current.set(e.pointerId, now);
         const g = gesture.current;
         if (!g) return;
+        if (e.pointerType !== "touch" && !ref.current?.hasPointerCapture?.(e.pointerId)) ref.current?.setPointerCapture?.(e.pointerId);
         const list = [...points.current.values()];
         const factor = list.length > 1 && g.spread > 0 ? spread(list) / g.spread : 1;
-        view.current = pinchView(g.start, g.from, middle(list), factor, box());
+        view.current = pinchView(g.start, g.from, middle(list), factor, box(), content());
         apply();
       }}
       onPointerUp={lift}

@@ -72,6 +72,8 @@ export interface BugMessage {
   event: "" | "status";
   body: string;
   created_at: number;
+  /** The pictures and recordings sent with it; absent when it has none. */
+  files?: BugFile[];
 }
 
 /** A report as the staff see it. */
@@ -124,8 +126,8 @@ export const bugs = {
   thread(id: Snowflake): Promise<BugThread<MemberBug>> {
     return api.request("GET", `/bugs/${id}`);
   },
-  reply(id: Snowflake, body: string): Promise<{ message: BugMessage; messages: BugMessage[]; report: MemberBug }> {
-    return api.request("POST", `/bugs/${id}/messages`, { body });
+  reply(id: Snowflake, body: string, files: BugFile[] = []): Promise<{ message: BugMessage; messages: BugMessage[]; report: MemberBug }> {
+    return api.request("POST", `/bugs/${id}/messages`, { body, files: files.map((f) => ({ id: f.id, name: f.name })) });
   },
   read(id: Snowflake, messageId: Snowflake): Promise<void> {
     return api.request("POST", `/bugs/${id}/read`, { message_id: messageId });
@@ -156,8 +158,17 @@ export const staffBugs = {
   thread(id: Snowflake): Promise<BugThread<StaffBug>> {
     return api.request("GET", `/moderation/bugs/${id}`);
   },
-  reply(id: Snowflake, body: string): Promise<{ message: BugMessage; messages: BugMessage[]; report: StaffBug }> {
-    return api.request("POST", `/moderation/bugs/${id}/messages`, { body });
+  reply(id: Snowflake, body: string, files: BugFile[] = []): Promise<{ message: BugMessage; messages: BugMessage[]; report: StaffBug }> {
+    return api.request("POST", `/moderation/bugs/${id}/messages`, { body, files: files.map((f) => ({ id: f.id, name: f.name })) });
+  },
+  /** Puts one file up for a staff line not sent yet. */
+  upload(file: Blob, name: string, opts?: Pick<UploadOptions, "onProgress" | "signal">): Promise<BugFile> {
+    const q = name ? `?name=${encodeURIComponent(name.slice(0, 120))}` : "";
+    return api.upload<BugFile>(`/moderation/bugs/attachments${q}`, file, { ...opts, headers: { "Content-Type": file.type || "application/octet-stream" } });
+  },
+  /** Reads one report up to a line, or all of it. */
+  read(id: Snowflake, messageId?: Snowflake): Promise<import("./moderation").ModUnread> {
+    return api.request("POST", `/moderation/bugs/${id}/read`, messageId ? { message_id: messageId } : {});
   },
   setStatus(id: Snowflake, status: BugStatus): Promise<{ report: StaffBug; messages: BugMessage[]; people: People }> {
     return api.request("POST", `/moderation/bugs/${id}/status`, { status });

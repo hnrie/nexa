@@ -27,7 +27,7 @@ import type {
   StickerPack,
   VoiceState,
 } from "@/api/types";
-import type { Announcement, CaseCounts, CaseMessage, MemberCase, ModLogEntry, NexaState, People, StaffCase } from "@/api/moderation";
+import type { Announcement, CaseCounts, CaseMessage, MemberCase, ModLogEntry, ModUnread, NexaState, People, StaffCase } from "@/api/moderation";
 import type { BugCounts, BugMessage, MemberBug, StaffBug } from "@/api/bugs";
 
 /** What a deleted message mentioned, which is what unread badges counted it by. */
@@ -120,6 +120,8 @@ export type GatewayEvent =
   | { t: "nexa_bug"; d: { report: MemberBug; messages: BugMessage[]; people: People; state: NexaState } }
   /** Staff: a bug report arrived or changed, with any new lines of its thread. */
   | { t: "mod_bug"; d: { report: StaffBug; messages: BugMessage[]; people: People; counts: BugCounts } }
+  /** Staff: the case threads and bug reports waiting on the staff that this person has not read. */
+  | { t: "mod_unread"; d: ModUnread }
   /** This account's linked Discord account changed: linked, unlinked, out of the activity server or back in it. */
   | { t: "discord_link"; d: DiscordState }
   /** A thread started, changed (renamed, closed, opened, locked, retagged) or was shown to someone just put in it. */

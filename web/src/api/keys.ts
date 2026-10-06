@@ -24,4 +24,8 @@ export const keys = {
   epochs(conv_id: Snowflake): Promise<{ epochs: KeyEpoch[]; flags: KeyFlags; entitled: Snowflake[] }> {
     return api.request("GET", "/keys/epochs", undefined, { query: { conv_id } });
   },
+  /** Asks the members holding a conversation's keys, who are online, to hand them over again. */
+  request(conv_id: Snowflake): Promise<void> {
+    return api.request("POST", "/keys/request", { conv_id });
+  },
 };

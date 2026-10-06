@@ -6165,6 +6165,7 @@
   "android.update.body": "A new version of the Android app is out. Update downloads it, then Android asks you to install it.",
   "android.update.failed": "The new version could not be downloaded. Try again in a moment.",
   "bugs.context.appAndroid": "Android app",
+  "bugs.staff.finishedLocked": "This report is marked {status}, so nobody can write in it. Reopen it to reply.",
   "whatsNew.r202610028.swipeBody": "On a phone, swipe a message to the left and let go when the arrow lights up to reply to it.",
   "whatsNew.r202610028.swipeTitle": "Swipe to Reply",
   "whatsNew.r20261004.statusEmojiTitle": "Custom Emoji in Your Status",
@@ -6179,5 +6180,24 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "If Nexa is already on there, the permission still points to an older copy of the app. Choose Reset Permission, then turn Nexa on again.",
   "desktop.displayPicker.theOldPermissionIsCleared": "The old permission is cleared.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Turn Nexa on in Screen Recording. macOS offers to reopen Nexa; if it doesn't, restart it here.",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS didn't reset the permission. Remove Nexa from Screen Recording with the minus button, add it again, and restart."
+  "desktop.displayPicker.couldNotResetThePermission": "macOS didn't reset the permission. Remove Nexa from Screen Recording with the minus button, add it again, and restart.",
+  "moderation.chat.caseStart": "This is the conversation with {name} about this case. What you write reaches them as Nexa, with your name shown, and nothing here is end-to-end encrypted.",
+  "moderation.chat.reportStart": "This is the conversation with {name} about their report. What you write reaches them as Nexa, with your name shown, and nothing here is end-to-end encrypted.",
+  "moderation.field.serverProfiles": "Server profiles",
+  "moderation.form.bannerAlso": "Their per-server banners go too",
+  "moderation.form.inServersOnly": "Only in their servers",
+  "moderation.sheet.inServers": {
+    "one": "In {count} server",
+    "other": "In {count} servers"
+  },
+  "nexa.chat.caseStart": "This is your conversation with the Nexa team about this case. Messages and files here aren't end-to-end encrypted: the team can see them.",
+  "nexa.chat.fileTooBig": "Pictures can be up to 10 MB and recordings up to 50 MB.",
+  "nexa.chat.notE2E": "Not end-to-end encrypted: the Nexa team can read this conversation.",
+  "nexa.chat.reportFinished": "This report is marked {status}, so it can't be written in anymore. If it happens again, send a new report.",
+  "nexa.chat.reportStart": "This is your conversation with the Nexa team about this report. Bug reports aren't end-to-end encrypted: the team can read them.",
+  "nexa.chat.uploading": "Uploading, {percent}%",
+  "threads.card.count": {
+    "one": "{count} Message",
+    "other": "{count} Messages"
+  }
 }

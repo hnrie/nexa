@@ -2,12 +2,14 @@
  * Song previews: thirty seconds of a song on someone's Favourite Songs,
  * played through this server (handleMusicPreview in internal/api/widgets.go)
  * so the listener never contacts Deezer. One plays at a time anywhere in the
- * app, at the volume voice notes and videos play at, and the list that
- * started one stops it as it goes away.
+ * app, at a volume of their own that every list's slider sets (starting from
+ * the one voice notes and videos play at), and the list that started one
+ * stops it as it goes away.
  */
 import { create } from "zustand";
 import { api } from "@/api/client";
 import { mediaPrefs } from "@/components/chat/mediaPrefs";
+import { storage } from "@/lib/storage";
 import { t } from "@/i18n";
 import { musicArtUrl, type WidgetMusic } from "@/lib/widgets";
 import { useUI } from "@/stores/ui";
@@ -20,15 +22,32 @@ export interface PreviewState {
   state: "loading" | "playing" | "paused";
   /** How far through it is, from 0 to 1. */
   progress: number;
+  /** How loud previews play, from 0 to 1, and whether they are muted: this device's, kept. */
+  volume: number;
+  muted: boolean;
 }
 
-const IDLE: PreviewState = { id: null, owner: null, state: "paused", progress: 0 };
+const VOLUME_KEY = "ec:songVolume";
 
-export const usePreview = create<PreviewState>(() => IDLE);
+/** The volume kept on this device, or the one videos play at until one is set. */
+function keptVolume(): { volume: number; muted: boolean } {
+  try {
+    const raw = JSON.parse(storage.get(VOLUME_KEY) ?? "null") as { volume?: unknown; muted?: unknown } | null;
+    if (raw && typeof raw.volume === "number" && Number.isFinite(raw.volume)) return { volume: Math.min(1, Math.max(0, raw.volume)), muted: raw.muted === true };
+  } catch {
+    /* kept wrong: start from the videos' */
+  }
+  const prefs = mediaPrefs();
+  return { volume: prefs.volume, muted: prefs.muted };
+}
+
+const IDLE = { id: null, owner: null, state: "paused", progress: 0 } as const;
+
+export const usePreview = create<PreviewState>(() => ({ ...IDLE, ...keptVolume() }));
 
 let player: HTMLAudioElement | null = null;
 
-const idle = () => usePreview.setState(IDLE);
+const idle = () => usePreview.setState({ ...IDLE });
 
 function audio(): HTMLAudioElement {
   if (player) return player;
@@ -70,9 +89,9 @@ export function togglePreview(song: WidgetMusic, owner: string): void {
     else el.pause();
     return;
   }
-  const prefs = mediaPrefs();
-  el.volume = prefs.volume;
-  el.muted = prefs.muted;
+  const { volume, muted } = usePreview.getState();
+  el.volume = volume;
+  el.muted = muted;
   el.src = `${api.baseUrl}/media/music/preview/${song.id}`;
   usePreview.setState({ id: song.id, owner, state: "loading", progress: 0 });
   play(el);
@@ -94,4 +113,33 @@ export function stopPreview(owner: string): void {
   player.pause();
   player.removeAttribute("src");
   player.load();
+}
+
+/** Sets how loud previews play, on the one playing now too, and keeps it on this device. */
+export function setPreviewVolume(volume: number, muted: boolean): void {
+  const v = Math.min(1, Math.max(0, volume));
+  usePreview.setState({ volume: v, muted });
+  if (player) {
+    player.volume = v;
+    player.muted = muted;
+  }
+  storage.set(VOLUME_KEY, JSON.stringify({ volume: v, muted }));
+}
+
+let volumeWorks: boolean | null = null;
+
+/**
+ * Whether this browser lets a page set how loud it plays. An iPhone's never
+ * does (its volume is the phone's own buttons); muting still works there.
+ */
+export function volumeAdjustable(): boolean {
+  if (volumeWorks !== null) return volumeWorks;
+  try {
+    const probe = new Audio();
+    probe.volume = 0.5;
+    volumeWorks = Math.abs(probe.volume - 0.5) < 0.01;
+  } catch {
+    volumeWorks = false;
+  }
+  return volumeWorks;
 }

@@ -66,6 +66,7 @@ function nowValue(f: AnyField, d: CaseDetails): string {
       return t("nexa.notice.madePrivate");
     case "status":
     case "nicknames":
+    case "server_profiles":
     case "description":
       return t("nexa.notice.cleared");
     case "icon":
@@ -87,7 +88,7 @@ function ChangedFields({ d, staff, label, labelOf = (f) => fieldLabel(f as Reset
         <div className={s.fieldRow} role="row" key={f}>
           <span className={s.fieldName} role="cell">{labelOf(f)}</span>
           <span className={s.fieldValue} role="cell">
-            <span className={s.newValue} data-word={f === "status" || f === "nicknames" || f === "description" || f === "icon" || f === "banner" || f === "public" || undefined}>{nowValue(f, d)}</span>
+            <span className={s.newValue} data-word={f === "status" || f === "nicknames" || f === "server_profiles" || f === "description" || f === "icon" || f === "banner" || f === "public" || undefined}>{nowValue(f, d)}</span>
             {staff && d.old?.[f] ? <WasValue field={f} value={d.old[f]!} /> : null}
           </span>
         </div>

@@ -5942,6 +5942,7 @@
   "android.update.body": "Android 앱의 새 버전이 나왔어요. 업데이트를 누르면 내려받은 뒤 Android가 설치할지 물어봐요.",
   "android.update.failed": "새 버전을 내려받지 못했어요. 잠시 후 다시 시도해 주세요.",
   "bugs.context.appAndroid": "Android 앱",
+  "bugs.staff.finishedLocked": "이 신고는 '{status}'(으)로 표시되어 아무도 글을 쓸 수 없습니다. 답장하려면 다시 여세요.",
   "whatsNew.r202610028.swipeBody": "휴대폰에서 메시지를 왼쪽으로 밀고 화살표가 밝아지면 손을 떼면 답장할 수 있어요.",
   "whatsNew.r202610028.swipeTitle": "밀어서 답장",
   "whatsNew.r20261004.statusEmojiTitle": "상태에 맞춤 이모지",
@@ -5956,5 +5957,22 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "그곳에서 Nexa가 이미 켜져 있다면, 권한이 아직 예전 앱 사본을 가리키고 있습니다. 권한 재설정을 선택한 다음 Nexa를 다시 켜세요.",
   "desktop.displayPicker.theOldPermissionIsCleared": "예전 권한을 지웠습니다.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "화면 기록에서 Nexa를 켜세요. macOS가 Nexa를 다시 열도록 안내합니다. 안내가 없으면 여기서 다시 시작하세요.",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS가 권한을 재설정하지 않았습니다. 화면 기록에서 빼기 버튼으로 Nexa를 지운 뒤 다시 추가하고 재시작하세요."
+  "desktop.displayPicker.couldNotResetThePermission": "macOS가 권한을 재설정하지 않았습니다. 화면 기록에서 빼기 버튼으로 Nexa를 지운 뒤 다시 추가하고 재시작하세요.",
+  "moderation.chat.caseStart": "이 케이스에 관한 {name} 님과의 대화입니다. 작성한 내용은 내 이름이 표시된 채 Nexa로 전달되며, 여기의 어떤 것도 종단 간 암호화되지 않습니다.",
+  "moderation.chat.reportStart": "{name} 님의 신고에 관한 대화입니다. 작성한 내용은 내 이름이 표시된 채 Nexa로 전달되며, 여기의 어떤 것도 종단 간 암호화되지 않습니다.",
+  "moderation.field.serverProfiles": "서버 프로필",
+  "moderation.form.bannerAlso": "서버별 배너도 함께 삭제됩니다",
+  "moderation.form.inServersOnly": "서버에서만",
+  "moderation.sheet.inServers": {
+    "other": "서버 {count}곳"
+  },
+  "nexa.chat.caseStart": "이 케이스에 관한 Nexa 팀과의 대화입니다. 여기의 메시지와 파일은 종단 간 암호화되지 않아 팀이 볼 수 있습니다.",
+  "nexa.chat.fileTooBig": "사진은 최대 10MB, 녹화는 최대 50MB까지 가능합니다.",
+  "nexa.chat.notE2E": "종단 간 암호화되지 않음: Nexa 팀이 이 대화를 읽을 수 있습니다.",
+  "nexa.chat.reportFinished": "이 신고는 '{status}'(으)로 표시되어 더 이상 글을 쓸 수 없습니다. 다시 발생하면 새 신고를 보내 주세요.",
+  "nexa.chat.reportStart": "이 신고에 관한 Nexa 팀과의 대화입니다. 버그 신고는 종단 간 암호화되지 않아 팀이 읽을 수 있습니다.",
+  "nexa.chat.uploading": "업로드 중, {percent}%",
+  "threads.card.count": {
+    "other": "메시지 {count}개"
+  }
 }

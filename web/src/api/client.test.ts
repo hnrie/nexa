@@ -510,3 +510,44 @@ describe("api.upload", () => {
     expect(err.code).toBe("no_xhr");
   });
 });
+
+describe("a request the server wants a captcha for", () => {
+  afterEach(() => {
+    api.captchaSolver = null;
+  });
+
+  it("is solved for the action the server names and sent again once", async () => {
+    let n = 0;
+    const calls = useFetch(() => {
+      n += 1;
+      return n === 1
+        ? json({ error: { code: "captcha_required", message: "Please complete the captcha." } }, 403, { "X-Captcha-Action": "username" })
+        : json({ id: "1", username: "alice2" });
+    });
+    const asked: string[] = [];
+    api.captchaSolver = async (action) => {
+      asked.push(action);
+      return "solved-token";
+    };
+    const out = await api.request<{ username: string }>("PATCH", "/users/@me", { username: "alice2" });
+    expect(out.username).toBe("alice2");
+    expect(asked).toEqual(["username"]);
+    expect(calls).toHaveLength(2);
+    expect(headersOf(calls[0]!)["x-captcha-token"]).toBeUndefined();
+    expect(headersOf(calls[1]!)["x-captcha-token"]).toBe("solved-token");
+    expect(calls[1]!.init.body).toBe(JSON.stringify({ username: "alice2" }));
+  });
+
+  it("is refused as it was when captchas are off here, or a token was already sent", async () => {
+    useFetch(() => json({ error: { code: "captcha_required", message: "Please complete the captcha." } }, 403, { "X-Captcha-Action": "dm" }));
+    api.captchaSolver = async () => null;
+    await expect(api.request("POST", "/users/@me/channels", { recipient_ids: ["2"] })).rejects.toMatchObject({ code: "captcha_required" });
+    let solved = 0;
+    api.captchaSolver = async () => {
+      solved += 1;
+      return "t";
+    };
+    await expect(api.request("POST", "/users/@me/channels", { recipient_ids: ["2"] }, { headers: { "X-Captcha-Token": "old" } })).rejects.toBeInstanceOf(ApiError);
+    expect(solved).toBe(0);
+  });
+});

@@ -15,6 +15,13 @@ const MAX_CHAN_KEYS = 512;
 
 const chanKeys = new Map<string, Uint8Array>();
 
+/**
+ * Told whenever a message could not be read for want of its conversation's
+ * key (lib/decrypt), so stores/keys asks the holders again. A plain list
+ * rather than an import of the store, which would make a loop of the two.
+ */
+export const missingKeyListeners = new Set<(conv: string, epoch: number) => void>();
+
 /** Channel key for (conv, epoch, channel), memoised; undefined without the root. */
 export function channelKeyFor(conv: string, epoch: number, channelId: string): Uint8Array | undefined {
   const k = `${conv}:${epoch}:${channelId}`;

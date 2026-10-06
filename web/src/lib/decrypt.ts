@@ -2,7 +2,7 @@ import type { Message } from "@/api/types";
 import { decryptMessage, isEnvelope, type MessagePayload } from "@/crypto/message";
 import { decryptCallLine, type CallSummary } from "@/voice/callSummary";
 import { openCopy } from "./follows";
-import { channelKeyFor } from "./keyring";
+import { channelKeyFor, missingKeyListeners } from "./keyring";
 import { listedAttachments, sanitizeHook, type HookContent } from "./webhookMessage";
 
 export type DecryptError = "no_key" | "bad";
@@ -61,6 +61,7 @@ export async function decryptForStore(msg: Message): Promise<DecryptedMessage> {
   const key = channelKeyFor(msg.key_conv_id, msg.key_epoch, msg.channel_id);
   if (!key) {
     out.decryptError = "no_key";
+    for (const l of missingKeyListeners) l(msg.key_conv_id, msg.key_epoch);
     return out;
   }
   try {

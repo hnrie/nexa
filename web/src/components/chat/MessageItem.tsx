@@ -348,7 +348,6 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
         </>
       )}
       {editing ? <EditMessage msg={msg} /> : <MessageBody msg={msg} name={name} id={bodyId} pending={pending} upload={upload} />}
-      {msg.thread && serverId && !pending ? <ThreadChip serverId={serverId} summary={msg.thread} /> : null}
       {!pending && !editing && canPublish(msg) ? (
         <button type="button" className={s.publishBtn} onClick={() => void publish(msg)} data-testid="publish">
           <Megaphone size={15} aria-hidden="true" />
@@ -356,6 +355,8 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
         </button>
       ) : null}
       {!pending ? <Reactions msg={msg} pickerAnchor={picker} onOpenPicker={setPicker} onPickerClose={() => setPicker(null)} /> : null}
+      {/* the thread it started hangs under everything the message carries, its reactions too */}
+      {msg.thread && serverId && !pending ? <ThreadChip serverId={serverId} summary={msg.thread} /> : null}
       {!pending && !editing && !selecting && (active || menuOpen) ? <RowToolbar msg={msg} pinned={pinned} dev={dev} setPicker={setPicker} openMenu={openMenu} /> : null}
       {dev && !pending ? <span hidden data-dev-id={msg.id} /> : null}
     </div>

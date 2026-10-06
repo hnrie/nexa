@@ -12,7 +12,7 @@ import type { BugCounts, BugMessage, MemberBug } from "./bugs";
 import type { Activity, Emoji, PublicUser, ServerTag, Snowflake, StickerPack } from "./types";
 
 export type ModAction = "avatar_remove" | "field_reset" | "mute" | "ban" | "delete" | "server_reset" | "expression_takedown";
-export type ResetField = "username" | "display_name" | "about_me" | "pronouns" | "status" | "nicknames" | "typing_style" | "widgets" | "server_tag";
+export type ResetField = "username" | "display_name" | "about_me" | "pronouns" | "status" | "nicknames" | "server_profiles" | "typing_style" | "widgets" | "server_tag";
 /** What a server_reset can take back of what a server shows everyone. */
 export type ServerField = "icon" | "banner" | "name" | "description" | "tag";
 /** What an expression_takedown can take back of a pack: its name, its description, its public listing. */
@@ -164,6 +164,12 @@ export interface CaseCounts {
   all: number;
 }
 
+/** The case threads and bug reports waiting on the staff that this member of staff has not read. */
+export interface ModUnread {
+  cases: Snowflake[];
+  bugs: Snowflake[];
+}
+
 /** An account's standing, as it arrives with the account and on every change. */
 export interface NexaState {
   /** The Nexa system account's id. */
@@ -178,8 +184,8 @@ export interface NexaState {
   people: People;
   /** The owner of Nexa, for every account ("0" when there is none yet; absent from older servers). */
   owner_id?: Snowflake;
-  /** Staff only: what is waiting on them (bug report counts are absent from older servers). */
-  staff?: { counts: CaseCounts; owner_id: Snowflake; bugs?: BugCounts };
+  /** Staff only: what is waiting on them (bug report counts and what they have not read are absent from older servers). */
+  staff?: { counts: CaseCounts; owner_id: Snowflake; bugs?: BugCounts; unread?: ModUnread };
 }
 
 export interface Announcement {
@@ -223,7 +229,7 @@ export interface ModUser extends PublicUser {
   widgets?: unknown;
 }
 
-/** A server someone owns, or goes by a nickname or a picture of their own in. */
+/** A server someone owns, or has a profile of their own in: a nickname, a picture, a banner, a bio, pronouns or widgets. */
 export interface ModMembership {
   server_id: Snowflake;
   name: string;
@@ -231,8 +237,18 @@ export interface ModMembership {
   owner: boolean;
   nickname: string;
   avatar_id: Snowflake | null;
+  /** The rest of their profile there (absent from older servers). */
+  banner_id?: Snowflake | null;
+  bio?: string;
+  pronouns?: string;
+  widgets?: string;
   member_count: number;
   joined_at: number;
+}
+
+/** Whether a membership carries words of its own that a server_profiles reset clears. */
+export function hasServerProfile(m: ModMembership): boolean {
+  return !!(m.bio || m.pronouns || (m.widgets && m.widgets !== "[]"));
 }
 
 /** A server as the panel shows it: what it shows everyone, who owns it, how many are in it. */
@@ -367,8 +383,16 @@ export const nexa = {
 };
 
 export const moderation = {
-  summary(): Promise<{ counts: CaseCounts; bugs?: BugCounts | null; owner_id: Snowflake; nexa_id: Snowflake; staff_ids: Snowflake[]; people: People }> {
+  summary(): Promise<{ counts: CaseCounts; bugs?: BugCounts | null; unread?: ModUnread; owner_id: Snowflake; nexa_id: Snowflake; staff_ids: Snowflake[]; people: People }> {
     return api.request("GET", "/moderation/summary");
+  },
+  /** Mark as Read: every case thread and bug report, read up to now. */
+  readAll(): Promise<ModUnread> {
+    return api.request("POST", "/moderation/read");
+  },
+  /** Reads one case thread up to a line, or all of it. */
+  readCase(caseId: Snowflake, messageId?: Snowflake): Promise<ModUnread> {
+    return api.request("POST", `/moderation/cases/${caseId}/read`, messageId ? { message_id: messageId } : {});
   },
   users(p: { q?: string; show?: GridShow; sort?: GridSort; cursor?: string; limit?: number }): Promise<{ users: ModUser[]; next_cursor: string }> {
     return api.request("GET", "/moderation/users", undefined, { query: { q: p.q || undefined, show: p.show, sort: p.sort, cursor: p.cursor || undefined, limit: p.limit } });

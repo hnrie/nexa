@@ -1,6 +1,6 @@
 import { ArrowLeft, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { moderation as modApi, type ActionRequest, type ModAction, type ModMembership, type ModUser, type PurgeCounts, type ResetField, type StaffCase } from "@/api/moderation";
+import { hasServerProfile, moderation as modApi, type ActionRequest, type ModAction, type ModMembership, type ModUser, type PurgeCounts, type ResetField, type StaffCase } from "@/api/moderation";
 import { bannerUrl } from "@/api/users";
 import { statusEmojiText } from "@/components/activity/StatusEmoji";
 import { Avatar } from "@/components/common/Avatar";
@@ -31,7 +31,7 @@ const MAX_BAN = 5 * 365 * SPAN.DAY;
 
 const ACTIONS: ModAction[] = ["avatar_remove", "field_reset", "mute", "ban", "delete"];
 /** The fields a reset empties rather than writing MODERATOR_REMOVED_ in. */
-const CLEARED: ResetField[] = ["status", "nicknames", "typing_style", "widgets", "server_tag"];
+const CLEARED: ResetField[] = ["status", "nicknames", "server_profiles", "typing_style", "widgets", "server_tag"];
 
 function unitLabel(u: number): string {
   switch (u) {
@@ -151,7 +151,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
   const presence = modStatus(user, live);
   const [action, setAction] = useState<ModAction | null>(initial ?? null);
   const [reason, setReason] = useState("");
-  const [images, setImages] = useState(preset?.images ?? { avatar: !!user.avatar_id, banner: !user.avatar_id && !!user.banner_id });
+  const [images, setImages] = useState(preset?.images ?? { avatar: !!user.avatar_id || !!servers?.some((x) => x.avatar_id), banner: !user.avatar_id && (!!user.banner_id || !!servers?.some((x) => x.banner_id)) });
   const [fields, setFields] = useState<ResetField[]>(preset?.fields ?? []);
   const [muteFor, setMuteFor] = useState<number | "permanent">(SPAN.DAY);
   const [banFor, setBanFor] = useState<number | "permanent">(SPAN.WEEK);
@@ -175,6 +175,12 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
   }, [action, preview, user.id]);
 
   const nicknamed = servers?.filter((x) => x.nickname);
+  const profiled = servers?.filter(hasServerProfile);
+  // a picture of theirs in one of their servers counts as theirs to take down
+  const serverAvatar = !!servers?.some((x) => x.avatar_id);
+  const serverBanner = !!servers?.some((x) => x.banner_id);
+  const hasAvatar = !!user.avatar_id || serverAvatar;
+  const hasBanner = !!user.banner_id || serverBanner;
   const values: Record<ResetField, string> = {
     username: `@${user.username}`,
     display_name: user.display_name,
@@ -183,6 +189,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
     status: [statusEmojiText(user.status_emoji), user.status_text].filter(Boolean).join(" "),
     // without the list, the server says whether there are any
     nicknames: nicknamed ? nicknamed.map((x) => `${x.name}: ${x.nickname}`).join(", ") : t("moderation.form.everyServer"),
+    server_profiles: profiled ? profiled.map((x) => x.name).join(", ") : t("moderation.form.everyServer"),
     typing_style: typingStyleText(readTypingStyle(user.typing_style)),
     widgets: widgetsText(readWidgets(user.widgets), widgetTitle).map((w) => `${w.title}: ${w.text}`).join(" / "),
     server_tag: user.server_tag?.text ?? "",
@@ -282,7 +289,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
               <div className={m.actionList}>
                 {ACTIONS.map((a) => {
                   const Icon = actionIcon(a);
-                  const nothing = a === "avatar_remove" && !user.avatar_id && !user.banner_id;
+                  const nothing = a === "avatar_remove" && !hasAvatar && !hasBanner;
                   let desc = actionBlurb(a);
                   if (nothing) desc = t("moderation.act.avatarNone");
                   if (a === "mute" && user.mute) desc = user.mute.expires_at ? t("moderation.act.alreadyMuted", { when: relativeTo(user.mute.expires_at) }) : t("moderation.act.alreadyMutedForever");
@@ -307,20 +314,20 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
             <div className={m.section}>
               <span className={m.sectionLabel}>{t("moderation.form.whatToRemove")}</span>
               <div className={m.choiceRow}>
-                <label className={m.pick} data-checked={images.avatar} data-disabled={!user.avatar_id}>
-                  <input type="checkbox" checked={images.avatar} disabled={!user.avatar_id} onChange={(e) => setImages((v) => ({ ...v, avatar: e.target.checked }))} />
+                <label className={m.pick} data-checked={images.avatar} data-disabled={!hasAvatar}>
+                  <input type="checkbox" checked={images.avatar} disabled={!hasAvatar} onChange={(e) => setImages((v) => ({ ...v, avatar: e.target.checked }))} />
                   <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={32} />
                   <span className={m.pickText}>
                     <span className={m.pickName}>{t("moderation.field.avatar")}</span>
-                    <span className={m.pickValue}>{user.avatar_id ? t("moderation.form.avatarAlso") : t("moderation.form.none")}</span>
+                    <span className={m.pickValue}>{user.avatar_id ? t("moderation.form.avatarAlso") : serverAvatar ? t("moderation.form.inServersOnly") : t("moderation.form.none")}</span>
                   </span>
                 </label>
-                <label className={m.pick} data-checked={images.banner} data-disabled={!user.banner_id}>
-                  <input type="checkbox" checked={images.banner} disabled={!user.banner_id} onChange={(e) => setImages((v) => ({ ...v, banner: e.target.checked }))} />
+                <label className={m.pick} data-checked={images.banner} data-disabled={!hasBanner}>
+                  <input type="checkbox" checked={images.banner} disabled={!hasBanner} onChange={(e) => setImages((v) => ({ ...v, banner: e.target.checked }))} />
                   <span className={m.bannerPreview} style={user.banner_id ? { backgroundImage: `url(${bannerUrl(user.banner_id, 160)})` } : { background: profileTheme(user.accent_color, user.accent_color_2, user.id) }} aria-hidden="true" />
                   <span className={m.pickText}>
                     <span className={m.pickName}>{t("moderation.field.banner")}</span>
-                    <span className={m.pickValue}>{user.banner_id ? t("moderation.form.bannerSet") : t("moderation.form.none")}</span>
+                    <span className={m.pickValue}>{user.banner_id ? t("moderation.form.bannerAlso") : serverBanner ? t("moderation.form.inServersOnly") : t("moderation.form.none")}</span>
                   </span>
                 </label>
               </div>
@@ -331,8 +338,8 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
             <div className={m.section}>
               <span className={m.sectionLabel}>{t("moderation.form.whatToReset")}</span>
               <div className={m.choiceRow}>
-                {(["username", "display_name", "about_me", "pronouns", "status", "nicknames", "typing_style", "widgets", "server_tag"] as ResetField[]).map((f) => {
-                  const empty = f === "nicknames" ? !!nicknamed && nicknamed.length === 0 : f !== "username" && f !== "display_name" && !values[f];
+                {(["username", "display_name", "about_me", "pronouns", "status", "nicknames", "server_profiles", "typing_style", "widgets", "server_tag"] as ResetField[]).map((f) => {
+                  const empty = f === "nicknames" ? !!nicknamed && nicknamed.length === 0 : f === "server_profiles" ? !!profiled && profiled.length === 0 : f !== "username" && f !== "display_name" && !values[f];
                   return (
                     <label key={f} className={m.pick} data-checked={fields.includes(f)} data-disabled={empty} data-testid={`field-${f}`}>
                       <input type="checkbox" checked={fields.includes(f)} disabled={empty} onChange={() => toggleField(f)} />

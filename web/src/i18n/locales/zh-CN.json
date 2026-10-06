@@ -5942,6 +5942,7 @@
   "android.update.body": "Android 应用发布了新版本。点按“更新”会下载它，然后 Android 会询问是否安装。",
   "android.update.failed": "无法下载新版本。请稍后再试。",
   "bugs.context.appAndroid": "Android 应用",
+  "bugs.staff.finishedLocked": "此报告已标记为“{status}”，因此没有人可以在其中发言。重新打开它即可回复。",
   "whatsNew.r202610028.swipeBody": "在手机上将消息向左滑动，箭头亮起时松手即可回复。",
   "whatsNew.r202610028.swipeTitle": "滑动回复",
   "whatsNew.r20261004.statusEmojiTitle": "状态里的自定义表情",
@@ -5956,5 +5957,22 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "如果 Nexa 在那里已经是开启的，说明权限仍指向旧的应用副本。选择“重置权限”，然后重新开启 Nexa。",
   "desktop.displayPicker.theOldPermissionIsCleared": "旧的权限已清除。",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "在“屏幕录制”中开启 Nexa。macOS 会提示重新打开 Nexa；如果没有提示，请在这里重启。",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS 没有重置权限。请在“屏幕录制”中用减号按钮移除 Nexa，再添加回来，然后重启。"
+  "desktop.displayPicker.couldNotResetThePermission": "macOS 没有重置权限。请在“屏幕录制”中用减号按钮移除 Nexa，再添加回来，然后重启。",
+  "moderation.chat.caseStart": "这是与 {name} 关于此案件的对话。你写的内容会以 Nexa 的身份送达，并显示你的名字，这里的任何内容都没有端到端加密。",
+  "moderation.chat.reportStart": "这是与 {name} 关于其报告的对话。你写的内容会以 Nexa 的身份送达，并显示你的名字，这里的任何内容都没有端到端加密。",
+  "moderation.field.serverProfiles": "服务器内的个人资料",
+  "moderation.form.bannerAlso": "其在各服务器的横幅也会一并移除",
+  "moderation.form.inServersOnly": "仅在其所在的服务器中",
+  "moderation.sheet.inServers": {
+    "other": "在 {count} 个服务器中"
+  },
+  "nexa.chat.caseStart": "这是你与 Nexa 团队关于此案件的对话。这里的消息和文件没有端到端加密：团队可以看到它们。",
+  "nexa.chat.fileTooBig": "图片最大 10 MB，录像最大 50 MB。",
+  "nexa.chat.notE2E": "未端到端加密：Nexa 团队可以阅读此对话。",
+  "nexa.chat.reportFinished": "此报告已标记为“{status}”，因此不能再在其中发言。如果问题再次出现，请发送新的报告。",
+  "nexa.chat.reportStart": "这是你与 Nexa 团队关于此报告的对话。错误报告没有端到端加密：团队可以阅读它们。",
+  "nexa.chat.uploading": "正在上传，{percent}%",
+  "threads.card.count": {
+    "other": "{count} 条消息"
+  }
 }

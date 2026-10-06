@@ -6584,6 +6584,7 @@
   "android.update.body": "Вышла новая версия приложения для Android. Кнопка «Обновить» скачает её, а затем Android предложит её установить.",
   "android.update.failed": "Не удалось скачать новую версию. Попробуйте ещё раз чуть позже.",
   "bugs.context.appAndroid": "Приложение для Android",
+  "bugs.staff.finishedLocked": "Этот отчёт отмечен как «{status}», поэтому никто не может в нём писать. Откройте его снова, чтобы ответить.",
   "whatsNew.r202610028.swipeBody": "На телефоне смахните сообщение влево и отпустите, когда загорится стрелка, чтобы ответить на него.",
   "whatsNew.r202610028.swipeTitle": "Ответ свайпом",
   "whatsNew.r20261004.statusEmojiTitle": "Свои эмодзи в статусе",
@@ -6598,5 +6599,28 @@
   "desktop.displayPicker.ifNexaIsAlreadyOnThere": "Если Nexa там уже включён, разрешение всё ещё указывает на старую копию приложения. Нажмите «Сбросить разрешение», затем снова включите Nexa.",
   "desktop.displayPicker.theOldPermissionIsCleared": "Старое разрешение удалено.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Включите Nexa в «Записи экрана». macOS предложит заново открыть Nexa; если не предложит, перезапустите приложение здесь.",
-  "desktop.displayPicker.couldNotResetThePermission": "macOS не сбросила разрешение. Удалите Nexa из «Записи экрана» кнопкой «минус», добавьте снова и перезапустите."
+  "desktop.displayPicker.couldNotResetThePermission": "macOS не сбросила разрешение. Удалите Nexa из «Записи экрана» кнопкой «минус», добавьте снова и перезапустите.",
+  "moderation.chat.caseStart": "Это разговор с {name} об этом случае. То, что вы пишете, приходит от имени Nexa с вашим именем, и ничто здесь не защищено сквозным шифрованием.",
+  "moderation.chat.reportStart": "Это разговор с {name} о его отчёте. То, что вы пишете, приходит от имени Nexa с вашим именем, и ничто здесь не защищено сквозным шифрованием.",
+  "moderation.field.serverProfiles": "Профили на серверах",
+  "moderation.form.bannerAlso": "Баннеры на отдельных серверах тоже удалятся",
+  "moderation.form.inServersOnly": "Только на их серверах",
+  "moderation.sheet.inServers": {
+    "one": "На {count} сервере",
+    "few": "На {count} серверах",
+    "many": "На {count} серверах",
+    "other": "На {count} сервера"
+  },
+  "nexa.chat.caseStart": "Это ваш разговор с командой Nexa об этом случае. Сообщения и файлы здесь не защищены сквозным шифрованием: команда может их видеть.",
+  "nexa.chat.fileTooBig": "Изображения могут весить до 10 МБ, записи до 50 МБ.",
+  "nexa.chat.notE2E": "Без сквозного шифрования: команда Nexa может читать этот разговор.",
+  "nexa.chat.reportFinished": "Этот отчёт отмечен как «{status}», поэтому писать в нём больше нельзя. Если это повторится, отправьте новый отчёт.",
+  "nexa.chat.reportStart": "Это ваш разговор с командой Nexa об этом отчёте. Отчёты об ошибках не защищены сквозным шифрованием: команда может их читать.",
+  "nexa.chat.uploading": "Загрузка, {percent}%",
+  "threads.card.count": {
+    "one": "{count} сообщение",
+    "few": "{count} сообщения",
+    "many": "{count} сообщений",
+    "other": "{count} сообщения"
+  }
 }
