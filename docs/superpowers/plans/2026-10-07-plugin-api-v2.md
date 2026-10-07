@@ -12,7 +12,7 @@ decisions of 2026-10-07 applied (two rounds). Nothing here is built yet. Approve
 | `typingStopped` | Simulated on the client (see Events). |
 | Context menus | Every menu comes from one registry instead of being built inline. |
 | Plugin keybinds | A separate list, apart from the app's own three (mute, deafen, activity), keyed by plugin id (not name). |
-| Blocking `messageDeleted` | The delete hook moves to before the store drops the message. |
+| Blocking `messageDeleted` | Left out of this release; it may come in a later update. Listeners' return values are ignored, and `events.write` covers only `events.run`. The docs drop the Blocking events section. |
 | Commands | Throws when a plugin tries to take a built-in name. Between plugins it simply replaces: the replaced command is not brought back later. |
 | Toasts | Gain `warning` and `duration`. |
 | Size limits | Stay as they are: 64 KB per pasted plugin, 256 KB for all pasted plugins, 1 MB for a plugin from a link. The docs are corrected to say so. |
@@ -92,9 +92,8 @@ turned into media URLs, and badge and emoji strings passed through as they are.
 - New hooks next to the existing message ones: reactions, typing, members, servers, channels,
   users, presence, relationships and locale. Each fires after the store is updated, with the
   object as it is now.
-- `messageDeleted` runs **before** the message leaves the store. If any v2 listener with
-  `events.write` returns `false` (synchronously), the client keeps the message on screen. The
-  other delete bookkeeping (unread counts, mentions) still runs.
+- `messageDeleted` fires after the message leaves the store, with the message as it was. It cannot
+  be blocked in this release.
 - `typingStopped` is simulated: it fires when someone's typing entry in `stores/typing` runs out
   (the 10 second timer), or as soon as a message from them arrives in that channel.
 - `events.run` fires `<plugin name>:<event>` to other plugins' listeners; it can never fire a
@@ -166,7 +165,7 @@ the warning toast. Every new string goes into all eleven locales.
 
 - Vitest: v1 still runs unchanged (existing `runtime.test.ts`); styles with and without
   `persist`; v2 permission checks, events
-  (including blocking `messageDeleted` and the simulated `typingStopped`), command rules, the
+  (including the simulated `typingStopped`), command rules, the
   registry (add, remove, edit, undo on stop), keybinds, settings and storage.
 - On a throwaway server with Playwright at 1366x768 and 411x914: installing a v1 and a v2
   plugin, the permissions prompt, changing permissions, the keybinds section, a plugin's
@@ -178,7 +177,7 @@ the warning toast. Every new string goes into all eleven locales.
 ## Order of work
 
 1. Context menu registry, with every existing menu moved and unchanged (its own commit).
-2. Dispatch hooks and the delete hook reordering.
+2. Dispatch hooks.
 3. v2 runtime, permissions and managers.
 4. Commands, keybinds, toasts.
 5. UI (prompt, permissions editor, Edit Code, keybinds section) through the design pass.
