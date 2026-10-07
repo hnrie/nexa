@@ -46,5 +46,5 @@ export const subchatMenu = defineMenu<SubchatMenuCtx>("subchat", [
   ],
   [button("copySubchatId", ({ channel }) => developerMode() && copyIdItem("copy", t("sidebar.dmMenu.copyChannelId"), channel.id))],
 ]);
-about(subchatMenu, ({ channel }) => ({ channelId: channel.id }));
+about(subchatMenu, ["channel"], ({ channel }) => ({ channelId: channel.id }));
 

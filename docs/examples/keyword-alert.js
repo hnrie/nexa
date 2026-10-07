@@ -5,8 +5,25 @@
 export default {
   name: "Keyword alert",
   description: "A note when a message says the word you picked, underlined mentions, and /shout.",
-  version: "1.0.0",
+  version: "2.0.0",
   author: "Nexa docs",
+  apiVersion: 2,
+
+  // Written out plainly, so the app can show them before any of this code runs.
+  permissions: [
+    "users.self.read",
+    "servers.channels.read",
+    "servers.messages.read",
+    "servers.messages.write",
+    "directmessages.read",
+    "directmessages.write",
+    "events.read",
+    "commands.write",
+    "styles.write",
+    "storage.read",
+    "storage.write",
+    "ui.write",
+  ],
 
   // Drawn as a form on the Plugins page; the values follow your account.
   settings: [
@@ -16,26 +33,26 @@ export default {
 
   start(api) {
     // Everything registered here is taken away again when the plugin stops,
-    // so stop() below has nothing it must clean up.
-    api.css.add(".md-mention { text-decoration: underline; text-underline-offset: 2px; }");
+    // so there is no stop() to write.
+    api.styles.add(".md-mention { text-decoration: underline; text-underline-offset: 2px; }");
 
-    api.events.on("messageCreate", (message) => {
+    const me = api.users.me;
+    api.events.on("messageCreated", (message) => {
       const word = String(api.settings.get("word") || "").trim().toLowerCase();
-      if (!word || !message.decrypted) return;
-      if (message.mine && !api.settings.get("mine")) return;
-      if (message.content.toLowerCase().includes(word)) api.toast(`Someone said "${word}".`);
+      if (!word || message.content === null) return;
+      if (message.authorId === me.id && !api.settings.get("mine")) return;
+      if (message.content.toLowerCase().includes(word)) {
+        api.ui.toast(`Someone said "${word}".`, { type: "warning", duration: 6000 });
+      }
     });
 
-    api.commands.register({
-      name: "shout",
-      description: "Sends your message in capitals",
-      run: (args) => (args.trim() ? args.toUpperCase() : null),
+    // A command sends nothing by itself; it sends what it wants to.
+    api.commands.register("shout", "Sends your message in capitals", (args, ctx) => {
+      if (args.trim() && ctx.channel) api.messages.send(ctx.channel.id, { content: args.toUpperCase() });
     });
 
     // Kept on this device only.
-    const starts = (api.storage.get("starts") || 0) + 1;
+    const starts = (api.storage.get("starts") ?? 0) + 1;
     api.storage.set("starts", starts);
   },
-
-  stop() {},
 };

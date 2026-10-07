@@ -98,7 +98,7 @@ export const callParticipantMenu = defineMenu<CallParticipantCtx>("callParticipa
     return !p.self && !p.guest && developerMode() && copyIdItem("copy", t("chat.groupMemberMenu.copyUserId"), p.userId);
   })],
 ]);
-about(callParticipantMenu, ({ serverId, channelId, vs }) => ({ serverId, channelId, userId: vs.user_id }));
+about(callParticipantMenu, ["user", "channel", "server"], ({ serverId, channelId, vs }) => ({ serverId, channelId, userId: vs.user_id }));
 
 
 export interface CallTileCtx {
@@ -158,5 +158,5 @@ export const callTileMenu = defineMenu<CallTileCtx>("callTile", [
   [button("removeGuestFromTile", (c) => inCall(c) && c.guestTile && c.canRemoveGuest && c.kind !== "screen" && { id: "remove-guest", label: t("voice.voiceParticipants.removeFromCall"), danger: true, onSelect: c.removeGuest })],
   [button("copyTileUserId", (c) => inCall(c) && !c.viewerIsGuest && !c.guestTile && developerMode() && copyIdItem("copy-user", t("chat.groupMemberMenu.copyUserId"), c.userId))],
 ]);
-about(callTileMenu, ({ serverId, channelId, userId }) => ({ serverId, channelId, userId }));
+about(callTileMenu, ["user", "channel", "server"], ({ serverId, channelId, userId }) => ({ serverId, channelId, userId }));
 

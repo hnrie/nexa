@@ -72,7 +72,7 @@ const userGridMenu = defineMenu<UserGridMenuCtx>("userGrid", [
     }),
   ],
 ]);
-about(userGridMenu, ({ user }) => ({ userId: user.id }));
+about(userGridMenu, ["user"], ({ user }) => ({ userId: user.id }));
 
 import { ModerateModal } from "./ModerateModal";
 import { modStatus, StatusSummary } from "./ModStatus";

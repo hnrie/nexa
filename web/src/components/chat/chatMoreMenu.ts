@@ -47,5 +47,5 @@ export const chatMoreMenu = defineMenu<ChatMoreCtx>("chatMore", [
     button("reportBugFromMore", ({ isServer, convo }) => !isServer && reportBugMenuItem(convo.type === "group_dm" ? "group" : "dm")),
   ],
 ]);
-about(chatMoreMenu, ({ channel }) => ({ channelId: channel.id }));
+about(chatMoreMenu, ["channel", "server"], ({ channel }) => ({ channelId: channel.id }));
 

@@ -177,14 +177,14 @@ export const messageMenu = defineMenu<MessageMenuCtx>("message", [
   // the exact moment, which a phone has no tooltip for, closes the menu
   [button("messageTimes", ({ msg }) => messageTimes(msg).map((line, i) => ({ id: `time${i}`, label: line, note: true })))],
 ]);
-about(messageMenu, ({ msg }) => ({ message: msg, channelId: msg.channel_id }));
+about(messageMenu, ["message", "user", "channel", "server"], ({ msg }) => ({ message: msg, userId: msg.author_id, channelId: msg.channel_id }));
 
 
 /** The menu of a system line that can be taken away (someone joining). */
 export const systemMessageMenu = defineMenu<DecryptedMessage>("systemMessage", [
   [button("deleteSystemMessage", (msg) => msg.type === "system_join" && canDelete(msg) && { id: "delete", label: t("chat.messageMenu.deleteMessage"), danger: true, onSelect: () => confirmDelete(msg) })],
 ]);
-about(systemMessageMenu, (msg) => ({ message: msg, channelId: msg.channel_id }));
+about(systemMessageMenu, ["message", "user", "channel", "server"], (msg) => ({ message: msg, userId: msg.author_id, channelId: msg.channel_id }));
 
 
 /** Asks before deleting a message, as the menu's Delete does; `deleted` runs once it is gone. */

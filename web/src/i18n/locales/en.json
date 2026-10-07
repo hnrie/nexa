@@ -6346,5 +6346,11 @@
   "whatsNew.r202610062.voiceBadgeBody": "A green speaker on a server's icon means people are in a voice channel there that you can join.",
   "whatsNew.r202610062.voiceBadgeTitle": "Voice Activity on Servers",
   "whatsNew.r202610062.voiceModBody": "With the right permissions, open someone's menu in a voice channel or a call to server mute, deafen, disconnect or move them. On a computer you can also drag people between voice channels.",
-  "whatsNew.r202610062.voiceModTitle": "Voice Moderation"
+  "whatsNew.r202610062.voiceModTitle": "Voice Moderation",
+  "whatsNew.r20261007.pluginKeysBody": "Plugins can add keybinds and buttons to any right-click menu. Set a plugin's keys in Settings, Keybinds, in the browser or the desktop app.",
+  "whatsNew.r20261007.pluginKeysTitle": "Keybinds for Plugins",
+  "whatsNew.r20261007.pluginPermsBody": "In Settings, Plugins, press Permissions on a plugin to switch any of them off or back on. The change applies at once.",
+  "whatsNew.r20261007.pluginPermsTitle": "Choose What Plugins May Do",
+  "whatsNew.r20261007.pluginReviewBody": "Adding a plugin now shows what it is and what it wants to do before any of its code runs. Plugins work in the browser and the desktop app.",
+  "whatsNew.r20261007.pluginReviewTitle": "Plugins Ask First"
 }

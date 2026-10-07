@@ -34,5 +34,5 @@ export const friendMenu = defineMenu<FriendMenuCtx>("friend", [
   // the way into picking on a touch screen, where there is no Ctrl to hold
   [button("selectFriends", ({ rel }) => ({ id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start("friends", rel.user.id) }))],
 ]);
-about(friendMenu, ({ rel }) => ({ userId: rel.user.id }));
+about(friendMenu, ["user"], ({ rel }) => ({ userId: rel.user.id }));
 

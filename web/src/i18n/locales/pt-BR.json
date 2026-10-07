@@ -6448,5 +6448,11 @@
   "whatsNew.r202610062.voiceBadgeBody": "Um alto-falante verde no ícone de um servidor indica que há pessoas em um canal de voz em que você pode entrar.",
   "whatsNew.r202610062.voiceBadgeTitle": "Atividade de voz nos servidores",
   "whatsNew.r202610062.voiceModBody": "Com as permissões certas, abra o menu de alguém em um canal de voz ou em uma chamada para silenciar, ensurdecer, desconectar ou mover a pessoa no servidor. No computador, você também pode arrastar pessoas entre canais de voz.",
-  "whatsNew.r202610062.voiceModTitle": "Moderação de voz"
+  "whatsNew.r202610062.voiceModTitle": "Moderação de voz",
+  "whatsNew.r20261007.pluginKeysBody": "Plugins podem adicionar atalhos e botões a qualquer menu do clique direito. Defina as teclas de um plugin em Configurações, Teclas de atalho, no navegador ou no app para computador.",
+  "whatsNew.r20261007.pluginKeysTitle": "Atalhos para plugins",
+  "whatsNew.r20261007.pluginPermsBody": "Em Configurações, Plugins, toque em Permissões num plugin para desligar ou religar qualquer uma delas. A mudança vale na hora.",
+  "whatsNew.r20261007.pluginPermsTitle": "Escolha o que os plugins podem fazer",
+  "whatsNew.r20261007.pluginReviewBody": "Ao adicionar um plugin, agora você vê o que ele é e o que quer fazer antes de qualquer parte do código rodar. Plugins funcionam no navegador e no app para computador.",
+  "whatsNew.r20261007.pluginReviewTitle": "Plugins pedem antes"
 }

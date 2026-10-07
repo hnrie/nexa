@@ -1,7 +1,7 @@
 /**
- * What a v2 plugin can ask to do. The person grants them when the plugin is
- * added (the prompt is step 5 of the plugin plan; until then a plugin is
- * granted what it asks for) and can take any of them away later. Every v2
+ * What a v2 plugin can ask to do. The person grants them all when the plugin
+ * is added (AddPluginDialog) and can switch any of them off, or back on,
+ * later on the Plugins page. Every v2
  * method checks its permission as it is called, against the grants as they
  * are at that moment.
  */

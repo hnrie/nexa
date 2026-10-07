@@ -1,7 +1,26 @@
 # Plugin API 2.0
 
 Plan for building version 2 of the plugin API from the pre-release write-up, with the owner's
-decisions of 2026-10-07 applied (two rounds). Nothing here is built yet. Approve, deny or change any part.
+decisions of 2026-10-07 applied (two rounds).
+
+**Built** (2026-10-07), in the six steps of `2026-10-07-plugin-api-v2-todo.md`, which records each
+step as it was done. Where it ended up different from this plan:
+
+- Permissions are never read by running a plugin. Its code runs only after the person has agreed
+  to it, so `apiVersion`, `permissions` and the name, description, version and author are read
+  from the code's text (`declaration.ts`); a permissions list not written out as plain strings
+  grants nothing. Installing grants the whole list or nothing; the Plugins page switches each
+  permission off or on later.
+- Blocking events (`messageDeleted`) were left out, for a later update.
+- Every context menu (58 of them, not about 25) is in the registry. Plugins change any of them by
+  its kind; there is no combined "user" menu. Menus open through `menu.open(ctx, placement)`
+  rather than `openMenu(kind, ctx)`.
+- A plugin's menu button may name a Lucide icon, loaded only when shown.
+- Objects are mapped in `objects.ts` (not `pluginObjects.ts`), and the v2 API is built in
+  `runtimeV2.ts`.
+- The app's first load went from 330 to 335 kB.
+- The reference for plugin authors is `docs/plugins.md`, in VitePress markdown, with a table of
+  menus made from the registry by a test; examples of both versions are in `docs/examples/`.
 
 ## Decisions already made
 

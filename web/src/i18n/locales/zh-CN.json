@@ -6121,5 +6121,11 @@
   "whatsNew.r202610062.voiceBadgeBody": "服务器图标上出现绿色扬声器，表示那里有你可以加入的语音频道里有人。",
   "whatsNew.r202610062.voiceBadgeTitle": "服务器语音动态",
   "whatsNew.r202610062.voiceModBody": "有相应权限时，在语音频道或通话中打开某人的菜单，即可将其服务器静音、服务器闭麦听、断开连接或移动。在电脑上还可以把人拖到其他语音频道。",
-  "whatsNew.r202610062.voiceModTitle": "语音管理"
+  "whatsNew.r202610062.voiceModTitle": "语音管理",
+  "whatsNew.r20261007.pluginKeysBody": "插件可以添加按键绑定，也能在任意右键菜单中添加按钮。在浏览器或桌面应用的设置、按键绑定中为插件设置按键。",
+  "whatsNew.r20261007.pluginKeysTitle": "插件的按键绑定",
+  "whatsNew.r20261007.pluginPermsBody": "在设置的插件中，点插件的权限，即可关闭或重新开启其中任意一项。更改立即生效。",
+  "whatsNew.r20261007.pluginPermsTitle": "选择插件可以做什么",
+  "whatsNew.r20261007.pluginReviewBody": "添加插件时，现在会在其任何代码运行之前显示它是什么、想做什么。插件可在浏览器和桌面应用中使用。",
+  "whatsNew.r20261007.pluginReviewTitle": "插件先征求同意"
 }

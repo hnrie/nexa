@@ -6346,5 +6346,11 @@
   "whatsNew.r202610062.voiceBadgeBody": "Ein grüner Lautsprecher am Symbol eines Servers heißt, dass dort Leute in einem Sprachkanal sind, dem du beitreten kannst.",
   "whatsNew.r202610062.voiceBadgeTitle": "Sprachaktivität auf Servern",
   "whatsNew.r202610062.voiceModBody": "Mit den passenden Berechtigungen öffnest du das Menü einer Person in einem Sprachkanal oder Anruf, um sie serverweit stummzuschalten, taub zu schalten, zu trennen oder zu verschieben. Am Computer kannst du Leute auch zwischen Sprachkanälen ziehen.",
-  "whatsNew.r202610062.voiceModTitle": "Sprachmoderation"
+  "whatsNew.r202610062.voiceModTitle": "Sprachmoderation",
+  "whatsNew.r20261007.pluginKeysBody": "Plugins können Tastenkürzel und Knöpfe in jedem Rechtsklickmenü hinzufügen. Die Tasten eines Plugins legst du unter Einstellungen, Tastenbelegung fest, im Browser oder in der Desktop-App.",
+  "whatsNew.r20261007.pluginKeysTitle": "Tastenkürzel für Plugins",
+  "whatsNew.r20261007.pluginPermsBody": "Drück unter Einstellungen, Plugins bei einem Plugin auf Berechtigungen, um sie einzeln aus- oder wieder einzuschalten. Die Änderung gilt sofort.",
+  "whatsNew.r20261007.pluginPermsTitle": "Bestimme, was Plugins dürfen",
+  "whatsNew.r20261007.pluginReviewBody": "Beim Hinzufügen eines Plugins siehst du jetzt, was es ist und was es tun will, bevor irgendetwas von seinem Code läuft. Plugins laufen im Browser und in der Desktop-App.",
+  "whatsNew.r20261007.pluginReviewTitle": "Plugins fragen zuerst"
 }

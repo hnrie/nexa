@@ -121,7 +121,7 @@ export function threadButtons<C>(ids: { join: string; archive: string; lock: str
 
 /** A thread's menu in its header on a computer. */
 export const threadMenu = defineMenu<ThreadMenuCtx>("thread", [threadButtons({ join: "joinThread", archive: "closeThread", lock: "lockThread", settings: "threadSettings", remove: "deleteThread" }, (x) => x)]);
-about(threadMenu, ({ thread }) => ({ channelId: thread.id }));
+about(threadMenu, ["channel", "server"], ({ thread }) => ({ channelId: thread.id }));
 
 
 /**

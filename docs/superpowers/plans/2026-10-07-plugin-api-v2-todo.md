@@ -352,4 +352,70 @@ desktop and phone width. Every new word goes into all eleven languages.
 - [x] CLAUDE.md: the prompt, the permissions editor, the Keybinds section, menu icons
 - [x] Commit (not pushed: pushing waits until the owner says)
 
-## 6. Docs, example, What's New, CLAUDE.md, final testing (not started)
+## 6. Docs, example, What's New, CLAUDE.md, final testing (done, committed, not pushed)
+
+Saying what was built, everywhere people and plugin authors will read it, and one last pass over
+the whole of it. CLAUDE.md has been kept up to date step by step; this step checks it once more.
+
+- [x] Open questions, answered by the owner before building:
+  - [x] (VitePress, in `docs/plugins.md`; Android's What's New items say plugins are for the
+    browser and the desktop app, as suggested.) The docs' form. Your write-up uses VitePress syntax (`::: details` blocks, `> [!NOTE]`),
+    while `docs/plugins.md` today is plain markdown. My suggestion: `docs/plugins.md` becomes the
+    v2 reference in the write-up's own form and structure, corrected to what was built, with v1's
+    reference kept below it in a section of its own; say if it should be plain markdown instead,
+    or a separate file for a docs site
+  - [x] What's New on Android. The Android app shows the same list of releases, and plugins never
+    run there. My suggestion: the items say plainly that plugins are for the browser and the
+    desktop app, rather than leaving them out on Android (the list has no way to do that today)
+- [x] `docs/plugins.md`, the reference for plugin authors, corrected to what was built:
+  - [x] a plugin's shape: `apiVersion: 2`, and `permissions` written out as a plain list of strings,
+    since that list is read from the code's text and is exactly what is granted; a list built any
+    other way grants nothing
+  - [x] the plugin id, the lifecycle (10 seconds for `start`, 3 for `stop`), cleanup (stylesheets
+    go unless added with `persist`), the limits as they are (64 KB a pasted plugin, 256 KB for all
+    pasted ones, 1 MB from a link, 512 KB of storage per plugin on each device), compatibility (no
+    `apiVersion`, or 1, keeps v1 exactly)
+  - [x] permissions: the table, installing all or nothing, taking them away later, new code asking
+    again, not a sandbox, and a method that returns a promise rejecting with `PermissionError`
+  - [x] the API reference: every manager and object as built (no `servers.join`; storage
+    synchronous; every channel and message type; `nonce` may be null; `ThreadInfo.joined`; badges
+    and role emoji as the server sends them)
+  - [x] events: the list, the permission each needs, `typingStopped` simulated, custom events named
+    after the plugin; no blocking (left for a later update)
+  - [x] commands, keybinds (kept apart by plugin id, `get` giving the keys as people see them, the
+    app's window only), styles, toasts (types, durations, the plugin's name in front), notify,
+    confirm, storage, settings, constants, stores
+  - [x] context menus: every menu by its name, what its context holds and its built-in button ids,
+    in a table generated from the registry. A test fails when the table and the registry differ
+    (`about` learns which of message, user, channel and server each menu gives, for the table)
+  - [x] the v1 reference kept as it is, under its own heading
+- [x] `docs/examples/`: a v2 version of `keyword-alert.js`, and the two test plugins from this
+  session as examples of each version
+- [x] What's New: a new release at the top of `RELEASES` (its id the day it is deployed, set when
+  you say deploy), with a few items saying what people can do now and where: plugins that ask for
+  permissions, shown before they are added; the Permissions switches on the Plugins page; plugin
+  keybinds in Settings, Keybinds. In the shape the Android app reads, in all eleven languages
+- [x] Words people read elsewhere: the Plugins page's introduction and cautions, the front page's
+  "Custom CSS and Plugins", and the privacy policy where it lists what the account's encrypted
+  settings hold (plugins' permissions and keybinds now among them), each checked against the code
+  and changed only where it is no longer true
+- [x] The plan (`2026-10-07-plugin-api-v2.md`): marked as built, with where it ended up different
+  from what was planned (the decisions made along the way)
+- [x] Final testing:
+  - [x] the whole web suite (2703 tests pass with `NODE_OPTIONS=--no-experimental-webstorage`;
+    without it, Node 26's own `localStorage` breaks 110 tests that pass otherwise), `tools/check.sh`
+    (Go, typecheck, app size and i18n pass; the desktop checks need `desktop/node_modules`, not
+    installed on this machine), both i18n checks
+  - [x] `tools/e2e.py` against the scratch build: register, friends, DMs and read marks pass. The
+    server flow stops at steps written for the members page before the 2026-10-04 redesign (a
+    per-row Edit Roles and Kick button), which none of these steps touched, so the flows after it
+    did not run. It also turned up a bug from 2026-10-04: the Mod View panel's backdrop sits above
+    the dialogs it opens (Edit Roles, Timeout, Kick, Ban), so they cannot be used. Both reported,
+    neither fixed here
+  - [x] on a throwaway server, at 1366x768 and 411x914: the docs' examples (`keyword-alert.js`,
+    `try-everything.js`) reviewed, added, used (toasts, the command, the keybinds section, the
+    Permissions panel, the confirm dialog, a message menu button and a renamed one) and removed,
+    and What's New opened from Settings, About
+  - [ ] the Android app's unit tests: skipped, since the owner asked for no Android build this step
+- [x] CLAUDE.md checked once more against everything above
+- [x] Commit (push only when you say; deploy only when you say)

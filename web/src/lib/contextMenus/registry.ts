@@ -67,10 +67,14 @@ export interface RegisteredButton {
   group: number;
 }
 
+/** What a menu's context can hold for a plugin; the server also comes with a channel that is in one. */
+export type SubjectName = "message" | "user" | "channel" | "server";
+
 interface Entry {
   kind: string;
   groups: MenuButton<never>[][];
   about?: (ctx: never) => MenuSubject;
+  subjects?: SubjectName[];
 }
 
 const menus = new Map<string, Entry>();
@@ -124,10 +128,21 @@ export function defineMenu<C>(kind: string, groups: MenuButton<C>[][], opts: Men
   };
 }
 
-/** Says what a menu is about, from its context, after it is defined. */
-export function about<C>(menu: Menu<C>, fn: (ctx: C) => MenuSubject): void {
+/**
+ * Says what a menu is about, from its context, after it is defined; and,
+ * for the plugin docs' table of menus, which of message, user, channel and
+ * server that gives.
+ */
+export function about<C>(menu: Menu<C>, subjects: SubjectName[], fn: (ctx: C) => MenuSubject): void {
   const entry = menus.get(menu.kind);
-  if (entry) entry.about = fn as (ctx: never) => MenuSubject;
+  if (!entry) return;
+  entry.about = fn as (ctx: never) => MenuSubject;
+  entry.subjects = subjects;
+}
+
+/** Which of message, user, channel and server a menu's context gives a plugin; none for a menu about nothing in particular. */
+export function menuSubjects(kind: string): SubjectName[] {
+  return menus.get(kind)?.subjects ?? [];
 }
 
 /** The menu kinds registered so far, in the order they were. */

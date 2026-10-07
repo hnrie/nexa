@@ -139,5 +139,5 @@ export const groupMemberMenu = defineMenu<GroupMemberMenuRowCtx>("groupMember", 
   [button("copyGroupMemberId", ({ channelId, userId }) => !!about(channelId, userId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void copyText(userId, t("clipboard.idCopied")) })],
   [button("selectGroupMembers", ({ channelId, userId, select }) => !!select && !!about(channelId, userId) && { id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start(select, userId) })],
 ]);
-menuAbout(groupMemberMenu, ({ channelId, userId }) => ({ channelId, userId }));
+menuAbout(groupMemberMenu, ["user", "channel"], ({ channelId, userId }) => ({ channelId, userId }));
 

@@ -655,8 +655,12 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   `relationshipButtons`). Components open a menu with `menu.open(ctx, placement)`, passing what only
   they have (callbacks, the moves a reorder hook offers) in the context. `registry.test.ts` fails
   when any file but the registry calls `openContextMenu`, and loads every menu module together to
-  catch a button id used twice. A menu about something says what with `about(menu, (ctx) => ({
-  message, userId, channelId, serverId }))`, which is what plugins' menu callbacks are told. Plugins
+  catch a button id used twice. A menu about something says what with `about(menu, subjects, (ctx) => ({
+  message, userId, channelId, serverId }))`, which is what plugins' menu callbacks are told
+  (`subjects` names which of message, user, channel and server that gives, for the docs). The
+  table of menus in `docs/plugins.md` is made from the registry by `lib/contextMenus/menuDocs.test.ts`,
+  which fails when it is out of date (`UPDATE_DOCS=1` writes it again) or a menu has no line in its
+  `WHERE` list; a new or changed menu updates both. Plugins
   change menus through the registry's layer of changes (`addButton`, `removeButton`, `editButton`,
   each recorded against the plugin and taken back by `dropChanges` when it stops); every menu
   module is listed in `lib/contextMenus/all.ts` so the plugin API can load them all before a plugin
@@ -675,7 +679,9 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   anything new, drops the rest). `components/settings/look/PermissionLedger.tsx` draws a list of
   permissions, grouped by what they touch, everywhere one is shown: the add dialog, the update
   dialog and each v2 plugin's Permissions panel on the Plugins page, with a switch for each. v2 events are built on `dispatchHooks` (above); v2 stylesheets go when the
-  plugin stops unless added with `persist`. Plugins never run on Android.
+  plugin stops unless added with `persist`. Plugins never run on Android. `docs/plugins.md` is
+  the reference for plugin authors (VitePress markdown: v2 first, v1 under its own heading), with
+  examples in `docs/examples/` for both versions; a change to the API changes it in the same commit.
 - Plugin commands sit beside the app's own in `components/composer/commands.ts`: a v1 plugin's is
   refused a taken name and its return value is sent; a v2 plugin's (`takePluginCommand`) takes the
   name from any plugin, can never take one of the app's, and sends nothing. Plugin keybinds:

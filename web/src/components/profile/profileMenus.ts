@@ -36,7 +36,7 @@ export const profileMoreMenu = defineMenu<ProfileMoreCtx>("profileMore", [
   ],
   [button("copyProfileUserId", ({ user }) => ({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void copyText(user.id, t("clipboard.idCopied")) }))],
 ]);
-about(profileMoreMenu, ({ user }) => ({ userId: user.id }));
+about(profileMoreMenu, ["user"], ({ user }) => ({ userId: user.id }));
 
 
 /** The roles a profile's + button can give someone in a server. */

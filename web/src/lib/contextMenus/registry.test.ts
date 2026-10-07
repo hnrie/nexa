@@ -96,7 +96,7 @@ describe("changes laid over a menu", () => {
       [button<C>("layerDelete", () => ({ id: "delete", label: "Delete", danger: true, onSelect: () => picked.push("delete") }))],
     ],
   );
-  about(menu, ({ who }) => ({ userId: who }));
+  about(menu, ["user"], ({ who }) => ({ userId: who }));
   const labels = () => menu.items({ who: "bob" }).map((i) => i.label + (i.separatorAfter ? " |" : ""));
 
   beforeEach(() => {

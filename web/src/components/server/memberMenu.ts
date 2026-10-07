@@ -126,5 +126,5 @@ export const memberMenu = defineMenu<MemberMenuCtx>("member", [
   [button("copyMemberId", ({ serverId, userId }) => !!where(serverId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => copyAndSay(userId) })],
   [button("selectMembers", ({ serverId, userId, select }) => !!select && !!where(serverId) && { id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start(select, userId) })],
 ]);
-about(memberMenu, ({ serverId, userId }) => ({ serverId, userId }));
+about(memberMenu, ["user", "server"], ({ serverId, userId }) => ({ serverId, userId }));
 

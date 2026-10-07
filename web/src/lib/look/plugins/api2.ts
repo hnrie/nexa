@@ -1,8 +1,7 @@
 /**
  * The Nexa plugin API, version 2: what `start(api)` is handed by a plugin that
  * says `apiVersion: 2`. Version 1 (api.ts) is still what every other plugin
- * gets. The plan is docs/superpowers/plans/2026-10-07-plugin-api-v2.md; the
- * reference for plugin authors comes with step 6.
+ * gets. The reference for plugin authors is docs/plugins.md.
  *
  * Plugins run in the page with the person's full access. Permissions say what
  * a plugin means to do and stop it doing anything else through this API, but

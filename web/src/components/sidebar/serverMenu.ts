@@ -98,7 +98,7 @@ export const serverMenu = defineMenu<ServerMenuCtx>("server", [
     button("copyServerId", ({ serverId }) => !!serverOf(serverId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("sidebar.serverMenu.copyServerId"), onSelect: () => copy(serverId) }),
   ],
 ]);
-about(serverMenu, ({ serverId }) => ({ serverId }));
+about(serverMenu, ["server"], ({ serverId }) => ({ serverId }));
 
 
 /** The list a channel is ordered within: its category's channels, the loose ones, or the categories themselves. */
@@ -231,7 +231,7 @@ export const channelMenu = defineMenu<ChannelMenuCtx>("channel", [
     button("copyChannelId", ({ channelId }) => !!serverChannel(channelId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("sidebar.dmMenu.copyChannelId"), onSelect: () => copy(channelId) }),
   ],
 ]);
-about(channelMenu, ({ channelId }) => ({ channelId }));
+about(channelMenu, ["channel", "server"], ({ channelId }) => ({ channelId }));
 
 
 export interface CategoryMenuCtx extends MenuCtx {
@@ -263,5 +263,5 @@ export const categoryMenu = defineMenu<CategoryMenuCtx>("category", [
     button("copyCategoryId", ({ categoryId }) => !!serverChannel(categoryId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("sidebar.serverMenu.copyCategoryId"), onSelect: () => copy(categoryId) }),
   ],
 ]);
-about(categoryMenu, ({ categoryId }) => ({ channelId: categoryId }));
+about(categoryMenu, ["channel", "server"], ({ categoryId }) => ({ channelId: categoryId }));
 

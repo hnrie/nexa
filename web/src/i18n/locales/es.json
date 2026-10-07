@@ -6447,5 +6447,11 @@
   "whatsNew.r202610062.voiceBadgeBody": "Un altavoz verde en el icono de un servidor indica que hay gente en un canal de voz al que puedes unirte.",
   "whatsNew.r202610062.voiceBadgeTitle": "Actividad de voz en servidores",
   "whatsNew.r202610062.voiceModBody": "Con los permisos adecuados, abre el menú de alguien en un canal de voz o una llamada para silenciarlo o ensordecerlo en el servidor, desconectarlo o moverlo. En el ordenador también puedes arrastrar a la gente entre canales de voz.",
-  "whatsNew.r202610062.voiceModTitle": "Moderación de voz"
+  "whatsNew.r202610062.voiceModTitle": "Moderación de voz",
+  "whatsNew.r20261007.pluginKeysBody": "Los complementos pueden añadir teclas rápidas y botones a cualquier menú de clic derecho. Elige las teclas de un complemento en Ajustes, Teclas rápidas, en el navegador o en la aplicación de escritorio.",
+  "whatsNew.r20261007.pluginKeysTitle": "Teclas rápidas para complementos",
+  "whatsNew.r20261007.pluginPermsBody": "En Ajustes, Complementos, pulsa Permisos en un complemento para desactivar o volver a activar cualquiera. El cambio se aplica al momento.",
+  "whatsNew.r20261007.pluginPermsTitle": "Elige qué pueden hacer los complementos",
+  "whatsNew.r20261007.pluginReviewBody": "Al añadir un complemento ahora ves qué es y qué quiere hacer antes de que se ejecute nada de su código. Los complementos funcionan en el navegador y en la aplicación de escritorio.",
+  "whatsNew.r20261007.pluginReviewTitle": "Los complementos preguntan primero"
 }

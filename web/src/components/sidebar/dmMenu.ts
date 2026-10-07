@@ -200,7 +200,7 @@ export const dmMenu = defineMenu<DMMenuRowCtx>("dm", [
   ],
 ]);
 // a one-to-one conversation is also about the person in it
-about(dmMenu, ({ channelId }) => {
+about(dmMenu, ["channel", "user"], ({ channelId }) => {
   const ch = dmOf(channelId);
   return { channelId, userId: ch ? (otherIn(ch) ?? null) : null };
 });

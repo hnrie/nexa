@@ -6447,5 +6447,11 @@
   "whatsNew.r202610062.voiceBadgeBody": "Un haut-parleur vert sur l'icône d'un serveur signifie que des gens sont dans un salon vocal que tu peux rejoindre.",
   "whatsNew.r202610062.voiceBadgeTitle": "Activité vocale sur les serveurs",
   "whatsNew.r202610062.voiceModBody": "Avec les bonnes permissions, ouvre le menu de quelqu'un dans un salon vocal ou un appel pour le rendre muet ou sourd sur le serveur, le déconnecter ou le déplacer. Sur ordinateur, tu peux aussi glisser des gens d'un salon vocal à l'autre.",
-  "whatsNew.r202610062.voiceModTitle": "Modération vocale"
+  "whatsNew.r202610062.voiceModTitle": "Modération vocale",
+  "whatsNew.r20261007.pluginKeysBody": "Les plugins peuvent ajouter des raccourcis et des boutons à n'importe quel menu du clic droit. Choisis les touches d'un plugin dans Réglages, Raccourcis clavier, dans le navigateur ou l'application de bureau.",
+  "whatsNew.r20261007.pluginKeysTitle": "Raccourcis pour les plugins",
+  "whatsNew.r20261007.pluginPermsBody": "Dans Réglages, Plugins, appuie sur Autorisations pour un plugin afin d'en désactiver ou réactiver n'importe laquelle. Le changement s'applique tout de suite.",
+  "whatsNew.r20261007.pluginPermsTitle": "Choisis ce que les plugins peuvent faire",
+  "whatsNew.r20261007.pluginReviewBody": "En ajoutant un plugin, tu vois maintenant ce qu'il est et ce qu'il veut faire avant que la moindre ligne de son code ne s'exécute. Les plugins fonctionnent dans le navigateur et l'application de bureau.",
+  "whatsNew.r20261007.pluginReviewTitle": "Les plugins demandent d'abord"
 }
