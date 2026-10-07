@@ -281,3 +281,35 @@
 .fontName { font-size: 15px; font-weight: 650; color: var(--text-strong); }
 .fontNote { font-size: 13px; color: var(--text-muted); }
 .fontCheck { flex: none; color: var(--text-brand); }
+
+/*
+ * A plugin's permissions, grouped by what they touch. Rows sit in one quiet
+ * panel with hairlines between them; only the dangerous permission (danger)
+ * and ones new code asks for (warning) carry colour, as a rule at their start.
+ */
+.ledger { display: flex; flex-direction: column; gap: 14px; }
+.ledgerGroup { min-width: 0; }
+.ledgerGroupName { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.ledgerRows { list-style: none; margin: 0; padding: 0; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--bg-surface) 70%, transparent); box-shadow: 0 0 0 1px var(--border-subtle); overflow: hidden; }
+.ledgerRow { --tone: transparent; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 14px; }
+.ledgerRow + .ledgerRow { border-top: 1px solid var(--border-subtle); }
+.ledgerRow[data-tone="danger"] { --tone: var(--danger); }
+.ledgerRow[data-tone="new"] { --tone: var(--warning); }
+.ledgerRow[data-tone] { background: color-mix(in srgb, var(--tone) 7%, transparent); box-shadow: inset 3px 0 0 var(--tone); }
+[dir="rtl"] .ledgerRow[data-tone] { box-shadow: inset -3px 0 0 var(--tone); }
+.ledgerText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ledgerName { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 14px; font-weight: 600; color: var(--text-strong); }
+.ledgerTag { font-size: 12.5px; font-weight: 650; }
+.ledgerTag[data-tone="danger"] { color: var(--text-danger); }
+.ledgerTag[data-tone="new"] { color: var(--text-warning); }
+.ledgerHint { font-size: 13px; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
+.ledgerSwitch { flex: none; }
+.ledgerNote { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--text-muted); }
+.reviewHead { display: flex; flex-direction: column; gap: 2px; }
+.reviewName { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 17px; font-weight: 650; color: var(--text-strong); overflow-wrap: anywhere; }
+.reviewVersion { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.reviewSub { font-size: 13.5px; color: var(--text-muted); }
+.reviewDesc { margin-top: 4px; font-size: 14px; line-height: 1.45; color: var(--text); }
+.reviewFingerprint { margin-top: 4px; font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.fullAccess { color: var(--text-danger); font-weight: 600; }
+.permsPanel { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }

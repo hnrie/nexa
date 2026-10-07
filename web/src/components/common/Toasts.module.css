@@ -4,6 +4,7 @@
 .toast::before { content: ""; position: absolute; inset-inline-start: 13px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 22%, transparent), 0 0 10px var(--tone); }
 .error { --tone: var(--danger); }
 .success { --tone: var(--positive); }
+.warning { --tone: var(--warning); }
 /* on a phone, under the page's header rather than over its buttons */
 @media (max-width: 767px) { .stack { top: calc(var(--header-h) + 8px + env(safe-area-inset-top, 0px)); width: calc(100% - 24px); align-items: center; } }
 @keyframes drop { from { transform: translateY(-14px) scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }

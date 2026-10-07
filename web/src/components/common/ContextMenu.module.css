@@ -59,3 +59,6 @@
 }
 @keyframes sheetIn { from { transform: translateY(32px); opacity: 0.4; } }
 @keyframes dimIn { from { opacity: 0; } }
+/* a plugin's button may bring an icon: it sits before the label, in the label's colour */
+.itemIcon { flex: none; width: 16px; height: 16px; margin-inline-end: 8px; color: currentColor; opacity: 0.85; }
+.itemIcon + .itemLabel { flex: 1; }

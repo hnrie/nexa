@@ -1,5 +1,5 @@
-import { AlertTriangle, CheckCircle2, Code2, Download, Link2, Loader2, Pencil, Plus, Puzzle, RefreshCw, Settings2, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle2, Code2, Download, Link2, Loader2, Pencil, Plus, Puzzle, RefreshCw, Settings2, ShieldCheck, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Toggle } from "@/components/common/Toggle";
 import { t } from "@/i18n";
@@ -7,8 +7,6 @@ import { codeKey, lookCache } from "@/lib/look/cache";
 import { shortHash } from "@/lib/look/hash";
 import { byteLength, unpackText } from "@/lib/look/pack";
 import { checkForUpdate, dismissUpdate, retryPlugin, syncPlugins, usePlugins, type PluginState } from "@/lib/look/plugins/runtime";
-import { readDeclaration } from "@/lib/look/plugins/declaration";
-import { grantChange } from "@/lib/look/plugins/permissions";
 import { useSafeMode } from "@/lib/look/safeMode";
 import { MAX_PLUGINS, linkName, sanitizePlugins, sanitizeValues } from "@/lib/look/sanitize";
 import type { PluginEntry } from "@/lib/look/types";
@@ -20,6 +18,9 @@ import { AddPluginDialog } from "./look/AddPluginDialog";
 import { Caution } from "./look/Caution";
 import { PluginSettingsForm } from "./look/PluginSettingsForm";
 import { PluginUpdateDialog } from "./look/PluginUpdateDialog";
+import { PermissionLedger } from "./look/PermissionLedger";
+import { readDeclaration } from "@/lib/look/plugins/declaration";
+import { inOrder } from "@/lib/look/plugins/permissions";
 import look from "./look/Look.module.css";
 import s from "./Settings.module.css";
 
@@ -112,6 +113,7 @@ export default function PluginsPage() {
   const [pasted, setPasted] = useState(0);
 
   const setList = (next: PluginEntry[]) => patch({ plugins: next });
+  const [permsOpen, setPermsOpen] = useState<string | null>(null);
   const update = (id: string, change: Partial<PluginEntry>) => setList(list.map((p) => (p.id === id ? { ...p, ...change } : p)));
 
   const pastedTotal = async (except?: string) => {
@@ -207,6 +209,11 @@ export default function PluginsPage() {
                     <div className={look.itemUrl} title={t("look.plugins.fingerprintHint")}>
                       {t("look.plugins.fingerprint", { hash: shortHash(p.hash) })}
                     </div>
+                    {!Array.isArray(p.permissions) && meta ? (
+                      <div className={look.itemDesc} data-testid="plugin-full-access">
+                        <span className={look.fullAccess}>{t("look.plugins.fullAccess")}:</span> {t("look.plugins.v1Warning")}
+                      </div>
+                    ) : null}
                   </div>
                   <div className={look.itemSwitch}>
                     <Toggle
@@ -224,6 +231,11 @@ export default function PluginsPage() {
                   {schema.length ? (
                     <Button size="sm" variant="secondary" onClick={() => setOpen(open === p.id ? null : p.id)} aria-expanded={open === p.id} data-testid="plugin-settings-toggle">
                       <Settings2 size={14} aria-hidden="true" /> {t("look.plugins.settings")}
+                    </Button>
+                  ) : null}
+                  {Array.isArray(p.permissions) ? (
+                    <Button size="sm" variant="secondary" onClick={() => setPermsOpen(permsOpen === p.id ? null : p.id)} aria-expanded={permsOpen === p.id} data-testid="plugin-permissions-toggle">
+                      <ShieldCheck size={14} aria-hidden="true" /> {t("look.plugins.permissions")}
                     </Button>
                   ) : null}
                   {p.source === "url" ? (
@@ -249,6 +261,7 @@ export default function PluginsPage() {
                     <Trash2 size={14} aria-hidden="true" /> {t("look.plugins.remove")}
                   </Button>
                 </div>
+                {permsOpen === p.id && Array.isArray(p.permissions) ? <PluginPermissions entry={p} name={name} onChange={(permissions) => update(p.id, { permissions })} /> : null}
                 {open === p.id && schema.length ? <PluginSettingsForm schema={schema} saved={p.settings} onChange={(values) => update(p.id, { settings: sanitizeValues(values) })} /> : null}
               </div>
             );
@@ -289,18 +302,55 @@ export default function PluginsPage() {
             setReviewing(null);
             toast(t("look.plugins.keptOld"), "info");
           }}
-          onAccept={() => {
+          onAccept={(permissions) => {
             retryPlugin(reviewEntry.id);
             dismissUpdate(reviewEntry.id);
-            // the new hash is the approval, on every device of the account; the grants are
-            // what the new code still asks for, read from its text without running it
-            const asked = readDeclaration(reviewUpdate.code).permissions ?? [];
-            update(reviewEntry.id, { hash: reviewUpdate.hash, enabled: true, ...(Array.isArray(reviewEntry.permissions) ? { permissions: grantChange(reviewEntry.permissions, asked).keep } : {}) });
+            // the new hash is the approval, on every device of the account, and with it what the
+            // dialog showed the new code asking for (read from its text, without running it)
+            update(reviewEntry.id, { hash: reviewUpdate.hash, enabled: true, ...(permissions ? { permissions } : {}) });
             setReviewing(null);
             toast(t("look.plugins.updated", { name: nameOf(reviewEntry, states[reviewEntry.id]) }), "success");
           }}
         />
       ) : null}
     </>
+  );
+}
+
+/**
+ * A v2 plugin's permissions, each with a switch: what it was granted, and
+ * what its code asks for that it was not (read from the code as this device
+ * keeps it, without running it). Switching one off takes it away at once,
+ * from the running plugin too; one it asks for can be given here.
+ */
+function PluginPermissions({ entry, name, onChange }: { entry: PluginEntry; name: string; onChange: (permissions: string[]) => void }) {
+  const [asked, setAsked] = useState<string[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    const text = entry.source === "code" ? unpackText(entry.code ?? "") : lookCache.get(codeKey(entry.hash)).then((f) => f?.text ?? "");
+    void text.then(
+      (code) => live && setAsked(readDeclaration(code).permissions ?? []),
+      () => live && setAsked([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, [entry.source, entry.code, entry.hash]);
+  const granted = new Set(entry.permissions ?? []);
+  const shown = inOrder([...granted, ...(asked ?? [])]);
+  return (
+    <div className={look.permsPanel} data-testid="plugin-permissions">
+      {shown.length ? (
+        <>
+          <p className={look.ledgerNote}>{t("look.plugins.permsEditLead")}</p>
+          <PermissionLedger
+            permissions={shown}
+            switches={{ granted, plugin: name, onChange: (perm, on) => onChange(inOrder(on ? [...granted, perm] : [...granted].filter((x) => x !== perm))) }}
+          />
+        </>
+      ) : asked !== null ? (
+        <p className={look.ledgerNote}>{t("look.plugins.permsNone")}</p>
+      ) : null}
+    </div>
   );
 }

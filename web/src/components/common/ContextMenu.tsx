@@ -1,11 +1,14 @@
 import { Check, ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
 import { attachSheetDrag, fadeElement, sheetsHere } from "@/lib/sheetDrag";
 import { t } from "@/i18n";
 import { useUI, type ContextMenuItem, type ContextMenuState } from "@/stores/ui";
 import s from "./ContextMenu.module.css";
+
+/** A plugin's button can name an icon; the icons load only when a menu shows one (MenuIcon). */
+const MenuIcon = lazy(() => import("./MenuIcon"));
 
 function SliderItem({ item }: { item: ContextMenuItem & { slider: NonNullable<ContextMenuItem["slider"]> } }) {
   const { min, max, step = 1, unit = "", onChange } = item.slider;
@@ -484,6 +487,11 @@ export function ContextMenuHost() {
                   item.onSelect?.();
                 }}
               >
+                {item.icon ? (
+                  <Suspense fallback={<span className={s.itemIcon} />}>
+                    <MenuIcon name={item.icon} className={s.itemIcon} />
+                  </Suspense>
+                ) : null}
                 <span className={s.itemLabel}>{item.label}</span>
                 {item.warn ? (
                   <span className={s.warn} title={item.warn} data-testid="menu-item-warn">

@@ -58,3 +58,6 @@
   .row { padding-inline: 14px 10px; }
   .side { flex: 1 0 100%; justify-content: space-between; margin-inline-start: 0; }
 }
+
+/* a running plugin's keybinds, under its name */
+.pluginName { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--text-muted); overflow-wrap: anywhere; }

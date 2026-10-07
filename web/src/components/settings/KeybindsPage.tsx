@@ -9,9 +9,10 @@ import { bindable, bindKeys, comboOf, formatBind, isMac, KEYBIND_ACTIONS, keybin
 import { useDesktop } from "@/stores/desktop";
 import { useSettings } from "@/stores/settings";
 import k from "./Keybinds.module.css";
+import { PluginKeybinds } from "./PluginKeybinds";
 import s from "./Settings.module.css";
 
-const NAMES: Record<KeybindAction, string> = { mute: "keybinds.actions.mute", deafen: "keybinds.actions.deafen", activity: "keybinds.actions.activity" };
+export const KEYBIND_NAMES: Record<KeybindAction, string> = { mute: "keybinds.actions.mute", deafen: "keybinds.actions.deafen", activity: "keybinds.actions.activity" };
 const HINTS: Record<KeybindAction, string> = { mute: "keybinds.actions.muteHint", deafen: "keybinds.actions.deafenHint", activity: "keybinds.actions.activityHint" };
 
 /** The keys of a bind, as caps. */
@@ -73,7 +74,7 @@ export default function KeybindsPage({ onVoice }: { onVoice: () => void }) {
       }
       const taken = KEYBIND_ACTIONS.find((a) => a !== recording && sameCombo(parseBind(binds[a]), c));
       if (taken) {
-        setError({ action: recording, text: t("keybinds.taken", { action: t(NAMES[taken]) }) });
+        setError({ action: recording, text: t("keybinds.taken", { action: t(KEYBIND_NAMES[taken]) }) });
         return;
       }
       const reserved = reservedBy(c);
@@ -129,7 +130,7 @@ export default function KeybindsPage({ onVoice }: { onVoice: () => void }) {
           return (
             <div key={action} ref={on ? rowRef : undefined} className={k.row} data-recording={on || undefined} data-testid={`keybind-${action}`}>
               <div className={k.what}>
-                <span className={k.name} id={`keybind-${action}-name`}>{t(NAMES[action])}</span>
+                <span className={k.name} id={`keybind-${action}-name`}>{t(KEYBIND_NAMES[action])}</span>
                 <span className={k.desc}>{t(HINTS[action])}</span>
               </div>
               <div className={k.side}>
@@ -154,7 +155,7 @@ export default function KeybindsPage({ onVoice }: { onVoice: () => void }) {
                   </Button>
                   {combo && !on ? (
                     <Tooltip text={t("keybinds.removeKey")}>
-                      <button type="button" className={k.clear} onClick={() => clear(action)} aria-label={t("keybinds.removeKeyFor", { action: t(NAMES[action]) })} data-testid={`keybind-${action}-clear`}>
+                      <button type="button" className={k.clear} onClick={() => clear(action)} aria-label={t("keybinds.removeKeyFor", { action: t(KEYBIND_NAMES[action]) })} data-testid={`keybind-${action}-clear`}>
                         <X size={18} />
                       </button>
                     </Tooltip>
@@ -191,13 +192,14 @@ export default function KeybindsPage({ onVoice }: { onVoice: () => void }) {
         </div>
       </div>
       {/* the polite announcement a screen reader gets while a row listens */}
-      <span className="visually-hidden" aria-live="polite">{recording ? t("keybinds.listeningFor", { action: t(NAMES[recording]) }) : ""}</span>
+      <span className="visually-hidden" aria-live="polite">{recording ? t("keybinds.listeningFor", { action: t(KEYBIND_NAMES[recording]) }) : ""}</span>
       <div className={k.foot}>
         <p className={k.where}>{bridge ? (canHold ? t("keybinds.inApp") : t("keybinds.updateApp")) : t("keybinds.inBrowser")}</p>
         {changed ? (
           <Button size="sm" variant="ghost" onClick={() => patch({ keybinds: {} })} data-testid="keybinds-reset">{t("keybinds.reset")}</Button>
         ) : null}
       </div>
+      <PluginKeybinds />
       {canHold ? (
         <>
           <h3 className={s.h5}>{t("keybinds.backgroundHeading")}</h3>
