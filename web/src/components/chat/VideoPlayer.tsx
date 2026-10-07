@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Tooltip } from "@/components/common/Tooltip";
 import { menuAnchor } from "@/components/common/ContextMenu";
 import { enterElementFullscreen, enterVideoFullscreen, exitElementFullscreen, fullscreenElement, lockLandscape, onFullscreenChange, streamFullscreenWay } from "@/lib/fullscreen";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
 import { fitVideo } from "./fitMedia";
 import { mediaPrefs, saveMediaPrefs } from "./mediaPrefs";
 import { followVideo } from "./soundtrack";
@@ -23,6 +23,15 @@ function clock(t: number): string {
 const SPEEDS = [0.5, 1, 1.5, 2];
 /** How long the controls stay up after a tap, while the video is playing. */
 const CONTROLS_LINGER = 2800;
+
+/** On a player too narrow for every control, speed, picture in picture and download wait in a menu. */
+const videoMoreMenu = defineMenu<{ speed: number; setSpeed: (v: number) => void; pip?: () => void; download: () => void }>("videoMore", [
+  [button("playbackSpeed", ({ speed, setSpeed }) => ({ id: "speed", label: tr_("chat.audioPlayer.playbackSpeed"), slider: { value: speed, min: 0.5, max: 2, step: 0.5, unit: "×", onChange: setSpeed } }))],
+  [
+    button("pictureInPicture", ({ pip }) => !!pip && { id: "pip", label: tr_("chat.videoPlayer.pictureInPicture"), onSelect: pip }),
+    button("downloadVideo", ({ download }) => ({ id: "download", label: tr_("chat.attachments.download"), onSelect: download })),
+  ],
+]);
 
 /**
  * Whether anything can go full screen here. iPhone Safari has no full screen
@@ -159,7 +168,6 @@ export function VideoPlayer({ src, frame, name, width, height, poster, spoiler =
   const [revealed, setRevealed] = useState(!spoiler);
   const [fullOk] = useState(canFullscreen);
   const [pipOk] = useState(canPip);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   // On a touch screen the controls would otherwise sit over the picture the
   // whole time, so they appear on a tap and fade out again while it plays.
   const [ui, setUi] = useState(true);
@@ -344,11 +352,8 @@ export function VideoPlayer({ src, frame, name, width, height, poster, spoiler =
   const more = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     const anchor = menuAnchor(e.currentTarget);
-    const items: ContextMenuItem[] = [{ id: "speed", label: tr_("chat.audioPlayer.playbackSpeed"), slider: { value: speed, min: 0.5, max: 2, step: 0.5, unit: "×", onChange: setSpeed }, separatorAfter: true }];
-    if (pipOk) items.push({ id: "pip", label: tr_("chat.videoPlayer.pictureInPicture"), onSelect: pip });
-    items.push({ id: "download", label: tr_("chat.attachments.download"), onSelect: download });
     // over the bar it sits on, lined up with the button's end, rather than a guessed 200px to the left
-    openContextMenu({ x: anchor.left, y: anchor.top, anchor, above: true, items });
+    videoMoreMenu.open({ speed, setSpeed, ...(pipOk ? { pip } : {}), download }, { x: anchor.left, y: anchor.top, anchor, above: true });
     reveal();
   };
 

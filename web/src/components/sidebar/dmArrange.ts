@@ -22,7 +22,9 @@ import { useChannels } from "@/stores/channels";
 import { useNexa } from "@/stores/nexa";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { useSettings } from "@/stores/settings";
+import { usePick } from "@/stores/pick";
 import type { ContextMenuItem } from "@/stores/ui";
+import { button, defineMenu, type MenuButton } from "@/lib/contextMenus/registry";
 
 /**
  * Whether the Nexa conversation is in the list: Nexa has said something, and
@@ -78,18 +80,29 @@ export function closeNexa(nav?: (path: string) => void): void {
   settings.patch({ nexaClosed: nexa.state?.latest || Date.now(), ...(dmList !== settings.settings.dmList ? { dmList } : {}) });
 }
 
+export interface NexaMenuCtx {
+  nav: (path: string) => void;
+  /** Where the list is there to arrange: the moves it offers. Absent in the server rail. */
+  arrange?: { moves: ContextMenuItem[] };
+  /** Offer picking more conversations, as the DM list does. */
+  select?: boolean;
+}
+
 /**
  * The Nexa conversation's menu: read it, arrange it (where the list is there
  * to arrange, with the moves it offers), and close it.
  */
-export function nexaMenuItems(nav: (path: string) => void, arrange?: { moves: ContextMenuItem[] }): ContextMenuItem[] {
-  const unread = (useNexa.getState().state?.unread ?? 0) > 0;
-  return [
-    { id: "read", label: t("sidebar.dmMenu.markAsRead"), disabled: !unread, onSelect: () => useNexa.getState().markSeen(), separatorAfter: true },
-    ...(arrange ? dmArrangeItems(NEXA_ID, arrange.moves) : []),
-    { id: "close", label: t("sidebar.dMSidebar.closeDm"), onSelect: () => closeNexa(nav) },
-  ];
-}
+export const nexaMenu = defineMenu<NexaMenuCtx>("nexa", [
+  [
+    button("markNexaRead", () => ({ id: "read", label: t("sidebar.dmMenu.markAsRead"), disabled: !((useNexa.getState().state?.unread ?? 0) > 0), onSelect: () => useNexa.getState().markSeen() })),
+    button("selectNexa", ({ select }) => !!select && { id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start("dms", NEXA_ID) }),
+  ],
+  dmArrangeButtons<NexaMenuCtx>({ pin: "pinNexa", add: "addNexaToGroup", remove: "removeNexaFromGroup", move: "moveNexa" }, (c) => (c.arrange ? { id: NEXA_ID, moves: c.arrange.moves } : null)),
+  [button("closeNexa", ({ nav }) => ({ id: "close", label: t("sidebar.dMSidebar.closeDm"), onSelect: () => closeNexa(nav) }))],
+]);
+
+/** The Direct Messages heading's menu: picking from the list. */
+export const dmListMenu = defineMenu<null>("dmList", [[button("selectConversationsInList", () => ({ id: "select", label: t("pick.selectConversations"), onSelect: () => usePick.getState().start("dms") }))]]);
 
 /** Asks for a name and makes a group, with `ids` in it. */
 export async function newGroup(ids: string[] = []): Promise<void> {
@@ -106,39 +119,47 @@ export function groupName(g: DMGroup): string {
 /**
  * What a conversation's menu offers for arranging the list: pin it, put it in
  * a group or take it out, and move a pinned one. The only way on a touch
- * screen, which cannot drag.
+ * screen, which cannot drag. `ids` names the buttons in the menu they are in;
+ * `which` says which conversation, with the moves the list offers for its row
+ * (among the pins, or a list sorted by hand), or null where it does not apply.
  */
-export function dmArrangeItems(id: string, moves: ContextMenuItem[] = []): ContextMenuItem[] {
-  const layout = useSettings.getState().settings.dmList;
-  const pinned = isPinnedDM(layout, id);
-  const group = groupOf(layout, id);
-  const items: ContextMenuItem[] = [
-    {
-      id: "pin",
-      label: pinned ? t("organize.dm.unpinConversation") : t("organize.dm.pinConversation"),
-      onSelect: () => changeDMList((l) => (pinned ? unpinDM(l, id) : pinDM(l, id))),
-    },
-    {
-      id: "add-to-group",
-      label: t("organize.dm.addToGroup"),
-      submenu: [
-        ...layout.groups.map((g, i): ContextMenuItem => ({
-          id: `group-${g.id}`,
-          label: groupName(g),
-          // the group it is in shows ticked
-          ...(g.id === group?.id ? { checked: true } : {}),
-          separatorAfter: i === layout.groups.length - 1,
-          onSelect: () => changeDMList((l) => addToGroup(l, id, g.id)),
-        })),
-        { id: "new-group", label: t("organize.dm.newGroup"), onSelect: () => void newGroup([id]) },
-      ],
-    },
+export function dmArrangeButtons<C>(ids: { pin: string; add: string; remove: string; move: string }, which: (ctx: C) => { id: string; moves?: ContextMenuItem[] } | null): MenuButton<C>[] {
+  const layout = () => useSettings.getState().settings.dmList;
+  return [
+    button(ids.pin, (ctx) => {
+      const w = which(ctx);
+      if (!w) return null;
+      const pinned = isPinnedDM(layout(), w.id);
+      return { id: "pin", label: pinned ? t("organize.dm.unpinConversation") : t("organize.dm.pinConversation"), onSelect: () => changeDMList((l) => (pinned ? unpinDM(l, w.id) : pinDM(l, w.id))) };
+    }),
+    button(ids.add, (ctx) => {
+      const w = which(ctx);
+      if (!w) return null;
+      const l = layout();
+      const group = groupOf(l, w.id);
+      return {
+        id: "add-to-group",
+        label: t("organize.dm.addToGroup"),
+        submenu: [
+          ...l.groups.map((g, i): ContextMenuItem => ({
+            id: `group-${g.id}`,
+            label: groupName(g),
+            // the group it is in shows ticked
+            ...(g.id === group?.id ? { checked: true } : {}),
+            separatorAfter: i === l.groups.length - 1,
+            onSelect: () => changeDMList((next) => addToGroup(next, w.id, g.id)),
+          })),
+          { id: "new-group", label: t("organize.dm.newGroup"), onSelect: () => void newGroup([w.id]) },
+        ],
+      };
+    }),
+    button(ids.remove, (ctx) => {
+      const w = which(ctx);
+      const group = w && groupOf(layout(), w.id);
+      return !!w && !!group && { id: "remove-from-group", label: t("organize.dm.removeFromNamed", { name: groupName(group) }), onSelect: () => changeDMList((l) => removeFromGroup(l, w.id)) };
+    }),
+    button(ids.move, (ctx) => which(ctx)?.moves),
   ];
-  if (group) items.push({ id: "remove-from-group", label: t("organize.dm.removeFromNamed", { name: groupName(group) }), onSelect: () => changeDMList((l) => removeFromGroup(l, id)) });
-  // whoever opens the menu offers the moves where the row can make them: among the pins, or a list sorted by hand
-  items.push(...moves);
-  items[items.length - 1]!.separatorAfter = true;
-  return items;
 }
 
 /** Marks every conversation of a group read. */
@@ -155,7 +176,8 @@ export function markGroupRead(g: DMGroup): void {
   }
 }
 
-interface GroupMenuCtx {
+export interface DMGroupMenuCtx {
+  group: DMGroup;
   openModal: (kind: string, props?: Record<string, unknown>) => void;
   /** Whether anything in it is waiting to be read. */
   unread: boolean;
@@ -164,43 +186,33 @@ interface GroupMenuCtx {
 }
 
 /** A group's own menu, from its header. */
-export function dmGroupMenuItems(g: DMGroup, ctx: GroupMenuCtx): ContextMenuItem[] {
-  const layout = useSettings.getState().settings.dmList;
-  const pinned = isPinnedDM(layout, g.id);
-  const name = groupName(g);
-  const items: ContextMenuItem[] = [
-    { id: "read", label: t("sidebar.dmMenu.markAsRead"), disabled: !ctx.unread, onSelect: () => markGroupRead(g), separatorAfter: true },
-    {
-      id: "collapse",
-      label: g.collapsed ? t("organize.dm.expandGroup") : t("organize.dm.collapseGroup"),
-      onSelect: () => changeDMList((l) => setGroupCollapsed(l, g.id, !g.collapsed)),
-    },
-    {
+export const dmGroupMenu = defineMenu<DMGroupMenuCtx>("dmGroup", [
+  [button("markDmGroupRead", ({ group, unread }) => ({ id: "read", label: t("sidebar.dmMenu.markAsRead"), disabled: !unread, onSelect: () => markGroupRead(group) }))],
+  [
+    button("collapseDmGroup", ({ group: g }) => ({ id: "collapse", label: g.collapsed ? t("organize.dm.expandGroup") : t("organize.dm.collapseGroup"), onSelect: () => changeDMList((l) => setGroupCollapsed(l, g.id, !g.collapsed)) })),
+    button("renameDmGroup", ({ group: g }) => ({
       id: "rename",
       label: t("organize.dm.renameGroup"),
       onSelect: () =>
         void promptText(t("organize.dm.renameGroup"), { label: t("organize.dm.groupName"), initial: g.name, maxLength: GROUP_NAME_MAX }, t("chat.editMessage.save")).then((next) => {
           if (next !== null && next.trim()) changeDMList((l) => renameGroup(l, g.id, next));
         }),
-    },
-    {
-      id: "pin",
-      label: pinned ? t("organize.dm.unpinGroup") : t("organize.dm.pinGroup"),
-      onSelect: () => changeDMList((l) => (pinned ? unpinDM(l, g.id) : pinDM(l, g.id))),
-    },
-    ...(pinned ? (ctx.moves ?? []) : []),
-  ];
-  items[items.length - 1]!.separatorAfter = true;
-  items.push({
+    })),
+    button("pinDmGroup", ({ group: g }) => {
+      const pinned = isPinnedDM(useSettings.getState().settings.dmList, g.id);
+      return { id: "pin", label: pinned ? t("organize.dm.unpinGroup") : t("organize.dm.pinGroup"), onSelect: () => changeDMList((l) => (pinned ? unpinDM(l, g.id) : pinDM(l, g.id))) };
+    }),
+    button("moveDmGroup", ({ group: g, moves }) => isPinnedDM(useSettings.getState().settings.dmList, g.id) && moves),
+  ],
+  [button("deleteDmGroup", ({ group: g, openModal }) => ({
     id: "delete",
     label: t("organize.dm.deleteGroup"),
     onSelect: () =>
-      ctx.openModal("confirm", {
-        title: t("organize.dm.deleteNamed", { name }),
+      openModal("confirm", {
+        title: t("organize.dm.deleteNamed", { name: groupName(g) }),
         body: t("organize.dm.deleteBody"),
         confirmLabel: t("organize.dm.deleteGroup"),
         onConfirm: () => changeDMList((l) => deleteGroup(l, g.id)),
       }),
-  });
-  return items;
-}
+  }))],
+]);

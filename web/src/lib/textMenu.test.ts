@@ -84,16 +84,19 @@ describe("the text box menu", () => {
     expect(ta.value).toBe("say **hello**");
   });
 
-  it("puts a box's own items last, and its own formatting in the submenu", async () => {
+  it("puts the Send button's switch last, and a box's own formatting in the submenu", async () => {
     const div = document.createElement("div");
     div.setAttribute("contenteditable", "true");
     div.innerHTML = "<p>some <span>words</span></p>";
     document.body.append(div);
     const format = vi.fn();
-    setTextMenu(div, { format, extra: () => [{ id: "mine", label: "Mine" }] });
+    const toggle = vi.fn();
+    setTextMenu(div, { format, sendButton: { on: true, toggle } });
     rightClick(div.querySelector("span")!);
     const items = await opened();
-    expect(items[items.length - 1]?.id).toBe("mine");
+    expect(items[items.length - 1]).toMatchObject({ id: "sendButton", checked: true });
+    items[items.length - 1]!.onSelect!();
+    expect(toggle).toHaveBeenCalled();
     items.find((i) => i.id === "format")!.submenu!.find((i) => i.id === "format:spoiler")!.onSelect!();
     expect(format).toHaveBeenCalledWith("spoiler");
   });

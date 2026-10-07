@@ -5,51 +5,15 @@ import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import type { Channel } from "@/api/types";
 import { Spinner } from "@/components/common/Spinner";
-import { appendSection, copyIdItem, developerMode } from "@/lib/copyId";
 import { compareIds } from "@/lib/ids";
 import { selectSubchats, useChannels } from "@/stores/channels";
 import { isUnread, useReadStates } from "@/stores/readStates";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useUI } from "@/stores/ui";
 import s from "./Chat.module.css";
 import { useLayerPresence } from "./useLayerPresence";
+import { subchatMenu } from "./subchatMenu";
 
 import { t } from "@/i18n";
-/** Menu for one subchat row: edit its name and password, or delete for everyone. */
-export function subchatMenuItems(ch: Channel, ctx: { openModal: (k: string, p?: Record<string, unknown>) => void; nav: (p: string) => void; path?: string }): ContextMenuItem[] {
-  const toast = useUI.getState().toast;
-  const remove = async () => {
-    try {
-      await channelsApi.close(ch.id);
-      useChannels.getState().remove(ch.id);
-      // only someone in the subchat is taken back to its conversation; anywhere else they stay put
-      if (ch.parent_id && (ctx.path ?? window.location.pathname).split("/").includes(ch.id)) ctx.nav(`/channels/@me/${ch.parent_id}`);
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("chat.subchat.couldNotDeleteThatSubchat"), "error");
-    }
-  };
-  const items: ContextMenuItem[] = [
-    {
-      id: "edit",
-      label: t("chat.subchat.editSubchat"),
-      onSelect: () => ctx.openModal("subchat", { channel: ch }),
-    },
-    {
-      id: "delete",
-      label: t("chat.subchat.deleteSubchat"),
-      danger: true,
-      onSelect: () =>
-        ctx.openModal("confirm", {
-          title: t("chat.subchat.deleteNamed", { name: ch.name }),
-          body: t("chat.subchat.theSubchatAndEveryMessageIn"),
-          confirmLabel: t("chat.subchat.deleteSubchat"),
-          danger: true,
-          onConfirm: remove,
-        }),
-    },
-  ];
-  return developerMode() ? appendSection(items, [copyIdItem("copy", t("sidebar.dmMenu.copyChannelId"), ch.id)]) : items;
-}
-
 interface Props {
   /** The DM or group the subchats belong to. */
   parent: Channel;
@@ -65,7 +29,6 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
   const upsert = useChannels((c) => c.upsert);
   const reads = useReadStates((r) => r.byChannel);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const toast = useUI((u) => u.toast);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -158,7 +121,7 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
               }}
               onContextMenu={(e) => {
                 e.preventDefault();
-                openContextMenu({ x: e.clientX, y: e.clientY, items: subchatMenuItems(ch, { openModal, nav }) });
+                subchatMenu.open({ channel: ch, openModal, nav }, { x: e.clientX, y: e.clientY });
               }}
             >
               {ch.locked ? <Lock size={16} className={s.subIcon} /> : <MessageCircle size={16} className={s.subIcon} />}

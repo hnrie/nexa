@@ -17,6 +17,7 @@ import { useAuth } from "@/stores/auth";
 import { useNotes } from "@/stores/notes";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
+import { noteLinkRoleMenu, noteMemberRoleMenu } from "./noteMenu";
 import { displayName, useUsers } from "@/stores/users";
 import { t } from "@/i18n";
 import { noteName } from "./NoteParts";
@@ -271,17 +272,10 @@ function PeopleWithAccess({ noteId, sharing, owner, meId, onDone }: { noteId: st
                   onClick={(e) => {
                     const r = e.currentTarget.getBoundingClientRect();
                     const setRole = (role: NoteRole) => void act(`role${m.user.id}`, () => notesApi.setRole(noteId, m.user.id, role), t("notes.share.couldNotChange", { name }));
-                    useUI.getState().openContextMenu({
-                      x: r.right,
-                      y: r.bottom,
-                      anchor: { left: r.left, right: r.right, top: r.top, bottom: r.bottom, align: "end" },
-                      label: t("notes.share.roleOf", { name }),
-                      items: [
-                        { id: "edit", label: t("notes.share.canEdit"), checked: m.role === NOTE_EDITOR, onSelect: () => m.role !== NOTE_EDITOR && setRole(NOTE_EDITOR) },
-                        { id: "view", label: t("notes.share.canView"), checked: m.role === NOTE_VIEWER, onSelect: () => m.role !== NOTE_VIEWER && setRole(NOTE_VIEWER), separatorAfter: true },
-                        { id: "remove", label: t("notes.share.removeFromNote"), danger: true, onSelect: () => void act(`rm${m.user.id}`, () => notesApi.removeMember(noteId, m.user.id), t("notes.share.couldNotRemove", { name })) },
-                      ],
-                    });
+                    noteMemberRoleMenu.open(
+                      { role: m.role, setRole, remove: () => void act(`rm${m.user.id}`, () => notesApi.removeMember(noteId, m.user.id), t("notes.share.couldNotRemove", { name })) },
+                      { x: r.right, y: r.bottom, anchor: { left: r.left, right: r.right, top: r.top, bottom: r.bottom, align: "end" }, label: t("notes.share.roleOf", { name }) },
+                    );
                   }}
                 >
                   {roleName(m.role)}
@@ -417,16 +411,7 @@ function ShareLinks({ noteId, links, onDone }: { noteId: string; links: NoteLink
           data-testid="note-link-create"
           onClick={(e) => {
             const r = e.currentTarget.getBoundingClientRect();
-            useUI.getState().openContextMenu({
-              x: r.left,
-              y: r.bottom,
-              anchor: { left: r.left, right: r.right, top: r.top, bottom: r.bottom, align: "start" },
-              label: t("notes.share.linkRole"),
-              items: [
-                { id: "view", label: t("notes.share.linkCanView"), onSelect: () => void create(NOTE_VIEWER) },
-                { id: "edit", label: t("notes.share.linkCanEdit"), onSelect: () => void create(NOTE_EDITOR) },
-              ],
-            });
+            noteLinkRoleMenu.open({ create: (role) => void create(role) }, { x: r.left, y: r.bottom, anchor: { left: r.left, right: r.right, top: r.top, bottom: r.bottom, align: "start" }, label: t("notes.share.linkRole") });
           }}
         >
           <Plus size={16} aria-hidden="true" /> {t("notes.share.createLink")}

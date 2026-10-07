@@ -1,76 +1,20 @@
 import { HeadphoneOff, MicOff, MonitorUp, Video } from "lucide-react";
 import type { KeyboardEvent, MouseEvent } from "react";
-import { ApiError } from "@/api/client";
-import { guests as guestsApi } from "@/api/guests";
-import type { VoiceState } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
-import { memberMenuItems } from "@/components/server/memberMenu";
 import { UserTag } from "@/components/servertag/UserTag";
-import { appendSection, copyIdItem, developerMode } from "@/lib/copyId";
-import { P } from "@/lib/perms";
 import { memberName } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
-import { canI, useServers } from "@/stores/servers";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useServers } from "@/stores/servers";
+import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
 import { useVoiceDrag } from "@/stores/voiceDrag";
 import { openProfilePopout } from "@/stores/profilePopout";
-import { setUserLocalMute, setUserVolume } from "@/voice/session";
-import { inAsGuest, modMuted, voiceModerationItems, voicePowers } from "./voiceModeration";
+import { inAsGuest, modMuted, voicePowers } from "./voiceModeration";
+import { callParticipantMenu } from "./callMenus";
 import s from "./Voice.module.css";
 
 import { t } from "@/i18n";
-
-/** How loud someone is on this device: the slider, a mute here, and a way back to 100%. */
-export function volumeItems(userId: string): ContextMenuItem[] {
-  const v = useVoice.getState();
-  const vol = v.volumes[userId] ?? 100;
-  const muted = !!v.localMutes[userId];
-  return [
-    { id: "volume", label: t("voice.voiceParticipants.userVolume"), slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (n: number) => setUserVolume(userId, n) } },
-    { id: "mute", label: muted ? t("voice.voice.unmute") : t("voice.voice.mute"), onSelect: () => setUserLocalMute(userId, !muted) },
-    { id: "reset", label: t("voice.voiceParticipants.resetVolume"), disabled: vol === 100, onSelect: () => setUserVolume(userId, 100) },
-  ];
-}
-
-/**
- * Someone's menu under a voice channel: their profile and the member's usual
- * choices, how loud they are here, and a moderator's tools where this account
- * has them (Server Mute, Server Deafen, Move To, Disconnect, then the
- * server's Time Out, Kick and Ban). A guest's has their volume and, for whoever
- * may move members, Remove From Call.
- */
-function personMenu(serverId: string | null, channelId: string, p: VoiceState, openModal: (kind: string, props?: Record<string, unknown>) => void): ContextMenuItem[] {
-  const meId = useAuth.getState().me?.id;
-  const profile: ContextMenuItem = { id: "profile", label: t("profile.profile.profile"), onSelect: () => openModal("profile", { userId: p.user_id }) };
-  if (p.user_id === meId) return [profile];
-  const voice = serverId ? voiceModerationItems(serverId, channelId, p) : [];
-  if (inAsGuest(p)) {
-    const items = [...volumeItems(p.user_id)];
-    appendSection(items, voice);
-    const server = serverId ? useServers.getState().byId[serverId] : undefined;
-    if (canI(server, P.MOVE_MEMBERS, channelId)) {
-      const remove = () => void guestsApi.remove(channelId, p.user_id).catch((err) => useUI.getState().toast(err instanceof ApiError ? err.message : t("voice.voiceParticipants.couldNotRemoveTheGuest"), "error"));
-      appendSection(items, [{ id: "remove-guest", label: t("voice.voiceParticipants.removeFromCall"), danger: true, onSelect: remove }]);
-    }
-    return items;
-  }
-  if (!serverId) {
-    const items = [{ ...profile, separatorAfter: true }, ...volumeItems(p.user_id)];
-    if (developerMode()) appendSection(items, [copyIdItem("copy", t("chat.groupMemberMenu.copyUserId"), p.user_id)]);
-    return items;
-  }
-  // the member's own menu, with the call's choices after who they are
-  const items = memberMenuItems(serverId, p.user_id, { openModal });
-  const at = items.findIndex((x) => x.id === "mention") + 1 || 1;
-  const head = items.slice(0, at);
-  head[head.length - 1] = { ...head[head.length - 1]!, separatorAfter: true };
-  const call = [...volumeItems(p.user_id)];
-  appendSection(call, voice);
-  call[call.length - 1] = { ...call[call.length - 1]!, separatorAfter: true };
-  return [...head, ...call, ...items.slice(at)];
-}
 
 /** Who is in a voice channel, listed under it in the sidebar. */
 export function VoiceParticipants({ channelId, serverId }: { channelId: string; serverId: string | null }) {
@@ -80,7 +24,6 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
   const server = useServers((st) => (serverId ? st.byId[serverId] : undefined));
   const meId = useAuth((a) => a.me?.id);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const dragging = useVoiceDrag((d) => d.drag?.userId ?? null);
   const list = participantsOf(byChannel, channelId);
   if (list.length === 0) return null;
@@ -124,9 +67,7 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
             }}
             onContextMenu={(e) => {
               e.preventDefault();
-              const items = personMenu(serverId, channelId, p, openModal);
-              // a guest's ID lasts only as long as its link, so there is nothing to copy
-              if (items.length) openContextMenu({ x: e.clientX, y: e.clientY, items, label: name });
+              callParticipantMenu.open({ serverId, channelId, vs: p, openModal }, { x: e.clientX, y: e.clientY, label: name });
             }}
           >
             <Avatar id={p.user_id} avatarId={users[p.user_id]?.avatar_id ?? null} name={name} size={24} className={s.pAvatar} />

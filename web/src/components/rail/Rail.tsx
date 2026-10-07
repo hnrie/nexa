@@ -24,17 +24,17 @@ import { P } from "@/lib/perms";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
-import { dmMenuItems } from "@/components/sidebar/dmMenu";
-import { nexaListed, nexaMenuItems } from "@/components/sidebar/dmArrange";
-import { serverMenuItems } from "@/components/sidebar/serverMenu";
+import { dmMenu } from "@/components/sidebar/dmMenu";
+import { nexaListed, nexaMenu } from "@/components/sidebar/dmArrange";
+import { serverMenu } from "@/components/sidebar/serverMenu";
 import { menuPoint } from "@/components/sidebar/ServerSidebar";
 import { lastChannelOf } from "@/stores/serverNav";
 import { useNexa } from "@/stores/nexa";
 import { unreadCount, useModeration } from "@/stores/moderation";
-import { moderationMenuItems } from "@/components/moderation/modMenu";
+import { moderationMenu } from "@/components/moderation/modMenu";
 import { NexaAvatar } from "@/components/nexa/NexaBits";
 import { FolderFace } from "./FolderFace";
-import { adoptRail, changeRail, folderMenuItems, folderName, serverArrangeItems, toggleFolder } from "./railActions";
+import { adoptRail, changeRail, folderMenu, folderName, toggleFolder } from "./railActions";
 import { railBulk } from "./railBulk";
 import { PickBar, PickMark } from "@/components/common/Pick";
 import { pickClick, usePick } from "@/stores/pick";
@@ -76,7 +76,6 @@ export function Rail() {
   const settings = useSettings((st) => st.settings);
   const loaded = useSettings((st) => st.loaded);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const meId = useAuth((a) => a.me?.id);
   const users = useUsers((u) => u.byId);
   const rels = useRelationships((r) => r.byUser);
@@ -176,18 +175,15 @@ export function Rail() {
     const pick = usePick.getState();
     // a right click on one of several picked acts on all of them
     if (pick.list === "servers" && pick.ids.includes(id) && pick.ids.length > 1) {
-      openContextMenu({ ...menuPoint(e), label: t("pick.count", { count: pick.ids.length }), items: railBulk(pick.ids, { nav, openModal }).menu() });
+      railBulk(pick.ids, { nav, openModal }).menu({ ...menuPoint(e), label: t("pick.count", { count: pick.ids.length }) });
       return;
     }
     if (pick.list === "servers" && !pick.mode && pick.ids.length) pick.clear();
-    const items = serverMenuItems(id, { nav, openModal });
-    // arranging it comes straight after Mark as read, which stays first, and then picking more
-    items.splice(items.findIndex((i) => i.id === "read") + 1, 0, ...serverArrangeItems(id, { openModal, moves: reorder.menuItems(id) }), { id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start("servers", id), separatorAfter: true });
-    openContextMenu({ ...menuPoint(e), label: servers[id]?.server.name ?? "", items });
+    serverMenu.open({ serverId: id, nav, openModal, rail: { moves: reorder.menuItems(id) } }, { ...menuPoint(e), label: servers[id]?.server.name ?? "" });
   };
   const onFolderContext = (e: MouseEvent, f: ServerFolder) => {
     e.preventDefault();
-    openContextMenu({ ...menuPoint(e), label: folderName(f), items: folderMenuItems(f.id, { openModal, moves: reorder.menuItems(f.id) }) });
+    folderMenu.open({ folderId: f.id, openModal, moves: reorder.menuItems(f.id) }, { ...menuPoint(e), label: folderName(f) });
   };
 
   const setDrag = (next: RailDrag | null) => {
@@ -417,7 +413,7 @@ export function Rail() {
               onClick={() => nav("/channels/@admin")}
               onContextMenu={(e) => {
                 e.preventDefault();
-                openContextMenu({ ...menuPoint(e), label: t("moderation.title"), items: moderationMenuItems() });
+                moderationMenu.open(null, { ...menuPoint(e), label: t("moderation.title") });
               }}
             >
               <Shield size={24} />
@@ -442,7 +438,7 @@ export function Rail() {
                   }}
                   onContextMenu={(e) => {
                     e.preventDefault();
-                    openContextMenu({ ...menuPoint(e), label: "Nexa", items: nexaMenuItems(nav) });
+                    nexaMenu.open({ nav }, { ...menuPoint(e), label: "Nexa" });
                   }}
                 >
                   <NexaAvatar size={48} />
@@ -468,7 +464,7 @@ export function Rail() {
                 }}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  openContextMenu({ x: e.clientX, y: e.clientY, items: dmMenuItems(ch.id, { nav, openModal }) });
+                  dmMenu.open({ channelId: ch.id, nav, openModal }, { x: e.clientX, y: e.clientY });
                 }}
               >
                 {ch.type === "dm" ? (

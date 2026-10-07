@@ -10,7 +10,8 @@ import { toggleActivitySharing } from "@/lib/keybindActions";
 import { useDesktop } from "@/stores/desktop";
 import { useDiscord } from "@/stores/discord";
 import { useSettings } from "@/stores/settings";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useUI } from "@/stores/ui";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
 
 /**
  * The gamepad struck through, as the microphone and headphones beside it are
@@ -37,69 +38,79 @@ export function GamepadOff({ size = 20 }: { size?: number }) {
   );
 }
 
+const DISCORD_KIND_LABELS: { bit: number; label: () => string }[] = [
+  { bit: DISCORD_KINDS.listening, label: () => t("settings.activity.kindListening") },
+  { bit: DISCORD_KINDS.playing, label: () => t("settings.activity.kindPlaying") },
+  { bit: DISCORD_KINDS.watching, label: () => t("settings.activity.kindWatching") },
+  { bit: DISCORD_KINDS.streaming, label: () => t("settings.activity.kindStreaming") },
+  { bit: DISCORD_KINDS.competing, label: () => t("settings.activity.kindCompeting") },
+];
+
+const sharing = () => useSettings.getState().settings.shareActivity !== false;
+/** The desktop app's Rich Presence, when the app is there to ask. */
+function richPresence() {
+  const bridge = desktopBridge();
+  const rpc = useDesktop.getState().rpc;
+  return bridge && rpc ? { bridge, rpc } : null;
+}
+const programsShown = () => {
+  const r = richPresence();
+  return !!r && r.rpc.enabled && r.rpc.apps.length > 0;
+};
+
 /**
  * What the button's right click offers: the switch itself, and each place
  * activity comes from, so one of them can be quiet while the rest still show.
  * In the desktop app, Rich Presence and each program heard through it; with
  * Discord linked, each kind of activity from there.
  */
-export function activityMenuItems(): ContextMenuItem[] {
-  const st = useSettings.getState().settings;
-  const share = st.shareActivity !== false;
-  const items: ContextMenuItem[] = [
-    { id: "share", label: t("settings.privacy.shareMyActivity"), checked: share, toggle: true, keys: bindText(keybindsOf(st.keybinds).activity) || undefined, onSelect: () => void toggleActivitySharing() },
-  ];
-  const bridge = desktopBridge();
-  const rpc = useDesktop.getState().rpc;
-  if (bridge && rpc) {
-    items[items.length - 1]!.separatorAfter = true;
-    items.push({ id: "rpc", label: t("settings.desktop.richPresence"), checked: rpc.enabled, toggle: true, disabled: !share, onSelect: () => void bridge.rpc.setEnabled(!rpc.enabled) });
-    if (rpc.enabled && rpc.apps.length > 0) {
-      items.push({
+export const activityMenu = defineMenu<null>("activity", [
+  [button("shareActivity", () => ({ id: "share", label: t("settings.privacy.shareMyActivity"), checked: sharing(), toggle: true, keys: bindText(keybindsOf(useSettings.getState().settings.keybinds).activity) || undefined, onSelect: () => void toggleActivitySharing() }))],
+  [
+    // a line between Rich Presence and Discord, unless the programs' submenu stands between them
+    button("richPresence", () => {
+      const r = richPresence();
+      return r && { id: "rpc", label: t("settings.desktop.richPresence"), checked: r.rpc.enabled, toggle: true, disabled: !sharing(), onSelect: () => void r.bridge.rpc.setEnabled(!r.rpc.enabled), separatorAfter: !programsShown() && !!useDiscord.getState().state?.linked };
+    }),
+    button("richPresencePrograms", () => {
+      const r = richPresence();
+      if (!r || !programsShown()) return null;
+      return {
         id: "programs",
         label: t("settings.desktop.programs"),
-        disabled: !share,
-        submenu: rpc.apps.map((app) => {
+        disabled: !sharing(),
+        submenu: r.rpc.apps.map((app) => {
           const name = app.name || app.activity?.name || t("settings.desktop.programNamed", { id: app.clientId });
-          return { id: `app-${app.clientId}`, label: name, checked: !app.hidden, toggle: true, onSelect: () => void bridge.rpc.setHidden(app.clientId, !app.hidden) };
+          return { id: `app-${app.clientId}`, label: name, checked: !app.hidden, toggle: true, onSelect: () => void r.bridge.rpc.setHidden(app.clientId, !app.hidden) };
         }),
-      });
-    }
-  }
-  const linked = useDiscord.getState().state?.linked;
-  if (linked) {
-    const kinds: { bit: number; label: string }[] = [
-      { bit: DISCORD_KINDS.listening, label: t("settings.activity.kindListening") },
-      { bit: DISCORD_KINDS.playing, label: t("settings.activity.kindPlaying") },
-      { bit: DISCORD_KINDS.watching, label: t("settings.activity.kindWatching") },
-      { bit: DISCORD_KINDS.streaming, label: t("settings.activity.kindStreaming") },
-      { bit: DISCORD_KINDS.competing, label: t("settings.activity.kindCompeting") },
-    ];
-    if (!items[items.length - 1]!.submenu) items[items.length - 1]!.separatorAfter = true;
-    items.push({
-      id: "discord",
-      label: t("settings.activity.discord"),
-      disabled: !share,
-      submenu: kinds.map((k) => {
-        const on = (linked.kinds & k.bit) !== 0;
-        return {
-          id: `kind-${k.bit}`,
-          label: k.label,
-          checked: on,
-          toggle: true,
-          onSelect: () =>
-            void connections
-              .setDiscord({ kinds: on ? linked.kinds & ~k.bit : linked.kinds | k.bit })
-              .then((next) => useDiscord.getState().set(next))
-              .catch((err) => useUI.getState().toast(describeError(err, t("settings.privacy.couldNotSave")), "error")),
-        };
-      }),
-    });
-  }
-  items[items.length - 1]!.separatorAfter = true;
-  items.push({ id: "settings", label: t("activityToggle.settings"), onSelect: () => useUI.getState().openModal("settings", { page: "activity" }) });
-  return items;
-}
+      };
+    }),
+    button("discordActivityKinds", () => {
+      const linked = useDiscord.getState().state?.linked;
+      if (!linked) return null;
+      return {
+        id: "discord",
+        label: t("settings.activity.discord"),
+        disabled: !sharing(),
+        submenu: DISCORD_KIND_LABELS.map((k) => {
+          const on = (linked.kinds & k.bit) !== 0;
+          return {
+            id: `kind-${k.bit}`,
+            label: k.label(),
+            checked: on,
+            toggle: true,
+            onSelect: () =>
+              void connections
+                .setDiscord({ kinds: on ? linked.kinds & ~k.bit : linked.kinds | k.bit })
+                .then((next) => useDiscord.getState().set(next))
+                .catch((err) => useUI.getState().toast(describeError(err, t("settings.privacy.couldNotSave")), "error")),
+          };
+        }),
+      };
+    }),
+  ],
+  [button("activitySettings", () => ({ id: "settings", label: t("activityToggle.settings"), onSelect: () => useUI.getState().openModal("settings", { page: "activity" }) }))],
+]);
 
 /**
  * Beside mute and deafen: whether what you are playing or listening to shows
@@ -109,8 +120,7 @@ export function activityMenuItems(): ContextMenuItem[] {
 export function ActivityToggle({ className }: { className?: string | undefined }) {
   const share = useSettings((x) => x.settings.shareActivity !== false);
   const keys = useSettings((x) => bindText(keybindsOf(x.settings.keybinds).activity));
-  const openContextMenu = useUI((u) => u.openContextMenu);
-  const openMenu = (at: { x: number; y: number }) => openContextMenu({ ...at, above: true, label: t("settings.activity.title"), items: activityMenuItems() });
+  const openMenu = (at: { x: number; y: number }) => activityMenu.open(null, { ...at, above: true, label: t("settings.activity.title") });
   return (
     <Tooltip text={share ? t("activityToggle.hide") : t("activityToggle.show")} keys={keys || undefined}>
       <button

@@ -12,11 +12,11 @@ import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 import { useVoice } from "@/stores/voice";
 import { canShareScreen } from "@/voice/media";
-import { noiseMenuItems, noiseModeLabel } from "@/voice/noiseMode";
+import { noiseModeLabel } from "@/voice/noiseMode";
 import { leaveVoice, toggleCamera, toggleScreen } from "@/voice/session";
 import { HangUp } from "./HangUp";
 import s from "./Voice.module.css";
-import { cameraMenuItems } from "./deviceMenus";
+import { noiseMenu, openDeviceMenu } from "./deviceMenus";
 
 import { t } from "@/i18n";
 /** The "Voice Connected" block that sits above the user panel while in a call. */
@@ -84,7 +84,7 @@ export function VoiceStatus() {
             // a right click chooses the camera
             e.preventDefault();
             const at = { x: e.clientX, y: e.clientY };
-            void cameraMenuItems(openModal).then((items) => useUI.getState().openContextMenu({ ...at, above: true, items }));
+            void openDeviceMenu("camera", openModal, { ...at, above: true });
           }}
         >
           <Video size={16} /> {localVideo ? t("voice.voiceStatus.cameraOn") : t("settings.voice.camera")}
@@ -105,7 +105,7 @@ function NoiseButton() {
   const label = t("voice.noise.button", { mode: noiseModeLabel(mode) });
   const open = (e: MouseEvent<HTMLButtonElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    useUI.getState().openContextMenu({ x: r.left, y: r.top, above: true, anchor: menuAnchor(e.currentTarget), label: t("voice.noise.title"), items: noiseMenuItems() });
+    noiseMenu.open(null, { x: r.left, y: r.top, above: true, anchor: menuAnchor(e.currentTarget), label: t("voice.noise.title") });
   };
   return (
     <Tooltip text={label} side="top">

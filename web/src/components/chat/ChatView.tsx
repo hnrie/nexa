@@ -19,7 +19,7 @@ import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
 import { StatusLine } from "@/components/activity/StatusLine";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { conversationOf, useChannels } from "@/stores/channels";
 import { useRelationships } from "@/stores/relationships";
@@ -48,7 +48,8 @@ import { SelectionBar } from "./SelectionBar";
 import { TypingBar } from "./TypingBar";
 import { MutedBar } from "@/components/nexa/NexaNotices";
 import { useMute } from "@/stores/nexa";
-import { ReportBugButton, reportBugMenuItem } from "@/components/bugs/ReportBugButton";
+import { ReportBugButton } from "@/components/bugs/ReportBugButton";
+import { chatMoreMenu } from "./chatMoreMenu";
 import s from "./Chat.module.css";
 
 import { t as tr_ } from "@/i18n";
@@ -60,7 +61,6 @@ export function ChatView({ channel }: { channel: Channel }) {
   const users = useUsers((u) => u.byId);
   const presence = usePresence((p) => p.byUser);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const membersOpenDesktop = useUI((u) => u.membersOpen);
   const toggleMembersDesktop = useUI((u) => u.toggleMembers);
   // phones, tablets and narrow windows open the member list as a drawer that
@@ -367,23 +367,24 @@ export function ChatView({ channel }: { channel: Channel }) {
             data-testid="chat-more"
             onClick={(e) => {
               const anchor = menuAnchor(e.currentTarget);
-              // a thread's own choices come first: joining it, closing, locking, its settings
-              const own = threadMenu.items.map((it, i, all) => (i === all.length - 1 ? { ...it, separatorAfter: true } : it));
-              const items: ContextMenuItem[] = [
-                ...own,
-                { id: "pins", label: tr_("chat.chat.pinnedMessages"), onSelect: () => setPins(true) },
-                ...(threadsHere ? [{ id: "threads", label: tr_("threads.panel.title"), onSelect: () => setThreadsOpen(true) }] : []),
-                ...(isServer && channel.type === "announcement" ? [{ id: "follow", label: tr_("follows.follow"), onSelect: () => openModal("follow", { channelId: channel.id }) }] : []),
-                // server channels have no subchats
-                ...(!isServer ? [{ id: "subchats", label: tr_("chat.chat.subchats"), onSelect: () => setSubchats(true) }] : []),
-              ];
-              if (isServer) items.push({ id: "invite", label: tr_("chat.chat.invitePeople"), onSelect: () => openModal("invite", { serverId, channelId: channel.id }) });
-              else items.push({ id: "add", label: convo.type === "dm" ? tr_("chat.chat.addFriendsToDm") : tr_("chat.chat.inviteToGroup"), onSelect: () => openModal(convo.type === "group_dm" ? "groupInvite" : "createDM", convo.type === "dm" ? { initial: other ? [other] : [] } : { channelId: convo.id }) });
-              if (isServer || convo.type === "group_dm") items.push({ id: "members", label: membersOpen ? tr_("chat.chat.hideMembers") : tr_("chat.chat.showMembers"), onSelect: toggleMembers });
-              // a phone's call bar has no room for it, so inviting guests to the call is here too
-              if (!isServer && inThisCall && (convo.type === "dm" || convo.type === "group_dm")) items.push({ id: "guests", label: tr_("chat.chat.inviteGuestsToCall"), onSelect: () => openModal("guestLink", { channelId: convo.id }) });
-              if (!isServer) items.push(reportBugMenuItem(convo.type === "group_dm" ? "group" : "dm"));
-              openContextMenu({ x: anchor.left, y: anchor.bottom + 4, anchor, items, label: tr_("chat.chat.more") });
+              chatMoreMenu.open(
+                {
+                  channel,
+                  convo,
+                  isServer,
+                  ...(other ? { other } : {}),
+                  thread: threadMenu.ctx,
+                  threadsHere,
+                  membersOpen,
+                  inThisCall,
+                  openPins: () => setPins(true),
+                  openThreads: () => setThreadsOpen(true),
+                  openSubchats: () => setSubchats(true),
+                  toggleMembers,
+                  openModal,
+                },
+                { x: anchor.left, y: anchor.bottom + 4, anchor, label: tr_("chat.chat.more") },
+              );
             }}
           >
             <MoreVertical size={22} />

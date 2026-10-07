@@ -6,7 +6,7 @@ vi.mock("@/api/channels", () => ({
   channels: { close: () => Promise.resolve() },
 }));
 
-import { subchatMenuItems } from "./SubchatPanel";
+import { subchatMenu } from "./subchatMenu";
 
 const sub = { id: "900", type: "subchat", name: "Plans", parent_id: "700", server_id: null, recipient_ids: [], key_conv_id: "900" } as unknown as Channel;
 
@@ -14,7 +14,8 @@ const sub = { id: "900", type: "subchat", name: "Plans", parent_id: "700", serve
 async function deleteFrom(path: string): Promise<string[]> {
   const went: string[] = [];
   let confirm: (() => Promise<void>) | undefined;
-  const items = subchatMenuItems(sub, {
+  const items = subchatMenu.items({
+    channel: sub,
     nav: (p) => went.push(p),
     openModal: (_kind, props) => {
       confirm = props?.["onConfirm"] as () => Promise<void>;

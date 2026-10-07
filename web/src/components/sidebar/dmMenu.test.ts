@@ -3,7 +3,7 @@ import type { Channel } from "@/api/types";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useSettings } from "@/stores/settings";
-import { closeDM, dmMenuItems, isViewingDM, purgeDM } from "./dmMenu";
+import { closeDM, dmMenu, isViewingDM, purgeDM } from "./dmMenu";
 
 function channel(id: string, type: Channel["type"], parent: string | null = null): Channel {
   return { id, type, parent_id: parent, recipient_ids: [] } as unknown as Channel;
@@ -61,7 +61,7 @@ describe("closing a conversation", () => {
 
 describe("the developer-mode items on a conversation", () => {
   const ctx = { nav: () => undefined, openModal: () => undefined };
-  const ids = (channelId: string) => dmMenuItems(channelId, ctx).map((i) => i.id);
+  const ids = (channelId: string) => dmMenu.items({ channelId, ...ctx }).map((i) => i.id);
   beforeEach(() => {
     useAuth.setState({ me: { id: "1" } as never });
     useChannels.setState({

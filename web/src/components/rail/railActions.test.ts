@@ -3,7 +3,12 @@ import type { ServerState } from "@/stores/servers";
 import { useServers } from "@/stores/servers";
 import { DEFAULT_SETTINGS, useSettings } from "@/stores/settings";
 import type { ContextMenuItem } from "@/stores/ui";
-import { adoptRail, currentRail, folderMenuItems, folderName, serverArrangeItems } from "./railActions";
+import { buildItems, button } from "@/lib/contextMenus/registry";
+import { adoptRail, currentRail, folderMenu, folderName, serverArrangeButtons, type RailServerCtx } from "./railActions";
+
+// the rail's part of a server menu, with something after it for the line to go before
+const serverArrangeItems = (serverId: string, ctx: { openModal: RailServerCtx["openModal"]; moves: ContextMenuItem[] }) =>
+  buildItems([serverArrangeButtons, [button<RailServerCtx>("testAfter", () => ({ id: "after", label: "" }))]], { serverId, openModal: ctx.openModal, rail: { moves: ctx.moves } }).slice(0, -1);
 
 const server = (id: string, name: string) => ({ server: { id, name, icon_id: null } }) as unknown as ServerState;
 
@@ -79,7 +84,7 @@ describe("the menus", () => {
   it("gives a folder read, settings, pin, moves and delete, and asks before deleting", () => {
     load({ rail: { pinned: [], rest: [{ id: "fa", name: "Games", color: null, servers: ["2", "3"] }, "1"] } });
     const opened: { kind: string; props?: Record<string, unknown> }[] = [];
-    const items = folderMenuItems("fa", { openModal: (kind, props) => opened.push({ kind, props }), moves: [{ id: "move-down", label: "Move down" }] });
+    const items = folderMenu.items({ folderId: "fa", openModal: (kind, props) => opened.push({ kind, props }), moves: [{ id: "move-down", label: "Move down" }] });
     expect(ids(items)).toEqual(["read", "settings", "pin", "move-down", "delete"]);
     items.at(-1)!.onSelect!();
     expect(opened[0]!.kind).toBe("confirm");

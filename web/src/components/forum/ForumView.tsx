@@ -23,6 +23,7 @@ import { Markdown, parse, plainText } from "@/markdown";
 import { useChannels } from "@/stores/channels";
 import { canI, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
 import { useUsers } from "@/stores/users";
 import { useShownName } from "@/components/chat/useShownName";
 import chat from "@/components/chat/Chat.module.css";
@@ -32,6 +33,18 @@ import s from "./Forum.module.css";
 
 type Sort = "activity" | "created";
 type Layout = "list" | "gallery";
+
+/** A forum's View menu: how posts are sorted and laid out. */
+const forumViewMenu = defineMenu<{ sort: Sort; layout: Layout; setSort: (s: Sort) => void; setLayout: (l: Layout) => void }>("forumView", [
+  [
+    button("sortForumByActivity", ({ sort, setSort }) => ({ id: "activity", label: t("forum.sort.activity"), checked: sort === "activity", onSelect: () => setSort("activity") })),
+    button("sortForumByCreated", ({ sort, setSort }) => ({ id: "created", label: t("forum.sort.created"), checked: sort === "created", onSelect: () => setSort("created") })),
+  ],
+  [
+    button("forumListLayout", ({ layout, setLayout }) => ({ id: "list", label: t("forum.layout.list"), checked: layout === "list", onSelect: () => setLayout("list") })),
+    button("forumGalleryLayout", ({ layout, setLayout }) => ({ id: "gallery", label: t("forum.layout.gallery"), checked: layout === "gallery", onSelect: () => setLayout("gallery") })),
+  ],
+]);
 
 interface Post {
   thread: ThreadListing;
@@ -247,18 +260,7 @@ export default function ForumView({ channel }: { channel: Channel }) {
   const toggleTag = (id: string) => setFilter((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   const viewMenu = (el: HTMLElement) => {
     const anchor = menuAnchor(el, "end");
-    useUI.getState().openContextMenu({
-      x: anchor.right,
-      y: anchor.bottom + 4,
-      anchor,
-      label: t("forum.view.title"),
-      items: [
-        { id: "activity", label: t("forum.sort.activity"), checked: sort === "activity", onSelect: () => setSort("activity") },
-        { id: "created", label: t("forum.sort.created"), checked: sort === "created", onSelect: () => setSort("created"), separatorAfter: true },
-        { id: "list", label: t("forum.layout.list"), checked: layout === "list", onSelect: () => setLayout("list") },
-        { id: "gallery", label: t("forum.layout.gallery"), checked: layout === "gallery", onSelect: () => setLayout("gallery") },
-      ],
-    });
+    forumViewMenu.open({ sort, layout, setSort, setLayout }, { x: anchor.right, y: anchor.bottom + 4, anchor, label: t("forum.view.title") });
   };
   const empty = ordered !== null && ordered.length === 0;
 

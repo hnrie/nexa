@@ -14,7 +14,11 @@ import { useReorder } from "@/hooks/useReorder";
 import { describeError } from "@/lib/errors";
 import { useAuth } from "@/stores/auth";
 import { useExpressions } from "@/stores/expressions";
-import { useUI } from "@/stores/ui";
+import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
+
+/** A sticker's menu in its pack: moving it up or down, as dragging does. */
+const stickerOrderMenu = defineMenu<{ moves: ContextMenuItem[] }>("stickerOrder", [[button("moveSticker", ({ moves }) => moves)]]);
 import { copyText } from "@/lib/copyText";
 import { unlessUnsaved } from "@/stores/unsaved";
 import { SaveBar } from "./SettingsLayer";
@@ -93,7 +97,6 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
   const removePack = useExpressions((x) => x.removePack);
   const toast = useUI((u) => u.toast);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const [name, setName] = useState(pack.name);
   const [description, setDescription] = useState(pack.description);
   const [busy, setBusy] = useState(false);
@@ -367,10 +370,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
             onDragEnd={() => { setDrag(null); setDrop(null); }}
             onKeyDown={reorder.onKeyDown(st.id)}
             onContextMenu={(e) => {
-              const items = reorder.menuItems(st.id);
-              if (items.length === 0) return;
-              e.preventDefault();
-              openContextMenu({ x: e.clientX, y: e.clientY, label: st.name, items });
+              if (stickerOrderMenu.open({ moves: reorder.menuItems(st.id) }, { x: e.clientX, y: e.clientY, label: st.name })) e.preventDefault();
             }}
             data-reorder-id={st.id}
             tabIndex={manage ? -1 : undefined}

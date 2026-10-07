@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { menuAnchor } from "@/components/common/ContextMenu";
 import { Tooltip } from "@/components/common/Tooltip";
 import { usePick, type PickList } from "@/stores/pick";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import type { MenuPlacement } from "@/lib/contextMenus/registry";
 import s from "./Pick.module.css";
 
 import { t } from "@/i18n";
@@ -31,10 +31,9 @@ export interface PickAction {
  * the things done to them most, the rest in a menu, and the way out. Escape
  * puts it away as well.
  */
-export function PickBar({ list, count, actions, more, label }: { list: PickList; count: number; actions: PickAction[]; more: () => ContextMenuItem[]; label: string }) {
+export function PickBar({ list, count, actions, more, label }: { list: PickList; count: number; actions: PickAction[]; more: (at: MenuPlacement) => void; label: string }) {
   const clear = usePick((p) => p.clear);
   const mode = usePick((p) => p.list === list && p.mode);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || document.querySelector("[data-modal-layer]")) return;
@@ -68,7 +67,7 @@ export function PickBar({ list, count, actions, more, label }: { list: PickList;
             disabled={count === 0}
             aria-label={t("pick.more")}
             aria-haspopup="menu"
-            onClick={(e) => openContextMenu({ x: 0, y: 0, anchor: menuAnchor(e.currentTarget), label: t("pick.count", { count }), items: more() })}
+            onClick={(e) => more({ x: 0, y: 0, anchor: menuAnchor(e.currentTarget), label: t("pick.count", { count }) })}
             data-testid="pick-more"
           >
             <MoreHorizontal size={18} aria-hidden="true" />

@@ -10,7 +10,7 @@ import { useExpressions } from "@/stores/expressions";
 import { useAuth } from "@/stores/auth";
 import { isInstanceAdmin } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { favoriteGifMenu, gifResultMenu } from "./pickerMenus";
 import { GifGrid, type GifTileData } from "./GifGrid";
 import { focusSearchOnOpen } from "./EmojiPicker";
 import { SearchBox } from "@/components/common/SearchBox";
@@ -34,7 +34,6 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
   const meId = useAuth((a) => a.me?.id);
   const admin = !!meId && isInstanceAdmin(meId);
   const setEnabled = useExpressions((x) => x.setGifEnabled);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const [tab, setTab] = useState<"favorites" | "search">("favorites");
   const [q, setQ] = useState("");
   const [results, setResults] = useState<GifResult[]>([]);
@@ -149,7 +148,6 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, failed, next, shownFor]);
 
-  const menu = (x: number, y: number, items: ContextMenuItem[]) => openContextMenu({ x, y, items });
 
   const resultTiles = useMemo<ResultTile[]>(() => results.map((g) => ({ key: g.id, src: g.preview, label: g.title || "GIF", w: g.w, h: g.h, gif: g })), [results]);
   // A favourite is kept as the link it was saved with, whose signature runs out
@@ -213,10 +211,7 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
             onPick={(t) => onPick(t.fav)}
             onDead={(t) => setDead((d) => (d.has(t.key) ? d : new Set(d).add(t.key)))}
             onMenu={(t, x, y) =>
-              menu(x, y, [
-                ...(t.dead ? [] : [{ id: "send", label: tr_("pickers.gifPicker.sendGif"), onSelect: () => onPick(t.fav) }]),
-                { id: "unfavorite", label: tr_("pickers.gifPicker.removeFromFavorites"), danger: true, onSelect: () => removeFavoriteGifs(new Set([t.key])) },
-              ])
+              favoriteGifMenu.open({ dead: !!t.dead, send: () => onPick(t.fav), unfavorite: () => removeFavoriteGifs(new Set([t.key])) }, { x, y })
             }
             overlay={(t) => <button className={s.gifRemove} aria-label={tr_("pickers.gifPicker.removeFavorite")} onClick={() => removeFavoriteGifs(new Set([t.key]))}><X size={14} /></button>}
             footer={
@@ -237,10 +232,7 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
           onNearEnd={loadMore}
           onMenu={(t, x, y) => {
             const fav = favSet.has(mediaKey(t.gif.url));
-            menu(x, y, [
-              { id: "send", label: tr_("pickers.gifPicker.sendGif"), onSelect: () => sendResult(t.gif) },
-              { id: "favorite", label: fav ? tr_("pickers.gifPicker.removeFromFavorites") : tr_("pickers.gifPicker.addToFavorites"), onSelect: () => toggleFavoriteGif({ url: t.gif.url, w: t.gif.w, h: t.gif.h }) },
-            ]);
+            gifResultMenu.open({ favorite: fav, send: () => sendResult(t.gif), toggleFavorite: () => toggleFavoriteGif({ url: t.gif.url, w: t.gif.w, h: t.gif.h }) }, { x, y });
           }}
           overlay={(t) => {
             const fav = favSet.has(mediaKey(t.gif.url));

@@ -28,6 +28,7 @@ import { formatBytes, formatDateDivider, formatFull, formatShortDate, formatTime
 import { parse, plainText } from "@/markdown";
 import { filesOf, isVideo, linksOf, mediaOf, type LinkItem, type MediaItem, type SearchDoc } from "@/search/doc";
 import { TABS, type Sort, type Tab } from "@/search/engine";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
 import { excerptAround } from "@/search/text";
 import { useChannels } from "@/stores/channels";
 import { useSettings } from "@/stores/settings";
@@ -40,6 +41,11 @@ import s from "./Search.module.css";
 
 const TAB_LABEL: Record<Tab, string> = { messages: "search.tab.messages", media: "search.tab.media", links: "search.tab.links", files: "search.tab.files" };
 const SORT_LABEL: Record<Sort, string> = { newest: "search.sort.newest", oldest: "search.sort.oldest", relevance: "search.sort.relevance" };
+
+/** How search results are sorted. */
+const searchSortMenu = defineMenu<{ sort: Sort; onSort: (s: Sort) => void }>("searchSort", [
+  [button("searchSortOrder", ({ sort, onSort }) => (["newest", "oldest", "relevance"] as const).map((o) => ({ id: `sort-${o}`, label: t(SORT_LABEL[o]), checked: sort === o, onSelect: () => onSort(o) })))],
+]);
 
 function count(n: number): string {
   try {
@@ -432,7 +438,6 @@ export function SearchResults({
   onTop?: (() => void) | undefined;
 }) {
   const id = useId();
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const scroller = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const { counts } = run.result;
@@ -508,13 +513,7 @@ export function SearchResults({
           data-testid="search-sort"
           onClick={(e) => {
             const anchor = menuAnchor(e.currentTarget);
-            openContextMenu({
-              x: anchor.left,
-              y: anchor.bottom + 4,
-              anchor,
-              label: t("search.sort.menu"),
-              items: (["newest", "oldest", "relevance"] as const).map((o) => ({ id: `sort-${o}`, label: t(SORT_LABEL[o]), checked: sort === o, onSelect: () => onSort(o) })),
-            });
+            searchSortMenu.open({ sort, onSort }, { x: anchor.left, y: anchor.bottom + 4, anchor, label: t("search.sort.menu") });
           }}
         >
           <ArrowDownUp size={16} aria-hidden="true" />

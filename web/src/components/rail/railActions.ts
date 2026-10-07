@@ -4,6 +4,7 @@ import { useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import type { ContextMenuItem } from "@/stores/ui";
+import { button, defineMenu, type MenuButton } from "@/lib/contextMenus/registry";
 import {
   addToFolder,
   deleteFolder,
@@ -18,7 +19,7 @@ import {
   type RailLayout,
   type ServerFolder,
 } from "@/lib/railLayout";
-import { markServerRead } from "@/components/sidebar/serverMenu";
+import { markServerRead } from "@/components/sidebar/serverActions";
 
 /** The rail as it shows now: the account's layout, resolved against the servers it is in. */
 export function currentRail(): RailLayout {
@@ -74,10 +75,20 @@ function anyUnread(serverIds: string[]): boolean {
   return Object.values(channels).some((ch) => !!ch.server_id && inFolder.has(ch.server_id) && ch.type === "text" && (isUnread(reads[ch.id], ch.last_message_id) || (reads[ch.id]?.mentions ?? 0) > 0));
 }
 
-interface Ctx {
+/** What the server menu is handed when it opens from the rail, where servers are arranged. */
+export interface RailServerCtx {
+  serverId: string;
   openModal: (kind: string, props?: Record<string, unknown>) => void;
-  /** Move up and Move down, where there is room: the same moves Alt and an arrow key make. */
-  moves: ContextMenuItem[];
+  /** Set only in the rail: Move up and Move down where there is room, the same moves Alt and an arrow key make. */
+  rail?: { moves: ContextMenuItem[] };
+}
+
+/** The server's place in the rail, when the menu opened there and it has one. */
+function railPlace(ctx: RailServerCtx) {
+  if (!ctx.rail) return null;
+  const layout = currentRail();
+  const at = findPlace(layout, ctx.serverId);
+  return at ? { layout, folder: at.folder } : null;
 }
 
 /**
@@ -85,20 +96,22 @@ interface Ctx {
  * a folder or take it out of one, move it. A touch screen has no dragging, so
  * this is how every move is made there.
  */
-export function serverArrangeItems(serverId: string, ctx: Ctx): ContextMenuItem[] {
-  const layout = currentRail();
-  const at = findPlace(layout, serverId);
-  if (!at) return [];
-  const folder = at.folder;
-  const pinned = isPinned(layout, serverId);
-  const folders = foldersOf(layout);
-  const items: ContextMenuItem[] = [
-    {
+export const serverArrangeButtons: MenuButton<RailServerCtx>[] = [
+  button("pinServer", (ctx) => {
+    const place = railPlace(ctx);
+    if (!place) return null;
+    const pinned = isPinned(place.layout, ctx.serverId);
+    return {
       id: "pin",
       label: pinned ? t("organize.rail.unpinServer") : t("organize.rail.pinServer"),
-      onSelect: () => changeRail((l) => (pinned ? unpinEntry(l, serverId) : pinEntry(l, serverId))),
-    },
-    {
+      onSelect: () => changeRail((l) => (pinned ? unpinEntry(l, ctx.serverId) : pinEntry(l, ctx.serverId))),
+    };
+  }),
+  button("addServerToFolder", (ctx) => {
+    const place = railPlace(ctx);
+    if (!place) return null;
+    const folders = foldersOf(place.layout);
+    return {
       id: "add-to-folder",
       label: t("organize.rail.addToFolder"),
       submenu: [
@@ -106,57 +119,66 @@ export function serverArrangeItems(serverId: string, ctx: Ctx): ContextMenuItem[
           id: `folder-${f.id}`,
           label: folderName(f),
           // the folder it is in shows ticked; choosing it again does nothing
-          ...(f.id === folder?.id ? { checked: true } : {}),
+          ...(f.id === place.folder?.id ? { checked: true } : {}),
           separatorAfter: i === folders.length - 1,
-          onSelect: () => changeRail((l) => addToFolder(l, serverId, f.id)),
+          onSelect: () => changeRail((l) => addToFolder(l, ctx.serverId, f.id)),
         })),
-        { id: "new-folder", label: t("organize.rail.newFolder"), onSelect: () => ctx.openModal("folderSettings", { serverIds: [serverId] }) },
+        { id: "new-folder", label: t("organize.rail.newFolder"), onSelect: () => ctx.openModal("folderSettings", { serverIds: [ctx.serverId] }) },
       ],
-    },
-  ];
-  if (folder) {
+    };
+  }),
+  button("removeServerFromFolder", (ctx) => {
+    const folder = railPlace(ctx)?.folder;
+    if (!folder) return null;
     const name = folder.name.trim();
-    items.push({
+    return {
       id: "remove-from-folder",
       label: name ? t("organize.rail.removeFromNamed", { name }) : t("organize.rail.removeFromFolder"),
-      onSelect: () => changeRail((l) => removeFromFolder(l, serverId)),
-    });
-  }
-  items.push(...ctx.moves);
-  items[items.length - 1]!.separatorAfter = true;
-  return items;
+      onSelect: () => changeRail((l) => removeFromFolder(l, ctx.serverId)),
+    };
+  }),
+  button("moveServer", (ctx) => railPlace(ctx) && ctx.rail?.moves),
+];
+
+export interface FolderMenuCtx {
+  folderId: string;
+  openModal: (kind: string, props?: Record<string, unknown>) => void;
+  /** Move up and Move down, where there is room. */
+  moves: ContextMenuItem[];
 }
 
+const folderOf = (folderId: string) => foldersOf(currentRail()).find((x) => x.id === folderId);
+
 /** A folder's menu: read, its settings, pin, move, delete. */
-export function folderMenuItems(folderId: string, ctx: Ctx): ContextMenuItem[] {
-  const layout = currentRail();
-  const f = foldersOf(layout).find((x) => x.id === folderId);
-  if (!f) return [];
-  const pinned = isPinned(layout, folderId);
-  const items: ContextMenuItem[] = [
-    { id: "read", label: t("sidebar.dmMenu.markAsRead"), disabled: !anyUnread(f.servers), onSelect: () => markFolderRead(f), separatorAfter: true },
-    { id: "settings", label: t("organize.rail.folderSettings"), onSelect: () => ctx.openModal("folderSettings", { folderId }) },
-    {
-      id: "pin",
-      label: pinned ? t("organize.rail.unpinFolder") : t("organize.rail.pinFolder"),
-      onSelect: () => changeRail((l) => (pinned ? unpinEntry(l, folderId) : pinEntry(l, folderId))),
-    },
-    ...ctx.moves,
-  ];
-  items[items.length - 1]!.separatorAfter = true;
-  items.push({
-    id: "delete",
-    label: t("organize.rail.deleteFolder"),
-    onSelect: () =>
-      ctx.openModal("confirm", {
-        title: t("organize.rail.deleteNamed", { name: folderName(f) }),
-        body: t("organize.rail.deleteBody"),
-        confirmLabel: t("organize.rail.deleteFolder"),
-        onConfirm: () => changeRail((l) => deleteFolder(l, folderId)),
-      }),
-  });
-  return items;
-}
+export const folderMenu = defineMenu<FolderMenuCtx>("folder", [
+  [button("markFolderRead", ({ folderId }) => {
+    const f = folderOf(folderId);
+    return f && { id: "read", label: t("sidebar.dmMenu.markAsRead"), disabled: !anyUnread(f.servers), onSelect: () => markFolderRead(f) };
+  })],
+  [
+    button("folderSettings", ({ folderId, openModal }) => !!folderOf(folderId) && { id: "settings", label: t("organize.rail.folderSettings"), onSelect: () => openModal("folderSettings", { folderId }) }),
+    button("pinFolder", ({ folderId }) => {
+      if (!folderOf(folderId)) return null;
+      const pinned = isPinned(currentRail(), folderId);
+      return { id: "pin", label: pinned ? t("organize.rail.unpinFolder") : t("organize.rail.pinFolder"), onSelect: () => changeRail((l) => (pinned ? unpinEntry(l, folderId) : pinEntry(l, folderId))) };
+    }),
+    button("moveFolder", ({ folderId, moves }) => !!folderOf(folderId) && moves),
+  ],
+  [button("deleteFolder", ({ folderId, openModal }) => {
+    const f = folderOf(folderId);
+    return f && {
+      id: "delete",
+      label: t("organize.rail.deleteFolder"),
+      onSelect: () =>
+        openModal("confirm", {
+          title: t("organize.rail.deleteNamed", { name: folderName(f) }),
+          body: t("organize.rail.deleteBody"),
+          confirmLabel: t("organize.rail.deleteFolder"),
+          onConfirm: () => changeRail((l) => deleteFolder(l, folderId)),
+        }),
+    };
+  })],
+]);
 
 /** Opens or closes a folder where it is. */
 export function toggleFolder(f: ServerFolder): void {

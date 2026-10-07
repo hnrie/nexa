@@ -16,7 +16,11 @@ import { memberName } from "@/lib/names";
 import { canManageRole, parsePerm, permString } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
 import { memberHighest, rolesByPosition, useServers } from "@/stores/servers";
-import { useUI } from "@/stores/ui";
+import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
+
+/** A role's menu in the role list: moving it up or down, as dragging does. */
+const roleOrderMenu = defineMenu<{ moves: ContextMenuItem[] }>("roleOrder", [[button("moveRole", ({ moves }) => moves)]]);
 import { useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import { RoleGrid } from "../PermissionGrid";
@@ -40,7 +44,6 @@ export default function RolesPage({ serverId }: { serverId: string }) {
   const removeRole = useServers((x) => x.removeRole);
   const meId = useAuth((a) => a.me?.id);
   const toast = useUI((u) => u.toast);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const roles = useMemo(() => rolesByPosition(server), [server]);
   const [selected, setSelected] = useState<string>(roles[0]?.id ?? serverId);
   const [tab, setTab] = useState<"display" | "permissions" | "members">("display");
@@ -152,10 +155,7 @@ export default function RolesPage({ serverId }: { serverId: string }) {
                 onDragEnd={() => { setDrag(null); setDrop(null); }}
                 onKeyDown={reorder.onKeyDown(r.id)}
                 onContextMenu={(e) => {
-                  const items = reorder.menuItems(r.id);
-                  if (items.length === 0) return;
-                  e.preventDefault();
-                  openContextMenu({ x: e.clientX, y: e.clientY, label: r.name, items });
+                  if (roleOrderMenu.open({ moves: reorder.menuItems(r.id) }, { x: e.clientX, y: e.clientY, label: r.name })) e.preventDefault();
                 }}
                 data-reorder-id={r.id}
                 aria-current={r.id === role.id}

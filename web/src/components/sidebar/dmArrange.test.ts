@@ -5,11 +5,15 @@ import { useChannels } from "@/stores/channels";
 import { useNexa } from "@/stores/nexa";
 import { DEFAULT_SETTINGS, useSettings } from "@/stores/settings";
 import type { ContextMenuItem } from "@/stores/ui";
-import { changeDMList, closeNexa, dmArrangeItems, dmGroupMenuItems, forgetConversation, nexaListed, nexaMenuItems } from "./dmArrange";
+import { buildItems } from "@/lib/contextMenus/registry";
+import { changeDMList, closeNexa, dmArrangeButtons, dmGroupMenu, forgetConversation, nexaListed, nexaMenu } from "./dmArrange";
 import { pinDM } from "@/lib/dmLayout";
 
 const dm = (id: string) => ({ id, type: "dm", recipient_ids: [], last_message_id: null }) as unknown as Channel;
 const ids = (items: ContextMenuItem[]) => items.map((i) => i.id);
+const arrange = dmArrangeButtons<{ id: string; moves?: ContextMenuItem[] }>({ pin: "testPin", add: "testAdd", remove: "testRemove", move: "testMove" }, (c) => c);
+const dmArrangeItems = (id: string, moves?: ContextMenuItem[]) => buildItems([arrange], { id, moves });
+const nexaMenuItems = (nav: (p: string) => void, arrange?: { moves: ContextMenuItem[] }) => nexaMenu.items({ nav, ...(arrange ? { arrange } : {}) });
 const layout = () => useSettings.getState().settings.dmList;
 
 beforeEach(() => {
@@ -96,7 +100,7 @@ describe("arranging from menus", () => {
   it("gives a group its menu, and deleting it asks first", () => {
     const opened: { kind: string; props?: Record<string, unknown> }[] = [];
     const g = layout().groups[0]!;
-    const items = dmGroupMenuItems(g, { openModal: (kind, props) => opened.push({ kind, props }), unread: false });
+    const items = dmGroupMenu.items({ group: g, openModal: (kind, props) => opened.push({ kind, props }), unread: false });
     expect(ids(items)).toEqual(["read", "collapse", "rename", "pin", "delete"]);
     expect(items[0]!.disabled).toBe(true);
     items[1]!.onSelect!();

@@ -93,7 +93,7 @@ type Sub = {
   anchor: { top: number; bottom: number };
 };
 
-/** Renders the ui store's context menu; opened by any component via useUI.openContextMenu. */
+/** Renders the ui store's context menu, which a registered menu opens (lib/contextMenus/registry). */
 export function ContextMenuHost() {
   const menu = useUI((st) => st.contextMenu);
   const close = useUI((st) => st.closeContextMenu);

@@ -13,7 +13,8 @@ import { useChannels } from "@/stores/channels";
 import { usePick } from "@/stores/pick";
 import { useRelationships } from "@/stores/relationships";
 import { canI, memberHighest, rolesByPosition, useServers } from "@/stores/servers";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useUI } from "@/stores/ui";
+import { button, defineMenu, type MenuPlacement } from "@/lib/contextMenus/registry";
 import { useUsers } from "@/stores/users";
 import { outranks } from "./memberMenu";
 
@@ -64,85 +65,126 @@ async function removeAll(serverId: string, ids: string[], ban: boolean): Promise
   );
 }
 
-/**
- * What can be done to several members of a server at once, by what you are
- * allowed to do there and whom you outrank: give or take a role, kick, ban;
- * and, about the people themselves, block them.
- */
-export function memberBulk(serverId: string, ids: string[]): { bar: PickAction[]; menu: () => ContextMenuItem[] } {
+/** Whom a pick of members can be acted on: who is below you (never the owner), who can be blocked, and the roles you may hand out. */
+function memberPlan(serverId: string, ids: string[]) {
   const st = useServers.getState().byId[serverId];
   const me = useAuth.getState().me?.id;
   const others = ids.filter((id) => id !== me);
-  // the ones you may act on: below you, and never the owner
   const below = others.filter((id) => outranks(serverId, id));
   const blockable = usersOf(others).filter((u) => useRelationships.getState().byUser[u.id]?.type !== "blocked");
-  const bar: PickAction[] = [];
-  const menu: ContextMenuItem[] = [];
-  if (st && canI(st, P.MANAGE_ROLES) && below.length) {
-    const mine = me ? memberHighest(st, me) : { highest: 0, isOwner: false };
-    const roles = rolesByPosition(st).filter((r) => r.id !== serverId && canManageRole(mine.highest, mine.isOwner, r.position));
-    const give = (roleId: string, on: boolean) =>
-      void each(
-        below.filter((id) => st.members[id]?.role_ids.includes(roleId) !== on),
-        async (id) => useServers.getState().upsertMember(on ? await serversApi.addRole(serverId, id, roleId) : await serversApi.removeRole(serverId, id, roleId)),
-        (count) => (on ? t("pick.roleGiven", { count }) : t("pick.roleTaken", { count })),
-      );
-    if (roles.length) {
-      menu.push({ id: "add-role", label: t("pick.addRole"), submenu: roles.map((r) => ({ id: `add-${r.id}`, label: r.name, onSelect: () => give(r.id, true) })) });
-      menu.push({ id: "remove-role", label: t("pick.removeRole"), submenu: roles.map((r) => ({ id: `rm-${r.id}`, label: r.name, onSelect: () => give(r.id, false) })), separatorAfter: true });
-    }
-  }
-  if (st && below.length && canI(st, P.KICK_MEMBERS)) {
-    const kick: PickAction = { id: "kick", icon: DoorOpen, label: t("pick.kick", { count: below.length }), danger: true, onSelect: () => void removeAll(serverId, below, false) };
-    bar.push(kick);
-    menu.push({ id: kick.id, label: kick.label, danger: true, onSelect: kick.onSelect });
-  }
-  if (st && below.length && canI(st, P.BAN_MEMBERS)) {
-    const ban: PickAction = { id: "ban", icon: Ban, label: t("pick.ban", { count: below.length }), danger: true, onSelect: () => void removeAll(serverId, below, true) };
-    bar.push(ban);
-    menu.push({ id: ban.id, label: ban.label, danger: true, onSelect: ban.onSelect });
-  }
-  if (blockable.length) {
-    if (menu.length) menu[menu.length - 1]!.separatorAfter = true;
-    menu.push({ id: "block", label: t("pick.block", { count: blockable.length }), danger: true, onSelect: () => confirmBlockPeople(blockable) });
-    if (bar.length < 3) bar.push({ id: "block", icon: ShieldOff, label: t("pick.block", { count: blockable.length }), danger: true, onSelect: () => confirmBlockPeople(blockable) });
-  }
-  return { bar: bar.slice(0, 3), menu: () => menu };
+  const mine = st && me ? memberHighest(st, me) : { highest: 0, isOwner: false };
+  const roles = st && canI(st, P.MANAGE_ROLES) && below.length ? rolesByPosition(st).filter((r) => r.id !== serverId && canManageRole(mine.highest, mine.isOwner, r.position)) : [];
+  const give = (roleId: string, on: boolean) =>
+    void each(
+      below.filter((id) => st?.members[id]?.role_ids.includes(roleId) !== on),
+      async (id) => useServers.getState().upsertMember(on ? await serversApi.addRole(serverId, id, roleId) : await serversApi.removeRole(serverId, id, roleId)),
+      (count) => (on ? t("pick.roleGiven", { count }) : t("pick.roleTaken", { count })),
+    );
+  return {
+    below,
+    blockable,
+    roles,
+    give,
+    kick: !!st && below.length > 0 && canI(st, P.KICK_MEMBERS),
+    ban: !!st && below.length > 0 && canI(st, P.BAN_MEMBERS),
+  };
 }
 
-/** What can be done to several people in a group chat at once: remove them (for whoever manages it), block them. */
-export function groupMemberBulk(channelId: string, ids: string[]): { bar: PickAction[]; menu: () => ContextMenuItem[] } {
+interface MemberBulkCtx {
+  serverId: string;
+  ids: string[];
+}
+
+/** The menu for several members of a server picked at once. */
+export const memberBulkMenu = defineMenu<MemberBulkCtx>("memberBulk", [
+  [
+    button("addRoleToMembers", ({ serverId, ids }) => {
+      const p = memberPlan(serverId, ids);
+      return p.roles.length > 0 && { id: "add-role", label: t("pick.addRole"), submenu: p.roles.map((r) => ({ id: `add-${r.id}`, label: r.name, onSelect: () => p.give(r.id, true) })) };
+    }),
+    button("removeRoleFromMembers", ({ serverId, ids }) => {
+      const p = memberPlan(serverId, ids);
+      return p.roles.length > 0 && { id: "remove-role", label: t("pick.removeRole"), submenu: p.roles.map((r) => ({ id: `rm-${r.id}`, label: r.name, onSelect: () => p.give(r.id, false) })) };
+    }),
+  ],
+  [
+    button("kickMembers", ({ serverId, ids }) => {
+      const p = memberPlan(serverId, ids);
+      return p.kick && { id: "kick", label: t("pick.kick", { count: p.below.length }), danger: true, onSelect: () => void removeAll(serverId, p.below, false) };
+    }),
+    button("banMembers", ({ serverId, ids }) => {
+      const p = memberPlan(serverId, ids);
+      return p.ban && { id: "ban", label: t("pick.ban", { count: p.below.length }), danger: true, onSelect: () => void removeAll(serverId, p.below, true) };
+    }),
+  ],
+  [button("blockMembers", ({ serverId, ids }) => {
+    const { blockable } = memberPlan(serverId, ids);
+    return blockable.length > 0 && { id: "block", label: t("pick.block", { count: blockable.length }), danger: true, onSelect: () => confirmBlockPeople(blockable) };
+  })],
+]);
+
+/**
+ * What can be done to several members of a server at once, by what you are
+ * allowed to do there and whom you outrank: give or take a role, kick, ban;
+ * and, about the people themselves, block them. `menu` opens the menu.
+ */
+export function memberBulk(serverId: string, ids: string[]): { bar: PickAction[]; menu: (at: MenuPlacement) => void } {
+  const p = memberPlan(serverId, ids);
+  const bar: PickAction[] = [];
+  if (p.kick) bar.push({ id: "kick", icon: DoorOpen, label: t("pick.kick", { count: p.below.length }), danger: true, onSelect: () => void removeAll(serverId, p.below, false) });
+  if (p.ban) bar.push({ id: "ban", icon: Ban, label: t("pick.ban", { count: p.below.length }), danger: true, onSelect: () => void removeAll(serverId, p.below, true) });
+  if (p.blockable.length && bar.length < 3) bar.push({ id: "block", icon: ShieldOff, label: t("pick.block", { count: p.blockable.length }), danger: true, onSelect: () => confirmBlockPeople(p.blockable) });
+  return { bar: bar.slice(0, 3), menu: (at) => void memberBulkMenu.open({ serverId, ids }, at) };
+}
+
+/** Whom a pick of people in a group chat can be acted on: removed (for whoever manages it), blocked. */
+function groupPlan(channelId: string, ids: string[]) {
   const ch = useChannels.getState().byId[channelId];
   const me = useAuth.getState().me?.id;
   const others = ids.filter((id) => id !== me && id !== ch?.owner_id);
-  const blockable = usersOf(ids.filter((id) => id !== me)).filter((u) => useRelationships.getState().byUser[u.id]?.type !== "blocked");
+  return {
+    removable: ch && managesGroup(ch) ? others : [],
+    blockable: usersOf(ids.filter((id) => id !== me)).filter((u) => useRelationships.getState().byUser[u.id]?.type !== "blocked"),
+  };
+}
+
+function removeFromGroup(channelId: string, others: string[]): void {
+  useUI.getState().openModal("confirm", {
+    title: t("pick.removeFromGroupTitle", { count: others.length }),
+    body: t("pick.removeFromGroupBody", { names: nameList(usersOf(others)) }),
+    confirmLabel: t("pick.removeFromGroup", { count: others.length }),
+    danger: true,
+    onConfirm: async () => {
+      usePick.getState().clear();
+      await each(others, (id) => channelsApi.removeRecipient(channelId, id), (count) => t("pick.removedFromGroup", { count }));
+    },
+  });
+}
+
+interface GroupBulkCtx {
+  channelId: string;
+  ids: string[];
+}
+
+/** The menu for several people of a group chat picked at once. */
+export const groupMemberBulkMenu = defineMenu<GroupBulkCtx>("groupMemberBulk", [
+  [
+    button("removeGroupMembers", ({ channelId, ids }) => {
+      const { removable } = groupPlan(channelId, ids);
+      return removable.length > 0 && { id: "remove", label: t("pick.removeFromGroup", { count: removable.length }), danger: true, onSelect: () => removeFromGroup(channelId, removable) };
+    }),
+    button("blockGroupMembers", ({ channelId, ids }) => {
+      const { blockable } = groupPlan(channelId, ids);
+      return blockable.length > 0 && { id: "block", label: t("pick.block", { count: blockable.length }), danger: true, onSelect: () => confirmBlockPeople(blockable) };
+    }),
+  ],
+]);
+
+/** What can be done to several people in a group chat at once: remove them (for whoever manages it), block them. */
+export function groupMemberBulk(channelId: string, ids: string[]): { bar: PickAction[]; menu: (at: MenuPlacement) => void } {
+  const { removable, blockable } = groupPlan(channelId, ids);
   const bar: PickAction[] = [];
-  const menu: ContextMenuItem[] = [];
-  if (ch && managesGroup(ch) && others.length) {
-    const remove: PickAction = {
-      id: "remove",
-      icon: DoorOpen,
-      label: t("pick.removeFromGroup", { count: others.length }),
-      danger: true,
-      onSelect: () =>
-        useUI.getState().openModal("confirm", {
-          title: t("pick.removeFromGroupTitle", { count: others.length }),
-          body: t("pick.removeFromGroupBody", { names: nameList(usersOf(others)) }),
-          confirmLabel: t("pick.removeFromGroup", { count: others.length }),
-          danger: true,
-          onConfirm: async () => {
-            usePick.getState().clear();
-            await each(others, (id) => channelsApi.removeRecipient(channelId, id), (count) => t("pick.removedFromGroup", { count }));
-          },
-        }),
-    };
-    bar.push(remove);
-    menu.push({ id: remove.id, label: remove.label, danger: true, onSelect: remove.onSelect });
-  }
-  if (blockable.length) {
-    const block: PickAction = { id: "block", icon: ShieldOff, label: t("pick.block", { count: blockable.length }), danger: true, onSelect: () => confirmBlockPeople(blockable) };
-    bar.push(block);
-    menu.push({ id: block.id, label: block.label, danger: true, onSelect: block.onSelect });
-  }
-  return { bar, menu: () => menu };
+  if (removable.length) bar.push({ id: "remove", icon: DoorOpen, label: t("pick.removeFromGroup", { count: removable.length }), danger: true, onSelect: () => removeFromGroup(channelId, removable) });
+  if (blockable.length) bar.push({ id: "block", icon: ShieldOff, label: t("pick.block", { count: blockable.length }), danger: true, onSelect: () => confirmBlockPeople(blockable) });
+  return { bar, menu: (at) => void groupMemberBulkMenu.open({ channelId, ids }, at) };
 }

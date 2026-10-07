@@ -12,7 +12,8 @@ import { useMessages, type DecryptedMessage } from "@/stores/messages";
 import { useReadStates } from "@/stores/readStates";
 import { useSelection } from "@/stores/selection";
 import { useSettings } from "@/stores/settings";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useUI } from "@/stores/ui";
+import { button, defineMenu, type MenuButton } from "@/lib/contextMenus/registry";
 import { canI, isInstanceAdmin, P, useServers } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
 import { mentionsMe } from "@/lib/mentionsMe";
@@ -103,62 +104,84 @@ export function canEdit(msg: DecryptedMessage): boolean {
   return !!me && msg.author_id === me.id && (msg.type === "default" || msg.type === "reply") && !!msg.payload && !msg.payload.poll;
 }
 
-/** Copy Image and Save Image, for a picture a menu was opened on. */
-export function imageMenuItems(image: ImageTarget): ContextMenuItem[] {
-  const ui = useUI.getState();
+/** Copy Image and Save Image, for a picture a menu was opened on; `ids` names the two buttons in the menu they are in. */
+export function imageButtons<C>(ids: [copy: string, save: string], image: (ctx: C) => ImageTarget | null | undefined): MenuButton<C>[] {
   // a browser's own refusal says nothing useful; the helpers' own errors do
-  const failed = (err: unknown, fallback: string) => ui.toast(err instanceof Error && !(err instanceof DOMException) && err.message ? err.message : fallback, "error");
+  const failed = (err: unknown, fallback: string) => useUI.getState().toast(err instanceof Error && !(err instanceof DOMException) && err.message ? err.message : fallback, "error");
   return [
     // a picture shown from its small copy is copied and saved whole
-    { id: "copy-image", label: t("chat.messageMenu.copyImage"), onSelect: () => void copyImage(image.full ? image.full() : image.src).then(() => ui.toast(t("chat.messageMenu.imageCopied"), "success"), (err: unknown) => failed(err, t("chat.messageMenu.couldNotCopyThePicture"))) },
-    { id: "save-image", label: t("chat.messageMenu.saveImage"), onSelect: () => void (image.full ? image.full() : Promise.resolve(image.src)).then((src) => saveImage(src, image.name)).catch((err: unknown) => failed(err, t("chat.messageMenu.couldNotSaveThePicture"))) },
+    button(ids[0], (ctx) => {
+      const img = image(ctx);
+      return img && { id: "copy-image", label: t("chat.messageMenu.copyImage"), onSelect: () => void copyImage(img.full ? img.full() : img.src).then(() => useUI.getState().toast(t("chat.messageMenu.imageCopied"), "success"), (err: unknown) => failed(err, t("chat.messageMenu.couldNotCopyThePicture"))) };
+    }),
+    button(ids[1], (ctx) => {
+      const img = image(ctx);
+      return img && { id: "save-image", label: t("chat.messageMenu.saveImage"), onSelect: () => void (img.full ? img.full() : Promise.resolve(img.src)).then((src) => saveImage(src, img.name)).catch((err: unknown) => failed(err, t("chat.messageMenu.couldNotSaveThePicture"))) };
+    }),
   ];
 }
 
-/** The menu for a message; opened on one of its pictures, the picture's own actions come first. */
-export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks, image?: ImageTarget | null): ContextMenuItem[] {
-  const ui = useUI.getState();
-  const dev = useSettings.getState().settings.developerMode;
-  const pinned = (msg.flags & MSG_FLAG_PINNED) !== 0;
-  const items: ContextMenuItem[] = image ? imageMenuItems(image) : [];
-  if (items.length) items[items.length - 1]!.separatorAfter = true;
-  // where reacting is not allowed the item is not offered, rather than failing after the pick
-  if (canReact(msg)) items.push({ id: "react", label: t("chat.messageItem.addReaction"), onSelect: hooks.openReactionPicker, separatorAfter: true });
-  if (canEdit(msg)) items.push({ id: "edit", label: t("chat.messageItem.editMessage"), onSelect: () => ui.setEditing({ channelId: msg.channel_id, messageId: msg.id }) });
-  items.push({ id: "reply", label: t("chat.messageItem.reply"), onSelect: () => ui.setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true }), separatorAfter: !canThread(msg) && !canPublish(msg) });
-  if (canThread(msg)) items.push({ id: "thread", label: t("threads.create.title"), onSelect: () => ui.openModal("createThread", { channelId: msg.channel_id, messageId: msg.id }), separatorAfter: !canPublish(msg) });
-  if (canPublish(msg)) items.push({ id: "publish", label: t("follows.publish"), onSelect: () => void publish(msg), separatorAfter: true });
-  items.push({
-    id: "copy",
-    label: t("chat.messageMenu.copyText"),
-    disabled: !msg.payload?.t,
-    onSelect: () => void copyText(humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId, knownNames()), t("clipboard.textCopied")),
-  });
-  if (canPin(msg)) items.push({
-    id: "pin",
-    label: pinned ? t("chat.messageItem.unpinMessage") : t("chat.messageItem.pinMessage"),
-    onSelect: () => {
-      const p = pinned ? channelsApi.unpin(msg.channel_id, msg.id) : channelsApi.pin(msg.channel_id, msg.id);
-      p.catch((err: unknown) => ui.toast(err instanceof Error ? err.message : t("chat.messageMenu.couldNotUpdateThePin"), "error"));
-    },
-  });
-  items.push({ id: "unread", label: t("chat.messageItem.markUnread"), onSelect: () => markUnread(msg) });
-  if ((msg.payload?.embeds?.length || msg.hook?.link_embeds.length) && canRemoveEmbeds(msg)) {
-    const suppressed = (msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) !== 0;
-    items.push({ id: "embeds", label: suppressed ? t("chat.messageMenu.showEmbeds") : t("chat.messageMenu.removeEmbeds"), onSelect: () => setEmbedsHidden(msg, !suppressed) });
-  }
-  items.push({ id: "link", label: t("chat.messageItem.copyMessageLink"), onSelect: () => copyMessageLink(msg), separatorAfter: dev || canDelete(msg) });
-  if (dev) items.push({ id: "id", label: t("chat.messageItem.copyMessageId"), onSelect: () => void copyText(msg.id, t("clipboard.idCopied")), separatorAfter: canDelete(msg) });
-  if (canDelete(msg)) {
-    items.push({ id: "select", label: t("chat.messageMenu.selectMessages"), onSelect: () => startSelecting(msg) });
-    items.push({ id: "delete", label: t("chat.messageMenu.deleteMessage"), danger: true, onSelect: () => confirmDelete(msg) });
-  }
-  // the exact moment, which a phone has no tooltip for, closes the menu
-  const times = messageTimes(msg);
-  if (times.length) items[items.length - 1]!.separatorAfter = true;
-  for (const [i, line] of times.entries()) items.push({ id: `time${i}`, label: line, note: true });
-  return items;
+/** The menu for a picture on its own, as the lightbox shows it. */
+export const imageMenu = defineMenu<ImageTarget>("image", [imageButtons(["copyImage", "saveImage"], (img) => img)]);
+
+export interface MessageMenuCtx {
+  msg: DecryptedMessage;
+  openReactionPicker: () => void;
+  /** The picture the menu was opened on, whose own actions then come first. */
+  image?: ImageTarget | null;
 }
+
+/** The menu for a message; opened on one of its pictures, the picture's own actions come first. */
+export const messageMenu = defineMenu<MessageMenuCtx>("message", [
+  imageButtons(["copyMessageImage", "saveMessageImage"], (c) => c.image),
+  // where reacting is not allowed the item is not offered, rather than failing after the pick
+  [button("addReaction", ({ msg, openReactionPicker }) => canReact(msg) && { id: "react", label: t("chat.messageItem.addReaction"), onSelect: openReactionPicker })],
+  [
+    button("editMessage", ({ msg }) => canEdit(msg) && { id: "edit", label: t("chat.messageItem.editMessage"), onSelect: () => useUI.getState().setEditing({ channelId: msg.channel_id, messageId: msg.id }) }),
+    button("replyToMessage", ({ msg }) => ({ id: "reply", label: t("chat.messageItem.reply"), onSelect: () => useUI.getState().setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true }) })),
+    button("createThreadFromMessage", ({ msg }) => canThread(msg) && { id: "thread", label: t("threads.create.title"), onSelect: () => useUI.getState().openModal("createThread", { channelId: msg.channel_id, messageId: msg.id }) }),
+    button("publishMessage", ({ msg }) => canPublish(msg) && { id: "publish", label: t("follows.publish"), onSelect: () => void publish(msg) }),
+  ],
+  [
+    button("copyMessageText", ({ msg }) => ({
+      id: "copy",
+      label: t("chat.messageMenu.copyText"),
+      disabled: !msg.payload?.t,
+      onSelect: () => void copyText(humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId, knownNames()), t("clipboard.textCopied")),
+    })),
+    button("pinMessage", ({ msg }) => {
+      if (!canPin(msg)) return null;
+      const pinned = (msg.flags & MSG_FLAG_PINNED) !== 0;
+      return {
+        id: "pin",
+        label: pinned ? t("chat.messageItem.unpinMessage") : t("chat.messageItem.pinMessage"),
+        onSelect: () => {
+          const p = pinned ? channelsApi.unpin(msg.channel_id, msg.id) : channelsApi.pin(msg.channel_id, msg.id);
+          p.catch((err: unknown) => useUI.getState().toast(err instanceof Error ? err.message : t("chat.messageMenu.couldNotUpdateThePin"), "error"));
+        },
+      };
+    }),
+    button("markUnread", ({ msg }) => ({ id: "unread", label: t("chat.messageItem.markUnread"), onSelect: () => markUnread(msg) })),
+    button("toggleEmbeds", ({ msg }) => {
+      if (!(msg.payload?.embeds?.length || msg.hook?.link_embeds.length) || !canRemoveEmbeds(msg)) return null;
+      const suppressed = (msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) !== 0;
+      return { id: "embeds", label: suppressed ? t("chat.messageMenu.showEmbeds") : t("chat.messageMenu.removeEmbeds"), onSelect: () => setEmbedsHidden(msg, !suppressed) };
+    }),
+    button("copyMessageLink", ({ msg }) => ({ id: "link", label: t("chat.messageItem.copyMessageLink"), onSelect: () => copyMessageLink(msg) })),
+  ],
+  [button("copyMessageId", ({ msg }) => useSettings.getState().settings.developerMode && { id: "id", label: t("chat.messageItem.copyMessageId"), onSelect: () => void copyText(msg.id, t("clipboard.idCopied")) })],
+  [
+    button("selectMessages", ({ msg }) => canDelete(msg) && { id: "select", label: t("chat.messageMenu.selectMessages"), onSelect: () => startSelecting(msg) }),
+    button("deleteMessage", ({ msg }) => canDelete(msg) && { id: "delete", label: t("chat.messageMenu.deleteMessage"), danger: true, onSelect: () => confirmDelete(msg) }),
+  ],
+  // the exact moment, which a phone has no tooltip for, closes the menu
+  [button("messageTimes", ({ msg }) => messageTimes(msg).map((line, i) => ({ id: `time${i}`, label: line, note: true })))],
+]);
+
+/** The menu of a system line that can be taken away (someone joining). */
+export const systemMessageMenu = defineMenu<DecryptedMessage>("systemMessage", [
+  [button("deleteSystemMessage", (msg) => msg.type === "system_join" && canDelete(msg) && { id: "delete", label: t("chat.messageMenu.deleteMessage"), danger: true, onSelect: () => confirmDelete(msg) })],
+]);
 
 /** Asks before deleting a message, as the menu's Delete does; `deleted` runs once it is gone. */
 export function confirmDelete(msg: DecryptedMessage, deleted?: () => void): void {

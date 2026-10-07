@@ -26,7 +26,7 @@ vi.mock("@/api/relationships", () => ({ relationships: api }));
 // no captcha on Nexa: the request goes straight out
 vi.mock("@/lib/captcha", () => ({ guarded: (_action: string, send: (c: string | null) => Promise<unknown>) => send(null) }));
 
-import { acceptFriendRequest, addRequestNote, blockUser, dropFriendRequest, relationshipMenuItems, sendFriendRequest, unblockUser, useRelationshipBusy } from "./friendship";
+import { acceptFriendRequest, addRequestNote, blockMenuItem, blockUser, dropFriendRequest, friendMenuItems, sendFriendRequest, unblockUser, useRelationshipBusy } from "./friendship";
 
 const eve = { id: "eve", username: "eve", display_name: "Eve", avatar_id: null, flags: 0 } as unknown as PublicUser;
 const nexa = { id: "nexa", username: "nexa", display_name: "Nexa", avatar_id: null, flags: FLAG_SYSTEM } as unknown as PublicUser;
@@ -123,7 +123,8 @@ describe("blocking", () => {
   });
 });
 
-describe("relationshipMenuItems", () => {
+describe("the friend and block items", () => {
+  const relationshipMenuItems = (id: string) => [...friendMenuItems(id), ...[blockMenuItem(id)].filter((i) => i !== null)];
   const ids = (id = "eve") => relationshipMenuItems(id).map((i) => i.id);
   it("offers what fits where things stand", () => {
     expect(ids()).toEqual(["add-friend", "block"]);

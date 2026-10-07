@@ -25,7 +25,7 @@ import { useTypingIn } from "@/stores/typing";
 import { useUsers } from "@/stores/users";
 import { memberName } from "@/lib/names";
 import { useUI } from "@/stores/ui";
-import { categoryMenuItems, channelMenuItems, serverMenuItems } from "./serverMenu";
+import { categoryMenu, channelMenu, serverMenu } from "./serverMenu";
 import s from "./ServerSidebar.module.css";
 
 import { t } from "@/i18n";
@@ -55,7 +55,6 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   const settings = useSettings((x) => x.settings);
   const patch = useSettings((x) => x.patch);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const toast = useUI((u) => u.toast);
   const [menuOpen, setMenuOpen] = useState(false);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -100,7 +99,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
     setMenuOpen(true);
     // from the header's start edge, which is its right one in a right-to-left language
     const x = document.documentElement.dir === "rtl" ? r.right - 8 : r.left + 8;
-    openContextMenu({ x, y: r.bottom + 4, items: serverMenuItems(serverId, { nav, openModal }) });
+    serverMenu.open({ serverId, nav, openModal }, { x, y: r.bottom + 4 });
     menuWatch.current?.();
     menuWatch.current = useUI.subscribe((state) => {
       if (!state.contextMenu) {
@@ -122,11 +121,11 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
 
   const onChannelContext = (e: MouseEvent, id: string) => {
     e.preventDefault();
-    openContextMenu({ ...menuPoint(e), items: channelMenuItems(id, { nav, openModal }) });
+    channelMenu.open({ channelId: id, nav, openModal }, menuPoint(e));
   };
   const onCategoryContext = (e: MouseEvent, id: string) => {
     e.preventDefault();
-    openContextMenu({ ...menuPoint(e), items: categoryMenuItems(id, { nav, openModal, collapsed: collapsed.includes(id), toggle: () => toggleCategory(id) }) });
+    categoryMenu.open({ categoryId: id, nav, openModal, collapsed: collapsed.includes(id), toggle: () => toggleCategory(id) }, menuPoint(e));
   };
 
   // --- drag and drop reordering (Manage Channels only) -------------------

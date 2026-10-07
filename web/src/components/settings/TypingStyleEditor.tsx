@@ -9,6 +9,7 @@ import { TextInput } from "@/components/common/TextInput";
 import { StyledTyping, TypingEmoji } from "@/components/chat/TypingLine";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { t } from "@/i18n";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
 import { MAX_TYPING_EMOJI, MAX_TYPING_WORDS, presetLabel, surpriseStyle, TYPING_MOTIONS, TYPING_PRESETS, type TypingMotion, type TypingStyle } from "@/lib/typingStyle";
 import s from "./TypingEditor.module.css";
 
@@ -26,8 +27,16 @@ function tidy(style: TypingStyle): TypingStyle | null {
  * pictures of your own (the first one picked fills all three, to start from a
  * whole set), how they move, and the words after your name.
  */
+/** A slot of the typing indicator: an emoji, a picture of one's own, or nothing. */
+const typingSlotMenu = defineMenu<{ filled: boolean; pickEmoji: () => void; usePicture: () => void; remove: () => void }>("typingSlot", [
+  [
+    button("pickTypingEmoji", ({ pickEmoji }) => ({ id: "emoji", label: t("typing.editor.pickEmoji"), onSelect: pickEmoji })),
+    button("useTypingPicture", ({ usePicture }) => ({ id: "picture", label: t("typing.editor.usePicture"), onSelect: usePicture })),
+    button("removeTypingItem", ({ filled, remove }) => filled && { id: "remove", label: t("typing.editor.removeItem"), danger: true, onSelect: remove }),
+  ],
+]);
+
 export function TypingStyleEditor({ value, onChange, name, preview = true }: { value: TypingStyle | null; onChange: (v: TypingStyle | null) => void; name: string; preview?: boolean }) {
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const toast = useUI((u) => u.toast);
   const [picker, setPicker] = useState<{ slot: number; at: DOMRect } | null>(null);
   const [crop, setCrop] = useState<{ file: File; slot: number } | null>(null);
@@ -62,22 +71,18 @@ export function TypingStyleEditor({ value, onChange, name, preview = true }: { v
     const token = style.emoji[i];
     const slot = token ? i : Math.min(i, style.emoji.length);
     const at = el.getBoundingClientRect();
-    openContextMenu({
-      x: at.left,
-      y: at.bottom + 4,
-      items: [
-        { id: "emoji", label: t("typing.editor.pickEmoji"), onSelect: () => setPicker({ slot, at }) },
-        {
-          id: "picture",
-          label: t("typing.editor.usePicture"),
-          onSelect: () => {
-            pictureSlot.current = slot;
-            fileRef.current?.click();
-          },
+    typingSlotMenu.open(
+      {
+        filled: !!token,
+        pickEmoji: () => setPicker({ slot, at }),
+        usePicture: () => {
+          pictureSlot.current = slot;
+          fileRef.current?.click();
         },
-        ...(token ? [{ id: "remove", label: t("typing.editor.removeItem"), danger: true, onSelect: () => removeEmoji(i) }] : []),
-      ],
-    });
+        remove: () => removeEmoji(i),
+      },
+      { x: at.left, y: at.bottom + 4 },
+    );
   };
   const upload = async (slot: number, file: Blob, area: { x: number; y: number; w: number; h: number } | null) => {
     setUploading(slot);

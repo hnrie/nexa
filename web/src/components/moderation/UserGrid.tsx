@@ -18,6 +18,60 @@ import { useUI } from "@/stores/ui";
 import { formatStamp } from "@/lib/time";
 import { copyAndSay } from "@/lib/copyText";
 import { t } from "@/i18n";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
+
+interface UserGridMenuCtx {
+  user: ModUser;
+  /** The account is the instance's owner, whom nobody changes. */
+  owner: boolean;
+  openModal: (kind: string, props?: Record<string, unknown>) => void;
+  setAccess: (body: { admin?: boolean; disabled?: boolean }) => Promise<void>;
+}
+
+/** What staff can do to an account from the users grid. */
+const userGridMenu = defineMenu<UserGridMenuCtx>("userGrid", [
+  [
+    button("viewModUserProfile", ({ user, openModal }) => ({ id: "profile", label: t("moderation.menu.profile"), onSelect: () => openModal("profile", { userId: user.id }) })),
+    button("copyModUserId", ({ user }) => ({ id: "copy", label: t("moderation.menu.copyId"), onSelect: () => copyAndSay(user.id, t("moderation.copied")) })),
+  ],
+  [
+    button("toggleStaffAdmin", ({ user: u, owner, openModal, setAccess }) => {
+      if (u.blocked === "self" || owner) return null;
+      const admin = (u.admin_flags & FLAG_ADMIN) !== 0;
+      return {
+        id: "admin",
+        label: admin ? t("moderation.menu.removeAdmin") : t("moderation.menu.makeAdmin"),
+        onSelect: () =>
+          openModal("confirm", {
+            title: admin ? t("moderation.menu.removeAdminTitle", { name: u.display_name }) : t("moderation.menu.makeAdminTitle", { name: u.display_name }),
+            body: admin ? t("moderation.menu.removeAdminBody") : t("moderation.menu.makeAdminBody"),
+            confirmLabel: admin ? t("moderation.menu.removeAdmin") : t("moderation.menu.makeAdmin"),
+            danger: admin,
+            onConfirm: () => setAccess({ admin: !admin }),
+          }),
+      };
+    }),
+    button("toggleAccountDisabled", ({ user: u, owner, openModal, setAccess }) => {
+      if (u.blocked === "self" || owner) return null;
+      const disabled = (u.admin_flags & FLAG_DISABLED) !== 0;
+      return {
+        id: "disable",
+        label: disabled ? t("moderation.menu.enable") : t("moderation.menu.disable"),
+        danger: !disabled,
+        onSelect: () =>
+          disabled
+            ? void setAccess({ disabled: false })
+            : openModal("confirm", {
+                title: t("moderation.menu.disableTitle", { name: u.display_name }),
+                body: t("moderation.menu.disableBody"),
+                confirmLabel: t("moderation.menu.disable"),
+                danger: true,
+                onConfirm: () => setAccess({ disabled: true }),
+              }),
+      };
+    }),
+  ],
+]);
 import { ModerateModal } from "./ModerateModal";
 import { modStatus, StatusSummary } from "./ModStatus";
 import m from "./Moderation.module.css";
@@ -45,7 +99,6 @@ export function UserGrid() {
   const nav = useNavigate();
   const toast = useUI((u) => u.toast);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const ownerId = useModeration((s) => s.ownerId);
   const [q, setQ] = useState("");
   const [show, setShow] = useState<GridShow>("all");
@@ -135,50 +188,15 @@ export function UserGrid() {
   const menu = (e: MouseEvent, u: ModUser) => {
     e.preventDefault();
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const admin = (u.admin_flags & FLAG_ADMIN) !== 0;
-    const disabled = (u.admin_flags & FLAG_DISABLED) !== 0;
-    const owner = u.id === ownerId;
-    openContextMenu({
-      // from the button's start edge, which is its right one in a right-to-left language
-      x: e.type === "contextmenu" ? e.clientX : document.documentElement.dir === "rtl" ? r.right : r.left,
-      y: e.type === "contextmenu" ? e.clientY : r.bottom + 4,
-      label: u.display_name,
-      items: [
-        { id: "profile", label: t("moderation.menu.profile"), onSelect: () => openModal("profile", { userId: u.id }) },
-        { id: "copy", label: t("moderation.menu.copyId"), onSelect: () => copyAndSay(u.id, t("moderation.copied")), separatorAfter: true },
-        ...(u.blocked === "self" || owner
-          ? []
-          : [
-              {
-                id: "admin",
-                label: admin ? t("moderation.menu.removeAdmin") : t("moderation.menu.makeAdmin"),
-                onSelect: () =>
-                  openModal("confirm", {
-                    title: admin ? t("moderation.menu.removeAdminTitle", { name: u.display_name }) : t("moderation.menu.makeAdminTitle", { name: u.display_name }),
-                    body: admin ? t("moderation.menu.removeAdminBody") : t("moderation.menu.makeAdminBody"),
-                    confirmLabel: admin ? t("moderation.menu.removeAdmin") : t("moderation.menu.makeAdmin"),
-                    danger: admin,
-                    onConfirm: () => setAccess(u, { admin: !admin }),
-                  }),
-              },
-              {
-                id: "disable",
-                label: disabled ? t("moderation.menu.enable") : t("moderation.menu.disable"),
-                danger: !disabled,
-                onSelect: () =>
-                  disabled
-                    ? void setAccess(u, { disabled: false })
-                    : openModal("confirm", {
-                        title: t("moderation.menu.disableTitle", { name: u.display_name }),
-                        body: t("moderation.menu.disableBody"),
-                        confirmLabel: t("moderation.menu.disable"),
-                        danger: true,
-                        onConfirm: () => setAccess(u, { disabled: true }),
-                      }),
-              },
-            ]),
-      ],
-    });
+    userGridMenu.open(
+      { user: u, owner: u.id === ownerId, openModal, setAccess: (body) => setAccess(u, body) },
+      {
+        // from the button's start edge, which is its right one in a right-to-left language
+        x: e.type === "contextmenu" ? e.clientX : document.documentElement.dir === "rtl" ? r.right : r.left,
+        y: e.type === "contextmenu" ? e.clientY : r.bottom + 4,
+        label: u.display_name,
+      },
+    );
   };
 
   const shows: { id: GridShow; label: string }[] = [

@@ -1,5 +1,5 @@
-import { useSettings } from "@/stores/settings";
-import type { ContextMenuItem } from "@/stores/ui";
+import { useSettings, type VoiceSettings } from "@/stores/settings";
+import { button, defineMenu, type MenuPlacement } from "@/lib/contextMenus/registry";
 import { defaultDeviceLabel, listDevices, realDevices as real } from "@/voice/media";
 import { noiseMenuItems } from "@/voice/noiseMode";
 import { canChooseOutput } from "@/voice/output";
@@ -14,57 +14,74 @@ function nameOf(d: MediaDeviceInfo, i: number, kind: "microphone" | "speakers" |
   return t(key, { n: i + 1 });
 }
 
+type Devices = Awaited<ReturnType<typeof listDevices>>;
+
+interface DeviceMenuCtx {
+  devices: Devices;
+  openModal: OpenModal;
+  /** Whether to offer the settings page (a guest has none). */
+  settings: boolean;
+}
+
+function setVoice(patch: Partial<VoiceSettings>): void {
+  const store = useSettings.getState();
+  store.patch({ voice: { ...store.settings.voice, ...patch } });
+}
+
+const voice = () => useSettings.getState().settings.voice;
+
 /**
  * The menu under the mute button: which microphone the call uses and, where
  * the browser can route it, which speakers it plays through, and how noise is
  * taken out of the microphone. A choice takes effect at once, in a call too,
  * and is the same one the voice settings show.
  */
-export async function micMenuItems(openModal: OpenModal, opts: { settings?: boolean } = {}): Promise<ContextMenuItem[]> {
-  const devices = await listDevices().catch(() => ({ inputs: [], outputs: [], cameras: [] }));
-  const store = useSettings.getState();
-  const v = store.settings.voice;
-  const set = (patch: Partial<typeof v>) => store.patch({ voice: { ...useSettings.getState().settings.voice, ...patch } });
-  const items: ContextMenuItem[] = [{ id: "input-heading", label: t("voice.deviceMenus.inputDevice"), heading: true }];
-  items.push({ id: "input-default", label: defaultDeviceLabel(devices.inputs), checked: !v.inputDeviceId, onSelect: () => set({ inputDeviceId: null, inputDeviceLabel: null }) });
-  real(devices.inputs).forEach((d, i) => {
-    items.push({ id: `input-${d.deviceId}`, label: nameOf(d, i, "microphone"), checked: v.inputDeviceId === d.deviceId, onSelect: () => set({ inputDeviceId: d.deviceId, inputDeviceLabel: d.label || null }) });
-  });
-  const outputs = real(devices.outputs);
-  if (canChooseOutput() && outputs.length > 0) {
-    items[items.length - 1]!.separatorAfter = true;
-    items.push({ id: "output-heading", label: t("voice.deviceMenus.outputDevice"), heading: true });
-    items.push({ id: "output-default", label: defaultDeviceLabel(devices.outputs), checked: !v.outputDeviceId, onSelect: () => set({ outputDeviceId: null, outputDeviceLabel: null }) });
-    outputs.forEach((d, i) => {
-      items.push({ id: `output-${d.deviceId}`, label: nameOf(d, i, "speakers"), checked: v.outputDeviceId === d.deviceId, onSelect: () => set({ outputDeviceId: d.deviceId, outputDeviceLabel: d.label || null }) });
-    });
-  }
-  items[items.length - 1]!.separatorAfter = true;
-  items.push(...noiseMenuItems());
-  if (opts.settings === false) return items;
-  items[items.length - 1]!.separatorAfter = true;
-  items.push({ id: "voice-settings", label: t("voice.deviceMenus.voiceSettings"), onSelect: () => openModal("settings", { page: "voice" }) });
-  return items;
-}
+export const micMenu = defineMenu<DeviceMenuCtx>("microphone", [
+  [button("microphoneDevices", ({ devices }) => {
+    const v = voice();
+    return [
+      { id: "input-heading", label: t("voice.deviceMenus.inputDevice"), heading: true },
+      { id: "input-default", label: defaultDeviceLabel(devices.inputs), checked: !v.inputDeviceId, onSelect: () => setVoice({ inputDeviceId: null, inputDeviceLabel: null }) },
+      ...real(devices.inputs).map((d, i) => ({ id: `input-${d.deviceId}`, label: nameOf(d, i, "microphone"), checked: v.inputDeviceId === d.deviceId, onSelect: () => setVoice({ inputDeviceId: d.deviceId, inputDeviceLabel: d.label || null }) })),
+    ];
+  })],
+  [button("speakerDevices", ({ devices }) => {
+    const outputs = real(devices.outputs);
+    if (!canChooseOutput() || outputs.length === 0) return null;
+    const v = voice();
+    return [
+      { id: "output-heading", label: t("voice.deviceMenus.outputDevice"), heading: true },
+      { id: "output-default", label: defaultDeviceLabel(devices.outputs), checked: !v.outputDeviceId, onSelect: () => setVoice({ outputDeviceId: null, outputDeviceLabel: null }) },
+      ...outputs.map((d, i) => ({ id: `output-${d.deviceId}`, label: nameOf(d, i, "speakers"), checked: v.outputDeviceId === d.deviceId, onSelect: () => setVoice({ outputDeviceId: d.deviceId, outputDeviceLabel: d.label || null }) })),
+    ];
+  })],
+  [button("microphoneNoiseModes", () => noiseMenuItems())],
+  [button("voiceSettings", ({ settings, openModal }) => settings && { id: "voice-settings", label: t("voice.deviceMenus.voiceSettings"), onSelect: () => openModal("settings", { page: "voice" }) })],
+]);
 
 /** The menu under the camera button: which camera to use, switched live when it is on. */
-export async function cameraMenuItems(openModal: OpenModal, opts: { settings?: boolean } = {}): Promise<ContextMenuItem[]> {
-  const devices = await listDevices().catch(() => ({ inputs: [], outputs: [], cameras: [] }));
-  const store = useSettings.getState();
-  const v = store.settings.voice;
-  const set = (patch: Partial<typeof v>) => store.patch({ voice: { ...useSettings.getState().settings.voice, ...patch } });
-  const cameras = real(devices.cameras);
-  const items: ContextMenuItem[] = [{ id: "camera-heading", label: t("settings.voice.camera"), heading: true }];
-  if (cameras.length === 0) {
-    items.push({ id: "camera-none", label: t("voice.deviceMenus.noCameraFound"), disabled: true });
-  } else {
-    items.push({ id: "camera-default", label: defaultDeviceLabel(devices.cameras), checked: !v.cameraDeviceId, onSelect: () => set({ cameraDeviceId: null, cameraDeviceLabel: null }) });
-    cameras.forEach((d, i) => {
-      items.push({ id: `camera-${d.deviceId}`, label: nameOf(d, i, "camera"), checked: v.cameraDeviceId === d.deviceId, onSelect: () => set({ cameraDeviceId: d.deviceId, cameraDeviceLabel: d.label || null }) });
-    });
-  }
-  if (opts.settings === false) return items;
-  items[items.length - 1]!.separatorAfter = true;
-  items.push({ id: "video-settings", label: t("voice.deviceMenus.videoSettings"), onSelect: () => openModal("settings", { page: "voice" }) });
-  return items;
+export const cameraMenu = defineMenu<DeviceMenuCtx>("camera", [
+  [button("cameraDevices", ({ devices }) => {
+    const v = voice();
+    const cameras = real(devices.cameras);
+    return [
+      { id: "camera-heading", label: t("settings.voice.camera"), heading: true },
+      ...(cameras.length === 0
+        ? [{ id: "camera-none", label: t("voice.deviceMenus.noCameraFound"), disabled: true }]
+        : [
+            { id: "camera-default", label: defaultDeviceLabel(devices.cameras), checked: !v.cameraDeviceId, onSelect: () => setVoice({ cameraDeviceId: null, cameraDeviceLabel: null }) },
+            ...cameras.map((d, i) => ({ id: `camera-${d.deviceId}`, label: nameOf(d, i, "camera"), checked: v.cameraDeviceId === d.deviceId, onSelect: () => setVoice({ cameraDeviceId: d.deviceId, cameraDeviceLabel: d.label || null }) })),
+          ]),
+    ];
+  })],
+  [button("videoSettings", ({ settings, openModal }) => settings && { id: "video-settings", label: t("voice.deviceMenus.videoSettings"), onSelect: () => openModal("settings", { page: "voice" }) })],
+]);
+
+/** Opens the microphone or camera menu once the devices are listed. */
+export async function openDeviceMenu(kind: "mic" | "camera", openModal: OpenModal, at: MenuPlacement, opts: { settings?: boolean } = {}): Promise<void> {
+  const devices = await listDevices().catch((): Devices => ({ inputs: [], outputs: [], cameras: [] }));
+  (kind === "mic" ? micMenu : cameraMenu).open({ devices, openModal, settings: opts.settings !== false }, at);
 }
+
+/** Noise suppression's own menu, beside hanging up: Enhanced (RNNoise), Standard or Off. */
+export const noiseMenu = defineMenu<null>("noiseMode", [[button("noiseModes", () => noiseMenuItems())]]);

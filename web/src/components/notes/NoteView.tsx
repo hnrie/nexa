@@ -16,7 +16,7 @@ import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
 import { IDLE_BRIDGE, NoteEditor, type NoteBridge } from "./NoteEditor";
 import { NoteHistory } from "./NoteHistory";
-import { noteMenuItems } from "./noteMenu";
+import { noteMenu } from "./noteMenu";
 import { Byline, NoteReader, PeopleHere, SaveState, noteName } from "./NoteParts";
 import s from "./Notes.module.css";
 
@@ -41,7 +41,6 @@ export function NoteView({ noteId, narrow, onBack, fresh }: Props) {
   const keysOpen = useKeys((k) => k.identity !== null);
   const item = useNotes((n) => n.notes[noteId]);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const [opening, setOpening] = useState<Opening>({ kind: "opening" });
   const [save, setSave] = useState<{ state: Saving; error: unknown }>({ state: "saved", error: null });
   const [, setTitle] = useState<string | null>(null);
@@ -147,13 +146,10 @@ export function NoteView({ noteId, narrow, onBack, fresh }: Props) {
   const more = (e: MouseEvent<HTMLButtonElement>) => {
     if (!item) return;
     const r = e.currentTarget.getBoundingClientRect();
-    openContextMenu({
-      x: r.right,
-      y: r.bottom,
-      anchor: { left: r.left, right: r.right, top: r.top, bottom: r.bottom, align: "end" },
-      label: title,
-      items: noteMenuItems(item, { nav, openModal, onHistory: () => setHistory(true), onGone: () => nav("/channels/@me/notes") }),
-    });
+    noteMenu.open(
+      { note: item, nav, openModal, onHistory: () => setHistory(true), onGone: () => nav("/channels/@me/notes") },
+      { x: r.right, y: r.bottom, anchor: { left: r.left, right: r.right, top: r.top, bottom: r.bottom, align: "end" }, label: title },
+    );
   };
   const barEnd = (
     <>

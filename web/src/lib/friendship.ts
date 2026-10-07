@@ -23,6 +23,7 @@ import { sealingKeyOf } from "@/stores/keys";
 import { useRelationships } from "@/stores/relationships";
 import { useSettings, type Settings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { button, type MenuButton } from "@/lib/contextMenus/registry";
 import { displayName, useUsers } from "@/stores/users";
 
 import { formatList, t } from "@/i18n";
@@ -209,27 +210,52 @@ export async function unblockUser(userId: string): Promise<boolean> {
   return done ?? false;
 }
 
-/**
- * The friend and block items for someone's menu: Add friend, or answering or
- * taking back a request, or Remove friend; then Block or Unblock. None for
- * this account itself or for the Nexa system account.
- */
-export function relationshipMenuItems(userId: string): ContextMenuItem[] {
+/** Someone a menu can offer friend and block items for: not this account itself, nor the Nexa system account. */
+function otherPerson(userId: string): PublicUser | null {
   const me = useAuth.getState().me;
   const user = useUsers.getState().byId[userId];
-  if (!me || userId === me.id || !user || isSystemAccount(user.flags)) return [];
+  return !me || userId === me.id || !user || isSystemAccount(user.flags) ? null : user;
+}
+
+/** The friend items for someone's menu: Add friend, or answering or taking back a request, or Remove friend. */
+export function friendMenuItems(userId: string): ContextMenuItem[] {
+  const user = otherPerson(userId);
+  if (!user) return [];
   const rel = useRelationships.getState().byUser[userId];
   const busy = !!useRelationshipBusy.getState().busy[userId];
-  const items: ContextMenuItem[] = [];
-  if (!rel) items.push({ id: "add-friend", label: t("profile.profileCard.addFriend"), disabled: busy, onSelect: () => void sendFriendRequest(user) });
-  else if (rel.type === "incoming") {
-    items.push({ id: "accept-request", label: t("profile.profileCard.acceptFriendRequest"), disabled: busy, onSelect: () => void acceptFriendRequest(user) });
-    items.push({ id: "ignore-request", label: t("people.menu.ignoreRequest"), disabled: busy, onSelect: () => void dropFriendRequest(userId) });
-  } else if (rel.type === "outgoing") items.push({ id: "cancel-request", label: t("people.menu.cancelRequest"), disabled: busy, onSelect: () => void dropFriendRequest(userId) });
-  else if (rel.type === "friend") items.push({ id: "remove-friend", label: t("profile.profileCard.removeFriend"), danger: true, onSelect: () => confirmRemoveFriend(user) });
-  if (rel?.type === "blocked") items.push({ id: "unblock", label: t("friends.unblock"), disabled: busy, onSelect: () => void unblockUser(userId) });
-  else items.push({ id: "block", label: t("profile.profileCard.block"), danger: true, onSelect: () => openBlockDialog(userId) });
-  return items;
+  if (!rel) return [{ id: "add-friend", label: t("profile.profileCard.addFriend"), disabled: busy, onSelect: () => void sendFriendRequest(user) }];
+  if (rel.type === "incoming")
+    return [
+      { id: "accept-request", label: t("profile.profileCard.acceptFriendRequest"), disabled: busy, onSelect: () => void acceptFriendRequest(user) },
+      { id: "ignore-request", label: t("people.menu.ignoreRequest"), disabled: busy, onSelect: () => void dropFriendRequest(userId) },
+    ];
+  if (rel.type === "outgoing") return [{ id: "cancel-request", label: t("people.menu.cancelRequest"), disabled: busy, onSelect: () => void dropFriendRequest(userId) }];
+  if (rel.type === "friend") return [{ id: "remove-friend", label: t("profile.profileCard.removeFriend"), danger: true, onSelect: () => confirmRemoveFriend(user) }];
+  return [];
+}
+
+/** Block or Unblock, for someone's menu. */
+export function blockMenuItem(userId: string): ContextMenuItem | null {
+  if (!otherPerson(userId)) return null;
+  if (useRelationships.getState().byUser[userId]?.type === "blocked") return { id: "unblock", label: t("friends.unblock"), disabled: !!useRelationshipBusy.getState().busy[userId], onSelect: () => void unblockUser(userId) };
+  return { id: "block", label: t("profile.profileCard.block"), danger: true, onSelect: () => openBlockDialog(userId) };
+}
+
+/**
+ * The friend and block items for someone's menu, as two buttons: `ids` names
+ * them in the menu they are in, `user` says who the menu is about.
+ */
+export function relationshipButtons<C>(ids: { friend: string; block: string }, user: (ctx: C) => string | null): MenuButton<C>[] {
+  return [
+    button(ids.friend, (ctx) => {
+      const id = user(ctx);
+      return id ? friendMenuItems(id) : null;
+    }),
+    button(ids.block, (ctx) => {
+      const id = user(ctx);
+      return id ? blockMenuItem(id) : null;
+    }),
+  ];
 }
 
 // --- several people at once (a picked part of a list) ------------------------

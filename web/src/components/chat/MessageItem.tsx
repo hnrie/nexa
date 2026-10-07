@@ -49,7 +49,7 @@ import { menuAnchor } from "@/components/common/ContextMenu";
 import { copyText } from "@/lib/clipboard";
 import { MSG_FLAG_PINNED } from "@/api/types";
 import { discardPending, retryPending } from "@/components/composer/send";
-import { buildMessageMenu, canDelete, canEdit, canRemoveEmbeds, confirmRemoveEmbeds, canPick, canPin, canReact, canThread, copyMessageLink, deleteMessageNow, markUnread, messageTimes, togglePin } from "./messageMenu";
+import { canDelete, canEdit, canRemoveEmbeds, confirmRemoveEmbeds, canPick, canPin, canReact, canThread, copyMessageLink, deleteMessageNow, markUnread, messageMenu, messageTimes, togglePin } from "./messageMenu";
 import { useRowActive } from "./activeRow";
 import { useShownName } from "./useShownName";
 import { HookAvatar, HookPopout, HookTags } from "./webhook/HookHeader";
@@ -193,7 +193,6 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const [hookCard, setHookCard] = useState<HTMLElement | null>(null);
   const closeHookCard = useCallback(() => setHookCard(null), []);
   const editing = useUI((u) => u.editing?.channelId === msg.channel_id && u.editing.messageId === msg.id);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const dev = useSettings((st) => st.settings.developerMode);
   const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
   // the author's colours and role icon only, so a change to anyone else in the server leaves this row alone
@@ -218,7 +217,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const openMenu = useCallback((x: number, y: number, image?: ImageTarget | null, anchor?: ContextMenuState["anchor"]) => {
     setMenuOpen(true);
     // the menu is named by when the message was sent: its last lines say so to the eye
-    openContextMenu({ x, y, ...(anchor ? { anchor } : {}), label: messageTimes(msg).join(", "), items: buildMessageMenu(msg, { openReactionPicker: () => setPicker(new DOMRect(x, y, 0, 0)) }, image) });
+    messageMenu.open({ msg, openReactionPicker: () => setPicker(new DOMRect(x, y, 0, 0)), image }, { x, y, ...(anchor ? { anchor } : {}), label: messageTimes(msg).join(", ") });
     menuWatch.current?.();
     menuWatch.current = useUI.subscribe((state) => {
       if (!state.contextMenu) {
@@ -227,7 +226,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
         menuWatch.current = null;
       }
     });
-  }, [msg, openContextMenu]);
+  }, [msg]);
   // Switching channels unmounts every row, menu open or not, and the store
   // would keep this subscriber and the closure behind it for good.
   useEffect(

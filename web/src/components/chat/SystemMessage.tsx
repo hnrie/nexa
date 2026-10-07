@@ -11,7 +11,7 @@ import { formatTimestamp } from "@/lib/time";
 import { pollVerdict, type PollVerdict } from "@/lib/poll";
 import { usePollOf } from "./usePollOf";
 import { Tooltip } from "@/components/common/Tooltip";
-import { canDelete, confirmDelete, deleteMessageNow } from "./messageMenu";
+import { canDelete, confirmDelete, deleteMessageNow, systemMessageMenu } from "./messageMenu";
 import s from "./Chat.module.css";
 
 import { t, Tr } from "@/i18n";
@@ -116,11 +116,7 @@ function PlainSystemMessage({ msg }: { msg: DecryptedMessage }) {
           ? (e) => {
               e.preventDefault();
               const r = e.currentTarget.getBoundingClientRect();
-              useUI.getState().openContextMenu({
-                x: e.clientX || r.left + 72,
-                y: e.clientY || r.top + 8,
-                items: [{ id: "delete", label: t("chat.messageMenu.deleteMessage"), danger: true, onSelect: () => remove(false) }],
-              });
+              systemMessageMenu.open(msg, { x: e.clientX || r.left + 72, y: e.clientY || r.top + 8 });
             }
           : undefined
       }

@@ -2,7 +2,7 @@ import { ArrowDownUp, ChevronDown, Scissors } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { servers as serversApi, type MemberQuery } from "@/api/servers";
-import type { MemberRow } from "@/api/types";
+import type { MemberRow, Role } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { menuAnchor } from "@/components/common/ContextMenu";
@@ -21,6 +21,7 @@ import { formatDateDivider } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { canI, rolesByPosition, useServers } from "@/stores/servers";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { button, defineMenu, type MenuPlacement } from "@/lib/contextMenus/registry";
 import { displayName, useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import { outranks } from "../../memberMenu";
@@ -48,6 +49,39 @@ function sortLabel(sort: Sort): string {
       return t("members.sort.joinedNew");
   }
 }
+
+function spanLabel(days: number): string {
+  return days === 1 ? t("members.filter.day") : days === 7 ? t("members.filter.week") : days === 30 ? t("members.filter.month") : t("members.filter.threeMonths");
+}
+
+/** Mod View's sort menu. */
+const memberSortMenu = defineMenu<{ sort: Sort; setSort: (s: Sort) => void }>("memberSort", [
+  [button("memberSortOrder", ({ sort, setSort }) => SORTS.map((k) => ({ id: k, label: sortLabel(k), checked: sort === k, onSelect: () => setSort(k) })))],
+]);
+
+/** Mod View's roles filter: any of the roles ticked. */
+const memberRoleFilterMenu = defineMenu<{ roles: Role[]; picked: string[]; toggle: (id: string) => void }>("memberRoleFilter", [
+  [button("memberRoleFilter", ({ roles, picked, toggle }) => roles.map((r) => ({ id: r.id, label: r.name, checked: picked.includes(r.id), toggle: true, onSelect: () => toggle(r.id) })))],
+]);
+
+/** Mod View's filters by how recently someone joined, or made their account. */
+const spanFilterItems = (prefix: string, value: number, set: (d: number) => void): ContextMenuItem[] => [
+  { id: "any", label: t("members.filter.any"), checked: !value, onSelect: () => set(0) },
+  ...SPANS.map((d) => ({ id: `${prefix}${d}`, label: spanLabel(d), checked: value === d, onSelect: () => set(d) })),
+];
+const memberJoinedFilterMenu = defineMenu<{ value: number; set: (d: number) => void }>("memberJoinedFilter", [[button("memberJoinedFilter", ({ value, set }) => spanFilterItems("j", value, set))]]);
+const memberAgeFilterMenu = defineMenu<{ value: number; set: (d: number) => void }>("memberAgeFilter", [[button("memberAgeFilter", ({ value, set }) => spanFilterItems("c", value, set))]]);
+
+/** Mod View's filter by how someone joined, or through which invite. */
+const memberJoinFilterMenu = defineMenu<{ method: string; code: string; codes: string[]; pick: (method: string, code: string) => void }>("memberJoinFilter", [
+  [
+    button("memberJoinMethodFilter", ({ method, code, pick }) => [
+      { id: "any", label: t("members.filter.any"), checked: !method && !code, onSelect: () => pick("", "") },
+      ...["invite", "discovery", "tag"].map((m) => ({ id: m, label: joinMethodLabel(m), checked: method === m && !code, onSelect: () => pick(m, "") })),
+    ]),
+    button("memberInviteFilter", ({ code, codes, pick }) => codes.length > 0 && [{ id: "codes", label: t("members.filter.byInvite"), heading: true }, ...codes.slice(0, 20).map((c) => ({ id: `code${c}`, label: c, checked: code === c, onSelect: () => pick("invite", c) }))]),
+  ],
+]);
 
 function RoleChips({ serverId, ids }: { serverId: string; ids: string[] }) {
   const roles = useServers((x) => x.byId[serverId]?.roles);
@@ -158,12 +192,12 @@ export function ModMembers({ serverId }: { serverId: string }) {
     setMethod("");
     setCode("");
   };
-  const menu = (el: HTMLElement, label: string, items: ContextMenuItem[]) => {
+  /** Where a filter's menu opens: under its button, from its start edge. */
+  const under = (el: HTMLElement, label: string): MenuPlacement => {
     const anchor = menuAnchor(el, "start");
-    useUI.getState().openContextMenu({ x: anchor.left, y: anchor.bottom + 4, anchor, label, items });
+    return { x: anchor.left, y: anchor.bottom + 4, anchor, label };
   };
   const allRoles = rolesByPosition(server).filter((r) => r.id !== serverId);
-  const spanLabel = (days: number) => (days === 1 ? t("members.filter.day") : days === 7 ? t("members.filter.week") : days === 30 ? t("members.filter.month") : t("members.filter.threeMonths"));
   const toggle = (id: string) =>
     setPicked((cur) => {
       const next = new Set(cur);
@@ -229,16 +263,16 @@ export function ModMembers({ serverId }: { serverId: string }) {
       <SearchBox className={s.search} value={q} onChange={setQ} placeholder={t("members.search")} aria-label={t("members.search")} data-testid="members-search" />
       {/* the filters in one row; a phone scrolls it sideways rather than stacking four rows of it */}
       <div className={s.filters} role="group" aria-label={t("members.filter.label")}>
-        <button type="button" className={s.filterBtn} aria-haspopup="menu" onClick={(e) => menu(e.currentTarget, t("members.sort.label"), SORTS.map((k) => ({ id: k, label: sortLabel(k), checked: sort === k, onSelect: () => setSort(k) })))} data-testid="members-sort">
+        <button type="button" className={s.filterBtn} aria-haspopup="menu" onClick={(e) => memberSortMenu.open({ sort, setSort }, under(e.currentTarget, t("members.sort.label")))} data-testid="members-sort">
           <ArrowDownUp size={14} aria-hidden="true" /> {sortLabel(sort)} <ChevronDown size={14} aria-hidden="true" />
         </button>
-        <button type="button" className={s.filterBtn} data-on={roles.length ? "" : undefined} aria-haspopup="menu" onClick={(e) => menu(e.currentTarget, t("server.members.roles"), allRoles.map((r) => ({ id: r.id, label: r.name, checked: roles.includes(r.id), toggle: true, onSelect: () => setRoles((cur) => (cur.includes(r.id) ? cur.filter((x) => x !== r.id) : [...cur, r.id])) })))}>
+        <button type="button" className={s.filterBtn} data-on={roles.length ? "" : undefined} aria-haspopup="menu" onClick={(e) => memberRoleFilterMenu.open({ roles: allRoles, picked: roles, toggle: (id) => setRoles((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id])) }, under(e.currentTarget, t("server.members.roles")))}>
           {roles.length ? t("members.filter.rolesN", { count: roles.length }) : t("server.members.roles")} <ChevronDown size={14} aria-hidden="true" />
         </button>
-        <button type="button" className={s.filterBtn} data-on={joined ? "" : undefined} aria-haspopup="menu" onClick={(e) => menu(e.currentTarget, t("members.filter.joined"), [{ id: "any", label: t("members.filter.any"), checked: !joined, onSelect: () => setJoined(0) }, ...SPANS.map((d) => ({ id: `j${d}`, label: spanLabel(d), checked: joined === d, onSelect: () => setJoined(d) }))])}>
+        <button type="button" className={s.filterBtn} data-on={joined ? "" : undefined} aria-haspopup="menu" onClick={(e) => memberJoinedFilterMenu.open({ value: joined, set: setJoined }, under(e.currentTarget, t("members.filter.joined")))}>
           {joined ? t("members.filter.joinedIn", { span: spanLabel(joined) }) : t("members.filter.joined")} <ChevronDown size={14} aria-hidden="true" />
         </button>
-        <button type="button" className={s.filterBtn} data-on={created ? "" : undefined} aria-haspopup="menu" onClick={(e) => menu(e.currentTarget, t("members.filter.age"), [{ id: "any", label: t("members.filter.any"), checked: !created, onSelect: () => setCreated(0) }, ...SPANS.map((d) => ({ id: `c${d}`, label: spanLabel(d), checked: created === d, onSelect: () => setCreated(d) }))])}>
+        <button type="button" className={s.filterBtn} data-on={created ? "" : undefined} aria-haspopup="menu" onClick={(e) => memberAgeFilterMenu.open({ value: created, set: setCreated }, under(e.currentTarget, t("members.filter.age")))}>
           {created ? t("members.filter.ageIn", { span: spanLabel(created) }) : t("members.filter.age")} <ChevronDown size={14} aria-hidden="true" />
         </button>
         {seesJoins ? (
@@ -248,12 +282,18 @@ export function ModMembers({ serverId }: { serverId: string }) {
             data-on={method || code ? "" : undefined}
             aria-haspopup="menu"
             onClick={(e) =>
-              menu(e.currentTarget, t("members.col.joinMethod"), [
-                { id: "any", label: t("members.filter.any"), checked: !method && !code, onSelect: () => { setMethod(""); setCode(""); } },
-                ...["invite", "discovery", "tag"].map((m) => ({ id: m, label: joinMethodLabel(m), checked: method === m && !code, onSelect: () => { setMethod(m); setCode(""); } })),
-                ...(codes.length ? [{ id: "codes", label: t("members.filter.byInvite"), heading: true }] : []),
-                ...codes.slice(0, 20).map((c) => ({ id: `code${c}`, label: c, checked: code === c, onSelect: () => { setMethod("invite"); setCode(c); } })),
-              ])
+              memberJoinFilterMenu.open(
+                {
+                  method,
+                  code,
+                  codes,
+                  pick: (m, c) => {
+                    setMethod(m);
+                    setCode(c);
+                  },
+                },
+                under(e.currentTarget, t("members.col.joinMethod")),
+              )
             }
           >
             {code ? t("members.filter.invite", { code }) : method ? joinMethodLabel(method) : t("members.col.joinMethod")} <ChevronDown size={14} aria-hidden="true" />

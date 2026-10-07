@@ -18,6 +18,18 @@ import { useNexa } from "@/stores/nexa";
 import { openProfilePopout } from "@/stores/profilePopout";
 import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
+
+/** A line of a case thread or bug report: copying what it says. */
+const threadLineMenu = defineMenu<string>("threadLine", [[button("copyThreadLine", (body) => ({ id: "copy", label: t("chat.messageMenu.copyText"), onSelect: () => void copyText(body) }))]]);
+
+/** The phone's one button in a case thread's or bug report's box, for formatting and emoji. */
+const threadToolsMenu = defineMenu<{ openFormatting: () => void; openEmoji: () => void }>("threadTools", [
+  [
+    button("threadFormattingEditor", ({ openFormatting }) => ({ id: "formatting", label: t("composer.more.formatting"), onSelect: openFormatting })),
+    button("threadEmojiPicker", ({ openEmoji }) => ({ id: "emoji", label: t("composer.more.emoji"), onSelect: openEmoji })),
+  ],
+]);
 import { NexaAvatar, OfficialBadge } from "./NexaBits";
 import { ThreadFiles } from "./ThreadFiles";
 import chat from "@/components/chat/Chat.module.css";
@@ -254,7 +266,6 @@ function Lines({ lines, people, perspective, fileKind, action, openerAt }: { lin
 
 function Row({ m, people, perspective, grouped, fileKind }: { m: ThreadLine; people: People; perspective: "member" | "staff"; grouped: boolean; fileKind: PrivateFileKind }) {
   const ctx = useRenderCtx();
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const { person, asNexa, nexaId, name } = useAuthor(m.author_id, m.kind, people, perspective);
   const staffLine = m.kind === "staff";
   const profile = (e: MouseEvent<HTMLElement>, who = asNexa ? nexaId : m.author_id) => {
@@ -266,7 +277,7 @@ function Row({ m, people, perspective, grouped, fileKind }: { m: ThreadLine; peo
     e.preventDefault();
     const x = e.clientX || e.currentTarget.getBoundingClientRect().left + 72;
     const y = e.clientY || e.currentTarget.getBoundingClientRect().top + 8;
-    openContextMenu({ x, y, items: [{ id: "copy", label: t("chat.messageMenu.copyText"), onSelect: () => void copyText(m.body) }] });
+    threadLineMenu.open(m.body, { x, y });
   };
   return (
     <div role="article" className={chat.msg} data-group-start={!grouped} data-row="" data-kind={m.kind} onContextMenu={menu} data-testid={`case-line-${m.kind}`}>
@@ -489,17 +500,7 @@ function ThreadComposer({ onSend, upload, placeholder, dropName }: { onSend: (bo
 
   const tools = (el: HTMLElement) => {
     const anchor = menuAnchor(el, "end");
-    useUI.getState().openContextMenu({
-      x: anchor.right,
-      y: anchor.top - 4,
-      anchor,
-      above: true,
-      label: t("composer.more.label"),
-      items: [
-        { id: "formatting", label: t("composer.more.formatting"), onSelect: () => setFormatting(true) },
-        { id: "emoji", label: t("composer.more.emoji"), onSelect: () => setPicker(true) },
-      ],
-    });
+    threadToolsMenu.open({ openFormatting: () => setFormatting(true), openEmoji: () => setPicker(true) }, { x: anchor.right, y: anchor.top - 4, anchor, above: true, label: t("composer.more.label") });
   };
 
   const canSend = (!!text.trim() || ready.length > 0) && !over && !busy && !uploading;

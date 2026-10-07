@@ -7,7 +7,7 @@ import { useChannels } from "@/stores/channels";
 import type { DecryptedMessage } from "@/stores/messages";
 import { useSelection } from "@/stores/selection";
 import { useServers } from "@/stores/servers";
-import { buildMessageMenu, canDelete, canPick, canPin, canReact, deleteMessagesNow, messageTimes, startSelecting } from "./messageMenu";
+import { messageMenu, canDelete, canPick, canPin, canReact, deleteMessagesNow, messageTimes, startSelecting } from "./messageMenu";
 
 const S = "100";
 const ch = (id: string, extra: Partial<Channel> = {}): Channel => ({
@@ -83,7 +83,7 @@ describe("message permissions", () => {
     expect(canDelete(msg("300", "2"))).toBe(true);
   });
   it("offers Add Reaction only where reacting is allowed", () => {
-    const ids = () => buildMessageMenu(msg("200", "1"), { openReactionPicker: () => {} }).map((i) => i.id);
+    const ids = () => messageMenu.items({ msg: msg("200", "1"), openReactionPicker: () => {} }).map((i) => i.id);
     expect(canReact(msg("200", "1"))).toBe(true);
     expect(ids()).toContain("react");
     // an announcements channel: @everyone may not add reactions there
@@ -96,7 +96,7 @@ describe("message permissions", () => {
   it("ends the menu with when the message was sent, and edited", () => {
     const sent = Date.UTC(2026, 8, 24, 14, 3, 11);
     const m = { ...msg("200", "1"), created_at: sent, edited_at: null } as DecryptedMessage;
-    const menu = buildMessageMenu(m, { openReactionPicker: () => {} });
+    const menu = messageMenu.items({ msg: m, openReactionPicker: () => {} });
     const notes = menu.filter((i) => i.note);
     expect(notes).toHaveLength(1);
     expect(menu[menu.length - 1]).toBe(notes[0]);
@@ -111,10 +111,10 @@ describe("picking messages to delete", () => {
     signIn("3");
     useSelection.getState().clear();
   });
-  const labels = (m: DecryptedMessage) => buildMessageMenu(m, { openReactionPicker: () => {} }).map((i) => i.id);
+  const labels = (m: DecryptedMessage) => messageMenu.items({ msg: m, openReactionPicker: () => {} }).map((i) => i.id);
 
   it("puts a picture's Copy Image and Save Image first when opened on one", () => {
-    const withImage = buildMessageMenu(msg("200", "1"), { openReactionPicker: () => {} }, { src: "blob:x", name: "cat.png" });
+    const withImage = messageMenu.items({ msg: msg("200", "1"), openReactionPicker: () => {}, image: { src: "blob:x", name: "cat.png" } });
     expect(withImage.slice(0, 3).map((i) => i.id)).toEqual(["copy-image", "save-image", "react"]);
     expect(withImage[1]!.separatorAfter).toBe(true);
     expect(labels(msg("200", "1"))).not.toContain("copy-image");

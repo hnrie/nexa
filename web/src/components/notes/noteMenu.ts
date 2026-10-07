@@ -1,5 +1,6 @@
 import type { NavigateFunction } from "react-router-dom";
-import { NOTE_OWNER } from "@/api/types";
+import { NOTE_EDITOR, NOTE_OWNER, NOTE_VIEWER, type NoteRole } from "@/api/types";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
 import type { ContextMenuItem } from "@/stores/ui";
 import type { NoteItem } from "@/stores/notes";
 import { ReadableError } from "@/lib/readableError";
@@ -8,7 +9,8 @@ import { removeNote } from "@/lib/notes/share";
 import { t } from "@/i18n";
 import { noteName } from "./NoteParts";
 
-interface Deps {
+export interface NoteMenuCtx {
+  note: NoteItem;
   nav: NavigateFunction;
   openModal: (kind: string, props?: Record<string, unknown>) => void;
   /** On the note's own page: its history is opened there. */
@@ -19,14 +21,10 @@ interface Deps {
   inList?: boolean;
 }
 
-/** What can be done with a note from its card's menu or the menu on its page. */
-export function noteMenuItems(note: NoteItem, d: Deps): ContextMenuItem[] {
+/** Deletes the note (its owner) or leaves it (anyone else), after asking. */
+function removeItem({ note, openModal, onGone }: NoteMenuCtx): ContextMenuItem {
   const owner = note.role === NOTE_OWNER;
   const title = noteName(note.head?.title);
-  const items: ContextMenuItem[] = [];
-  if (d.inList) items.push({ id: "open", label: t("notes.menu.open"), onSelect: () => d.nav(`/channels/@me/notes/${note.id}`) });
-  items.push({ id: "share", label: owner ? t("notes.menu.share") : t("notes.menu.whoHasAccess"), onSelect: () => d.openModal("shareNote", { noteId: note.id }), separatorAfter: !d.onHistory });
-  if (d.onHistory) items.push({ id: "history", label: t("notes.menu.history"), onSelect: d.onHistory, separatorAfter: true });
   const remove = async () => {
     try {
       await removeNote(note);
@@ -34,22 +32,36 @@ export function noteMenuItems(note: NoteItem, d: Deps): ContextMenuItem[] {
       // the dialog stays open, saying why
       throw new ReadableError(noteError(err));
     }
-    d.onGone?.();
+    onGone?.();
   };
-  items.push(
-    owner
-      ? {
-          id: "delete",
-          label: t("notes.menu.delete"),
-          danger: true,
-          onSelect: () => d.openModal("confirm", { title: t("notes.menu.deleteTitle"), body: t("notes.menu.deleteBody", { title }), confirmLabel: t("notes.menu.delete"), danger: true, onConfirm: remove }),
-        }
-      : {
-          id: "leave",
-          label: t("notes.menu.leave"),
-          danger: true,
-          onSelect: () => d.openModal("confirm", { title: t("notes.menu.leaveTitle"), body: t("notes.menu.leaveBody", { title }), confirmLabel: t("notes.menu.leave"), danger: true, onConfirm: remove }),
-        },
-  );
-  return items;
+  return owner
+    ? { id: "delete", label: t("notes.menu.delete"), danger: true, onSelect: () => openModal("confirm", { title: t("notes.menu.deleteTitle"), body: t("notes.menu.deleteBody", { title }), confirmLabel: t("notes.menu.delete"), danger: true, onConfirm: remove }) }
+    : { id: "leave", label: t("notes.menu.leave"), danger: true, onSelect: () => openModal("confirm", { title: t("notes.menu.leaveTitle"), body: t("notes.menu.leaveBody", { title }), confirmLabel: t("notes.menu.leave"), danger: true, onConfirm: remove }) };
 }
+
+/** What can be done with a note from its card's menu or the menu on its page. */
+export const noteMenu = defineMenu<NoteMenuCtx>("note", [
+  [
+    button("openNote", ({ note, nav, inList }) => !!inList && { id: "open", label: t("notes.menu.open"), onSelect: () => nav(`/channels/@me/notes/${note.id}`) }),
+    button("shareNote", ({ note, openModal }) => ({ id: "share", label: note.role === NOTE_OWNER ? t("notes.menu.share") : t("notes.menu.whoHasAccess"), onSelect: () => openModal("shareNote", { noteId: note.id }) })),
+    button("noteHistory", ({ onHistory }) => !!onHistory && { id: "history", label: t("notes.menu.history"), onSelect: onHistory }),
+  ],
+  [button("deleteNote", (ctx) => removeItem(ctx))],
+]);
+
+/** A note member's role, chosen by the note's owner in Share. */
+export const noteMemberRoleMenu = defineMenu<{ role: number; setRole: (role: NoteRole) => void; remove: () => void }>("noteMemberRole", [
+  [
+    button("noteMemberCanEdit", ({ role, setRole }) => ({ id: "edit", label: t("notes.share.canEdit"), checked: role === NOTE_EDITOR, onSelect: () => role !== NOTE_EDITOR && setRole(NOTE_EDITOR) })),
+    button("noteMemberCanView", ({ role, setRole }) => ({ id: "view", label: t("notes.share.canView"), checked: role === NOTE_VIEWER, onSelect: () => role !== NOTE_VIEWER && setRole(NOTE_VIEWER) })),
+  ],
+  [button("removeNoteMember", ({ remove }) => ({ id: "remove", label: t("notes.share.removeFromNote"), danger: true, onSelect: remove }))],
+]);
+
+/** What a new share link lets its holders do. */
+export const noteLinkRoleMenu = defineMenu<{ create: (role: NoteRole) => void }>("noteLinkRole", [
+  [
+    button("noteLinkCanView", ({ create }) => ({ id: "view", label: t("notes.share.linkCanView"), onSelect: () => create(NOTE_VIEWER) })),
+    button("noteLinkCanEdit", ({ create }) => ({ id: "edit", label: t("notes.share.linkCanEdit"), onSelect: () => create(NOTE_EDITOR) })),
+  ],
+]);

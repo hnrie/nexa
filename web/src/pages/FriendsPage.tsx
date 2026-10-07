@@ -3,7 +3,7 @@ import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { channels as channelsApi } from "@/api/channels";
 import { relationships as relApi } from "@/api/relationships";
-import { acceptFriendRequest, addRequestNote, confirmRemoveFriend, dropFriendRequest, openBlockDialog, requestError, unblockUser, useBusyWith } from "@/lib/friendship";
+import { acceptFriendRequest, addRequestNote, dropFriendRequest, requestError, unblockUser, useBusyWith } from "@/lib/friendship";
 import { REQUEST_NOTE_MAX, cleanRequestNote } from "@/lib/requestNote";
 import type { Relationship } from "@/api/types";
 import { Avatar, statusLabel } from "@/components/common/Avatar";
@@ -33,10 +33,10 @@ import { guarded } from "@/lib/captcha";
 import { describeError, dmOpenError } from "@/lib/errors";
 import { PickBar, PickMark } from "@/components/common/Pick";
 import { friendsBulk } from "@/components/friends/friendsBulk";
+import { friendMenu } from "@/components/friends/friendMenu";
 import { pickClick, usePick } from "@/stores/pick";
 
 import { t as tr_, translator } from "@/i18n";
-import { copyProfileLink } from "@/lib/profileLinks";
 type Tab = "online" | "all" | "pending" | "blocked" | "add";
 
 const NO_PICKS: string[] = [];
@@ -243,7 +243,6 @@ function FriendRow({ rel, presenceUser, order, picking, picked }: { rel: Relatio
   const nav = useNavigate();
   const p = usePresence((st) => st.byUser[rel.user.id]);
   const toast = useUI((u) => u.toast);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const upsertChannel = useChannels((c) => c.upsert);
   const busy = useBusyWith(rel.user.id);
   const status = statusOf(p);
@@ -291,7 +290,7 @@ function FriendRow({ rel, presenceUser, order, picking, picked }: { rel: Relatio
     const pick = usePick.getState();
     // a right click on one of several picked acts on all of them
     if (pick.list === "friends" && pick.ids.includes(rel.user.id) && pick.ids.length > 1) {
-      openContextMenu({ x: e.clientX, y: e.clientY, label: tr_("pick.count", { count: pick.ids.length }), items: friendsBulk(pick.ids, useUI.getState().openModal).menu() });
+      friendsBulk(pick.ids, useUI.getState().openModal).menu({ x: e.clientX, y: e.clientY, label: tr_("pick.count", { count: pick.ids.length }) });
       return;
     }
     if (pick.list === "friends" && !pick.mode && pick.ids.length) pick.clear();
@@ -299,24 +298,10 @@ function FriendRow({ rel, presenceUser, order, picking, picked }: { rel: Relatio
     // 0,0: the menu goes by the button instead.
     const fromKeys = e.clientX === 0 && e.clientY === 0;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    openContextMenu({
-      x: fromKeys ? (document.documentElement.dir === "rtl" ? r.right : r.left) : e.clientX,
-      y: fromKeys ? r.bottom + 4 : e.clientY,
-      items: [
-        { id: "profile", label: tr_("profile.profile.profile"), onSelect: profile },
-        { id: "msg", label: tr_("profile.profileCard.message"), onSelect: () => void message(), separatorAfter: rel.type !== "friend" },
-        ...(rel.type === "friend" ? [{ id: "call", label: tr_("chat.chat.startVoiceCall"), onSelect: () => void call(), separatorAfter: true }] : []),
-        ...(rel.type === "friend" ? [{ id: "rm", label: tr_("profile.profileCard.removeFriend"), danger: true, onSelect: () => confirmRemoveFriend(rel.user) }] : []),
-        // the one block dialog, with its choices about their messages
-        ...(rel.type !== "blocked"
-          ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: () => openBlockDialog(rel.user.id) }]
-          : [{ id: "unblock", label: tr_("friends.unblock"), onSelect: () => void unblockUser(rel.user.id) }]),
-        { id: "copy-profile-link", label: tr_("profileLink.copy"), onSelect: () => copyProfileLink(rel.user.username) },
-        { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => copyAndSay(rel.user.id, tr_("friends.userIdCopied")), separatorAfter: true },
-        // the way into picking on a touch screen, where there is no Ctrl to hold
-        { id: "select", label: tr_("pick.select"), onSelect: () => usePick.getState().start("friends", rel.user.id) },
-      ],
-    });
+    friendMenu.open(
+      { rel, profile, message: () => void message(), call: () => void call() },
+      { x: fromKeys ? (document.documentElement.dir === "rtl" ? r.right : r.left) : e.clientX, y: fromKeys ? r.bottom + 4 : e.clientY },
+    );
   };
 
   // A friend's line is their status or what they are doing, which scrolls when

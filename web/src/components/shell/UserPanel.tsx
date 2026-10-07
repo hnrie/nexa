@@ -12,7 +12,7 @@ import { useUI } from "@/stores/ui";
 import { useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 import s from "./UserPanel.module.css";
-import { micMenuItems } from "@/components/voice/deviceMenus";
+import { openDeviceMenu } from "@/components/voice/deviceMenus";
 import { ActivityToggle } from "@/components/activity/ActivityToggle";
 import { bindText, keybindsOf } from "@/lib/keybinds";
 import { useSettings } from "@/stores/settings";
@@ -42,7 +42,6 @@ export function UserPanel() {
   const muted = useVoiceLocal((v) => v.muted);
   const deafened = useVoiceLocal((v) => v.deafened);
   const toggleMute = useVoiceLocal((v) => v.toggleMute);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const toggleDeafen = useVoiceLocal((v) => v.toggleDeafen);
   // the account's own keys for these, shown in their tooltips (Settings, Keybinds)
   const keys = keybindsOf(useSettings((x) => x.settings.keybinds));
@@ -97,7 +96,7 @@ export function UserPanel() {
   };
 
   const openMicMenu = (at: { x: number; y: number }) =>
-    void micMenuItems(openModal).then((items) => openContextMenu({ ...at, above: true, label: t("voice.voice.microphoneOptions"), items }));
+    void openDeviceMenu("mic", openModal, { ...at, above: true, label: t("voice.voice.microphoneOptions") });
 
   return (
     <div className={s.panel} ref={ref}>

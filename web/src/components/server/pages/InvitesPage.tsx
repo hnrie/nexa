@@ -21,6 +21,23 @@ import st from "@/components/settings/Settings.module.css";
 import s from "../ServerSettings.module.css";
 
 import { t } from "@/i18n";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
+
+const HOUR = 3600 * 1000;
+/** How long invites can be paused for; "forever" is a date far enough away. */
+const PAUSES: { id: string; label: () => string; ms: number | null }[] = [
+  { id: "1h", label: () => t("server.invites.pause1h"), ms: HOUR },
+  { id: "6h", label: () => t("server.invites.pause6h"), ms: 6 * HOUR },
+  { id: "12h", label: () => t("server.invites.pause12h"), ms: 12 * HOUR },
+  { id: "1d", label: () => t("server.invites.pause1d"), ms: 24 * HOUR },
+  { id: "1w", label: () => t("server.invites.pause1w"), ms: 24 * 7 * HOUR },
+  { id: "forever", label: () => t("server.invites.pauseForever"), ms: null },
+];
+
+/** For how long to pause a server's invites. */
+const invitePauseMenu = defineMenu<{ pause: (until: number) => void }>("invitePause", [
+  [button("pauseInvites", ({ pause }) => PAUSES.map((p) => ({ id: p.id, label: p.label(), onSelect: () => pause(p.ms === null ? 32503600000000 : Date.now() + p.ms) })))],
+]);
 export default function InvitesPage({ serverId }: { serverId: string }) {
   const users = useUsers((u) => u.byId);
   const channels = useChannels((c) => c.byId);
@@ -79,23 +96,7 @@ export default function InvitesPage({ serverId }: { serverId: string }) {
   };
   const pauseMenu = (el: HTMLElement) => {
     const anchor = menuAnchor(el, "start");
-    const spans = [
-      ["1h", 1],
-      ["6h", 6],
-      ["12h", 12],
-      ["1d", 24],
-      ["1w", 24 * 7],
-    ] as const;
-    useUI.getState().openContextMenu({
-      x: anchor.left,
-      y: anchor.bottom + 4,
-      anchor,
-      label: t("server.invites.pauseFor"),
-      items: [
-        ...spans.map(([id, h]) => ({ id, label: t(`server.invites.pause${id}`), onSelect: () => void setPause(Date.now() + h * 3600 * 1000) })),
-        { id: "forever", label: t("server.invites.pauseForever"), onSelect: () => void setPause(32503600000000) },
-      ],
-    });
+    invitePauseMenu.open({ pause: (until) => void setPause(until) }, { x: anchor.left, y: anchor.bottom + 4, anchor, label: t("server.invites.pauseFor") });
   };
   const revokeAll = () => {
     openModal("confirm", {

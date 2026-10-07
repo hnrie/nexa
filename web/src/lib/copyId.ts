@@ -15,12 +15,3 @@ export function copyIdItem(key: string, label: string, id: string): ContextMenuI
     onSelect: () => copyAndSay(id),
   };
 }
-
-/** Adds `extra` to the end of a menu, set apart from what came before. */
-export function appendSection(items: ContextMenuItem[], extra: ContextMenuItem[]): ContextMenuItem[] {
-  if (!extra.length) return items;
-  const last = items[items.length - 1];
-  if (last) items[items.length - 1] = { ...last, separatorAfter: true };
-  items.push(...extra);
-  return items;
-}

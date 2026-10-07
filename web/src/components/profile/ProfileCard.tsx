@@ -7,7 +7,7 @@ import { ApiError } from "@/api/client";
 import { dmOpenError } from "@/lib/errors";
 import { channels as channelsApi } from "@/api/channels";
 import { relationships as relApi } from "@/api/relationships";
-import { confirmRemoveFriend, openBlockDialog, sendFriendRequest, unblockUser, useBusyWith } from "@/lib/friendship";
+import { sendFriendRequest, useBusyWith } from "@/lib/friendship";
 import type { PublicUser } from "@/api/types";
 import { avatarUrl, bannerUrl, iconUrl, users as usersApi } from "@/api/users";
 import { ActivityList } from "@/components/activity/ActivityCard";
@@ -23,7 +23,6 @@ import { promptFields } from "@/components/modals/PromptModal";
 import { KeyStatusChip } from "./KeyVerify";
 import { RelationshipBar, relationshipLine } from "./RelationshipBar";
 import { profileTheme, profileThemeOf } from "@/lib/avatarColor";
-import { copyText } from "@/lib/clipboard";
 import { copyProfileLink } from "@/lib/profileLinks";
 import { useDominantColor } from "@/lib/dominantColor";
 import { formatShortDate } from "@/lib/time";
@@ -38,9 +37,10 @@ import { canActOn, canManageRole, P } from "@/lib/perms";
 import { sendMessage } from "@/components/composer/send";
 import { servers as serversApi } from "@/api/servers";
 import { useSettings } from "@/stores/settings";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 import s from "./Profile.module.css";
+import { profileAddRoleMenu, profileMoreMenu } from "./profileMenus";
 
 import { t } from "@/i18n";
 // in the app's language, not the browser's (lib/time)
@@ -101,7 +101,6 @@ function ServerRoles({ serverId, userId, popout }: { serverId: string; userId: s
   const member = server?.members[userId];
   const upsertMember = useServers((st) => st.upsertMember);
   const meId = useAuth((a) => a.me?.id);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const toast = useUI((u) => u.toast);
   const [busy, setBusy] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
@@ -165,7 +164,7 @@ function ServerRoles({ serverId, userId, popout }: { serverId: string; userId: s
                 disabled={busy !== null}
                 onClick={(e) => {
                   const at = e.currentTarget.getBoundingClientRect();
-                  openContextMenu({ x: at.left, y: at.bottom + 4, items: addable.map((r) => ({ id: r.id, label: r.name, onSelect: () => void change(r.id, true) })) });
+                  profileAddRoleMenu.open({ roles: addable, add: (roleId) => void change(roleId, true) }, { x: at.left, y: at.bottom + 4 });
                 }}
                 data-testid="role-add"
               >
@@ -412,7 +411,6 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const upsertChannel = useChannels((c) => c.upsert);
   const toast = useUI((u) => u.toast);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const note = useSettings((st) => st.settings.userNotes[userId] ?? "");
   const allNotes = useSettings((st) => st.settings.userNotes);
   const patchSettings = useSettings((st) => st.patch);
@@ -541,21 +539,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   };
   const more = (e: MouseEvent<HTMLButtonElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const items: ContextMenuItem[] = [];
-    if (compact) items.push({ id: "full", label: t("profile.profileCard.viewFullProfile"), onSelect: () => viewFull() });
-    if (popout) items.push({ id: "link", label: t("profileLink.copy"), onSelect: copyLink });
-    if (compact) items[items.length - 1]!.separatorAfter = true;
-    if (friend) {
-      items.push({ id: "nick", label: rel.nickname ? t("profile.profileCard.editFriendNickname") : t("profile.profileCard.addFriendNickname"), onSelect: () => void editNickname() });
-      // asked first, as the friends list asks: neither is quick to take back
-      items.push({ id: "rm", label: t("profile.profileCard.removeFriend"), danger: true, onSelect: () => confirmRemoveFriend(user) });
-    }
-    // one block dialog everywhere, with its choices about their messages
-    if (rel?.type === "blocked") items.push({ id: "unblock", label: t("friends.unblock"), onSelect: () => void unblockUser(userId) });
-    else items.push({ id: "block", label: t("profile.profileCard.block"), danger: true, onSelect: () => openBlockDialog(userId) });
-    items[items.length - 1]!.separatorAfter = true;
-    items.push({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void copyText(userId, t("clipboard.idCopied")) });
-    openContextMenu({ x: r.left, y: r.bottom + 4, items });
+    profileMoreMenu.open({ user, compact, popout, friend, viewFull: () => viewFull(), copyLink, editNickname: () => void editNickname() }, { x: r.left, y: r.bottom + 4 });
   };
   const setNote = (value: string) => {
     const userNotes = { ...allNotes };

@@ -21,6 +21,12 @@ import { parse, plainText } from "@/markdown";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
+
+/** A bug report's status, set by the staff. */
+const bugStatusMenu = defineMenu<{ status: BugStatus; setStatus: (st: BugStatus) => void }>("bugStatus", [
+  [button("setBugStatus", ({ status, setStatus }) => BUG_STATUSES.map((st) => ({ id: st, label: bugStatusLabel(st), checked: st === status, onSelect: () => setStatus(st) })))],
+]);
 import m from "./Moderation.module.css";
 import b from "./BugsTab.module.css";
 
@@ -285,7 +291,6 @@ function BugRow({ r, people, selected, onPick }: { r: StaffBug; people: People; 
 function StaffBugPane({ reportId, onBack, onChanged }: { reportId: string; onBack: () => void; onChanged: (r: StaffBug) => void }) {
   const nav = useNavigate();
   const toast = useUI((u) => u.toast);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const mergePeople = useModeration((s) => s.mergePeople);
   const [data, setData] = useState<{ report: StaffBug; messages: BugMessage[]; people: People } | null>(null);
   const [failed, setFailed] = useState(false);
@@ -339,13 +344,7 @@ function StaffBugPane({ reportId, onBack, onChanged }: { reportId: string; onBac
   const statusMenu = (el: HTMLElement) => {
     if (!data) return;
     const anchor = menuAnchor(el);
-    openContextMenu({
-      x: anchor.left,
-      y: anchor.bottom + 4,
-      anchor,
-      label: t("bugs.staff.setStatus"),
-      items: BUG_STATUSES.map((st) => ({ id: st, label: bugStatusLabel(st), checked: st === data.report.status, onSelect: () => void setStatus(st) })),
-    });
+    bugStatusMenu.open({ status: data.report.status, setStatus: (st) => void setStatus(st) }, { x: anchor.left, y: anchor.bottom + 4, anchor, label: t("bugs.staff.setStatus") });
   };
 
   if (failed) {

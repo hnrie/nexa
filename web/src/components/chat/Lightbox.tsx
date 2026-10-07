@@ -3,11 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { AttachmentMeta } from "@/crypto/message";
 import { PRIORITY, acquire, attachmentObjectURL, cachedURL, release } from "@/lib/mediaCache";
-import { useUI } from "@/stores/ui";
 import { Spinner } from "@/components/common/Spinner";
 import { useFocusTrap } from "@/components/common/useFocusTrap";
 import { ZoomPan, type ZoomPanHandle } from "@/components/common/ZoomPan";
-import { imageMenuItems } from "./messageMenu";
+import { imageMenu } from "./messageMenu";
 import s from "./Lightbox.module.css";
 import { t } from "@/i18n";
 
@@ -79,7 +78,6 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
   const [index, setIndex] = useState(() => Math.min(Math.max(0, start), Math.max(0, count - 1)));
   const item = items[index] ?? items[0]!;
   const { src, failed, copy } = useItemSrc(item);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const [scale, setScale] = useState(1);
   const zoom = useRef<ZoomPanHandle>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -236,7 +234,7 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
                 const att = item.att;
                 // copied and saved whole, even while the copy is what shows
                 const full = !src && att ? () => attachmentObjectURL(att, undefined, PRIORITY.open) : undefined;
-                openContextMenu({ x: e.clientX, y: e.clientY, items: imageMenuItems({ src: src ?? copy!, name: item.name, ...(full ? { full } : {}) }) });
+                imageMenu.open({ src: src ?? copy!, name: item.name, ...(full ? { full } : {}) }, { x: e.clientX, y: e.clientY });
               }}
             />
           ) : (

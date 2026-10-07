@@ -11,6 +11,7 @@ import { isUnread, useReadStates } from "@/stores/readStates";
 import { useRelationships } from "@/stores/relationships";
 import { useSettings } from "@/stores/settings";
 import type { ContextMenuItem } from "@/stores/ui";
+import { button, defineMenu, type MenuPlacement } from "@/lib/contextMenus/registry";
 import { useUsers } from "@/stores/users";
 import { promptText } from "@/components/modals/PromptModal";
 import { GROUP_NAME_MAX } from "@/lib/dmLayout";
@@ -85,33 +86,26 @@ function closeAll(ids: string[], ctx: Ctx): void {
   });
 }
 
-/**
- * What can be done to several conversations of the DM list at once: the bar's
- * buttons (read, pin, mute, close) and the menu with all of it. One-to-one
- * conversations also offer what concerns the people in them: a group chat
- * with them, no longer being friends, blocking.
- */
-export function dmBulk(ids: string[], ctx: Ctx): { bar: PickAction[]; menu: () => ContextMenuItem[] } {
-  const layout: DMListLayout = useSettings.getState().settings.dmList;
-  const settings = useSettings.getState().settings;
-  const allPinned = ids.every((id) => isPinnedDM(layout, id));
-  const allMuted = ids.every((id) => id === NEXA_ID || settings.notifications.muted.includes(id));
-  const anyUnread = ids.some(unreadIn);
-  const people = peopleOf(ids);
-  const friends = people.filter((u) => useRelationships.getState().byUser[u.id]?.type === "friend");
-  const blockable = people.filter((u) => useRelationships.getState().byUser[u.id]?.type !== "blocked");
-  const pin = () => changeDMList((l) => ids.reduce((acc, id) => (allPinned ? unpinDM(acc, id) : isPinnedDM(acc, id) ? acc : pinDM(acc, id)), l));
-  const bar: PickAction[] = [
-    { id: "read", icon: CheckCheck, label: t("sidebar.dmMenu.markAsRead"), disabled: !anyUnread, onSelect: () => markRead(ids) },
-    { id: "pin", icon: allPinned ? PinOff : Pin, label: allPinned ? t("pick.unpin") : t("pick.pin"), onSelect: pin },
-    { id: "mute", icon: allMuted ? Bell : BellOff, label: allMuted ? t("pick.unmute") : t("pick.mute"), onSelect: () => setMuted(ids, !allMuted) },
-    { id: "close", icon: LogOut, label: t("pick.close"), danger: true, onSelect: () => closeAll(ids, ctx) },
-  ];
-  const menu = (): ContextMenuItem[] => {
-    const items: ContextMenuItem[] = [
-      { id: "read", label: t("sidebar.dmMenu.markAsRead"), disabled: !anyUnread, onSelect: () => markRead(ids), separatorAfter: true },
-      { id: "pin", label: allPinned ? t("pick.unpin") : t("pick.pin"), onSelect: pin },
-      {
+interface BulkCtx extends Ctx {
+  ids: string[];
+}
+
+const allPinnedIn = (ids: string[]) => ids.every((id) => isPinnedDM(useSettings.getState().settings.dmList, id));
+const allMutedIn = (ids: string[]) => ids.every((id) => id === NEXA_ID || useSettings.getState().settings.notifications.muted.includes(id));
+const pinAll = (ids: string[]) => {
+  const allPinned = allPinnedIn(ids);
+  changeDMList((l) => ids.reduce((acc, id) => (allPinned ? unpinDM(acc, id) : isPinnedDM(acc, id) ? acc : pinDM(acc, id)), l));
+};
+const relation = (id: string) => useRelationships.getState().byUser[id]?.type;
+
+/** The menu for several conversations of the DM list picked at once. */
+export const dmBulkMenu = defineMenu<BulkCtx>("dmBulk", [
+  [button("markConversationsRead", ({ ids }) => ({ id: "read", label: t("sidebar.dmMenu.markAsRead"), disabled: !ids.some(unreadIn), onSelect: () => markRead(ids) }))],
+  [
+    button("pinConversations", ({ ids }) => ({ id: "pin", label: allPinnedIn(ids) ? t("pick.unpin") : t("pick.pin"), onSelect: () => pinAll(ids) })),
+    button("addConversationsToGroup", ({ ids }) => {
+      const layout: DMListLayout = useSettings.getState().settings.dmList;
+      return {
         id: "group",
         label: t("organize.dm.addToGroup"),
         submenu: [
@@ -130,17 +124,44 @@ export function dmBulk(ids: string[], ctx: Ctx): { bar: PickAction[]; menu: () =
               }),
           },
         ],
-      },
-      { id: "mute", label: allMuted ? t("pick.unmute") : t("pick.mute"), onSelect: () => setMuted(ids, !allMuted), separatorAfter: true },
-    ];
-    if (people.length) {
-      items.push({ id: "group-chat", label: t("pick.groupChatWith", { count: people.length }), onSelect: () => ctx.openModal("createDM", { initial: people.map((u) => u.id) }) });
-      if (friends.length) items.push({ id: "remove-friends", label: t("pick.removeFriends", { count: friends.length }), danger: true, onSelect: () => confirmRemoveFriends(friends) });
-      if (blockable.length) items.push({ id: "block", label: t("pick.block", { count: blockable.length }), danger: true, onSelect: () => confirmBlockPeople(blockable) });
-      items[items.length - 1]!.separatorAfter = true;
-    }
-    items.push({ id: "close", label: t("pick.close"), danger: true, onSelect: () => closeAll(ids, ctx) });
-    return items;
-  };
-  return { bar, menu };
+      };
+    }),
+    button("muteConversations", ({ ids }) => {
+      const allMuted = allMutedIn(ids);
+      return { id: "mute", label: allMuted ? t("pick.unmute") : t("pick.mute"), onSelect: () => setMuted(ids, !allMuted) };
+    }),
+  ],
+  [
+    button("groupChatWithPeople", ({ ids, openModal }) => {
+      const people = peopleOf(ids);
+      return people.length > 0 && { id: "group-chat", label: t("pick.groupChatWith", { count: people.length }), onSelect: () => openModal("createDM", { initial: people.map((u) => u.id) }) };
+    }),
+    button("removeFriendsOfConversations", ({ ids }) => {
+      const friends = peopleOf(ids).filter((u) => relation(u.id) === "friend");
+      return friends.length > 0 && { id: "remove-friends", label: t("pick.removeFriends", { count: friends.length }), danger: true, onSelect: () => confirmRemoveFriends(friends) };
+    }),
+    button("blockPeopleOfConversations", ({ ids }) => {
+      const blockable = peopleOf(ids).filter((u) => relation(u.id) !== "blocked");
+      return blockable.length > 0 && { id: "block", label: t("pick.block", { count: blockable.length }), danger: true, onSelect: () => confirmBlockPeople(blockable) };
+    }),
+  ],
+  [button("closeConversations", (ctx) => ({ id: "close", label: t("pick.close"), danger: true, onSelect: () => closeAll(ctx.ids, ctx) }))],
+]);
+
+/**
+ * What can be done to several conversations of the DM list at once: the bar's
+ * buttons (read, pin, mute, close), and `menu`, which opens the menu with all
+ * of it. One-to-one conversations also offer what concerns the people in
+ * them: a group chat with them, no longer being friends, blocking.
+ */
+export function dmBulk(ids: string[], ctx: Ctx): { bar: PickAction[]; menu: (at: MenuPlacement) => void } {
+  const allPinned = allPinnedIn(ids);
+  const allMuted = allMutedIn(ids);
+  const bar: PickAction[] = [
+    { id: "read", icon: CheckCheck, label: t("sidebar.dmMenu.markAsRead"), disabled: !ids.some(unreadIn), onSelect: () => markRead(ids) },
+    { id: "pin", icon: allPinned ? PinOff : Pin, label: allPinned ? t("pick.unpin") : t("pick.pin"), onSelect: () => pinAll(ids) },
+    { id: "mute", icon: allMuted ? Bell : BellOff, label: allMuted ? t("pick.unmute") : t("pick.mute"), onSelect: () => setMuted(ids, !allMuted) },
+    { id: "close", icon: LogOut, label: t("pick.close"), danger: true, onSelect: () => closeAll(ids, ctx) },
+  ];
+  return { bar, menu: (at) => void dmBulkMenu.open({ ...ctx, ids }, at) };
 }

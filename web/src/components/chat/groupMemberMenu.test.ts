@@ -7,7 +7,7 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useRelationships } from "@/stores/relationships";
 import { useUsers } from "@/stores/users";
-import { groupMemberMenuItems } from "./groupMemberMenu";
+import { groupMemberMenu } from "./groupMemberMenu";
 
 const ADMIN = 1;
 const group = { id: "g", type: "group_dm", parent_id: null, owner_id: "owner", name: "Crew", recipient_ids: ["owner", "me", "bob"] } as unknown as Channel;
@@ -17,7 +17,7 @@ function signIn(flags = 0): void {
 }
 
 function ids(userId: string): string[] {
-  return groupMemberMenuItems("g", userId, { nav: vi.fn(), openModal: vi.fn() }).map((i) => i.id);
+  return groupMemberMenu.items({ channelId: "g", userId: userId, nav: vi.fn(), openModal: vi.fn() }).map((i) => i.id);
 }
 
 describe("groupMemberMenuItems", () => {
@@ -51,14 +51,14 @@ describe("groupMemberMenuItems", () => {
     signIn(ADMIN);
     expect(ids("bob")).toEqual(["profile", "copy-profile-link", "mention", "message", "add-friend", "block", "owner", "remove"]);
     expect(ids("owner")).toEqual(["profile", "copy-profile-link", "mention", "message", "add-friend", "block"]);
-    const mine = groupMemberMenuItems("g", "me", { nav: vi.fn(), openModal: vi.fn() });
+    const mine = groupMemberMenu.items({ channelId: "g", userId: "me", nav: vi.fn(), openModal: vi.fn() });
     expect(mine.find((i) => i.id === "owner")?.label).toBe("Take Ownership");
   });
 
   it("asks before removing anyone", () => {
     signIn(ADMIN);
     const openModal = vi.fn();
-    groupMemberMenuItems("g", "bob", { nav: vi.fn(), openModal }).find((i) => i.id === "remove")!.onSelect!();
+    groupMemberMenu.items({ channelId: "g", userId: "bob", nav: vi.fn(), openModal }).find((i) => i.id === "remove")!.onSelect!();
     expect(openModal).toHaveBeenCalledWith("confirm", expect.objectContaining({ title: "Remove Bob?", danger: true }));
   });
 
@@ -66,7 +66,7 @@ describe("groupMemberMenuItems", () => {
     useChannels.setState({ byId: { g: { ...group, owner_id: "me" } } });
     signIn();
     const openModal = vi.fn();
-    const items = groupMemberMenuItems("g", "bob", { nav: vi.fn(), openModal });
+    const items = groupMemberMenu.items({ channelId: "g", userId: "bob", nav: vi.fn(), openModal });
     const owner = items.find((i) => i.id === "owner")!;
     expect(owner.label).toBe("Transfer Ownership");
     expect(owner.danger).toBeFalsy();
@@ -84,7 +84,7 @@ describe("groupMemberMenuItems", () => {
     useChannels.setState({ byId: { g: { ...group, owner_id: "me" } } });
     signIn();
     const openModal = vi.fn();
-    const items = groupMemberMenuItems("g", "bob", { nav: vi.fn(), openModal });
+    const items = groupMemberMenu.items({ channelId: "g", userId: "bob", nav: vi.fn(), openModal });
     const remove = items[items.length - 1]!;
     expect([remove.id, remove.label, remove.danger]).toEqual(["remove", "Remove from Group", true]);
     remove.onSelect!();

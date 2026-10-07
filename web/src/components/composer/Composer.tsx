@@ -46,7 +46,7 @@ import { formatWait, mentionScope, screenForSend, sendMessage, sendWithFiles, ty
 import { AutomodNotice } from "./AutomodNotice";
 import { useAutomodNotices } from "@/stores/automodNotices";
 import { talkGate } from "@/lib/talkGate";
-import { canCreatePoll, plusButton, type PlusOption } from "./plusMenu";
+import { canCreatePoll, composerToolsMenu, plusButton, plusLabel, plusMenu, type PlusOption } from "./plusMenu";
 import { menuAnchor } from "@/components/common/ContextMenu";
 import { extractMentions } from "./mentions";
 import { useUploads } from "@/stores/uploads";
@@ -275,7 +275,7 @@ export function Composer({ channel }: { channel: Channel }) {
   useKeepFocused(taRef, true, hush);
   // the box's right-click menu has the switch for the Send button
   useTextMenu(taRef, {
-    extra: () => [{ id: "sendButton", label: tr_("textMenu.showSendButton"), checked: sendButton, toggle: true, onSelect: () => useSettings.getState().patch({ sendButton: !sendButton }) }],
+    sendButton: { on: sendButton, toggle: () => useSettings.getState().patch({ sendButton: !sendButton }) },
   });
 
   const name = channelDisplayName(channel, users, me?.id);
@@ -776,7 +776,6 @@ export function Composer({ channel }: { channel: Channel }) {
     );
   }
 
-  const plusLabel = (o: PlusOption) => (o === "upload" ? tr_("composer.composer.uploadAFile") : tr_("poll.create.title"));
   const plusDo = (o: PlusOption) => {
     // still inside the click that chose it, which is what lets the file picker open
     if (o === "upload") fileRef.current?.click();
@@ -786,18 +785,18 @@ export function Composer({ channel }: { channel: Channel }) {
   const onTools = (el: HTMLElement) => {
     const anchor = menuAnchor(el, "end");
     setToolsOpen(true);
-    useUI.getState().openContextMenu({
-      x: anchor.right,
-      y: anchor.top - 4,
-      anchor,
-      above: true,
-      label: tr_("composer.more.label"),
-      items: [
-        { id: "formatting", label: tr_("composer.more.formatting"), onSelect: () => { preloadFormatEditor(); setFormatting(true); } },
-        { id: "preview", label: tr_("composer.preview.show"), checked: preview, toggle: true, onSelect: () => setPreview((v) => !v) },
-        { id: "emoji", label: tr_("composer.more.emoji"), onSelect: () => setPicker(true) },
-      ],
-    });
+    composerToolsMenu.open(
+      {
+        preview,
+        openFormatting: () => {
+          preloadFormatEditor();
+          setFormatting(true);
+        },
+        togglePreview: () => setPreview((v) => !v),
+        openEmoji: () => setPicker(true),
+      },
+      { x: anchor.right, y: anchor.top - 4, anchor, above: true, label: tr_("composer.more.label") },
+    );
     const stop = useUI.subscribe((st) => {
       if (!st.contextMenu) {
         setToolsOpen(false);
@@ -810,7 +809,7 @@ export function Composer({ channel }: { channel: Channel }) {
     if (plus.kind !== "menu") return;
     const anchor = menuAnchor(el, "start");
     setPlusOpen(true);
-    useUI.getState().openContextMenu({ x: anchor.left, y: anchor.top - 4, anchor, above: true, label: tr_("composer.plus.label"), items: plus.options.map((o) => ({ id: o, label: plusLabel(o), onSelect: () => plusDo(o) })) });
+    plusMenu.open({ options: plus.options, run: plusDo }, { x: anchor.left, y: anchor.top - 4, anchor, above: true, label: tr_("composer.plus.label") });
     const stop = useUI.subscribe((st) => {
       if (!st.contextMenu) {
         setPlusOpen(false);

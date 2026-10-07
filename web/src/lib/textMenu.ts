@@ -6,7 +6,7 @@
  * what a box adds of its own, such as the message box's Send button.
  *
  * Words picked out on the page and links where nothing else has a menu get a
- * small one of the app's own too (pageItems), so a right click shows the same
+ * small one of the app's own too (pageMenu), so a right click shows the same
  * menu in a browser and in the desktop app.
  *
  * Shift with the right click still opens the browser's menu. A touch screen
@@ -19,7 +19,8 @@ import { t } from "@/i18n";
 import { copyText } from "@/lib/copyText";
 import { desktopBridge, pasteNeedsUpdate } from "@/lib/desktopBridge";
 import { learn, misspelled, spellActive, suggestions, wordAt, type Word } from "@/lib/spell";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useUI } from "@/stores/ui";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
 
 export type TextFormat = "bold" | "italic" | "underline" | "strike" | "spoiler" | "code";
 
@@ -36,8 +37,8 @@ export interface TextMenuHooks {
   canRedo?: () => boolean;
   /** Puts words in place of the selection, for a box that keeps its own copy of its text. */
   insert?: (text: string) => void;
-  /** Items of its own, after the rest. */
-  extra?: () => ContextMenuItem[];
+  /** The message box's switch for its Send button, after the rest. */
+  sendButton?: { on: boolean; toggle: () => void };
 }
 
 const registered = new WeakMap<Element, TextMenuHooks>();
@@ -370,58 +371,69 @@ function within<T>(work: Promise<T>, ms: number): Promise<T | null> {
   return Promise.race([work, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]);
 }
 
-/** The menu's items for a box, as found when it was right-clicked. */
-function textMenuItems(s: Snap, spelling: Spelling | null): ContextMenuItem[] {
-  const hooks = registered.get(s.el);
-  const writable = !s.readOnly;
-  const selected = hasSelection(s);
-  const items: ContextMenuItem[] = [];
-  if (spelling) {
-    if (spelling.suggestions.length) {
-      for (const word of spelling.suggestions) {
-        items.push({
-          id: `spell:${word}`,
-          label: word,
-          strong: true,
-          onSelect: () => {
-            restore(s);
-            spelling.select();
-            insertText(snapshot(s.el), word);
-          },
-        });
-      }
-    } else items.push({ id: "spell:none", label: t("textMenu.noSuggestions"), disabled: true });
-    items.push({ id: "spell:add", label: t("textMenu.addToDictionary"), onSelect: () => learn(spelling.word), separatorAfter: true });
-  }
-  if (writable) {
-    items.push(
-      { id: "undo", label: t("textMenu.undo"), keys: modKeys("Z"), disabled: !(hooks?.canUndo ? hooks.canUndo() : possible("undo")), onSelect: () => (hooks?.undo ? hooks.undo() : (restore(s), exec("undo"))) },
-      { id: "redo", label: t("textMenu.redo"), keys: isMac ? modKeys("Z", true) : modKeys("Y"), disabled: !(hooks?.canRedo ? hooks.canRedo() : possible("redo")), onSelect: () => (hooks?.redo ? hooks.redo() : (restore(s), exec("redo"))), separatorAfter: true },
-      { id: "cut", label: t("textMenu.cut"), keys: modKeys("X"), disabled: !selected, onSelect: () => void cut(s) },
-    );
-  }
-  items.push({ id: "copy", label: t("textMenu.copy"), keys: modKeys("C"), disabled: !selected, onSelect: () => void copy(s) });
-  // an app too old to paste for the page says so, and offers the update
-  if (writable && pasteNeedsUpdate()) items.push({ id: "paste", label: t("textMenu.paste"), warn: t("textMenu.pasteNeedsUpdate"), onSelect: () => useUI.getState().openModal("pasteUpdate") });
-  else if (writable) items.push({ id: "paste", label: t("textMenu.paste"), keys: modKeys("V"), onSelect: () => void paste(s) });
-  items.push({ id: "selectAll", label: t("textMenu.selectAll"), keys: modKeys("A"), disabled: s.empty, onSelect: () => selectAll(s) });
-  const formats = writable && (hooks?.format || (s.el instanceof HTMLTextAreaElement && s.el.hasAttribute("data-markdown")));
-  if (formats) {
-    const keys: Partial<Record<TextFormat, string>> = hooks?.formatKeys ?? { bold: modKeys("B"), italic: modKeys("I"), underline: modKeys("U") };
-    items[items.length - 1]!.separatorAfter = true;
-    items.push({
-      id: "format",
-      label: t("textMenu.format"),
-      submenu: FORMATS.map((f) => ({ id: `format:${f}`, label: t(FORMAT_LABELS[f]), keys: keys[f], onSelect: () => format(s, f) })),
-    });
-  }
-  const extra = hooks?.extra?.() ?? [];
-  if (extra.length) {
-    items[items.length - 1]!.separatorAfter = true;
-    items.push(...extra);
-  }
-  return items;
+interface TextBoxCtx {
+  /** The box as it was when right-clicked. */
+  s: Snap;
+  spelling: Spelling | null;
 }
+
+const writableIn = ({ s }: TextBoxCtx) => !s.readOnly;
+const hooksOf = ({ s }: TextBoxCtx) => registered.get(s.el);
+
+/** A text box's menu, as found when it was right-clicked: spellings, history, the clipboard, formatting. */
+export const textBoxMenu = defineMenu<TextBoxCtx>("textBox", [
+  [
+    button("spellingSuggestions", ({ s, spelling }) => {
+      if (!spelling) return null;
+      if (!spelling.suggestions.length) return { id: "spell:none", label: t("textMenu.noSuggestions"), disabled: true };
+      return spelling.suggestions.map((word) => ({
+        id: `spell:${word}`,
+        label: word,
+        strong: true,
+        onSelect: () => {
+          restore(s);
+          spelling.select();
+          insertText(snapshot(s.el), word);
+        },
+      }));
+    }),
+    button("addToDictionary", ({ spelling }) => !!spelling && { id: "spell:add", label: t("textMenu.addToDictionary"), onSelect: () => learn(spelling.word) }),
+  ],
+  [
+    button("undoText", (c) => {
+      if (!writableIn(c)) return null;
+      const hooks = hooksOf(c);
+      return { id: "undo", label: t("textMenu.undo"), keys: modKeys("Z"), disabled: !(hooks?.canUndo ? hooks.canUndo() : possible("undo")), onSelect: () => (hooks?.undo ? hooks.undo() : (restore(c.s), exec("undo"))) };
+    }),
+    button("redoText", (c) => {
+      if (!writableIn(c)) return null;
+      const hooks = hooksOf(c);
+      return { id: "redo", label: t("textMenu.redo"), keys: isMac ? modKeys("Z", true) : modKeys("Y"), disabled: !(hooks?.canRedo ? hooks.canRedo() : possible("redo")), onSelect: () => (hooks?.redo ? hooks.redo() : (restore(c.s), exec("redo"))) };
+    }),
+  ],
+  [
+    button("cutText", (c) => writableIn(c) && { id: "cut", label: t("textMenu.cut"), keys: modKeys("X"), disabled: !hasSelection(c.s), onSelect: () => void cut(c.s) }),
+    button("copyText", ({ s }) => ({ id: "copy", label: t("textMenu.copy"), keys: modKeys("C"), disabled: !hasSelection(s), onSelect: () => void copy(s) })),
+    // an app too old to paste for the page says so, and offers the update
+    button("pasteText", (c) => {
+      if (!writableIn(c)) return null;
+      if (pasteNeedsUpdate()) return { id: "paste", label: t("textMenu.paste"), warn: t("textMenu.pasteNeedsUpdate"), onSelect: () => useUI.getState().openModal("pasteUpdate") };
+      return { id: "paste", label: t("textMenu.paste"), keys: modKeys("V"), onSelect: () => void paste(c.s) };
+    }),
+    button("selectAllText", ({ s }) => ({ id: "selectAll", label: t("textMenu.selectAll"), keys: modKeys("A"), disabled: s.empty, onSelect: () => selectAll(s) })),
+  ],
+  [button("formatText", (c) => {
+    const hooks = hooksOf(c);
+    const formats = writableIn(c) && (hooks?.format || (c.s.el instanceof HTMLTextAreaElement && c.s.el.hasAttribute("data-markdown")));
+    if (!formats) return null;
+    const keys: Partial<Record<TextFormat, string>> = hooks?.formatKeys ?? { bold: modKeys("B"), italic: modKeys("I"), underline: modKeys("U") };
+    return { id: "format", label: t("textMenu.format"), submenu: FORMATS.map((f) => ({ id: `format:${f}`, label: t(FORMAT_LABELS[f]), keys: keys[f], onSelect: () => format(c.s, f) })) };
+  })],
+  [button("showSendButton", (c) => {
+    const toggle = hooksOf(c)?.sendButton;
+    return toggle && { id: "sendButton", label: t("textMenu.showSendButton"), checked: toggle.on, toggle: true, onSelect: toggle.toggle };
+  })],
+]);
 
 /**
  * Opens the menu for a box, at a point on screen. Opened with the mouse it
@@ -432,18 +444,19 @@ export async function openTextMenu(el: HTMLElement, x: number, y: number, byMous
   const s = snapshot(el);
   const spelling = await within(spellingAt(s, x, y).catch(() => null), SPELL_WAIT_MS);
   if (!el.isConnected) return;
-  useUI.getState().openContextMenu({ x, y, items: textMenuItems(s, spelling), label: t("textMenu.label"), keepFocus: byMouse });
+  textBoxMenu.open({ s, spelling }, { x, y, label: t("textMenu.label"), keepFocus: byMouse });
 }
 
-/**
- * Words picked out on the page, or a link, where nothing has a menu of its
- * own (a message's, a person's, a server's): a small menu of the app's own,
- * so it is the same in a browser and in the desktop app, where each would
- * otherwise show a different one of its own. Empty when there is neither.
- */
-export function pageItems(target: EventTarget | null): ContextMenuItem[] {
-  if (!(target instanceof Element) || target.closest("[data-native-menu]")) return [];
-  const items: ContextMenuItem[] = [];
+interface PageMenuCtx {
+  /** The words picked out, when the click was on them. */
+  words: string | null;
+  /** The link clicked, and the address it goes to. */
+  link: { el: HTMLAnchorElement; address: string } | null;
+}
+
+/** What a right click on the page landed on: words picked out, a link, or neither (null). */
+export function pageTarget(target: EventTarget | null): PageMenuCtx | null {
+  if (!(target instanceof Element) || target.closest("[data-native-menu]")) return null;
   const sel = typeof window.getSelection === "function" ? window.getSelection() : null;
   const words = sel && !sel.isCollapsed ? sel.toString() : "";
   // only when the click is on the words picked out, as a browser's menu goes
@@ -453,38 +466,44 @@ export function pageItems(target: EventTarget | null): ContextMenuItem[] {
   } catch {
     onWords = false;
   }
-  if (onWords) {
-    items.push({
-      id: "copy",
-      label: t("textMenu.copy"),
-      keys: modKeys("C"),
-      onSelect: () => {
-        // with what formatting the page has, as Ctrl+C would; just the words where that is refused
-        if (exec("copy")) return;
-        void copyText(words).then((ok) => !ok && useUI.getState().toast(t("common.copyFailed"), "error"));
-      },
-    });
-  }
-  const link = target.closest<HTMLAnchorElement>("a[href]");
-  const href = link?.getAttribute("href") ?? "";
-  if (link && href && !href.startsWith("#") && !/^javascript:/i.test(href)) {
+  const el = target.closest<HTMLAnchorElement>("a[href]");
+  const href = el?.getAttribute("href") ?? "";
+  let link: PageMenuCtx["link"] = null;
+  if (el && href && !href.startsWith("#") && !/^javascript:/i.test(href)) {
     let address = href;
     try {
       address = new URL(href, window.location.href).toString();
     } catch {
       /* kept as written */
     }
-    if (items.length) items[items.length - 1]!.separatorAfter = true;
-    // opened the way a click opens it: inside the app when it is the app's (shell/AppLinks), in a new tab otherwise
-    items.push({ id: "open-link", label: t("textMenu.openLink"), onSelect: () => link.click() });
-    items.push({
-      id: "copy-link",
-      label: t("textMenu.copyLink"),
-      onSelect: () => void copyText(address).then((ok) => useUI.getState().toast(ok ? t("chat.messageMenu.linkCopied") : t("common.copyFailed"), ok ? "success" : "error")),
-    });
+    link = { el, address };
   }
-  return items;
+  return onWords || link ? { words: onWords ? words : null, link } : null;
 }
+
+/**
+ * Words picked out on the page, or a link, where nothing has a menu of its
+ * own (a message's, a person's, a server's): a small menu of the app's own,
+ * so it is the same in a browser and in the desktop app, where each would
+ * otherwise show a different one of its own.
+ */
+export const pageMenu = defineMenu<PageMenuCtx>("page", [
+  [button("copySelection", ({ words }) => words !== null && {
+    id: "copy",
+    label: t("textMenu.copy"),
+    keys: modKeys("C"),
+    onSelect: () => {
+      // with what formatting the page has, as Ctrl+C would; just the words where that is refused
+      if (exec("copy")) return;
+      void copyText(words).then((ok) => !ok && useUI.getState().toast(t("common.copyFailed"), "error"));
+    },
+  })],
+  [
+    // opened the way a click opens it: inside the app when it is the app's (shell/AppLinks), in a new tab otherwise
+    button("openLink", ({ link }) => !!link && { id: "open-link", label: t("textMenu.openLink"), onSelect: () => link.el.click() }),
+    button("copyLink", ({ link }) => !!link && { id: "copy-link", label: t("textMenu.copyLink"), onSelect: () => void copyText(link.address).then((ok) => useUI.getState().toast(ok ? t("chat.messageMenu.linkCopied") : t("common.copyFailed"), ok ? "success" : "error")) }),
+  ],
+]);
 
 /** A pointer that right-clicks: a mouse, a trackpad or a pen, not a finger. */
 function fromMouse(e: MouseEvent): boolean {
@@ -504,8 +523,8 @@ export function installTextMenu(doc: Document = document): () => void {
     if (!fromMouse(e)) return;
     const el = textBoxOf(e.target);
     if (!el) {
-      const items = pageItems(e.target);
-      if (!items.length) return;
+      const page = pageTarget(e.target);
+      if (!page) return;
       e.preventDefault();
       let { clientX: x, clientY: y } = e;
       // the menu key on a focused link has no pointer: the menu opens at the link
@@ -516,7 +535,7 @@ export function installTextMenu(doc: Document = document): () => void {
           y = r.bottom;
         }
       }
-      useUI.getState().openContextMenu({ x, y, items, label: t("textMenu.label"), keepFocus: e.button === 2 });
+      pageMenu.open(page, { x, y, label: t("textMenu.label"), keepFocus: e.button === 2 });
       return;
     }
     e.preventDefault();

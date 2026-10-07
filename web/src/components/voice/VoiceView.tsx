@@ -26,16 +26,14 @@ import { ApiError } from "@/api/client";
 import { guests as guestsApi } from "@/api/guests";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
-import { memberModerationItems } from "@/components/server/memberMenu";
 import { UserTag } from "@/components/servertag/UserTag";
-import { cameraMenuItems, micMenuItems } from "./deviceMenus";
-import { voiceModerationItems } from "./voiceModeration";
+import { openDeviceMenu as openDeviceMenuAt } from "./deviceMenus";
+import { callTileMenu } from "./callMenus";
 import { HangUp } from "./HangUp";
 import { Tooltip } from "@/components/common/Tooltip";
 import { useIsMobile, useMediaQuery } from "@/hooks/useIsMobile";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { fitGrid } from "@/lib/callLayout";
-import { appendSection, copyIdItem, developerMode } from "@/lib/copyId";
 import { isGuest } from "@/lib/guestLink";
 import { P } from "@/lib/perms";
 import { CALL_PANEL_DEFAULT, CALL_PANEL_KEY, clampCallPanel, readCallPanel } from "@/lib/callPanel";
@@ -48,11 +46,11 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { canI, memberColor, useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
-import { callThroughSfu, flipCamera, guestLinksOn, holdToTalk, joinVoice, leaveVoice, pushToTalkButton, resumeCallAudio, retryMic, setStreamLocalMute, setStreamVolume, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen } from "@/voice/session";
+import { callThroughSfu, flipCamera, guestLinksOn, holdToTalk, joinVoice, leaveVoice, pushToTalkButton, resumeCallAudio, retryMic, toggleCamera, toggleScreen } from "@/voice/session";
 import { canShareScreen, hasSeveralCameras } from "@/voice/media";
 import { safeAspect } from "@/voice/videoCap";
 import s from "./Voice.module.css";
@@ -393,8 +391,6 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const watching = useVoice((v) => v.watching);
   const setWatching = useVoice((v) => v.setWatching);
   const tooLarge = useVoice((v) => v.tooLarge);
-  const volumes = useVoice((v) => v.volumes);
-  const streamVolumes = useVoice((v) => v.streamVolumes);
   const streamMutes = useVoice((v) => v.streamMutes);
   const localMutes = useVoice((v) => v.localMutes);
   const micBlocked = useVoice((v) => v.micBlocked);
@@ -418,7 +414,6 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   // the account's keys for these two, said in their tooltips (Settings, Keybinds)
   const binds = keybindsOf(useSettings((x) => x.settings.keybinds));
   const serverState = useServers((st) => (channel.server_id ? st.byId[channel.server_id] : undefined));
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const openModal = useUI((u) => u.openModal);
   const [canFlip, setCanFlip] = useState(false);
   const mobile = useIsMobile();
@@ -662,60 +657,32 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
       });
   };
 
-  const openDeviceMenu = async (kind: "mic" | "camera", anchor: DOMRect) => {
-    const items = kind === "mic" ? await micMenuItems(openModal, { settings: !guest }) : await cameraMenuItems(openModal, { settings: !guest });
+  const openDeviceMenu = (kind: "mic" | "camera", anchor: DOMRect) =>
     // the menu opens from the group's start edge: its left, or its right in a right-to-left language
-    openContextMenu({ x: document.documentElement.dir === "rtl" ? anchor.right : anchor.left, y: anchor.top - 8, above: true, items });
-  };
+    openDeviceMenuAt(kind, openModal, { x: document.documentElement.dir === "rtl" ? anchor.right : anchor.left, y: anchor.top - 8, above: true }, { settings: !guest });
 
   const tileMenu = (e: MouseEvent, t: Tile) => {
     e.preventDefault();
-    const guestTile = isGuest(users[t.userId]);
-    const items: ContextMenuItem[] = [];
-    // a guest has no profile, and a guest's page knows nobody's
-    if (!guest && !guestTile) items.push({ id: "profile", label: tr_("profile.profile.profile"), onSelect: () => openModal("profile", { userId: t.userId }) });
-    // someone still being rung is not in the call yet: there is nothing of theirs to turn up or down
-    if (t.kind === "ringing") {
-      if (items.length) openContextMenu({ x: e.clientX, y: e.clientY, items });
-      return;
-    }
-    if (t.kind === "screen" && t.me) items.push({ id: "stop-share", label: tr_("voice.voice.stopSharing"), onSelect: () => void toggleScreen() });
-    if (isLive(t)) items.push({ id: "watch", label: watching[t.userId] ? tr_("voice.voice.stopWatching") : tr_("voice.voice.watchStream"), onSelect: () => setWatching(t.userId, !watching[t.userId]) });
-    if (showsStream(t)) {
-      items.push({ id: "focus", label: focused === t.key ? tr_("voice.voice.unfocus") : tr_("voice.voice.focus"), onSelect: () => setFocused(focused === t.key ? null : t.key) });
-      items.push({ id: "fullscreen", label: tileIsFull(t) ? tr_("voice.voice.exitFullScreen") : tr_("voice.voice.fullScreen"), onSelect: () => fullscreenTile(t) });
-    }
-    if (!t.me && t.kind === "screen") {
-      // a stream's sound has its own level: turning a loud game down leaves the person's voice alone
-      const vol = streamVolumes[t.userId] ?? 100;
-      if (items.length) items[items.length - 1]!.separatorAfter = true;
-      items.push(
-        { id: "stream-volume", label: tr_("voice.voice.streamVolume"), slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v) => setStreamVolume(t.userId, v) } },
-        { id: "stream-mute", label: streamMutes[t.userId] ? tr_("voice.voice.unmuteStream") : tr_("voice.voice.muteStream"), onSelect: () => setStreamLocalMute(t.userId, !streamMutes[t.userId]) },
-        { id: "stream-reset", label: tr_("voice.voice.resetStreamVolume"), disabled: vol === 100, onSelect: () => setStreamVolume(t.userId, 100) },
-      );
-    } else if (!t.me) {
-      const vol = volumes[t.userId] ?? 100;
-      if (items.length) items[items.length - 1]!.separatorAfter = true;
-      items.push(
-        { id: "volume", label: tr_("voice.voiceParticipants.userVolume"), slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v) => setUserVolume(t.userId, v) } },
-        { id: "mute", label: localMutes[t.userId] ? tr_("voice.voice.unmute") : tr_("voice.voice.mute"), onSelect: () => setUserLocalMute(t.userId, !localMutes[t.userId]) },
-        { id: "reset", label: tr_("voice.voiceParticipants.resetVolume"), disabled: vol === 100, onSelect: () => setUserVolume(t.userId, 100) },
-      );
-    }
-    // a moderator's tools, on the person's own tile: Server Mute, Server Deafen, Move To, Disconnect, then the server's Time Out, Kick and Ban
-    const tileState = byChannel[channel.id]?.[t.userId];
-    if (!guest && !t.me && t.kind !== "screen" && channel.server_id && tileState) {
-      appendSection(items, voiceModerationItems(channel.server_id, channel.id, tileState));
-      if (!guestTile) appendSection(items, memberModerationItems(channel.server_id, t.userId, { openModal }));
-    }
-    if (guestTile && canRemoveGuests && t.kind !== "screen") {
-      if (items.length) items[items.length - 1]!.separatorAfter = true;
-      items.push({ id: "remove-guest", label: tr_("voice.voiceParticipants.removeFromCall"), danger: true, onSelect: () => removeGuest(t.userId) });
-    }
-    if (!guest && !guestTile && developerMode()) appendSection(items, [copyIdItem("copy-user", tr_("chat.groupMemberMenu.copyUserId"), t.userId)]);
-    if (items.length === 0) return;
-    openContextMenu({ x: e.clientX, y: e.clientY, items });
+    const voiceState = byChannel[channel.id]?.[t.userId];
+    callTileMenu.open(
+      {
+        userId: t.userId,
+        channelId: channel.id,
+        serverId: channel.server_id,
+        ...(voiceState ? { voiceState } : {}),
+        me: t.me,
+        kind: t.kind,
+        viewerIsGuest: guest,
+        guestTile: isGuest(users[t.userId]),
+        ...(isLive(t) ? { watch: { on: !!watching[t.userId], toggle: () => setWatching(t.userId, !watching[t.userId]) } } : {}),
+        ...(showsStream(t) ? { view: { focused: focused === t.key, toggleFocus: () => setFocused(focused === t.key ? null : t.key), full: tileIsFull(t), toggleFull: () => fullscreenTile(t) } } : {}),
+        stopSharing: () => void toggleScreen(),
+        canRemoveGuest: canRemoveGuests,
+        removeGuest: () => removeGuest(t.userId),
+        openModal,
+      },
+      { x: e.clientX, y: e.clientY },
+    );
   };
 
   /**

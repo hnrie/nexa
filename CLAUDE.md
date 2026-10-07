@@ -465,8 +465,9 @@ mute or deafen is kept in the member's `server_members.flags` (2 muted, 4 deafen
 quarantine) and applied again whenever they join a voice channel of that server. A voice state's
 `suppress` says the channel denies Speak (`server_mute` is set too, for older apps), and the leave
 of someone a moderator put out carries `reason: "disconnected"` ("moved" is another device of theirs
-taking the call). The menus are `components/voice/voiceModeration.ts` on the web, which also drags
-people between channels (`stores/voiceDrag.ts`), and `ui/voice/VoiceModeration.kt` on Android.
+taking the call). On the web the moderator's buttons are `components/voice/voiceModeration.ts`, in the
+call's menus in `components/voice/callMenus.ts`; dragging people between channels is
+`stores/voiceDrag.ts`. On Android it is `ui/voice/VoiceModeration.kt`.
 
 How a screen share is sent was measured through the SFU with `tools/share_quality.py`, and the
 findings decide it (web `voice/media.ts`, `shareQuality.ts`, `shareAdapt.ts`; Android `VideoCap`,
@@ -632,6 +633,17 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   (Terms gate), `invite`, `discovery`, `follows`, `friends`, `stickers`,
   `servertag`, `activity`, `desktop`, `common` (shared controls: Modal, Popout, ContextMenu, Button,
   Toggle, Select, Avatar, Twemoji and more).
+- Context menus: every menu the app opens is registered in `lib/contextMenus/registry.ts`, and none
+  is built inline. A menu is `defineMenu<Ctx>(kind, groups)`, defined once at module level beside
+  what it acts on (`chat/messageMenu.ts`, `sidebar/serverMenu.ts`, `sidebar/dmMenu.ts`, ...): groups
+  of buttons, each `button(id, (ctx) => item | items | null)`, with a line drawn between two groups
+  that both show something. Button ids are camelCase and unique across every menu
+  (`deleteMessage`), since the plugin API will name buttons by id alone; a set of buttons that two
+  menus share is a factory taking the ids (`imageButtons`, `dmArrangeButtons`, `threadButtons`,
+  `relationshipButtons`). Components open a menu with `menu.open(ctx, placement)`, passing what only
+  they have (callbacks, the moves a reorder hook offers) in the context. `registry.test.ts` fails
+  when any file but the registry calls `openContextMenu`, and loads every menu module together to
+  catch a button id used twice.
 - `pages/`: one per route. `styles/`: `tokens.css` (every theme token: colour, radius, shadow,
   motion), `base.css`, `markdown.css`, `fonts.css` (Wix Madefor) and `fonts-classic.css` (Onest,
   Mona Sans). `lib/theme.ts` applies a theme; `lib/look/` derives presets and custom themes.

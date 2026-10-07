@@ -5,7 +5,8 @@ import { canRemovePack, confirmRemovePack } from "@/lib/packRemoval";
 import { useAuth } from "@/stores/auth";
 import { groupPacks, searchStickers, useExpressions } from "@/stores/expressions";
 import { useServers } from "@/stores/servers";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useUI } from "@/stores/ui";
+import { stickerPackMenu } from "./pickerMenus";
 import { hoverPlays, moves, StillFace, stillSourceOf, useStickerStill } from "@/components/stickers/StickerTile";
 import { useScreenPlace } from "@/hooks/useNearScreen";
 import { warmLottieLater } from "@/lib/stickerStills";
@@ -101,7 +102,6 @@ export function StickerPicker({ serverId, onPick, onlyServer = false }: { server
   // whether a pack can be removed depends on the servers you are in
   useServers((x) => x.byId);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const [q, setQ] = useState("");
   const gridRef = useRef<HTMLDivElement>(null);
   const catsRef = useRef<HTMLDivElement>(null);
@@ -130,12 +130,7 @@ export function StickerPicker({ serverId, onPick, onlyServer = false }: { server
   const edit = (p: StickerPack) => openModal("settings", { page: "stickers", packId: p.id });
   // right click, or a long press on a phone
   const packMenu = (p: StickerPack) => (e: MouseEvent) => {
-    const items: ContextMenuItem[] = [];
-    if (p.owner_user_id === meId) items.push({ id: "edit", label: t("pickers.stickerPicker.editPack"), onSelect: () => edit(p) });
-    if (canRemovePack(p, meId)) items.push({ id: "remove", label: t("pickers.stickerPicker.removePack"), danger: true, onSelect: () => confirmRemovePack(p) });
-    if (!items.length) return;
-    e.preventDefault();
-    openContextMenu({ x: e.clientX, y: e.clientY, items });
+    if (stickerPackMenu.open({ pack: p, meId, edit: () => edit(p) }, { x: e.clientX, y: e.clientY })) e.preventDefault();
   };
 
   // the same function every render, so typing elsewhere does not redraw every cell

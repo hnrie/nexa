@@ -6,7 +6,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { AdminHammer, OwnerCrown } from "@/components/common/OwnerBadge";
 import { isOwner } from "@/lib/owner";
 import { memberName } from "@/lib/names";
-import { memberMenuItems } from "@/components/server/memberMenu";
+import { memberMenu } from "@/components/server/memberMenu";
 import { memberBulk } from "@/components/server/memberBulk";
 import { PickBar, PickMark } from "@/components/common/Pick";
 import { pickClick, usePick } from "@/stores/pick";
@@ -55,7 +55,6 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
   const typingOn = useSettings((x) => x.settings.typingAvatars !== false);
   const typers = useTypingIn(typingOn ? channelId : null, meId);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const ref = useRef<HTMLElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(600);
@@ -224,14 +223,11 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
     const pick = usePick.getState();
     // a right click on one of several picked acts on all of them
     if (pick.list === pickList && pick.ids.includes(m.user_id) && pick.ids.length > 1) {
-      openContextMenu({ x: e.clientX, y: e.clientY, label: t("pick.count", { count: pick.ids.length }), items: memberBulk(serverId, pick.ids).menu() });
+      memberBulk(serverId, pick.ids).menu({ x: e.clientX, y: e.clientY, label: t("pick.count", { count: pick.ids.length }) });
       return;
     }
     if (pick.list === pickList && !pick.mode && pick.ids.length) pick.clear();
-    const items = memberMenuItems(serverId, m.user_id, { openModal });
-    items[items.length - 1]!.separatorAfter = true;
-    items.push({ id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start(pickList, m.user_id) });
-    openContextMenu({ x: e.clientX, y: e.clientY, items });
+    memberMenu.open({ serverId, userId: m.user_id, openModal, select: pickList }, { x: e.clientX, y: e.clientY });
   };
   const bulk = isPicking ? memberBulk(serverId, picked) : null;
 

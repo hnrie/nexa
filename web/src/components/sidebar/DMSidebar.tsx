@@ -17,26 +17,27 @@ import { activitiesOf, customStatus, statusOf, usePresence, type StatusKind } fr
 import { useTypingIn } from "@/stores/typing";
 import { StatusLine } from "@/components/activity/StatusLine";
 import { isUnread, useReadStates } from "@/stores/readStates";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useUI } from "@/stores/ui";
+import type { MenuPlacement } from "@/lib/contextMenus/registry";
 import { useUsers } from "@/stores/users";
 import { useRelationships } from "@/stores/relationships";
 import { pickClick, usePick } from "@/stores/pick";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { iconUrl } from "@/api/users";
-import { subchatMenuItems } from "@/components/chat/SubchatPanel";
+import { subchatMenu } from "@/components/chat/subchatMenu";
 import { badgeText, conversationCount } from "@/lib/unread";
 import { useSettings } from "@/stores/settings";
 import { modKeys } from "@/lib/textMenu";
 import { textWidth } from "@/lib/fitText";
-import { closeDM, dmMenuItems } from "./dmMenu";
+import { closeDM, dmMenu } from "./dmMenu";
 import { dmBulk } from "./dmBulk";
-import { changeDMList, closeNexa, dmGroupMenuItems, groupName, nexaListed, nexaMenuItems } from "./dmArrange";
+import { changeDMList, closeNexa, dmGroupMenu, dmListMenu, groupName, nexaListed, nexaMenu } from "./dmArrange";
 import { menuPoint } from "./ServerSidebar";
 import { NexaAvatar, OfficialBadge } from "@/components/nexa/NexaBits";
 import { useNexa } from "@/stores/nexa";
 import { useNotes } from "@/stores/notes";
 import { unreadCount, useModeration } from "@/stores/moderation";
-import { moderationMenuItems } from "@/components/moderation/modMenu";
+import { moderationMenu } from "@/components/moderation/modMenu";
 import { UserTag } from "@/components/servertag/UserTag";
 import s from "./Sidebar.module.css";
 
@@ -63,7 +64,6 @@ export function DMSidebar() {
   const settings = useSettings((st) => st.settings);
   const patch = useSettings((st) => st.patch);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const setQuickSwitcher = useUI((u) => u.setQuickSwitcher);
   const rels = useRelationships((r) => r.byUser);
   const nicknames = useMemo(() => friendNicknames(rels), [rels]);
@@ -349,19 +349,15 @@ export function DMSidebar() {
     const pick = usePick.getState();
     // a right click on one of several picked acts on all of them
     if (pick.list === "dms" && pick.ids.includes(id) && pick.ids.length > 1) {
-      openContextMenu({ ...menuPoint(e), label: t("pick.count", { count: pick.ids.length }), items: dmBulk(pick.ids, { nav, openModal }).menu() });
+      dmBulk(pick.ids, { nav, openModal }).menu({ ...menuPoint(e), label: t("pick.count", { count: pick.ids.length }) });
       return;
     }
     // on one that is not picked, it is about that one, as a file manager does
     if (pick.list === "dms" && !pick.mode && pick.ids.length) pick.clear();
     const moves = movesFor(id, place);
-    const items: ContextMenuItem[] = id === NEXA_ID ? nexaMenuItems(nav, { moves }) : dmMenuItems(id, { nav, openModal, moves });
-    // the way into picking on a touch screen, where there is no Ctrl to hold
-    const select: ContextMenuItem = { id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start("dms", id), separatorAfter: true };
-    const at = items.findIndex((it) => it.id === "read");
-    items.splice(at >= 0 ? at + 1 : 0, 0, select);
-    if (at >= 0) items[at]!.separatorAfter = false;
-    openContextMenu({ ...menuPoint(e), label: rowName(id), items });
+    const at = { ...menuPoint(e), label: rowName(id) };
+    if (id === NEXA_ID) nexaMenu.open({ nav, arrange: { moves }, select: true }, at);
+    else dmMenu.open({ channelId: id, nav, openModal, moves, select: true }, at);
   };
 
   /** Props every conversation row takes for being dragged, picked and arranged. */
@@ -496,7 +492,7 @@ export function DMSidebar() {
               title={ch.type === "group_dm" ? t("sidebar.dMSidebar.leaveGroup") : t("sidebar.dMSidebar.closeDm")}
               onClick={(e) => {
                 e.stopPropagation();
-                if (ch.type === "group_dm") openContextMenu({ x: e.clientX, y: e.clientY, items: dmMenuItems(ch.id, { nav, openModal }) });
+                if (ch.type === "group_dm") dmMenu.open({ channelId: ch.id, nav, openModal }, { x: e.clientX, y: e.clientY });
                 else void closeDM(ch.id, nav);
               }}
             >
@@ -516,7 +512,7 @@ export function DMSidebar() {
               onClick={() => go(`/channels/@me/${sc.id}`)}
               onContextMenu={(e) => {
                 e.preventDefault();
-                openContextMenu({ x: e.clientX, y: e.clientY, items: subchatMenuItems(sc, { openModal, nav }) });
+                subchatMenu.open({ channel: sc, openModal, nav }, { x: e.clientX, y: e.clientY });
               }}
             >
               {sc.locked ? <Lock size={15} /> : <MessageCircle size={15} />}
@@ -543,7 +539,7 @@ export function DMSidebar() {
     // collapsed, it still shows the conversation open in it, so you can see where you are
     const shown = collapsed ? row.ids.filter((id) => id === activeConvo || (id === NEXA_ID && nexaOpen) || picked.includes(id)) : row.ids;
     const moves = pinned ? reorder.menuItems(g.id) : reorderMain.menuItems(g.id);
-    const menu = (): ContextMenuItem[] => dmGroupMenuItems(g, { openModal, unread: anyUnread, moves });
+    const menu = (at: MenuPlacement) => dmGroupMenu.open({ group: g, openModal, unread: anyUnread, moves }, at);
     const keys = pinned ? reorder.onKeyDown(g.id) : reorderMain.onKeyDown(g.id);
     return (
       <div
@@ -564,7 +560,7 @@ export function DMSidebar() {
           onDragStart={(e) => onDragStart(e, g.id)}
           onContextMenu={(e) => {
             e.preventDefault();
-            openContextMenu({ ...menuPoint(e), label: name, items: menu() });
+            menu({ ...menuPoint(e), label: name });
           }}
           onKeyDown={keys}
           data-reorder-id={g.id}
@@ -581,7 +577,7 @@ export function DMSidebar() {
               className={s.groupMore}
               aria-label={t("organize.dm.groupOptions", { name })}
               title={t("organize.dm.groupOptions", { name })}
-              onClick={(e) => openContextMenu({ x: 0, y: 0, anchor: menuAnchor(e.currentTarget), label: name, items: menu() })}
+              onClick={(e) => menu({ x: 0, y: 0, anchor: menuAnchor(e.currentTarget), label: name })}
               data-testid="dm-group-more"
             >
               <MoreHorizontal size={16} />
@@ -602,14 +598,7 @@ export function DMSidebar() {
    * sorting to choose: the list goes by activity, and a conversation moved by
    * hand stays where it was put until something new happens in it.
    */
-  const listMenu = (e: MouseEvent<HTMLButtonElement>) =>
-    openContextMenu({
-      x: 0,
-      y: 0,
-      anchor: menuAnchor(e.currentTarget),
-      label: t("sidebar.dMSidebar.directMessages"),
-      items: [{ id: "select", label: t("pick.selectConversations"), onSelect: () => usePick.getState().start("dms") }],
-    });
+  const listMenu = (e: MouseEvent<HTMLButtonElement>) => dmListMenu.open(null, { x: 0, y: 0, anchor: menuAnchor(e.currentTarget), label: t("sidebar.dMSidebar.directMessages") });
 
   const bulk = isPicking ? dmBulk(picked, { nav, openModal }) : null;
 
@@ -660,7 +649,7 @@ export function DMSidebar() {
             onClick={() => go("/channels/@admin")}
             onContextMenu={(e) => {
               e.preventDefault();
-              openContextMenu({ ...menuPoint(e), label: t("moderation.title"), items: moderationMenuItems() });
+              moderationMenu.open(null, { ...menuPoint(e), label: t("moderation.title") });
             }}
             data-testid="nav-moderation"
           >

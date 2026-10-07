@@ -16,7 +16,7 @@ import { activitiesOf, statusOf, usePresence } from "@/stores/presence";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
-import { groupMemberMenuItems } from "./groupMemberMenu";
+import { groupMemberMenu } from "./groupMemberMenu";
 import { groupMemberBulk } from "@/components/server/memberBulk";
 import { PickBar, PickMark } from "@/components/common/Pick";
 import { pickClick, usePick } from "@/stores/pick";
@@ -45,7 +45,6 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
   const typingOn = useSettings((x) => x.settings.typingAvatars !== false);
   const typers = useTypingIn(typingOn ? channel.id : null, me?.id);
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const nav = useNavigate();
 
   const rows = useMemo(() => {
@@ -88,15 +87,12 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
               e.preventDefault();
               const pick = usePick.getState();
               if (pick.list === pickList && pick.ids.includes(row.id) && pick.ids.length > 1) {
-                openContextMenu({ ...menuPoint(e), label: t("pick.count", { count: pick.ids.length }), items: groupMemberBulk(channel.id, pick.ids).menu() });
+                groupMemberBulk(channel.id, pick.ids).menu({ ...menuPoint(e), label: t("pick.count", { count: pick.ids.length }) });
                 return;
               }
               if (pick.list === pickList && !pick.mode && pick.ids.length) pick.clear();
               // the menu key or Shift+F10 has no pointer: the menu opens by the row
-              const items = groupMemberMenuItems(channel.id, row.id, { nav, openModal });
-              items[items.length - 1]!.separatorAfter = true;
-              items.push({ id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start(pickList, row.id) });
-              openContextMenu({ ...menuPoint(e), label: row.name, items });
+              groupMemberMenu.open({ channelId: channel.id, userId: row.id, nav, openModal, select: pickList }, { ...menuPoint(e), label: row.name });
             }}
             data-picked={picked.includes(row.id) || undefined}
             aria-pressed={isPicking ? picked.includes(row.id) : undefined}

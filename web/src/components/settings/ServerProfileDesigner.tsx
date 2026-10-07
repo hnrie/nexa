@@ -12,6 +12,7 @@ import { ProfileCard, type ProfileDesign, type ProfilePart, type ProfileTab } fr
 import { widgetName, type WidgetDesign } from "@/components/profile/Widgets";
 import { SaveBar } from "@/components/server/SettingsLayer";
 import { t } from "@/i18n";
+import { button, defineMenu } from "@/lib/contextMenus/registry";
 import { profileThemeOf } from "@/lib/avatarColor";
 import { useDominantColor } from "@/lib/dominantColor";
 import { describeError } from "@/lib/errors";
@@ -62,24 +63,21 @@ export function ServerProfileDesigner({ serverId, onServer }: { serverId: string
   return <Designer key={current} serverId={current} servers={servers} onServer={onServer} />;
 }
 
+/** Which server's profile the designer edits. */
+const serverProfilePickMenu = defineMenu<{ servers: string[]; current: string; pick: (id: string) => void }>("serverProfilePick", [
+  [button("pickProfileServer", ({ servers, current, pick }) => {
+    const byId = useServers.getState().byId;
+    return servers.map((id) => ({ id, label: byId[id]?.server.name ?? id, checked: id === current, onSelect: () => pick(id) }));
+  })],
+]);
+
 function ServerPicker({ serverId, servers, onServer }: { serverId: string; servers: string[]; onServer: (id: string) => void }) {
   const byId = useServers((x) => x.byId);
   const server = byId[serverId]?.server;
   if (!server) return null;
   const open = (el: HTMLElement) => {
     const anchor = menuAnchor(el, "start");
-    useUI.getState().openContextMenu({
-      x: anchor.left,
-      y: anchor.bottom + 4,
-      anchor,
-      label: t("serverProfile.designer.choose"),
-      items: servers.map((id) => ({
-        id,
-        label: byId[id]?.server.name ?? id,
-        checked: id === serverId,
-        onSelect: unlessUnsaved(() => onServer(id)),
-      })),
-    });
+    serverProfilePickMenu.open({ servers, current: serverId, pick: (id) => unlessUnsaved(() => onServer(id))() }, { x: anchor.left, y: anchor.bottom + 4, anchor, label: t("serverProfile.designer.choose") });
   };
   return (
     <button type="button" className={d.serverPick} onClick={(e) => open(e.currentTarget)} aria-haspopup="menu" aria-label={t("serverProfile.designer.chooseNamed", { name: server.name })} data-testid="server-profile-picker">

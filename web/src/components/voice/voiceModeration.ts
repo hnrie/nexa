@@ -20,7 +20,8 @@ import { P, has } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
 import { channelTree, useChannels } from "@/stores/channels";
 import { canI, channelPerms, useServers } from "@/stores/servers";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useUI } from "@/stores/ui";
+import { button, type MenuButton } from "@/lib/contextMenus/registry";
 import { useUsers } from "@/stores/users";
 
 export interface VoicePowers {
@@ -77,22 +78,43 @@ export function modMuted(vs: Pick<VoiceState, "server_mute" | "suppress">): bool
   return vs.server_mute && !vs.suppress;
 }
 
+/** Someone in a server's voice channel, as a moderator's buttons find them in the context of their menu. */
+export interface VoiceTarget {
+  serverId: string;
+  channelId: string;
+  vs: VoiceState;
+}
+
 /**
  * The moderator's part of someone's menu in a voice channel: Server Mute,
- * Server Deafen, Move To and Disconnect, each where this account may. Empty
+ * Server Deafen, Move To and Disconnect, each where this account may. None
  * for anyone else. A guest is put out with the call's own Remove From Call.
+ * `ids` names the buttons in the menu they are in.
  */
-export function voiceModerationItems(serverId: string, channelId: string, vs: VoiceState): ContextMenuItem[] {
-  const can = voicePowers(serverId, channelId, vs);
-  const userId = vs.user_id;
-  const items: ContextMenuItem[] = [];
-  const muted = modMuted(vs);
-  if (can.mute) items.push({ id: "server-mute", label: t("voice.moderation.serverMute"), checked: muted, toggle: true, onSelect: () => void setServerMute(serverId, userId, !muted) });
-  if (can.deafen) items.push({ id: "server-deafen", label: t("voice.moderation.serverDeafen"), checked: vs.server_deaf, toggle: true, onSelect: () => void setServerDeafen(serverId, userId, !vs.server_deaf) });
-  if (can.move && !inAsGuest(vs)) {
-    const targets = moveTargets(serverId, userId, channelId);
-    items.push({ id: "move-to", label: t("voice.moderation.moveTo"), submenu: targets.map((c) => ({ id: `move-${c.id}`, label: c.name, onSelect: () => void moveMember(serverId, userId, c.id) })) });
-    items.push({ id: "disconnect", label: t("voice.moderation.disconnect"), danger: true, onSelect: () => void disconnectMember(serverId, userId) });
-  }
-  return items;
+export function voiceModerationButtons<C>(ids: { mute: string; deafen: string; move: string; disconnect: string }, of: (ctx: C) => VoiceTarget | null): MenuButton<C>[] {
+  const target = (c: C) => {
+    const x = of(c);
+    return x && { ...x, userId: x.vs.user_id, can: voicePowers(x.serverId, x.channelId, x.vs) };
+  };
+  return [
+    button(ids.mute, (c) => {
+      const x = target(c);
+      if (!x?.can.mute) return null;
+      const muted = modMuted(x.vs);
+      return { id: "server-mute", label: t("voice.moderation.serverMute"), checked: muted, toggle: true, onSelect: () => void setServerMute(x.serverId, x.userId, !muted) };
+    }),
+    button(ids.deafen, (c) => {
+      const x = target(c);
+      return !!x?.can.deafen && { id: "server-deafen", label: t("voice.moderation.serverDeafen"), checked: x.vs.server_deaf, toggle: true, onSelect: () => void setServerDeafen(x.serverId, x.userId, !x.vs.server_deaf) };
+    }),
+    button(ids.move, (c) => {
+      const x = target(c);
+      if (!x?.can.move || inAsGuest(x.vs)) return null;
+      return { id: "move-to", label: t("voice.moderation.moveTo"), submenu: moveTargets(x.serverId, x.userId, x.channelId).map((ch) => ({ id: `move-${ch.id}`, label: ch.name, onSelect: () => void moveMember(x.serverId, x.userId, ch.id) })) };
+    }),
+    button(ids.disconnect, (c) => {
+      const x = target(c);
+      return !!x?.can.move && !inAsGuest(x.vs) && { id: "disconnect", label: t("voice.moderation.disconnect"), danger: true, onSelect: () => void disconnectMember(x.serverId, x.userId) };
+    }),
+  ];
 }

@@ -20,7 +20,7 @@ import { peopleHere, sortedNotes, useNotes, type NoteInviteItem, type NoteItem }
 import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 import { t } from "@/i18n";
-import { noteMenuItems } from "./noteMenu";
+import { noteMenu } from "./noteMenu";
 import { noteName, useMinuteClock } from "./NoteParts";
 import s from "./Notes.module.css";
 
@@ -104,7 +104,6 @@ export function NotesList({ selected, onNew, making }: { selected: string | null
 function Row({ note, words, selected, now }: { note: NoteItem; words: string; selected: boolean; now: number }) {
   const nav = useNavigate();
   const openModal = useUI((u) => u.openModal);
-  const openContextMenu = useUI((u) => u.openContextMenu);
   const here = useNotes((n) => n.here[note.id]);
   const meId = useAuth((a) => a.me?.id);
   const users = useUsers((u) => u.byId);
@@ -112,7 +111,7 @@ function Row({ note, words, selected, now }: { note: NoteItem; words: string; se
   const live = peopleHere(here, now).filter((id) => id !== meId);
   const menu = (e: MouseEvent<HTMLElement>) => {
     e.preventDefault();
-    openContextMenu({ ...menuPoint(e), label: title, items: noteMenuItems(note, { nav, openModal, inList: true }) });
+    noteMenu.open({ note, nav, openModal, inList: true }, { ...menuPoint(e), label: title });
   };
   const shared = note.members > 1;
   const viewOnly = note.role < NOTE_EDITOR;
