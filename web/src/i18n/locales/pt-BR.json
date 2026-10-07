@@ -6288,6 +6288,7 @@
   "desktop.displayPicker.theOldPermissionIsCleared": "A permissão antiga foi apagada.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Ative o Nexa em Gravação de Tela. O macOS oferece reabrir o Nexa; se não oferecer, reinicie o app aqui.",
   "desktop.displayPicker.couldNotResetThePermission": "O macOS não redefiniu a permissão. Remova o Nexa de Gravação de Tela com o botão de menos, adicione de novo e reinicie.",
+  "look.plugins.errorVersion": "Este plugin foi escrito para a versão {version} da API de plugins, que este app não tem.",
   "moderation.action.discoveryRestore": "Voltou a mostrar um servidor em Descobrir",
   "moderation.chat.caseStart": "Esta é a conversa com {name} sobre este caso. O que você escrever chega como Nexa, com o seu nome visível, e nada aqui tem criptografia de ponta a ponta.",
   "moderation.chat.reportStart": "Esta é a conversa com {name} sobre o relatório. O que você escrever chega como Nexa, com o seu nome visível, e nada aqui tem criptografia de ponta a ponta.",

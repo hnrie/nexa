@@ -83,10 +83,15 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       {modal?.kind === "createDM" ? <CreateDMModal onClose={close} initial={(modal.props?.["initial"] as string[] | undefined) ?? []} groupId={modal.props?.["groupId"] as string | undefined} /> : null}
       {modal?.kind === "confirm" ? (
         <ConfirmModal
-          onClose={close}
+          onClose={() => {
+            // told however it closes, after a confirm too: whoever waits on a yes or no takes the first answer
+            (modal.props?.["onDismiss"] as (() => void) | undefined)?.();
+            close();
+          }}
           title={String(modal.props?.["title"] ?? t("modals.modalHost.areYouSure"))}
           body={modal.props?.["body"] as React.ReactNode}
           confirmLabel={modal.props?.["confirmLabel"] as string | undefined}
+          cancelLabel={modal.props?.["cancelLabel"] as string | undefined}
           danger={Boolean(modal.props?.["danger"])}
           onConfirm={modal.props?.["onConfirm"] as () => unknown}
         />

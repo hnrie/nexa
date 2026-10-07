@@ -2,7 +2,7 @@ import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import type { Channel } from "@/api/types";
 import { t } from "@/i18n";
-import { button, defineMenu } from "@/lib/contextMenus/registry";
+import { about, button, defineMenu } from "@/lib/contextMenus/registry";
 import { copyIdItem, developerMode } from "@/lib/copyId";
 import { useChannels } from "@/stores/channels";
 import { useUI } from "@/stores/ui";
@@ -46,3 +46,5 @@ export const subchatMenu = defineMenu<SubchatMenuCtx>("subchat", [
   ],
   [button("copySubchatId", ({ channel }) => developerMode() && copyIdItem("copy", t("sidebar.dmMenu.copyChannelId"), channel.id))],
 ]);
+about(subchatMenu, ({ channel }) => ({ channelId: channel.id }));
+

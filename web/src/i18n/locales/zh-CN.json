@@ -5963,6 +5963,7 @@
   "desktop.displayPicker.theOldPermissionIsCleared": "旧的权限已清除。",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "在“屏幕录制”中开启 Nexa。macOS 会提示重新打开 Nexa；如果没有提示，请在这里重启。",
   "desktop.displayPicker.couldNotResetThePermission": "macOS 没有重置权限。请在“屏幕录制”中用减号按钮移除 Nexa，再添加回来，然后重启。",
+  "look.plugins.errorVersion": "此插件是为插件 API 第 {version} 版编写的，而此应用没有该版本。",
   "moderation.action.discoveryRestore": "让服务器重新显示在发现中",
   "moderation.chat.caseStart": "这是与 {name} 关于此案件的对话。你写的内容会以 Nexa 的身份送达，并显示你的名字，这里的任何内容都没有端到端加密。",
   "moderation.chat.reportStart": "这是与 {name} 关于其报告的对话。你写的内容会以 Nexa 的身份送达，并显示你的名字，这里的任何内容都没有端到端加密。",

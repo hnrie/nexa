@@ -2,7 +2,7 @@ import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import type { Channel } from "@/api/types";
 import { copyIdItem, developerMode } from "@/lib/copyId";
-import { button, defineMenu } from "@/lib/contextMenus/registry";
+import { about, button, defineMenu } from "@/lib/contextMenus/registry";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -199,3 +199,9 @@ export const dmMenu = defineMenu<DMMenuRowCtx>("dm", [
     button("copyDmChannelId", ({ channelId }) => !!dmOf(channelId) && developerMode() && copyIdItem("copy", t("sidebar.dmMenu.copyChannelId"), channelId)),
   ],
 ]);
+// a one-to-one conversation is also about the person in it
+about(dmMenu, ({ channelId }) => {
+  const ch = dmOf(channelId);
+  return { channelId, userId: ch ? (otherIn(ch) ?? null) : null };
+});
+

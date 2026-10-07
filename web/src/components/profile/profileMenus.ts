@@ -1,5 +1,5 @@
 import type { PublicUser, Role } from "@/api/types";
-import { button, defineMenu } from "@/lib/contextMenus/registry";
+import { about, button, defineMenu } from "@/lib/contextMenus/registry";
 import { copyText } from "@/lib/clipboard";
 import { confirmRemoveFriend, openBlockDialog, unblockUser } from "@/lib/friendship";
 import { useRelationships } from "@/stores/relationships";
@@ -36,6 +36,8 @@ export const profileMoreMenu = defineMenu<ProfileMoreCtx>("profileMore", [
   ],
   [button("copyProfileUserId", ({ user }) => ({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void copyText(user.id, t("clipboard.idCopied")) }))],
 ]);
+about(profileMoreMenu, ({ user }) => ({ userId: user.id }));
+
 
 /** The roles a profile's + button can give someone in a server. */
 export const profileAddRoleMenu = defineMenu<{ roles: Role[]; add: (roleId: string) => void }>("profileAddRole", [

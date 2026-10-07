@@ -6605,6 +6605,7 @@
   "desktop.displayPicker.theOldPermissionIsCleared": "Старое разрешение удалено.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Включите Nexa в «Записи экрана». macOS предложит заново открыть Nexa; если не предложит, перезапустите приложение здесь.",
   "desktop.displayPicker.couldNotResetThePermission": "macOS не сбросила разрешение. Удалите Nexa из «Записи экрана» кнопкой «минус», добавьте снова и перезапустите.",
+  "look.plugins.errorVersion": "Этот плагин написан для версии {version} API плагинов, которой нет в этом приложении.",
   "moderation.action.discoveryRestore": "Сервер снова показан в «Обзоре»",
   "moderation.chat.caseStart": "Это разговор с {name} об этом случае. То, что вы пишете, приходит от имени Nexa с вашим именем, и ничто здесь не защищено сквозным шифрованием.",
   "moderation.chat.reportStart": "Это разговор с {name} о его отчёте. То, что вы пишете, приходит от имени Nexa с вашим именем, и ничто здесь не защищено сквозным шифрованием.",

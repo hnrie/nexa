@@ -1,7 +1,7 @@
 import type { Channel } from "@/api/types";
 import { reportBugMenuItem } from "@/components/bugs/ReportBugButton";
 import { threadButtons, type ThreadMenuCtx } from "@/components/threads/ThreadBar";
-import { button, defineMenu } from "@/lib/contextMenus/registry";
+import { about, button, defineMenu } from "@/lib/contextMenus/registry";
 import { t } from "@/i18n";
 
 export interface ChatMoreCtx {
@@ -47,3 +47,5 @@ export const chatMoreMenu = defineMenu<ChatMoreCtx>("chatMore", [
     button("reportBugFromMore", ({ isServer, convo }) => !isServer && reportBugMenuItem(convo.type === "group_dm" ? "group" : "dm")),
   ],
 ]);
+about(chatMoreMenu, ({ channel }) => ({ channelId: channel.id }));
+

@@ -15,7 +15,7 @@ import { useChannels } from "@/stores/channels";
 import { canI, useServers } from "@/stores/servers";
 import { useThreads } from "@/stores/threads";
 import { useUI } from "@/stores/ui";
-import { button, defineMenu, type MenuButton } from "@/lib/contextMenus/registry";
+import { about, button, defineMenu, type MenuButton } from "@/lib/contextMenus/registry";
 import chat from "@/components/chat/Chat.module.css";
 import s from "./Threads.module.css";
 
@@ -121,6 +121,8 @@ export function threadButtons<C>(ids: { join: string; archive: string; lock: str
 
 /** A thread's menu in its header on a computer. */
 export const threadMenu = defineMenu<ThreadMenuCtx>("thread", [threadButtons({ join: "joinThread", archive: "closeThread", lock: "lockThread", settings: "threadSettings", remove: "deleteThread" }, (x) => x)]);
+about(threadMenu, ({ thread }) => ({ channelId: thread.id }));
+
 
 /**
  * A thread's state for its menus and its Join button: the context its menus

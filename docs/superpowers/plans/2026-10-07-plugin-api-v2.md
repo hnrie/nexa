@@ -18,7 +18,7 @@ decisions of 2026-10-07 applied (two rounds). Nothing here is built yet. Approve
 | Size limits | Stay as they are: 64 KB per pasted plugin, 256 KB for all pasted plugins, 1 MB for a plugin from a link. The docs are corrected to say so. |
 | Storage | Stays per device in `localStorage`, per account and plugin, 512 KB, and synchronous. The docs drop the `Promise`s and the "per account" wording. |
 | Styles | `styles.add(stylesheet, persist?)`. By default (`persist` false) a stylesheet is removed when the plugin stops. With `persist: true` it stays after the plugin stops, until the function `add` returned is called, `styles.clear()` runs, the plugin is deleted or the page reloads. |
-| Context menu registry | Every menu in the app moves into the registry, not only the four plugins can change. |
+| Context menu registry | Every menu in the app moves into the registry, and plugins can change every one of them, each named by its kind. |
 | Time limits | `start()` gets 10 seconds and `stop()` 3 seconds, in both v1 and v2 (as v1 today). |
 | Toast `duration` | Clamped to 1 to 15 seconds. |
 | v1 compatibility | `apiVersion: 1`, or no `apiVersion` at all (every plugin installed today), gets the whole v1 API unchanged. `apiVersion: 2` gets v2. The two live side by side. |
@@ -114,8 +114,8 @@ turned into media URLs, and badge and emoji strings passed through as they are.
 - New `web/src/lib/contextMenus/` with a registry. Every menu in the app moves into it (about 25
   today: message, image, member, group member, DM, DM group, server, channel, category, folder,
   thread, subchat, note, relationship, Nexa, activity, moderation, voice devices, text, and the
-  smaller ones in pickers, settings and the staff panel). Plugins can change only `message`,
-  `user`, `channel` and `server`. Each menu kind registers its built-in buttons once, each with a stable
+  smaller ones in pickers, settings and the staff panel). Plugins can change every one of them, named by
+  its kind. Each menu kind registers its built-in buttons once, each with a stable
   camelCase id (`deleteMessage`, `copyMessageLink`, `kickMember`, ...), a label key, an icon,
   `danger`, `separatorAfter`, a `visible(ctx)` and an `onClick(ctx)`.
 - Components stop building item arrays inline. They open a menu by kind and context

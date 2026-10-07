@@ -10,11 +10,13 @@ interface Props {
   title: string;
   body: React.ReactNode;
   confirmLabel?: string;
+  /** The cancel button's words, where something other than Cancel fits better. */
+  cancelLabel?: string;
   danger?: boolean;
   onConfirm: () => Promise<unknown> | unknown;
 }
 
-export function ConfirmModal({ onClose, title, body, confirmLabel, danger = false, onConfirm }: Props) {
+export function ConfirmModal({ onClose, title, body, confirmLabel, cancelLabel, danger = false, onConfirm }: Props) {
   const [busy, setBusy] = useState(false);
   const go = async () => {
     setBusy(true);
@@ -29,7 +31,7 @@ export function ConfirmModal({ onClose, title, body, confirmLabel, danger = fals
     }
   };
   return (
-    <Modal open onClose={onClose} title={title} width={440} footer={<><Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button><Button variant={danger ? "danger" : "primary"} loading={busy} onClick={() => void go()}>{confirmLabel ?? t("modals.confirm.confirm")}</Button></>}>
+    <Modal open onClose={onClose} title={title} width={440} footer={<><Button variant="ghost" onClick={onClose}>{cancelLabel ?? t("chat.editMessage.cancel")}</Button><Button variant={danger ? "danger" : "primary"} loading={busy} onClick={() => void go()}>{confirmLabel ?? t("modals.confirm.confirm")}</Button></>}>
       <div style={{ color: "var(--text)", fontSize: 16 }}>{body}</div>
     </Modal>
   );

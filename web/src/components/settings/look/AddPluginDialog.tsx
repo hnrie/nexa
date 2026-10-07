@@ -7,7 +7,8 @@ import { codeKey, lookCache } from "@/lib/look/cache";
 import { FetchError, checkLink, fetchFailure, fetchText } from "@/lib/look/fetchText";
 import { codeHash } from "@/lib/look/hash";
 import { byteLength, packText } from "@/lib/look/pack";
-import { importPlugin, metaOf } from "@/lib/look/plugins/runtime";
+import { apiVersionOf, importPlugin, metaOf, permissionsOf } from "@/lib/look/plugins/runtime";
+import type { NexaPlugin } from "@/lib/look/plugins/api";
 import { MAX_PASTED_PLUGIN_BYTES, MAX_PASTED_TOTAL_BYTES, linkName, newLookId } from "@/lib/look/sanitize";
 import type { PluginEntry } from "@/lib/look/types";
 import { formatBytes } from "@/lib/time";
@@ -24,6 +25,18 @@ type Source = "url" | "code";
  * so a link that is not a plugin is caught before it is saved, and the hash of
  * exactly this code is what the plugin is pinned to.
  */
+/**
+ * What a v2 plugin is granted as it is added: what it asks for. The prompt
+ * that asks the person first is still to come (step 5 of the plugin plan).
+ * New code for a plugin keeps the grants it had; asking for more waits for
+ * that prompt. A v1 plugin asks for nothing.
+ */
+function grantsFor(plugin: NexaPlugin, had: PluginEntry | undefined): Pick<PluginEntry, "permissions"> {
+  if (apiVersionOf(plugin) !== 2) return {};
+  if (had && Array.isArray(had.permissions)) return { permissions: had.permissions };
+  return { permissions: permissionsOf(plugin) };
+}
+
 export function AddPluginDialog({ initial, editing, pastedElsewhere, taken, onClose, onSave }: { initial: Source; editing?: { entry: PluginEntry; code: string }; pastedElsewhere: number; taken: string[]; onClose: () => void; onSave: (entry: PluginEntry) => void }) {
   const [source, setSource] = useState<Source>(editing ? "code" : initial);
   const [url, setUrl] = useState("");
@@ -68,6 +81,7 @@ export function AddPluginDialog({ initial, editing, pastedElsewhere, taken, onCl
         settings: editing?.entry.settings ?? {},
         meta,
         addedAt: editing?.entry.addedAt ?? Date.now(),
+        ...grantsFor(plugin, editing?.entry),
       });
     } catch (err) {
       setError(err instanceof FetchError ? fetchFailure(err.reason, err.status) : err instanceof Error ? err.message : String(err));

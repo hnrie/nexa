@@ -18,7 +18,7 @@ import { useUI } from "@/stores/ui";
 import { formatStamp } from "@/lib/time";
 import { copyAndSay } from "@/lib/copyText";
 import { t } from "@/i18n";
-import { button, defineMenu } from "@/lib/contextMenus/registry";
+import { about, button, defineMenu } from "@/lib/contextMenus/registry";
 
 interface UserGridMenuCtx {
   user: ModUser;
@@ -72,6 +72,8 @@ const userGridMenu = defineMenu<UserGridMenuCtx>("userGrid", [
     }),
   ],
 ]);
+about(userGridMenu, ({ user }) => ({ userId: user.id }));
+
 import { ModerateModal } from "./ModerateModal";
 import { modStatus, StatusSummary } from "./ModStatus";
 import m from "./Moderation.module.css";

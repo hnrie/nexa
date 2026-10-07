@@ -6186,6 +6186,7 @@
   "desktop.displayPicker.theOldPermissionIsCleared": "Die alte Berechtigung ist gelöscht.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Schalte Nexa unter Bildschirmaufnahme ein. macOS bietet an, Nexa neu zu öffnen; wenn nicht, starte es hier neu.",
   "desktop.displayPicker.couldNotResetThePermission": "macOS hat die Berechtigung nicht zurückgesetzt. Entferne Nexa unter Bildschirmaufnahme mit dem Minus-Knopf, füge es wieder hinzu und starte neu.",
+  "look.plugins.errorVersion": "Dieses Plugin ist für Version {version} der Plugin-API geschrieben, die diese App nicht hat.",
   "moderation.action.discoveryRestore": "Server wieder in Entdecken gezeigt",
   "moderation.chat.caseStart": "Das ist die Unterhaltung mit {name} zu diesem Fall. Was du schreibst, erreicht die Person als Nexa, mit deinem Namen dabei, und nichts hier ist Ende-zu-Ende-verschlüsselt.",
   "moderation.chat.reportStart": "Das ist die Unterhaltung mit {name} zu der Meldung. Was du schreibst, erreicht die Person als Nexa, mit deinem Namen dabei, und nichts hier ist Ende-zu-Ende-verschlüsselt.",

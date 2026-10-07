@@ -11,7 +11,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { copyAndSay } from "@/lib/copyText";
 import { openInTabButton } from "./openMenu";
 import { leaveServer, markServerRead, toggleMuted } from "./serverActions";
-import { button, defineMenu } from "@/lib/contextMenus/registry";
+import { about, button, defineMenu } from "@/lib/contextMenus/registry";
 import { serverArrangeButtons, type RailServerCtx } from "@/components/rail/railActions";
 import { usePick } from "@/stores/pick";
 import { canWearTag } from "@/lib/serverTags";
@@ -98,6 +98,8 @@ export const serverMenu = defineMenu<ServerMenuCtx>("server", [
     button("copyServerId", ({ serverId }) => !!serverOf(serverId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("sidebar.serverMenu.copyServerId"), onSelect: () => copy(serverId) }),
   ],
 ]);
+about(serverMenu, ({ serverId }) => ({ serverId }));
+
 
 /** The list a channel is ordered within: its category's channels, the loose ones, or the categories themselves. */
 function siblingsOf(ch: Channel, byId: Record<string, Channel>): Channel[] {
@@ -229,6 +231,8 @@ export const channelMenu = defineMenu<ChannelMenuCtx>("channel", [
     button("copyChannelId", ({ channelId }) => !!serverChannel(channelId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("sidebar.dmMenu.copyChannelId"), onSelect: () => copy(channelId) }),
   ],
 ]);
+about(channelMenu, ({ channelId }) => ({ channelId }));
+
 
 export interface CategoryMenuCtx extends MenuCtx {
   categoryId: string;
@@ -259,3 +263,5 @@ export const categoryMenu = defineMenu<CategoryMenuCtx>("category", [
     button("copyCategoryId", ({ categoryId }) => !!serverChannel(categoryId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("sidebar.serverMenu.copyCategoryId"), onSelect: () => copy(categoryId) }),
   ],
 ]);
+about(categoryMenu, ({ categoryId }) => ({ channelId: categoryId }));
+

@@ -19,7 +19,10 @@ import { FetchError, fetchFailure, fetchText } from "../fetchText";
 import { codeHash } from "../hash";
 import { unpackText } from "../pack";
 import { noteHealthy, setLookActive } from "../safeMode";
-import { sanitizeMeta } from "../sanitize";
+import { sanitizeMeta, sanitizePlugins, sanitizeValues } from "../sanitize";
+import { loadAllMenus } from "@/lib/contextMenus/all";
+import { buildApiV2 } from "./runtimeV2";
+import { cleanPermissions, type PermissionName } from "./permissions";
 import { setSheets, type Sheet } from "../styles";
 import type { PluginEntry, PluginMeta } from "../types";
 import { PLUGIN_API_VERSION, type NexaPlugin, type NexaPluginApi, type PluginCommandDef, type PluginEventName, type PluginEvents, type PluginMessage, type PluginSetting, type SettingValue } from "./api";
@@ -127,6 +130,23 @@ export async function importPlugin(code: string): Promise<NexaPlugin> {
   return candidate as NexaPlugin;
 }
 
+/**
+ * Which API a plugin is written for: one that says nothing, or 1, gets
+ * version 1 (api.ts), and 2 gets version 2 (api2.ts). Anything else will not
+ * start, saying why.
+ */
+export function apiVersionOf(p: Partial<NexaPlugin>): 1 | 2 {
+  const v = (p as { apiVersion?: unknown }).apiVersion;
+  if (v === undefined || v === null || v === 1) return 1;
+  if (v === 2) return 2;
+  throw new Error(t("look.plugins.errorVersion", { version: String(v).slice(0, 20) }));
+}
+
+/** The permissions a plugin asks for (v2), the known ones only. */
+export function permissionsOf(p: Partial<NexaPlugin>): string[] {
+  return cleanPermissions((p as { permissions?: unknown }).permissions);
+}
+
 /** What a plugin says about itself, checked. */
 export function metaOf(p: Partial<NexaPlugin>, fallbackName: string): PluginMeta {
   return sanitizeMeta({ name: p.name || fallbackName, description: p.description, version: p.version, author: p.author }) ?? { name: fallbackName, description: "", version: "", author: "" };
@@ -200,16 +220,29 @@ interface Running {
   hash: string;
   name: string;
   plugin: NexaPlugin;
+  /** Which API it was handed: 1 (api.ts) or 2 (api2.ts). */
+  version: 1 | 2;
   schema: PluginSetting[];
   settingsJson: string;
+  /** Its stylesheets that go when it stops: all of a v1 plugin's, and a v2 plugin's added without `persist`. */
   sheets: Sheet[];
   handlers: Map<PluginEventName, Set<(payload: never) => void>>;
   commands: { name: string; run: (args: string, channelId: string) => Promise<string | null> }[];
-  settingsListeners: Set<(values: Record<string, SettingValue>) => void>;
+  settingsListeners: Set<(values: Record<string, SettingValue>, old: Record<string, SettingValue>) => void>;
   values: Record<string, SettingValue>;
+  /** A v2 plugin's API takes back what it registered (listeners, menu changes) through this. */
+  stopV2?: () => void;
 }
 
 const running = new Map<string, Running>();
+/**
+ * The stylesheets v2 plugins added with `persist`: kept after the plugin
+ * stops, until it clears them, takes one back, is deleted, or the page
+ * reloads.
+ */
+const persisted = new Map<string, Sheet[]>();
+/** What each plugin is granted, as the account's settings say now (v2 only; v1 asks for nothing). */
+const grants = new Map<string, Set<string>>();
 /** Plugins that failed to start: off until the page reloads or the person tries again. */
 const sessionOff = new Set<string>();
 /**
@@ -233,10 +266,7 @@ export function configurePlugins(opts: { navigate: (path: string) => void; onMet
 export const pluginsEverRan = (): boolean => everRan;
 
 function drawSheets(): void {
-  setSheets(
-    "plugins",
-    [...running.values()].flatMap((r) => r.sheets),
-  );
+  setSheets("plugins", [...[...running.values()].flatMap((r) => r.sheets), ...[...persisted.values()].flat()]);
 }
 
 const STORAGE_MAX = 512 * 1024;
@@ -305,7 +335,7 @@ dispatchHooks.onMessageDelete.push((channelId, ids, was) => {
 const COMMAND_NAME = /^[a-z0-9_-]{1,32}$/;
 
 function apiFor(r: Running, meta: PluginMeta): NexaPluginApi {
-  const stores = Object.freeze({ auth: useAuth, settings: useSettings, messages: useMessages, channels: useChannels, servers: useServers, users: useUsers, relationships: useRelationships, presence: usePresence, readStates: useReadStates, ui: useUI });
+  const stores = unsupportedStores();
   return Object.freeze({
     apiVersion: PLUGIN_API_VERSION,
     plugin: Object.freeze({ id: r.id, name: meta.name, version: meta.version }),
@@ -411,7 +441,87 @@ function apiFor(r: Running, meta: PluginMeta): NexaPluginApi {
   });
 }
 
+/** The stores a plugin can reach past the API: v1's `unsupported.stores`, and v2's `stores`. */
+function unsupportedStores(): Record<string, unknown> {
+  return Object.freeze({ auth: useAuth, settings: useSettings, messages: useMessages, channels: useChannels, servers: useServers, users: useUsers, relationships: useRelationships, presence: usePresence, readStates: useReadStates, ui: useUI });
+}
+
+/** Saves one of a plugin's setting values with the account, as the Plugins page does, and tells the plugin at once. */
+function saveSetting(r: Running, key: string, value: SettingValue | undefined): void {
+  const now = sanitizePlugins(useSettings.getState().settings.plugins);
+  const entry = now.find((p) => p.id === r.id);
+  if (!entry) return;
+  const next = { ...entry.settings };
+  if (value === undefined) delete next[key];
+  else next[key] = value;
+  const settings = sanitizeValues(next);
+  const old = r.values;
+  r.settingsJson = JSON.stringify(settings);
+  r.values = settingValues(r.schema, settings);
+  useSettings.getState().patch({ plugins: now.map((p) => (p.id === r.id ? { ...p, settings } : p)) });
+  for (const fn of r.settingsListeners) {
+    try {
+      fn({ ...r.values }, old);
+    } catch (err) {
+      console.warn(`plugin ${r.name}: its settings listener failed`, err);
+    }
+  }
+}
+
+function apiForV2(r: Running, meta: PluginMeta): Record<string, unknown> {
+  const built = buildApiV2({
+    id: r.id,
+    meta,
+    schema: r.schema,
+    can: (p: PermissionName) => !!grants.get(r.id)?.has(p),
+    values: () => r.values,
+    saveSetting: (key, value) => saveSetting(r, key, value),
+    onSettings: (fn) => {
+      r.settingsListeners.add(fn);
+      return () => void r.settingsListeners.delete(fn);
+    },
+    addSheet: (css, persist) => {
+      const sheet = { id: `${r.id}-${Math.random().toString(36).slice(2, 10)}`, css };
+      if (persist) persisted.set(r.id, [...(persisted.get(r.id) ?? []), sheet]);
+      else r.sheets.push(sheet);
+      drawSheets();
+      return () => {
+        r.sheets = r.sheets.filter((x) => x !== sheet);
+        const kept = (persisted.get(r.id) ?? []).filter((x) => x !== sheet);
+        if (kept.length) persisted.set(r.id, kept);
+        else persisted.delete(r.id);
+        drawSheets();
+      };
+    },
+    clearSheets: () => {
+      r.sheets = [];
+      persisted.delete(r.id);
+      drawSheets();
+    },
+    storage: {
+      get: (key) => readStore(r.id)[key],
+      set: (key, value) => {
+        const data = readStore(r.id);
+        data[key] = JSON.parse(JSON.stringify(value ?? null)) as unknown;
+        writeStore(r.id, data);
+      },
+      remove: (key) => {
+        const data = readStore(r.id);
+        delete data[key];
+        writeStore(r.id, data);
+      },
+      keys: () => Object.keys(readStore(r.id)),
+      clear: () => storage.remove(storageKey(r.id)),
+    },
+    stores: unsupportedStores(),
+  });
+  r.stopV2 = built.stop;
+  return built.api;
+}
+
 function undo(r: Running): void {
+  r.stopV2?.();
+  r.stopV2 = undefined;
   for (const c of r.commands) unregisterPluginCommand(c.name, c.run);
   r.commands = [];
   r.handlers.clear();
@@ -457,9 +567,13 @@ async function start(entry: PluginEntry): Promise<void> {
     const plugin = await importPlugin(loaded.code);
     const meta = metaOf(plugin, fallback);
     const schema = schemaOf(plugin);
-    r = { id: entry.id, hash: entry.hash, name: meta.name, plugin, schema, settingsJson: JSON.stringify(entry.settings), sheets: [], handlers: new Map(), commands: [], settingsListeners: new Set(), values: settingValues(schema, entry.settings) };
+    const version = apiVersionOf(plugin);
+    r = { id: entry.id, hash: entry.hash, name: meta.name, plugin, version, schema, settingsJson: JSON.stringify(entry.settings), sheets: [], handlers: new Map(), commands: [], settingsListeners: new Set(), values: settingValues(schema, entry.settings) };
     running.set(entry.id, r);
-    await within(Promise.resolve(plugin.start(apiFor(r, meta))), START_TIMEOUT_MS, t("look.plugins.errorSlow"));
+    // a plugin that may change menus sees all of them from the start, the ones of screens not opened yet too
+    if (version === 2 && grants.get(entry.id)?.has("ui.write")) await loadAllMenus();
+    const api = version === 2 ? apiForV2(r, meta) : apiFor(r, meta);
+    await within(Promise.resolve(plugin.start(api as NexaPluginApi)), START_TIMEOUT_MS, t("look.plugins.errorSlow"));
     everRan = true;
     setLookActive(true);
     setState(entry.id, { status: "running", error: undefined, meta, schema });
@@ -519,7 +633,14 @@ export function syncPlugins(entries: PluginEntry[], allowed: boolean, why: Plugi
       }
     }
     const ids = new Set(entries.map((e) => e.id));
+    // the grants as the account's settings say now: a permission taken away applies at once
+    grants.clear();
+    for (const e of entries) if (Array.isArray(e.permissions)) grants.set(e.id, new Set(e.permissions));
     for (const id of [...running.keys()]) if (!ids.has(id)) await stop(id);
+    // a deleted plugin's persisted stylesheets go with it
+    let dropped = false;
+    for (const id of [...persisted.keys()]) if (!ids.has(id)) dropped = persisted.delete(id) || dropped;
+    if (dropped) drawSheets();
     for (const id of Object.keys(usePlugins.getState().byId)) if (!ids.has(id)) setState(id, null);
     for (const e of entries) {
       const want = allowed && e.enabled && !sessionOff.has(e.id);
@@ -537,11 +658,12 @@ export function syncPlugins(entries: PluginEntry[], allowed: boolean, why: Plugi
       if (now) {
         const json = JSON.stringify(e.settings);
         if (json !== now.settingsJson) {
+          const old = now.values;
           now.settingsJson = json;
           now.values = settingValues(now.schema, e.settings);
           for (const fn of now.settingsListeners) {
             try {
-              fn({ ...now.values });
+              fn({ ...now.values }, old);
             } catch (err) {
               console.warn(`plugin ${now.name}: its settings listener failed`, err);
             }
@@ -597,6 +719,9 @@ export function dismissUpdate(id: string): void {
 /** Clears what this device keeps for plugins: on signing out. */
 export async function forgetPlugins(): Promise<void> {
   await stopAllPlugins();
+  persisted.clear();
+  grants.clear();
+  drawSheets();
   sessionOff.clear();
   blocked.clear();
   usePlugins.setState({ byId: {} });

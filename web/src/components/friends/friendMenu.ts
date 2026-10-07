@@ -1,5 +1,5 @@
 import type { Relationship } from "@/api/types";
-import { button, defineMenu } from "@/lib/contextMenus/registry";
+import { about, button, defineMenu } from "@/lib/contextMenus/registry";
 import { copyAndSay } from "@/lib/copyText";
 import { confirmRemoveFriend, openBlockDialog, unblockUser } from "@/lib/friendship";
 import { copyProfileLink } from "@/lib/profileLinks";
@@ -34,3 +34,5 @@ export const friendMenu = defineMenu<FriendMenuCtx>("friend", [
   // the way into picking on a touch screen, where there is no Ctrl to hold
   [button("selectFriends", ({ rel }) => ({ id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start("friends", rel.user.id) }))],
 ]);
+about(friendMenu, ({ rel }) => ({ userId: rel.user.id }));
+

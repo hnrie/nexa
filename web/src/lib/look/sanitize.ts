@@ -1,5 +1,6 @@
 import { checkLink } from "./fetchText";
 import type { CssLink, CustomCss, PluginEntry, PluginMeta } from "./types";
+import { cleanPermissions } from "./plugins/permissions";
 
 /**
  * Limits on what the look settings may hold, and the checks that hold them to
@@ -89,6 +90,7 @@ function sanitizePlugin(v: unknown): PluginEntry | null {
     settings: sanitizeValues(r["settings"]),
     meta: sanitizeMeta(r["meta"]),
     addedAt: typeof r["addedAt"] === "number" ? r["addedAt"] : 0,
+    ...(Array.isArray(r["permissions"]) ? { permissions: cleanPermissions(r["permissions"]) } : {}),
   };
 }
 

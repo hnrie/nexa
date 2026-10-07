@@ -6186,6 +6186,7 @@
   "desktop.displayPicker.theOldPermissionIsCleared": "The old permission is cleared.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Turn Nexa on in Screen Recording. macOS offers to reopen Nexa; if it doesn't, restart it here.",
   "desktop.displayPicker.couldNotResetThePermission": "macOS didn't reset the permission. Remove Nexa from Screen Recording with the minus button, add it again, and restart.",
+  "look.plugins.errorVersion": "This plugin is written for version {version} of the plugin API, which this app doesn't have.",
   "moderation.action.discoveryRestore": "Showed a server on Discover again",
   "moderation.chat.caseStart": "This is the conversation with {name} about this case. What you write reaches them as Nexa, with your name shown, and nothing here is end-to-end encrypted.",
   "moderation.chat.reportStart": "This is the conversation with {name} about their report. What you write reaches them as Nexa, with your name shown, and nothing here is end-to-end encrypted.",

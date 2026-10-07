@@ -67,5 +67,11 @@ export interface PluginEntry {
   settings: Record<string, unknown>;
   /** What the plugin said about itself the last time it ran, to name it before it runs again. */
   meta: PluginMeta | null;
+  /**
+   * The permissions the person granted a plugin of API version 2
+   * (plugins/permissions.ts). Absent or null for a version 1 plugin, which
+   * asks for none and has the whole of its own API.
+   */
+  permissions?: string[] | null;
   addedAt: number;
 }

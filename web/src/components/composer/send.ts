@@ -5,7 +5,7 @@ import { encryptMessage, type AttachmentMeta, type MessagePayload, type PollPayl
 import { goesInOneRequest, sendInWorker, uploadStaged, type Staged } from "@/lib/attachments";
 import { encryptedSize } from "@/crypto/fileChunks";
 import { holdReload } from "@/lib/busy";
-import { decryptForStore } from "@/lib/decrypt";
+import { decryptForStore, type DecryptedMessage } from "@/lib/decrypt";
 import { nonce as newNonce, tmpId } from "@/lib/ids";
 import { channelKeyFor } from "@/lib/keyring";
 import { useAuth } from "@/stores/auth";
@@ -40,6 +40,8 @@ export interface SendOptions {
   poll?: PollPayload;
   /** AutoMod has read it already (screenForSend): what to tell it once the message is sent. */
   screened?: (messageId: string) => void;
+  /** Told the message as the server took it, once it is sent (the plugin API's messages.send). */
+  onSent?: (message: DecryptedMessage) => void;
 }
 
 /** The conversation whose keys encrypt a channel: the server tells us (itself for DMs and private channels, the server root otherwise). */
@@ -456,6 +458,7 @@ async function deliver(channelId: string, meId: string, w: Written, tmp: string,
     useMessages.getState().settle(channelId, [decrypted], { tmpId: tmp, nonce });
     useChannels.getState().setLastMessage(channelId, sent.id);
     useSlowmode.getState().markSent(channelId);
+    opts.onSent?.(decrypted);
   } catch (err) {
     // stopped by AutoMod: it never went, so nothing waits in the list to be sent again
     if (err instanceof AutomodStop || (err instanceof ApiError && err.code === "automod_blocked")) {

@@ -6287,6 +6287,7 @@
   "desktop.displayPicker.theOldPermissionIsCleared": "L’ancienne permission est effacée.",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Activez Nexa dans Enregistrement de l’écran. macOS propose de rouvrir Nexa. Sinon, redémarrez-le ici.",
   "desktop.displayPicker.couldNotResetThePermission": "macOS n’a pas réinitialisé la permission. Retirez Nexa d’Enregistrement de l’écran avec le bouton moins, rajoutez-le et redémarrez.",
+  "look.plugins.errorVersion": "Ce plugin est écrit pour la version {version} de l'API des plugins, que cette app n'a pas.",
   "moderation.action.discoveryRestore": "Serveur de nouveau affiché dans Découvrir",
   "moderation.chat.caseStart": "Voici la conversation avec {name} à propos de ce dossier. Ce que tu écris lui parvient au nom de Nexa, avec ton nom affiché, et rien ici n'est chiffré de bout en bout.",
   "moderation.chat.reportStart": "Voici la conversation avec {name} à propos de son signalement. Ce que tu écris lui parvient au nom de Nexa, avec ton nom affiché, et rien ici n'est chiffré de bout en bout.",

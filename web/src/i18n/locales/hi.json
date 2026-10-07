@@ -6186,6 +6186,7 @@
   "desktop.displayPicker.theOldPermissionIsCleared": "पुरानी अनुमति हटा दी गई है।",
   "desktop.displayPicker.turnNexaOnInScreenRecording": "Screen Recording में Nexa को चालू करें। macOS, Nexa को फिर से खोलने का विकल्प देगा; अगर न दे, तो यहाँ से उसे दोबारा शुरू करें।",
   "desktop.displayPicker.couldNotResetThePermission": "macOS ने अनुमति रीसेट नहीं की। माइनस बटन से Nexa को Screen Recording से हटाएँ, फिर से जोड़ें और दोबारा शुरू करें।",
+  "look.plugins.errorVersion": "यह प्लगइन प्लगइन API के संस्करण {version} के लिए लिखा गया है, जो इस ऐप में नहीं है।",
   "moderation.action.discoveryRestore": "सर्वर को खोजें में फिर से दिखाया",
   "moderation.chat.caseStart": "यह इस मामले के बारे में {name} के साथ बातचीत है। आप जो लिखते हैं वह उन्हें Nexa के रूप में आपके नाम के साथ पहुँचता है, और यहाँ कुछ भी एंड-टू-एंड एन्क्रिप्टेड नहीं है।",
   "moderation.chat.reportStart": "यह {name} के साथ उनकी रिपोर्ट के बारे में बातचीत है। आप जो लिखते हैं वह उन्हें Nexa के रूप में आपके नाम के साथ पहुँचता है, और यहाँ कुछ भी एंड-टू-एंड एन्क्रिप्टेड नहीं है।",

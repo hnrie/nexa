@@ -6,7 +6,7 @@ import { copyAndSay } from "@/lib/copyText";
 import { useUsers } from "@/stores/users";
 import { relationshipButtons } from "@/lib/friendship";
 import { profileLinkItem } from "@/lib/profileLinks";
-import { button, defineMenu, type MenuButton } from "@/lib/contextMenus/registry";
+import { about, button, defineMenu, type MenuButton } from "@/lib/contextMenus/registry";
 import { usePick, type PickList } from "@/stores/pick";
 
 import { t } from "@/i18n";
@@ -126,3 +126,5 @@ export const memberMenu = defineMenu<MemberMenuCtx>("member", [
   [button("copyMemberId", ({ serverId, userId }) => !!where(serverId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => copyAndSay(userId) })],
   [button("selectMembers", ({ serverId, userId, select }) => !!select && !!where(serverId) && { id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start(select, userId) })],
 ]);
+about(memberMenu, ({ serverId, userId }) => ({ serverId, userId }));
+

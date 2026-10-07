@@ -655,7 +655,23 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   `relationshipButtons`). Components open a menu with `menu.open(ctx, placement)`, passing what only
   they have (callbacks, the moves a reorder hook offers) in the context. `registry.test.ts` fails
   when any file but the registry calls `openContextMenu`, and loads every menu module together to
-  catch a button id used twice.
+  catch a button id used twice. A menu about something says what with `about(menu, (ctx) => ({
+  message, userId, channelId, serverId }))`, which is what plugins' menu callbacks are told. Plugins
+  change menus through the registry's layer of changes (`addButton`, `removeButton`, `editButton`,
+  each recorded against the plugin and taken back by `dropChanges` when it stops); every menu
+  module is listed in `lib/contextMenus/all.ts` so the plugin API can load them all before a plugin
+  that may change menus starts, and a test fails when one is missing there.
+- Plugins (`lib/look/plugins`): `runtime.ts` pins, loads, starts and stops them. A plugin without
+  `apiVersion`, or with 1, gets the v1 API (`api.ts`, kept as it was); `apiVersion: 2` gets v2
+  (`api2.ts` for its types, `runtimeV2.ts` for the API, `objects.ts` turning the app's objects into
+  the API's, `permissions.ts` for what a plugin can ask for). A v2 plugin's grants are
+  `PluginEntry.permissions` in the account's settings; every v2 method checks its permission when
+  it is called (`PermissionError`; a method that returns a promise rejects with it), events are
+  delivered only with the permission for what they carry, and context objects leave out what a
+  plugin may not see. Until the install prompt exists (step 5 of
+  `docs/superpowers/plans/2026-10-07-plugin-api-v2.md`) a v2 plugin is granted what it asks for
+  when it is added. v2 events are built on `dispatchHooks` (above); v2 stylesheets go when the
+  plugin stops unless added with `persist`. Plugins never run on Android.
 - `pages/`: one per route. `styles/`: `tokens.css` (every theme token: colour, radius, shadow,
   motion), `base.css`, `markdown.css`, `fonts.css` (Wix Madefor) and `fonts-classic.css` (Onest,
   Mona Sans). `lib/theme.ts` applies a theme; `lib/look/` derives presets and custom themes.

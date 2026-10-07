@@ -2,7 +2,6 @@ import { File as FileIcon, Paperclip, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
-import { threads as threadsApi } from "@/api/threads";
 import type { Channel } from "@/api/types";
 import { Button } from "@/components/common/Button";
 import { FormattedText } from "@/components/common/FormattedText";
@@ -10,15 +9,13 @@ import { Modal } from "@/components/common/Modal";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { AutomodNotice } from "@/components/composer/AutomodNotice";
 import { MAX_MESSAGE_LENGTH } from "@/components/composer/limit";
-import { screenForSend, sendMessage, sendWithFiles } from "@/components/composer/send";
 import { t } from "@/i18n";
 import { fitsUploadLimit, stage, type Staged } from "@/lib/attachments";
+import { startForumPost } from "@/lib/forumPost";
 import { P } from "@/lib/perms";
 import { formatBytes } from "@/lib/time";
 import { useAutomodNotices } from "@/stores/automodNotices";
-import { useChannels } from "@/stores/channels";
 import { canI, useServers } from "@/stores/servers";
-import { useThreads } from "@/stores/threads";
 import { useUI } from "@/stores/ui";
 import srv from "@/components/server/ServerSettings.module.css";
 import s from "./Forum.module.css";
@@ -77,21 +74,14 @@ export function NewPostDialog({ forum, onClose }: { forum: Channel; onClose: () 
     if (!name) return setProblem(t("forum.post.needTitle"));
     if (!body && files.length === 0) return setProblem(t("forum.post.needWords"));
     if (forum.forum?.require_tag && applied.length === 0) return setProblem(t("forum.post.needTag"));
-    // AutoMod reads it before anything goes: a post it stops never goes up
-    const screened = screenForSend(forum.id, body, files.map((f) => f.name));
-    if (screened?.stopped) return;
     setBusy(true);
     try {
-      const res = await threadsApi.create(forum.id, { name, applied_tags: applied });
-      const thread = res.thread;
-      useChannels.getState().upsert(thread);
-      useThreads.getState().setJoined(thread.id, true);
+      // AutoMod reads it before anything goes: a post it stops never goes up
+      const thread = await startForumPost(forum, { name, body, appliedTags: applied, files });
+      if (!thread) return;
       handed.current = true;
       onClose();
       nav(`/channels/${forum.server_id}/${thread.id}`);
-      // the post's first message, sealed for the post: it goes up for everyone with it
-      if (files.length) void sendWithFiles(thread.id, body, files).catch(() => undefined);
-      else void sendMessage(thread.id, body).catch(() => undefined);
     } catch (err) {
       setProblem(err instanceof ApiError ? err.message : t("forum.post.failed"));
     } finally {
