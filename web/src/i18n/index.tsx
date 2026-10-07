@@ -82,6 +82,20 @@ export function formatList(items: string[]): string {
   }
 }
 
+const localeListeners = new Set<(locale: string) => void>();
+/** The language last drawn in, once its words had arrived; null before the first. */
+let shownLocale: string | null = null;
+
+/**
+ * Calls `fn` each time the app's language changes, once the new language's
+ * words have arrived (the gateway's AppEvents pass it on). Not for the first
+ * language the app opens in. Returns a function that stops it.
+ */
+export function onLocaleChange(fn: (locale: string) => void): () => void {
+  localeListeners.add(fn);
+  return () => void localeListeners.delete(fn);
+}
+
 /** The translator itself, for code that needs the locale or the raw message. */
 export function translator(): Translator {
   return current;
@@ -140,6 +154,21 @@ export function I18nProvider({ locale, children }: { locale?: string | null; chi
     document.documentElement.lang = tag;
     document.documentElement.dir = info?.rtl ? "rtl" : "ltr";
   }, [tag]);
+
+  // a language counts as changed once its words are here, not while it is still English waiting for them
+  useEffect(() => {
+    if (loaded.get(tag) !== catalog || shownLocale === tag) return;
+    const first = shownLocale === null;
+    shownLocale = tag;
+    if (first) return;
+    for (const fn of [...localeListeners]) {
+      try {
+        fn(tag);
+      } catch (err) {
+        console.warn("a language listener failed", err);
+      }
+    }
+  }, [tag, catalog]);
 
   const value = useMemo<Ctx>(() => {
     const tr = new Translator(tag, catalog, english);

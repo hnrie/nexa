@@ -26,7 +26,7 @@ import { channels as channelsApi } from "@/api/channels";
 import { ApiError } from "@/api/client";
 import { expressions as expressionsApi } from "@/api/expressions";
 import { ring } from "@/lib/keyring";
-import type { Message, NoteInviteRow, PublicUser, Relationship, ServerView } from "@/api/types";
+import type { Member, Message, NoteInviteRow, PublicUser, Relationship, ServerView } from "@/api/types";
 import { nexa as nexaApi, type Announcement, type MemberCase, type NexaState } from "@/api/moderation";
 import { useNexa } from "@/stores/nexa";
 import { useDiscord } from "@/stores/discord";
@@ -35,6 +35,7 @@ import { bugAlertHooks } from "@/lib/bugs";
 import { mentionsMe } from "@/lib/mentionsMe";
 import { currentBlockRules, isQuiet, loadedAuthorOf } from "@/lib/blocked";
 import { loadChunk } from "@/lib/lazyChunk";
+import { appEventHooks, each, emitAppEvent, quietly, reportMissed, watched, type AppEvent } from "./appEvents";
 
 type VoiceModule = typeof import("@/voice/session");
 let voiceModule: Promise<VoiceModule> | null = null;
@@ -82,7 +83,9 @@ export const dispatchHooks: {
   onMessageDelete: ((channelId: string, ids: string[], was: (DecryptedMessage | undefined)[]) => void)[];
   /** A message was edited or deleted, or conversations went away. */
   onMessageChange: ((c: MessageChange) => void)[];
-} = { onMessage: [], onUnhandled: [], onReady: [], onFriendRequest: [], onNexa: [], onNoteInvite: [], onMessageUpdate: [], onMessageDelete: [], onMessageChange: [] };
+  /** Everything else that happens, once the stores have it (appEvents.ts). */
+  onEvent: ((e: AppEvent) => void)[];
+} = { onMessage: [], onUnhandled: [], onReady: [], onFriendRequest: [], onNexa: [], onNoteInvite: [], onMessageUpdate: [], onMessageDelete: [], onMessageChange: [], onEvent: appEventHooks };
 
 /** The account's standing, and for staff what is waiting on them. */
 function applyNexaState(st: NexaState | undefined): void {
@@ -142,6 +145,11 @@ export function onReadyApplied(fn: () => void): () => void {
 // Channels are not cleared here: ready replaces them in one step, because a
 // call whose channel vanished from the store even for a moment is ended.
 export function resetAll(keepMessagesIn: string[] = []): void {
+  // emptied, nobody has left anything or stopped typing
+  quietly(() => clearStores(keepMessagesIn));
+}
+
+function clearStores(keepMessagesIn: string[]): void {
   useMessages.getState().clearAll(keepMessagesIn);
   // Ready does not bring back everyone the kept conversations show (people in
   // a large server, people who left), and their messages are never looked up
@@ -228,6 +236,11 @@ function quietMessage(channelId: string, messageId: string, author: string | und
   return !!author && rules.blocked.has(author);
 }
 
+/** A member as the store has them once a change is in, or as the event told it when the store keeps no members for that server. */
+function memberNow(serverId: string, told: Member): Member {
+  return useServers.getState().byId[serverId]?.members[told.user_id] ?? told;
+}
+
 function mentionedMe(channelId: string, messageId: string, meId: string | undefined, told?: Partial<MentionMeta>): boolean {
   if (!meId) return false;
   const loaded = useMessages.getState().channels[channelId]?.byId[messageId];
@@ -249,25 +262,33 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       // message.
       const active = useUI.getState().activeChannelId;
       const shown = active ? [active] : [];
-      resetAll(shown);
-      // Merged, not replaced: a field the gateway leaves out must not read as
-      // "none" here, or the next profile save sends that back and wipes it.
-      const was = useAuth.getState().me;
-      useAuth.getState().setMe(was && was.id === d.user.id ? { ...was, ...d.user } : d.user);
-      useUsers.getState().upsert([...d.users, d.user]);
-      // a reconnect may have missed what Nexa said meanwhile: open views load it again
-      useNexa.setState({ feed: null, threads: {} });
-      applyNexaState(d.nexa);
       const servers = d.servers ?? [];
-      const channels = [...d.channels, ...servers.flatMap((v) => v.channels), ...servers.flatMap((v) => v.threads ?? [])];
-      useChannels.setState({ byId: Object.fromEntries(channels.map((c) => [c.id, c])) });
-      useThreads.getState().clear();
-      for (const v of servers) useThreads.getState().setServer(v.id, v.threads ?? [], v.joined_threads ?? []);
-      useRelationships.getState().setMany(d.relationships);
-      useReadStates.getState().setMany(d.read_states);
-      useGroupAddNotices.getState().setAll(d.group_add_notices ?? []);
-      usePresence.getState().setMany(d.presences);
-      for (const view of servers) useServers.getState().setFromView(view);
+      // A reconnect: what changed while the connection was down is told once
+      // the stores are filled again. A first ready has nothing to compare with.
+      const reconnect = useAuth.getState().me?.id === d.user.id && (Object.keys(useServers.getState().byId).length > 0 || Object.keys(useRelationships.getState().byUser).length > 0);
+      const before = watched();
+      // filled from ready, nothing has been joined or changed: the store watchers stay quiet
+      quietly(() => {
+        resetAll(shown);
+        // Merged, not replaced: a field the gateway leaves out must not read as
+        // "none" here, or the next profile save sends that back and wipes it.
+        const was = useAuth.getState().me;
+        useAuth.getState().setMe(was && was.id === d.user.id ? { ...was, ...d.user } : d.user);
+        useUsers.getState().upsert([...d.users, d.user]);
+        // a reconnect may have missed what Nexa said meanwhile: open views load it again
+        useNexa.setState({ feed: null, threads: {} });
+        applyNexaState(d.nexa);
+        const channels = [...d.channels, ...servers.flatMap((v) => v.channels), ...servers.flatMap((v) => v.threads ?? [])];
+        useChannels.setState({ byId: Object.fromEntries(channels.map((c) => [c.id, c])) });
+        useThreads.getState().clear();
+        for (const v of servers) useThreads.getState().setServer(v.id, v.threads ?? [], v.joined_threads ?? []);
+        useRelationships.getState().setMany(d.relationships);
+        useReadStates.getState().setMany(d.read_states);
+        useGroupAddNotices.getState().setAll(d.group_add_notices ?? []);
+        usePresence.getState().setMany(d.presences);
+        for (const view of servers) useServers.getState().setFromView(view);
+      });
+      if (reconnect) reportMissed(before);
       useExpressions.getState().setAllEmojis(d.emojis ?? []);
       useExpressions.getState().setPacks(d.sticker_packs ?? []);
       // Recents ride REST rather than ready: one small request after the
@@ -298,7 +319,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       // the rules members' apps apply, from the servers that have any
       warmAutomod(servers.filter((v) => (v.automod_at ?? 0) > 0).map((v) => v.id));
       for (const fn of [...readyListeners]) fn();
-      for (const h of dispatchHooks.onReady) h();
+      each(dispatchHooks.onReady, (h) => h());
       void useKeys.getState().reconcile();
       void useDiscord.getState().load();
       // The notes ride REST, like the stickers above. Asked for again on every
@@ -355,7 +376,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         // none of your own, as the server counts them
         if (!mine && (!type || type === "dm" || type === "group_dm")) useReadStates.getState().bumpUnread(m.channel_id);
       }
-      for (const h of dispatchHooks.onMessage) h(m, mine, decrypted);
+      each(dispatchHooks.onMessage, (h) => h(m, mine, decrypted));
       return;
     }
     case "message_update": {
@@ -371,8 +392,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         else if (!before && after) useReadStates.getState().addMention(e.d.channel_id, e.d.id);
       }
       useMessages.getState().update(e.d.channel_id, decrypted);
-      for (const h of dispatchHooks.onMessageUpdate) h(decrypted);
-      for (const h of dispatchHooks.onMessageChange) h({ kind: "update", msg: decrypted });
+      each(dispatchHooks.onMessageUpdate, (h) => h(decrypted));
+      each(dispatchHooks.onMessageChange, (h) => h({ kind: "update", msg: decrypted }));
       return;
     }
     case "message_delete": {
@@ -390,8 +411,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       if (e.d.last_message_id !== undefined) useChannels.getState().resetLastMessage(e.d.channel_id, e.d.last_message_id);
       if (!uncounted) useReadStates.getState().dropUnread(e.d.channel_id, e.d.id);
       if (counted && !uncounted) useReadStates.getState().dropMention(e.d.channel_id, e.d.id);
-      for (const h of dispatchHooks.onMessageDelete) h(e.d.channel_id, [e.d.id], [was]);
-      for (const h of dispatchHooks.onMessageChange) h({ kind: "delete", channelId: e.d.channel_id, ids: [e.d.id] });
+      each(dispatchHooks.onMessageDelete, (h) => h(e.d.channel_id, [e.d.id], [was]));
+      each(dispatchHooks.onMessageChange, (h) => h({ kind: "delete", channelId: e.d.channel_id, ids: [e.d.id] }));
       return;
     }
     case "message_delete_bulk": {
@@ -404,13 +425,14 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       if (e.d.last_message_id !== undefined) useChannels.getState().resetLastMessage(e.d.channel_id, e.d.last_message_id);
       for (const id of e.d.ids) if (!uncounted.has(id)) useReadStates.getState().dropUnread(e.d.channel_id, id);
       for (const id of counted) useReadStates.getState().dropMention(e.d.channel_id, id);
-      for (const h of dispatchHooks.onMessageDelete) h(e.d.channel_id, e.d.ids, was);
-      for (const h of dispatchHooks.onMessageChange) h({ kind: "delete", channelId: e.d.channel_id, ids: e.d.ids });
+      each(dispatchHooks.onMessageDelete, (h) => h(e.d.channel_id, e.d.ids, was));
+      each(dispatchHooks.onMessageChange, (h) => h({ kind: "delete", channelId: e.d.channel_id, ids: e.d.ids }));
       return;
     }
     case "reaction_add":
     case "reaction_remove":
       useMessages.getState().setReaction(e.d.channel_id, e.d.message_id, e.d.emoji, e.d.user_id, e.t === "reaction_add", e.d.user_id === meId);
+      emitAppEvent({ type: "reaction", channelId: e.d.channel_id, messageId: e.d.message_id, userId: e.d.user_id, emoji: e.d.emoji, added: e.t === "reaction_add" });
       return;
     case "typing":
       if (e.d.user_id === meId) return;
@@ -424,17 +446,20 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "channel_update":
       useChannels.getState().upsert(e.d);
       fetchMissingUsers(e.d.recipient_ids);
+      emitAppEvent({ type: e.t === "channel_create" ? "channelCreated" : "channelUpdated", channel: useChannels.getState().byId[e.d.id] ?? e.d });
       return;
     case "channel_delete": {
       // a channel's threads go with it
       const gone = [e.d.id, ...Object.values(useChannels.getState().byId).filter((c) => isThread(c) && c.parent_id === e.d.id).map((c) => c.id)];
+      const had = gone.map((id) => useChannels.getState().byId[id] ?? null);
       for (const id of gone) {
         useChannels.getState().remove(id);
         useMessages.getState().clearChannel(id);
         useThreads.getState().forget(id);
       }
       useGroupAddNotices.getState().remove(e.d.id);
-      for (const h of dispatchHooks.onMessageChange) h({ kind: "channelsGone", channelIds: gone });
+      each(dispatchHooks.onMessageChange, (h) => h({ kind: "channelsGone", channelIds: gone }));
+      gone.forEach((id, i) => emitAppEvent({ type: "channelDeleted", id, serverId: had[i]?.server_id ?? (i === 0 ? (e.d.server_id ?? null) : null), channel: had[i] ?? null }));
       return;
     }
     case "thread_create":
@@ -447,19 +472,23 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         useMessages.getState().setThread(thread.parent_id, starter, { id: thread.id, name: thread.name, message_count: thread.thread?.message_count ?? 0, last_message_id: thread.last_message_id ?? null, archived: !!thread.thread?.archived, locked: !!thread.thread?.locked });
       }
       if (typeof member_count === "number") useThreads.getState().membersChanged(thread.id, [], [], member_count, meId);
-      for (const h of dispatchHooks.onUnhandled) h(e);
+      each(dispatchHooks.onUnhandled, (h) => h(e));
+      emitAppEvent({ type: e.t === "thread_create" ? "channelCreated" : "channelUpdated", channel: useChannels.getState().byId[thread.id] ?? thread });
       return;
     }
-    case "thread_delete":
+    case "thread_delete": {
+      const had = useChannels.getState().byId[e.d.id] ?? null;
       useChannels.getState().remove(e.d.id);
       useMessages.getState().clearChannel(e.d.id);
       useThreads.getState().forget(e.d.id);
-      for (const h of dispatchHooks.onUnhandled) h(e);
-      for (const h of dispatchHooks.onMessageChange) h({ kind: "channelsGone", channelIds: [e.d.id] });
+      each(dispatchHooks.onUnhandled, (h) => h(e));
+      each(dispatchHooks.onMessageChange, (h) => h({ kind: "channelsGone", channelIds: [e.d.id] }));
+      emitAppEvent({ type: "channelDeleted", id: e.d.id, serverId: e.d.server_id ?? had?.server_id ?? null, channel: had });
       return;
+    }
     case "thread_members_update":
       useThreads.getState().membersChanged(e.d.thread_id, e.d.added, e.d.removed, e.d.member_count, meId);
-      for (const h of dispatchHooks.onUnhandled) h(e);
+      each(dispatchHooks.onUnhandled, (h) => h(e));
       return;
     case "automod_rules_update": {
       const st = useServers.getState().byId[e.d.server_id];
@@ -476,7 +505,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         // a follow's key sealed again (or a new follow) opens copies that could not be read
         void useMessages.getState().redecrypt((m) => m.channel_id === channelId && m.type === "crosspost" && !!m.decryptError);
       }
-      for (const h of dispatchHooks.onUnhandled) h(e);
+      each(dispatchHooks.onUnhandled, (h) => h(e));
       return;
     case "channel_positions":
       useChannels.getState().applyPositions(e.d.channels);
@@ -484,7 +513,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "server_create":
       if (e.d.users) useUsers.getState().upsert(e.d.users);
       ingestServerView(e.d);
-      for (const h of dispatchHooks.onUnhandled) h(e);
+      each(dispatchHooks.onUnhandled, (h) => h(e));
       return;
     case "server_update":
       useServers.getState().updateServer(e.d);
@@ -501,8 +530,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       }
       useServers.getState().remove(e.d.id);
       useExpressions.getState().removeServer(e.d.id);
-      for (const h of dispatchHooks.onUnhandled) h(e);
-      for (const h of dispatchHooks.onMessageChange) h({ kind: "channelsGone", channelIds: gone });
+      each(dispatchHooks.onUnhandled, (h) => h(e));
+      each(dispatchHooks.onMessageChange, (h) => h({ kind: "channelsGone", channelIds: gone }));
       return;
     }
     case "emoji_update":
@@ -518,13 +547,18 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "member_add":
       useUsers.getState().upsert(e.d.user);
       useServers.getState().upsertMember(e.d.member, true);
+      emitAppEvent({ type: "memberJoined", serverId: e.d.server_id, member: memberNow(e.d.server_id, e.d.member) });
       return;
     case "member_update":
       useServers.getState().upsertMember(e.d);
+      emitAppEvent({ type: "memberUpdated", serverId: e.d.server_id, member: memberNow(e.d.server_id, e.d) });
       return;
-    case "member_remove":
+    case "member_remove": {
+      const had = useServers.getState().byId[e.d.server_id]?.members[e.d.user_id] ?? null;
       useServers.getState().removeMember(e.d.server_id, e.d.user_id, true);
+      emitAppEvent({ type: "memberLeft", serverId: e.d.server_id, userId: e.d.user_id, member: had });
       return;
+    }
     case "role_create":
     case "role_update":
       useServers.getState().upsertRole(e.d);
@@ -534,6 +568,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     case "presence":
       usePresence.getState().set(e.d);
+      emitAppEvent({ type: "presenceUpdated", presence: e.d });
       return;
     case "user_update":
       useUsers.getState().upsert(e.d);
@@ -541,12 +576,13 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         const me = useAuth.getState().me;
         if (me) useAuth.getState().setMe({ ...me, ...e.d, flags: me.flags });
       }
+      emitAppEvent({ type: "userUpdated", user: useUsers.getState().byId[e.d.id] ?? e.d });
       return;
     case "relationship_add": {
       const before = useRelationships.getState().byUser[e.d.user.id]?.type;
       useRelationships.getState().set(e.d);
       useUsers.getState().upsert(e.d.user);
-      if (e.d.type === "incoming" && before !== "incoming") for (const h of dispatchHooks.onFriendRequest) h(e.d);
+      if (e.d.type === "incoming" && before !== "incoming") each(dispatchHooks.onFriendRequest, (h) => h(e.d));
       return;
     }
     case "relationship_remove":
@@ -570,7 +606,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "note_invite": {
       const known = useNotes.getState().invites.some((i) => i.id === e.d.id);
       useNotes.getState().invited(e.d);
-      if (!known) for (const h of dispatchHooks.onNoteInvite) h(e.d);
+      if (!known) each(dispatchHooks.onNoteInvite, (h) => h(e.d));
       return;
     }
     case "note_invite_delete":
@@ -620,7 +656,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const ch = useMessages.getState().channels[e.d.channel_id];
       const m = ch?.byId[e.d.message_id];
       if (m) useMessages.getState().setFlags(e.d.channel_id, e.d.message_id, e.d.pinned ? m.flags | 1 : m.flags & ~1);
-      for (const h of dispatchHooks.onMessageChange) h({ kind: "pin", channelId: e.d.channel_id, id: e.d.message_id, pinned: e.d.pinned });
+      each(dispatchHooks.onMessageChange, (h) => h({ kind: "pin", channelId: e.d.channel_id, id: e.d.message_id, pinned: e.d.pinned }));
       return;
     }
     case "settings_update":
@@ -636,7 +672,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "nexa_notice":
       useNexa.getState().onNotice(e.d.case, e.d.people, e.d.state);
       applyNexaState(e.d.state);
-      for (const h of dispatchHooks.onNexa) h({ kind: "notice", case: e.d.case });
+      each(dispatchHooks.onNexa, (h) => h({ kind: "notice", case: e.d.case }));
       return;
     case "nexa_state":
       applyNexaState(e.d);
@@ -644,12 +680,12 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "nexa_case":
       useNexa.getState().onCase(e.d.case, e.d.messages, e.d.people, e.d.state);
       applyNexaState(e.d.state);
-      if (e.d.messages.some((m) => m.kind === "staff")) for (const h of dispatchHooks.onNexa) h({ kind: "reply", case: e.d.case });
+      if (e.d.messages.some((m) => m.kind === "staff")) each(dispatchHooks.onNexa, (h) => h({ kind: "reply", case: e.d.case }));
       return;
     case "nexa_announcement":
       useNexa.getState().onAnnouncement(e.d.announcement, e.d.people);
       emitModEvent({ type: "announcement", announcement: e.d.announcement, people: e.d.people });
-      for (const h of dispatchHooks.onNexa) h({ kind: "announcement", announcement: e.d.announcement });
+      each(dispatchHooks.onNexa, (h) => h({ kind: "announcement", announcement: e.d.announcement }));
       return;
     case "nexa_announcement_delete":
       useNexa.getState().onAnnouncementGone(e.d.id);
@@ -659,7 +695,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useModeration.getState().setCounts(e.d.counts);
       emitModEvent({ type: "case", case: e.d.case, messages: e.d.messages, people: e.d.people });
       // a member writing is what the staff are waiting for
-      if (e.d.messages.some((m) => m.kind === "member")) for (const h of dispatchHooks.onNexa) h({ kind: "appeal", caseId: e.d.case.id, userId: e.d.case.user_id });
+      if (e.d.messages.some((m) => m.kind === "member")) each(dispatchHooks.onNexa, (h) => h({ kind: "appeal", caseId: e.d.case.id, userId: e.d.case.user_id }));
       return;
     case "mod_log":
       emitModEvent({ type: "log", entry: e.d.entry, people: e.d.people });
@@ -706,7 +742,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "invite_create":
     case "invite_delete":
     case "webhooks_update":
-      for (const h of dispatchHooks.onUnhandled) h(e);
+      each(dispatchHooks.onUnhandled, (h) => h(e));
       return;
     case "poll_vote_add":
     case "poll_vote_remove":

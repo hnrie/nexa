@@ -33,7 +33,7 @@ context menu registry, is being built.
 - [x] CLAUDE.md: menus come from the registry
 - [x] Commit and push
 
-## 2. Dispatch hooks (planned, not started)
+## 2. Dispatch hooks (done, committed, not pushed)
 
 What the v2 events will be built on: one hook per thing that can happen, fired by the gateway's
 dispatch (`web/src/gateway/dispatch.ts`) after the stores have the change, with what was there before
@@ -45,44 +45,51 @@ Already there and kept as they are: `onMessage` (a message arrives, decrypted), 
 `onMessageDelete` (after the message is gone, with the message as it was), `onMessageChange` (the
 search index), `onFriendRequest`, `onReady`. Blocking a deletion is left out of this release.
 
-- [ ] One typed hook list, `dispatchHooks.onEvent`, taking an `AppEvent` (a union in
+- [x] One typed hook list, `dispatchHooks.onEvent`, taking an `AppEvent` (a union in
   `gateway/appEvents.ts`) instead of a separate list for every event:
-  - [ ] `reaction` (channel, message, user, emoji, added or removed), from `reaction_add` and `reaction_remove`
-  - [ ] `typing` (channel, user, started or stopped), see the typing item below
-  - [ ] `memberJoined`, `memberUpdated` (the member after the change), `memberLeft` (server, user,
+  - [x] `reaction` (channel, message, user, emoji, added or removed), from `reaction_add` and `reaction_remove`
+  - [x] `typing` (channel, user, started or stopped), see the typing item below
+  - [x] `memberJoined`, `memberUpdated` (the member after the change), `memberLeft` (server, user,
     and the member as this device had it, read before `removeMember`), from `member_add`,
     `member_update`, `member_remove`
-  - [ ] `serverJoined` (the server once it is in the store), `serverLeft` (id, and the server as it
+  - [x] `serverJoined` (the server once it is in the store), `serverLeft` (id, and the server as it
     was, read before it is removed): only when a server comes or goes, not for the servers `ready`
     brings, nor twice when the REST answer to joining or creating and the `server_create` event both
     arrive. Leaving, being kicked or banned and a server being deleted all count as leaving
-  - [ ] `channelCreated`, `channelUpdated`, `channelDeleted` (id, server, and the channel as it was),
+  - [x] `channelCreated`, `channelUpdated`, `channelDeleted` (id, server, and the channel as it was),
     from the channel and thread events, DMs and groups included. A channel deleted with its threads
     is one event per channel
-  - [ ] `userUpdated` (the user after the change, from `user_update`, the signed-in account's own included)
-  - [ ] `presenceUpdated` (user and status), from `presence`
-  - [ ] `relationshipChanged` (the user, the new kind and the old one, `none` when there was or is
+  - [x] `userUpdated` (the user after the change, from `user_update`, the signed-in account's own included)
+  - [x] `presenceUpdated` (user and status), from `presence`
+  - [x] `relationshipChanged` (the user, the new kind and the old one, `none` when there was or is
     no relationship), from `relationship_add` and `relationship_remove`
-  - [ ] `localeChanged` (the new language), fired by `i18n` once the new catalogue has loaded, through
+  - [x] `localeChanged` (the new language), fired by `i18n` once the new catalogue has loaded, through
     a small listener list there, since the language is switched in React and not by the gateway
-- [ ] A listener that throws is caught and logged and never stops the dispatch or the other
-  listeners (today's hooks are called bare)
-- [ ] Typing: a hook on the typing store (`stores/typing.ts`) rather than on the gateway, so every
+- [x] A listener that throws is caught and logged and never stops the dispatch or the other
+  listeners (today's hooks are called bare): every `dispatchHooks` call goes through `each`
+- [x] Added while building: after a reconnect's `ready`, what changed while the connection was down
+  (a server left or joined, a relationship, everyone typing having stopped) is told once the stores
+  are filled again, since `ready` itself fills them quietly
+- [x] Typing: a hook on the typing store (`stores/typing.ts`) rather than on the gateway, so every
   way typing ends is caught: `started` when someone starts showing as typing (not again for each
   refresh while they keep typing), `stopped` when they stop showing, whether the server said so
   (`typing` with `stop`), their message arrived (dispatch already takes them off then) or their 10
   seconds ran out in the sweep. Someone blocked never shows as typing, so never fires either
-- [ ] Tests (`gateway/dispatch.test.ts` and new ones beside the typing store and `i18n`): every
+- [x] Tests (`gateway/dispatch.test.ts` and new ones beside the typing store and `i18n`): every
   event fires once with the right payload and after the store has the change; what was there is
   handed over when something goes; `ready` fires no `serverJoined`; a join seen twice fires once;
   typing starts once, stops on a stop, on a message and on expiry; a listener that throws leaves
   the rest working
-- [ ] Nothing changes for people: the existing web tests pass with no new failures, and a quick
-  look on a throwaway server that messages, deletions, reactions, typing and joining still look
-  as they do on `main`
-- [ ] `tools/check.sh`
-- [ ] CLAUDE.md: the hooks and `AppEvent` under the gateway section
-- [ ] Commit and push
+- [x] Nothing changes for people: the existing web tests pass with no new failures (the same 110
+  fail as before), and on the throwaway server Bob typing (the line under the chat, the dot pill,
+  the dots after the channel name), his message arriving, Alice's reaction and Bob deleting it all
+  work at 1366x768 and 411x914, with no page errors. Joining was not driven in the browser; the
+  unit tests cover it
+- [x] `tools/check.sh`: everything passes but web tests (the same 110 as before) and the three
+  desktop steps (`desktop/node_modules` is not installed here). App size passes: 321.5 kB of the
+  330 kB the front page now says; this step adds about 1.3 kB
+- [x] CLAUDE.md: the hooks and `AppEvent` under the gateway section
+- [x] Commit (not pushed: pushing waits until the owner says)
 
 ## 3. v2 runtime, permissions and managers (not started)
 

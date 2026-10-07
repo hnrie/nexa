@@ -65,9 +65,9 @@ new built-in ones. If an extra seems worth having, suggest it instead of shippin
 
 1. Run the checks (`tools/check.sh` covers most of them) and the web and Android testing above,
    and update this file if the change touched anything it describes.
-2. Commit on `main` and push it to GitHub: `git push origin main`. The owner also works on another
-   machine and pulls from GitHub, so unpushed work is lost to them. Never commit `chatd.env`,
-   `android/keystore.properties` or any token.
+2. Commit on `main`, and push to GitHub (`git push origin main`) only when the owner says to push.
+   The owner also works on another machine and pulls from GitHub, so say what is committed and not
+   yet pushed. Never commit `chatd.env`, `android/keystore.properties` or any token.
 3. After a round of app changes, leave a throwaway server with the new build running and give the
    owner its address so they can try it. WebCrypto needs https or localhost, so from another machine
    it is reached through an SSH tunnel to localhost, not the plain LAN address. Do not deploy until
@@ -383,6 +383,18 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
 - A new event touches: the constant in `protocol.go`, the emit in the handler, its type in
   `web/src/gateway/events.ts`, its handling in `web/src/gateway/dispatch.ts` (which updates the
   stores), and the same on Android (`fish.nexa.data.Session`).
+- What follows the app without being part of it (plugins, the search index, notifications) listens
+  through `dispatchHooks` in `dispatch.ts`, each hook called inside a try/catch (`each`), so a
+  listener that throws stops nothing. `dispatchHooks.onEvent` takes the `AppEvent`s of
+  `gateway/appEvents.ts`, each fired once the stores have the change, with what was there when
+  something goes: reactions, typing started and stopped, members joined, updated and left, servers
+  joined and left, channels and threads created, updated and deleted, user and presence updates,
+  relationship changes and the language changing (`onLocaleChange` in `i18n`, once the new
+  language's words have loaded). Servers, relationships and typing are told by watching their
+  stores, since they also change without an event or arrive twice (a REST answer and its event);
+  `ready` and sign-out fill and empty the stores inside `quietly`, and after a reconnect's `ready`
+  `reportMissed` tells what changed while the connection was down. A deleted message cannot be
+  kept on screen by a listener (left for a later update).
 
 ### Database (`internal/db`, `internal/store`)
 
