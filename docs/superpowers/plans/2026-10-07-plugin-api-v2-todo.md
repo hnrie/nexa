@@ -273,6 +273,64 @@ people until a v2 plugin uses these.
 - [x] CLAUDE.md: plugin commands, plugin keybinds and `pluginKeybinds`, the warning toast
 - [x] Commit (not pushed: pushing waits until the owner says)
 
-## 5. UI through the design pass (not started)
+## 5. UI through the design pass (planned, not started)
+
+Everything about plugins people see and touch, designed first: the `frontend-design` skill is
+invoked before any of it is drawn, as CLAUDE.md requires, and its direction is followed for every
+piece below. Web only (plugins never run on Android, so there is no Android side to match), at
+desktop and phone width. Every new word goes into all eleven languages.
+
+- [x] Decided by the owner: installing is all or nothing (the whole list, or the plugin is not
+  added), and any permission can be taken away or given later on the Plugins page; icons on
+  plugins' menu buttons are lucide icons by name, each loaded only when a menu shows it
+  (`DynamicIcon`), no icon for an unknown name, the app's own buttons staying without
+- [ ] The `frontend-design` skill was not installed in this session; the owner is installing it.
+  Until it is there, only the parts with no design in them are built (the permission wording, the
+  grant rules, saving keybinds); every screen waits for the design pass
+- [ ] Design pass: invoke `frontend-design:frontend-design`, look at the Plugins page, the add and
+  update dialogs, Settings, Keybinds, the toasts and the menus as they are, and settle the direction
+  for every piece below before any of it is built
+- [x] Words for every permission (`lib/look/plugins/permissions.ts`, `permissionWords`): a short
+  name and one plain sentence saying what it lets a plugin do, 25 of each, in all eleven languages;
+  `stores` says plainly that it reaches everything, past every other permission
+- [x] The grant rules, without their screens: installing grants the whole list (`grantChange` in
+  `permissions.ts`); new code (Edit Code, or a link plugin's update once accepted) keeps what it
+  still asks for and drops the rest, and anything it asks for anew is not granted until the screens
+  below ask for it. A link plugin's new code is read only once the update is accepted
+- [x] Saving plugin keybinds without their screen: `setPluginBind` and `bindClash` (the app's keybind
+  or another plugin's on the same keys) in `lib/pluginKeybinds.ts`, with tests
+- [ ] Adding a plugin (`AddPluginDialog`): in two stages. First the link or the code; then, once the
+  code is read, what it is (name, author, version, fingerprint) and:
+  - [ ] a v2 plugin: the permissions it asks for, each with its sentence, `stores` marked as
+    dangerous, and the note that permissions say what a plugin means to do but are not a sandbox;
+    adding it grants that list
+  - [ ] a v1 plugin: the warning that plugins written for the old API ask for nothing and have
+    full access to the account
+  - [ ] the tick for "I understand and trust its author" moves to this second stage, beside what it
+    is agreeing to; nothing is added before it
+- [ ] New code asking for more (`PluginUpdateDialog` for a plugin from a link, Edit Code for a pasted
+  one): what it asks for that it did not have before, said plainly; accepting grants it, and keeping
+  the old code keeps the old grants. Code that asks for less drops what it no longer asks for
+- [ ] The Plugins page: for a v2 plugin, its permissions, each with a switch; switching one off
+  takes it away at once (the running plugin's next call fails, its events stop); one it asks for
+  but was not granted can be switched on. A v1 plugin is marked as having full access instead
+- [ ] Settings, Keybinds: a section for each running plugin with keybinds, under the plugin's name,
+  each keybind with its name, description and the same recorder the app's keybinds use: the same
+  rules for which keys can be a keybind, reserved combinations refused, a combination the app's own
+  keybinds or another plugin's already have pointed out. A section is there only while its plugin
+  runs; the keys stay saved while it is off
+- [ ] The warning toast's look (its mark in the warning colour, as the error and success ones have
+  theirs), in every theme
+- [ ] Icons on plugins' menu buttons, as the open question decides
+- [ ] Tests: the add dialog's stages (a v2 plugin's list, a v1 plugin's warning, nothing added
+  without the tick), new code asking for more and for less, switching a permission off and on, the
+  keybind section (recording, refused combinations, a clash pointed out), a menu button's icon, the
+  warning toast's kind
+- [ ] On a throwaway server, every piece above at 1366x768 and 411x914, in Dark, Light and one
+  preset, screenshots looked at; a v2 plugin installed, a permission taken away while it runs, a
+  plugin keybind recorded and pressed, a link plugin's update that asks for more
+- [ ] `tools/check.sh`, `python3 tools/i18n_check.py`, `python3 tools/i18n_keys_used.py`
+- [ ] CLAUDE.md: the prompt, the permissions editor, the Keybinds section, menu icons
+- [ ] Commit (push only when the owner says)
 
 ## 6. Docs, example, What's New, CLAUDE.md, final testing (not started)

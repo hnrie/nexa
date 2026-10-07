@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { useSettings } from "@/stores/settings";
-import { parseBind, sameCombo, type Combo } from "./keybinds";
+import { formatBind, KEYBIND_ACTIONS, keybindsOf, parseBind, sameCombo, type Combo, type KeybindAction } from "./keybinds";
 
 /**
  * The keybinds running plugins have registered (the v2 plugin API's
@@ -81,4 +81,38 @@ export function runPluginKeybinds(c: Combo | null, repeat = false, now = Date.no
     }
   }
   return any;
+}
+
+/** Saves the keys for a plugin's keybind with the account, or with null takes them off. */
+export function setPluginBind(pluginId: string, id: string, bind: string | null): void {
+  const st = useSettings.getState();
+  const all = { ...st.settings.pluginKeybinds };
+  const mine = { ...(all[pluginId] ?? {}) };
+  const c = bind ? parseBind(bind) : null;
+  if (c) mine[id] = formatBind(c);
+  else delete mine[id];
+  if (Object.keys(mine).length) all[pluginId] = mine;
+  else delete all[pluginId];
+  st.patch({ pluginKeybinds: all });
+}
+
+/** What already answers to a combination: one of the app's keybinds, or another plugin keybind (running or not). */
+export type BindClash = { kind: "app"; action: KeybindAction } | { kind: "plugin"; pluginId: string; id: string; plugin: string | null; name: string | null };
+
+/** Whatever else has these keys, apart from the keybind being set; null when nothing does. */
+export function bindClash(c: Combo, except: { pluginId: string; id: string }): BindClash | null {
+  const settings = useSettings.getState().settings;
+  const app = keybindsOf(settings.keybinds);
+  const action = KEYBIND_ACTIONS.find((a) => sameCombo(parseBind(app[a]), c));
+  if (action) return { kind: "app", action };
+  const registered = usePluginKeybinds.getState().byPlugin;
+  for (const [pluginId, binds] of Object.entries(settings.pluginKeybinds)) {
+    for (const [id, bind] of Object.entries(binds)) {
+      if (pluginId === except.pluginId && id === except.id) continue;
+      if (!sameCombo(parseBind(bind), c)) continue;
+      const known = registered[pluginId];
+      return { kind: "plugin", pluginId, id, plugin: known?.plugin ?? null, name: known?.keybinds[id]?.name ?? null };
+    }
+  }
+  return null;
 }

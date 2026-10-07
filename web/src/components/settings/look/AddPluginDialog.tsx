@@ -9,6 +9,7 @@ import { codeHash } from "@/lib/look/hash";
 import { byteLength, packText } from "@/lib/look/pack";
 import { apiVersionOf, importPlugin, metaOf, permissionsOf } from "@/lib/look/plugins/runtime";
 import type { NexaPlugin } from "@/lib/look/plugins/api";
+import { grantChange } from "@/lib/look/plugins/permissions";
 import { MAX_PASTED_PLUGIN_BYTES, MAX_PASTED_TOTAL_BYTES, linkName, newLookId } from "@/lib/look/sanitize";
 import type { PluginEntry } from "@/lib/look/types";
 import { formatBytes } from "@/lib/time";
@@ -26,14 +27,14 @@ type Source = "url" | "code";
  * exactly this code is what the plugin is pinned to.
  */
 /**
- * What a v2 plugin is granted as it is added: what it asks for. The prompt
- * that asks the person first is still to come (step 5 of the plugin plan).
- * New code for a plugin keeps the grants it had; asking for more waits for
- * that prompt. A v1 plugin asks for nothing.
+ * What a v2 plugin is granted as it is added: installing is all or nothing,
+ * so the whole list it asks for. New code for a plugin keeps what it had and
+ * still asks for, and drops what it no longer asks for; what it asks for anew
+ * waits until the person has said yes to it. A v1 plugin asks for nothing.
  */
 function grantsFor(plugin: NexaPlugin, had: PluginEntry | undefined): Pick<PluginEntry, "permissions"> {
   if (apiVersionOf(plugin) !== 2) return {};
-  if (had && Array.isArray(had.permissions)) return { permissions: had.permissions };
+  if (had && Array.isArray(had.permissions)) return { permissions: grantChange(had.permissions, permissionsOf(plugin)).keep };
   return { permissions: permissionsOf(plugin) };
 }
 
