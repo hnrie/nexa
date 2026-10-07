@@ -284,6 +284,12 @@ desktop and phone width. Every new word goes into all eleven languages.
   added), and any permission can be taken away or given later on the Plugins page; icons on
   plugins' menu buttons are lucide icons by name, each loaded only when a menu shows it
   (`DynamicIcon`), no icon for an unknown name, the app's own buttons staying without
+- [x] Decided by the owner: before anyone has agreed to a plugin, its code is never run. The review
+  stage of adding one, and an update from its link, read what it says about itself from its text
+  (`lib/look/plugins/declaration.ts`: `apiVersion`, a plainly written `permissions` list, and the
+  name, description, version and author), and what is granted is exactly that list. A plugin whose
+  list is not written out plainly gets nothing until it is given permissions on the Plugins page.
+  Built, with tests; the add and update dialogs grant from it already
 - [ ] The `frontend-design` skill was not installed in this session; the owner is installing it.
   Until it is there, only the parts with no design in them are built (the permission wording, the
   grant rules, saving keybinds); every screen waits for the design pass

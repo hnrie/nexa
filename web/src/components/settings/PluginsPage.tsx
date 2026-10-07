@@ -6,7 +6,8 @@ import { t } from "@/i18n";
 import { codeKey, lookCache } from "@/lib/look/cache";
 import { shortHash } from "@/lib/look/hash";
 import { byteLength, unpackText } from "@/lib/look/pack";
-import { checkForUpdate, dismissUpdate, importPlugin, permissionsOf, retryPlugin, syncPlugins, usePlugins, type PluginState } from "@/lib/look/plugins/runtime";
+import { checkForUpdate, dismissUpdate, retryPlugin, syncPlugins, usePlugins, type PluginState } from "@/lib/look/plugins/runtime";
+import { readDeclaration } from "@/lib/look/plugins/declaration";
 import { grantChange } from "@/lib/look/plugins/permissions";
 import { useSafeMode } from "@/lib/look/safeMode";
 import { MAX_PLUGINS, linkName, sanitizePlugins, sanitizeValues } from "@/lib/look/sanitize";
@@ -112,11 +113,6 @@ export default function PluginsPage() {
 
   const setList = (next: PluginEntry[]) => patch({ plugins: next });
   const update = (id: string, change: Partial<PluginEntry>) => setList(list.map((p) => (p.id === id ? { ...p, ...change } : p)));
-  /** A plugin's grants, written onto the list as it is now (it may have changed while the new code was read). */
-  const updatePermissions = (id: string, permissions: string[]) => {
-    const now = sanitizePlugins(useSettings.getState().settings.plugins);
-    patch({ plugins: now.map((p) => (p.id === id ? { ...p, permissions } : p)) });
-  };
 
   const pastedTotal = async (except?: string) => {
     let total = 0;
@@ -296,17 +292,10 @@ export default function PluginsPage() {
           onAccept={() => {
             retryPlugin(reviewEntry.id);
             dismissUpdate(reviewEntry.id);
-            // the new hash is the approval, on every device of the account; the grants
-            // are what the new code still asks for, read only now that it is approved
-            const entry = reviewEntry;
-            const code = reviewUpdate.code;
-            update(entry.id, { hash: reviewUpdate.hash, enabled: true });
-            if (Array.isArray(entry.permissions)) {
-              void importPlugin(code).then(
-                (plugin) => updatePermissions(entry.id, grantChange(entry.permissions ?? [], permissionsOf(plugin)).keep),
-                () => undefined,
-              );
-            }
+            // the new hash is the approval, on every device of the account; the grants are
+            // what the new code still asks for, read from its text without running it
+            const asked = readDeclaration(reviewUpdate.code).permissions ?? [];
+            update(reviewEntry.id, { hash: reviewUpdate.hash, enabled: true, ...(Array.isArray(reviewEntry.permissions) ? { permissions: grantChange(reviewEntry.permissions, asked).keep } : {}) });
             setReviewing(null);
             toast(t("look.plugins.updated", { name: nameOf(reviewEntry, states[reviewEntry.id]) }), "success");
           }}

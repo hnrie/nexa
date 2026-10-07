@@ -22,7 +22,7 @@ import { noteHealthy, setLookActive } from "../safeMode";
 import { sanitizeMeta, sanitizePlugins, sanitizeValues } from "../sanitize";
 import { loadAllMenus } from "@/lib/contextMenus/all";
 import { buildApiV2 } from "./runtimeV2";
-import { cleanPermissions, type PermissionName } from "./permissions";
+import type { PermissionName } from "./permissions";
 import { setSheets, type Sheet } from "../styles";
 import type { PluginEntry, PluginMeta } from "../types";
 import { PLUGIN_API_VERSION, type NexaPlugin, type NexaPluginApi, type PluginCommandDef, type PluginEventName, type PluginEvents, type PluginMessage, type PluginSetting, type SettingValue } from "./api";
@@ -140,11 +140,6 @@ export function apiVersionOf(p: Partial<NexaPlugin>): 1 | 2 {
   if (v === undefined || v === null || v === 1) return 1;
   if (v === 2) return 2;
   throw new Error(t("look.plugins.errorVersion", { version: String(v).slice(0, 20) }));
-}
-
-/** The permissions a plugin asks for (v2), the known ones only. */
-export function permissionsOf(p: Partial<NexaPlugin>): string[] {
-  return cleanPermissions((p as { permissions?: unknown }).permissions);
 }
 
 /** What a plugin says about itself, checked. */

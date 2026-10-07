@@ -7,7 +7,8 @@ import { codeKey, lookCache } from "@/lib/look/cache";
 import { FetchError, checkLink, fetchFailure, fetchText } from "@/lib/look/fetchText";
 import { codeHash } from "@/lib/look/hash";
 import { byteLength, packText } from "@/lib/look/pack";
-import { apiVersionOf, importPlugin, metaOf, permissionsOf } from "@/lib/look/plugins/runtime";
+import { apiVersionOf, importPlugin, metaOf } from "@/lib/look/plugins/runtime";
+import { readDeclaration } from "@/lib/look/plugins/declaration";
 import type { NexaPlugin } from "@/lib/look/plugins/api";
 import { grantChange } from "@/lib/look/plugins/permissions";
 import { MAX_PASTED_PLUGIN_BYTES, MAX_PASTED_TOTAL_BYTES, linkName, newLookId } from "@/lib/look/sanitize";
@@ -32,10 +33,12 @@ type Source = "url" | "code";
  * still asks for, and drops what it no longer asks for; what it asks for anew
  * waits until the person has said yes to it. A v1 plugin asks for nothing.
  */
-function grantsFor(plugin: NexaPlugin, had: PluginEntry | undefined): Pick<PluginEntry, "permissions"> {
+function grantsFor(plugin: NexaPlugin, code: string, had: PluginEntry | undefined): Pick<PluginEntry, "permissions"> {
   if (apiVersionOf(plugin) !== 2) return {};
-  if (had && Array.isArray(had.permissions)) return { permissions: grantChange(had.permissions, permissionsOf(plugin)).keep };
-  return { permissions: permissionsOf(plugin) };
+  // what is granted is what the code says in writing, the list the person is shown (declaration.ts)
+  const asked = readDeclaration(code).permissions ?? [];
+  if (had && Array.isArray(had.permissions)) return { permissions: grantChange(had.permissions, asked).keep };
+  return { permissions: asked };
 }
 
 export function AddPluginDialog({ initial, editing, pastedElsewhere, taken, onClose, onSave }: { initial: Source; editing?: { entry: PluginEntry; code: string }; pastedElsewhere: number; taken: string[]; onClose: () => void; onSave: (entry: PluginEntry) => void }) {
@@ -82,7 +85,7 @@ export function AddPluginDialog({ initial, editing, pastedElsewhere, taken, onCl
         settings: editing?.entry.settings ?? {},
         meta,
         addedAt: editing?.entry.addedAt ?? Date.now(),
-        ...grantsFor(plugin, editing?.entry),
+        ...grantsFor(plugin, text, editing?.entry),
       });
     } catch (err) {
       setError(err instanceof FetchError ? fetchFailure(err.reason, err.status) : err instanceof Error ? err.message : String(err));
