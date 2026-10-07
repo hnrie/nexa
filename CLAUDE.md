@@ -668,9 +668,13 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   `PluginEntry.permissions` in the account's settings; every v2 method checks its permission when
   it is called (`PermissionError`; a method that returns a promise rejects with it), events are
   delivered only with the permission for what they carry, and context objects leave out what a
-  plugin may not see. Until the install prompt exists (step 5 of
-  `docs/superpowers/plans/2026-10-07-plugin-api-v2.md`) a v2 plugin is granted what it asks for
-  when it is added. v2 events are built on `dispatchHooks` (above); v2 stylesheets go when the
+  plugin may not see. Before anyone has agreed to a plugin its code never runs: the Add Plugin
+  dialog's review stage and a link plugin's update read its API version, its plainly written
+  `permissions` list and who it is from the text (`declaration.ts`), and what is granted is exactly
+  that list (installing is all or nothing; new code keeps what it still asks for, asks again for
+  anything new, drops the rest). `components/settings/look/PermissionLedger.tsx` draws a list of
+  permissions, grouped by what they touch, everywhere one is shown: the add dialog, the update
+  dialog and each v2 plugin's Permissions panel on the Plugins page, with a switch for each. v2 events are built on `dispatchHooks` (above); v2 stylesheets go when the
   plugin stops unless added with `persist`. Plugins never run on Android.
 - Plugin commands sit beside the app's own in `components/composer/commands.ts`: a v1 plugin's is
   refused a taken name and its return value is sent; a v2 plugin's (`takePluginCommand`) takes the
@@ -680,7 +684,11 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   people chose are the account's `pluginKeybinds` setting (by plugin id, then keybind id, checked
   by `sanitizePluginKeybinds`, which also forgets a deleted plugin's). Toasts have a fourth kind,
   `warning`, and `toast(text, kind, duration)` takes a duration from 1 to 15 seconds, which only
-  plugins' toasts use.
+  plugins' toasts use. Settings, Keybinds has a Plugins section (`components/settings/PluginKeybinds.tsx`)
+  for every running plugin's keybinds, recorded by the same rules as the app's own, pointing out
+  keys the app or another plugin already has. A plugin's menu button may name a lucide icon, drawn
+  by `components/common/MenuIcon.tsx`, which loads (with lucide's list of every icon) only when a
+  menu shows one; the app's own buttons have no icons.
 - `pages/`: one per route. `styles/`: `tokens.css` (every theme token: colour, radius, shadow,
   motion), `base.css`, `markdown.css`, `fonts.css` (Wix Madefor) and `fonts-classic.css` (Onest,
   Mona Sans). `lib/theme.ts` applies a theme; `lib/look/` derives presets and custom themes.
