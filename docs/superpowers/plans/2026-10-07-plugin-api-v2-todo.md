@@ -33,7 +33,70 @@ context menu registry, is being built.
 - [x] CLAUDE.md: menus come from the registry
 - [x] Commit and push
 
-## 2. Dispatch hooks and the delete hook order (not started)
+## 2. Dispatch hooks and the delete hook order (planned, not started)
+
+What the v2 events will be built on: one hook per thing that can happen, fired by the gateway's
+dispatch (`web/src/gateway/dispatch.ts`) after the stores have the change, with what was there before
+when something goes. Step 2 only adds the hooks on the app's own wire types; turning them into the
+plugin API's `messageCreated`, `memberJoined` and so on, with permissions, is step 3. Nothing
+anyone sees changes, so there is no UI work, no What's New entry and no Android work.
+
+Already there and kept as they are: `onMessage` (a message arrives, decrypted), `onMessageUpdate`,
+`onMessageDelete`, `onMessageChange` (the search index), `onFriendRequest`, `onReady`.
+
+- [ ] Open questions, answered by the owner before building:
+  - [ ] A deletion a listener blocks: the message stays in the chat as it was, with nothing marking
+    it. Should its thread card, its place in Pinned Messages and the search index keep it too (my
+    suggestion: yes, all of the app keeps it, so it looks as if nothing happened), while the unread
+    and mention counts still drop as they do today? It is gone again after a reload either way,
+    since the server no longer has it.
+  - [ ] Should v1 plugins still get `messageDelete` for a deletion a v2 plugin blocked (my
+    suggestion: yes, v1 behaves exactly as it does today)?
+- [ ] One typed hook list, `dispatchHooks.onEvent`, taking an `AppEvent` (a union in
+  `gateway/appEvents.ts`) instead of a separate list for every event:
+  - [ ] `reaction` (channel, message, user, emoji, added or removed), from `reaction_add` and `reaction_remove`
+  - [ ] `typing` (channel, user, started or stopped), see the typing item below
+  - [ ] `memberJoined`, `memberUpdated` (the member after the change), `memberLeft` (server, user,
+    and the member as this device had it, read before `removeMember`), from `member_add`,
+    `member_update`, `member_remove`
+  - [ ] `serverJoined` (the server once it is in the store), `serverLeft` (id, and the server as it
+    was, read before it is removed): only when a server comes or goes, not for the servers `ready`
+    brings, nor twice when the REST answer to joining or creating and the `server_create` event both
+    arrive. Leaving, being kicked or banned and a server being deleted all count as leaving
+  - [ ] `channelCreated`, `channelUpdated`, `channelDeleted` (id, server, and the channel as it was),
+    from the channel and thread events, DMs and groups included. A channel deleted with its threads
+    is one event per channel
+  - [ ] `userUpdated` (the user after the change, from `user_update`, the signed-in account's own included)
+  - [ ] `presenceUpdated` (user and status), from `presence`
+  - [ ] `relationshipChanged` (the user, the new kind and the old one, `none` when there was or is
+    no relationship), from `relationship_add` and `relationship_remove`
+  - [ ] `localeChanged` (the new language), fired by `i18n` once the new catalogue has loaded, through
+    a small listener list there, since the language is switched in React and not by the gateway
+- [ ] A listener that throws is caught and logged and never stops the dispatch or the other
+  listeners (today's hooks are called bare)
+- [ ] Typing: a hook on the typing store (`stores/typing.ts`) rather than on the gateway, so every
+  way typing ends is caught: `started` when someone starts showing as typing (not again for each
+  refresh while they keep typing), `stopped` when they stop showing, whether the server said so
+  (`typing` with `stop`), their message arrived (dispatch already takes them off then) or their 10
+  seconds ran out in the sweep. Someone blocked never shows as typing, so never fires either
+- [ ] The delete order: a new `beforeMessageDelete` hook list, asked with the channel, the id and the
+  message as this device had it, before anything is removed. If any listener returns `false`
+  (synchronously; a promise counts as no), the message is kept on this device as the answer to
+  the first open question says, and the rest of the bookkeeping runs as it does today. Bulk
+  deletions ask for each message on its own. `onMessageDelete` then fires after, as today, for
+  everything, kept or not, with which ones were kept
+- [ ] Tests (`gateway/dispatch.test.ts` and new ones beside the typing store and `i18n`): every
+  event fires once with the right payload and after the store has the change; what was there is
+  handed over when something goes; `ready` fires no `serverJoined`; a join seen twice fires once;
+  typing starts once, stops on a stop, on a message and on expiry; a blocked deletion keeps the
+  message and still drops the counts; a bulk deletion with one kept; a listener that throws leaves
+  the rest working
+- [ ] Nothing changes for people: the existing web tests pass with no new failures, and a quick
+  look on a throwaway server that messages, deletions, reactions, typing and joining still look
+  as they do on `main`
+- [ ] `tools/check.sh`
+- [ ] CLAUDE.md: the hooks, `AppEvent` and `beforeMessageDelete` under the gateway section
+- [ ] Commit and push
 
 ## 3. v2 runtime, permissions and managers (not started)
 
