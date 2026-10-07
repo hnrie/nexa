@@ -20,7 +20,7 @@ export function Toasts() {
       {toasts.map((x) => (
         <button key={x.id} className={[s.toast, s[x.kind]].join(" ")} onClick={() => dismiss(x.id)} onMouseEnter={() => hold(true)} onMouseLeave={() => hold(false)} onFocus={() => hold(true)} onBlur={() => hold(false)}>
           {/* Severity was carried by a 4px border colour and nothing else. */}
-          <span className="visually-hidden">{x.kind === "error" ? t("toasts.error") : x.kind === "success" ? t("toasts.done") : t("toasts.note")}{": "}</span>
+          <span className="visually-hidden">{x.kind === "error" ? t("toasts.error") : x.kind === "success" ? t("toasts.done") : x.kind === "warning" ? t("toasts.warning") : t("toasts.note")}{": "}</span>
           {/* An error is worth interrupting for; the rest wait for a pause.
               It goes on a span inside, not on the button, because `role="alert"`
               on the button would replace its own role and the toast would stop

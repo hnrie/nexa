@@ -17,6 +17,10 @@ import type { Channel as WireChannel, Member, MeUser, Message as WireMessage, Pu
 import { users as usersApi, type MePatch } from "@/api/users";
 import { api as client } from "@/api/client";
 import { editMessage, sendMessage } from "@/components/composer/send";
+import { isBuiltInCommand, takePluginCommand, unregisterPluginCommand } from "@/components/composer/commands";
+import { bindText } from "@/lib/keybinds";
+import { pluginBind, registerPluginKeybind } from "@/lib/pluginKeybinds";
+import { useSettings } from "@/stores/settings";
 import { dispatchHooks } from "@/gateway/dispatch";
 import type { AppEvent } from "@/gateway/appEvents";
 import { t, translator } from "@/i18n";
@@ -43,6 +47,8 @@ import {
   PLUGIN_API_V2,
   type Channel,
   type ChannelCreateOptions,
+  type CommandContext,
+  type KeybindContext,
   type ContextMenuButton,
   type ContextMenuChanges,
   type ContextMenuContext,
@@ -726,6 +732,83 @@ export function buildApiV2(host: V2Host): { api: Record<string, unknown>; stop: 
     },
   });
 
+  // --- commands and keybinds ---
+  const taken = new Set<() => void>();
+  const keep = (undo: () => void) => {
+    taken.add(undo);
+    return () => {
+      undo();
+      taken.delete(undo);
+    };
+  };
+  /** Who and where, for a command or a keybind: what this plugin may see of them. */
+  const runContext = (channelId: string | null) => {
+    const me = useAuth.getState().me;
+    const ch = channelId ? channelOf(channelId) : undefined;
+    return Object.freeze({
+      user: me && can("users.self.read") ? toSelfUser(me, can) : null,
+      channel: ch && can(channelReadPerm(ch)) ? toChannel(ch) : null,
+    });
+  };
+  /** Runs a plugin's callback, which may be async; what it throws or rejects with goes no further than the log. */
+  const runQuietly = (fn: () => unknown) => {
+    const out = callSafely(name, fn);
+    if (out && typeof (out as Promise<unknown>).then === "function") (out as Promise<unknown>).then(undefined, (err: unknown) => console.warn(`plugin ${name}: a callback failed`, err));
+  };
+
+  const commands = Object.freeze({
+    register(commandName: string, description: string, cb: (args: string, ctx: CommandContext) => unknown): () => void {
+      need(can, "commands.write", "commands.register");
+      const n = String(commandName ?? "");
+      if (/[A-Z]/.test(n)) throw new Error(`the command name "${n}" has to be lowercase`);
+      if (/\s/.test(n)) throw new Error(`the command name "${n}" cannot have spaces`);
+      if (!/^[a-z0-9_-]{1,32}$/.test(n)) throw new Error(`the command name "${n}" can have only letters, digits, - and _, up to 32`);
+      if (isBuiltInCommand(n)) throw new Error(`/${n} is one of the app's own commands`);
+      if (typeof cb !== "function") throw new Error("commands.register needs a function");
+      // nothing is sent in its place: the plugin does what it does
+      const run = async (args: string, channelId: string): Promise<string | null> => {
+        runQuietly(() => cb(args, runContext(channelId)));
+        return null;
+      };
+      takePluginCommand({ name: n, desc: t("look.plugins.commandFrom", { description: String(description ?? "").slice(0, 100), name }), run });
+      return keep(() => unregisterPluginCommand(n, run));
+    },
+  });
+
+  const keybindStops = new Set<() => void>();
+  const keybinds = Object.freeze({
+    register(id: string, options: { name: string; description: string }, cb: (ctx: KeybindContext) => unknown): () => void {
+      need(can, "keybinds.write", "keybinds.register");
+      const kid = String(id ?? "");
+      if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(kid)) throw new Error(`a keybind id has letters, digits, ".", ":", "-" and "_", up to 64: "${kid}"`);
+      if (typeof cb !== "function") throw new Error("keybinds.register needs a function");
+      const info = { name: String(options?.name ?? kid).slice(0, 80), description: String(options?.description ?? "").slice(0, 200) };
+      const undo = registerPluginKeybind(host.id, name, kid, info, () => runQuietly(() => cb(runContext(useUI.getState().activeChannelId ?? null))));
+      return keep(undo);
+    },
+    get(id: string): string | null {
+      need(can, "keybinds.read", "keybinds.get");
+      return bindText(pluginBind(host.id, String(id))) || null;
+    },
+    onChange(id: string, cb: (keys: string | null) => void): () => void {
+      need(can, "keybinds.read", "keybinds.onChange");
+      if (typeof cb !== "function") throw new Error("keybinds.onChange needs a function");
+      const kid = String(id);
+      let was = pluginBind(host.id, kid);
+      const stop = useSettings.subscribe(() => {
+        const now = pluginBind(host.id, kid);
+        if (now === was) return;
+        was = now;
+        callSafely(name, () => cb(bindText(now) || null));
+      });
+      keybindStops.add(stop);
+      return () => {
+        stop();
+        keybindStops.delete(stop);
+      };
+    },
+  });
+
   // --- ui ---
   /** What a menu is about, as this plugin may see it. */
   const menuContext = (s: Subject): ContextMenuContext => {
@@ -791,8 +874,11 @@ export function buildApiV2(host: V2Host): { api: Record<string, unknown>; stop: 
   const ui = Object.freeze({
     toast(message: string, options?: { type?: "info" | "success" | "warning" | "error"; duration?: number }): void {
       need(can, "ui.write", "ui.toast");
-      const kind = options?.type === "success" || options?.type === "error" ? options.type : "info";
-      useUI.getState().toast(t("look.plugins.toastFrom", { name, text: String(message).slice(0, 300) }), kind);
+      const type = options?.type;
+      const kind = type === "success" || type === "error" || type === "warning" ? type : "info";
+      // a plugin's toast lasts what it asks, from 1 to 15 seconds (the store holds it to that), 4 when it does not say
+      const duration = typeof options?.duration === "number" && Number.isFinite(options.duration) ? options.duration : 4000;
+      useUI.getState().toast(t("look.plugins.toastFrom", { name, text: String(message).slice(0, 300) }), kind, duration);
     },
     notify(title: string, body?: string): void {
       need(can, "ui.write", "ui.notify");
@@ -833,6 +919,8 @@ export function buildApiV2(host: V2Host): { api: Record<string, unknown>; stop: 
     messages,
     styles,
     events,
+    commands,
+    keybinds,
     storage,
     settings,
     ui,
@@ -850,6 +938,10 @@ export function buildApiV2(host: V2Host): { api: Record<string, unknown>; stop: 
       inst.listeners.clear();
       for (const s of settingStops) s();
       settingStops.clear();
+      for (const undo of taken) undo();
+      taken.clear();
+      for (const s of keybindStops) s();
+      keybindStops.clear();
       dropChanges(host.id);
     },
   };

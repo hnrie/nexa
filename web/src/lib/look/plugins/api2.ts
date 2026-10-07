@@ -366,6 +366,17 @@ export interface PluginEventsV2 {
 
 export type PluginEventNameV2 = keyof PluginEventsV2;
 
+// --- commands and keybinds ------------------------------------------------------
+
+/** Who ran a command or pressed a keybind (you), and where; each null without the permission to see it. */
+export interface CommandContext {
+  user: SelfUser | null;
+  channel: Channel | null;
+}
+
+/** The same, for a keybind: the channel is the one on screen when it was pressed, or null. */
+export type KeybindContext = CommandContext;
+
 // --- the rest -------------------------------------------------------------------
 
 export type SettingValue = string | number | boolean;

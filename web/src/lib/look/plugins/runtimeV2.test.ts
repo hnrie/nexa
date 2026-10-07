@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api as client } from "@/api/client";
 import type { Channel, PublicUser, Relationship } from "@/api/types";
 import { messageMenu } from "@/components/chat/messageMenu";
+import { commands as commandList, runCommand } from "@/components/composer/commands";
+import { runPluginKeybinds, usePluginKeybinds } from "@/lib/pluginKeybinds";
+import { parseBind } from "@/lib/keybinds";
 import { dispatchHooks } from "@/gateway/dispatch";
 import { resetChanges } from "@/lib/contextMenus/registry";
 import type { DecryptedMessage } from "@/lib/decrypt";
@@ -41,6 +44,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   await forgetPlugins();
   vi.restoreAllMocks();
 });
@@ -233,5 +237,126 @@ describe("managers", () => {
     expect(modal).toMatchObject({ kind: "confirm", props: { title: "Ask: Sure?", body: "Really", confirmLabel: "Yes", cancelLabel: "No" } });
     (modal.props!["onDismiss"] as () => void)();
     expect(await answer).toBe(false);
+  });
+});
+
+describe("commands", () => {
+  const OLD = `{ name: "Old", start(api) { globalThis.oldTook = (() => { try { api.commands.register({ name: "wave", run: () => "old wave" }); return "took"; } catch (e) { return "refused"; } })(); } }`;
+
+  it("refuses the app's names and names with capitals or spaces", async () => {
+    await syncPlugins([await entry(v2("Cmd"), ["commands.write"])], true);
+    const reg = (n: string) => () => apiOf("Cmd")["commands"].register(n, "", () => undefined);
+    expect(reg("shrug")).toThrow(/app's own/);
+    expect(reg("Wave")).toThrow(/lowercase/);
+    expect(reg("two words")).toThrow(/spaces/);
+    expect(reg("x".repeat(33))).toThrow(/up to 32/);
+  });
+
+  it("runs with what was typed after it and who and where, sending nothing in its place", async () => {
+    g["ran"] = null;
+    await syncPlugins([await entry(v2("Runs", `api.commands.register("say-it", "Says it", (args, ctx) => { globalThis.ran = [args, ctx.channel && ctx.channel.id, ctx.user]; });`), ["commands.write", "servers.channels.read"])], true);
+    expect(commandList().find((c) => c.name === "say-it")?.desc).toBe("Says it (from Runs)");
+    const cmd = runCommand("/say-it hello there");
+    expect(cmd.kind).toBe("plugin");
+    if (cmd.kind === "plugin") expect(await cmd.run("sc")).toBeNull();
+    expect(g["ran"]).toEqual(["hello there", "sc", null]);
+  });
+
+  it("takes over another plugin's command, which it does not get back; a v1 plugin is still refused a taken name", async () => {
+    const old = await entry(OLD, null, "bcdefghijk");
+    const taker = await entry(v2("Taker", `api.commands.register("wave", "", () => { globalThis.waved = "new"; });`), ["commands.write"]);
+    await syncPlugins([old, taker], true);
+    expect(g["oldTook"]).toBe("took");
+    const cmd = runCommand("/wave");
+    if (cmd.kind === "plugin") await cmd.run("sc");
+    expect(g["waved"]).toBe("new");
+    // the v2 plugin stops: the name is free, and the v1 one does not get it back
+    await syncPlugins([old, { ...taker, enabled: false }], true);
+    expect(runCommand("/wave").kind).toBe("unknown");
+    // a v1 plugin started after the v2 one took a name is refused it, as before
+    await syncPlugins([{ ...old, enabled: false }, { ...taker, enabled: true }], true);
+    await syncPlugins([{ ...old, enabled: true }, taker], true);
+    expect(g["oldTook"]).toBe("refused");
+  });
+
+  it("keeps working past a command that throws", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await syncPlugins([await entry(v2("Throws", `api.commands.register("boom", "", () => { throw new Error("no"); });`), ["commands.write"])], true);
+    const cmd = runCommand("/boom");
+    if (cmd.kind === "plugin") await expect(cmd.run("sc")).resolves.toBeNull();
+  });
+});
+
+describe("keybinds", () => {
+  const press = (bind: string, repeat = false, at = Date.now()) => runPluginKeybinds(parseBind(bind), repeat, at);
+  const bindFor = (pluginId: string, id: string, keys: string) => useSettings.setState((s) => ({ settings: { ...s.settings, pluginKeybinds: { ...s.settings.pluginKeybinds, [pluginId]: { ...(s.settings.pluginKeybinds[pluginId] ?? {}), [id]: keys } } } }));
+
+  beforeEach(() => useSettings.setState((s) => ({ settings: { ...s.settings, pluginKeybinds: {} } })));
+
+  it("registers unbound, refuses an id twice, and runs on the keys chosen, once while held", async () => {
+    g["pressed"] = 0;
+    const e = await entry(v2("Keys", `api.keybinds.register("hi", { name: "Say Hi", description: "Says hi" }, (ctx) => { globalThis.pressed++; globalThis.keyCtx = ctx; });`), ["keybinds.write", "keybinds.read"]);
+    await syncPlugins([e], true);
+    expect(usePluginKeybinds.getState().byPlugin[e.id]).toEqual({ plugin: "Keys", keybinds: { hi: { name: "Say Hi", description: "Says hi" } } });
+    expect(() => apiOf("Keys")["keybinds"].register("hi", { name: "x", description: "" }, () => undefined)).toThrow(/already/);
+    expect(apiOf("Keys")["keybinds"].get("hi")).toBeNull();
+    expect(press("Mod+Shift+KeyH")).toBe(false);
+    const changes: unknown[] = [];
+    apiOf("Keys")["keybinds"].onChange("hi", (k: string | null) => changes.push(k));
+    bindFor(e.id, "hi", "Mod+Shift+KeyH");
+    expect(apiOf("Keys")["keybinds"].get("hi")).toMatch(/H$/);
+    expect(changes).toHaveLength(1);
+    expect(press("Mod+Shift+KeyH", false, 10_000)).toBe(true);
+    expect(press("Mod+Shift+KeyH", true, 10_050)).toBe(true);
+    expect(g["pressed"]).toBe(1);
+    expect(g["keyCtx"]).toEqual({ user: null, channel: null });
+  });
+
+  it("stops answering when its plugin stops, keeps its keys for a restart, and needs its permissions", async () => {
+    g["pressed2"] = 0;
+    const e = await entry(v2("Keys2", `api.keybinds.register("go", { name: "Go", description: "" }, () => { globalThis.pressed2++; });`), ["keybinds.write"]);
+    await syncPlugins([e], true);
+    bindFor(e.id, "go", "Alt+KeyG");
+    expect(() => apiOf("Keys2")["keybinds"].get("go")).toThrow(PermissionError);
+    await syncPlugins([{ ...e, enabled: false }], true);
+    expect(press("Alt+KeyG", false, 20_000)).toBe(false);
+    expect(usePluginKeybinds.getState().byPlugin[e.id]).toBeUndefined();
+    await syncPlugins([e], true);
+    expect(press("Alt+KeyG", false, 30_000)).toBe(true);
+    expect(g["pressed2"]).toBe(1);
+  });
+
+  it("forgets a deleted plugin's keys", () => {
+    useSettings.getState().patch({ pluginKeybinds: { gone: { go: "Alt+KeyG" }, kept: { go: "Alt+KeyK" } }, plugins: [{ id: "kept" } as PluginEntry] });
+    expect(useSettings.getState().settings.pluginKeybinds).toEqual({ kept: { go: "Alt+KeyK" } });
+  });
+});
+
+describe("toasts", () => {
+  it("passes a plugin's kind and duration through, a warning included, 4 seconds when it does not say", async () => {
+    vi.useFakeTimers();
+    await syncPlugins([await entry(v2("Toaster"), ["ui.write"])], true);
+    useUI.setState({ toasts: [] });
+    apiOf("Toaster")["ui"].toast("careful", { type: "warning", duration: 1500 });
+    apiOf("Toaster")["ui"].toast("plain");
+    expect(useUI.getState().toasts.map((x) => [x.text, x.kind])).toEqual([["Toaster: careful", "warning"], ["Toaster: plain", "info"]]);
+    vi.advanceTimersByTime(1600);
+    expect(useUI.getState().toasts.map((x) => x.text)).toEqual(["Toaster: plain"]);
+    vi.advanceTimersByTime(2500);
+    expect(useUI.getState().toasts).toEqual([]);
+  });
+
+  it("holds a duration to 1 to 15 seconds, and leaves the app's own toasts their timings", () => {
+    vi.useFakeTimers();
+    useUI.setState({ toasts: [] });
+    useUI.getState().toast("short", "info", 10);
+    useUI.getState().toast("long", "info", 60_000);
+    useUI.getState().toast("app error", "error");
+    vi.advanceTimersByTime(1100);
+    expect(useUI.getState().toasts.map((x) => x.text)).toEqual(["long", "app error"]);
+    vi.advanceTimersByTime(7000);
+    expect(useUI.getState().toasts.map((x) => x.text)).toEqual(["long"]);
+    vi.advanceTimersByTime(7000);
+    expect(useUI.getState().toasts).toEqual([]);
   });
 });

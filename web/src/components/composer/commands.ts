@@ -29,6 +29,22 @@ export function registerPluginCommand(c: PluginCommand): boolean {
   return true;
 }
 
+/** Whether a name is one of the app's own commands, which no plugin can take. */
+export function isBuiltInCommand(name: string): boolean {
+  return BUILT_IN.has(name.toLowerCase());
+}
+
+/**
+ * Adds a v2 plugin's command, taking over the name from any plugin that had
+ * it (that plugin does not get it back when this one stops). Throws for one
+ * of the app's own names.
+ */
+export function takePluginCommand(c: PluginCommand): void {
+  const name = c.name.toLowerCase();
+  if (BUILT_IN.has(name)) throw new Error(`/${name} is one of the app's own commands`);
+  pluginCommands.set(name, { ...c, name });
+}
+
 export function unregisterPluginCommand(name: string, run: PluginCommand["run"]): void {
   if (pluginCommands.get(name.toLowerCase())?.run === run) pluginCommands.delete(name.toLowerCase());
 }
@@ -59,7 +75,8 @@ export function commands() {
 export type CommandResult = { kind: "text" } | { kind: "command"; text: string } | { kind: "unknown"; name: string } | { kind: "empty"; name: string } | { kind: "plugin"; name: string; run: (channelId: string) => Promise<string | null> };
 
 export function runCommand(text: string): CommandResult {
-  const m = /^\/(\w+)(?:\s+([\s\S]*))?$/.exec(text.trim());
+  // names a plugin can give: letters, digits, - and _
+  const m = /^\/([\w-]+)(?:\s+([\s\S]*))?$/.exec(text.trim());
   if (!m) return { kind: "text" };
   const cmd = m[1]!.toLowerCase();
   const rest = (m[2] ?? "").trim();

@@ -672,6 +672,15 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   `docs/superpowers/plans/2026-10-07-plugin-api-v2.md`) a v2 plugin is granted what it asks for
   when it is added. v2 events are built on `dispatchHooks` (above); v2 stylesheets go when the
   plugin stops unless added with `persist`. Plugins never run on Android.
+- Plugin commands sit beside the app's own in `components/composer/commands.ts`: a v1 plugin's is
+  refused a taken name and its return value is sent; a v2 plugin's (`takePluginCommand`) takes the
+  name from any plugin, can never take one of the app's, and sends nothing. Plugin keybinds:
+  `lib/pluginKeybinds.ts` holds what running plugins registered, `components/shell/Shortcuts.tsx`
+  runs them after the app's own keybinds (in the window only, never system-wide), and the keys
+  people chose are the account's `pluginKeybinds` setting (by plugin id, then keybind id, checked
+  by `sanitizePluginKeybinds`, which also forgets a deleted plugin's). Toasts have a fourth kind,
+  `warning`, and `toast(text, kind, duration)` takes a duration from 1 to 15 seconds, which only
+  plugins' toasts use.
 - `pages/`: one per route. `styles/`: `tokens.css` (every theme token: colour, radius, shadow,
   motion), `base.css`, `markdown.css`, `fonts.css` (Wix Madefor) and `fonts-classic.css` (Onest,
   Mona Sans). `lib/theme.ts` applies a theme; `lib/look/` derives presets and custom themes.

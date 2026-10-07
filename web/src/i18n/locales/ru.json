@@ -6651,6 +6651,7 @@
     "many": "{count} сообщений",
     "other": "{count} сообщения"
   },
+  "toasts.warning": "Предупреждение",
   "voice.moderation.deafenedByModerator": "Звук отключён модератором",
   "voice.moderation.deafenedHint": "Модератор отключил вам звук на этом сервере. Вы снова услышите звонок, когда он это отменит.",
   "voice.moderation.disconnect": "Отключить",

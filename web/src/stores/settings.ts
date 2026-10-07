@@ -9,7 +9,7 @@ import { EMPTY_DM_LIST, sanitizeDMList, type DMListLayout } from "@/lib/dmLayout
 import type { CustomCss, CustomTheme, PluginEntry } from "@/lib/look/types";
 import { sanitizeUsage, type EmojiUsage } from "@/lib/emojiUsage";
 import { DEFAULT_SOUNDS, sanitizeSounds, type SoundSettings } from "@/lib/soundPacks";
-import { sanitizeKeybinds, type Keybinds } from "@/lib/keybinds";
+import { sanitizeKeybinds, sanitizePluginKeybinds, type Keybinds, type PluginKeybinds } from "@/lib/keybinds";
 
 /** A classic theme, "system", or the id of a gallery preset or a custom theme (lib/look). */
 export type Theme = "dark" | "light" | "ash" | "onyx" | "system" | (string & {});
@@ -112,6 +112,8 @@ export interface Settings {
   keybinds: Partial<Keybinds>;
   /** In the desktop app, the keybinds answer even while another window is in front. */
   backgroundKeybinds: boolean;
+  /** The keys chosen for plugins' keybinds (lib/look/plugins), by plugin id and then the keybind's own id. */
+  pluginKeybinds: PluginKeybinds;
   /** Show others' own typing styles (lib/typingStyle); off, everyone is shown with the plain dots. */
   customTyping: boolean;
   /** Someone typing turns their presence dot into a pill of dots, in the DM list and member lists (Avatar). */
@@ -221,6 +223,7 @@ export const DEFAULT_SETTINGS: Settings = {
   shareActivity: true,
   autoIdle: true,
   keybinds: {},
+  pluginKeybinds: {},
   backgroundKeybinds: true,
   customTyping: true,
   typingAvatars: true,
@@ -314,6 +317,11 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
 
     keybinds: "keybinds" in inc ? sanitizeKeybinds(inc.keybinds) : base.keybinds,
     backgroundKeybinds: typeof inc.backgroundKeybinds === "boolean" ? inc.backgroundKeybinds : base.backgroundKeybinds,
+    // a deleted plugin's keys go with it, whichever device deleted it
+    pluginKeybinds:
+      "pluginKeybinds" in inc || Array.isArray(inc.plugins)
+        ? sanitizePluginKeybinds(inc.pluginKeybinds ?? base.pluginKeybinds, (Array.isArray(inc.plugins) ? inc.plugins : base.plugins).map((p) => (p as { id?: unknown })?.id).filter((id): id is string => typeof id === "string"))
+        : base.pluginKeybinds,
     customTyping: typeof inc.customTyping === "boolean" ? inc.customTyping : base.customTyping,
     typingAvatars: typeof inc.typingAvatars === "boolean" ? inc.typingAvatars : base.typingAvatars,
     typingChannels: typeof inc.typingChannels === "boolean" ? inc.typingChannels : base.typingChannels,

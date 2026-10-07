@@ -6228,6 +6228,7 @@
     "one": "{count} Message",
     "other": "{count} Messages"
   },
+  "toasts.warning": "Warning",
   "voice.moderation.deafenedByModerator": "Deafened by a moderator",
   "voice.moderation.deafenedHint": "A moderator deafened you in this server. You'll hear the call again once they undeafen you.",
   "voice.moderation.disconnect": "Disconnect",

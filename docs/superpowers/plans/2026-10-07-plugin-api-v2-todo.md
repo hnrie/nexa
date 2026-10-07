@@ -208,7 +208,70 @@ Android); nothing people see changes until a v2 plugin is installed.
 - [x] CLAUDE.md: the v2 runtime, its files and the menus' plugin layer
 - [x] Commit (not pushed: pushing waits until the owner says)
 
-## 4. Commands, keybinds, toasts (not started)
+## 4. Commands, keybinds, toasts (done, committed, not pushed)
+
+The v2 API's `commands` and `keybinds`, and `ui.toast`'s warning and duration. Step 4 is the logic;
+how a plugin's keybinds show in Settings, Keybinds and how a warning toast looks are design work
+for step 5. Until then a warning toast looks like a note, and a plugin keybind can be bound only
+through the account's settings (which is how the tests bind them). Web only; nothing changes for
+people until a v2 plugin uses these.
+
+- [x] Commands (`components/composer/commands.ts`, `runtimeV2.ts`):
+  - [x] `api.commands.register(name, description, cb)` needs `commands.write`. A name is lowercase
+    letters, digits, `-` and `_`, up to 32: one with a capital letter or a space throws, and so
+    does one of the app's own (`shrug`, `tableflip`, `unflip`, `lenny`, `me`, `spoiler`). Returns
+    a function that takes it away
+  - [x] A name another plugin has (v1 or v2) is taken over; the plugin that had it does not get it
+    back when the new one stops. A v1 plugin's own `register` still refuses a taken name, as today
+  - [x] Running it calls `cb(args, ctx)` with everything after the name as one string ("" for none)
+    and `ctx` `{ user, channel }` (`user` needs `users.self.read`, `channel` the read permission
+    for its kind of channel, `null` otherwise). Nothing is sent in its place, and the box empties as
+    it does for any command. What `cb` throws is logged and goes no further
+  - [x] The message box reads names with `-` in them too (it reads only letters, digits and `_`
+    today, so a v1 command with a `-`, which v1 allows, never runs). The description shown while
+    picking a command says which plugin it is from, as v1's does
+  - [x] Every command goes when its plugin stops
+- [x] Keybinds (`lib/keybinds.ts`, `components/shell/Shortcuts.tsx`, the settings store):
+  - [x] The keys people choose are kept in the account's settings, apart from the app's own:
+    `pluginKeybinds: { [pluginId]: { [keybindId]: bind } }`, in the same form the app's keybinds
+    use, checked on the way in like them. Android keeps the field as it is (it keeps settings it
+    does not know), and never runs plugins
+  - [x] `api.keybinds.register(id, { name, description }, cb)` needs `keybinds.write`; an id the
+    plugin has registered already throws. A keybind starts unbound. Returns a function that takes
+    it away. What a running plugin has registered is kept in a small store (with the plugin's name
+    and each keybind's name and description), which step 5's Keybinds section draws from
+  - [x] Pressing the keys in the app's window calls `cb(ctx)`, `ctx` `{ user, channel }` with the
+    channel on screen (the same permissions as commands). The app's own keybinds come first; held
+    down, it is one press, as the app's are; two plugins on the same keys both run. Not
+    system-wide in the desktop app: that stays for mute, deafen and activity
+  - [x] `api.keybinds.get(id)` and `onChange(id, cb)` need `keybinds.read`; they give the keys as
+    the app writes them for people ("Ctrl+Shift+K", "⌘⇧K" on a Mac), or `null` when unbound
+  - [x] A plugin's keybinds stop answering when it stops, and keep their keys for when it starts
+    again; deleting the plugin forgets its keys
+- [x] Toasts (`stores/ui.ts`, `components/common/Toasts.tsx`):
+  - [x] A fourth kind, `warning`, with what a screen reader hears before it ("Warning:", a new
+    string in all eleven languages); its look is step 5
+  - [x] `toast(text, kind, duration?)`: a plugin's toast lasts what it asks, from 1 to 15 seconds,
+    4 seconds when it does not say; the app's own toasts keep their timings
+  - [x] v2's `ui.toast` passes the type and the duration through; v1's `toast` is unchanged
+- [x] Tests: commands (each refused name, taking over a plugin's command and not giving it back,
+  v1 still refused, `args` and `ctx`, nothing sent, a throwing `cb`, gone on stop, a name with
+  `-`); keybinds (registering, a second id refused, unbound at first, bound through the settings,
+  a press calling `cb` with its context, a held key once, `get` and `onChange`, the permissions,
+  gone on stop, kept for a restart, forgotten on delete); toasts (the warning kind, the duration
+  and its limits, the app's timings unchanged). The app's own keybinds coming first is the order
+  of the two checks in `Shortcuts.tsx`, not a test of its own
+- [x] On a throwaway server, a v2 test plugin pasted in through today's dialog: its command showed in
+  the message box's list with "(from Smoke Keys)", ran with the words after it and the channel and
+  account it was run in, sent nothing and emptied the box (on the phone too, from the send button);
+  its keybind, bound through the account's settings by the plugin itself (there is no Keybinds
+  section yet), ran on Alt+Shift+H; a success, warning, error and note toast showed (the warning
+  still looks like a note), and a 1 second one went first. No page errors; the plugin was removed
+  afterwards
+- [x] `tools/check.sh` (as before: only the 110 known test failures and the desktop steps; app size
+  324.7 kB of 330 kB), `python3 tools/i18n_check.py`
+- [x] CLAUDE.md: plugin commands, plugin keybinds and `pluginKeybinds`, the warning toast
+- [x] Commit (not pushed: pushing waits until the owner says)
 
 ## 5. UI through the design pass (not started)
 

@@ -7038,6 +7038,7 @@
     "many": "{count} رسالة",
     "other": "{count} رسالة"
   },
+  "toasts.warning": "تحذير",
   "voice.moderation.deafenedByModerator": "كتم مشرفٌ السماع عنك",
   "voice.moderation.deafenedHint": "كتم مشرفٌ السماع عنك في هذا الخادم. ستسمع المكالمة مجددًا حين يلغي ذلك.",
   "voice.moderation.disconnect": "قطع الاتصال",

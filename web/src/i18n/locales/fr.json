@@ -6329,6 +6329,7 @@
     "one": "{count} message",
     "other": "{count} messages"
   },
+  "toasts.warning": "Avertissement",
   "voice.moderation.deafenedByModerator": "Rendu sourd par un modérateur",
   "voice.moderation.deafenedHint": "Un modérateur vous a rendu sourd sur ce serveur. Vous entendrez de nouveau l’appel dès qu’il l’annulera.",
   "voice.moderation.disconnect": "Déconnecter",

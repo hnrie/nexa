@@ -71,7 +71,7 @@ export interface ContextMenuState {
 export interface Toast {
   id: number;
   text: string;
-  kind: "info" | "error" | "success";
+  kind: "info" | "error" | "success" | "warning";
 }
 
 interface UIState {
@@ -121,7 +121,8 @@ interface UIState {
   /** Ends the edit of that one message: its kept text goes, and the open edit closes only if it is this one. */
   endEdit: (channelId: string, messageId: string) => void;
   setJumpTo: (j: UIState["jumpTo"]) => void;
-  toast: (text: string, kind?: Toast["kind"]) => void;
+  /** `duration` in milliseconds, for a plugin's toast (from 1 to 15 seconds); the app's own toasts go by their kind. */
+  toast: (text: string, kind?: Toast["kind"], duration?: number) => void;
   dismissToast: (id: number) => void;
   holdToasts: (held: boolean) => void;
   setFocused: (v: boolean) => void;
@@ -219,7 +220,7 @@ export const useUI = create<UIState>()((set, get) => ({
       return { editing, editDrafts };
     }),
   setJumpTo: (jumpTo) => set({ jumpTo }),
-  toast: (text, kind = "info") => {
+  toast: (text, kind = "info", duration) => {
     toastSeq += 1;
     const id = toastSeq;
     set((s) => ({ toasts: [...s.toasts, { id, text, kind }] }));
@@ -232,7 +233,7 @@ export const useUI = create<UIState>()((set, get) => ({
       }
       set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
     };
-    setTimeout(expire, kind === "error" ? 8000 : 5000);
+    setTimeout(expire, typeof duration === "number" && Number.isFinite(duration) ? Math.min(15_000, Math.max(1000, duration)) : kind === "error" ? 8000 : 5000);
   },
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id), toastsHeld: s.toasts.length > 1 && s.toastsHeld })),
   holdToasts: (toastsHeld) => set({ toastsHeld }),

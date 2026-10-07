@@ -6003,6 +6003,7 @@
   "threads.card.count": {
     "other": "메시지 {count}개"
   },
+  "toasts.warning": "경고",
   "voice.moderation.deafenedByModerator": "운영자가 소리를 끔",
   "voice.moderation.deafenedHint": "이 서버에서 운영자가 소리를 껐어요. 다시 켜 주면 통화가 들려요.",
   "voice.moderation.disconnect": "연결 끊기",

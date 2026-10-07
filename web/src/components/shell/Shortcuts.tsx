@@ -10,6 +10,7 @@ import { useReadStates } from "@/stores/readStates";
 import { useTabs } from "@/stores/tabs";
 import { useUI } from "@/stores/ui";
 import { actionFor, comboOf, keybindsOf, learnLayout } from "@/lib/keybinds";
+import { runPluginKeybinds } from "@/lib/pluginKeybinds";
 import { runKeybind } from "@/lib/keybindActions";
 import { useSettings } from "@/stores/settings";
 
@@ -50,6 +51,11 @@ export function Shortcuts() {
       if (bound) {
         e.preventDefault();
         if (!e.repeat) runKeybind(bound);
+        return;
+      }
+      // then the keys people chose for plugins' keybinds (lib/pluginKeybinds)
+      if (runPluginKeybinds(comboOf(e), e.repeat)) {
+        e.preventDefault();
         return;
       }
       if (mod && e.key === "/") {

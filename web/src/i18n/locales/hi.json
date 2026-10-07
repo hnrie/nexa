@@ -6228,6 +6228,7 @@
     "one": "{count} संदेश",
     "other": "{count} संदेश"
   },
+  "toasts.warning": "चेतावनी",
   "voice.moderation.deafenedByModerator": "एक मॉडरेटर ने आवाज़ बंद की है",
   "voice.moderation.deafenedHint": "एक मॉडरेटर ने इस सर्वर में आपकी आवाज़ बंद की है। वे इसे हटाएँगे तो आप कॉल फिर से सुन पाएँगे।",
   "voice.moderation.disconnect": "कॉल से हटाएँ",

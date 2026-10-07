@@ -318,3 +318,29 @@ export function firstOfPress(action: KeybindAction, now = Date.now()): boolean {
   lastRun[action] = now;
   return now - last > 300;
 }
+
+/** The keys people chose for plugins' keybinds: by plugin id, then by the keybind's id within it. */
+export type PluginKeybinds = Record<string, Record<string, string>>;
+
+const PLUGIN_BIND_ID = /^[A-Za-z0-9_.:-]{1,64}$/;
+
+/**
+ * Plugins' binds as stored, read defensively: each a bind the app could make,
+ * for a plugin the account still has (a deleted plugin's keys are forgotten),
+ * and not too many of them.
+ */
+export function sanitizePluginKeybinds(x: unknown, pluginIds: Iterable<string>): PluginKeybinds {
+  const out: PluginKeybinds = {};
+  if (!x || typeof x !== "object" || Array.isArray(x)) return out;
+  const known = new Set(pluginIds);
+  for (const [pluginId, binds] of Object.entries(x as Record<string, unknown>)) {
+    if (!known.has(pluginId) || !binds || typeof binds !== "object" || Array.isArray(binds)) continue;
+    const kept: Record<string, string> = {};
+    for (const [id, bind] of Object.entries(binds as Record<string, unknown>).slice(0, 50)) {
+      const c = typeof bind === "string" ? parseBind(bind) : null;
+      if (PLUGIN_BIND_ID.test(id) && c) kept[id] = formatBind(c);
+    }
+    if (Object.keys(kept).length) out[pluginId] = kept;
+  }
+  return out;
+}

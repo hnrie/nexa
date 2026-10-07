@@ -6003,6 +6003,7 @@
   "threads.card.count": {
     "other": "{count} 件のメッセージ"
   },
+  "toasts.warning": "警告",
   "voice.moderation.deafenedByModerator": "モデレーターがスピーカーミュート中",
   "voice.moderation.deafenedHint": "このサーバーでモデレーターにスピーカーミュートされています。解除されると、また通話が聞こえます。",
   "voice.moderation.disconnect": "切断",

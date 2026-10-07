@@ -6003,6 +6003,7 @@
   "threads.card.count": {
     "other": "{count} 条消息"
   },
+  "toasts.warning": "警告",
   "voice.moderation.deafenedByModerator": "已被管理员静音收听",
   "voice.moderation.deafenedHint": "管理员在这个服务器里让你静音收听了。解除后你就能再听到通话。",
   "voice.moderation.disconnect": "断开连接",

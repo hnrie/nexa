@@ -6330,6 +6330,7 @@
     "one": "{count} mensagem",
     "other": "{count} mensagens"
   },
+  "toasts.warning": "Aviso",
   "voice.moderation.deafenedByModerator": "Ensurdecido por um moderador",
   "voice.moderation.deafenedHint": "Um moderador ensurdeceu você neste servidor. Você vai ouvir a chamada de novo quando ele desfizer isso.",
   "voice.moderation.disconnect": "Desconectar",

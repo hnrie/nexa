@@ -6228,6 +6228,7 @@
     "one": "{count} Nachricht",
     "other": "{count} Nachrichten"
   },
+  "toasts.warning": "Warnung",
   "voice.moderation.deafenedByModerator": "Von der Moderation taub gestellt",
   "voice.moderation.deafenedHint": "Die Moderation hat dich auf diesem Server taub gestellt. Du hörst den Anruf wieder, sobald sie das aufhebt.",
   "voice.moderation.disconnect": "Trennen",
