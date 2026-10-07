@@ -273,7 +273,7 @@ people until a v2 plugin uses these.
 - [x] CLAUDE.md: plugin commands, plugin keybinds and `pluginKeybinds`, the warning toast
 - [x] Commit (not pushed: pushing waits until the owner says)
 
-## 5. UI through the design pass (done, committed, not pushed; app size over its limit, see below)
+## 5. UI through the design pass (done, committed, not pushed)
 
 Everything about plugins people see and touch, designed first: the `frontend-design` skill is
 invoked before any of it is drawn, as CLAUDE.md requires, and its direction is followed for every
@@ -347,7 +347,8 @@ desktop and phone width. Every new word goes into all eleven languages.
   (the 110 known test failures, the desktop steps), and app size is now over its limit: 330.3 kB of
   the 330 kB the front page says. The growth is the English strings, which are part of the first
   load (about 76 new ones, the permission sentences most of it); the screens themselves load only
-  with their pages. Waiting on the owner: raise the limit (and the front page's number) or not
+  with their pages. The owner raised the limit to 335 kB (`LOAD_KB_LIMIT`, which the front page
+  prints), and the check passes again
 - [x] CLAUDE.md: the prompt, the permissions editor, the Keybinds section, menu icons
 - [x] Commit (not pushed: pushing waits until the owner says)
 
