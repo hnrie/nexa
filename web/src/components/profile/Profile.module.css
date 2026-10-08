@@ -244,28 +244,21 @@
   height: min(720px, var(--profile-max-h, calc(100dvh - 48px)));
   padding: 12px;
 }
-/* the banner again, large, blurred and fading out, behind both halves of the full profile */
+/* the banner again, sharp and quiet behind the top of the full profile: as wide as the card, its colour
+   drawn back, fading out by 280px. The same on a theme's colours, where it shows through them. */
 .backdrop {
   position: absolute;
-  inset: 0 0 auto;
-  height: 360px;
+  inset: 0;
   pointer-events: none;
   background-image: var(--backdrop);
-  background-size: cover;
-  background-position: center 30%;
-  filter: blur(30px) saturate(1.3);
-  opacity: 0.4;
-  transform: scale(1.15);
-  -webkit-mask-image: linear-gradient(180deg, #000 0%, rgb(0 0 0 / 0.5) 45%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 0%, rgb(0 0 0 / 0.5) 45%, transparent 100%);
-}
-/* On a theme's colours the picture shows through a wash of the theme's own top colour, so it reads as
-   the banner and still sits in the card's colours. It was light and shade over them (soft-light),
-   which on a strong colour like a bright pink left nothing of the picture to see. */
-.card[data-themed] .backdrop {
-  background-image: linear-gradient(color-mix(in srgb, var(--profile-top) 35%, transparent), color-mix(in srgb, var(--profile-top) 35%, transparent)), var(--backdrop);
-  filter: blur(14px) saturate(1.15);
-  opacity: 0.75;
+  background-size: 100%;
+  background-repeat: no-repeat;
+  background-position: top center;
+  border-radius: inherit;
+  filter: saturate(0.5);
+  opacity: 0.3;
+  -webkit-mask-image: linear-gradient(180deg, #000 0, transparent 280px);
+  mask-image: linear-gradient(180deg, #000 0, transparent 280px);
 }
 .card[data-layout="wide"] > .side, .card[data-layout="wide"] > .main { position: relative; }
 .side {
