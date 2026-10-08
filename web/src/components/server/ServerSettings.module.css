@@ -180,4 +180,3 @@
 .styleColors { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 10px; }
 .styleColor { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-muted); }
 .styleColor input[type="color"] { width: 40px; height: 32px; padding: 0; border: none; border-radius: var(--radius-sm); background: none; cursor: pointer; }
-.emojiField { width: 120px; }

@@ -3753,7 +3753,6 @@
   "reorder.moveUp": "Nach oben",
   "reorder.nameIsNowIndexOfCount": "{name} ist jetzt {index} von {count}.",
   "roles.icon.crop": "Rollensymbol zuschneiden",
-  "roles.icon.emoji": "Oder ein Emoji",
   "roles.icon.failed": "Das Symbol konnte nicht gespeichert werden.",
   "roles.icon.hint": "Steht neben den Namen von Mitgliedern, deren höchste Rolle ein Symbol hat. Ein Bild oder ein Emoji.",
   "roles.icon.label": "Rollensymbol",

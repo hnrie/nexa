@@ -3364,7 +3364,6 @@
   "reorder.moveUp": "Flytta upp",
   "reorder.nameIsNowIndexOfCount": "{name} är nu {index} av {count}.",
   "roles.icon.crop": "Beskär rollikon",
-  "roles.icon.emoji": "Eller en emoji",
   "roles.icon.failed": "Det gick inte att spara ikonen.",
   "roles.icon.hint": "Visas bredvid namnen på medlemmar vars högsta roll har en ikon. En bild, eller en emoji.",
   "roles.icon.label": "Rollikon",

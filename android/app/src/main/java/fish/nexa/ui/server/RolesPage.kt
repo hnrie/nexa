@@ -56,6 +56,7 @@ import fish.nexa.ui.components.ButtonKind
 import fish.nexa.ui.components.ButtonSize
 import fish.nexa.ui.components.NxButton
 import fish.nexa.ui.components.NxTextField
+import fish.nexa.ui.pickers.Pickers
 import fish.nexa.ui.components.ToggleLine
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
@@ -446,6 +447,12 @@ private fun DisplayTab(role: NexaRole, editable: Boolean, everyone: Boolean, hea
             openImageCrop(file, 1f, round = false, title = t("roles.icon.crop"), maxSize = 128, serverCrop = true) { r -> uploadIcon(r) }
         }
     }
+    // an emoji picked but not yet saved shows in place of the picture it will replace
+    val emojiIcon = when {
+        iconEmoji.startsWith("custom:") -> fish.nexa.ui.chat.RoleIconInfo.Custom(iconEmoji.removePrefix("custom:"), name)
+        iconEmoji.isNotEmpty() -> fish.nexa.ui.chat.RoleIconInfo.Emoji(iconEmoji, name)
+        else -> null
+    }
     // the name as it will be drawn: its colour, its gradient or its shimmer, and its icon
     val colours = if (color != 0L) listOfNotNull(color, color2, color3?.takeIf { color2 != null }).map { rgbColor(it) } else emptyList()
     val look = fish.nexa.ui.chat.RoleLook(
@@ -454,9 +461,8 @@ private fun DisplayTab(role: NexaRole, editable: Boolean, everyone: Boolean, hea
         shimmer = colours.size > 2,
         icon = when {
             everyone -> null
+            emojiIcon != null -> emojiIcon
             role.iconId != null -> fish.nexa.ui.chat.RoleIconInfo.Image(role.iconId, name)
-            iconEmoji.startsWith("custom:") -> fish.nexa.ui.chat.RoleIconInfo.Custom(iconEmoji.removePrefix("custom:"), name)
-            iconEmoji.isNotEmpty() -> fish.nexa.ui.chat.RoleIconInfo.Emoji(iconEmoji, name)
             else -> null
         },
     )
@@ -499,15 +505,12 @@ private fun DisplayTab(role: NexaRole, editable: Boolean, everyone: Boolean, hea
             if (!everyone) Field(t("roles.icon.label"), hint = t("roles.icon.hint")) {
                 Wrap(gap = 8.dp) {
                     NxButton(t("roles.icon.upload"), { pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)) }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "ImagePlus", enabled = editable && !iconBusy, loading = iconBusy)
-                    Box(Modifier.size(width = 120.dp, height = 44.dp)) {
-                        NxTextField(
-                            if (iconEmoji.startsWith("custom:")) "" else iconEmoji,
-                            { v -> iconEmoji = v.trim().let { s -> s.codePointCount(0, s.length).let { n -> if (n > 8) s.substring(s.offsetByCodePoints(0, n - 8)) else s } } },
-                            Modifier.semantics { contentDescription = t("roles.icon.emoji") },
-                            placeholder = t("roles.icon.emoji"),
-                            enabled = editable,
-                        )
-                    }
+                    // the emoji picked so far stands in for the button's smiley
+                    NxButton(t("server.channelIcon.chooseEmoji"), {
+                        Pickers.open(Pickers.Opener(listOf(Pickers.Tab.EMOJI), role.serverId, thisServerOnly = true, draggable = false, closeOnEmoji = true, onEmoji = { p ->
+                            iconEmoji = if (p.custom != null) "custom:${p.custom.id}" else p.text
+                        }))
+                    }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = if (emojiIcon == null) "SmilePlus" else null, enabled = editable, leading = emojiIcon?.let { e -> { fish.nexa.ui.chat.RoleIcon(e, 16.dp) } })
                     if (role.iconId != null || role.iconEmoji.isNotEmpty()) NxButton(t("roles.icon.remove"), ::removeIcon, kind = ButtonKind.GHOST, size = ButtonSize.SM, enabled = editable && !iconBusy)
                 }
             }

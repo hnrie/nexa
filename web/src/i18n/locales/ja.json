@@ -3574,7 +3574,6 @@
   "reorder.moveUp": "上へ移動",
   "reorder.nameIsNowIndexOfCount": "{name} は {count} 件中 {index} 番目になりました。",
   "roles.icon.crop": "ロールアイコンを切り抜く",
-  "roles.icon.emoji": "または絵文字",
   "roles.icon.failed": "アイコンを保存できませんでした。",
   "roles.icon.hint": "アイコン付きのロールのうち最上位のものが、名前の横に表示されます。画像か絵文字 1 つです。",
   "roles.icon.label": "ロールアイコン",

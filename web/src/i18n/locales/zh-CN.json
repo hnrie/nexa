@@ -3574,7 +3574,6 @@
   "reorder.moveUp": "上移",
   "reorder.nameIsNowIndexOfCount": "{name} 现在是第 {index} 个，共 {count} 个。",
   "roles.icon.crop": "裁剪身份组图标",
-  "roles.icon.emoji": "或一个表情",
   "roles.icon.failed": "无法保存图标。",
   "roles.icon.hint": "显示在最高的带图标身份组为此组的成员名字旁边。可以是图片或一个表情。",
   "roles.icon.label": "身份组图标",

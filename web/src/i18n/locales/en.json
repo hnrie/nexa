@@ -3364,7 +3364,6 @@
   "reorder.moveUp": "Move Up",
   "reorder.nameIsNowIndexOfCount": "{name} is now {index} of {count}.",
   "roles.icon.crop": "Crop Role Icon",
-  "roles.icon.emoji": "Or an emoji",
   "roles.icon.failed": "The icon couldn't be saved.",
   "roles.icon.hint": "Shown beside the names of members whose highest role has an icon. A picture, or one emoji.",
   "roles.icon.label": "Role Icon",

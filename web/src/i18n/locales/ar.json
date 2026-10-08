@@ -4419,7 +4419,6 @@
   "reorder.moveUp": "تحريك لأعلى",
   "reorder.nameIsNowIndexOfCount": "{name} أصبح الآن {index} من {count}.",
   "roles.icon.crop": "قص أيقونة الدور",
-  "roles.icon.emoji": "أو رمز تعبيري",
   "roles.icon.failed": "تعذّر حفظ الأيقونة.",
   "roles.icon.hint": "تظهر بجانب أسماء الأعضاء الذين لأعلى أدوارهم أيقونة. صورة أو رمز تعبيري واحد.",
   "roles.icon.label": "أيقونة الدور",

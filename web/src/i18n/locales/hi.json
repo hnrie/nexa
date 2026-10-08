@@ -3753,7 +3753,6 @@
   "reorder.moveUp": "ऊपर ले जाएँ",
   "reorder.nameIsNowIndexOfCount": "{name} अब {count} में से {index} है।",
   "roles.icon.crop": "भूमिका आइकन काटें",
-  "roles.icon.emoji": "या एक इमोजी",
   "roles.icon.failed": "आइकन सहेजा नहीं जा सका।",
   "roles.icon.hint": "जिन सदस्यों की सबसे ऊँची भूमिका का आइकन हो, उनके नाम के पास दिखता है। एक तस्वीर, या एक इमोजी।",
   "roles.icon.label": "भूमिका आइकन",

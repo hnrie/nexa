@@ -1,8 +1,9 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, SmilePlus, Trash2 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type DragEvent } from "react";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
+import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { RoleIcon } from "@/components/common/RoleIcon";
-import { nameClass, nameStyle, type RoleLook } from "@/lib/roleLook";
+import { nameClass, nameStyle, type RoleIconInfo, type RoleLook } from "@/lib/roleLook";
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import type { Role } from "@/api/types";
@@ -197,6 +198,7 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
   const [iconEmoji, setIconEmoji] = useState(role.icon_emoji ?? "");
   const [iconBusy, setIconBusy] = useState(false);
   const [crop, setCrop] = useState<File | null>(null);
+  const [picker, setPicker] = useState<DOMRect | null>(null);
   const iconRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   // One group per role, so switching roles does not leave the browser thinking
@@ -214,6 +216,9 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
     setColor3(next === "shimmer" ? (color3 ?? 0xffd166) : null);
   };
   const dirty = name !== role.name || color !== role.color || hoist !== role.hoist || mentionable !== role.mentionable || color2 !== (role.color2 ?? null) || color3 !== (role.color3 ?? null) || iconEmoji !== (role.icon_emoji ?? "");
+  // an emoji picked but not yet saved shows in place of the picture it will replace
+  const emojiIcon: RoleIconInfo | undefined = !iconEmoji ? undefined : iconEmoji.startsWith("custom:") ? { kind: "custom", id: iconEmoji.slice(7), name } : { kind: "emoji", text: iconEmoji, name };
+  const pickedIcon: RoleIconInfo | undefined = emojiIcon ?? (role.icon_id ? { kind: "image", id: role.icon_id, name } : undefined);
   const look = { color: color ? hex(color) : undefined, ...(color && color2 != null ? { colors: [hex(color), hex(color2), ...(color3 != null ? [hex(color3)] : [])], shimmer: color3 != null } : {}) } as RoleLook;
   const uploadIcon = async (blob: Blob, crop?: { x: number; y: number; w: number; h: number } | null) => {
     setIconBusy(true);
@@ -282,7 +287,7 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
           <span className={s.preview}>
             <span className={s.dot} style={{ background: look.colors ? `linear-gradient(90deg, ${look.colors.join(", ")})` : color ? hex(color) : "var(--text-muted)" }} />
             <span className={nameClass(look)} style={nameStyle(look)}>{name || "@everyone"}</span>
-            {!everyone && (role.icon_id || iconEmoji) ? <RoleIcon icon={role.icon_id ? { kind: "image", id: role.icon_id, name } : iconEmoji.startsWith("custom:") ? { kind: "custom", id: iconEmoji.slice(7), name } : { kind: "emoji", text: iconEmoji, name }} size={18} /> : null}
+            {!everyone && pickedIcon ? <RoleIcon icon={pickedIcon} size={18} /> : null}
           </span>
           {/* Without a shared `name` the browser treats twenty-one swatches as
               twenty-one unrelated radios: no arrow keys between them, and one
@@ -325,10 +330,24 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
         <Field as="div" label={t("roles.icon.label")} hint={t("roles.icon.hint")}>
           <div className={s.styleColors}>
             <Button size="sm" variant="secondary" disabled={!editable || iconBusy} onClick={() => iconRef.current?.click()}>{t("roles.icon.upload")}</Button>
-            <TextInput className={s.emojiField} value={iconEmoji.startsWith("custom:") ? "" : iconEmoji} placeholder={t("roles.icon.emoji")} aria-label={t("roles.icon.emoji")} disabled={!editable} onChange={(e) => setIconEmoji([...e.target.value.trim()].slice(-8).join(""))} maxLength={16} />
+            <Button size="sm" variant="secondary" disabled={!editable} onClick={(e) => setPicker(picker ? null : e.currentTarget.getBoundingClientRect())} data-picker-toggle={picker ? "" : undefined} data-testid="role-icon-choose-emoji">
+              {emojiIcon ? <RoleIcon icon={emojiIcon} size={16} /> : <SmilePlus size={16} aria-hidden="true" />} {t("server.channelIcon.chooseEmoji")}
+            </Button>
             {role.icon_id || role.icon_emoji ? <Button size="sm" variant="ghost" disabled={!editable || iconBusy} onClick={() => void removeIcon()}>{t("roles.icon.remove")}</Button> : null}
             <input ref={iconRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop(f); e.target.value = ""; }} />
           </div>
+          {picker ? (
+            <ExpressionPicker
+              anchor={picker}
+              serverId={role.server_id}
+              onlyServer
+              onClose={() => setPicker(null)}
+              onEmoji={(pick) => {
+                setIconEmoji(pick.custom ? `custom:${pick.custom.id}` : pick.unicode);
+                setPicker(null);
+              }}
+            />
+          ) : null}
           {crop ? <ImageCropModal file={crop} aspect={1} maxSize={128} title={t("roles.icon.crop")} serverCrop onClose={() => setCrop(null)} onDone={({ blob, crop: area }) => { setCrop(null); void uploadIcon(blob, area ?? null); }} /> : null}
         </Field>
       ) : null}

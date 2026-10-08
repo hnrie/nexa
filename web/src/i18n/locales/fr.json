@@ -3837,7 +3837,6 @@
   "reorder.moveUp": "Monter",
   "reorder.nameIsNowIndexOfCount": "{name} est maintenant en position {index} sur {count}.",
   "roles.icon.crop": "Recadrer l’icône du rôle",
-  "roles.icon.emoji": "Ou un emoji",
   "roles.icon.failed": "Impossible d’enregistrer l’icône.",
   "roles.icon.hint": "Affichée à côté du nom des membres dont le rôle le plus haut a une icône. Une image, ou un emoji.",
   "roles.icon.label": "Icône du rôle",

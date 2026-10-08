@@ -202,6 +202,8 @@ fun NxButton(
     inline: Boolean = false,
     /** After the words: a count in its own pill (`.btnCount`). */
     trailing: (@Composable () -> Unit)? = null,
+    /** Before the words in place of `icon`: a picture of its own, like a chosen emoji. */
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val c = Nx.colors
     val type = Nx.type
@@ -262,7 +264,8 @@ fun NxButton(
         contentAlignment = Alignment.Center,
     ) {
         Row(Modifier.alpha(if (loading) 0f else 1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (icon != null) Icon(icon, fg, size = if (size == ButtonSize.LG) 20.dp else if (size == ButtonSize.TOUCH) 15.dp else 18.dp)
+            if (leading != null) leading()
+            else if (icon != null) Icon(icon, fg, size = if (size == ButtonSize.LG) 20.dp else if (size == ButtonSize.TOUCH) 15.dp else 18.dp)
             Txt(text, style = if (kind == ButtonKind.LINK) style.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)) else style, color = fg, maxLines = 1)
             trailing?.invoke()
         }

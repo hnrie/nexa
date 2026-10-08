@@ -4087,7 +4087,6 @@
   "reorder.moveUp": "Вверх",
   "reorder.nameIsNowIndexOfCount": "«{name}» теперь {index} из {count}.",
   "roles.icon.crop": "Обрезать значок роли",
-  "roles.icon.emoji": "Или эмодзи",
   "roles.icon.failed": "Не удалось сохранить значок.",
   "roles.icon.hint": "Показывается рядом с именами участников, чья высшая роль со значком — эта. Картинка или одно эмодзи.",
   "roles.icon.label": "Значок роли",

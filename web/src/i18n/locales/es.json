@@ -3837,7 +3837,6 @@
   "reorder.moveUp": "Subir",
   "reorder.nameIsNowIndexOfCount": "{name} es ahora el {index} de {count}.",
   "roles.icon.crop": "Recortar icono del rol",
-  "roles.icon.emoji": "O un emoji",
   "roles.icon.failed": "No se pudo guardar el icono.",
   "roles.icon.hint": "Se muestra junto al nombre de quienes tienen este rol como el más alto con icono. Una imagen o un emoji.",
   "roles.icon.label": "Icono del rol",

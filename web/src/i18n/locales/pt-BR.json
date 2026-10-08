@@ -3837,7 +3837,6 @@
   "reorder.moveUp": "Mover para cima",
   "reorder.nameIsNowIndexOfCount": "{name} agora é o {index} de {count}.",
   "roles.icon.crop": "Recortar ícone do cargo",
-  "roles.icon.emoji": "Ou um emoji",
   "roles.icon.failed": "Não foi possível salvar o ícone.",
   "roles.icon.hint": "Aparece ao lado do nome de quem tem este como o cargo mais alto com ícone. Uma imagem ou um emoji.",
   "roles.icon.label": "Ícone do cargo",

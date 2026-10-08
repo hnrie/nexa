@@ -3574,7 +3574,6 @@
   "reorder.moveUp": "위로 이동",
   "reorder.nameIsNowIndexOfCount": "{name}은(는) 이제 {count}개 중 {index}번째입니다.",
   "roles.icon.crop": "역할 아이콘 자르기",
-  "roles.icon.emoji": "또는 이모지",
   "roles.icon.failed": "아이콘을 저장하지 못했습니다.",
   "roles.icon.hint": "아이콘이 있는 가장 높은 역할의 아이콘이 이름 옆에 표시됩니다. 사진 또는 이모지 하나.",
   "roles.icon.label": "역할 아이콘",
