@@ -31,6 +31,13 @@ server:
 	@mv -f bin/chatd.next bin/chatd
 	@echo "  bin/chatd is now $(VERSION); the one it replaced is bin/chatd.prev"
 
+# The dev frontend. The prod build writes web/dist, which prod serves live —
+# every build gets a fresh build id (vite.config.ts), so building it for dev
+# would show every prod tab an update prompt. This builds the same app into
+# web/dist-dev instead, which only the dev server serves.
+web-dev:
+	cd web && npm ci --no-audit --no-fund && npm run typecheck && npx vite build --outDir dist-dev --emptyOutDir
+
 test: test-go test-web test-desktop
 
 # -race makes the api package take about three minutes on an idle machine and
@@ -72,6 +79,19 @@ licenses:
 run:
 	bash deploy/warp-proxy.sh
 	$(GO) run ./cmd/chatd
+
+# Dev server binary. Unlike `server` above this never touches bin/chatd
+# (what prod runs), so building for dev can't change what prod restarts into.
+server-dev:
+	$(GO) build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o bin/chatd_dev ./cmd/chatd
+	@echo "  bin/chatd_dev is now $(VERSION)"
+
+# Dev site behind dev.nexa.fish (tunnel ingress points it at :6969): builds
+# both the web app (into web/dist-dev, leaving prod's web/dist alone) and the
+# dev server binary, then runs it against a separate DATA_DIR so it never
+# touches the live database on :8090.
+run-dev: web-dev server-dev
+	LISTEN=127.0.0.1:6969 PUBLIC_URL=https://dev.nexa.fish DATA_DIR=./data-dev WEB_DIST=./web/dist-dev ./bin/chatd_dev -env chatd.env
 
 # What builds leave lying around, and nothing else. bin/ and web/dist are not
 # leftovers: they are what is running (and bin/chatd.prev the way back), so one

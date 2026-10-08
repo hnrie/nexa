@@ -1,5 +1,6 @@
 # runtime
 /data/
+/data-dev/
 /logs/
 /bin/
 # `go build ./cmd/chatmigrate` from the top leaves its binary here
@@ -9,6 +10,7 @@
 # web
 /web/node_modules/
 /web/dist/
+/web/dist-dev/
 
 # tooling
 /.tools/
