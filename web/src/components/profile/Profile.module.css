@@ -250,6 +250,7 @@
   inset: 0 0 auto;
   height: 360px;
   pointer-events: none;
+  background-image: var(--backdrop);
   background-size: cover;
   background-position: center 30%;
   filter: blur(30px) saturate(1.3);
@@ -258,8 +259,14 @@
   -webkit-mask-image: linear-gradient(180deg, #000 0%, rgb(0 0 0 / 0.5) 45%, transparent 100%);
   mask-image: linear-gradient(180deg, #000 0%, rgb(0 0 0 / 0.5) 45%, transparent 100%);
 }
-/* on a theme's colours the picture is light and shade over them, so the card keeps its own colours */
-.card[data-themed] .backdrop { mix-blend-mode: soft-light; opacity: 0.85; }
+/* On a theme's colours the picture shows through a wash of the theme's own top colour, so it reads as
+   the banner and still sits in the card's colours. It was light and shade over them (soft-light),
+   which on a strong colour like a bright pink left nothing of the picture to see. */
+.card[data-themed] .backdrop {
+  background-image: linear-gradient(color-mix(in srgb, var(--profile-top) 35%, transparent), color-mix(in srgb, var(--profile-top) 35%, transparent)), var(--backdrop);
+  filter: blur(14px) saturate(1.15);
+  opacity: 0.75;
+}
 .card[data-layout="wide"] > .side, .card[data-layout="wide"] > .main { position: relative; }
 .side {
   min-height: 0;
