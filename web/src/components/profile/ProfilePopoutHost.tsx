@@ -38,7 +38,7 @@ export function ProfilePopoutHost() {
     );
   }
   return (
-    <Popout anchor={open.anchor} onClose={closeProfilePopout} label={name} prefer="side" className={s.popoutFrame} testId="profile-popout">
+    <Popout anchor={open.anchor} onClose={closeProfilePopout} label={name} prefer="side" className={s.popoutFrame} testId="profile-popout" keepFocus={open.keepFocus}>
       {card}
     </Popout>
   );

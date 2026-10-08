@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -669,6 +670,8 @@ private fun NoteEditor(noteId: String, note: OpenNote, bridge: NoteBridge, narro
         surface.onSubmit = { scope.launch { session.flush() } }
         surface.onLinkKey = { tray = Tray.LINK }
         surface.onEscape = { tray = null }
+        // a mention tapped is selected whole (Backspace takes it out) and shows who it is
+        surface.onMention = { id -> fish.nexa.ui.shell.openProfile(id) }
         if (autoFocus) {
             NotesUi.freshId = null
             runCatching { titleFocus.requestFocus() }
@@ -731,8 +734,10 @@ private fun NoteEditor(noteId: String, note: OpenNote, bridge: NoteBridge, narro
 
     Column(Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
         NoteBar(narrow, title.text, viewOnly = false, end = end)
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        val sheetScroll = rememberScrollState()
+        val sheetArea = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
+        Box(Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { sheetArea[0] = it }) {
+            Column(Modifier.fillMaxSize().verticalScroll(sheetScroll)) {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                     Column(
                         Modifier
@@ -798,6 +803,8 @@ private fun NoteEditor(noteId: String, note: OpenNote, bridge: NoteBridge, narro
                     }
                 }
             }
+            // typing @ offers the people who have the note
+            NoteMentionList(noteId, surface, sheetScroll, { sheetArea[0] }, redraw)
         }
         // what the caret is in, or the tray asked for, then the tools
         val shown = fish.nexa.ui.format.settledTray(tray, state)
@@ -827,6 +834,11 @@ private fun NoteReader(noteId: String, initial: NoteDoc, bridge: NoteBridge, nar
         true
     }
     DisposableEffect(bridge) { onDispose { bridge.onRemote = { _, _ -> false } } }
+    // the people it mentions, fetched if this device has not seen them, and drawn again once their names are here
+    val mentioned = remember(doc.md) { fish.nexa.notes.NoteMentions.mentionedIds(doc.md) }
+    LaunchedEffect(mentioned) { Nexa.session.ensureUsers(mentioned) }
+    val known by Nexa.users.byId.collectAsState()
+    val named = mentioned.count { known[it] != null }
     val ctx = remember(doc.files) {
         RenderCtx(
             files = true,
@@ -851,7 +863,7 @@ private fun NoteReader(noteId: String, initial: NoteDoc, bridge: NoteBridge, nar
                     modifier = Modifier.semantics { heading() },
                 )
                 Byline(noteId)
-                if (doc.md.isNotBlank()) MarkdownView(doc.md, ctx)
+                if (doc.md.isNotBlank()) androidx.compose.runtime.key(named) { MarkdownView(doc.md, ctx) }
                 else Txt(t("notes.reader.empty"), style = Nx.type.body, color = c.textMuted)
             }
         }

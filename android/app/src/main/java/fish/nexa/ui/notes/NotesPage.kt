@@ -324,7 +324,8 @@ internal fun BrandPill(label: String?, icon: String, busy: Boolean = false, desc
 private fun firstWords(n: NoteItem): String {
     val head = n.head ?: return ""
     val text = NoteModel.withoutFiles(head.preview, NoteModel.fileIds(head.preview).toSet())
-    return Markdown.plainText(Markdown.parse(text)).replace(Regex("\\s+"), " ").trim().take(240)
+    // a mention reads as the person's name, as it does in the note
+    return Markdown.plainText(Markdown.parse(text), fish.nexa.ui.chat.AppNames).replace(Regex("\\s+"), " ").trim().take(240)
 }
 
 /** A clock that moves every half minute, for times said as "2 minutes ago". */
@@ -354,7 +355,9 @@ private fun NotesList(selected: String?) {
     var query by rememberSaveable { mutableStateOf("") }
     val now = minuteClock()
     val all = remember(notes) { Notes.sorted(notes) }
-    val words = remember(all) { all.associate { it.id to firstWords(it) } }
+    val known by Nexa.users.byId.collectAsState()
+    LaunchedEffect(all) { Nexa.session.ensureUsers(all.flatMap { n -> n.head?.let { fish.nexa.notes.NoteMentions.mentionedIds(it.preview) } ?: emptyList() }) }
+    val words = remember(all, known) { all.associate { it.id to firstWords(it) } }
     val shown = remember(all, words, query) {
         val q = query.trim().lowercase()
         if (q.isEmpty()) all else all.filter { "${it.head?.title ?: ""}\n${words[it.id] ?: ""}".lowercase().contains(q) }

@@ -634,7 +634,7 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   for DM call lines).
 - `lib/`: everything else, one concern per file. Notable groups: `look/` (themes, presets, the theme
   builder's maths, custom CSS and plugins with their API in `look/plugins`), `notes/` (the Yjs
-  document, sessions, sharing, history), `automod/` (the client side of AutoMod), `spell/` (Hunspell
+  document, sessions, sharing, history, mentions), `automod/` (the client side of AutoMod), `spell/` (Hunspell
   in a worker for Nexa's own text menu), and single files for attachments, uploads, notifications,
   sounds, keybinds, the app lock, away detection, moving domains, invites, export, time, links,
   server tags, widgets and the rest.
@@ -698,6 +698,21 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   keys the app or another plugin already has. A plugin's menu button may name a lucide icon, drawn
   by `components/common/MenuIcon.tsx`, which loads (with lucide's list of every icon) only when a
   menu shows one; the app's own buttons have no icons.
+- Mentions in notes: a note writes `<@id>` as a message does. Typing @ in the note editor offers
+  the people who have the note (`GET /notes/{id}/sharing`, so viewers too, never yourself),
+  ranked by `lib/notes/mentions.ts`, in the message box's `Autocomplete` (its `style` prop places
+  it) hung from the caret by `components/notes/NoteMentions.tsx`. The format surface finds the
+  "@name" before the caret (`mentionAt`), puts the person in (the `mention` command) and redraws
+  mentions with names that arrive later (`setNames`, called from `useFormatBench`), without a save
+  or an undo step. Clicking a mention in the editor selects it whole, as a chip in a document
+  (Backspace or typing takes it out as one), and opens the profile popout beside it with
+  `keepFocus` (`openProfilePopout`'s fourth argument, `Popout`'s prop): the keyboard stays in the
+  note and the first key typed there closes the card. Only a surface given `onMention` does this.
+  The notes list shows mentions by name. Nobody is notified of a mention. Android:
+  `notes/NoteMentions` ranks the same, `ui/notes/NoteMentions.kt` draws the list, and
+  `FormatSurface` has `mentionAt`, `Cmd.Mention`, `relabelPeople`, and `onMention` with
+  `tappedAt` (a tap on a mention, seen by `mentionTaps` in `FormatPage.kt` without taking it
+  from the field, selects it and opens the profile sheet).
 - `pages/`: one per route. `styles/`: `tokens.css` (every theme token: colour, radius, shadow,
   motion), `base.css`, `markdown.css`, `fonts.css` (Wix Madefor) and `fonts-classic.css` (Onest,
   Mona Sans). `lib/theme.ts` applies a theme; `lib/look/` derives presets and custom themes.

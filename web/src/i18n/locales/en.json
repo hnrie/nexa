@@ -6367,6 +6367,8 @@
   "whatsNew.r20261007.pluginPermsTitle": "Choose What Plugins May Do",
   "whatsNew.r20261007.pluginReviewBody": "Adding a plugin now shows what it is and what it wants to do before any of its code runs. Plugins work in the browser and the desktop app.",
   "whatsNew.r20261007.pluginReviewTitle": "Plugins Ask First",
+  "whatsNew.r20261008.mentionsBody": "Type @ while writing a note to mention someone who has it. Pick them from the list and their name goes in.",
+  "whatsNew.r20261008.mentionsTitle": "Mention People in Notes",
   "whatsNew.r20261008.nightBody": "A theme that comes in light and dark is now one card, with two circles in its corner to switch between them. Winter, Spring and Summer have both too, and in dark Winter snow falls behind the messages.",
   "whatsNew.r20261008.nightTitle": "Light and Dark",
   "whatsNew.r20261008.seasonalBody": "Halloween and Fall are in Settings, Appearance while their seasons last, each with something small sitting on the message box. Winter, Spring and others arrive with their seasons.",

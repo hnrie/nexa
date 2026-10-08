@@ -63,7 +63,7 @@ function roleStyle(role: Role): CSSProperties | undefined {
  * as mentions there, not as commands. `heading` names the whole list in place
  * of its groups, as the emoji used most do.
  */
-export function Autocomplete({ kind, items, index, onHover, onPick, tone, heading: title }: { kind: string; items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number; heading?: string | undefined }) {
+export function Autocomplete({ kind, items, index, onHover, onPick, tone, heading: title, style }: { kind: string; items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number; heading?: string | undefined; style?: CSSProperties | undefined }) {
   const listRef = useRef<HTMLDivElement>(null);
   // The list scrolls when it is taller than the room above the keyboard, so the
   // highlighted row is kept in view. Only the list itself is scrolled:
@@ -79,7 +79,8 @@ export function Autocomplete({ kind, items, index, onHover, onPick, tone, headin
   }, [index, items]);
   if (items.length === 0) return null;
   return (
-    <div ref={listRef} id={AC_LIST_ID} className={s.ac} role="listbox" onMouseDown={(e) => e.preventDefault()}>
+    // style: where it floats, for a page that hangs it from the caret (a note) rather than over the message box
+    <div ref={listRef} id={AC_LIST_ID} className={s.ac} style={style} role="listbox" onMouseDown={(e) => e.preventDefault()}>
       {items.map((it, i) => {
         const group = title ?? groupOf(it, kind);
         const heading = i === 0 || (!title && groupOf(items[i - 1]!, kind) !== group) ? <div className={s.acHead} aria-hidden="true">{group}</div> : null;

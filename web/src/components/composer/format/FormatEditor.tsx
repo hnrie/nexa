@@ -170,6 +170,8 @@ interface BenchOptions {
   onPasteFiles?: (files: File[]) => void;
   /** The surface was drawn again. */
   onDraw?: () => void;
+  /** A mention of someone was clicked (it is selected whole). */
+  onMention?: (userId: string, el: HTMLElement) => void;
   /** Tools the page adds after the toolbar's own. */
   tools?: ReactNode;
   /** Tools the page puts first, where they are always in sight (a note's Add Picture). */
@@ -233,6 +235,8 @@ export function useFormatBench(o: BenchOptions): Bench {
       onFiles: (shown) => latest.current.onFiles?.(shown),
       onPasteFiles: (files) => latest.current.onPasteFiles?.(files),
       onDraw: () => latest.current.onDraw?.(),
+      // only a page that shows people (a note) takes clicks on mentions; elsewhere they are plain text to the caret
+      ...(o.onMention ? { onMention: (userId: string, el: HTMLElement) => latest.current.onMention?.(userId, el) } : {}),
     });
     ctl.current = c;
     setSimplified(c.load(o.initial));
@@ -258,6 +262,11 @@ export function useFormatBench(o: BenchOptions): Bench {
     // the surface is made once, with what it was given when it opened
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // names that arrive after the surface was made (a profile fetched later) show on its mentions
+  useEffect(() => {
+    ctl.current?.setNames(ctx);
+  }, [ctx]);
 
   const run = useCallback((cmd: Command) => ctl.current?.command(cmd), []);
   const current = () => ctl.current?.markdown() ?? markdown;

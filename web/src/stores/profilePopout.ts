@@ -10,18 +10,20 @@ export interface OpenProfilePopout {
   anchor: HTMLElement;
   /** The server it was opened in, whose roles it shows. */
   serverId?: string | undefined;
+  /** Leave the keyboard where it is (a mention selected in a note), rather than moving it into the card. */
+  keepFocus?: boolean;
 }
 
 export const useProfilePopout = create<{ open: OpenProfilePopout | null }>()(() => ({ open: null }));
 
 /** Opens someone's popout beside `anchor`, or closes it when it is open from there already. */
-export function openProfilePopout(userId: string, anchor: HTMLElement, serverId?: string): void {
+export function openProfilePopout(userId: string, anchor: HTMLElement, serverId?: string, keepFocus = false): void {
   const cur = useProfilePopout.getState().open;
   if (cur && cur.anchor === anchor && cur.userId === userId) {
     useProfilePopout.setState({ open: null });
     return;
   }
-  useProfilePopout.setState({ open: { userId, anchor, serverId } });
+  useProfilePopout.setState({ open: { userId, anchor, serverId, ...(keepFocus ? { keepFocus } : {}) } });
 }
 
 export function closeProfilePopout(): void {

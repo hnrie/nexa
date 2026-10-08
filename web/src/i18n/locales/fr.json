@@ -6468,6 +6468,8 @@
   "whatsNew.r20261007.pluginPermsTitle": "Choisis ce que les plugins peuvent faire",
   "whatsNew.r20261007.pluginReviewBody": "En ajoutant un plugin, tu vois maintenant ce qu'il est et ce qu'il veut faire avant que la moindre ligne de son code ne s'exécute. Les plugins fonctionnent dans le navigateur et l'application de bureau.",
   "whatsNew.r20261007.pluginReviewTitle": "Les plugins demandent d'abord",
+  "whatsNew.r20261008.mentionsBody": "Tapez @ en écrivant une note pour mentionner quelqu'un qui y a accès. Choisissez-le dans la liste et son nom s'ajoute.",
+  "whatsNew.r20261008.mentionsTitle": "Mentionner des personnes dans les notes",
   "whatsNew.r20261008.nightBody": "Un thème qui existe en clair et en sombre tient maintenant sur une seule carte, avec deux cercles dans le coin pour passer de l'un à l'autre. Hiver, Printemps et Été ont aussi les deux, et dans l'Hiver sombre la neige tombe derrière les messages.",
   "whatsNew.r20261008.nightTitle": "Clair et sombre",
   "whatsNew.r20261008.seasonalBody": "Halloween et Automne sont dans Paramètres, Apparence le temps de leur saison, chacun avec un petit quelque chose posé sur la zone de message. Hiver, Printemps et d'autres arriveront avec leur saison.",

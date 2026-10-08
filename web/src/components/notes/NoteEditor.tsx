@@ -17,10 +17,12 @@ import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import { useAuth } from "@/stores/auth";
 import { useNotes } from "@/stores/notes";
+import { openProfilePopout } from "@/stores/profilePopout";
 import { unfurl } from "@/api/unfurl";
 import { t } from "@/i18n";
 import { useLiveCursors } from "./LiveCursors";
 import { NoteFile, type PendingUpload } from "./NoteFile";
+import { useNoteMentions } from "./NoteMentions";
 import { noteName } from "./NoteParts";
 import s from "./Notes.module.css";
 
@@ -267,6 +269,8 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
     onFiles: setHosts,
     onPasteFiles: (list) => addFiles(list),
     onDraw: () => redrawRef.current(),
+    // the mention stays selected in the note, so Backspace takes it out, as a chip in a document does
+    onMention: (userId, el) => openProfilePopout(userId, el, undefined, true),
     focus: false,
     // first, so they never scroll out of sight along with the rest
     lead: (
@@ -276,6 +280,9 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
       </>
     ),
   });
+
+  // ---- mentioning people: @ offers whoever has the note -------------------------------
+  const mentionList = useNoteMentions(noteId, bench, meId);
 
   // ---- everyone else's caret ------------------------------------------------------
   const cursors = useLiveCursors({ noteId, note, ctl: bench.ctl, page: sheet });
@@ -481,6 +488,7 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
         data-testid="note-file-input"
       />
       {portals}
+      {mentionList}
     </div>
   );
 }

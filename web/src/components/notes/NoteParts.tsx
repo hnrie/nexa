@@ -6,6 +6,7 @@ import type { RenderCtx } from "@/markdown/ast";
 import { Markdown } from "@/markdown";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { NOTE_MAX_CHARS, NOTE_PREVIEW_CHARS, type NoteDoc, type NoteHead } from "@/lib/notes/model";
+import { mentionedIds } from "@/lib/notes/mentions";
 import { noteError } from "@/lib/notes/errors";
 import { personHue } from "@/lib/notes/people";
 import type { SaveState } from "@/lib/notes/session";
@@ -66,6 +67,10 @@ export function NoteReader({ initial, bridge, onTitle, barStart, barEnd, byline 
   const [doc, setDoc] = useState(initial);
   const base = useRenderCtx();
   const ctx = useMemo<RenderCtx>(() => ({ ...base, renderFile: (id, name, width) => <NoteFileLine width={width}><NoteFile meta={doc.files[id]} name={name} width={width} /></NoteFileLine> }), [base, doc.files]);
+  // the names of the people it mentions, who may be nobody this account has met
+  useEffect(() => {
+    fetchMissingUsers(mentionedIds(doc.md));
+  }, [doc.md]);
   useLayoutEffect(() => {
     bridge.current = {
       onRemote: (next) => {

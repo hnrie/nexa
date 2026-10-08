@@ -980,7 +980,7 @@ private fun Autocomplete(channel: Channel, token: AcToken, modifier: Modifier, p
 data class AcItem(val kind: String, val insert: String, val title: String, val sub: String = "", val user: PublicUser? = null, val color: Long? = null, val emoji: String? = null)
 
 @Composable
-private fun AcRow(item: AcItem, selected: Boolean, onClick: () -> Unit) {
+internal fun AcRow(item: AcItem, selected: Boolean, onClick: () -> Unit) {
     val c = Nx.colors
     val shape = Radii.Sm
     Row(

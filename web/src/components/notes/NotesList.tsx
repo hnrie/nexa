@@ -1,5 +1,5 @@
 import { Check, Eye, Plus, Users, X } from "lucide-react";
-import { useMemo, useState, type CSSProperties, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { NOTE_EDITOR } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
@@ -9,7 +9,9 @@ import { SearchBox } from "@/components/common/SearchBox";
 import { Spinner } from "@/components/common/Spinner";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { menuPoint } from "@/components/sidebar/ServerSidebar";
-import { parse, plainText } from "@/markdown";
+import { parse, plainText, type PlainTextNames } from "@/markdown";
+import { useRenderCtx } from "@/lib/markdownCtx";
+import { mentionedIds } from "@/lib/notes/mentions";
 import { noteError } from "@/lib/notes/errors";
 import { fileIds, withoutFiles } from "@/lib/notes/model";
 import { personHue } from "@/lib/notes/people";
@@ -18,17 +20,18 @@ import { formatListWhen } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { peopleHere, sortedNotes, useNotes, type NoteInviteItem, type NoteItem } from "@/stores/notes";
 import { useUI } from "@/stores/ui";
-import { displayName, useUsers } from "@/stores/users";
+import { displayName, fetchMissingUsers, useUsers } from "@/stores/users";
 import { t } from "@/i18n";
 import { noteMenu } from "./noteMenu";
 import { noteName, useMinuteClock } from "./NoteParts";
 import s from "./Notes.module.css";
 
 /** The first words of a note, as plain text, for its row: its words, not the names of its files. */
-function firstWords(n: NoteItem): string {
+function firstWords(n: NoteItem, names: PlainTextNames): string {
   if (!n.head) return "";
   const text = withoutFiles(n.head.preview, new Set(fileIds(n.head.preview)));
-  return plainText(parse(text)).replace(/\s+/g, " ").trim().slice(0, 240);
+  // a mention reads as the person's name, as it does in the note
+  return plainText(parse(text), names).replace(/\s+/g, " ").trim().slice(0, 240);
 }
 
 /**
@@ -44,7 +47,11 @@ export function NotesList({ selected, onNew, making }: { selected: string | null
   const now = useMinuteClock();
 
   const all = useMemo(() => sortedNotes(notes), [notes]);
-  const words = useMemo(() => new Map(all.map((n) => [n.id, firstWords(n)])), [all]);
+  const names = useRenderCtx();
+  useEffect(() => {
+    fetchMissingUsers(all.flatMap((n) => (n.head ? mentionedIds(n.head.preview) : [])));
+  }, [all]);
+  const words = useMemo(() => new Map(all.map((n) => [n.id, firstWords(n, names)])), [all, names]);
   const shown = useMemo(() => {
     const q = query.trim().toLocaleLowerCase();
     if (!q) return all;

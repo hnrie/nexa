@@ -39,8 +39,12 @@ function place(anchor: DOMRect, box: DOMRect, prefer: Prefer): { left: number; t
  * of the page so nothing it opened from can clip it, takes focus when it
  * opens and gives it back when it closes, and goes away with a press
  * anywhere else, with Escape, or when what it opened from scrolls away.
+ *
+ * With `keepFocus` it leaves the keyboard where it was (a mention clicked in
+ * a note, still selected there): typing anywhere but in the card puts it
+ * away, and the key goes on to where it was typed.
  */
-export function Popout({ anchor, onClose, label, children, className, prefer = "above", testId }: { anchor: HTMLElement; onClose: () => void; label: string; children: ReactNode; className?: string; prefer?: Prefer; testId?: string }) {
+export function Popout({ anchor, onClose, label, children, className, prefer = "above", testId, keepFocus = false }: { anchor: HTMLElement; onClose: () => void; label: string; children: ReactNode; className?: string; prefer?: Prefer; testId?: string; keepFocus?: boolean }) {
   const card = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
   const inside = useRef(false);
@@ -67,10 +71,10 @@ export function Popout({ anchor, onClose, label, children, className, prefer = "
 
   const focused = useRef(false);
   useEffect(() => {
-    if (!at || focused.current) return;
+    if (!at || focused.current || keepFocus) return;
     focused.current = true;
     card.current?.focus({ preventScroll: true });
-  }, [at]);
+  }, [at, keepFocus]);
   useEffect(
     () => () => {
       if (inside.current && anchor.isConnected) anchor.focus({ preventScroll: true });
@@ -88,6 +92,10 @@ export function Popout({ anchor, onClose, label, children, className, prefer = "
       onClose();
     };
     const key = (e: KeyboardEvent) => {
+      if (keepFocus && e.key !== "Escape" && !card.current?.contains(e.target as Node)) {
+        if (!["Shift", "Control", "Alt", "Meta"].includes(e.key)) onClose();
+        return;
+      }
       if (e.key !== "Escape") return;
       e.stopPropagation();
       onClose();
@@ -102,7 +110,7 @@ export function Popout({ anchor, onClose, label, children, className, prefer = "
       window.removeEventListener("resize", reposition);
       window.removeEventListener("scroll", reposition, true);
     };
-  }, [anchor, onClose, reposition]);
+  }, [anchor, onClose, reposition, keepFocus]);
 
   return createPortal(
     <div

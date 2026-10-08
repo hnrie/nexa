@@ -385,3 +385,63 @@ describe("a note on the writing surface", () => {
     expect(note.markdown()).toBe("hello from them");
   });
 });
+
+describe("mentioning people", () => {
+  // jsdom measures nothing: the caret's line is a made-up box
+  beforeEach(() => {
+    Range.prototype.getClientRects = () => [{ left: 10, top: 20, width: 0, height: 16 }] as unknown as DOMRectList;
+    Range.prototype.getBoundingClientRect = () => ({ left: 10, top: 20, width: 0, height: 16 }) as DOMRect;
+  });
+
+  it("finds the @name being typed and puts a mention in its place", () => {
+    surface.load("hi @al");
+    select(0, 6);
+    const at = surface.mentionAt();
+    expect(at?.query).toBe("al");
+    expect(at?.box.top).toBe(20);
+    surface.command({ t: "mention", raw: "<@42>", label: "@Alice", replace: 3 });
+    expect(surface.markdown()).toBe("hi <@42> ");
+    expect(root.querySelector("[data-atom='<@42>']")?.textContent).toBe("@Alice");
+  });
+
+  it("offers nothing inside a word, in code, or for a selection", () => {
+    surface.load("mail@al");
+    select(0, 7);
+    expect(surface.mentionAt()).toBeNull();
+    surface.load("x `@al` y");
+    select(0, 5);
+    expect(surface.mentionAt()).toBeNull();
+    surface.load("hi @al");
+    select(0, 3, 6);
+    expect(surface.mentionAt()).toBeNull();
+  });
+
+  it("draws a mention with a name that arrives after the text, changing nothing written", () => {
+    surface.load("hi <@42>");
+    const before = changes;
+    surface.setNames({ users: { "42": { id: "42", username: "alice", display_name: "Alice" } }, channels: {}, roles: {}, emojiUrl: () => "" } as never);
+    expect(root.querySelector("[data-atom='<@42>']")?.textContent).toBe("@Alice");
+    expect(surface.markdown()).toBe("hi <@42>");
+    expect(changes).toBe(before);
+  });
+
+  it("selects a clicked mention whole, so what is typed next replaces it as one", () => {
+    surface.destroy();
+    const told: string[] = [];
+    surface = new FormatSurface(root, {
+      labels: { placeholder: "", summary: "Summary", code: "Code", alert: (k) => k.toUpperCase() },
+      onChange: () => (changes += 1),
+      onState: (s) => (last = s),
+      onMention: (id, el) => told.push(id + " " + el.textContent),
+    });
+    surface.load("ask <@42> now");
+    surface.setNames({ users: { "42": { id: "42", username: "alice", display_name: "Alice" } }, channels: {}, roles: {}, emojiUrl: () => "" } as never);
+    const chip = root.querySelector<HTMLElement>("[data-atom='<@42>']")!;
+    chip.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    expect(told).toEqual(["42 @Alice"]);
+    expect(document.getSelection()?.toString()).toBe("@Alice");
+    // a browser deletes a selection in one line itself (jsdom does not), so typing over it through the model shows what is selected
+    surface.command({ t: "text", text: "Bob" });
+    expect(surface.markdown()).toBe("ask Bob now");
+  });
+});

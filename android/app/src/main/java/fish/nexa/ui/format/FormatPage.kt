@@ -28,6 +28,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.launch
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -484,10 +489,12 @@ private fun EditField(
     // one look for the field's life: a new one would restart the keyboard's connection to it
     val look = remember(surface, key, c, mono, code) { if (code) null else RunsLook(surface, key, c, mono) }
     val input = remember(surface, key) { FieldInput(surface, key) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     BasicTextField(
         state = state,
         modifier = modifier
             .focusRequester(focus)
+            .then(if (code) Modifier else Modifier.mentionTaps(surface, key, scope))
             .onFocusChanged { if (it.isFocused) surface.focused(key) else surface.blurred(key) }
             .onGloballyPositioned { surface.placed[key] = it }
             .onPreviewKeyEvent { e ->
@@ -612,3 +619,35 @@ private class RunsLook(
     override fun equals(other: Any?): Boolean = other is RunsLook && other.surface === surface && other.key == key && other.c == c && other.mono == mono
     override fun hashCode(): Int = key.hashCode()
 }
+
+/**
+ * Watches for a tap on a mention in a field, without taking it from the
+ * field: once the field has put the caret where the tap was, the surface
+ * selects the whole mention instead ([FormatSurface.tappedAt]).
+ */
+private fun Modifier.mentionTaps(surface: FormatSurface, key: FieldKey, scope: kotlinx.coroutines.CoroutineScope): Modifier =
+    pointerInput(surface, key) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            var up: androidx.compose.ui.input.pointer.PointerInputChange? = null
+            while (true) {
+                val e = awaitPointerEvent(PointerEventPass.Initial)
+                val ch = e.changes.firstOrNull { it.id == down.id } ?: break
+                if ((ch.position - down.position).getDistance() > viewConfiguration.touchSlop) break
+                if (!ch.pressed) {
+                    up = ch
+                    break
+                }
+            }
+            val tap = up ?: return@awaitEachGesture
+            if (surface.onMention == null || tap.uptimeMillis - down.uptimeMillis > viewConfiguration.longPressTimeoutMillis) return@awaitEachGesture
+            val laid = surface.laidOut[key]?.invoke() ?: return@awaitEachGesture
+            val at = laid.getOffsetForPosition(tap.position)
+            val hit = listOf(at, at - 1).firstOrNull { it in 0 until laid.layoutInput.text.length && laid.getBoundingBox(it).contains(tap.position) } ?: return@awaitEachGesture
+            // after the field has taken the tap (and put its caret there)
+            scope.launch {
+                kotlinx.coroutines.delay(40)
+                surface.tappedAt(key, hit)
+            }
+        }
+    }

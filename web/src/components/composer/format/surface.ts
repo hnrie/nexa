@@ -121,6 +121,8 @@ export interface SurfaceOptions {
   onPasteFiles?: (files: File[]) => void;
   /** The surface was drawn again: what is drawn over it (someone else's caret) is placed again. */
   onDraw?: () => void;
+  /** A mention of someone was clicked: it is selected whole, and this is told who and where it is drawn. */
+  onMention?: (userId: string, el: HTMLElement) => void;
 }
 
 /**
@@ -182,7 +184,9 @@ export type Command =
   | { t: "clear" }
   | { t: "undo" }
   | { t: "redo" }
-  | { t: "text"; text: string };
+  | { t: "text"; text: string }
+  /** Puts a mention of someone in place of the `replace` characters before the caret (the "@name" typed so far), and a space after it. */
+  | { t: "mention"; raw: string; label: string; replace: number };
 
 interface Snapshot {
   blocks: Block[];
@@ -355,6 +359,72 @@ export class FormatSurface {
     this.future = [];
     this.render();
     return loaded.simplified;
+  }
+
+  /**
+   * The "@name" being typed just before the caret, for the page to offer
+   * people for: what is typed after the @, and the line the caret is on in the
+   * page's coordinates, to hang the suggestions from. Null unless the caret
+   * (not a selection) sits at the end of one, in text that is not code.
+   */
+  mentionAt(): { query: string; box: { left: number; top: number; height: number } } | null {
+    if (this.composing || !this.active) return null;
+    this.syncSelection();
+    const { anchor, focus } = this.sel;
+    if (comparePos(anchor, focus) !== 0) return null;
+    const block = this.blocks[focus.b];
+    if (!block || !(isText(block) || (block.kind === "table" && focus.cell))) return null;
+    // an @ that starts a word: at the start, or after a space, a bracket or another mention
+    const m = /(?:^|[\s(\u0000])@([\p{L}\p{N}_.]{0,32})$/u.exec(this.textOf(focus).slice(0, focus.o));
+    if (!m) return null;
+    const content = isText(block) ? block.content : (block.rows[focus.cell![0]]?.[focus.cell![1]] ?? []);
+    // the @ and what follows it are code: not a mention (the last character typed says, the caret's own marks may not)
+    if (sliceMarks(content, focus.o - 1)?.code) return null;
+    const box = this.caretBox(focus);
+    return box ? { query: m[1]!, box } : null;
+  }
+
+  /**
+   * The names mentions are shown with changed (someone's profile arrived
+   * after the text was loaded): each mention is drawn with its name now. What
+   * the surface writes is the same, so nothing is saved or added to undo.
+   */
+  setNames(names: AtomNames): void {
+    this.opts.names = names;
+    let changed = false;
+    const relabel = (content: Inline[]): Inline[] => {
+      let out: Inline[] | null = null;
+      content.forEach((r, i) => {
+        if (r.kind !== "atom" || r.atom !== "user") return;
+        const id = /^<@(\d+)>$/.exec(r.raw)?.[1];
+        const u = id ? names.users[id] : undefined;
+        if (!u) return;
+        const label = "@" + (u.display_name || u.username);
+        if (label === r.label) return;
+        out ??= content.slice();
+        out[i] = { ...r, label };
+      });
+      if (out) changed = true;
+      return out ?? content;
+    };
+    const blocks = this.blocks.map((b): Block => {
+      if (isText(b)) {
+        const content = relabel(b.content);
+        return content === b.content ? b : { ...b, content };
+      }
+      if (b.kind === "table") {
+        const rows = b.rows.map((row) => {
+          const cells = row.map(relabel);
+          return cells.some((c, j) => c !== row[j]) ? cells : row;
+        });
+        return rows.some((r, i) => r !== b.rows[i]) ? { ...b, rows } : b;
+      }
+      return b;
+    });
+    if (!changed) return;
+    this.blocks = blocks;
+    this.render();
+    if (this.active) this.placeSelection();
   }
 
   /**
@@ -1508,6 +1578,20 @@ export class FormatSurface {
 
   private onClick(e: MouseEvent): void {
     const target = e.target as HTMLElement | null;
+    const mention = target?.closest<HTMLElement>('.atom[data-kind="user"]');
+    const userId = mention && this.root.contains(mention) ? /^<@!?(\d+)>$/.exec(mention.dataset["atom"] ?? "")?.[1] : undefined;
+    if (mention && userId && this.opts.onMention) {
+      // the whole mention is selected, so typing over it or Delete takes it as one
+      const range = document.createRange();
+      range.selectNode(mention);
+      const picked = document.getSelection();
+      picked?.removeAllRanges();
+      picked?.addRange(range);
+      this.syncSelection();
+      this.emitState();
+      this.opts.onMention(userId, mention);
+      return;
+    }
     const li = target?.closest<HTMLElement>("[data-task]");
     if (!li || li !== target) return;
     // the box is drawn in the item's start padding: a press there ticks it
@@ -1803,6 +1887,22 @@ export class FormatSurface {
       case "text": {
         this.syncSelection();
         this.typeText(cmd.text);
+        return;
+      }
+      case "mention": {
+        this.syncSelection();
+        const at = this.sel.focus;
+        const cut = deleteRange(this.blocks, { anchor: { ...at, o: Math.max(0, at.o - cmd.replace) }, focus: at });
+        const pos = cut.sel.focus;
+        const block = cut.blocks[pos.b];
+        const content = block && isText(block) ? block.content : block?.kind === "table" && pos.cell ? (block.rows[pos.cell[0]]?.[pos.cell[1]] ?? []) : [];
+        // the marks around it, but never a link or code: a mention is neither
+        const { link: _link, code: _code, ...marks } = marksAt(content, pos.o);
+        const edit = insertAt(cut.blocks, pos, [
+          { kind: "atom", atom: "user", raw: cmd.raw, label: cmd.label, marks },
+          { kind: "text", text: " ", marks },
+        ]);
+        this.apply(edit.blocks, edit.sel);
         return;
       }
     }

@@ -14,6 +14,7 @@ import fish.nexa.media.Media
 import fish.nexa.ui.chat.AppNames
 import fish.nexa.ui.markdown.Align
 import fish.nexa.ui.markdown.Timestamps
+import fish.nexa.ui.markdown.format.AtomKind
 import fish.nexa.ui.markdown.format.AtomNames
 import fish.nexa.ui.markdown.format.Block
 import fish.nexa.ui.markdown.format.CodeBlock
@@ -66,7 +67,12 @@ sealed interface Cmd {
     data class FileWidth(val id: Int, val width: Int) : Cmd
     /** Takes a block out: a file, from its own remove button. */
     data class RemoveBlock(val id: Int) : Cmd
+    /** Puts a mention of someone in place of the `replace` characters before the caret (the "@name" typed so far), and a space after it. */
+    data class Mention(val raw: String, val label: String, val replace: Int) : Cmd
 }
+
+/** The "@name" being typed just before the caret: what follows the @, and the field and offset the caret is at. */
+data class MentionAt(val query: String, val key: FieldKey, val offset: Int)
 
 /** A place another copy of a note can find: a block by where it was and what it says (surface.ts PlaceMark). */
 data class PlaceMark(val b: Int, val o: Int, val cell: Pair<Int, Int>?, val k: String)
@@ -168,6 +174,8 @@ class FormatSurface(
     var onSubmit: (() -> Unit)? = null
     var onLinkKey: (() -> Unit)? = null
     var onEscape: (() -> Unit)? = null
+    /** A mention of someone was tapped: it is selected whole, and this is told who. Unset, a mention is text the caret goes into. */
+    var onMention: ((String) -> Unit)? = null
 
     init {
         val loaded = FormatMarkdown.fromMarkdown(initial, labels, files, max)
@@ -191,6 +199,8 @@ class FormatSurface(
         private const val COALESCE_MS = 1000L
         private const val MAX_HISTORY = 200
         private val LANG_CHARS = Regex("[^a-zA-Z0-9_+-]")
+        private val MENTION = Regex("""(?:^|[\s(\x{FFFC}])@([\p{L}\p{N}_.]{0,32})$""")
+        private val USER_RAW = Regex("""<@!?(\d+)>""")
 
         fun textOf(content: List<Inline>): String = buildString { for (r in content) if (r is Inline.Text) append(r.text) else append(ATOM) }
     }
@@ -917,7 +927,97 @@ class FormatSurface(
                 }
                 apply(out, next)
             }
+            is Cmd.Mention -> {
+                val at = sel.focus
+                val cut = FormatModel.deleteRange(blocks, Sel(at.copy(o = maxOf(0, at.o - cmd.replace)), at))
+                val pos = cut.sel.focus
+                val content = contentOf(cut.blocks.getOrNull(pos.b), pos.cell) ?: return
+                // the marks around it, but never a link or code: a mention is neither
+                val marks = FormatModel.marksAt(content, pos.o).copy(link = null, code = false)
+                val e = FormatModel.insertAt(cut.blocks, pos, listOf(Inline.Atom(AtomKind.USER, cmd.raw, cmd.label, null, marks), Inline.Text(" ", marks)))
+                apply(e.blocks, e.sel)
+            }
         }
+    }
+
+    /**
+     * The "@name" being typed just before the caret (surface.ts mentionAt), for
+     * the page to offer people for. Null unless the caret (not a selection) sits
+     * at the end of one, in text that is not code.
+     */
+    fun mentionAt(): MentionAt? {
+        val key = activeKey ?: return null
+        val (anchor, focus) = sel
+        if (FormatModel.comparePos(anchor, focus) != 0) return null
+        val block = blocks.getOrNull(focus.b)
+        if (block !is TextBlock && !(block is TableBlock && focus.cell != null)) return null
+        val content = contentOf(block, focus.cell) ?: return null
+        val before = textOf(content).take(focus.o)
+        // an @ that starts a word: at the start, or after a space, a bracket or another mention
+        val m = MENTION.find(before) ?: return null
+        // the @ and what follows it are code: not a mention (the last character typed says)
+        if (FormatModel.sliceInline(content, focus.o - 1, focus.o).firstOrNull()?.marks?.code == true) return null
+        return MentionAt(m.groupValues[1], key, focus.o)
+    }
+
+    /**
+     * A tap on a field landed on the character drawn at `shown` (an offset in
+     * what the field draws, where each atom shows its label). On a mention of
+     * someone, the whole mention is selected, so typing over it or Backspace
+     * takes it out as one, and [onMention] is told who it is.
+     */
+    fun tappedAt(key: FieldKey, shown: Int): Boolean {
+        val tell = onMention ?: return false
+        val b = indexOf(key)
+        val runs = contentOf(blocks.getOrNull(b), key.cell) ?: return false
+        var o = 0
+        var t = 0
+        for (r in runs) {
+            val len = if (r is Inline.Text) r.text.length else 1
+            val drawn = if (r is Inline.Text) r.text.length else atomShown(r as Inline.Atom).length
+            if (r is Inline.Atom && r.atom == AtomKind.USER && shown >= t && shown < t + drawn) {
+                val id = USER_RAW.matchEntire(r.raw)?.groupValues?.get(1) ?: return false
+                sel = Sel(Pos(b, o, key.cell), Pos(b, o + len, key.cell))
+                pending = null
+                sync(force = true)
+                tell(id)
+                return true
+            }
+            o += len
+            t += drawn
+        }
+        return false
+    }
+
+    /**
+     * Mentions drawn with the names people have now (surface.ts setNames): a
+     * profile that arrived after the text was loaded. What the page writes is
+     * the same, so nothing is saved or added to undo.
+     */
+    fun relabelPeople() {
+        var changed = false
+        fun relabel(content: List<Inline>): List<Inline> {
+            var out: MutableList<Inline>? = null
+            content.forEachIndexed { i, r ->
+                if (r !is Inline.Atom || r.atom != AtomKind.USER) return@forEachIndexed
+                val id = USER_RAW.matchEntire(r.raw)?.groupValues?.get(1) ?: return@forEachIndexed
+                val u = EditorNames.user(id) ?: return@forEachIndexed
+                val label = "@" + u.displayName.ifEmpty { u.username }
+                if (label == r.label) return@forEachIndexed
+                if (out == null) out = content.toMutableList()
+                out!![i] = r.copy(label = label)
+            }
+            if (out != null) changed = true
+            return out ?: content
+        }
+        val next = blocks.map { b ->
+            when (b) {
+                is TextBlock -> relabel(b.content).let { if (it === b.content) b else b.copy(content = it) }
+                is TableBlock -> b.rows.map { row -> row.map(::relabel) }.let { rows -> if (rows.indices.all { r -> rows[r].indices.all { rows[r][it] === b.rows[r][it] } }) b else b.copy(rows = rows) }
+                else -> b
+            }
+        }
+        if (changed) blocks = next
     }
 
     // -----------------------------------------------------------------------
