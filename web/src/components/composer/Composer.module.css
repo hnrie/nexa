@@ -54,7 +54,7 @@
 .cardBtn[data-on="true"] { color: var(--text-brand); }
 .cardBtn.del:hover { color: var(--danger); }
 /* the message box floats at the foot of the conversation, and lights up round its edge while it is written in */
-.box { display: flex; align-items: flex-end; background: var(--bg-composer); border-radius: var(--radius-md); min-height: 48px; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-medium); transition: box-shadow var(--dur) var(--ease-out); }
+.box { position: relative; display: flex; align-items: flex-end; background: var(--bg-composer); border-radius: var(--radius-md); min-height: 48px; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-medium); transition: box-shadow var(--dur) var(--ease-out); }
 .box:focus-within:not([data-quiet]) { box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px color-mix(in srgb, var(--focus-ring) 45%, var(--border-subtle)), 0 0 0 4px color-mix(in srgb, var(--focus-ring) 10%, transparent), var(--shadow-medium); }
 /* put in focus for you rather than by you: ready for what is typed, with no caret or glow until it is */
 .box[data-quiet] .ta { caret-color: transparent; }

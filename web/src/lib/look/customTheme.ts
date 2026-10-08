@@ -1,6 +1,7 @@
 import { luminance, parseColour, toHex } from "@/lib/color";
 import { deriveTheme, fitBackground, schemeOf } from "./derive";
 import { presetById, presetTokens } from "./presets";
+import { seasonalTokens } from "./seasonal";
 import { ALPHA_TOKENS, CLASSIC, TOKENS, isToken, normaliseColour, type TokenMap, type TokenName } from "./tokens";
 import type { CustomTheme, Scheme, SimpleColours } from "./types";
 
@@ -110,7 +111,7 @@ export function resolveCustom(theme: CustomTheme): ResolvedTheme {
 
 /** The palette of any theme the gallery can show: classic, preset or custom. */
 export function themeTokens(id: string, customs: readonly CustomTheme[]): TokenMap | null {
-  const preset = presetTokens(id);
+  const preset = presetTokens(id) ?? seasonalTokens(id);
   if (preset) return preset;
   const custom = isCustomId(id) ? customs.find((c) => c.id === id) : undefined;
   return custom ? resolveCustom(custom).tokens : null;

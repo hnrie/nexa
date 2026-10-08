@@ -34,6 +34,7 @@ import fish.nexa.ui.theme.look.CustomThemes
 import fish.nexa.ui.theme.look.LookDraft
 import fish.nexa.ui.theme.look.Looks
 import fish.nexa.ui.theme.look.ResolvedTheme
+import fish.nexa.ui.theme.look.Seasonal
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -118,7 +119,23 @@ fun App() {
     @Suppress("UNUSED_VARIABLE") val lang = I18n.tag
     val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
     val draft = LookDraft.theme
-    val colors = remember(look, systemDark, draft) { Themes.resolve(look, systemDark, draft) }
+    // a season ending while the app is open is drawn as over at once
+    val today by Seasonal.today.collectAsState()
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(60_000)
+            Seasonal.tick()
+        }
+    }
+    // A seasonal theme is worn only while its season lasts. Once it is over the
+    // account goes back to the default theme, rather than drawing as Dark and
+    // coming back by itself the next year (ThemeEffect.tsx).
+    LaunchedEffect(look.theme, loaded, today) {
+        if (!loaded || auth !is AuthState.Ready) return@LaunchedEffect
+        val now = Seasonal.orDefault(look.theme, today)
+        if (now != look.theme) Nexa.settings.set("theme", JsonPrimitive(now))
+    }
+    val colors = remember(look, systemDark, draft, today) { Themes.resolve(look, systemDark, draft) }
     // the status and navigation bars' icons in the theme's own scheme
     val view = LocalView.current
     SideEffect {

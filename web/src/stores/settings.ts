@@ -120,6 +120,8 @@ export interface Settings {
   typingAvatars: boolean;
   /** Dots on a server's channels while someone types in them (ServerSidebar). */
   typingChannels: boolean;
+  /** Snow behind the messages in a seasonal theme that has it (components/chat/SnowFall.tsx). */
+  seasonalSnow: boolean;
   sidebarWidth: number;
   showMembers: boolean;
   recentEmoji: string[];
@@ -227,6 +229,7 @@ export const DEFAULT_SETTINGS: Settings = {
   backgroundKeybinds: true,
   customTyping: true,
   typingAvatars: true,
+  seasonalSnow: true,
   typingChannels: true,
   sidebarWidth: 240,
   showMembers: true,
@@ -324,6 +327,7 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
         : base.pluginKeybinds,
     customTyping: typeof inc.customTyping === "boolean" ? inc.customTyping : base.customTyping,
     typingAvatars: typeof inc.typingAvatars === "boolean" ? inc.typingAvatars : base.typingAvatars,
+    seasonalSnow: typeof inc.seasonalSnow === "boolean" ? inc.seasonalSnow : base.seasonalSnow,
     typingChannels: typeof inc.typingChannels === "boolean" ? inc.typingChannels : base.typingChannels,
 
     searchIndex: typeof inc.searchIndex === "boolean" ? inc.searchIndex : base.searchIndex,

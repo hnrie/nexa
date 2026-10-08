@@ -79,6 +79,8 @@ import fish.nexa.ui.components.NxButton
 import fish.nexa.ui.components.ButtonSize
 import fish.nexa.ui.components.ButtonKind
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.zIndex
 import androidx.compose.runtime.mutableIntStateOf
 import fish.nexa.data.P
 import fish.nexa.data.Send
@@ -421,44 +423,47 @@ fun Composer(channel: Channel) {
             if (tray.isNotEmpty()) Tray(channelId, tray, topShape("tray"))
             val boxShape = if (stack.any { it != "preview" }) RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp) else Radii.Md
             if (!canWrite) LockedBox(boxShape)
-            else ComposerBox(
-                channel, state, boxShape, borderTop = tray.isNotEmpty(),
-                canAttach = canAttach, canPoll = canPoll,
-                sendEnabled = (state.text.isNotBlank() || tray.isNotEmpty()) && slowLeft <= 0,
-                optionsOn = preview,
-                onAttach = { kind ->
-                    when (kind) {
-                        "files" -> pickFiles.launch(arrayOf("*/*"))
-                        "media" -> pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-                        "poll" -> openCreatePoll(channelId)
-                    }
-                },
-                onOptions = {
-                    openMenu(
-                        listOf(
-                            MenuItem.Action(t("composer.more.formatting")) {
-                                fish.nexa.ui.format.openFormattingEditor(
-                                    state.text.toString(), composerPlaceholder(channel),
-                                    onInsert = { state.setTextAndPlaceCursorAtEnd(it) },
-                                    onSend = { md ->
-                                        val was = state.text.toString()
-                                        state.setTextAndPlaceCursorAtEnd(md)
-                                        send().also { sent -> if (!sent) state.setTextAndPlaceCursorAtEnd(was) }
-                                    },
-                                    canSend = { slowLeft <= 0 },
-                                )
-                            },
-                            MenuItem.Action(t("composer.preview.show"), checked = preview, toggle = true) { preview = !preview },
-                            MenuItem.Action(t("composer.more.emoji")) { openExpressionPicker(channelId) { token -> insertAtCaret(state, "$token ") } },
-                        ),
-                        title = t("composer.more.label"),
-                        haptic = false,
-                    )
-                },
-                onPasteTooLong = { notice = Notice.PasteTooLong(it) },
-                onContent = { uris -> scope.launch { addFiles(uris.mapNotNull { Staging.stage(it) }) } },
-                onSend = { send() },
-            )
+            else Box(Modifier.fillMaxWidth()) {
+                ComposerBox(
+                    channel, state, boxShape, borderTop = tray.isNotEmpty(),
+                    canAttach = canAttach, canPoll = canPoll,
+                    sendEnabled = (state.text.isNotBlank() || tray.isNotEmpty()) && slowLeft <= 0,
+                    optionsOn = preview,
+                    onAttach = { kind ->
+                        when (kind) {
+                            "files" -> pickFiles.launch(arrayOf("*/*"))
+                            "media" -> pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                            "poll" -> openCreatePoll(channelId)
+                        }
+                    },
+                    onOptions = {
+                        openMenu(
+                            listOf(
+                                MenuItem.Action(t("composer.more.formatting")) {
+                                    fish.nexa.ui.format.openFormattingEditor(
+                                        state.text.toString(), composerPlaceholder(channel),
+                                        onInsert = { state.setTextAndPlaceCursorAtEnd(it) },
+                                        onSend = { md ->
+                                            val was = state.text.toString()
+                                            state.setTextAndPlaceCursorAtEnd(md)
+                                            send().also { sent -> if (!sent) state.setTextAndPlaceCursorAtEnd(was) }
+                                        },
+                                        canSend = { slowLeft <= 0 },
+                                    )
+                                },
+                                MenuItem.Action(t("composer.preview.show"), checked = preview, toggle = true) { preview = !preview },
+                                MenuItem.Action(t("composer.more.emoji")) { openExpressionPicker(channelId) { token -> insertAtCaret(state, "$token ") } },
+                            ),
+                            title = t("composer.more.label"),
+                            haptic = false,
+                        )
+                    },
+                    onPasteTooLong = { notice = Notice.PasteTooLong(it) },
+                    onContent = { uris -> scope.launch { addFiles(uris.mapNotNull { Staging.stage(it) }) } },
+                    onSend = { send() },
+                )
+                SeasonalPerch(Modifier.align(Alignment.TopEnd))
+            }
             val text = state.text
             val left = Send.MAX_MESSAGE_LENGTH - text.length
             if (left < 200) Txt(
@@ -1226,4 +1231,25 @@ private fun AutomodNoticeBar(n: fish.nexa.data.AutomodNotices.Notice, shape: and
             IconTile("X", t("composer.composer.dismiss"), c.textMuted, onClick = onDismiss)
         }
     }
+}
+
+/**
+ * The seasonal theme's picture, sitting on the top edge of the message box at
+ * its end, its base a few dp in front of the edge (SeasonalPerch.tsx). Only
+ * while a seasonal theme is worn and in season, and not while a theme is being
+ * tried on in the builder. Decoration: nothing to read out and nothing to tap.
+ */
+@Composable
+private fun SeasonalPerch(modifier: Modifier) {
+    val season = fish.nexa.ui.theme.look.Seasonal.worn() ?: return
+    coil3.compose.AsyncImage(
+        season.art,
+        null,
+        modifier
+            .padding(end = 12.dp)
+            .offset(y = -(38 - 4).dp)
+            .size(38.dp)
+            .zIndex(1f)
+            .clearAndSetSemantics {},
+    )
 }

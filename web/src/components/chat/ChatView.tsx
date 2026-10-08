@@ -51,6 +51,7 @@ import { useMute } from "@/stores/nexa";
 import { ReportBugButton } from "@/components/bugs/ReportBugButton";
 import { chatMoreMenu } from "./chatMoreMenu";
 import s from "./Chat.module.css";
+import { SnowFall } from "./SnowFall";
 
 import { t as tr_ } from "@/i18n";
 const PROFILE_PANEL_KEY = "ec:dmProfilePanel";
@@ -397,6 +398,7 @@ export function ChatView({ channel }: { channel: Channel }) {
             profile run the full height beside them, and pinned messages open at the top rather than under the call. */}
         {/* under a search that covers it, the chat is out of reach of Tab and of a screen reader */}
         <div className={s.main} {...(searchOpen && compactSearch ? ({ inert: "" } as Record<string, string>) : {})}>
+          <SnowFall />
           {!isServer ? <CallBanner channelId={convo.id} /> : null}
           {!isServer && inThisCall ? <VoiceView channel={convo} embedded /> : null}
           {locked ? (

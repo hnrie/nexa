@@ -70,6 +70,8 @@ import fish.nexa.ui.theme.look.CustomTheme
 import fish.nexa.ui.theme.look.CustomThemes
 import fish.nexa.ui.theme.look.Looks
 import fish.nexa.ui.theme.look.Presets
+import fish.nexa.ui.theme.look.Season
+import fish.nexa.ui.theme.look.Seasonal
 import fish.nexa.ui.theme.look.SimpleColours
 import fish.nexa.ui.theme.look.ThemeSource
 import fish.nexa.ui.theme.look.Tokens
@@ -91,6 +93,7 @@ private val ACCENTS = listOf("#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459
 fun themeName(id: String, customs: List<CustomTheme>): String {
     if (id == "system") return t("settings.appearance.themeSystem")
     Presets.byId(id)?.let { return t(it.nameKey) }
+    Seasonal.byId(id)?.let { return t(it.nameKey) }
     val custom = customs.firstOrNull { it.id == id }
     return custom?.let { it.name.ifEmpty { t("settings.themeBuilder.untitled") } } ?: t("settings.appearance.themeDark")
 }
@@ -98,6 +101,8 @@ fun themeName(id: String, customs: List<CustomTheme>): String {
 /** A theme's own few colours, for a new theme or Start From (startingColours). */
 fun startingColours(id: String): SimpleColours? {
     Presets.colours(id)?.let { return it }
+    // a seasonal theme gives its own, so a new theme made while wearing one can keep its colours after the season
+    Seasonal.byId(id)?.let { return SimpleColours(it.background, it.accent, null, it.scheme) }
     val classic = Tokens.CLASSIC[id] ?: return null
     return SimpleColours(classic.getValue("bg-raised"), classic.getValue("brand"), null, if (id == "light") "light" else "dark")
 }
@@ -133,7 +138,7 @@ fun AppearancePage() {
     PageTitle(t("settings.appearance.appearance"))
     Hint(t("settings.appearance.lead"), Modifier.padding(bottom = 4.dp).graphicsLayer { translationY = -8f * density })
     SectionHeading(t("settings.appearance.theme"), Modifier.settingAnchor("theme"))
-    ThemeGallery(theme, shown.id, pairDark, pairLight, customs)
+    ThemeGallery(theme, shown.id, shown.scheme, pairDark, pairLight, customs)
 
     SectionHeading(t("settings.appearance.accentColour"), Modifier.settingAnchor("accent"))
     Hint(t("settings.appearance.accentHint"), Modifier.padding(bottom = 10.dp))
@@ -188,25 +193,60 @@ fun AppearancePage() {
 
 // ---- the gallery ----
 
+// a theme's light version shares its dark one's card, so the colour themes are one group rather than a dark and a light one
 private val GROUPS = listOf(
     "classic" to "settings.appearance.groupClassic",
-    "dark" to "settings.appearance.groupDark",
-    "light" to "settings.appearance.groupLight",
+    "colours" to "settings.appearance.groupColours",
     "plain" to "settings.appearance.groupPlain",
 )
+private val GROUP_PRESETS = mapOf("classic" to listOf("classic"), "colours" to listOf("dark", "light"), "plain" to listOf("plain"))
 
 @Composable
-private fun ThemeGallery(theme: String, shownId: String, pairDark: String, pairLight: String, customs: List<CustomTheme>) {
+private fun ThemeGallery(theme: String, shownId: String, mode: String, pairDark: String, pairLight: String, customs: List<CustomTheme>) {
+    // A card that comes in light and dark shows, and puts on, the version in the
+    // mode being worn now ([mode], the shown look's scheme): from a dark theme
+    // every such card offers its dark version, so going from one to another never
+    // switches light and dark.
     val colorsOf = remember(customs) { HashMap<String, NexaColors>() }
     fun colors(id: String): NexaColors = colorsOf.getOrPut(id) { Looks.preview(id, customs) ?: Looks.preview("dark", emptyList())!! }
     fun schemeOf(id: String): String = customs.firstOrNull { it.id == id }?.let { CustomThemes.resolve(it).scheme } ?: Presets.byId(id)?.scheme ?: "dark"
     val pick = { id: String -> setSetting("theme", id) }
 
+    // only while a season is on: offered alongside the rest, never put on by itself
+    val today by Seasonal.today.collectAsState()
+    val seasons = remember(today) { Seasonal.on(today) }
+    if (seasons.isNotEmpty()) {
+        GroupTitle(t("settings.appearance.groupSeasonal"))
+        CardGrid { w ->
+            for ((light, dark) in Seasonal.cards(seasons)) {
+                val x = if (dark != null && mode == "dark") dark else light
+                val until = t("settings.appearance.seasonUntil", "date" to Seasonal.end(x, today).format(java.time.format.DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(fish.nexa.ui.I18n.locale, "MMMMd"), fish.nexa.ui.I18n.locale)))
+                ThemeCard(t(light.nameKey), theme == x.id, w, { pick(x.id) }, note = until) {
+                    Miniature(colors(x.id))
+                    SeasonOnMiniature(x)
+                    if (dark != null) ThemeModes(light.id, dark.id, x.id, pick) { colors(it).bgRaised }
+                }
+            }
+        }
+        Hint(t("settings.appearance.seasonalHint"), Modifier.padding(top = 10.dp))
+        if (seasons.any { it.snow }) {
+            val doc = settingsDoc()
+            ToggleRow(
+                t("settings.appearance.seasonalSnow"), doc.bool("seasonalSnow", true), { setSetting("seasonalSnow", it) },
+                t("settings.appearance.seasonalSnowHint"), anchor = "seasonalSnow",
+            )
+        }
+    }
+
     for ((group, label) in GROUPS) {
         GroupTitle(t(label))
         CardGrid { w ->
-            for (p in Presets.ALL.filter { it.group == group }) {
-                ThemeCard(t(p.nameKey), theme == p.id, w, { pick(p.id) }) { Miniature(colors(p.id)) }
+            for ((p, light, dark) in Presets.cards(GROUP_PRESETS.getValue(group))) {
+                val x = if (light != null && mode == "light") light else p
+                ThemeCard(t(p.nameKey), theme == x.id, w, { pick(x.id) }) {
+                    Miniature(colors(x.id))
+                    if (light != null && dark != null) ThemeModes(light.id, dark.id, x.id, pick) { colors(it).bgRaised }
+                }
             }
             if (group == "classic") ThemeCard(t("settings.appearance.themeSystem"), theme == "system", w, { pick("system") }) {
                 SplitMiniature(colors(pairDark), colors(pairLight))
@@ -253,7 +293,7 @@ private fun CardGrid(content: @Composable (Dp) -> Unit) {
 
 /** `.card`: the theme's picture and its name; chosen, ringed in the accent with a tick. */
 @Composable
-private fun ThemeCard(name: String, on: Boolean, width: Dp, onPick: () -> Unit, edit: (() -> Unit)? = null, editLabel: String? = null, art: @Composable BoxScope.() -> Unit) {
+private fun ThemeCard(name: String, on: Boolean, width: Dp, onPick: () -> Unit, edit: (() -> Unit)? = null, editLabel: String? = null, note: String? = null, art: @Composable BoxScope.() -> Unit) {
     val c = Nx.colors
     val shape = Radii.Md
     val interaction = remember { MutableInteractionSource() }
@@ -301,6 +341,42 @@ private fun ThemeCard(name: String, on: Boolean, width: Dp, onPick: () -> Unit, 
             }
         }
         Txt(name, style = Nx.type.bodySmall.copy(fontWeight = FontWeight(600), lineHeight = Nx.type.sp(18f)), color = if (on) c.textStrong else c.text, modifier = Modifier.padding(horizontal = 2.dp))
+        if (note != null) Txt(note, style = Nx.type.hint, color = c.textMuted, modifier = Modifier.padding(horizontal = 2.dp).graphicsLayer { translationY = -6f * density })
+    }
+}
+
+/**
+ * A theme's light and dark versions as two swatches in its card's corner
+ * (ModeCard, `.modes`): each is that version's own background and puts it on,
+ * and the one the card shows is ringed in the accent.
+ */
+@Composable
+private fun BoxScope.ThemeModes(light: String, dark: String, on: String, pick: (String) -> Unit, swatch: (String) -> Color) {
+    val c = Nx.colors
+    Row(Modifier.align(Alignment.TopStart).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for (m in listOf(light, dark)) {
+            val selected = m == on
+            val label = t(if (m == dark) "settings.appearance.themeDark" else "settings.appearance.themeLight")
+            Box(
+                Modifier
+                    .size(28.dp)
+                    .then(if (selected) Modifier.ring(CircleShape, c.brand, 4.dp).ring(CircleShape, c.bgRaised, 2.dp) else Modifier.ring(CircleShape, c.borderStrong, 1.5.dp))
+                    .background(swatch(m), CircleShape)
+                    .pressable(remember { MutableInteractionSource() }, role = Role.RadioButton) { pick(m) }
+                    .semantics {
+                        this.selected = selected
+                        contentDescription = label
+                    },
+            )
+        }
+    }
+}
+
+/** A seasonal theme's picture perched on its miniature's message box, as it sits on the real one (`.seasonArt`). */
+@Composable
+private fun BoxScope.SeasonOnMiniature(s: Season) {
+    BoxWithConstraints(Modifier.matchParentSize()) {
+        coil3.compose.AsyncImage(s.art, null, Modifier.align(Alignment.BottomEnd).padding(end = maxWidth * 0.09f, bottom = maxHeight * 0.24f - 3.dp).size(maxWidth * 0.19f))
     }
 }
 

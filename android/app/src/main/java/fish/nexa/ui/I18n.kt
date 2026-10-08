@@ -27,6 +27,7 @@ object I18n {
         Language("es", "Español", "Spanish"),
         Language("fr", "Français", "French"),
         Language("de", "Deutsch", "German"),
+        Language("sv", "Svenska", "Swedish"),
         Language("pt-BR", "Português (Brasil)", "Portuguese (Brazil)"),
         Language("ru", "Русский", "Russian"),
         Language("ja", "日本語", "Japanese"),

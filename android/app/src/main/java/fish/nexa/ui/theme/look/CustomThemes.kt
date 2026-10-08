@@ -135,7 +135,7 @@ object CustomThemes {
 
     /** The palette of any theme the gallery can show. */
     fun themeTokens(id: String, customs: List<CustomTheme>): TokenMap? =
-        Presets.tokens(id) ?: if (isCustomId(id)) customs.firstOrNull { it.id == id }?.let { resolve(it).tokens } else null
+        Presets.tokens(id) ?: Seasonal.tokens(id) ?: if (isCustomId(id)) customs.firstOrNull { it.id == id }?.let { resolve(it).tokens } else null
 
     /** Links underlined in it: when it starts from a preset that asks for that. */
     fun underlines(t: CustomTheme): Boolean = (t.source as? ThemeSource.FromPreset)?.let { Presets.byId(it.id)?.underlineLinks } == true

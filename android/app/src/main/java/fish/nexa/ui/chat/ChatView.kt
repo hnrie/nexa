@@ -93,6 +93,8 @@ fun ChatView(channelId: String) {
     Column(Modifier.fillMaxSize()) {
         ChatHeader(channel)
         Box(Modifier.weight(1f).fillMaxWidth()) {
+            // first, so it is drawn behind the messages
+            SnowFall(Modifier.matchParentSize())
             val conversation = @Composable {
                 Column(Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
                     if (channel.locked && !unlocked) LockedSubchat(channel, lockFailed, onRecheck = { recheck += 1 }) {

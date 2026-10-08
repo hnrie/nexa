@@ -84,7 +84,7 @@ they open the app after an update, and it is how they find out what changed.
   items to the newest release if that one has not been deployed yet.
 - Each item is a lucide-react icon, a title and one or two plain sentences. Title and body are i18n
   keys named after the release id without its dashes and dots (`whatsNew.r20260926.<name>Title`
-  and `...Body` for release `2026-09-26`), translated into all eleven locales.
+  and `...Body` for release `2026-09-26`), translated into all twelve locales.
 - Keep every item in the shape `{ icon: Name, title: "...", body: "..." }` (that order, double
   quotes): the Android app reads this same file with a regex (`fish.nexa.ui.WhatsNew`) and silently
   skips anything shaped differently.
@@ -107,8 +107,8 @@ they open the app after an update, and it is how they find out what changed.
   feature really talks to the Discord program (the desktop app's Rich Presence relay).
 - Never hardcode user-visible English. The web uses `t("key")` / `<Tr>` from `@/i18n`; Android uses
   `t("key")` on the same catalogues (its own keys start with `android.`). Add every new key to all
-  eleven files in `web/src/i18n/locales/` with real translations
-  (`python3 android/tools/add_strings.py strings.json` writes a batch into all eleven, in order).
+  twelve files in `web/src/i18n/locales/` with real translations
+  (`python3 android/tools/add_strings.py strings.json` writes a batch into all twelve, in order).
   `python3 tools/i18n_check.py` must pass.
 - Text about what Nexa stores or sends (the Terms, the privacy policy, settings) is checked against
   the code that runs (handlers, the SQL in `internal/store`, the client crypto), not comments. Say
@@ -440,7 +440,10 @@ access goes through the hooks `server_glue.go` installs, answered from `store/pe
 - Files are content-addressed on disk under `DATA_DIR/media`, described by the `blobs` table.
 - Public kinds (`avatar`, `banner`, `icon`, `emoji`, `sticker`, `tag`, `widget`, `typing`) are
   served at `/media/{kind}/{id}`, immutable, and at a requested size as a variant made once (the next
-  power of two). The kind in the address must match the stored one, and a picture the staff blocked
+  power of two). An animation keeps moving at any size: one of 512 px or less is served as it is, a
+  larger GIF gets every frame composed and shrunk (`animated.go`), and a WebP or APNG is served as
+  uploaded; `?still=1` asks for the first frame. Sized avatar, banner and icon addresses carry
+  `&v=2` (web `api/users.ts`, Android `Media.kt`) so caches drop the stills that large GIFs used to be. The kind in the address must match the stored one, and a picture the staff blocked
   is served to nobody.
 - Attachments are opaque encrypted blobs, served only to people in the conversation
   (`/media/attachments/{id}`). Files of bug reports and case threads are private to their people
@@ -698,8 +701,40 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
 - `pages/`: one per route. `styles/`: `tokens.css` (every theme token: colour, radius, shadow,
   motion), `base.css`, `markdown.css`, `fonts.css` (Wix Madefor) and `fonts-classic.css` (Onest,
   Mona Sans). `lib/theme.ts` applies a theme; `lib/look/` derives presets and custom themes.
+- The gallery (`components/settings/look/ThemeGallery.tsx`): Seasonal while one is in season, then
+  Classic, Colours (the presets' dark and light groups together) and Greyscale and High Contrast.
+  A theme with a light version (`forest` and `forest-light`, `presetCards`) is one card with two
+  swatches in its corner (`ModeCard`, each that version's own background) that switch between
+  them. Such a card shows and puts on the version in the mode being worn now (the resolved look's
+  scheme), so going from one theme to another keeps light or dark; Midnight, Sky and the classic themes are cards of their own. Android does the same
+  (`Presets.cards`, `ThemeModes` in `ui/settings/AppearancePage.kt`).
+- Seasonal themes (`lib/look/seasonal.ts`, `SEASONS`): Halloween, Fall, Winter, Holidays,
+  Valentine's Day, Spring and Summer, with Winter, Spring and Summer also in a dark Night version
+  (same days, the light one's picture through `art`), each a background and an accent run through `deriveTheme`
+  and a span of days in the device's calendar (one may run past the new year). The gallery offers
+  only those in season, in a Seasonal group above the rest, never putting one on by itself; a
+  season and its Night version are one card (`seasonCards`) with two swatches in its corner,
+  light and dark, that switch between them. Out
+  of season one draws as Dark (`resolveLook`), and `ThemeEffect` sets the account's theme back to
+  `dark` once the settings have loaded. While one is worn, `components/common/SeasonalPerch.tsx`
+  sits its picture (`assets/seasonal/<id>.svg`, which the Android app copies and draws too) on
+  the top edge of the message box, and the gallery's card shows it on the miniature. A season with
+  `snow` (Winter Night) has `components/chat/SnowFall.tsx` falling behind the messages: a canvas at
+  z-index -1 in the chat column, drawn over the app shell's main panel (its stacking context), and
+  nothing at all when motion is reduced or the account's `seasonalSnow` setting is off (Show
+  Falling Snow, in the Seasonal group while such a theme is in season). Nothing in it is a set path:
+  the wind and each flake's drift, fall and spin are random walks pulled back towards calm
+  (Ornstein-Uhlenbeck), fresh noise every frame. Flakes are dots, the near ones bigger and soft at
+  the edge. A frame's time step is never below zero (the frame time can come before the moment
+  the loop restarted, after a hidden tab, and a negative step made every flake NaN for good)
+  (Android `ui/chat/SnowFall.kt`, same model and numbers in dp). Android
+  keeps the same list in `ui/theme/look/Seasonal.kt`; a change to one changes the other, and
+  `look_vectors.ts` checks the palettes.
+  To try them all on any day, build the web with `VITE_ALL_SEASONS=1` (`npx vite build` into a
+  scratch directory) or Android with `-PallSeasons=true`: every season is then running every day.
+  Never set either for a deploy or a release.
 - `i18n/`: `useT()`, `t()` (usable outside components), `<Tr>`; English is bundled and the other
-  ten catalogues (ar, de, es, fr, hi, ja, ko, pt-BR, ru, zh-CN) load when chosen. Keys are flat and
+  eleven catalogues (ar, de, es, fr, hi, ja, ko, pt-BR, ru, sv, zh-CN) load when chosen. Keys are flat and
   dotted by area (`settings.*`, `server.*`, `chat.*`, `whatsNew.*`, `android.*`, ...).
 - Tests sit beside the code (`*.test.ts[x]`). Vitest runs in node with `fake-indexeddb`; component
   tests start with `// @vitest-environment jsdom`.
@@ -767,7 +802,7 @@ notes.
   arguments did not change. Read what a composable shows through `collectAsState()` (or
   `ui.shell.settingOn(key)` for a yes or no setting), in the composable that shows it.
 - The build's `copyWebAssets` task copies the web's locale files, sounds, emoji sprites,
-  `whatsNew.ts` and the legal documents into the app; `assets/lucide.json`, `assets/emoji/` and
+  `whatsNew.ts`, the seasonal themes' pictures and the legal documents into the app; `assets/lucide.json`, `assets/emoji/` and
   `assets/licenses.json` come from `android/tools`.
 - Logic ported from the web (markdown, search, themes, the formatting editor, webhook messages,
   crypto, metadata scrubbing, the notes CRDT) is tested against vectors produced by the web's own

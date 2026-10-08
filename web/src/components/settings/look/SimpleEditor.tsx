@@ -7,15 +7,22 @@ import { Toggle } from "@/components/common/Toggle";
 import { t } from "@/i18n";
 import { flipBackground, schemeOf, type Derived } from "@/lib/look/derive";
 import { PRESETS, presetColours } from "@/lib/look/presets";
+import { seasonById } from "@/lib/look/seasonal";
 import { CLASSIC, isClassic } from "@/lib/look/tokens";
 import type { Scheme, SimpleColours } from "@/lib/look/types";
 import { ColourField } from "./ColourField";
 import s from "./Look.module.css";
 
-/** The few colours a preset starts from, for "Start from"; a classic theme gives its page and the default purple. */
+/**
+ * The few colours a preset starts from, for "Start from"; a classic theme gives
+ * its page and the default purple. A seasonal theme gives its own, so a new
+ * theme made while wearing one can keep its colours after the season.
+ */
 export function startingColours(id: string): SimpleColours | null {
   const made = presetColours(id);
   if (made) return made;
+  const season = seasonById(id);
+  if (season) return { background: season.background, accent: season.accent, text: null, scheme: season.scheme };
   if (!isClassic(id)) return null;
   return { background: CLASSIC[id]["bg-raised"], accent: CLASSIC[id].brand, text: null, scheme: id === "light" ? "light" : "dark" };
 }

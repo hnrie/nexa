@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { AudioLines, BadgeCheck, Compass, Gavel, KeyRound, Megaphone, MonitorUp, Pause, ScrollText, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, FolderPlus, Gamepad2, Globe, Headphones, House, IdCard, ImagePlay, ImagePlus, Images, Keyboard, LayoutGrid, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessageSquareText, MessagesSquare, MousePointerClick, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, Tag, Trash2, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Volume2, Vote, Webhook, ZoomIn, type LucideIcon } from "lucide-react";
+import { AudioLines, BadgeCheck, Compass, Gavel, KeyRound, Megaphone, MonitorUp, Pause, ScrollText, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, FolderPlus, Gamepad2, Globe, Headphones, House, IdCard, ImagePlay, ImagePlus, Images, Keyboard, LayoutGrid, Leaf, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessageSquareText, MessagesSquare, MousePointerClick, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Snowflake, Sparkles, SpellCheck, Sticker, StickyNote, Tag, Trash2, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Volume2, Vote, Webhook, ZoomIn, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,14 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-10-08",
+    items: [
+      { icon: Leaf, title: "whatsNew.r20261008.seasonalTitle", body: "whatsNew.r20261008.seasonalBody" },
+      { icon: Snowflake, title: "whatsNew.r20261008.nightTitle", body: "whatsNew.r20261008.nightBody" },
+      { icon: Globe, title: "whatsNew.r20261008.swedishTitle", body: "whatsNew.r20261008.swedishBody" },
+    ],
+  },
   {
     id: "2026-10-07",
     items: [

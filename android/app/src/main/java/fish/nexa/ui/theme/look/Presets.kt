@@ -47,6 +47,20 @@ object Presets {
 
     fun byId(id: String): Preset? = BY_ID[id]
 
+    /** A card in the gallery (presetCards): a theme and its light version, switched between on the card; [light] and [dark] null for one with only one version. */
+    data class Card(val preset: Preset, val light: Preset?, val dark: Preset?)
+
+    fun cards(groups: List<String>): List<Card> {
+        val inGroups = ALL.filter { it.group in groups }
+        val ids = inGroups.map { it.id }.toSet()
+        return inGroups
+            .filter { !(it.id.endsWith("-light") && it.id.removeSuffix("-light") in ids) }
+            .map { p ->
+                val light = if (p.scheme == "dark" && "${p.id}-light" in ids) BY_ID.getValue("${p.id}-light") else null
+                Card(p, light, if (light != null) p else null)
+            }
+    }
+
     /** The colours a derived preset is made from, for a custom theme that starts from it in simple mode. */
     fun colours(id: String): SimpleColours? = RECIPE_BY_ID[id]?.let { SimpleColours(it.background, it.accent, null, it.scheme) }
 

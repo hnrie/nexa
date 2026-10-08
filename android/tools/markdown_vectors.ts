@@ -5,8 +5,13 @@
 // vite-node can only load files under web/, so this is copied there to run:
 //
 //   cp android/tools/markdown_vectors.ts web/md-vectors.gen.ts
-//   (cd web && TZ=Asia/Kolkata npx vite-node md-vectors.gen.ts)
+//   (cd web && npx vite-node md-vectors.gen.ts)
 //   rm web/md-vectors.gen.ts
+//
+// Timestamps are made in Asia/Kolkata. The zone is set below rather than by
+// TZ in the shell, which Git Bash on Windows never hands to Node: run that
+// way, every timestamp came out in the computer's own zone.
+process.env.TZ = "Asia/Kolkata";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -270,7 +275,7 @@ async function main(): Promise<void> {
   const stamps: unknown[] = [];
   const dates: unknown[] = [];
   const moments = [NOW, NOW - 30_000, NOW + 90_000, NOW - 3_600_000 * 5, NOW - 86_400_000, NOW - 86_400_000 * 2, NOW + 86_400_000 * 9, NOW - 86_400_000 * 40, NOW - 86_400_000 * 400, Date.UTC(2026, 0, 5, 9, 5, 7), 0, -86_400_000 * 365 * 60];
-  for (const locale of ["en", "es", "fr", "de", "pt-BR", "ru", "ja", "ko", "zh-CN", "hi", "ar"]) {
+  for (const locale of ["en", "es", "fr", "de", "sv", "pt-BR", "ru", "ja", "ko", "zh-CN", "hi", "ar"]) {
     renderToString(createElement(I18nProvider, { locale, children: createElement("span") }));
     for (const ms of moments) {
       for (const style of ["t", "T", "d", "D", "f", "F", "R"] as const) stamps.push({ locale, unix: ms / 1000, style, out: time.formatStamp(new Date(ms), style) });

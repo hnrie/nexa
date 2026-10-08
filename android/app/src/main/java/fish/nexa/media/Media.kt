@@ -50,9 +50,12 @@ object Media {
 
     private fun base() = Nexa.api.baseUrl
 
-    fun avatarUrl(id: String?, css: Int, density: Float): String? = id?.let { "${base()}/media/avatar/$it?size=${sized(css, density)}" }
-    fun bannerUrl(id: String?, css: Int, density: Float): String? = id?.let { "${base()}/media/banner/$it?size=${sized(css, density)}" }
-    fun iconUrl(id: String?, css: Int, density: Float): String? = id?.let { "${base()}/media/icon/$it?size=${sized(css, density)}" }
+    // &v=2: sized avatars, banners and icons used to be a still picture when the
+    // upload was a GIF over 512 pixels; the server now shrinks every frame, and
+    // a new address keeps the old still out of the image cache (api/users.ts MOVING)
+    fun avatarUrl(id: String?, css: Int, density: Float): String? = id?.let { "${base()}/media/avatar/$it?size=${sized(css, density)}&v=2" }
+    fun bannerUrl(id: String?, css: Int, density: Float): String? = id?.let { "${base()}/media/banner/$it?size=${sized(css, density)}&v=2" }
+    fun iconUrl(id: String?, css: Int, density: Float): String? = id?.let { "${base()}/media/icon/$it?size=${sized(css, density)}&v=2" }
     fun emojiUrl(blobId: String, css: Int, density: Float, still: Boolean = false): String =
         "${base()}/media/emoji/$blobId?size=${sized(css, density)}" + if (still) "&still=1" else ""
     fun stickerUrl(blobId: String, css: Int, density: Float): String = "${base()}/media/sticker/$blobId?size=${sized(css, density)}"

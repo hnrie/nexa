@@ -1,0 +1,2 @@
+/* behind the messages: the app's main panel (AppShell .main) is the stacking context, so -1 is just above its background and below everything drawn on it */
+.snow { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }

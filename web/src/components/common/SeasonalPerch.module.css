@@ -1,0 +1,5 @@
+/* sits on the message box's top edge, its base a few pixels in front of the edge, at the end where the buttons are */
+.perch { position: absolute; inset-inline-end: 18px; inset-block-end: calc(100% - 5px); width: 44px; height: 44px; z-index: 1; pointer-events: none; user-select: none; }
+@media (max-width: 767px) {
+  .perch { inset-inline-end: 12px; width: 38px; height: 38px; inset-block-end: calc(100% - 4px); }
+}

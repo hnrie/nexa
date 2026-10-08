@@ -2,6 +2,7 @@ import { blend, contrast, luminance, parseColour, parseHex, readableOn, rgbToHsl
 import { storage } from "@/lib/storage";
 import { isCustomId, resolveCustom, customUnderlines, sanitizeThemes } from "@/lib/look/customTheme";
 import { presetById, presetTokens } from "@/lib/look/presets";
+import { activeSeason, seasonalTokens } from "@/lib/look/seasonal";
 import { declarations, isClassic, type TokenMap } from "@/lib/look/tokens";
 import type { ClassicTheme, CustomTheme, Scheme } from "@/lib/look/types";
 import type { Settings } from "@/stores/settings";
@@ -121,6 +122,9 @@ function lookOf(id: string, customs: readonly CustomTheme[]): Look | null {
   if (isClassic(id)) return { id, scheme: id === "light" ? "light" : "dark", classic: id, tokens: null, underlineLinks: false };
   const preset = presetById(id);
   if (preset) return { id, scheme: preset.scheme, classic: preset.scheme, tokens: presetTokens(id), underlineLinks: preset.underlineLinks };
+  // a seasonal theme out of its season is not there to draw, so it comes out as Dark below
+  const season = activeSeason(id, new Date());
+  if (season) return { id, scheme: season.scheme, classic: season.scheme, tokens: seasonalTokens(id), underlineLinks: false };
   const custom = isCustomId(id) ? customs.find((c) => c.id === id) : undefined;
   if (!custom) return null;
   const r = resolveCustom(custom);
@@ -129,7 +133,8 @@ function lookOf(id: string, customs: readonly CustomTheme[]): Look | null {
 
 /**
  * The theme to draw. A theme that is not there any more (a custom one deleted
- * on another device) draws as Dark rather than as nothing.
+ * on another device, or a seasonal one whose season is over) draws as Dark
+ * rather than as nothing.
  */
 export function resolveLook(a: Appearance, draft?: ThemeDraft | null): Look {
   if (draft) return { id: draft.id ?? "draft", scheme: draft.scheme, classic: draft.scheme, tokens: draft.tokens, underlineLinks: false };
@@ -217,7 +222,7 @@ const REMEMBERED = "ec:appearance";
 
 /** Whether `id` names a theme that can be drawn with what is at hand. */
 function knownTheme(id: string, customs: readonly CustomTheme[]): boolean {
-  return id === "system" || isClassic(id) || !!presetById(id) || (isCustomId(id) && customs.some((c) => c.id === id));
+  return id === "system" || isClassic(id) || !!presetById(id) || !!activeSeason(id, new Date()) || (isCustomId(id) && customs.some((c) => c.id === id));
 }
 
 function sanitizePair(v: unknown): { dark: string; light: string } | undefined {

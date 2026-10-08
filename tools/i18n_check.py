@@ -10,7 +10,7 @@ PLACEHOLDER = re.compile(r"\{(\w+)\}")
 # The plural categories each language actually uses (CLDR).
 CATEGORIES = {
     "en": {"one", "other"}, "es": {"one", "many", "other"}, "fr": {"one", "many", "other"},
-    "de": {"one", "other"}, "pt-BR": {"one", "many", "other"},
+    "de": {"one", "other"}, "sv": {"one", "other"}, "pt-BR": {"one", "many", "other"},
     "ru": {"one", "few", "many", "other"}, "ja": {"other"}, "ko": {"other"},
     "zh-CN": {"other"}, "hi": {"one", "other"}, "ar": {"zero", "one", "two", "few", "many", "other"},
 }

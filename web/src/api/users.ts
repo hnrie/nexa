@@ -142,21 +142,30 @@ export function mediaSize(css: number): number {
   return size;
 }
 
-function mediaUrl(kind: string, id: Snowflake | null, css?: number): string | null {
+function mediaUrl(kind: string, id: Snowflake | null, css?: number, version = ""): string | null {
   if (!id) return null;
   const url = `${api.baseUrl}/media/${kind}/${id}`;
-  return css ? `${url}?size=${mediaSize(css)}` : url;
+  return css ? `${url}?size=${mediaSize(css)}${version}` : url;
 }
+
+/**
+ * Sized avatars, banners and icons used to be a still picture whenever the
+ * upload was a GIF over 512 pixels, which froze animated banners; the server
+ * now shrinks every frame. Sized copies are served as immutable, so browsers
+ * that kept the still one would keep showing it at the old address: this
+ * gives those three kinds a new one. The server ignores it.
+ */
+const MOVING = "&v=2";
 
 /** `css` is how many pixels across it is drawn; leave it out for the original. */
 export function avatarUrl(id: Snowflake | null, css?: number): string | null {
-  return mediaUrl("avatar", id, css);
+  return mediaUrl("avatar", id, css, MOVING);
 }
 export function bannerUrl(id: Snowflake | null, css?: number): string | null {
-  return mediaUrl("banner", id, css);
+  return mediaUrl("banner", id, css, MOVING);
 }
 export function iconUrl(id: Snowflake | null, css?: number): string | null {
-  return mediaUrl("icon", id, css);
+  return mediaUrl("icon", id, css, MOVING);
 }
 export function emojiUrl(id: Snowflake, _animated: boolean, css?: number): string {
   return mediaUrl("emoji", id, css) ?? "";

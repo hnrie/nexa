@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { contrast } from "@/lib/color";
 import { contrastIssues } from "./contrast";
-import { PRESETS, presetById, presetColours, presetTokens } from "./presets";
+import { PRESETS, presetById, presetCards, presetColours, presetTokens } from "./presets";
 import { CLASSIC_IDS } from "./tokens";
 
 const derived = PRESETS.filter((p) => !(CLASSIC_IDS as readonly string[]).includes(p.id));
@@ -32,6 +32,27 @@ describe("the gallery's themes", () => {
     expect(presetById("greyscale")?.underlineLinks).toBe(true);
     expect(presetById("contrast")?.underlineLinks).toBe(true);
     expect(presetById("forest")?.underlineLinks).toBe(false);
+  });
+
+  it("shows a theme and its light version as one card, and every theme on some card", () => {
+    const colours = presetCards(["dark", "light"]).map((c) => [c.preset.id, c.light?.id ?? null]);
+    expect(colours).toEqual([
+      ["nexa", "nexa-light"],
+      ["midnight", null],
+      ["forest", "forest-light"],
+      ["rose", "rose-light"],
+      ["amber", "amber-light"],
+      ["ocean", "ocean-light"],
+      ["sky", null],
+    ]);
+    expect(presetCards(["plain"]).map((c) => [c.light?.id, c.dark?.id])).toEqual([
+      ["greyscale-light", "greyscale"],
+      ["contrast-light", "contrast"],
+    ]);
+    // the classic Dark and Light stay cards of their own
+    expect(presetCards(["classic"]).every((c) => c.light === null)).toBe(true);
+    const shown = presetCards(["classic", "dark", "light", "plain"]).flatMap((c) => [c.preset.id, c.light?.id, c.dark?.id]);
+    for (const p of PRESETS) expect(shown, p.id).toContain(p.id);
   });
 
   it("works a palette out once and hands the same one back", () => {

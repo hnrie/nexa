@@ -6,6 +6,7 @@ import fish.nexa.ui.theme.look.CustomThemes
 import fish.nexa.ui.theme.look.Derive
 import fish.nexa.ui.theme.look.Looks
 import fish.nexa.ui.theme.look.Presets
+import fish.nexa.ui.theme.look.Seasonal
 import fish.nexa.ui.theme.look.SimpleColours
 import fish.nexa.ui.theme.look.ThemeSource
 import fish.nexa.ui.theme.look.TokenMap
@@ -44,6 +45,13 @@ class LookVectorsTest {
     @Test
     fun presets() {
         for ((id, want) in data["presets"]!!.jsonObject) assertEquals(id, tokens(want), Presets.tokens(id))
+    }
+
+    @Test
+    fun seasonal() {
+        val want = data["seasonal"]!!.jsonObject
+        assertEquals(Seasonal.ALL.map { it.id }, want.keys.toList())
+        for ((id, t) in want) assertEquals(id, tokens(t), Seasonal.tokens(id))
     }
 
     @Test

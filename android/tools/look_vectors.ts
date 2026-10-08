@@ -1,6 +1,6 @@
 // Writes android/app/src/test/resources/web-look-vectors.json.gz: what the
 // web's own theme code (lib/color.ts, lib/look/*, lib/theme.ts) makes of the
-// presets and of a few thousand seeded random inputs, for the Android port's
+// presets, the seasonal themes and of a few thousand seeded random inputs, for the Android port's
 // tests to match exactly (fish.nexa.look.*).
 //
 // vite-node can only load files under web/, so this is copied there to run:
@@ -15,6 +15,7 @@ import { contrastIssues, fixContrast } from "@/lib/look/contrast";
 import { exportTheme, importTheme, resolveCustom, sanitizeThemes } from "@/lib/look/customTheme";
 import { deriveTheme, fitBackground, flipBackground } from "@/lib/look/derive";
 import { PRESETS, presetTokens } from "@/lib/look/presets";
+import { SEASONS, seasonalTokens } from "@/lib/look/seasonal";
 import { TOKENS } from "@/lib/look/tokens";
 import { accentVarsOn, hardestSurface, resolveLook } from "@/lib/theme";
 
@@ -32,6 +33,7 @@ const pick = <T,>(xs: readonly T[]): T => xs[int(xs.length)]!;
 const scheme = () => pick(["dark", "light"] as const);
 
 const presets = Object.fromEntries(PRESETS.map((p) => [p.id, presetTokens(p.id)]));
+const seasonal = Object.fromEntries(SEASONS.map((s) => [s.id, seasonalTokens(s.id)]));
 
 const derive = Array.from({ length: 160 }, () => {
   const input = { background: hex(), accent: hex(), text: rand() < 0.3 ? hex() : null, scheme: scheme() };
@@ -124,6 +126,6 @@ const looks = Array.from({ length: 80 }, () => {
   return { theme, pair: pair ?? null, look, hardest: hardestSurface(look) };
 });
 
-const out = { presets, derive, fit, accents, ensure, mix, luminances, tune, parse, issues, custom, imports, looks };
+const out = { presets, seasonal, derive, fit, accents, ensure, mix, luminances, tune, parse, issues, custom, imports, looks };
 writeFileSync("../android/app/src/test/resources/web-look-vectors.json.gz", gzipSync(JSON.stringify(out)));
 console.log("wrote", Object.fromEntries(Object.entries(out).map(([k, v]) => [k, Array.isArray(v) ? v.length : Object.keys(v as object).length])));

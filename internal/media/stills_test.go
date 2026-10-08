@@ -121,7 +121,8 @@ func TestStillsOfMovingStickers(t *testing.T) {
 		t.Errorf("webp still: %s %v", format, img)
 	}
 	// a wide animated WebP keeps moving when asked for smaller, as it always
-	// has (only a still is a still); a GIF that wide becomes one, as before
+	// has (only a still is a still); a GIF that wide gets every frame shrunk
+	// (animated_test.go)
 	wide := mustB64(t, animWebPWide)
 	ww, err := m.PutPublic(ctx, "sticker", bytes.NewReader(wide), lim, ids.New())
 	if err != nil || !ww.Animated || *ww.Width != 520 {

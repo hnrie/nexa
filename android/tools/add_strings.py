@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Adds or updates translated strings in all eleven web locale files.
+"""Adds or updates translated strings in all twelve web locale files.
 
     python3 android/tools/add_strings.py strings.json
 
 strings.json maps each key to its text per locale:
     {"android.composer.photosAndVideos": {"en": "Photos and Videos", "de": "...", ...}}
 
-Every key must have all eleven locales. A new key goes in after the last key
+Every key must have all twelve locales. A new key goes in after the last key
 that sorts before it, so files stay in the order they are kept in and
 unrelated additions rarely touch the same lines.
 """
@@ -14,7 +14,7 @@ import json
 import os
 import sys
 
-LOCALES = ["ar", "de", "en", "es", "fr", "hi", "ja", "ko", "pt-BR", "ru", "zh-CN"]
+LOCALES = ["ar", "de", "en", "es", "fr", "hi", "ja", "ko", "pt-BR", "ru", "sv", "zh-CN"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 DIR = os.path.join(HERE, "..", "..", "web", "src", "i18n", "locales")
 

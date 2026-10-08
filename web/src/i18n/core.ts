@@ -50,6 +50,7 @@ export const LANGUAGES: LanguageInfo[] = [
   { tag: "es", endonym: "Español", english: "Spanish" },
   { tag: "fr", endonym: "Français", english: "French" },
   { tag: "de", endonym: "Deutsch", english: "German" },
+  { tag: "sv", endonym: "Svenska", english: "Swedish" },
   { tag: "pt-BR", endonym: "Português (Brasil)", english: "Portuguese (Brazil)" },
   { tag: "ru", endonym: "Русский", english: "Russian" },
   { tag: "ja", endonym: "日本語", english: "Japanese" },

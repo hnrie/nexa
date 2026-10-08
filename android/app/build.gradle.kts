@@ -23,6 +23,7 @@ abstract class CopyWebAssets : DefaultTask() {
     @get:InputDirectory abstract val locales: DirectoryProperty
     @get:InputDirectory abstract val sounds: DirectoryProperty
     @get:InputDirectory abstract val sprites: DirectoryProperty
+    @get:InputDirectory abstract val seasonal: DirectoryProperty
     @get:InputFile abstract val whatsNew: RegularFileProperty
     @get:InputDirectory abstract val legalDocs: DirectoryProperty
     @get:InputFile abstract val legalVersion: RegularFileProperty
@@ -40,6 +41,8 @@ abstract class CopyWebAssets : DefaultTask() {
         copyDir(locales.get().asFile, "locales") { it.name.endsWith(".json") }
         copyDir(sounds.get().asFile, "sounds") { it.name.endsWith(".m4a") }
         copyDir(sprites.get().asFile, "twemoji") { it.name.endsWith(".webp") || it.name.endsWith(".json") }
+        // the pictures seasonal themes sit on the message box (ui/theme/look/Seasonal.kt)
+        copyDir(seasonal.get().asFile, "seasonal") { it.name.endsWith(".svg") }
         // What's New is the web's own list, read by the app (ui/WhatsNew.kt), so a release is written once
         out.resolve("whatsnew").mkdirs()
         whatsNew.get().asFile.copyTo(out.resolve("whatsnew/whatsNew.ts"), overwrite = true)
@@ -53,6 +56,7 @@ val copyWebAssets = tasks.register<CopyWebAssets>("copyWebAssets") {
     locales.set(rootProject.file("../web/src/i18n/locales"))
     sounds.set(rootProject.file("../web/public/sounds"))
     sprites.set(rootProject.file("../web/src/assets/twemoji-sprites"))
+    seasonal.set(rootProject.file("../web/src/assets/seasonal"))
     whatsNew.set(rootProject.file("../web/src/lib/whatsNew.ts"))
     legalDocs.set(rootProject.file("../docs/legal"))
     legalVersion.set(rootProject.file("../web/src/lib/legal.ts"))
@@ -117,6 +121,8 @@ android {
         // -PserverUrl=http://127.0.0.1:18555 points a build at a local chatd (through adb reverse)
         val server = (findProperty("serverUrl") as String?)?.trim().takeUnless { it.isNullOrEmpty() } ?: "https://nexa.fish"
         buildConfigField("String", "DEFAULT_SERVER", "\"$server\"")
+        // -PallSeasons=true: every seasonal theme in season every day, for trying them out (never for a release)
+        buildConfigField("boolean", "ALL_SEASONS", (findProperty("allSeasons") as String?)?.trim().equals("true").toString())
 
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")

@@ -26,8 +26,8 @@ import (
 const (
 	minVariant = 16
 	maxVariant = 1024
-	// an animation larger than this is shown still once shrunk: resizing
-	// every frame is not worth it for the rare upload that big
+	// an animation no larger than this is served as it is at any size;
+	// shrinking every frame (animated.go) is kept for the large ones
 	maxAnimatedSide = 512
 )
 
@@ -88,26 +88,44 @@ func (m *Store) ServePublicSized(w http.ResponseWriter, r *http.Request, kind st
 	if !still && (size <= 0 || width == 0 || height == 0 || (width <= size && height <= size)) {
 		return m.ServePublic(w, r, kind, id)
 	}
-	// An animated WebP never had a shrunk copy (it could not be read here
-	// before its first frame could), so it keeps moving at every size, as it
-	// always has; only a still is asked for explicitly.
-	if !still && b.Animated && ((width <= maxAnimatedSide && height <= maxAnimatedSide) || b.Mime == "image/webp") {
-		return m.ServePublic(w, r, kind, id)
+	// A moving picture asked for at a size keeps moving. A small one is served
+	// as it is; a large GIF gets a copy with every frame shrunk; the formats
+	// whose frames cannot be shrunk here (WebP, APNG) are served as uploaded
+	// rather than as their first frame, which froze animated banners. Only a
+	// still is asked for explicitly.
+	if !still && b.Animated {
+		if (width <= maxAnimatedSide && height <= maxAnimatedSide) || b.Mime != "image/gif" {
+			return m.ServePublic(w, r, kind, id)
+		}
+		path, err := m.animatedVariant(r.Context(), b, size)
+		if err != nil {
+			return m.ServePublic(w, r, kind, id)
+		}
+		return m.serveVariant(w, r, b, path, "image/gif", strconv.Itoa(size)+"-moving")
 	}
 	path, mime, err := m.variant(r.Context(), b, size)
 	if err != nil {
 		// a picture that cannot be shrunk is still better than none
 		return m.ServePublic(w, r, kind, id)
 	}
+	if !m.serveVariant(w, r, b, path, mime, strconv.Itoa(size)) {
+		return m.ServePublic(w, r, kind, id)
+	}
+	return true
+}
+
+// serveVariant sends a copy made of b, kept for good like the blob itself.
+// tag tells copies of one blob apart in the ETag.
+func (m *Store) serveVariant(w http.ResponseWriter, r *http.Request, b *store.Blob, path, mime, tag string) bool {
 	f, err := os.Open(path)
 	if err != nil {
-		return m.ServePublic(w, r, kind, id)
+		return false
 	}
 	defer f.Close()
 	h := w.Header()
 	h.Set("Content-Type", mime)
 	h.Set("Cache-Control", "public, max-age=31536000, immutable")
-	h.Set("ETag", `"`+shaOf(b)+"-"+strconv.Itoa(size)+`"`)
+	h.Set("ETag", `"`+shaOf(b)+"-"+tag+`"`)
 	h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	h.Set("X-Content-Type-Options", "nosniff")
 	http.ServeContent(w, r, "", time.UnixMilli(b.CreatedAt), f)

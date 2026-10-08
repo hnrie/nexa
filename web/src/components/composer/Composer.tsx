@@ -60,6 +60,7 @@ import { formatShortDuration } from "@/lib/time";
 import { MAX_MESSAGE_LENGTH, pasteOverflows, tooLong, tooLongMessage } from "./limit";
 import { MessageCounter } from "./MessageCounter";
 import { applyWrap, formatShortcut } from "./wrapShortcut";
+import { SeasonalPerch } from "@/components/common/SeasonalPerch";
 import { SpellLines, useSpellActive } from "@/components/common/SpellLines";
 import { useTextMenu } from "@/lib/textMenu";
 /** How many files one message carries. */
@@ -944,6 +945,7 @@ export function Composer({ channel }: { channel: Channel }) {
         </div>
       ) : null}
       <div className={s.box} data-quiet={quiet || undefined} onPointerDown={() => setQuiet(false)}>
+        <SeasonalPerch />
         <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
         {plus.kind === "none" ? (
           <span className={s.attachSpacer} />

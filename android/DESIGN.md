@@ -130,7 +130,7 @@ From the owner (CLAUDE.md and standing feedback):
   case; descriptions, hints, toasts and errors as short, plain sentences.
 - No em dashes. Never describe the owner in the third person. Never compare Nexa to Discord.
 - Never hardcode English: `t("key")` with keys from the web catalogue; new keys (`android.*`) go into
-  all eleven locales with real translations, and `python3 tools/i18n_check.py` must pass.
+  all twelve locales with real translations, and `python3 tools/i18n_check.py` must pass.
 - A major feature or noticeable change gets a What's New entry.
 - Check every screen on the emulator in Dark, Light and one preset; look before calling it done.
 - Compare every screen with the same screen of the web app at phone width (a headless Playwright

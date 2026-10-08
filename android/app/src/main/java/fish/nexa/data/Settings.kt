@@ -236,7 +236,7 @@ class SettingsStore(private val api: Api, private val scope: CoroutineScope) {
             put("spellcheck", true); put("spellWords", JsonArray(emptyList())); put("sendButton", false)
             put("linkPreviews", true); put("imagePreviews", true); put("tts", true); put("developerMode", false)
             put("shareActivity", true); put("autoIdle", true); put("keybinds", JsonObject(emptyMap())); put("backgroundKeybinds", true)
-            put("customTyping", true); put("typingAvatars", true); put("typingChannels", true); put("sidebarWidth", 240); put("showMembers", true)
+            put("customTyping", true); put("typingAvatars", true); put("typingChannels", true); put("seasonalSnow", true); put("sidebarWidth", 240); put("showMembers", true)
             put("recentEmoji", JsonArray(emptyList())); put("smartEmoji", true); put("emojiUsage", JsonObject(emptyMap())); put("emojiLearned", false)
             put("favoriteGifs", JsonArray(emptyList())); put("skinTone", 0)
             put("notifications", DEFAULT_NOTIFICATIONS)

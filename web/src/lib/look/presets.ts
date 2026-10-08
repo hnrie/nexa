@@ -71,6 +71,30 @@ export function presetById(id: string): Preset | null {
   return BY_ID.get(id) ?? null;
 }
 
+/**
+ * The gallery's cards for some groups, in the order the gallery shows them. A
+ * theme that has a light version ("forest" and "forest-light") is one card,
+ * with a switch between the two on it; `light` and `dark` are null for a theme
+ * that has only one version.
+ */
+export interface PresetCard {
+  preset: Preset;
+  light: Preset | null;
+  dark: Preset | null;
+}
+
+export function presetCards(groups: readonly PresetGroup[]): PresetCard[] {
+  const inGroups = PRESETS.filter((p) => groups.includes(p.group));
+  const ids = new Set(inGroups.map((p) => p.id));
+  const lightOf = (p: Preset) => (p.scheme === "dark" && ids.has(`${p.id}-light`) ? BY_ID.get(`${p.id}-light`)! : null);
+  return inGroups
+    .filter((p) => !(p.id.endsWith("-light") && ids.has(p.id.slice(0, -"-light".length))))
+    .map((p) => {
+      const light = lightOf(p);
+      return { preset: p, light, dark: light ? p : null };
+    });
+}
+
 /** The recipe a derived preset is made from, for a custom theme that starts from it in simple mode. */
 export function presetColours(id: string): SimpleColours | null {
   const r = RECIPE_BY_ID.get(id);

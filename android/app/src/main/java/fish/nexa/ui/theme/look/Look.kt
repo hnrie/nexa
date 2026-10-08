@@ -76,13 +76,15 @@ object Looks {
     private fun lookOf(id: String, customs: List<CustomTheme>): ResolvedLook? {
         if (Tokens.isClassic(id)) return ResolvedLook(id, if (id == "light") "light" else "dark", id, null, false)
         Presets.byId(id)?.let { p -> return ResolvedLook(id, p.scheme, p.scheme, Presets.tokens(id), p.underlineLinks) }
+        // a seasonal theme out of its season is not there to draw, so it comes out as Dark below
+        Seasonal.active(id, java.time.LocalDate.now())?.let { s -> return ResolvedLook(id, s.scheme, s.scheme, Seasonal.tokens(id), false) }
         val custom = if (CustomThemes.isCustomId(id)) customs.firstOrNull { it.id == id } else null
         custom ?: return null
         val r = CustomThemes.resolve(custom)
         return ResolvedLook(id, r.scheme, r.scheme, r.tokens, CustomThemes.underlines(custom))
     }
 
-    /** The theme to draw; one that is not there any more (deleted on another device) draws as Dark. */
+    /** The theme to draw; one that is not there any more (deleted on another device, or out of its season) draws as Dark. */
     fun resolve(theme: String, prefersLight: Boolean, pairDark: String?, pairLight: String?, customs: List<CustomTheme>): ResolvedLook {
         val id = if (theme == "system") (if (prefersLight) pairLight ?: "light" else pairDark ?: "dark") else theme
         return lookOf(id, customs) ?: lookOf(if (prefersLight && theme == "system") "light" else "dark", emptyList())!!
