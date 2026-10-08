@@ -1,6 +1,6 @@
 import type { AlertKind, Align } from "@/markdown/ast";
 import { FALLBACK_SURFACE, paintColor, surfaceOf, type Surface } from "@/markdown/colors";
-import { fileWidth } from "@/markdown/parse";
+import { fileAlign, fileWidth, type FileAlign } from "@/markdown/parse";
 import { alignment } from "@/lib/align";
 import { fromMarkdown, inlineFromMarkdown, inlineMarkdown, toMarkdown, type AtomNames, type ReadOptions } from "./markdown";
 import {
@@ -157,6 +157,8 @@ export interface FileHost {
   name: string;
   /** How much of the line a picture takes, in percent (100 when the text says nothing). */
   width: number;
+  /** The side of the line a narrower picture keeps to; null for the middle. */
+  align: FileAlign | null;
   el: HTMLElement;
 }
 
@@ -181,6 +183,12 @@ export type Command =
   | { t: "removeBlock"; key: number }
   /** How wide a picture is drawn, in percent of the line: from the handles drawn on it. */
   | { t: "fileWidth"; key: number; width: number }
+  /**
+   * Puts a file somewhere else and on a side of its line, from the handle
+   * drawn on it: `to` is the gap between blocks it goes in (0 before the
+   * first, the block count after the last), and null leaves it where it is.
+   */
+  | { t: "placeFile"; key: number; to: number | null; align: FileAlign | null }
   | { t: "clear" }
   | { t: "undo" }
   | { t: "redo" }
@@ -750,6 +758,7 @@ export class FormatSurface {
       if (block.width) el.style.setProperty("--file-w", `${block.width}%`);
       else el.style.removeProperty("--file-w");
       set(el, "data-width", block.width ? String(block.width) : null);
+      set(el, "data-align", block.align ?? null);
     }
   }
 
@@ -760,10 +769,10 @@ export class FormatSurface {
     for (const block of this.blocks) {
       if (block.kind !== "file") continue;
       const el = this.elements.get(block)?.firstElementChild;
-      if (el instanceof HTMLElement) shown.push({ key: block.id, file: block.file, name: block.name, width: block.width ?? 100, el });
+      if (el instanceof HTMLElement) shown.push({ key: block.id, file: block.file, name: block.name, width: block.width ?? 100, align: block.align ?? null, el });
     }
     const was = this.filesShown;
-    if (was.length === shown.length && was.every((h, k) => h.key === shown[k]!.key && h.el === shown[k]!.el && h.width === shown[k]!.width)) return;
+    if (was.length === shown.length && was.every((h, k) => h.key === shown[k]!.key && h.el === shown[k]!.el && h.width === shown[k]!.width && h.align === shown[k]!.align)) return;
     this.filesShown = shown;
     this.opts.onFiles(shown);
   }
@@ -1858,6 +1867,40 @@ export class FormatSurface {
         else delete next.width;
         out[at] = next;
         this.apply(out, this.sel);
+        return;
+      }
+      case "placeFile": {
+        const at = this.blocks.findIndex((b) => b.id === cmd.key);
+        const block = this.blocks[at];
+        if (!block || block.kind !== "file") return;
+        const align = fileAlign(cmd.align);
+        // its own gaps, before it and after it, leave it where it is
+        const to = cmd.to === null || cmd.to === at + 1 ? at : Math.max(0, Math.min(this.blocks.length, cmd.to));
+        if (to === at && align === block.align) return;
+        const placed: FileBlock = { ...block };
+        if (align) placed.align = align;
+        else delete placed.align;
+        const out = this.blocks.slice();
+        if (to === at) {
+          out[at] = placed;
+          this.apply(out, this.sel);
+          return;
+        }
+        // it takes the wrap of the lines it goes between, as a file put in there would (never a quote's)
+        const before = this.blocks[to - 1];
+        const after = this.blocks[to];
+        placed.wrap = before && after && before.wrap === after.wrap && before.wrap !== "quote" ? before.wrap : null;
+        // the empty line put after it to carry on typing goes with it, when
+        // text is left on both sides of where it was
+        const left = this.blocks[at + 1];
+        const spare = left && isText(left) && left.kind === "p" && left.content.length === 0 && isText(this.blocks[at - 1]) && !!this.blocks[at + 2] && to !== at + 2 ? left : null;
+        out.splice(at, 1);
+        out.splice(to > at ? to - 1 : to, 0, placed);
+        if (spare) out.splice(out.indexOf(spare), 1);
+        const now = out.indexOf(placed);
+        // there is always a line to carry on typing after it
+        if (!isText(out[now + 1])) out.splice(now + 1, 0, textBlock("p", [], placed.wrap));
+        this.apply(out, caret(now + 1, 0));
         return;
       }
       case "removeBlock": {

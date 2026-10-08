@@ -66,7 +66,7 @@ export function Byline({ noteId }: { noteId: string }) {
 export function NoteReader({ initial, bridge, onTitle, barStart, barEnd, byline }: { initial: NoteDoc; bridge: React.MutableRefObject<NoteBridge>; onTitle: (title: string) => void; barStart?: ReactNode; barEnd: ReactNode; byline: ReactNode }) {
   const [doc, setDoc] = useState(initial);
   const base = useRenderCtx();
-  const ctx = useMemo<RenderCtx>(() => ({ ...base, renderFile: (id, name, width) => <NoteFileLine width={width}><NoteFile meta={doc.files[id]} name={name} width={width} /></NoteFileLine> }), [base, doc.files]);
+  const ctx = useMemo<RenderCtx>(() => ({ ...base, renderFile: (id, name, width, align) => <NoteFileLine width={width} align={align}><NoteFile meta={doc.files[id]} name={name} width={width} align={align} /></NoteFileLine> }), [base, doc.files]);
   // the names of the people it mentions, who may be nobody this account has met
   useEffect(() => {
     fetchMissingUsers(mentionedIds(doc.md));

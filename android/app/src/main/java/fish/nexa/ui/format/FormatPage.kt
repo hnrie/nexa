@@ -55,6 +55,11 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -107,6 +112,26 @@ private val LocalLook = compositionLocalOf { PageLook.CHAT }
 private val LocalFileSlot = compositionLocalOf<(@Composable (FileBlock) -> Unit)?> { null }
 
 /**
+ * Where each of a page's blocks is on the screen (in the window), kept for a
+ * note's file being dragged somewhere else (NoteFileView), and where it would
+ * land, which the page draws over itself while it is dragged (Notes.module.css
+ * `.landing`).
+ */
+class BlockPlaces {
+    /** By block id. Read while dragging, so not state: nothing redraws for it. */
+    val bounds = HashMap<Int, androidx.compose.ui.geometry.Rect>()
+    /** Where the page's own top left corner is, in the window. */
+    internal var origin = Offset.Zero
+    /** A slim bar between two lines, or the picture's own place on its line; null while nothing is dragged. */
+    var landing by androidx.compose.runtime.mutableStateOf<Landing?>(null)
+
+    data class Landing(val rect: androidx.compose.ui.geometry.Rect, val between: Boolean)
+}
+
+private fun Modifier.placedIn(places: BlockPlaces?, id: Int): Modifier =
+    if (places == null) this else onGloballyPositioned { places.bounds[id] = it.boundsInWindow() }
+
+/**
  * The writing page (FormatEditor.module.css `.surface`): the chat's own
  * background and type, so what is written looks as it will when it is sent.
  * Quotes, callouts and folded sections are the runs of lines that share a
@@ -148,7 +173,7 @@ private fun noteMargins(block: Block, prev: Block?): Pair<Float, Float> {
  * `file` draws a note's file where its line is.
  */
 @Composable
-fun FormatBlocks(surface: FormatSurface, placeholder: String, look: PageLook, modifier: Modifier = Modifier, file: (@Composable (FileBlock) -> Unit)? = null) {
+fun FormatBlocks(surface: FormatSurface, placeholder: String, look: PageLook, modifier: Modifier = Modifier, places: BlockPlaces? = null, file: (@Composable (FileBlock) -> Unit)? = null) {
     val blocks = surface.blocks
     // ordered lists count per depth, starting again after anything that is not an item
     val numbers = HashMap<Int, Int>()
@@ -171,8 +196,22 @@ fun FormatBlocks(surface: FormatSurface, placeholder: String, look: PageLook, mo
         val (_, bottom) = noteMargins(blocks[i - 1], blocks.getOrNull(i - 2))
         return (maxOf(top, bottom) * em).dp
     }
+    val brand = Nx.colors.brand
+    val landingLook = Modifier.onGloballyPositioned { places?.origin = it.positionInWindow() }.drawWithContent {
+        drawContent()
+        val land = places?.landing ?: return@drawWithContent
+        val r = land.rect.translate(-(places.origin))
+        if (land.between) {
+            drawRoundRect(brand.copy(alpha = 0.25f), r.topLeft - Offset(3.dp.toPx(), 3.dp.toPx()), androidx.compose.ui.geometry.Size(r.width + 6.dp.toPx(), r.height + 6.dp.toPx()), androidx.compose.ui.geometry.CornerRadius(5.dp.toPx()))
+            drawRoundRect(brand, r.topLeft, r.size, androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()))
+        } else {
+            val corner = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())
+            drawRoundRect(brand.copy(alpha = 0.12f), r.topLeft, r.size, corner)
+            drawRoundRect(brand, r.topLeft, r.size, corner, style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))))
+        }
+    }
     CompositionLocalProvider(LocalLook provides look, LocalFileSlot provides file) {
-        Column(modifier.fillMaxWidth()) {
+        Column(modifier.fillMaxWidth().then(if (places != null) landingLook else Modifier)) {
             var i = 0
             while (i < blocks.size) {
                 val wrap = blocks[i].wrap
@@ -181,7 +220,7 @@ fun FormatBlocks(surface: FormatSurface, placeholder: String, look: PageLook, mo
                     val top = gap(i)
                     key(block.id) {
                         if (top > 0.dp) Spacer(Modifier.height(top))
-                        BlockView(surface, block, numbers[block.id], first = i == 0, placeholder = placeholder.takeIf { blocks.size == 1 })
+                        Box(Modifier.placedIn(places, block.id)) { BlockView(surface, block, numbers[block.id], first = i == 0, placeholder = placeholder.takeIf { blocks.size == 1 }) }
                     }
                     i++
                     continue
@@ -196,11 +235,13 @@ fun FormatBlocks(surface: FormatSurface, placeholder: String, look: PageLook, mo
                         run.forEachIndexed { k, block ->
                             key(block.id) {
                                 if (k > 0) gap(start + k).takeIf { it > 0.dp }?.let { Spacer(Modifier.height(it)) }
-                                BlockView(
-                                    surface, block, numbers[block.id], first = k == 0,
-                                    summary = wrap == Wrap.DETAILS && k == 0,
-                                    placeholder = if (wrap == Wrap.DETAILS && k == 0) t("composer.format.summaryPlaceholder") else placeholder.takeIf { blocks.size == 1 },
-                                )
+                                Box(Modifier.placedIn(places, block.id)) {
+                                    BlockView(
+                                        surface, block, numbers[block.id], first = k == 0,
+                                        summary = wrap == Wrap.DETAILS && k == 0,
+                                        placeholder = if (wrap == Wrap.DETAILS && k == 0) t("composer.format.summaryPlaceholder") else placeholder.takeIf { blocks.size == 1 },
+                                    )
+                                }
                             }
                         }
                     }

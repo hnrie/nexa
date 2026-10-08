@@ -126,7 +126,7 @@ object FormatMarkdown {
                 is Node.ListBlock -> listOf(node, wrap, 0, st)
                 is Node.CodeBlock -> st.out += CodeBlock(newId(), wrap, node.lang ?: "", node.text)
                 is Node.Hr -> st.out += RuleBlock(newId(), wrap)
-                is Node.File -> st.out += FileBlock(newId(), wrap, node.id, node.name, node.width)
+                is Node.File -> st.out += FileBlock(newId(), wrap, node.id, node.name, node.width, node.align)
                 is Node.Table -> st.out += TableBlock(newId(), wrap, node.align.toList(), (listOf(node.head) + node.rows).map { row -> row.map { cell -> lines(cell, st).flatten() } })
                 is Node.Footnotes -> for (note in node.notes) st.out += textBlock(TextKind.NOTE, lines(note.children, st).flatten(), wrap, label = note.label)
                 else -> {
@@ -329,7 +329,7 @@ object FormatMarkdown {
                     out += fence
                 }
                 is RuleBlock -> out += "---"
-                is FileBlock -> out += Markdown.fileLine(block.file, block.name, block.width?.toDouble())
+                is FileBlock -> out += Markdown.fileLine(block.file, block.name, block.width?.toDouble(), block.align)
                 is TableBlock -> {
                     if (prevTable) out += ""
                     fun row(cells: List<List<Inline>>) = "| " + cells.joinToString(" | ") { inlineMarkdown(it, cell = true).ifEmpty { " " } } + " |"

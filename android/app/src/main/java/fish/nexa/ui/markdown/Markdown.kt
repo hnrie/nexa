@@ -60,11 +60,16 @@ object Markdown {
         return if (n >= 100) null else maxOf(FILE_MIN_WIDTH, n)
     }
 
+    /** A side a note may hold a picture on: "left" or "right", anything else the middle (null). */
+    fun fileAlign(a: String?): String? = if (a == "left" || a == "right") a else null
+
     /** The line that puts a file in a note's text. */
-    fun fileLine(id: String, name: String, width: Double? = null): String {
+    fun fileLine(id: String, name: String, width: Double? = null, align: String? = null): String {
         val w = fileWidth(width)
+        val a = fileAlign(align)
+        val query = listOfNotNull(w?.let { "w=$it" }, a?.let { "a=$it" }).joinToString("&")
         val clean = Js.trim(name.replace(Regex("[\\[\\]\\s\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]+"), " "))
-        return "![" + clean.take(200) + "](nexa-file:" + id + (if (w != null) "?w=$w" else "") + ")"
+        return "![" + clean.take(200) + "](nexa-file:" + id + (if (query.isNotEmpty()) "?$query" else "") + ")"
     }
 
     private fun normalize(src: String): String {
@@ -977,19 +982,30 @@ object Markdown {
             if (j == idStart || j - idStart > 64) return null
             val id = line.substring(idStart, j)
             var width: String? = null
+            var align: String? = null
+            // the side a picture keeps to: left or right, after `a=`
+            fun sideAt(from: Int): String? = if (line.startsWith("left", from)) "left" else if (line.startsWith("right", from)) "right" else null
             if (j < line.length && line[j] == '?') {
-                if (!line.startsWith("?w=", j)) return null
-                var d = j + 3
-                while (d < line.length && line[d] in '0'..'9') d++
-                if (d == j + 3 || d - (j + 3) > 3 || d >= line.length || line[d] != ')') return null
-                width = line.substring(j + 3, d)
-                j = d
+                if (line.startsWith("?w=", j)) {
+                    var d = j + 3
+                    while (d < line.length && line[d] in '0'..'9') d++
+                    if (d == j + 3 || d - (j + 3) > 3 || d >= line.length) return null
+                    width = line.substring(j + 3, d)
+                    j = d
+                    if (line.startsWith("&a=", j)) {
+                        align = sideAt(j + 3) ?: return null
+                        j += 3 + align.length
+                    }
+                } else if (line.startsWith("?a=", j)) {
+                    align = sideAt(j + 3) ?: return null
+                    j += 3 + align.length
+                } else return null
             }
             if (j >= line.length || line[j] != ')') return null
             j++
             while (j < line.length && (line[j] == ' ' || line[j] == '\t')) j++
             if (j != line.length) return null
-            return Node.File(id, name, fileWidth(width?.toDouble()))
+            return Node.File(id, name, fileWidth(width?.toDouble()), align)
         }
 
         private fun Char.isAsciiLetterOrDigit() = this in 'a'..'z' || this in 'A'..'Z' || this in '0'..'9'

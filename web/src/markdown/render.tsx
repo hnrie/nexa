@@ -243,7 +243,7 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
     case "hr":
       return <hr className="md-hr" />;
     case "file":
-      return ctx.renderFile ? <>{ctx.renderFile(node.id, node.name, node.width)}</> : <div className="md-paragraph" dir="auto">{node.name}</div>;
+      return ctx.renderFile ? <>{ctx.renderFile(node.id, node.name, node.width, node.align)}</> : <div className="md-paragraph" dir="auto">{node.name}</div>;
     case "table":
       return <Table node={node} ctx={ctx} />;
     case "alert":

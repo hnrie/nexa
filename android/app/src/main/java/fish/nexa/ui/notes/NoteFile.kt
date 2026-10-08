@@ -1,6 +1,27 @@
 package fish.nexa.ui.notes
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.AbsoluteAlignment
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import fish.nexa.ui.format.BlockPlaces
+import fish.nexa.ui.markdown.format.Block
+import fish.nexa.ui.markdown.format.TextBlock
+import fish.nexa.ui.markdown.format.TextKind
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -16,6 +37,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -66,30 +88,65 @@ private val SIZES = listOf(33 to "notes.file.small", 50 to "notes.file.medium", 
  * device it shows how far it has got. One the note names but nobody has the
  * file for says so.
  */
+/**
+ * What a note's file needs to be moved about its note (NoteFile.tsx onPlace):
+ * which block it is, where the note's blocks are on the screen, and the
+ * scroll that carries the note along while it is dragged near an edge.
+ */
+class FileMove(
+    val id: Int,
+    val places: BlockPlaces,
+    val blocks: () -> List<Block>,
+    val scroll: ScrollState,
+    /** The part of the screen the note scrolls in, in the window. */
+    val viewport: () -> Rect?,
+    /** Puts it in another gap between the blocks (null to stay) and on a side of its line ("left", "right", null). */
+    val onPlace: (to: Int?, align: String?) -> Unit,
+)
+
+/** How close to the note's top or bottom edge a drag scrolls it, and how fast at the edge, per frame. */
+private val EDGE = 56.dp
+private val EDGE_SPEED = 14.dp
+
 @Composable
 fun NoteFileView(
     meta: AttachmentMeta?,
     name: String,
     pending: PendingNoteFile?,
     width: Int?,
+    /** The side of its line a narrower picture keeps to: "left", "right", or null for the middle. */
+    align: String? = null,
     onResize: ((Int) -> Unit)? = null,
     onRemove: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
+    move: FileMove? = null,
 ) {
     val visual = meta != null && (meta.isImage || meta.isVideo)
     val resizable = visual && onResize != null
     val set = width ?: 100
     var live by remember { mutableStateOf<Int?>(null) }
     val shown = live ?: set
-    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+    // narrower than its line, it keeps to a side; a full-width one has none to keep to
+    val side = if (shown < 100) align else null
+    var moving by remember { mutableStateOf(false) }
+    val handle = if (move == null) null else moveHandle(move, shown, side) { moving = it }
+    BoxWithConstraints(
+        Modifier.fillMaxWidth(),
+        contentAlignment = when (side) {
+            "left" -> AbsoluteAlignment.TopLeft
+            "right" -> AbsoluteAlignment.TopRight
+            else -> Alignment.TopCenter
+        },
+    ) {
         val line = maxWidth
         // a picture or a video takes the whole width its line gives it; a percentage of the line when made smaller
         val frame = if (visual) Modifier.width(line * (shown.coerceIn(Markdown.FILE_MIN_WIDTH, 100) / 100f)) else Modifier.fillMaxWidth()
         Box(frame) {
             when {
                 meta != null -> Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(if (visual) Modifier.weight(1f) else Modifier.weight(1f, fill = false)) { Attachments(listOf(meta), null, null, fill = visual) }
-                    // a file that is not a picture keeps its remove button beside it
+                    Box((if (visual) Modifier.weight(1f) else Modifier.weight(1f, fill = false)).alpha(if (moving) 0.45f else 1f)) { Attachments(listOf(meta), null, null, fill = visual) }
+                    // a file that is not a picture keeps its handle and remove button beside it
+                    if (!visual && handle != null) Box(Modifier.padding(top = 4.dp)) { MoveHandle(name, handle, onPicture = false, narrow = true, moving = moving) }
                     if (!visual && onRemove != null) Box(Modifier.padding(top = 4.dp)) { RemoveButton(name, onRemove, onPicture = false) }
                 }
                 pending != null -> WaitCard(name, pending, onRetry)
@@ -107,10 +164,180 @@ fun NoteFileView(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp).background(Color(0xD10E0B14), RoundedCornerShape(50)).padding(horizontal = 9.dp, vertical = 3.dp),
                 )
             }
-            if (visual && (resizable || onRemove != null)) {
-                FileBar(name, shown, narrow = line * (shown / 100f) <= 380.dp, onSize = if (resizable) onResize else null, onRemove = onRemove, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
+            if (visual && (resizable || onRemove != null || handle != null)) {
+                val narrow = line * (shown / 100f) <= 380.dp
+                // a picture kept to a side has its bar on that side too, so a bar wider than it runs into the free part of the line
+                val corner = when (side) {
+                    "left" -> AbsoluteAlignment.TopLeft
+                    "right" -> AbsoluteAlignment.TopRight
+                    else -> Alignment.TopEnd
+                }
+                FileBar(
+                    name, shown, narrow, onSize = if (resizable) onResize else null, onRemove = onRemove,
+                    modifier = Modifier.align(corner).padding(8.dp).wrapContentWidth(unbounded = true, align = if (side == "left") AbsoluteAlignment.Left else if (side == "right") AbsoluteAlignment.Right else Alignment.End),
+                    move = handle?.let { h -> { MoveHandle(name, h, onPicture = true, narrow = narrow, moving = moving) } },
+                )
             }
         }
+    }
+}
+
+/** A file's handle for moving it: what dragging it does, and what TalkBack offers in its place. */
+private class Handle(val drag: Modifier, val actions: List<CustomAccessibilityAction>)
+
+/**
+ * Dragging the handle (NoteFile.tsx startMove): up and down to the gap between
+ * two of the note's blocks nearest the finger, across to the left, middle or
+ * right third of the line, with the landing drawn over the page; near the
+ * note's top or bottom the note scrolls along. TalkBack moves it a line at a
+ * time, or to a side, as the web's arrow keys do.
+ */
+@Composable
+private fun moveHandle(move: FileMove, shown: Int, side: String?, onMoving: (Boolean) -> Unit): Handle {
+    val scope = rememberCoroutineScope()
+    val at = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    // a drag outlives the redraws around it: it reads what is current through these
+    val now by rememberUpdatedState(Triple(move, shown, side))
+    val drag = Modifier
+        .onGloballyPositioned { at[0] = it }
+        .pointerInput(Unit) {
+            var x = 0f
+            var y = 0f
+            var to: Int? = null
+            var aim: String? = null
+            var job: Job? = null
+            fun measure() {
+                val (m, w, _) = now
+                val blocks = m.blocks()
+                val here = blocks.indexOfFirst { it.id == m.id }
+                val line = m.places.bounds[m.id] ?: return
+                if (here < 0) return
+                var best = here
+                var bestGap = Float.MAX_VALUE
+                var bestY = 0f
+                for (k in 0..blocks.size) {
+                    val above = blocks.getOrNull(k - 1)?.let { m.places.bounds[it.id] }
+                    val below = blocks.getOrNull(k)?.let { m.places.bounds[it.id] }
+                    val gy = when {
+                        above != null && below != null -> (above.bottom + below.top) / 2
+                        below != null -> below.top
+                        above != null -> above.bottom
+                        else -> continue
+                    }
+                    val d = abs(y - gy)
+                    if (d < bestGap) {
+                        bestGap = d
+                        best = k
+                        bestY = gy
+                    }
+                }
+                to = if (best == here || best == here + 1) null else best
+                if (w < 100) {
+                    val f = (x - line.left) / line.width.coerceAtLeast(1f)
+                    aim = if (f < 1 / 3f) "left" else if (f > 2 / 3f) "right" else null
+                }
+                val wide = line.width * w / 100f
+                val left = when (aim) {
+                    "left" -> line.left
+                    "right" -> line.right - wide
+                    else -> line.left + (line.width - wide) / 2
+                }
+                val bar = 4.dp.toPx()
+                m.places.landing = if (to == null) BlockPlaces.Landing(Rect(left, line.top, left + wide, line.bottom), between = false)
+                else BlockPlaces.Landing(Rect(left, bestY - bar / 2, left + wide, bestY + bar / 2), between = true)
+            }
+            fun finish(keep: Boolean) {
+                job?.cancel()
+                job = null
+                onMoving(false)
+                val (m, _, s) = now
+                m.places.landing = null
+                if (keep && (to != null || aim != s)) m.onPlace(to, aim)
+            }
+            detectDragGestures(
+                onDragStart = { o ->
+                    val p = at[0]?.localToWindow(o) ?: o
+                    x = p.x
+                    y = p.y
+                    to = null
+                    aim = now.third
+                    onMoving(true)
+                    measure()
+                    // near the note's top or bottom edge, the note scrolls along under the finger
+                    job = scope.launch {
+                        val edge = EDGE.toPx()
+                        val speed = EDGE_SPEED.toPx()
+                        while (isActive) {
+                            val box = now.first.viewport()
+                            val step = when {
+                                box == null -> 0f
+                                y < box.top + edge -> -speed * (1 - (y - box.top).coerceAtLeast(0f) / edge)
+                                y > box.bottom - edge -> speed * (1 - (box.bottom - y).coerceAtLeast(0f) / edge)
+                                else -> 0f
+                            }
+                            if (step != 0f) {
+                                now.first.scroll.scrollBy(step)
+                                measure()
+                            }
+                            delay(16)
+                        }
+                    }
+                },
+                onDragEnd = { finish(true) },
+                onDragCancel = { finish(false) },
+            ) { change, _ ->
+                change.consume()
+                val p = at[0]?.localToWindow(change.position) ?: change.position
+                x = p.x
+                y = p.y
+                measure()
+            }
+        }
+    val blocks = move.blocks()
+    val here = blocks.indexOfFirst { it.id == move.id }
+    val actions = buildList {
+        if (here > 0) add(CustomAccessibilityAction(t("android.notes.file.moveUp")) { move.onPlace(here - 1, side); true })
+        // the empty line that follows a file is stepped over with it
+        val next = blocks.getOrNull(here + 1)
+        val past = if (next is TextBlock && next.textKind == TextKind.P && next.content.isEmpty() && blocks.getOrNull(here + 2) != null) here + 3 else here + 2
+        if (here >= 0 && past <= blocks.size) add(CustomAccessibilityAction(t("android.notes.file.moveDown")) { move.onPlace(past, side); true })
+        if (shown < 100) {
+            if (side != "left") add(CustomAccessibilityAction(t("android.notes.file.toLeft")) { move.onPlace(null, "left"); true })
+            if (side != null) add(CustomAccessibilityAction(t("android.notes.file.toMiddle")) { move.onPlace(null, null); true })
+            if (side != "right") add(CustomAccessibilityAction(t("android.notes.file.toRight")) { move.onPlace(null, "right"); true })
+        }
+    }
+    return Handle(drag, actions)
+}
+
+/** The handle itself (.fileMove): first in a picture's bar, ruled off from the sizes; beside a file that is not one. */
+@Composable
+private fun MoveHandle(name: String, handle: Handle, onPicture: Boolean, narrow: Boolean, moving: Boolean) {
+    val c = Nx.colors
+    val shape = RoundedCornerShape(7.dp)
+    Row(
+        Modifier
+            .height(if (onPicture) 32.dp else 40.dp)
+            .then(
+                when {
+                    moving -> Modifier.background(c.brand, shape)
+                    onPicture -> Modifier
+                    else -> Modifier.ring(shape, c.borderSubtle).background(c.bgSurface, shape).topEdge(shape, c.edgeLight)
+                },
+            )
+            .clip(shape)
+            .then(handle.drag)
+            .padding(start = if (onPicture) 5.dp else 12.dp, end = if (onPicture && !narrow) 9.dp else if (onPicture) 5.dp else 12.dp)
+            .semantics {
+                contentDescription = t("notes.file.move", "name" to name)
+                customActions = handle.actions
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        val tint = if (moving) c.onBrand else if (onPicture) Color.White.copy(alpha = 0.86f) else c.textMuted
+        Icon("GripVertical", tint, size = 16.dp)
+        if (onPicture && !narrow) Txt(t("notes.file.moveShort"), style = Nx.type.label.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(650)), color = tint, maxLines = 1)
     }
 }
 
@@ -163,7 +390,7 @@ private fun androidx.compose.foundation.layout.BoxScope.Grip(name: String, start
 
 /** What can be done to a picture (.fileBar): its sizes, and taking it out. Always shown on a touch screen. */
 @Composable
-private fun FileBar(name: String, shown: Int, narrow: Boolean, onSize: ((Int) -> Unit)?, onRemove: (() -> Unit)?, modifier: Modifier) {
+private fun FileBar(name: String, shown: Int, narrow: Boolean, onSize: ((Int) -> Unit)?, onRemove: (() -> Unit)?, modifier: Modifier, move: (@Composable () -> Unit)? = null) {
     val shape = RoundedCornerShape(10.dp)
     Row(
         modifier
@@ -174,6 +401,11 @@ private fun FileBar(name: String, shown: Int, narrow: Boolean, onSize: ((Int) ->
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        if (move != null) {
+            move()
+            // ruled off from the sizes (.fileBarRule)
+            if (onSize != null) Box(Modifier.padding(horizontal = 3.dp).size(1.dp, 16.dp).background(Color.White.copy(alpha = 0.18f)))
+        }
         if (onSize != null) for ((w, key) in SIZES) {
             val on = shown == w
             val interaction = remember { MutableInteractionSource() }

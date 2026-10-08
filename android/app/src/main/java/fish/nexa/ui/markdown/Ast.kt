@@ -166,9 +166,10 @@ sealed class Node {
     /**
      * A file a note holds, on a line of its own (only when parsed with
      * `files`): drawn by the note's own file view, `width` percent of the line
-     * for a picture when not all of it; without one, `name` as a paragraph.
+     * for a picture when not all of it, keeping to the `align` side ("left" or
+     * "right", null for the middle); without one, `name` as a paragraph.
      */
-    class File(val id: String, val name: String, val width: Int?) : Node() {
+    class File(val id: String, val name: String, val width: Int?, val align: String? = null) : Node() {
         override val type get() = "file"
     }
 

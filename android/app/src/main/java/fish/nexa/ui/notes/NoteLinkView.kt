@@ -301,7 +301,7 @@ private fun Preview(preview: String, files: Map<String, AttachmentMeta>?, card: 
             bodyPx = if (card) 14f else 15f,
             bodyLine = if (card) 21f else 22.5f,
             color = subtle,
-            renderFile = { id, name, _ -> NoteFileThumb(files?.get(id), name) },
+            renderFile = { id, name, _, _ -> NoteFileThumb(files?.get(id), name) },
         )
     }
     Box(

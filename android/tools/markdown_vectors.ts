@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { parse, plainText, isEmojiOnly, trimUrl, extractUrls, misleadingLabel, fileLine, fileWidth } from "@/markdown/parse";
+import { parse, plainText, isEmojiOnly, trimUrl, extractUrls, misleadingLabel, fileLine, fileWidth, fileAlign } from "@/markdown/parse";
 import { flattenInline } from "@/markdown/flatten";
 import { colorToken, parseColorSpec, formatColorSpec, paintColor, swatchColor } from "@/markdown/colors";
 import { ensureShortcodes, onShortcodesReady, shortcodesReady, shortcodeToEmoji, emojiShortcode, mightHaveShortcode } from "@/lib/shortcodes";
@@ -168,6 +168,7 @@ const HAND = [
   ":smile: :+1: :nope:", "👍🏽❤️🇺🇸", "Nexa™ and ©", "1️⃣2️⃣", "🏳‍🌈", "😀".repeat(31), "😀".repeat(30), " # not heading",
   "# heading tail", "- item ", "a\r\nb\rc", "x".repeat(9000), "*".repeat(200), "[".repeat(300) + "x", "_".repeat(60) + "a",
   "![name](nexa-file:abc)", "![p](nexa-file:id_1?w=60)\ntext", "| a | b |\n|---|---|\n![x](nexa-file:y)",
+  "![p](nexa-file:id_1?w=60&a=left)\ntext", "![p](nexa-file:a?a=right)", "![p](nexa-file:a?w=40&a=up)", "![p](nexa-file:a?a=left&w=60)", "![p](nexa-file:a?w=50&a=right)  ",
 ];
 
 const corpus: string[] = [];
@@ -266,7 +267,7 @@ async function main(): Promise<void> {
   const zalgo = ["à́̂", "à́̂̃", "à́̂̃̄b⃒⃓⃐⃑", "plain", "҃҄҅҆҇"].map((text) => ({ text, has: hasZalgo(text), clamped: clampZalgo(text) }));
   const twemoji = ["😀", "❤️", "❤", "🏳‍🌈", "🏳️‍🌈", "👁‍🗨", "👨‍👩‍👧", "👍🏽", "#️⃣", "🇺🇸", "", "a"].map((text) => ({ text, files: twemojiFiles(text) }));
 
-  const files = [["abc", "name", undefined], ["id", "with [brackets] and\nnewline", 60], ["x", "  spaced  ", 100], ["y", "a".repeat(300), 3], ["z", "p", 15.4]].map(([id, name, width]) => ({ id, name, width: width ?? null, line: fileLine(id as string, name as string, width as number | undefined), w: fileWidth(width as number | undefined) ?? null }));
+  const files = [["abc", "name", undefined, null], ["id", "with [brackets] and\nnewline", 60, "left"], ["x", "  spaced  ", 100, "right"], ["y", "a".repeat(300), 3, null], ["z", "p", 15.4, "right"], ["q", "p", undefined, "left"], ["r", "p", 50, "up"]].map(([id, name, width, align]) => ({ id, name, width: width ?? null, align, line: fileLine(id as string, name as string, width as number | undefined, align as "left" | "right" | null), w: fileWidth(width as number | undefined) ?? null, a: fileAlign(align as string | null) ?? null }));
 
   // timestamps and the app's other dates, in each language, at a fixed now
   const NOW = Date.UTC(2026, 9, 3, 14, 30, 15);

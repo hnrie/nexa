@@ -92,6 +92,8 @@ export interface FileBlock extends Base {
   name: string;
   /** How much of the line a picture takes, in percent; the whole line when left out. */
   width?: number;
+  /** Which side of the line a narrower picture keeps to; the middle when left out. */
+  align?: "left" | "right";
 }
 export type Block = TextBlock | CodeBlock | RuleBlock | TableBlock | FileBlock;
 

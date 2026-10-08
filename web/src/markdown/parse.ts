@@ -112,10 +112,14 @@ const BLOCK_TYPES = new Set(["paragraph", "quote", "heading", "subtext", "list",
 
 /**
  * A note's file, alone on its line: `![name](nexa-file:id)`, or with how wide
- * a picture is drawn, in percent of the line, `![name](nexa-file:id?w=60)`.
- * The name has no brackets or line breaks in it.
+ * a picture is drawn, in percent of the line, `![name](nexa-file:id?w=60)`,
+ * and which side of the line it keeps to when narrower, `?w=60&a=left` (the
+ * middle left unsaid). The name has no brackets or line breaks in it.
  */
-export const RE_FILE = /^!\[([^\[\]\n]{0,200})\]\(nexa-file:([A-Za-z0-9_-]{1,64})(?:\?w=(\d{1,3}))?\)[ \t]*$/;
+export const RE_FILE = /^!\[([^\[\]\n]{0,200})\]\(nexa-file:([A-Za-z0-9_-]{1,64})(?:\?w=(\d{1,3})(?:&a=(left|right))?|\?a=(left|right))?\)[ \t]*$/;
+
+/** Which side of its line a picture narrower than the line keeps to; the middle when left out. */
+export type FileAlign = "left" | "right";
 
 /** The narrowest a picture in a note may be drawn, in percent of the line. */
 export const FILE_MIN_WIDTH = 15;
@@ -127,10 +131,17 @@ export function fileWidth(w: number | undefined | null): number | undefined {
   return n >= 100 ? undefined : Math.max(FILE_MIN_WIDTH, n);
 }
 
+/** A side a note may hold: left or right, anything else the middle. */
+export function fileAlign(a: string | undefined | null): FileAlign | undefined {
+  return a === "left" || a === "right" ? a : undefined;
+}
+
 /** The line that puts a file in a note's text. */
-export function fileLine(id: string, name: string, width?: number): string {
+export function fileLine(id: string, name: string, width?: number, align?: FileAlign | null): string {
   const w = fileWidth(width);
-  return `![${name.replace(/[\[\]\s]+/g, " ").trim().slice(0, 200)}](nexa-file:${id}${w ? `?w=${w}` : ""})`;
+  const a = fileAlign(align);
+  const query = [w ? `w=${w}` : "", a ? `a=${a}` : ""].filter(Boolean).join("&");
+  return `![${name.replace(/[\[\]\s]+/g, " ").trim().slice(0, 200)}](nexa-file:${id}${query ? `?${query}` : ""})`;
 }
 
 /** Whether file lines are being read as files: on for the length of one parse of a note. */
@@ -360,7 +371,8 @@ function parseBlocks(src: string, depth: number, notes: Notes): Node[] {
       if (file) {
         flushAll();
         const width = fileWidth(file[3] ? Number(file[3]) : undefined);
-        out.push({ type: "file", id: file[2] ?? "", name: file[1] ?? "", ...(width ? { width } : {}) });
+        const align = fileAlign(file[4] ?? file[5]);
+        out.push({ type: "file", id: file[2] ?? "", name: file[1] ?? "", ...(width ? { width } : {}), ...(align ? { align } : {}) });
         i = lineEnd + 1;
         continue;
       }

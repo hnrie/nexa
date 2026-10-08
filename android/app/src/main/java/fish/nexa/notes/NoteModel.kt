@@ -47,7 +47,7 @@ object NoteModel {
     private val FILE_ID = Regex("^[A-Za-z0-9_-]{1,64}$")
     private val BLOB_ID = Regex("^\\d{1,20}$")
     /** RE_FILE (markdown/parse.ts): a file alone on its line. */
-    private val RE_FILE = Regex("^!\\[([^\\[\\]\\n]{0,200})]\\(nexa-file:([A-Za-z0-9_-]{1,64})(?:\\?w=(\\d{1,3}))?\\)[ \\t]*$")
+    private val RE_FILE = Regex("^!\\[([^\\[\\]\\n]{0,200})]\\(nexa-file:([A-Za-z0-9_-]{1,64})(?:\\?w=(\\d{1,3})(?:&a=(left|right))?|\\?a=(left|right))?\\)[ \\t]*$")
     private val CALLOUT = Regex("^(?:> ?)+")
     private val FENCE = Regex("^(`{3,})")
 

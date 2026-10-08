@@ -135,7 +135,7 @@ function blocksOf(nodes: Node[], wrap: Wrap, st: LoadState): void {
         st.out.push({ id: newId(), kind: "hr", wrap });
         break;
       case "file":
-        st.out.push({ id: newId(), kind: "file", file: node.id, name: node.name, wrap, ...(node.width ? { width: node.width } : {}) });
+        st.out.push({ id: newId(), kind: "file", file: node.id, name: node.name, wrap, ...(node.width ? { width: node.width } : {}), ...(node.align ? { align: node.align } : {}) });
         break;
       case "table":
         st.out.push({
@@ -357,7 +357,7 @@ function flowLines(run: Block[], afterTable = false, at?: Map<Block, number>): s
         out.push("---");
         break;
       case "file":
-        out.push(fileLine(block.file, block.name, block.width));
+        out.push(fileLine(block.file, block.name, block.width, block.align));
         break;
       case "table": {
         if (prevTable) out.push("");

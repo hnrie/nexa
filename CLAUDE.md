@@ -713,6 +713,18 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   `FormatSurface` has `mentionAt`, `Cmd.Mention`, `relabelPeople`, and `onMention` with
   `tappedAt` (a tap on a mention, seen by `mentionTaps` in `FormatPage.kt` without taking it
   from the field, selects it and opens the profile sheet).
+- Files in notes: a file sits on a line of its own, `![name](nexa-file:id)`, with how much of
+  the line a picture takes and the side a narrower one keeps to as `?w=60`, `?w=60&a=left`,
+  `?a=right` (`RE_FILE`, `fileLine` and `fileAlign` in `markdown/parse.ts`; the middle and the
+  full width are left unsaid). In the editor `components/notes/NoteFile.tsx` draws the picture
+  with grips on its sides for its width and a bar along its top: Move first (dragged up or down
+  to the gap between two lines nearest the pointer, across to the left, middle or right third of
+  the line, with the landing drawn over the page; the arrow keys do the same), then the sizes and
+  Remove. Both go through the surface's `fileWidth` and `placeFile` commands, one undo step each;
+  a moved file takes away the empty line that followed it when text is left on both sides.
+  Android: `ui/notes/NoteFile.kt` (`FileMove`, TalkBack actions in place of the arrow keys),
+  `FormatSurface` `Cmd.PlaceFile`, and `BlockPlaces` in `ui/format/FormatPage.kt`, where the
+  page keeps each block's place on the screen and draws the landing.
 - `pages/`: one per route. `styles/`: `tokens.css` (every theme token: colour, radius, shadow,
   motion), `base.css`, `markdown.css`, `fonts.css` (Wix Madefor) and `fonts-classic.css` (Onest,
   Mona Sans). `lib/theme.ts` applies a theme; `lib/look/` derives presets and custom themes.

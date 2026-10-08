@@ -189,7 +189,7 @@ export function NoteHistory({ noteId, current, canRestore, narrow, onClose, onRe
 /** One version of a note, as it read then. */
 function VersionView({ doc, note }: { doc: NoteDoc; note: string }) {
   const base = useRenderCtx();
-  const ctx = useMemo<RenderCtx>(() => ({ ...base, renderFile: (id, name, width) => <NoteFileLine width={width}><NoteFile meta={doc.files[id]} name={name} width={width} /></NoteFileLine> }), [base, doc.files]);
+  const ctx = useMemo<RenderCtx>(() => ({ ...base, renderFile: (id, name, width, align) => <NoteFileLine width={width} align={align}><NoteFile meta={doc.files[id]} name={name} width={width} align={align} /></NoteFileLine> }), [base, doc.files]);
   return (
     <article className={s.sheet}>
       <p className={s.versionNote}>{note}</p>

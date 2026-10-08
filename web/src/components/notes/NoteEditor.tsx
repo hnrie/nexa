@@ -427,7 +427,7 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
     const n = seen.get(h.file) ?? 0;
     seen.set(h.file, n + 1);
     return createPortal(
-      <NoteFile meta={files[h.file]} name={h.name} pending={pending[h.file]} width={h.width} onResize={(width) => bench.run({ t: "fileWidth", key: h.key, width })} onRemove={() => removeFile(h)} onRetry={() => retry(h.file)} />,
+      <NoteFile meta={files[h.file]} name={h.name} pending={pending[h.file]} width={h.width} onResize={(width) => bench.run({ t: "fileWidth", key: h.key, width })} align={h.align} onPlace={(to, align) => bench.run({ t: "placeFile", key: h.key, to, align })} onRemove={() => removeFile(h)} onRetry={() => retry(h.file)} />,
       h.el,
       n ? `${h.file}:${n}` : h.file,
     );

@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -736,6 +737,7 @@ private fun NoteEditor(noteId: String, note: OpenNote, bridge: NoteBridge, narro
         NoteBar(narrow, title.text, viewOnly = false, end = end)
         val sheetScroll = rememberScrollState()
         val sheetArea = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
+        val places = remember { fish.nexa.ui.format.BlockPlaces() }
         Box(Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { sheetArea[0] = it }) {
             Column(Modifier.fillMaxSize().verticalScroll(sheetScroll)) {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
@@ -778,18 +780,27 @@ private fun NoteEditor(noteId: String, note: OpenNote, bridge: NoteBridge, narro
                             )
                         }
                         if (surface.simplified) Txt(t("composer.format.simplified"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, modifier = Modifier.padding(bottom = 14.dp))
-                        FormatBlocks(surface, t("notes.editor.placeholder"), PageLook.NOTE, Modifier.semantics { contentDescription = t("notes.editor.body") }) { block ->
+                        FormatBlocks(surface, t("notes.editor.placeholder"), PageLook.NOTE, Modifier.semantics { contentDescription = t("notes.editor.body") }, places = places) { block ->
                             NoteFileView(
                                 meta = files[block.file],
                                 name = block.name,
                                 pending = uploads.pending[block.file],
                                 width = block.width,
+                                align = block.align,
                                 onResize = { w -> surface.command(Cmd.FileWidth(block.id, w)) },
                                 onRemove = {
                                     uploads.cancel(block.file)
                                     surface.command(Cmd.RemoveBlock(block.id))
                                 },
                                 onRetry = { uploads.retry(block.file) },
+                                move = FileMove(
+                                    id = block.id,
+                                    places = places,
+                                    blocks = { surface.blocks },
+                                    scroll = sheetScroll,
+                                    viewport = { sheetArea[0]?.takeIf { it.isAttached }?.boundsInWindow() },
+                                    onPlace = { to, align -> surface.command(Cmd.PlaceFile(block.id, to, align)) },
+                                ),
                             )
                         }
                         // the page goes on below the last line: a tap there writes at the end
@@ -846,8 +857,8 @@ private fun NoteReader(noteId: String, initial: NoteDoc, bridge: NoteBridge, nar
             bodyPx = 16.5f,
             bodyLine = 28f,
             gap = 6.6.dp,
-            renderFile = { id, name, width ->
-                Box(Modifier.fillMaxWidth().padding(vertical = 16.dp)) { NoteFileView(doc.files[id], name, null, width) }
+            renderFile = { id, name, width, align ->
+                Box(Modifier.fillMaxWidth().padding(vertical = 16.dp)) { NoteFileView(doc.files[id], name, null, width, align) }
             },
         )
     }

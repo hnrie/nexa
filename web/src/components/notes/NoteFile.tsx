@@ -1,10 +1,11 @@
-import { AlertCircle, FileIcon, RotateCw, Trash2 } from "lucide-react";
+import { AlertCircle, FileIcon, GripVertical, RotateCw, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { AttachmentMeta } from "@/crypto/message";
 import { Attachments } from "@/components/chat/Attachments";
 import { acquire, attachmentObjectURL, cachedURL, PRIORITY, release } from "@/lib/mediaCache";
 import { copyOf } from "@/lib/pictureCopy";
-import { FILE_MIN_WIDTH } from "@/markdown/parse";
+import { FILE_MIN_WIDTH, type FileAlign } from "@/markdown/parse";
 import { t } from "@/i18n";
 import s from "./Notes.module.css";
 
@@ -29,6 +30,43 @@ interface Props {
   width?: number | undefined;
   /** In a note being written: makes a picture or video that wide. */
   onResize?: ((width: number) => void) | undefined;
+  /** The side of its line a narrower picture keeps to; null or left out for the middle. */
+  align?: FileAlign | null | undefined;
+  /**
+   * In a note being written: puts the file in another gap between the note's
+   * lines (`to`, counted as the editor counts its blocks; null to stay) and on
+   * a side of its line.
+   */
+  onPlace?: ((to: number | null, align: FileAlign | null) => void) | undefined;
+}
+
+/** Where a file being moved would land, drawn over the page while it is dragged. */
+interface Landing {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  /** A slim bar between two lines, or the picture's own place on its line. */
+  between: boolean;
+}
+
+/** How close to the top or bottom of the note a drag scrolls it, and how fast at the edge. */
+const EDGE = 56;
+const EDGE_SPEED = 14;
+
+/** The side a point across a line asks for: its left third, its middle, its right third. */
+function sideAt(x: number, line: DOMRect): FileAlign | null {
+  const at = (x - line.left) / (line.width || 1);
+  return at < 1 / 3 ? "left" : at > 2 / 3 ? "right" : null;
+}
+
+/** The nearest element above that scrolls up and down. */
+function scrollerOf(el: HTMLElement | null): HTMLElement | null {
+  for (let p = el?.parentElement ?? null; p; p = p.parentElement) {
+    const y = getComputedStyle(p).overflowY;
+    if ((y === "auto" || y === "scroll") && p.scrollHeight > p.clientHeight) return p;
+  }
+  return null;
 }
 
 /** The sizes offered at a click, in percent of the line. */
@@ -48,12 +86,149 @@ const SIZES: { width: number; label: () => string }[] = [
  * file for (someone else's still on its way, or one that never made it up)
  * says so.
  */
-export function NoteFile({ meta, name, pending, onRemove, onRetry, width = 100, onResize }: Props) {
+export function NoteFile({ meta, name, pending, onRemove, onRetry, width = 100, onResize, align = null, onPlace }: Props) {
   const root = useRef<HTMLDivElement>(null);
+  const handle = useRef<HTMLButtonElement>(null);
   const [live, setLive] = useState<number | null>(null);
+  const [landing, setLanding] = useState<Landing | null>(null);
   const visual = !!meta && (meta.type.startsWith("image/") || meta.type.startsWith("video/"));
   const resizable = visual && !!onResize;
+  const movable = !!onPlace;
   const shown = live ?? width;
+  // narrower than its line, it keeps to a side; a full-width one has none to keep to
+  const side = shown < 100 ? align : null;
+  // keys pressed faster than the note redraws each start from the one before
+  const sideNow = useRef(side);
+  sideNow.current = side;
+
+  /** The editor's line the file is, and the lines around it: what a move counts in. */
+  const lines = (): { el: HTMLElement; all: HTMLElement[]; at: number } | null => {
+    const el = root.current?.closest<HTMLElement>("[data-b='file']");
+    const all = el?.parentElement ? ([...el.parentElement.children] as HTMLElement[]) : [];
+    const at = el ? all.indexOf(el) : -1;
+    return el && at >= 0 ? { el, all, at } : null;
+  };
+
+  /** Where a picture this wide sits across a line, on a side. */
+  const across = (line: DOMRect, to: FileAlign | null): { left: number; width: number } => {
+    const w = (line.width * shown) / 100;
+    return { left: to === "left" ? line.left : to === "right" ? line.right - w : line.left + (line.width - w) / 2, width: w };
+  };
+
+  const startMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0 || !onPlace) return;
+    const here = lines();
+    if (!here) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const scroller = scrollerOf(here.el);
+    let x = e.clientX;
+    let y = e.clientY;
+    let to: number | null = null;
+    let aim: FileAlign | null = side;
+    let frame = 0;
+    const measure = (): void => {
+      const { el, all, at } = here;
+      const line = el.getBoundingClientRect();
+      // the gap between lines nearest the pointer, down the page
+      let best = at;
+      let bestGap = Infinity;
+      let bestY = 0;
+      for (let k = 0; k <= all.length; k++) {
+        const above = all[k - 1]?.getBoundingClientRect();
+        const below = all[k]?.getBoundingClientRect();
+        const gy = above && below ? (above.bottom + below.top) / 2 : below ? below.top : (above?.bottom ?? 0);
+        const d = Math.abs(y - gy);
+        if (d < bestGap) {
+          bestGap = d;
+          best = k;
+          bestY = gy;
+        }
+      }
+      to = best === at || best === at + 1 ? null : best;
+      if (shown < 100) aim = sideAt(x, line);
+      const place = across(line, aim);
+      if (to === null) {
+        const host = root.current?.getBoundingClientRect() ?? line;
+        setLanding({ top: host.top, left: place.left, width: place.width, height: host.height, between: false });
+      } else setLanding({ top: bestY - 2, left: place.left, width: place.width, height: 4, between: true });
+    };
+    // near the note's top or bottom edge the note scrolls along
+    const tick = (): void => {
+      frame = 0;
+      if (!scroller) return;
+      const box = scroller.getBoundingClientRect();
+      const step = y < box.top + EDGE ? -EDGE_SPEED * (1 - Math.max(0, y - box.top) / EDGE) : y > box.bottom - EDGE ? EDGE_SPEED * (1 - Math.max(0, box.bottom - y) / EDGE) : 0;
+      if (!step) return;
+      scroller.scrollTop += step;
+      measure();
+      frame = requestAnimationFrame(tick);
+    };
+    const move = (ev: PointerEvent): void => {
+      x = ev.clientX;
+      y = ev.clientY;
+      measure();
+      if (!frame) frame = requestAnimationFrame(tick);
+    };
+    const finish = (keep: boolean): void => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("keydown", key, true);
+      scroller?.removeEventListener("scroll", measure);
+      cancelAnimationFrame(frame);
+      setLanding(null);
+      if (keep && (to !== null || aim !== side)) onPlace(to, aim);
+    };
+    const up = (): void => finish(true);
+    const cancel = (): void => finish(false);
+    // Escape puts it down where it was
+    const key = (ev: KeyboardEvent): void => {
+      if (ev.key !== "Escape") return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      finish(false);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("keydown", key, true);
+    scroller?.addEventListener("scroll", measure);
+    measure();
+  };
+
+  // Up and Down move it past the line before or after it; Left and Right move
+  // it to that side of its own line, through the middle.
+  const moveKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!onPlace) return;
+    const here = lines();
+    if (!here) return;
+    const { all, at } = here;
+    const blank = (el: HTMLElement | undefined) => el?.dataset["b"] === "p" && el.hasAttribute("data-empty");
+    const was = sideNow.current;
+    let to: number | null = null;
+    let next = was;
+    if (e.key === "ArrowUp") {
+      if (at === 0) return;
+      to = at - 1;
+    } else if (e.key === "ArrowDown") {
+      // the empty line that follows a file is stepped over with it
+      const past = blank(all[at + 1]) && all[at + 2] ? at + 3 : at + 2;
+      if (past > all.length) return;
+      to = past;
+    } else if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && shown < 100) {
+      const order: (FileAlign | null)[] = ["left", null, "right"];
+      next = order[Math.max(0, Math.min(2, order.indexOf(was) + (e.key === "ArrowLeft" ? -1 : 1)))] ?? null;
+      if (next === was) return;
+    } else return;
+    e.preventDefault();
+    onPlace(to, next);
+    sideNow.current = next;
+    // the editor puts its caret after the file; the keyboard stays on the handle
+    handle.current?.focus({ preventScroll: true });
+    requestAnimationFrame(() => handle.current?.focus({ preventScroll: true }));
+  };
 
   /** The line the file sits on: its width is what a percentage is of. */
   const line = (): HTMLElement | null => root.current?.closest<HTMLElement>("[data-b='file'], [data-note-file-line]") ?? null;
@@ -145,7 +320,7 @@ export function NoteFile({ meta, name, pending, onRemove, onRetry, width = 100, 
     );
   }
   return (
-    <div ref={root} className={s.file} data-testid="note-file" data-visual={visual || undefined} data-resizing={live !== null || undefined} data-state={meta ? "ready" : pending ? (pending.error ? "failed" : "uploading") : "missing"}>
+    <div ref={root} className={s.file} data-testid="note-file" data-visual={visual || undefined} data-resizing={live !== null || undefined} data-moving={landing ? "" : undefined} data-align={visual ? (side ?? undefined) : undefined} data-state={meta ? "ready" : pending ? (pending.error ? "failed" : "uploading") : "missing"}>
       {body}
       {resizable
         ? (["start", "end"] as const).map((side) => (
@@ -167,8 +342,30 @@ export function NoteFile({ meta, name, pending, onRemove, onRetry, width = 100, 
           ))
         : null}
       {live !== null ? <span className={s.fileSize} aria-hidden="true">{live}%</span> : null}
-      {resizable || onRemove ? (
+      {landing
+        ? createPortal(<div className={s.landing} data-between={landing.between || undefined} style={{ top: landing.top, left: landing.left, width: landing.width, height: landing.height }} aria-hidden="true" />, document.body)
+        : null}
+      {resizable || onRemove || movable ? (
         <div className={s.fileBar} role="toolbar" aria-label={t("notes.file.tools", { name })} onMouseDown={(e) => e.preventDefault()}>
+          {movable ? (
+            <>
+              <button
+                ref={handle}
+                type="button"
+                className={s.fileMove}
+                aria-label={t("notes.file.move", { name })}
+                aria-description={shown < 100 ? t("notes.file.moveHint") : t("notes.file.moveHintFull")}
+                title={t("notes.file.moveShort")}
+                onPointerDown={startMove}
+                onKeyDown={moveKey}
+                data-testid="note-file-move"
+              >
+                <GripVertical size={16} aria-hidden="true" />
+                <span className={s.sizeWord} aria-hidden="true">{t("notes.file.moveShort")}</span>
+              </button>
+              {resizable ? <span className={s.fileBarRule} aria-hidden="true" /> : null}
+            </>
+          ) : null}
           {resizable
             ? SIZES.map((size) => (
                 <button key={size.width} type="button" className={s.fileBarSize} aria-pressed={shown === size.width} aria-label={size.label()} onClick={() => onResize?.(size.width)} data-testid={`note-file-size-${size.width}`}>
@@ -189,10 +386,10 @@ export function NoteFile({ meta, name, pending, onRemove, onRetry, width = 100, 
   );
 }
 
-/** The line a file sits on in a note that is only read: as wide as the note says for a picture, centred. */
-export function NoteFileLine({ width, children }: { width?: number | undefined; children: React.ReactNode }) {
+/** The line a file sits on in a note that is only read: as wide as the note says for a picture, in the middle or on the side it says. */
+export function NoteFileLine({ width, align, children }: { width?: number | undefined; align?: FileAlign | undefined; children: React.ReactNode }) {
   return (
-    <div className={s.fileLine} data-note-file-line="" style={width && width < 100 ? ({ "--file-w": `${width}%` } as React.CSSProperties) : undefined}>
+    <div className={s.fileLine} data-note-file-line="" data-align={width && width < 100 ? align : undefined} style={width && width < 100 ? ({ "--file-w": `${width}%` } as React.CSSProperties) : undefined}>
       {children}
     </div>
   );

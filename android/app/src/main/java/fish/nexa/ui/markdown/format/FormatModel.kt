@@ -162,7 +162,7 @@ data class TableBlock(override val id: Int, override val wrap: Wrap?, val align:
 }
 
 /** A file a note holds, where it sits in the text; `width` is how much of the line a picture takes, in percent. */
-data class FileBlock(override val id: Int, override val wrap: Wrap?, val file: String, val name: String, val width: Int? = null) : Block() {
+data class FileBlock(override val id: Int, override val wrap: Wrap?, val file: String, val name: String, val width: Int? = null, val align: String? = null) : Block() {
     override val kind: String get() = "file"
 }
 

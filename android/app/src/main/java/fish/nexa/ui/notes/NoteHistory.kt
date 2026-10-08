@@ -292,7 +292,7 @@ private fun VersionView(doc: NoteDoc, note: String) {
             bodyPx = 16.5f,
             bodyLine = 28f,
             gap = 6.6.dp,
-            renderFile = { id, name, width -> Box(Modifier.fillMaxWidth().padding(vertical = 16.dp)) { NoteFileView(doc.files[id], name, null, width) } },
+            renderFile = { id, name, width, align -> Box(Modifier.fillMaxWidth().padding(vertical = 16.dp)) { NoteFileView(doc.files[id], name, null, width, align) } },
         )
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {

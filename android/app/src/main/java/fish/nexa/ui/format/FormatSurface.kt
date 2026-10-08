@@ -65,6 +65,13 @@ sealed interface Cmd {
     data class File(val file: String, val name: String) : Cmd
     /** How much of the line a note's picture takes, in percent. */
     data class FileWidth(val id: Int, val width: Int) : Cmd
+    /**
+     * Puts a note's file somewhere else and on a side of its line (surface.ts
+     * placeFile): `to` is the gap between blocks it goes in (0 before the
+     * first, the block count after the last), null to leave it where it is;
+     * `align` is "left", "right" or null for the middle.
+     */
+    data class PlaceFile(val id: Int, val to: Int?, val align: String?) : Cmd
     /** Takes a block out: a file, from its own remove button. */
     data class RemoveBlock(val id: Int) : Cmd
     /** Puts a mention of someone in place of the `replace` characters before the caret (the "@name" typed so far), and a space after it. */
@@ -913,6 +920,35 @@ class FormatSurface(
                 val out = blocks.toMutableList()
                 out[at] = file.copy(width = width)
                 apply(out, sel)
+            }
+            is Cmd.PlaceFile -> {
+                val at = blocks.indexOfFirst { it.id == cmd.id }
+                val file = blocks.getOrNull(at) as? FileBlock ?: return
+                val align = fish.nexa.ui.markdown.Markdown.fileAlign(cmd.align)
+                // its own gaps, before it and after it, leave it where it is
+                val to = if (cmd.to == null || cmd.to == at + 1) at else cmd.to.coerceIn(0, blocks.size)
+                if (to == at && align == file.align) return
+                val out = blocks.toMutableList()
+                if (to == at) {
+                    out[at] = file.copy(align = align)
+                    apply(out, sel)
+                    return
+                }
+                // it takes the wrap of the lines it goes between, as a file put in there would (never a quote's)
+                val before = blocks.getOrNull(to - 1)
+                val after = blocks.getOrNull(to)
+                val wrap = if (before != null && after != null && before.wrap == after.wrap && before.wrap != Wrap.QUOTE) before.wrap else null
+                val placed = file.copy(align = align, wrap = wrap)
+                // the empty line put after it to carry on typing goes with it, when text is left on both sides of where it was
+                val left = blocks.getOrNull(at + 1)
+                val spare = left?.takeIf { it is TextBlock && it.textKind == TextKind.P && it.content.isEmpty() && blocks.getOrNull(at - 1) is TextBlock && blocks.getOrNull(at + 2) != null && to != at + 2 }
+                out.removeAt(at)
+                out.add(if (to > at) to - 1 else to, placed)
+                if (spare != null) out.removeAt(out.indexOfFirst { it === spare })
+                val now = out.indexOfFirst { it === placed }
+                // there is always a line to carry on typing after it
+                if (out.getOrNull(now + 1) !is TextBlock) out.add(now + 1, FormatModel.textBlock(TextKind.P, emptyList(), wrap))
+                apply(out, FormatModel.caret(now + 1, 0))
             }
             is Cmd.RemoveBlock -> {
                 val at = blocks.indexOfFirst { it.id == cmd.id }

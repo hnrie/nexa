@@ -27,8 +27,8 @@ export type Node =
    * note's text is parsed with these on (`files`); in a message the same
    * characters are the words they look like.
    */
-  /** A note's file on a line of its own; `width` is how much of the line a picture takes, in percent, when not all of it. */
-  | { type: "file"; id: string; name: string; width?: number }
+  /** A note's file on a line of its own; `width` is how much of the line a picture takes, in percent, when not all of it, and `align` the side it keeps to. */
+  | { type: "file"; id: string; name: string; width?: number; align?: "left" | "right" }
   /** `head` is the header row's cells; every row has exactly `align.length` cells. */
   | { type: "table"; align: Align[]; head: Node[][]; rows: Node[][][] }
   | { type: "alert"; kind: AlertKind; children: Node[] }
@@ -65,5 +65,5 @@ export interface RenderCtx {
   inert?: boolean;
   /** Draws a note's file where the text has it; without it the file's name stands in. */
   /** Draws a note's file where its text has it; `width` is the share of the line a picture takes, in percent, when not all of it. */
-  renderFile?: (id: string, name: string, width?: number) => import("react").ReactNode;
+  renderFile?: (id: string, name: string, width?: number, align?: "left" | "right") => import("react").ReactNode;
 }

@@ -129,10 +129,13 @@ class ParseVectorsTest {
         val cases = Vectors["files"].jsonArray.map { it.jsonObject }
         Vectors.expectAll("fileLine / fileWidth", cases) { c ->
             val width = c["width"]!!.jsonPrimitive.contentOrNull?.toDouble()
-            val line = Markdown.fileLine(str(c, "id"), str(c, "name"), width)
+            val align = c["align"]?.jsonPrimitive?.contentOrNull
+            val line = Markdown.fileLine(str(c, "id"), str(c, "name"), width, align)
             val w = Markdown.fileWidth(width)
+            val a = Markdown.fileAlign(align)
             val wantW = c["w"]!!.jsonPrimitive.contentOrNull?.toDouble()?.toInt()
-            if (line == str(c, "line") && w == wantW) null else "file $c: kotlin line ${Vectors.show(line)} width $w"
+            val wantA = c["a"]?.jsonPrimitive?.contentOrNull
+            if (line == str(c, "line") && w == wantW && a == wantA) null else "file $c: kotlin line ${Vectors.show(line)} width $w align $a"
         }
     }
 

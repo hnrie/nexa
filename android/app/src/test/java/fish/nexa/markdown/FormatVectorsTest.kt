@@ -119,6 +119,7 @@ class FormatVectorsTest {
                 put("file", b.file)
                 put("name", b.name)
                 b.width?.let { put("width", it) }
+                b.align?.let { put("align", it) }
             }
         }
     }

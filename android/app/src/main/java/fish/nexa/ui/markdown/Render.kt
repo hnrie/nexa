@@ -108,7 +108,7 @@ data class RenderCtx(
     /** A note: files on lines of their own (drawn by `renderFile`), as much text as a note holds, and its longer-form type. */
     val files: Boolean = false,
     val max: Int = 0,
-    val renderFile: (@Composable (id: String, name: String, width: Int?) -> Unit)? = null,
+    val renderFile: (@Composable (id: String, name: String, width: Int?, align: String?) -> Unit)? = null,
     val bodyPx: Float = 16f,
     val bodyLine: Float = 22f,
     /** Space between the top-level blocks (a note's paragraphs stand a little apart). */
@@ -214,7 +214,7 @@ private fun Block(b: Node, ctx: RenderCtx, jumbo: Boolean, first: Boolean, edite
         is Node.Alert -> AlertView(b, ctx)
         is Node.Details -> DetailsView(b, ctx)
         is Node.Footnotes -> FootnotesView(b, ctx)
-        is Node.File -> ctx.renderFile?.invoke(b.id, b.name, b.width) ?: InlineText(listOf(Node.Text(b.name)), ctx, base, false)
+        is Node.File -> ctx.renderFile?.invoke(b.id, b.name, b.width, b.align) ?: InlineText(listOf(Node.Text(b.name)), ctx, base, false)
         else -> InlineText(listOf(b), ctx, base, jumbo, edited = edited)
     }
 }

@@ -129,6 +129,7 @@ object Vectors {
                 put("id", n.id)
                 put("name", n.name)
                 n.width?.let { put("width", it) }
+                n.align?.let { put("align", it) }
             }
             is Node.Table -> {
                 put("align", buildJsonArray { for (a in n.align) add(a?.let { JsonPrimitive(it.key) } ?: JsonNull) })

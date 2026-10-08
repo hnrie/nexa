@@ -233,6 +233,48 @@ describe("a note on the writing surface", () => {
     expect(note.markdown()).toBe("one\n![a.png](nexa-file:a)\n![b.png](nexa-file:b)\ntwo");
   });
 
+  it("keeps a picture's width and side through the note's text", () => {
+    for (const line of ["![a.png](nexa-file:a?w=60&a=left)", "![a.png](nexa-file:a?w=40&a=right)", "![a.png](nexa-file:a?a=right)", "![a.png](nexa-file:a?w=60)"]) {
+      note.load(`x\n${line}\ny`);
+      expect(note.markdown()).toBe(`x\n${line}\ny`);
+    }
+    note.load("x\n![a.png](nexa-file:a?w=60&a=left)\ny");
+    expect(files[0]).toMatchObject({ width: 60, align: "left" });
+    expect((page.children[1] as HTMLElement).dataset["align"]).toBe("left");
+    // a side it does not know is the middle, and so is the wrong order
+    note.load("![a.png](nexa-file:a?w=60&a=up)");
+    expect([...page.children].map((c) => (c as HTMLElement).dataset["b"])).toEqual(["p"]);
+    note.load("![a.png](nexa-file:a?a=left&w=60)");
+    expect([...page.children].map((c) => (c as HTMLElement).dataset["b"])).toEqual(["p"]);
+  });
+
+  it("moves a file between other lines, and to a side of its own, in one undo step each", () => {
+    note.load("one\n![a.png](nexa-file:a?w=50)\n\ntwo\nthree");
+    const key = files[0]!.key;
+    // after "two": the empty line left behind goes with it
+    note.command({ t: "placeFile", key, to: 4, align: null });
+    expect(note.markdown()).toBe("one\ntwo\n![a.png](nexa-file:a?w=50)\nthree");
+    // to the very top, onto the left of its line
+    note.command({ t: "placeFile", key, to: 0, align: "left" });
+    expect(note.markdown()).toBe("![a.png](nexa-file:a?w=50&a=left)\none\ntwo\nthree");
+    // staying put on another side
+    note.command({ t: "placeFile", key, to: null, align: "right" });
+    expect(note.markdown()).toBe("![a.png](nexa-file:a?w=50&a=right)\none\ntwo\nthree");
+    // its own gaps change nothing
+    note.command({ t: "placeFile", key, to: 1, align: "right" });
+    expect(note.markdown()).toBe("![a.png](nexa-file:a?w=50&a=right)\none\ntwo\nthree");
+    // to the end: a line follows it to carry on typing
+    note.command({ t: "placeFile", key, to: 4, align: null });
+    expect(note.markdown()).toBe("one\ntwo\nthree\n![a.png](nexa-file:a?w=50)");
+    expect([...page.children].map((c) => (c as HTMLElement).dataset["b"]).at(-1)).toBe("p");
+    note.command({ t: "undo" });
+    expect(note.markdown()).toBe("![a.png](nexa-file:a?w=50&a=right)\none\ntwo\nthree");
+    note.command({ t: "undo" });
+    note.command({ t: "undo" });
+    note.command({ t: "undo" });
+    expect(note.markdown()).toBe("one\n![a.png](nexa-file:a?w=50)\n\ntwo\nthree");
+  });
+
   it("leaves keys pressed on what the editor draws in a file frame to it", () => {
     note.load("one\n![a.png](nexa-file:a)\ntwo");
     const button = document.createElement("button");
