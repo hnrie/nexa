@@ -6327,6 +6327,7 @@
     "other": "{count} संदेश"
   },
   "toasts.warning": "चेतावनी",
+  "voice.callTimer.label": "कॉल {length} से चल रही है",
   "voice.moderation.deafenedByModerator": "एक मॉडरेटर ने आवाज़ बंद की है",
   "voice.moderation.deafenedHint": "एक मॉडरेटर ने इस सर्वर में आपकी आवाज़ बंद की है। वे इसे हटाएँगे तो आप कॉल फिर से सुन पाएँगे।",
   "voice.moderation.disconnect": "कॉल से हटाएँ",
@@ -6384,5 +6385,7 @@
   "whatsNew.r20261008.seasonalBody": "हैलोवीन और पतझड़ अपने मौसम तक सेटिंग्स, रूप-रंग में हैं, हर एक के साथ मैसेज बॉक्स पर कुछ छोटा सा बैठा है। सर्दी, वसंत और बाकी अपने मौसम के साथ आएँगी।",
   "whatsNew.r20261008.seasonalTitle": "मौसमी थीम",
   "whatsNew.r20261008.swedishBody": "Nexa अब स्वीडिश बोलता है। सेटिंग्स, भाषा में Svenska चुनें।",
-  "whatsNew.r20261008.swedishTitle": "स्वीडिश में Nexa"
+  "whatsNew.r20261008.swedishTitle": "स्वीडिश में Nexa",
+  "whatsNew.r202610082.callTimersBody": "देखें कि कॉल कितनी देर से चल रही है: कॉल में ही, «आवाज़ जुड़ी» पैनल में, व्यस्त वॉइस चैनलों के बगल में और उस कॉल के बैनर पर जिसमें आप शामिल नहीं हुए।",
+  "whatsNew.r202610082.callTimersTitle": "कॉल टाइमर"
 }

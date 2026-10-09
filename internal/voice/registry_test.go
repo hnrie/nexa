@@ -186,6 +186,47 @@ func TestTogglingKeepsYourPlaceInTheCall(t *testing.T) {
 	}
 }
 
+// A call's start belongs to the channel: it outlives whoever started the call,
+// survives toggles and a dropped connection, and starts again once the channel
+// has emptied.
+func TestCallSinceBelongsToTheChannel(t *testing.T) {
+	r := New()
+	a, b, ch := ids.ID(1), ids.ID(2), ids.ID(10)
+	r.Join(State{UserID: a, ChannelID: ch, ConnID: 1}, false)
+	start := r.since[ch]
+	if st, _ := r.Get(a); start == 0 || st.CallSince != start {
+		t.Fatalf("first join: since %d, state %+v", start, st)
+	}
+	// pretend the call began long ago, so a fresh start would show
+	r.since[ch] = 1000
+	r.Join(State{UserID: b, ChannelID: ch, ConnID: 2}, false)
+	if st, _ := r.Get(b); st.CallSince != 1000 {
+		t.Errorf("second join: %d", st.CallSince)
+	}
+	r.Leave(a)
+	r.Join(State{UserID: b, ChannelID: ch, ConnID: 2, SelfMute: true}, false)
+	if st, _ := r.Get(b); st.CallSince != 1000 {
+		t.Errorf("alone after a toggle: %d", st.CallSince)
+	}
+	r.Detach(b, 2)
+	r.Resume(b, 0, "", 3)
+	if st, _ := r.Get(b); st.CallSince != 1000 {
+		t.Errorf("after a drop: %d", st.CallSince)
+	}
+	r.Leave(b)
+	if _, ok := r.since[ch]; ok {
+		t.Error("an empty channel kept its call")
+	}
+	r.Join(State{UserID: a, ChannelID: ch, ConnID: 1}, false)
+	if st, _ := r.Get(a); st.CallSince == 1000 || st.CallSince == 0 {
+		t.Errorf("a new call: %d", st.CallSince)
+	}
+	r.ClearChannel(ch)
+	if _, ok := r.since[ch]; ok {
+		t.Error("a cleared channel kept its call")
+	}
+}
+
 // Putting someone out of a channel does not depend on which of their
 // connections holds the call.
 func TestLeaveChannelWhateverTheConnection(t *testing.T) {

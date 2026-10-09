@@ -6,6 +6,7 @@ import { ApiError } from "@/api/client";
 import { servers as serversApi, type ChannelPositionPatch } from "@/api/servers";
 import { bannerUrl } from "@/api/users";
 import { ChannelGlyph } from "@/components/common/ChannelGlyph";
+import { CallTimer } from "@/components/voice/CallTimer";
 import { VoiceParticipants } from "@/components/voice/VoiceParticipants";
 import { moveMember, moveTargets } from "@/components/voice/voiceModeration";
 import { joinVoice } from "@/voice/session";
@@ -321,6 +322,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
           {/* The dot and the count sit outside the button, so the button said
               nothing about either; they are said as part of its name now. */}
           {mentions > 0 ? <span className="visually-hidden">{`, ${t("sidebar.serverSidebar.mentionsCount", { count: mentions })}`}</span> : unread && !selected ? <span className="visually-hidden">{`, ${t("sidebar.serverSidebar.unread")}`}</span> : null}
+          {ch.type === "voice" ? <CallTimer channelId={ch.id} pill className={s.callTimer} /> : null}
           {ch.type === "voice" && ch.user_limit > 0 ? <span className={s.limit}>{Object.keys(voiceByChannel[ch.id] ?? {}).length}/{ch.user_limit}</span> : null}
         </button>
         <span className={s.actions}>

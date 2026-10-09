@@ -140,6 +140,8 @@ fun VoiceStatus() {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Icon(if (calling) "PhoneOutgoing" else "Signal", headColor, size = 14.dp)
                     Txt(head, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(15.6f)), color = headColor, maxLines = 1)
+                    // nobody has picked up while it rings, so there is nothing to count yet
+                    mine?.channelId?.takeIf { !calling }?.let { CallTimer(it) }
                 }
                 val interaction = remember { MutableInteractionSource() }
                 Txt(
@@ -262,7 +264,10 @@ fun CallBanner(channelId: String, modifier: Modifier = Modifier) {
                 Box(Modifier.width((28 + 22 * (minOf(5, others.size) - 1)).dp).height(28.dp))
             }
             Column(Modifier.weight(1f)) {
-                Txt(t("voice.callBanner.callInProgress"), style = Nx.type.bodySmall.copy(fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Txt(t("voice.callBanner.callInProgress"), Modifier.weight(1f, fill = false), style = Nx.type.bodySmall.copy(fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
+                    CallTimer(channelId, pill = true)
+                }
                 Txt(others.joinToString(", ") { callName(it.userId, channelId) }, style = Nx.type.hint, color = c.textMuted, maxLines = 1)
             }
             val interaction = remember { MutableInteractionSource() }

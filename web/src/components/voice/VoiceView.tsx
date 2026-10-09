@@ -29,6 +29,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { UserTag } from "@/components/servertag/UserTag";
 import { openDeviceMenu as openDeviceMenuAt } from "./deviceMenus";
 import { callTileMenu } from "./callMenus";
+import { CallTimer } from "./CallTimer";
 import { HangUp } from "./HangUp";
 import { Tooltip } from "@/components/common/Tooltip";
 import { useIsMobile, useMediaQuery } from "@/hooks/useIsMobile";
@@ -923,6 +924,12 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           </div>
         )}
       </div>
+      {/* a narrow call has no side to the controls, so the time sits centred above them */}
+      {compact && !calling ? (
+        <div className={s.timerRow}>
+          <CallTimer channelId={channel.id} />
+        </div>
+      ) : null}
       {ptt ? (
         <div className={s.pttRow}>
           <HoldToTalk />
@@ -937,6 +944,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
               {quality ? formatRtt(quality.rtt) : "…"}
             </span>
           ) : null}
+          {/* while it still rings nobody has picked up, so there is nothing to count */}
+          {calling ? null : <CallTimer channelId={channel.id} className={s.viewTimer} />}
         </div>
         <div className={s.controlsMain}>
           <ControlButton label={modMute ? tr_("voice.moderation.mutedByModerator") : micBlocked ? tr_("voice.voice.microphoneBlockedTryAgain") : muted ? tr_("voice.voice.unmute") : tr_("voice.voice.mute")} keys={micBlocked || modMute ? undefined : bindText(binds.mute)} off={muted || micBlocked || modMute} onClick={modMute ? () => useUI.getState().toast(tr_("voice.moderation.mutedHint")) : micBlocked ? () => void retryMic() : toggleMute} testId="voice-mute" menu={{ label: tr_("voice.voice.microphoneOptions"), open: (r) => void openDeviceMenu("mic", r), testId: "mic-menu" }}>{muted || micBlocked || modMute ? <MicOff size={22} /> : <Mic size={22} />}</ControlButton>

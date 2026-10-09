@@ -14,6 +14,7 @@ import { useVoice } from "@/stores/voice";
 import { canShareScreen } from "@/voice/media";
 import { noiseModeLabel } from "@/voice/noiseMode";
 import { leaveVoice, toggleCamera, toggleScreen } from "@/voice/session";
+import { CallTimer } from "./CallTimer";
 import { HangUp } from "./HangUp";
 import s from "./Voice.module.css";
 import { noiseMenu, openDeviceMenu } from "./deviceMenus";
@@ -66,6 +67,8 @@ export function VoiceStatus() {
         <div className={s.statusText}>
           <span className={s.statusHead} data-level={level} data-connecting={!mine || calling || connection === "connecting"} data-testid="voice-status-head">
             {calling ? <PhoneOutgoing size={14} /> : <Signal size={14} />} {head}
+            {/* nobody has picked up while it rings, so there is nothing to count yet */}
+            {mine?.channel_id && !calling ? <CallTimer channelId={mine.channel_id} className={s.statusTimer} /> : null}
           </span>
           <span className={s.statusSub} onClick={go} title={where}>{where}</span>
         </div>

@@ -6102,6 +6102,7 @@
     "other": "{count} 件のメッセージ"
   },
   "toasts.warning": "警告",
+  "voice.callTimer.label": "通話時間 {length}",
   "voice.moderation.deafenedByModerator": "モデレーターがスピーカーミュート中",
   "voice.moderation.deafenedHint": "このサーバーでモデレーターにスピーカーミュートされています。解除されると、また通話が聞こえます。",
   "voice.moderation.disconnect": "切断",
@@ -6159,5 +6160,7 @@
   "whatsNew.r20261008.seasonalBody": "ハロウィンと秋のテーマが、季節の間だけ設定の外観にあります。どちらもメッセージ欄の上に小さな飾りが乗ります。冬や春なども季節に合わせて登場します。",
   "whatsNew.r20261008.seasonalTitle": "季節のテーマ",
   "whatsNew.r20261008.swedishBody": "Nexa がスウェーデン語に対応しました。設定の言語で Svenska を選んでください。",
-  "whatsNew.r20261008.swedishTitle": "スウェーデン語の Nexa"
+  "whatsNew.r20261008.swedishTitle": "スウェーデン語の Nexa",
+  "whatsNew.r202610082.callTimersBody": "通話が続いている時間を確認できます。通話画面、「音声接続中」パネル、使用中のボイスチャンネルの横、まだ参加していない通話のバナーに表示されます。",
+  "whatsNew.r202610082.callTimersTitle": "通話タイマー"
 }

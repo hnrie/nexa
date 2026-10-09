@@ -6429,6 +6429,7 @@
     "other": "{count} mensagens"
   },
   "toasts.warning": "Aviso",
+  "voice.callTimer.label": "Chamada em andamento há {length}",
   "voice.moderation.deafenedByModerator": "Ensurdecido por um moderador",
   "voice.moderation.deafenedHint": "Um moderador ensurdeceu você neste servidor. Você vai ouvir a chamada de novo quando ele desfizer isso.",
   "voice.moderation.disconnect": "Desconectar",
@@ -6486,5 +6487,7 @@
   "whatsNew.r20261008.seasonalBody": "Halloween e Outono estão em Configurações, Aparência enquanto durar a estação, cada um com algo pequeno sobre a caixa de mensagem. Inverno, Primavera e outros chegam com a sua estação.",
   "whatsNew.r20261008.seasonalTitle": "Temas da estação",
   "whatsNew.r20261008.swedishBody": "O Nexa agora fala sueco. Escolha Svenska em Configurações, Idioma.",
-  "whatsNew.r20261008.swedishTitle": "Nexa em sueco"
+  "whatsNew.r20261008.swedishTitle": "Nexa em sueco",
+  "whatsNew.r202610082.callTimersBody": "Veja há quanto tempo uma chamada está rolando: na própria chamada, no painel Voz conectada, ao lado dos canais de voz ocupados e no aviso de uma chamada em que você não entrou.",
+  "whatsNew.r202610082.callTimersTitle": "Cronômetros de chamada"
 }

@@ -7137,6 +7137,7 @@
     "other": "{count} رسالة"
   },
   "toasts.warning": "تحذير",
+  "voice.callTimer.label": "المكالمة جارية منذ {length}",
   "voice.moderation.deafenedByModerator": "كتم مشرفٌ السماع عنك",
   "voice.moderation.deafenedHint": "كتم مشرفٌ السماع عنك في هذا الخادم. ستسمع المكالمة مجددًا حين يلغي ذلك.",
   "voice.moderation.disconnect": "قطع الاتصال",
@@ -7194,5 +7195,7 @@
   "whatsNew.r20261008.seasonalBody": "سمتا الهالوين والخريف موجودتان في الإعدادات، المظهر طوال موسميهما، ومع كل منهما شيء صغير فوق مربع الرسائل. والشتاء والربيع وغيرهما تأتي مع مواسمها.",
   "whatsNew.r20261008.seasonalTitle": "سمات موسمية",
   "whatsNew.r20261008.swedishBody": "أصبح Nexa يتحدث السويدية. اختر Svenska في الإعدادات، اللغة.",
-  "whatsNew.r20261008.swedishTitle": "Nexa بالسويدية"
+  "whatsNew.r20261008.swedishTitle": "Nexa بالسويدية",
+  "whatsNew.r202610082.callTimersBody": "اعرف منذ متى تجري المكالمة: داخل المكالمة نفسها، وفي لوحة «الصوت متصل»، وبجانب القنوات الصوتية المشغولة، وعلى شريط المكالمة التي لم تنضم إليها.",
+  "whatsNew.r202610082.callTimersTitle": "مؤقتات المكالمات"
 }

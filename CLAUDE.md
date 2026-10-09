@@ -366,7 +366,9 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
 - One WebSocket at `GET /gateway`. The client sends `{op, d}`, the server `{t, s, d}`. The first
   frame is `identify` with the token, answered by `ready`: `session_id`, `user`, `users`,
   `channels`, `relationships`, `read_states`, `presences`, `key_grants`, `settings`, `servers`,
-  `emojis`, `sticker_packs`, `voice_states`, `group_add_notices`, `guest`, `nexa`.
+  `emojis`, `sticker_packs`, `voice_states`, `group_add_notices`, `guest`, `nexa`, and `now` (the
+  server's clock as it went out; web `lib/serverClock.ts` and Android `data/ServerClock` keep how
+  far the device's clock is off, for running clocks of server times).
 - Client ops: `identify`, `heartbeat` (every 25 s, answered by `heartbeat_ack`), `presence`,
   `typing`, `voice_state`, `voice_signal`, `subscribe_members`, `activities` (the desktop app's
   Rich Presence), `away`, `note_cursor`. The server also pings every 12 s at the protocol level.
@@ -471,6 +473,18 @@ goes through Cloudflare's SFU, with chatd as its signalling proxy (`/api/v1/voic
 who may pull which track. The usage meter pauses video near `REALTIME_MONTHLY_GB` and stops calls
 just short of it. A call through the SFU outlives a dropped socket for `voiceGrace`. Guest links let
 someone without an account into one call. Frames are encrypted in the apps.
+
+Call timers: the registry keeps when each channel went from empty to occupied and stamps it on
+every voice state as `call_since` (the same for everyone in the call, kept when the person who
+started it leaves, gone once the channel empties). The apps count from it, through the server
+clock offset, falling back to the earliest `joined_at` on a server without it (web
+`lib/callTimer.ts` and `components/voice/CallTimer.tsx`, Android `data/CallTimer` and
+`ui/voice/CallTimer.kt`, both ticking once a second). The time shows after "Voice Connected", in
+the call view (beside the quality on a wide call, centred above the controls on a narrow one and
+on Android), as a tag on an occupied voice channel in the sidebar (making way on the web for the
+row's hover buttons) and on the banner of a call this device is not in. Nothing counts while a
+call rings, and the time holds still while this device's call is reconnecting. Android's call
+notification's chronometer runs from the same start.
 
 Moderators act on people in a server's voice channels with `PATCH /servers/{id}/members/{uid}/voice`
 (`mute`, `deaf`, `channel_id`, null to disconnect), checked against the permissions in the channel

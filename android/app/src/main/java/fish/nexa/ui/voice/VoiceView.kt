@@ -385,6 +385,10 @@ private fun Stage(channelId: String, state: CallState, byUser: Map<String, Voice
                 }
             }
         }
+        // the call's time, centred above the controls as on the web's narrow call; nothing to count while it rings
+        if (state.calling != channelId) {
+            Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 6.dp), contentAlignment = Alignment.Center) { CallTimer(channelId) }
+        }
         if (ptt) HoldToTalk(state.pttHeld)
         Controls(channelId, state, local.muted, local.deafened, embedded, full)
         if (embedded && !full) Spacer(Modifier.height(24.dp)) else Spacer(Modifier.navigationBarsPadding())

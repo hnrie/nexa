@@ -6428,6 +6428,7 @@
     "other": "{count} messages"
   },
   "toasts.warning": "Avertissement",
+  "voice.callTimer.label": "Appel en cours depuis {length}",
   "voice.moderation.deafenedByModerator": "Rendu sourd par un modérateur",
   "voice.moderation.deafenedHint": "Un modérateur vous a rendu sourd sur ce serveur. Vous entendrez de nouveau l’appel dès qu’il l’annulera.",
   "voice.moderation.disconnect": "Déconnecter",
@@ -6485,5 +6486,7 @@
   "whatsNew.r20261008.seasonalBody": "Halloween et Automne sont dans Paramètres, Apparence le temps de leur saison, chacun avec un petit quelque chose posé sur la zone de message. Hiver, Printemps et d'autres arriveront avec leur saison.",
   "whatsNew.r20261008.seasonalTitle": "Thèmes de saison",
   "whatsNew.r20261008.swedishBody": "Nexa parle maintenant suédois. Choisis Svenska dans Paramètres, Langue.",
-  "whatsNew.r20261008.swedishTitle": "Nexa en suédois"
+  "whatsNew.r20261008.swedishTitle": "Nexa en suédois",
+  "whatsNew.r202610082.callTimersBody": "Voyez depuis combien de temps dure un appel : dans l'appel lui-même, dans le panneau Vocal connecté, à côté des salons vocaux occupés et sur la bannière d'un appel que vous n'avez pas rejoint.",
+  "whatsNew.r202610082.callTimersTitle": "Minuteurs d'appel"
 }

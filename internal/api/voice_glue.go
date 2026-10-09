@@ -47,6 +47,9 @@ type voiceStatePayload struct {
 	// so a moderator's menu does not offer to lift a mute nobody gave.
 	Suppress bool  `json:"suppress,omitempty"`
 	JoinedAt int64 `json:"joined_at"`
+	// CallSince is when the call in this channel began, the same for everyone
+	// in it, so the apps can show how long it has been going.
+	CallSince int64 `json:"call_since,omitempty"`
 	// Media maps the kinds this participant publishes through the SFU to a
 	// tag that changes whenever that track is published again.
 	Media map[string]string `json:"media,omitempty"`
@@ -78,7 +81,7 @@ type guestMark struct {
 
 func statePayload(st voice.State) voiceStatePayload {
 	ch := st.ChannelID
-	out := voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, Suppress: st.Suppress, JoinedAt: st.JoinedAt, Media: st.Tracks.Tags(), Codecs: st.Codecs,
+	out := voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, Suppress: st.Suppress, JoinedAt: st.JoinedAt, CallSince: st.CallSince, Media: st.Tracks.Tags(), Codecs: st.Codecs,
 		User: &callUser{ID: st.UserID, DisplayName: st.Name, AvatarID: st.AvatarID}}
 	if st.Guest {
 		out.User.Flags = store.FlagGuest

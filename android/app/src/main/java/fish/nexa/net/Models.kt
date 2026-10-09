@@ -517,6 +517,8 @@ data class VoiceState(
     /** The channel denies Speak: serverMute is set for that, not for anything a moderator did. */
     val suppress: Boolean = false,
     @SerialName("joined_at") val joinedAt: Long = 0,
+    /** When the call in this channel began, the same for everyone in it (0 from older servers). */
+    @SerialName("call_since") val callSince: Long = 0,
     val media: Map<String, String>? = null,
     /** The video codecs besides VP8 the participant's device can watch: "h264" for a phone's screen share. */
     val codecs: List<String>? = null,
@@ -788,6 +790,8 @@ data class ReadyPayload(
     @SerialName("group_add_notices") val groupAddNotices: List<GroupAddNotice> = emptyList(),
     val guest: GuestInfo? = null,
     val nexa: JsonElement? = null,
+    /** The server's clock as the ready went out (Unix ms), 0 from older servers. */
+    val now: Long = 0,
 )
 
 @Serializable

@@ -22,6 +22,7 @@ import { fetchMissingUsers, useUsers } from "@/stores/users";
 import { decryptForStore, type DecryptedMessage } from "@/lib/decrypt";
 import { appOnScreen } from "@/lib/notify";
 import { readingPresent } from "@/lib/readPosition";
+import { setServerNow } from "@/lib/serverClock";
 import { channels as channelsApi } from "@/api/channels";
 import { ApiError } from "@/api/client";
 import { expressions as expressionsApi } from "@/api/expressions";
@@ -256,6 +257,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
   switch (e.t) {
     case "ready": {
       const d = e.d;
+      setServerNow(d.now);
       // A reconnect re-sends ready. Everything else is rebuilt from the
       // payload, but the conversation on screen keeps its messages, so the
       // reader stays where they were instead of being thrown to the newest
@@ -766,6 +768,7 @@ export async function applyLockedEvent(e: GatewayEvent): Promise<void> {
   const gen = sessionGen;
   switch (e.t) {
     case "ready": {
+      setServerNow(e.d.now);
       const v = await voice();
       if (gen === sessionGen) v.onReadyVoice(e.d.voice_states ?? [], e.d.session_id);
       return;

@@ -6327,6 +6327,7 @@
     "other": "{count} Messages"
   },
   "toasts.warning": "Warning",
+  "voice.callTimer.label": "Call running for {length}",
   "voice.moderation.deafenedByModerator": "Deafened by a moderator",
   "voice.moderation.deafenedHint": "A moderator deafened you in this server. You'll hear the call again once they undeafen you.",
   "voice.moderation.disconnect": "Disconnect",
@@ -6384,5 +6385,7 @@
   "whatsNew.r20261008.seasonalBody": "Halloween and Fall are in Settings, Appearance while their seasons last, each with something small sitting on the message box. Winter, Spring and others arrive with their seasons.",
   "whatsNew.r20261008.seasonalTitle": "Seasonal Themes",
   "whatsNew.r20261008.swedishBody": "Nexa now speaks Swedish. Pick Svenska in Settings, Language.",
-  "whatsNew.r20261008.swedishTitle": "Nexa in Swedish"
+  "whatsNew.r20261008.swedishTitle": "Nexa in Swedish",
+  "whatsNew.r202610082.callTimersBody": "See how long a call has been going: in the call itself, in the Voice Connected panel, beside busy voice channels and on the banner of a call you haven't joined.",
+  "whatsNew.r202610082.callTimersTitle": "Call Timers"
 }

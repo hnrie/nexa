@@ -429,6 +429,8 @@ export interface VoiceState {
   /** The channel denies Speak: server_mute is set for that, not for anything a moderator did. */
   suppress?: boolean;
   joined_at: number;
+  /** When the call in this channel began, the same for everyone in it (absent from older servers). */
+  call_since?: number;
   /**
    * What this participant publishes through the SFU: each kind (audio, video,
    * screen, screen_audio) with a tag that changes when that track is published again.
@@ -847,6 +849,8 @@ export interface ReadyPayload {
   guest?: GuestInfo;
   /** The account's moderation standing. */
   nexa?: NexaState;
+  /** The server's clock as the ready went out (Unix ms), absent from older servers. */
+  now?: number;
 }
 
 /** What a member of a note may do: read it, edit it, or own it. A higher role includes the ones below. */

@@ -6327,6 +6327,7 @@
     "other": "{count} Nachrichten"
   },
   "toasts.warning": "Warnung",
+  "voice.callTimer.label": "Anruf läuft seit {length}",
   "voice.moderation.deafenedByModerator": "Von der Moderation taub gestellt",
   "voice.moderation.deafenedHint": "Die Moderation hat dich auf diesem Server taub gestellt. Du hörst den Anruf wieder, sobald sie das aufhebt.",
   "voice.moderation.disconnect": "Trennen",
@@ -6384,5 +6385,7 @@
   "whatsNew.r20261008.seasonalBody": "Halloween und Herbst findest du in Einstellungen, Erscheinungsbild, solange ihre Saison dauert, jeweils mit etwas Kleinem auf dem Nachrichtenfeld. Winter, Frühling und weitere kommen mit ihrer Saison.",
   "whatsNew.r20261008.seasonalTitle": "Saisonale Designs",
   "whatsNew.r20261008.swedishBody": "Nexa spricht jetzt Schwedisch. Wähle Svenska in Einstellungen, Sprache.",
-  "whatsNew.r20261008.swedishTitle": "Nexa auf Schwedisch"
+  "whatsNew.r20261008.swedishTitle": "Nexa auf Schwedisch",
+  "whatsNew.r202610082.callTimersBody": "Sieh, wie lange ein Anruf schon läuft: im Anruf selbst, im Feld „Sprache verbunden“, neben belegten Sprachkanälen und im Banner eines Anrufs, dem du nicht beigetreten bist.",
+  "whatsNew.r202610082.callTimersTitle": "Anruf-Timer"
 }

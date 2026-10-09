@@ -181,9 +181,11 @@ internal object CallNotifications {
             if (muted) t("voice.voice.unmute") else t("voice.voice.mute"),
             CallService.pending(context, CallActionReceiver.ACTION_MUTE, ch),
         ).build()
-        // how long the call has run, once someone is in it with this device
+        // how long the call has run, as the app's timers count it, once someone is
+        // in it with this device; the chronometer runs on this device's clock
         val mine = st.mine
-        val since = if (mine != null && mine.joinedAt > 0 && st.calling != mine.channelId) mine.joinedAt else null
+        val callStart = mine?.channelId?.let { fish.nexa.data.CallTimer.since(Nexa.voiceStates.byUser.value, it) }
+        val since = if (mine != null && callStart != null && st.calling != mine.channelId) fish.nexa.data.ServerClock.toLocal(callStart) else null
         val b = Notification.Builder(context, CHANNEL_CALLS)
             .setSmallIcon(R.drawable.ic_call)
             .setContentTitle(place)

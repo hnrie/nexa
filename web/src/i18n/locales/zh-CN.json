@@ -6102,6 +6102,7 @@
     "other": "{count} 条消息"
   },
   "toasts.warning": "警告",
+  "voice.callTimer.label": "通话已进行 {length}",
   "voice.moderation.deafenedByModerator": "已被管理员静音收听",
   "voice.moderation.deafenedHint": "管理员在这个服务器里让你静音收听了。解除后你就能再听到通话。",
   "voice.moderation.disconnect": "断开连接",
@@ -6159,5 +6160,7 @@
   "whatsNew.r20261008.seasonalBody": "万圣节和秋天主题在当季可在设置的外观中找到，每个都会在消息框上放一个小装饰。冬天、春天等主题会随季节到来。",
   "whatsNew.r20261008.seasonalTitle": "季节主题",
   "whatsNew.r20261008.swedishBody": "Nexa 现在支持瑞典语。在设置的语言中选择 Svenska。",
-  "whatsNew.r20261008.swedishTitle": "瑞典语版 Nexa"
+  "whatsNew.r20261008.swedishTitle": "瑞典语版 Nexa",
+  "whatsNew.r202610082.callTimersBody": "查看通话已进行多久：在通话界面、“语音已连接”面板、有人的语音频道旁边，以及你尚未加入的通话横幅上。",
+  "whatsNew.r202610082.callTimersTitle": "通话计时"
 }

@@ -398,6 +398,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		c.close(4002, "ready failed")
 		return
 	}
+	ready.Now = time.Now().UnixMilli()
 	c.goLive(ServerFrame{T: EvReady, S: h.nextSeq(), D: ready})
 	// a guest has no presence: nobody lists them anywhere but in the call
 	if first && guest == nil {

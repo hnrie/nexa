@@ -6102,6 +6102,7 @@
     "other": "메시지 {count}개"
   },
   "toasts.warning": "경고",
+  "voice.callTimer.label": "통화 시간 {length}",
   "voice.moderation.deafenedByModerator": "운영자가 소리를 끔",
   "voice.moderation.deafenedHint": "이 서버에서 운영자가 소리를 껐어요. 다시 켜 주면 통화가 들려요.",
   "voice.moderation.disconnect": "연결 끊기",
@@ -6159,5 +6160,7 @@
   "whatsNew.r20261008.seasonalBody": "핼러윈과 가을 테마가 시즌 동안 설정, 모양에 있어요. 메시지 입력창 위에 작은 장식도 함께 올라가요. 겨울, 봄 등은 각자의 시즌에 찾아와요.",
   "whatsNew.r20261008.seasonalTitle": "시즌 테마",
   "whatsNew.r20261008.swedishBody": "Nexa가 이제 스웨덴어를 지원해요. 설정, 언어에서 Svenska를 고르세요.",
-  "whatsNew.r20261008.swedishTitle": "스웨덴어로 쓰는 Nexa"
+  "whatsNew.r20261008.swedishTitle": "스웨덴어로 쓰는 Nexa",
+  "whatsNew.r202610082.callTimersBody": "통화가 얼마나 오래 진행 중인지 확인하세요. 통화 화면, 음성 연결됨 패널, 사용 중인 음성 채널 옆, 아직 참여하지 않은 통화의 배너에 표시돼요.",
+  "whatsNew.r202610082.callTimersTitle": "통화 타이머"
 }

@@ -121,6 +121,8 @@
 .sideBtn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--text-muted); }
 .sideBtn:hover { color: var(--text-strong); background: var(--bg-hover); }
 .quality { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+/* the call's time beside its quality, the two read as one group */
+.quality + .viewTimer { margin-inline-start: 12px; }
 .qualityDot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
 .quality[data-level="good"] .qualityDot { background: var(--positive); }
 .quality[data-level="ok"] .qualityDot { background: var(--warning); }
@@ -151,6 +153,8 @@
 @keyframes statusIn { from { opacity: 0; transform: translateY(6px); } }
 .statusRow { display: flex; align-items: center; gap: 8px; }
 .statusText { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.2; }
+/* the call's time, after "Voice Connected" on the same line, set back from it */
+.statusTimer { margin-inline-start: 4px; }
 .statusHead { font-size: 13px; font-weight: 700; color: var(--status-online); display: flex; align-items: center; gap: 4px; }
 .statusHead[data-level="bad"] { color: var(--text-danger); }
 .statusHead[data-level="ok"] { color: var(--text-warning); }
@@ -190,6 +194,7 @@
 /* DM call banner */
 .banner { flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: linear-gradient(90deg, color-mix(in srgb, var(--positive) 14%, var(--bg-surface)), var(--bg-surface)); border-bottom: 1px solid var(--border-subtle); }
 .bannerText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bannerHeadRow { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .bannerHead { font-size: 14px; font-weight: 600; color: var(--text-strong); }
 .bannerSub { font-size: 12px; color: var(--text-muted); }
 .bannerAvatars { display: flex; }
@@ -308,6 +313,7 @@
 .lobbyError { max-width: 320px; font-size: 13px; color: var(--text-danger); text-align: center; }
 
 /* push to talk on a touch screen: a wide button to hold, above the controls */
+.timerRow { flex: none; display: flex; justify-content: center; padding: 6px 12px 0; }
 .pttRow { flex: none; display: flex; justify-content: center; padding: 6px 12px 0; }
 .pttBtn { width: min(100%, 420px); height: 56px; border-radius: 28px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--bg-surface); color: var(--text-strong); font-size: 16px; font-weight: 600; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: background-color 80ms ease; }
 .pttBtn[data-held] { background: var(--positive); color: var(--on-positive); }
@@ -325,6 +331,12 @@
 .callLine[data-tone="missed"] .callIcon { color: var(--text-danger); background: color-mix(in srgb, var(--danger) 16%, var(--bg-surface)); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px color-mix(in srgb, var(--danger) 32%, transparent); }
 .callWords { min-width: 0; color: var(--text); overflow-wrap: anywhere; }
 .callDetail { flex: none; display: inline-flex; align-items: center; height: 22px; padding-inline: 9px; border-radius: 11px; background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--border-subtle); color: var(--text-muted); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* how long a call has been going: quiet digits that never shift as they count (CallTimer.tsx) */
+.callTimer { flex: none; font-size: 12px; font-weight: 600; line-height: 1; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* as a tag (the sidebar, a call you are not in): the call line's tag, in the green of a call that is on */
+.callTimer[data-pill] { display: inline-flex; align-items: center; height: 20px; padding-inline: 7px; border-radius: 10px; background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--border-subtle); color: color-mix(in srgb, var(--positive) 70%, var(--text)); }
+/* this device's call is reconnecting: the time holds still, greyed */
+.callTimer[data-held] { color: var(--text-placeholder); }
 .callLine[data-tone="talked"] .callDetail { color: color-mix(in srgb, var(--positive) 70%, var(--text)); }
 .callLine .callTime { margin-inline-start: 0; line-height: 22px; }
 

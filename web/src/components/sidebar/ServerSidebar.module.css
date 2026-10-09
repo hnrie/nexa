@@ -67,6 +67,9 @@
 [data-reduced-motion="true"] .typing i { animation-name: rowTypingCalm; }
 .empty { padding: 24px 8px; color: var(--text-muted); font-size: 14px; text-align: center; }
 .limit { margin-inline-start: auto; font-size: 12px; color: var(--text-muted); }
+/* how long a voice channel's call has been going, at the end of the row; it makes way for the row's buttons */
+.callTimer { margin-inline-start: auto; }
+.callTimer + .limit { margin-inline-start: 6px; }
 /* Buttons that show on hover stay hover-only: on a touch screen iOS treats a
    tap that reveals them as a hover and drops the click, and an invisible "+" still
    takes taps. Long-press menus offer the same actions there. */
@@ -74,12 +77,15 @@
   .catHead:hover .catAdd { opacity: 1; }
   .row:hover .actions { display: flex; }
   .row:hover .mention { display: none; }
+  .row:hover:has(.action) .callTimer { display: none; }
 }
 @media (hover: none) { .catAdd { display: none; } }
 /* and from the keyboard: whatever a row or a category offers shows while focus
    is on it, so Tab can reach Invite, Edit and the category's "+" */
 .row:focus-within .actions { display: flex; }
 .row:focus-within .mention { display: none; }
+/* only from the keyboard: a click on the channel (which joins its call) leaves the time in view */
+.row:has(:focus-visible):has(.action) .callTimer { display: none; }
 .catHead:focus-within .catAdd { opacity: 1; }
 
 @media (pointer: coarse) {

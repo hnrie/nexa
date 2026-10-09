@@ -101,7 +101,7 @@ class Session(private val nx: Nexa) {
                 if (gen != generation) break
                 if (lockedInCall && e.t !in LOCKED_EVENTS) continue
                 try {
-                    if (lockedInCall && e.t == "ready") decode(e.d, ReadyPayload.serializer())?.let { nx.voiceStates.replaceAll(it.voiceStates) }
+                    if (lockedInCall && e.t == "ready") decode(e.d, ReadyPayload.serializer())?.let { ServerClock.set(it.now); nx.voiceStates.replaceAll(it.voiceStates) }
                     else apply(e)
                 } catch (ex: Exception) {
                     Log.w(TAG, "event ${e.t} failed", ex)
@@ -360,6 +360,7 @@ class Session(private val nx: Nexa) {
     }
 
     private suspend fun onReady(d: ReadyPayload) {
+        ServerClock.set(d.now)
         val keep = setOfNotNull(nx.ui.activeChannel.value)
         nx.messages.clearAll(keep)
         val keepUsers = keep.flatMap { ch -> nx.messages.get(ch).byId.values.map { it.authorId } }.toSet()

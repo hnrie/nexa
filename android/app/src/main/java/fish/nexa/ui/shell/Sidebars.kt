@@ -308,6 +308,7 @@ private fun ChannelRow(serverId: String, ch: Channel, selected: Boolean, threads
                     )
                     ChannelTyping(serverId, ch.id, lit = selected || unread)
                 }
+                if (ch.isVoice && people.isNotEmpty()) fish.nexa.ui.voice.CallTimer(ch.id, pill = true)
                 if (ch.isVoice && ch.userLimit > 0) Txt("${people.size}/${ch.userLimit}", style = Nx.type.hint, color = c.textMuted)
                 if (mentions > 0) CountBadge(mentions, Modifier.padding(start = 4.dp))
             }

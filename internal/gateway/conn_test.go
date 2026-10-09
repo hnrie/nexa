@@ -101,6 +101,22 @@ func TestSweepClosesDeletedAndDisabledSessions(t *testing.T) {
 	cc.roundTrip() // a live session stays connected
 }
 
+// The ready carries the server's clock, which the apps measure their own against.
+func TestReadyCarriesTheServerClock(t *testing.T) {
+	e := newEnv(t)
+	_, tok := e.user(t, "a")
+	before := time.Now().UnixMilli()
+	ready := e.dial(t).identify(tok)
+	if ready == nil {
+		t.Fatal("ready")
+	}
+	d, _ := ready["d"].(map[string]any)
+	now, _ := d["now"].(float64)
+	if int64(now) < before || int64(now) > time.Now().UnixMilli() {
+		t.Errorf("now = %v, want between %d and now", d["now"], before)
+	}
+}
+
 func TestTypingRemembersOnlyAccessibleChannels(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()

@@ -26,6 +26,10 @@ type State struct {
 	ServerMute bool   `json:"server_mute"`
 	ServerDeaf bool   `json:"server_deaf"`
 	JoinedAt   int64  `json:"joined_at"`
+	// CallSince is when the call in this channel began: the moment it went
+	// from empty to occupied. Everyone in the channel carries the same value,
+	// and it outlives the person who started the call.
+	CallSince int64 `json:"call_since"`
 	// ConnID is the gateway connection that owns this state. A session is
 	// shared by every tab and reconnect of a device, so it cannot say which
 	// socket is actually in the call.
@@ -119,11 +123,13 @@ type Registry struct {
 	mu        sync.RWMutex
 	byUser    map[ids.ID]*State
 	byChannel map[ids.ID]map[ids.ID]*State
+	// since is each occupied channel's CallSince, gone once it empties.
+	since map[ids.ID]int64
 }
 
 // New creates an empty registry.
 func New() *Registry {
-	return &Registry{byUser: map[ids.ID]*State{}, byChannel: map[ids.ID]map[ids.ID]*State{}}
+	return &Registry{byUser: map[ids.ID]*State{}, byChannel: map[ids.ID]map[ids.ID]*State{}, since: map[ids.ID]int64{}}
 }
 
 // Get returns a user's state.
@@ -200,6 +206,9 @@ func (r *Registry) Join(st State, keepModeration bool) (old *State, started bool
 			}
 		}
 	}
+	// read before the user's old state goes, which empties the channel when
+	// they were alone in it and only toggled a button
+	since := r.since[st.ChannelID]
 	if prev, ok := r.byUser[st.UserID]; ok {
 		cp := *prev
 		old = &cp
@@ -223,6 +232,11 @@ func (r *Registry) Join(st State, keepModeration bool) (old *State, started bool
 	if st.JoinedAt == 0 {
 		st.JoinedAt = time.Now().UnixMilli()
 	}
+	if since == 0 {
+		since = time.Now().UnixMilli()
+	}
+	r.since[st.ChannelID] = since
+	st.CallSince = since
 	cp := st
 	r.byUser[st.UserID] = &cp
 	if r.byChannel[st.ChannelID] == nil {
@@ -361,11 +375,12 @@ func (r *Registry) leaveLocked(uid ids.ID) (State, bool) {
 }
 
 // removeLocked takes a state out of its channel, and the channel out of the
-// map once nobody is left in it.
+// map once nobody is left in it, which ends its call.
 func (r *Registry) removeLocked(st *State) {
 	delete(r.byChannel[st.ChannelID], st.UserID)
 	if len(r.byChannel[st.ChannelID]) == 0 {
 		delete(r.byChannel, st.ChannelID)
+		delete(r.since, st.ChannelID)
 	}
 }
 
@@ -398,5 +413,6 @@ func (r *Registry) ClearChannel(ch ids.ID) []State {
 		delete(r.byUser, uid)
 	}
 	delete(r.byChannel, ch)
+	delete(r.since, ch)
 	return out
 }

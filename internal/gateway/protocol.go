@@ -214,7 +214,11 @@ type ReadyPayload struct {
 	Guest any `json:"guest,omitempty"`
 	// Nexa is the account's moderation state: restrictions in force, notices
 	// not yet dismissed, what is unread from Nexa, and for staff the queue.
-	Nexa  any            `json:"nexa,omitempty"`
+	Nexa any `json:"nexa,omitempty"`
+	// Now is the server's clock (Unix ms) as the ready goes out, so an app
+	// can tell how far its own clock is off before it shows server times as
+	// running clocks (a call's timer).
+	Now   int64          `json:"now"`
 	Extra map[string]any `json:"-"`
 }
 

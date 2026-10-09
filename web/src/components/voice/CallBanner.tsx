@@ -4,6 +4,7 @@ import { useAuth } from "@/stores/auth";
 import { displayName, useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
 import { joinVoice } from "@/voice/session";
+import { CallTimer } from "./CallTimer";
 import s from "./Voice.module.css";
 
 import { t } from "@/i18n";
@@ -24,7 +25,10 @@ export function CallBanner({ channelId }: { channelId: string }) {
         ))}
       </div>
       <div className={s.bannerText}>
-        <span className={s.bannerHead}>{t("voice.callBanner.callInProgress")}</span>
+        <span className={s.bannerHeadRow}>
+          <span className={s.bannerHead}>{t("voice.callBanner.callInProgress")}</span>
+          <CallTimer channelId={channelId} pill />
+        </span>
         <span className={s.bannerSub}>{participants.map((p) => displayName(users[p.user_id])).join(", ")}</span>
       </div>
       <button className={s.bannerJoin} onClick={() => void joinVoice(channelId)} disabled={joining === channelId}>
