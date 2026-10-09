@@ -78,6 +78,7 @@ class MeshTransport(
     private var screenStreamId = UUID.randomUUID().toString()
     private var screenBitrate = 6_000_000
     private var screenFps = 30
+    private var screenSmooth = false
     private val early = HashMap<String, MutableList<JsonObject>>()
     private val upBefore = HashSet<String>()
     private var lastConnection: CallConnection? = null
@@ -98,11 +99,12 @@ class MeshTransport(
         for (p in peers.values) syncSenders(p)
     }
 
-    override fun setLocalScreen(track: VideoTrack?, bitrate: Int, fps: Int) {
+    override fun setLocalScreen(track: VideoTrack?, bitrate: Int, fps: Int, smooth: Boolean) {
         if (track != null && screen == null) screenStreamId = UUID.randomUUID().toString()
         screen = track
         screenBitrate = VideoCap.clampShareBitrate(bitrate)
         if (fps > 0) screenFps = fps
+        screenSmooth = smooth
         for (p in peers.values) syncSenders(p)
     }
 
@@ -483,7 +485,7 @@ class MeshTransport(
                 transceiverOf(pc, s)?.let { VideoCap.preferVp8(it, sending = true) }
                 VideoCap.capShare(s, screenBitrate, screenFps)
                 peer.screenSenders += s
-                peer.shareAdapter = ShareAdapter(screenFps)
+                peer.shareAdapter = ShareAdapter(screenFps, screenSmooth)
             }
         }
     }
@@ -551,7 +553,7 @@ class MeshTransport(
         val streams = HashMap<String, Pair<Long, Long>>()
         for ((peerId, p) in peers.toMap()) {
             // a share in motion is sized to what this peer's link carries
-            for (s in p.screenSenders.toList()) VideoCap.retuneShare(p.pc, s, p.shareAdapter ?: ShareAdapter(screenFps).also { p.shareAdapter = it })
+            for (s in p.screenSenders.toList()) VideoCap.retuneShare(p.pc, s, p.shareAdapter ?: ShareAdapter(screenFps, screenSmooth).also { p.shareAdapter = it })
             val report = WebRtc.stats(p.pc) ?: continue
             for (r in report.statsMap.values) {
                 if (r.type == "candidate-pair" && r.members["state"] == "succeeded") num(r.members["currentRoundTripTime"])?.let {

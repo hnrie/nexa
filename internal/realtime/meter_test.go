@@ -99,7 +99,7 @@ func TestMeterMonthsAndThresholds(t *testing.T) {
 }
 
 func TestRates(t *testing.T) {
-	if RateFor(KindAudio, 0) != AudioBps || RateFor(KindScreenAudio, 0) != AudioBps || RateFor(KindVideo, 0) != CameraBps {
+	if RateFor(KindAudio, 0) != AudioBps || RateFor(KindScreenAudio, 0) != StreamAudioBps || RateFor(KindVideo, 0) != CameraBps {
 		t.Error("audio and camera rates")
 	}
 	if RateFor(KindScreen, 0) != DefaultScreenBps || RateFor(KindScreen, 100) != minScreenBps || RateFor(KindScreen, 50_000_000) != maxScreenBps || RateFor(KindScreen, 8_000_000) != 8_000_000 {

@@ -77,7 +77,57 @@ export function preferVp8(tr: RTCRtpTransceiver): boolean {
 }
 
 /**
- * What a call takes in: VP8, and H.264, which a phone shares its screen in
+ * H.264 and its retransmissions only, for a screen share everyone in the call
+ * can watch in it (sfu.ts): a Mac's hardware encoder keeps a sharp 60 fps where
+ * VP8 in software cannot. Packetisation mode 1 first, so big frames are split
+ * across packets rather than kept small. True when the browser took the list.
+ */
+export function preferH264(tr: RTCRtpTransceiver): boolean {
+  if (typeof tr.setCodecPreferences !== "function") return false;
+  const caps = RTCRtpSender.getCapabilities?.("video")?.codecs ?? [];
+  const h264 = caps.filter((c) => /^video\/h264$/i.test(c.mimeType));
+  if (h264.length === 0) return false;
+  const mode1 = (c: RTCRtpCodec) => (/packetization-mode=1/.test(c.sdpFmtpLine ?? "") ? 0 : 1);
+  const rtx = caps.filter((c) => /^video\/rtx$/i.test(c.mimeType));
+  try {
+    tr.setCodecPreferences([...[...h264].sort((a, b) => mode1(a) - mode1(b)), ...rtx]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether this device shares its screen in H.264: a Chromium on a Mac (the
+ * desktop app, Chrome, Edge) whose H.264 encoder is the hardware one, as the
+ * browser says (powerEfficient) for a 1080p share at 60 fps. There VP8 is
+ * encoded in software and a busy share drops frames and heats the machine,
+ * while VideoToolbox does the same work on the media engine. Elsewhere VP8
+ * stays: Windows' hardware H.264 in WebRTC varies by graphics driver, and
+ * Safari seals frames by another path than the one tried here. Asked once.
+ */
+let h264Share: Promise<boolean> | null = null;
+
+export function sharesInH264(): Promise<boolean> {
+  h264Share ??= (async () => {
+    try {
+      const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+      if (nav.userAgentData?.platform !== "macOS") return false;
+      if (!RTCRtpSender.getCapabilities?.("video")?.codecs.some((c) => /^video\/h264$/i.test(c.mimeType))) return false;
+      const info = await navigator.mediaCapabilities?.encodingInfo({
+        type: "webrtc",
+        video: { contentType: "video/H264;profile-level-id=42e01f;packetization-mode=1", width: 1920, height: 1080, bitrate: 9_900_000, framerate: 60 },
+      });
+      return !!info?.supported && !!info.powerEfficient;
+    } catch {
+      return false;
+    }
+  })();
+  return h264Share;
+}
+
+/**
+ * What a call takes in: VP8, and H.264, which a phone or a Mac shares its screen in
  * with its hardware encoder (h264.ts). The frame encryption and the size
  * check read both before anything is decoded, and asking for them alone on a
  * receiving transceiver means a sender cannot slip another codec past that
@@ -101,7 +151,7 @@ export function acceptCallVideo(tr: RTCRtpTransceiver): boolean {
   return false;
 }
 
-/** Whether this browser can take a phone's H.264 screen share (acceptCallVideo), which the call is told. */
+/** Whether this browser can take an H.264 screen share from a phone or a Mac (acceptCallVideo), which the call is told. */
 export function canReceiveH264(): boolean {
   return !!RTCRtpReceiver.getCapabilities?.("video")?.codecs.some((c) => /^video\/h264$/i.test(c.mimeType));
 }

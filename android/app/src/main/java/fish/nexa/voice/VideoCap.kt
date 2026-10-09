@@ -12,6 +12,7 @@ import org.webrtc.RtpTransceiver
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
@@ -168,6 +169,48 @@ object VideoCap {
     }
 
     fun clampShareBitrate(bps: Int): Int = if (bps <= 0) 6_000_000 else bps.coerceIn(MIN_SHARE_BPS, MAX_SHARE_BPS)
+
+    /**
+     * What a share is sent as (shareQuality.ts SharePlan): its size and frame
+     * rate, its bitrate limit, and whether it keeps its frames by being made
+     * smaller when the link is short (`smooth`, ShareAdapt) or keeps its size.
+     */
+    data class SharePlan(val res: String, val fps: Int, val bitrate: Int, val smooth: Boolean)
+
+    /** Performance: smooth motion, 1080p at 60 fps within 6 Mbit/s (shareQuality.ts PERFORMANCE_PLAN). */
+    val PERFORMANCE = SharePlan("1080p", 60, 6_000_000, true)
+    /** Quality: the screen as it is, up to 60 fps, at the most a share may use (QUALITY_PLAN). */
+    val QUALITY = SharePlan("source", 60, MAX_SHARE_BPS, false)
+    val MODES = listOf("performance", "quality", "custom")
+
+    /** A Custom bitrate limit from settings, held to what a share may use; null when there is none (customShareBitrate). */
+    fun customBitrate(bps: Double?): Int? =
+        bps?.takeIf { it.isFinite() && it > 0 }?.let { it.roundToInt().coerceIn(MIN_SHARE_BPS, MAX_SHARE_BPS) }
+
+    /**
+     * The mode the settings ask for (shareModeOf): settings from before modes
+     * had only a size and frame rate, and one other than the usual 1080p at
+     * 30 fps was a choice, kept as Custom; the usual one is Performance.
+     */
+    fun shareMode(mode: String?, res: String?, fps: Int?): String = when {
+        mode in MODES -> mode!!
+        (res ?: "1080p") != "1080p" || (fps ?: 30) != 30 -> "custom"
+        else -> "performance"
+    }
+
+    /** What a Custom share keeps when the link is short; before modes, 60 fps stayed smooth and slower shares sharp. */
+    fun shareKeep(keep: String?, fps: Int?): String = if (keep == "sharp" || keep == "smooth") keep else if ((fps ?: 30) >= 60) "smooth" else "sharp"
+
+    /** What a share is sent as, from the account's voice settings (sharePlan). */
+    fun sharePlan(mode: String?, res: String?, fps: Int?, bitrate: Double?, keep: String?): SharePlan = when (shareMode(mode, res, fps)) {
+        "quality" -> QUALITY
+        "custom" -> {
+            val r = if (res in RESOLUTIONS) res!! else "1080p"
+            val f = if (fps in FRAME_RATES) fps!! else 30
+            SharePlan(r, f, customBitrate(bitrate) ?: shareBitrate(r, f), shareKeep(keep, fps) == "smooth")
+        }
+        else -> PERFORMANCE
+    }
 
     /**
      * A screen share's sender: its bitrate and frame rate, served before a

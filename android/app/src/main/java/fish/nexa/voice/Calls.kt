@@ -533,7 +533,7 @@ object Calls {
     fun stopScreenShare() = scope.launch { Engine.stopScreen() }
 
     /** Shares the screen at a quality from the share sheet, once the system said yes. */
-    fun startScreenShare(permission: android.content.Intent, resolution: String, fps: Int) = scope.launch { Engine.startScreen(permission, resolution, fps) }
+    fun startScreenShare(permission: android.content.Intent, plan: VideoCap.SharePlan) = scope.launch { Engine.startScreen(permission, plan) }
 
     fun setWatching(userId: String, on: Boolean) = scope.launch { Engine.setWatching(userId, on) }
     fun setUserVolume(userId: String, pct: Int) = Voice.setVolume(userId, pct)

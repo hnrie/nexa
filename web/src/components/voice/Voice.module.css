@@ -249,6 +249,29 @@
 .shareOption:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .shareValue { font-size: 16px; font-weight: 600; color: var(--text-strong); }
 .shareNote { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* the share's mode: one sunken track, a lit thumb under the chosen mode that slides to the next (ShareScreenModal.tsx) */
+.modeBlock { display: flex; flex-direction: column; gap: 10px; }
+.modeTrack { --at: 0; position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 4px; border-radius: var(--radius-lg); background: var(--bg-input); box-shadow: inset 0 1px 3px color-mix(in srgb, black 28%, transparent), inset 0 0 0 1px var(--border-subtle); }
+.modeThumb { position: absolute; top: 4px; bottom: 4px; inset-inline-start: 4px; width: calc((100% - 8px) / 3); border-radius: calc(var(--radius-lg) - 4px); background: var(--grad-brand); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), var(--glow-brand); translate: calc(var(--at) * 100%) 0; transition: translate 240ms var(--ease-out); }
+:global([dir="rtl"]) .modeThumb { translate: calc(var(--at) * -100%) 0; }
+.modeOption { position: relative; min-width: 0; min-height: 40px; padding: 0 8px; border-radius: calc(var(--radius-lg) - 4px); font-size: 14.5px; font-weight: 650; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 160ms var(--ease-out); }
+.modeOption:hover { color: var(--text-strong); }
+.modeOption[data-on="true"] { color: var(--on-brand); }
+.modeOption:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.modeAbout { margin: 0; min-height: 2.8em; font-size: 13.5px; line-height: 1.4; color: var(--text); }
+/* Custom unfolds under the switch, in answer to choosing it */
+.customPanel { display: flex; flex-direction: column; gap: 16px; padding-top: 4px; animation: customIn 200ms var(--ease-out); }
+@keyframes customIn { from { opacity: 0; translate: 0 -4px; } }
+.bitrateHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.bitrateValue { font-size: 14px; font-weight: 650; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.bitrateSlider { width: 100%; margin: 0; accent-color: var(--brand); }
+.bitrateFoot { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 12.5px; line-height: 1.4; color: var(--text-muted); }
+.linkButton { flex: none; padding: 0; font-size: 12.5px; font-weight: 600; color: var(--link); }
+.linkButton:hover { text-decoration: underline; }
+.linkButton:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 2px; }
+@media (prefers-reduced-motion: reduce) { .modeThumb, .modeOption { transition: none; } .customPanel { animation: none; } }
+[data-reduced-motion="true"] .modeThumb, [data-reduced-motion="true"] .modeOption { transition: none; }
+[data-reduced-motion="true"] .customPanel { animation: none; }
 .shareHint { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
 /* the switch sits flush with the choices above it, without a settings row's rule and padding */
 .shareAudio > label { padding: 0; margin: 0; border: 0; min-height: 0; }

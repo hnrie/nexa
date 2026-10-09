@@ -11,11 +11,11 @@ import { voice as voiceApi, type SfuDescription } from "@/api/voice";
 import type { VoiceState } from "@/api/types";
 import { FrameCrypto, voiceKeysFor, voiceKeysVersion, type VoiceKeys } from "./e2ee";
 import { CopyPlanner, LOSS_ONE_COPY } from "./copyPlanner";
-import { tunedRemote } from "./opus";
+import { tunedLocal, tunedRemote } from "./opus";
 import { Playback } from "./playback";
 import { MAX_SHARE_BPS, MIN_SHARE_BPS } from "./shareQuality";
 import type { SignalPayload, TransportEvents, VoiceTransport } from "./transport";
-import { acceptCallVideo, capSender, clampBitrate, preferVp8, recapSender, trackSize } from "./videoCap";
+import { acceptCallVideo, capSender, clampBitrate, preferH264, preferVp8, recapSender, sharesInH264, trackSize } from "./videoCap";
 import { ShareAdapter, retuneShare } from "./shareAdapt";
 import { STALL_CHECK_MS, type StallWatch, watchStall } from "./stallWatch";
 
@@ -154,6 +154,12 @@ const UPLINK_MIN_PACKETS = 40;
 const LOSS_GRACE_MS = 4_000;
 /** After the server pauses video, this device leaves it alone this long before asking again. */
 const VIDEO_PAUSE_MS = 10 * 60_000;
+/**
+ * How long the call's pictures stay pulled after they leave the screen: a
+ * look at another channel, or a switch to another window and back, finds them
+ * still there, rather than waiting on a pull and a keyframe.
+ */
+const VIDEO_HIDDEN_GRACE_MS = 15_000;
 
 
 
@@ -211,6 +217,13 @@ export class SfuTransport implements VoiceTransport {
   private shareAdapter = new ShareAdapter(30);
   private senders: Partial<Record<PubKind, RTCRtpTransceiver>> = {};
   private published = new Set<PubKind>();
+  /** Whether this device shares in hardware H.264 (videoCap.ts sharesInH264), and whether the share's transceiver went out in it. */
+  private canH264 = false;
+  private screenH264 = false;
+  private republishing = false;
+  /** Whether cameras and watched shares are pulled: their pictures are on screen, or left it less than VIDEO_HIDDEN_GRACE_MS ago. */
+  private videoShown = true;
+  private hiddenTimer: ReturnType<typeof setTimeout> | null = null;
 
   private roster = new Map<string, VoiceState>();
   private peers = new Set<string>();
@@ -281,6 +294,10 @@ export class SfuTransport implements VoiceTransport {
       if (this.senders.screen) void retuneShare(this.senders.screen.sender, this.shareAdapter);
     }, LOSS_CHECK_MS);
     this.stallTimer = setInterval(() => void this.watchStalls(), STALL_CHECK_MS);
+    void sharesInH264().then((yes) => {
+      this.canH264 = yes;
+      this.checkShareCodec();
+    });
   }
 
   // --- the connection ----------------------------------------------------
@@ -561,12 +578,12 @@ export class SfuTransport implements VoiceTransport {
         pc.restartIce();
         const offer = await pc.createOffer({ iceRestart: true });
         this.live(pc);
-        await pc.setLocalDescription(offer);
+        await pc.setLocalDescription(tunedLocal(offer, this.streamMids()));
         this.live(pc);
         const res = await voiceApi.sfuRestart({ session_id: session, offer: description(pc.localDescription), mid, kind: anchor }, timeout());
         this.live(pc);
         if (!res.answer) throw new Error("no answer to the ICE restart");
-        await pc.setRemoteDescription(tunedRemote(res.answer));
+        await pc.setRemoteDescription(tunedRemote(res.answer, this.streamMids()));
         this.iceRestarts++;
       } catch (err) {
         if (err instanceof Stale) throw err;
@@ -629,7 +646,13 @@ export class SfuTransport implements VoiceTransport {
     for (const kind of fresh) {
       if (this.senders[kind]) continue;
       const tr = pc.addTransceiver(this.trackFor(kind) ?? media(kind), { direction: "sendonly" });
-      if (media(kind) === "video") preferVp8(tr);
+      if (kind === "screen") {
+        const h264 = this.wantsH264();
+        this.screenH264 = h264 && preferH264(tr);
+        // a browser that turned the list down stays on VP8 for this call, rather than publishing again and again
+        if (h264 && !this.screenH264) this.canH264 = false;
+        if (!this.screenH264) preferVp8(tr);
+      } else if (media(kind) === "video") preferVp8(tr);
       // the microphone's frames carry copies of the ones before when listeners lose packets
       this.crypto.protectSender(tr.sender, media(kind), kind === "audio");
       if (kind === "video") capSender(tr.sender, CAMERA_BPS);
@@ -641,7 +664,7 @@ export class SfuTransport implements VoiceTransport {
     try {
       const offer = await pc.createOffer();
       this.live(pc);
-      await pc.setLocalDescription(offer);
+      await pc.setLocalDescription(tunedLocal(offer, this.streamMids()));
       this.live(pc);
       const res = await voiceApi.sfuPublish(
         {
@@ -653,7 +676,7 @@ export class SfuTransport implements VoiceTransport {
       );
       this.live(pc);
       if (!res.answer) throw new Error("no answer to the offer");
-      await pc.setRemoteDescription(tunedRemote(res.answer));
+      await pc.setRemoteDescription(tunedRemote(res.answer, this.streamMids()));
       this.live(pc);
       failed = res.failed;
     } catch (err) {
@@ -672,6 +695,76 @@ export class SfuTransport implements VoiceTransport {
     if (failed > 0) throw new Error(`the call service refused ${failed} track(s)`);
   }
 
+  /**
+   * Whether the screen goes out in H.264: this device's hardware encoder can
+   * make it, and everyone else in the call said they can watch it (a browser
+   * without H.264, or an older app, cannot, and gets VP8).
+   */
+  private wantsH264(): boolean {
+    if (!this.canH264) return false;
+    for (const [userId, st] of this.roster) if (userId !== this.meId && !st.codecs?.includes("h264")) return false;
+    return true;
+  }
+
+  /** Publishes the share again when the codec it went out in is no longer the one the call should get. */
+  private checkShareCodec(): void {
+    if (this.closed || !this.senders.screen || !this.screen?.getVideoTracks()[0]) return;
+    if (this.wantsH264() !== this.screenH264) this.republishScreen();
+  }
+
+  /**
+   * The share published again, in the codec the call can watch now. One at a
+   * time: it reads the call as it is when its turn comes, and looks again
+   * once it is done, so states arriving together cost one change, not one each.
+   */
+  private republishScreen(): void {
+    if (!this.sessionId || this.republishing) return;
+    this.republishing = true;
+    void this.enqueue(async () => {
+      await this.unpublishNow("screen");
+      if (this.screen?.getVideoTracks()[0]) await this.publishNow(["screen"]);
+      this.scheduleSync();
+    }).finally(() => {
+      this.republishing = false;
+      this.checkShareCodec();
+    });
+  }
+
+  /**
+   * The mids of every screen share's sound on this connection, this device's
+   * own and those it pulls: their Opus is tuned for music in stereo rather
+   * than for a voice (opus.ts), in each exchange, as the voice tuning is.
+   */
+  private streamMids(): Set<string> {
+    const mids = new Set<string>();
+    const own = this.senders.screen_audio?.mid;
+    if (own) mids.add(own);
+    for (const p of this.pulled.values()) if (p.kind === "screen_audio") mids.add(p.mid);
+    return mids;
+  }
+
+  /** Takes a published track back from the SFU; publishing it again gives it a new name everyone pulls afresh. */
+  private async unpublishNow(kind: PubKind): Promise<void> {
+    const session = this.sessionId;
+    const tr = this.senders[kind];
+    if (!session || !tr) return;
+    const pc = this.pc;
+    delete this.senders[kind];
+    this.published.delete(kind);
+    const mid = tr.mid;
+    tr.stop();
+    if (!mid) return;
+    const offer = await pc.createOffer();
+    this.live(pc);
+    await pc.setLocalDescription(tunedLocal(offer, this.streamMids()));
+    this.live(pc);
+    const res = await voiceApi.sfuClose({ session_id: session, mids: [mid], offer: description(pc.localDescription) }, timeout());
+    this.live(pc);
+    if (!res.answer) throw new Error("no answer to closing a track");
+    await pc.setRemoteDescription(tunedRemote(res.answer, this.streamMids()));
+    this.live(pc);
+  }
+
   setLocalAudio(track: MediaStreamTrack | null): void {
     this.audioTrack = track;
     const tr = this.senders.audio;
@@ -687,11 +780,18 @@ export class SfuTransport implements VoiceTransport {
     else if (track) this.publish(["video"]);
   }
 
-  setLocalScreen(stream: MediaStream | null, bitrate = 6_000_000, fps = 30): void {
+  setLocalScreen(stream: MediaStream | null, bitrate = 6_000_000, fps = 30, smooth = fps >= 50): void {
     this.screen = stream;
     // the server charges pulls of the share at this rate and holds it to the same bounds
     this.screenBitrate = clampBitrate(bitrate, MIN_SHARE_BPS, MAX_SHARE_BPS, 6_000_000);
-    if (stream) this.shareAdapter = new ShareAdapter(fps);
+    if (stream) this.shareAdapter = new ShareAdapter(fps, smooth);
+    // a share starting on a transceiver of the other codec is published again in the one the call can watch
+    if (this.senders.screen && stream?.getVideoTracks()[0] && this.wantsH264() !== this.screenH264) {
+      if (this.senders.screen_audio) void this.senders.screen_audio.sender.replaceTrack(this.trackFor("screen_audio")).catch(() => {});
+      else if (this.trackFor("screen_audio")) this.publish(["screen_audio"]);
+      this.republishScreen();
+      return;
+    }
     const missing: PubKind[] = [];
     for (const kind of ["screen", "screen_audio"] as const) {
       const tr = this.senders[kind];
@@ -817,9 +917,28 @@ export class SfuTransport implements VoiceTransport {
 
   setRoster(states: VoiceState[]): void {
     this.roster = new Map(states.filter((s) => s.channel_id === this.channelId).map((s) => [s.user_id, s]));
+    // someone who cannot watch H.264 came in, or the last of them left: the share changes codec
+    this.checkShareCodec();
     // a camera turned on or off shows at once: its track stays pulled either way
     this.present();
     this.scheduleSync();
+  }
+
+  setVideoShown(on: boolean): void {
+    if (on) {
+      if (this.hiddenTimer) clearTimeout(this.hiddenTimer);
+      this.hiddenTimer = null;
+      if (this.videoShown) return;
+      this.videoShown = true;
+      this.scheduleSync();
+      return;
+    }
+    if (!this.videoShown || this.hiddenTimer) return;
+    this.hiddenTimer = setTimeout(() => {
+      this.hiddenTimer = null;
+      this.videoShown = false;
+      this.scheduleSync();
+    }, VIDEO_HIDDEN_GRACE_MS);
   }
 
   setWatching(userId: string, on: boolean): void {
@@ -836,7 +955,8 @@ export class SfuTransport implements VoiceTransport {
    */
   private wanted(): Map<string, Want> {
     const out = new Map<string, Want>();
-    const paused = this.videoPaused();
+    // pictures come in while the server allows video and someone can see them
+    const pictures = !this.videoPaused() && this.videoShown;
     for (const [userId, st] of this.roster) {
       if (userId === this.meId || !this.peers.has(userId)) continue;
       const add = (kind: PubKind) => {
@@ -844,9 +964,9 @@ export class SfuTransport implements VoiceTransport {
         if (tag) out.set(slot(userId, kind), { userId, kind, tag });
       };
       add("audio");
-      if (!paused) add("video");
+      if (pictures) add("video");
       if (st.streaming && this.watching.has(userId)) {
-        if (!paused) add("screen");
+        if (pictures) add("screen");
         add("screen_audio");
       }
     }
@@ -909,11 +1029,11 @@ export class SfuTransport implements VoiceTransport {
       this.byMid.set(p.mid, p);
     }
     if (res.offer) {
-      await pc.setRemoteDescription(tunedRemote(res.offer));
+      await pc.setRemoteDescription(tunedRemote(res.offer, this.streamMids()));
       this.live(pc);
       const answer = await pc.createAnswer();
       this.live(pc);
-      await pc.setLocalDescription(answer);
+      await pc.setLocalDescription(tunedLocal(answer, this.streamMids()));
       this.live(pc);
       await voiceApi.sfuRenegotiate({ session_id: session, description: description(pc.localDescription) }, timeout());
       this.live(pc);
@@ -937,12 +1057,12 @@ export class SfuTransport implements VoiceTransport {
     this.present();
     const offer = await pc.createOffer();
     this.live(pc);
-    await pc.setLocalDescription(offer);
+    await pc.setLocalDescription(tunedLocal(offer, this.streamMids()));
     this.live(pc);
     const res = await voiceApi.sfuClose({ session_id: session, mids: list.map((p) => p.mid), offer: description(pc.localDescription) }, timeout());
     this.live(pc);
     if (!res.answer) throw new Error("no answer to closing tracks");
-    await pc.setRemoteDescription(tunedRemote(res.answer));
+    await pc.setRemoteDescription(tunedRemote(res.answer, this.streamMids()));
     this.live(pc);
   }
 
@@ -1198,6 +1318,7 @@ export class SfuTransport implements VoiceTransport {
     clearInterval(this.bypassTimer);
     clearInterval(this.lossTimer);
     clearInterval(this.stallTimer);
+    if (this.hiddenTimer) clearTimeout(this.hiddenTimer);
     if (this.sendSwitch) clearTimeout(this.sendSwitch);
     if (this.recoverTimer) clearTimeout(this.recoverTimer);
     if (this.retry) clearTimeout(this.retry.timer);

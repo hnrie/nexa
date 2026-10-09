@@ -1,5 +1,5 @@
 import type { ShareFps, ShareResolution } from "@/stores/settings";
-import { MAX_SHARE_BPS, MIN_SHARE_BPS, fromStreamQuality, isShareFps, isShareResolution, shareBitrate, shareQuality, shareVideoConstraints } from "./shareQuality";
+import { MAX_SHARE_BPS, MIN_SHARE_BPS, PERFORMANCE_PLAN, fromStreamQuality, isShareFps, isShareResolution, shareBitrate, shareModeOf, sharePlan, shareQuality, shareVideoConstraints } from "./shareQuality";
 
 describe("screen share quality", () => {
   it("caps the picture at the chosen size, keeping its shape, and the frame rate at the chosen one", () => {
@@ -50,5 +50,31 @@ describe("screen share quality", () => {
     expect(fromStreamQuality("1080p60")).toEqual({ shareResolution: "1080p", shareFps: 60 });
     expect(fromStreamQuality("source")).toEqual({ shareResolution: "source", shareFps: 60 });
     expect(fromStreamQuality("nonsense")).toBeNull();
+  });
+});
+
+describe("stream modes", () => {
+  it("sends Performance smooth at 1080p60 within 6 Mbit/s, and Quality sharp at the screen's own size at the most a share may use", () => {
+    expect(sharePlan({ shareMode: "performance" })).toEqual({ res: "1080p", fps: 60, bitrate: 6_000_000, smooth: true });
+    expect(sharePlan({ shareMode: "quality" })).toEqual({ res: "source", fps: 60, bitrate: MAX_SHARE_BPS, smooth: false });
+    // anything not understood is Performance
+    expect(sharePlan({ shareMode: "turbo" })).toEqual(PERFORMANCE_PLAN);
+  });
+
+  it("sends Custom as chosen, its bitrate following the size and frame rate until one is set", () => {
+    const custom = { shareMode: "custom", shareResolution: "1440p", shareFps: 30, shareBitrate: null, shareKeep: "smooth" };
+    expect(sharePlan(custom)).toEqual({ res: "1440p", fps: 30, bitrate: shareBitrate("1440p", 30), smooth: true });
+    expect(sharePlan({ ...custom, shareBitrate: 4_500_000, shareKeep: "sharp" })).toEqual({ res: "1440p", fps: 30, bitrate: 4_500_000, smooth: false });
+    // a limit out of bounds is held to them, and nonsense is no limit
+    expect(sharePlan({ ...custom, shareBitrate: 99e9 }).bitrate).toBe(MAX_SHARE_BPS);
+    expect(sharePlan({ ...custom, shareBitrate: 10 }).bitrate).toBe(MIN_SHARE_BPS);
+    expect(sharePlan({ ...custom, shareBitrate: "fast" }).bitrate).toBe(shareBitrate("1440p", 30));
+  });
+
+  it("turns settings from before modes into one: the usual 1080p30 becomes Performance, a choice stays as Custom", () => {
+    expect(shareModeOf({}, { shareResolution: "1080p", shareFps: 30 })).toEqual({ shareMode: "performance", shareBitrate: null, shareKeep: "sharp" });
+    expect(shareModeOf({}, { shareResolution: "1080p", shareFps: 60 })).toEqual({ shareMode: "custom", shareBitrate: null, shareKeep: "smooth" });
+    expect(shareModeOf({}, { shareResolution: "source", shareFps: 15 })).toEqual({ shareMode: "custom", shareBitrate: null, shareKeep: "sharp" });
+    expect(shareModeOf({ shareMode: "quality", shareBitrate: 3e6, shareKeep: "smooth" }, { shareResolution: "720p", shareFps: 30 })).toEqual({ shareMode: "quality", shareBitrate: 3e6, shareKeep: "smooth" });
   });
 });

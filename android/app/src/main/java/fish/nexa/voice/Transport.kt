@@ -31,7 +31,8 @@ interface VoiceTransport {
     /** The voice to send: one track for the whole call, silenced with `enabled`, never taken away between phrases. */
     fun setLocalAudio(track: AudioTrack?)
     fun setLocalVideo(track: VideoTrack?)
-    fun setLocalScreen(track: VideoTrack?, bitrate: Int, fps: Int)
+    /** `smooth`: the share keeps its frames and is made smaller when the link is short, rather than keeping its size (VideoCap.SharePlan). */
+    fun setLocalScreen(track: VideoTrack?, bitrate: Int, fps: Int, smooth: Boolean = fps >= 50)
     fun addPeer(userId: String)
     fun removePeer(userId: String)
     fun peerIds(): List<String>
@@ -52,6 +53,11 @@ interface VoiceTransport {
     fun currentSession(): String?
     fun setIceServers(servers: List<PeerConnection.IceServer>)
     fun setWatching(userId: String, on: Boolean)
+    /**
+     * Whether the call's pictures are on screen anywhere (VideoShown). While
+     * they are not, cameras and shares need not come in; voices always do.
+     */
+    fun setVideoShown(on: Boolean) = Unit
     /** Round trip and loss since the last reading; null with nothing to measure. */
     suspend fun stats(): Quality?
     /** [sealed, opened, dropped, oversize] frames, or null peer to peer. */

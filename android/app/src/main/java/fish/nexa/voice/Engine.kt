@@ -16,6 +16,7 @@ import fish.nexa.ui.t
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -387,6 +388,13 @@ internal object Engine {
                 Voice.setSpeaking(myId, sending && loud)
             }
         }
+        // cameras and shares come in only while the call's pictures are on screen somewhere
+        s.jobs += scope.launch {
+            kotlinx.coroutines.flow.combine(VideoShown.open, Nexa.ui.visible, Pip.active, Voice.state) { open, inFront, floating, _ ->
+                // the call's own channel, read each time: a moderator can move it
+                VideoShown.shown(open, s.channelId, inFront, floating)
+            }.distinctUntilChanged().collect { shown -> if (session === s) s.transport.setVideoShown(shown) }
+        }
         // the link's quality for every view that shows it
         s.jobs += scope.launch {
             while (isActive && session === s) {
@@ -634,7 +642,9 @@ internal object Engine {
     }
 
     /** Shares the screen once the system has said yes (`permission` is its answer). */
-    fun startScreen(permission: Intent, res: String, fps: Int) {
+    fun startScreen(permission: Intent, plan: VideoCap.SharePlan) {
+        val res = plan.res
+        val fps = plan.fps
         val s = session ?: return
         if (s.screenPending || s.screen != null) return
         s.screenPending = true
@@ -667,7 +677,7 @@ internal object Engine {
                 // the capturer leaves the frame rate to the screen (60, 90 or 120 a second): the share keeps to the one asked for
                 capture.source.adaptOutputFormat(w, h, fps)
                 s.screen = capture
-                s.transport.setLocalScreen(capture.track, VideoCap.shareBitrate(res, fps), fps)
+                s.transport.setLocalScreen(capture.track, plan.bitrate, fps, plan.smooth)
                 Voice.update { it.copy(localScreen = capture.track) }
                 Calls.sendState(s.channelId)
                 CallService.update()

@@ -1,6 +1,28 @@
 package fish.nexa.ui.voice
 
 import android.content.ClipData
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import fish.nexa.ui.components.NxSlider
+import fish.nexa.ui.theme.brandGradient
+import fish.nexa.ui.theme.glowBrand
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
+import kotlin.math.roundToInt
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
@@ -297,7 +319,7 @@ private fun <T> Choices(label: String, options: List<Triple<T, String, String>>,
     val c = Nx.colors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Txt(label, style = Nx.type.label, color = c.textSubtle)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for ((v, title, note) in options) {
                 val on = v == value
                 val interaction = remember { MutableInteractionSource() }
@@ -326,7 +348,69 @@ private fun <T> Choices(label: String, options: List<Triple<T, String, String>>,
     }
 }
 
-/** Asks for a share's resolution and frame rate, then the phone asks what to share. */
+/** "6", "9.9": a bitrate in megabits as the sheet writes it. */
+private fun mbpsOf(bps: Int): String {
+    val mbps = bps / 1_000_000.0
+    return if (mbps == Math.floor(mbps)) mbps.toInt().toString() else String.format(fish.nexa.ui.I18n.locale, "%.1f", mbps)
+}
+
+private fun modeName(m: String): String = t(
+    when (m) {
+        "performance" -> "voice.shareScreen.modePerformance"
+        "quality" -> "voice.shareScreen.modeQuality"
+        else -> "voice.shareScreen.modeCustom"
+    },
+)
+
+/**
+ * The three ways a share can go, on one sunken track: a lit thumb sits under
+ * the chosen one and slides to the next, the only thing in the sheet that
+ * moves (ShareScreenModal.tsx ModeSwitch).
+ */
+@Composable
+private fun ModeSwitch(value: String, onChange: (String) -> Unit) {
+    val c = Nx.colors
+    val at = VideoCap.MODES.indexOf(value).coerceAtLeast(0)
+    val pos by animateFloatAsState(at.toFloat(), if (Nx.motion.reduced) snap() else tween(240, easing = Nx.motion.easeOut), label = "share-mode")
+    val inner = RoundedCornerShape(16.dp)
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .background(c.bgInput, Radii.Lg)
+            .ring(Radii.Lg, c.borderSubtle)
+            .padding(4.dp),
+    ) {
+        val third = maxWidth / 3
+        Box(
+            Modifier
+                .offset(x = third * pos)
+                .width(third)
+                .height(40.dp)
+                .glowBrand(inner, c)
+                .background(brandGradient(c), inner)
+                .topEdge(inner, Color.White.copy(alpha = 0.22f)),
+        )
+        Row(Modifier.fillMaxWidth().selectableGroup().semantics { contentDescription = t("voice.shareScreen.streamMode") }) {
+            for (m in VideoCap.MODES) {
+                val on = m == value
+                val interaction = remember { MutableInteractionSource() }
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clip(inner)
+                        .pressable(interaction, role = Role.RadioButton) { onChange(m) }
+                        .semantics { selected = on },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Txt(modeName(m), style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(650)), color = if (on) c.onBrand else c.textMuted, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+/** Asks how a share should go, then the phone asks what to share. */
 fun openShareScreen() {
     openSheet("share-screen", title = t("voice.shareScreen.shareYourScreen"), footer = { close ->
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
@@ -338,16 +422,81 @@ fun openShareScreen() {
         }
     }) {
         val c = Nx.colors
+        val savedFps = Voice.settingInt("shareFps", 30)
+        var mode by remember { mutableStateOf(VideoCap.shareMode(Voice.setting("shareMode"), Voice.setting("shareResolution"), savedFps)) }
         var res by remember { mutableStateOf(Voice.setting("shareResolution")?.takeIf { it in VideoCap.RESOLUTIONS } ?: "1080p") }
-        var fps by remember { mutableIntStateOf(Voice.settingInt("shareFps", 30).takeIf { it in VideoCap.FRAME_RATES } ?: 30) }
-        LaunchedEffect(res, fps) {
+        var fps by remember { mutableIntStateOf(savedFps.takeIf { it in VideoCap.FRAME_RATES } ?: 30) }
+        var bitrate by remember { mutableStateOf(VideoCap.customBitrate((Voice.settings["shareBitrate"] as? JsonPrimitive)?.doubleOrNull)) }
+        var keep by remember { mutableStateOf(VideoCap.shareKeep(Voice.setting("shareKeep"), savedFps)) }
+        val plan = VideoCap.sharePlan(mode, res, fps, bitrate?.toDouble(), keep)
+        LaunchedEffect(mode, res, fps, bitrate, keep) {
+            ShareChoice.mode = mode
             ShareChoice.res = res
             ShareChoice.fps = fps
+            ShareChoice.bitrate = bitrate
+            ShareChoice.keep = keep
         }
-        val resNotes = mapOf("720p" to "HD", "1080p" to t("voice.shareScreen.fullHd"), "1440p" to "QHD", "source" to t("voice.shareScreen.native"))
-        Choices(t("voice.shareScreen.resolution"), VideoCap.RESOLUTIONS.map { Triple(it, if (it == "source") t("shareQuality.source") else it, resNotes.getValue(it)) }, res) { res = it }
-        val fpsNotes = mapOf(15 to t("voice.shareScreen.textSlides"), 30 to t("voice.shareScreen.smooth"), 60 to t("voice.shareScreen.gamesVideo"))
-        Choices(t("voice.shareScreen.frameRate"), VideoCap.FRAME_RATES.map { Triple(it, "$it fps", fpsNotes.getValue(it)) }, fps) { fps = it }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            ModeSwitch(mode) { mode = it }
+            // Custom's own rows say what it is
+            if (mode != "custom") {
+                Txt(
+                    t(if (mode == "quality") "voice.shareScreen.qualityAbout" else "voice.shareScreen.performanceAbout"),
+                    Modifier.heightIn(min = 38.dp),
+                    style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), lineHeight = Nx.type.sp(18.9f)),
+                    color = c.text,
+                )
+            }
+        }
+        AnimatedVisibility(
+            mode == "custom",
+            enter = if (Nx.motion.reduced) EnterTransition.None else fadeIn(tween(200)) + expandVertically(tween(200, easing = Nx.motion.easeOut)),
+            exit = ExitTransition.None,
+        ) {
+            Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                val resNotes = mapOf("720p" to "HD", "1080p" to t("voice.shareScreen.fullHd"), "1440p" to "QHD", "source" to t("voice.shareScreen.native"))
+                Choices(t("voice.shareScreen.resolution"), VideoCap.RESOLUTIONS.map { Triple(it, if (it == "source") t("shareQuality.source") else it, resNotes.getValue(it)) }, res) { res = it }
+                val fpsNotes = mapOf(15 to t("voice.shareScreen.textSlides"), 30 to t("voice.shareScreen.smooth"), 60 to t("voice.shareScreen.gamesVideo"))
+                Choices(t("voice.shareScreen.frameRate"), VideoCap.FRAME_RATES.map { Triple(it, "$it fps", fpsNotes.getValue(it)) }, fps) { fps = it }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                        Txt(t("voice.shareScreen.bitrateLimit"), style = Nx.type.label, color = c.textSubtle)
+                        Txt(t("voice.shareScreen.mbps", "mbps" to mbpsOf(plan.bitrate)), style = Nx.type.body.copy(fontWeight = FontWeight(650), fontFeatureSettings = "tnum"), color = c.textStrong)
+                    }
+                    NxSlider(
+                        plan.bitrate / 1_000_000f,
+                        { mb -> bitrate = ((mb * 2).roundToInt() / 2.0 * 1_000_000).toInt().coerceIn(VideoCap.MIN_SHARE_BPS, VideoCap.MAX_SHARE_BPS) },
+                        VideoCap.MIN_SHARE_BPS / 1_000_000f..VideoCap.MAX_SHARE_BPS / 1_000_000f,
+                        label = t("voice.shareScreen.bitrateLimit"),
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Txt(
+                            if (bitrate == null) t("voice.shareScreen.bitrateAuto") else t("voice.shareScreen.bitrateChosen", "mbps" to mbpsOf(VideoCap.shareBitrate(res, fps))),
+                            Modifier.weight(1f),
+                            style = Nx.type.hint,
+                            color = c.textMuted,
+                        )
+                        if (bitrate != null) {
+                            val interaction = remember { MutableInteractionSource() }
+                            Txt(
+                                t("voice.shareScreen.useAutomatic"),
+                                Modifier.heightIn(min = 48.dp).pressable(interaction, role = Role.Button) { bitrate = null }.wrapContentHeight(),
+                                style = Nx.type.hint.copy(fontWeight = FontWeight(600)),
+                                color = c.link,
+                            )
+                        }
+                    }
+                }
+                Choices(
+                    t("voice.shareScreen.whenConnectionShort"),
+                    listOf(
+                        Triple("sharp", t("voice.shareScreen.keepSharp"), t("voice.shareScreen.keepSharpNote")),
+                        Triple("smooth", t("voice.shareScreen.keepSmooth"), t("voice.shareScreen.keepSmoothNote")),
+                    ),
+                    keep,
+                ) { keep = it }
+            }
+        }
         // a phone shares the picture; its sound cannot go into the call as a share's own
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f)) {
@@ -356,10 +505,8 @@ fun openShareScreen() {
             }
             NxToggle(false, {}, enabled = false, label = t("voice.shareScreen.shareAudio"))
         }
-        val mbps = VideoCap.shareBitrate(res, fps) / 1_000_000.0
-        val shown = if (mbps == Math.floor(mbps)) mbps.toInt().toString() else String.format(fish.nexa.ui.I18n.locale, "%.1f", mbps)
         Txt(
-            (if (res == "source") t("voice.shareScreen.sharesAtYourScreenSOwn") else "") + t("android.call.shareUpload", "mbps" to shown),
+            (if (mode == "custom" && res == "source") t("voice.shareScreen.sharesAtYourScreenSOwn") else "") + t("android.call.shareUpload", "mbps" to mbpsOf(plan.bitrate)),
             style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18.2f)),
             color = c.textMuted,
         )
@@ -368,23 +515,36 @@ fun openShareScreen() {
 
 /** What the share sheet chose, kept for its Go Live. */
 private object ShareChoice {
+    var mode = "performance"
     var res = "1080p"
     var fps = 30
+    var bitrate: Int? = null
+    var keep = "sharp"
 
     fun goLive() {
-        val r = res
-        val f = fps
-        if (Voice.setting("shareResolution") != r || Voice.settingInt("shareFps", 30) != f) {
+        val plan = VideoCap.sharePlan(mode, res, fps, bitrate?.toDouble(), keep)
+        val savedBitrate = VideoCap.customBitrate((Voice.settings["shareBitrate"] as? JsonPrimitive)?.doubleOrNull)
+        val changed = Voice.setting("shareMode") != mode || Voice.setting("shareResolution") != res || Voice.settingInt("shareFps", 30) != fps ||
+            savedBitrate != bitrate || Voice.setting("shareKeep") != keep
+        if (changed) {
+            val m = mode
+            val r = res
+            val f = fps
+            val b = bitrate
+            val k = keep
             Nexa.settings.patch(buildJsonObject {
                 put("voice", buildJsonObject {
+                    put("shareMode", m)
                     put("shareResolution", r)
                     put("shareFps", f)
+                    if (b == null) put("shareBitrate", JsonNull) else put("shareBitrate", b)
+                    put("shareKeep", k)
                 })
             })
         }
         Nexa.scope.launch {
             val permission = ScreenConsent.ask() ?: return@launch
-            Calls.startScreenShare(permission, r, f)
+            Calls.startScreenShare(permission, plan)
         }
     }
 }

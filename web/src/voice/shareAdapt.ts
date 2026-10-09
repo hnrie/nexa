@@ -121,11 +121,19 @@ export class ShareAdapter {
   private state: AdaptState = START;
   private checks = 0;
 
-  /** `fps` is the share's chosen rate; only a share at 50 or more is steered. */
-  constructor(readonly fps: number) {}
+  /**
+   * `fps` is the share's chosen rate, and `smooth` whether it keeps its frames
+   * by being made smaller (shareQuality.ts SharePlan); one that keeps sharp is
+   * only held to the size cap. Without `smooth`, a share at 50 fps or more is
+   * steered, as every one was before shares had modes.
+   */
+  constructor(
+    readonly fps: number,
+    readonly smooth = fps >= 50,
+  ) {}
 
   get steering(): boolean {
-    return this.fps >= 50;
+    return this.smooth;
   }
 
   /** The scale to send at for this look: whatever the size cap asks for, and for a share in motion whatever fits the budget. */

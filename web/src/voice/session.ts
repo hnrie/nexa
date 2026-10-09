@@ -18,7 +18,7 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { activeMute, useNexa } from "@/stores/nexa";
 import { usePresence } from "@/stores/presence";
-import { useSettings, type ShareFps, type ShareResolution } from "@/stores/settings";
+import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
@@ -26,6 +26,7 @@ import { useVoiceLocal } from "@/stores/voiceLocal";
 import { closeRingNotice, missedNotice, ringNotice } from "./callNotice";
 import { allDeclined, callDeclined, callEnded, callLine, callStarted, callTimedOut, callsAfterReady, installCallRecord } from "./callRecord";
 import { audioContext, resumeAudio } from "./media";
+import type { SharePlan } from "./shareQuality";
 import { canReceiveH264 } from "./videoCap";
 
 import { t as tr_ } from "@/i18n";
@@ -317,13 +318,13 @@ export function toggleCamera(): Promise<void> {
  * not given), unless one is already running. Call it straight from a click:
  * the browser only opens its screen picker during a user gesture.
  */
-export function startScreen(quality?: { resolution: ShareResolution; fps: ShareFps; audio?: boolean }): Promise<void> {
+export function startScreen(quality?: { plan: SharePlan; audio?: boolean }): Promise<void> {
   if (!engine || engine.sharing()) return Promise.resolve();
   return engine.toggleScreen(quality);
 }
 
 /** Stops a share, or starts one the way startScreen does. */
-export function toggleScreen(quality?: { resolution: ShareResolution; fps: ShareFps; audio?: boolean }): Promise<void> {
+export function toggleScreen(quality?: { plan: SharePlan; audio?: boolean }): Promise<void> {
   return engine?.toggleScreen(quality) ?? Promise.resolve();
 }
 

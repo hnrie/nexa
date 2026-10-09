@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tuneOpus, tunedRemote, VOICE_BITRATE } from "./opus";
+import { STREAM_AUDIO_BITRATE, tuneOpus, tunedLocal, tunedRemote, VOICE_BITRATE } from "./opus";
 
 const answer = [
   "v=0",
@@ -46,6 +46,27 @@ describe("tuneOpus", () => {
   it("leaves a description without Opus as it is", () => {
     const sdp = "m=video 9 RTP/SAVPF 96\r\na=rtpmap:96 VP8/90000\r\n";
     expect(tuneOpus(sdp)).toBe(sdp);
+  });
+
+  it("asks a share's sound for stereo at the stream bitrate, without DTX", () => {
+    const out = tuneOpus(answer, new Set(["2"]));
+    expect(out).toContain(`a=fmtp:109 usedtx=0;maxaveragebitrate=${STREAM_AUDIO_BITRATE};stereo=1;sprop-stereo=1`);
+    // the voice next to it keeps the voice's tuning
+    expect(out).toContain(`a=fmtp:111 minptime=10;useinbandfec=1;usedtx=1;maxaveragebitrate=${VOICE_BITRATE}`);
+    expect(tuneOpus(out, new Set(["2"]))).toBe(out);
+  });
+
+  it("finds a section's mid wherever in the section it is", () => {
+    const sdp = "m=audio 9 RTP/SAVPF 111\na=rtpmap:111 opus/48000/2\na=fmtp:111 minptime=10\na=mid:7\n";
+    expect(tuneOpus(sdp, new Set(["7"]))).toContain("a=fmtp:111 minptime=10;usedtx=0;");
+  });
+
+  it("tunes only a share's sound in this device's own descriptions", () => {
+    const local = tunedLocal({ type: "answer", sdp: answer }, new Set(["2"]));
+    expect(local.sdp).toContain("a=fmtp:111 minptime=10;useinbandfec=1\r\n");
+    expect(local.sdp).toContain("a=fmtp:109 usedtx=0;");
+    // with no share's sound there is nothing to change
+    expect(tunedLocal({ type: "offer", sdp: answer }, new Set()).sdp).toBe(answer);
   });
 
   it("passes rollbacks and empty descriptions through", () => {

@@ -131,6 +131,9 @@ class SfuTransport(
     private var failures = 0
     private var lastFailure = 0L
     private var videoPausedUntil = 0L
+    /** Whether cameras and watched shares are pulled: their pictures are on screen, or left it less than VIDEO_HIDDEN_GRACE_MS ago. */
+    private var videoShown = true
+    private var hiddenJob: Job? = null
     private val recentLoss = RecentLoss()
     private val lossSeen = HashMap<String, List<VoiceCounts>>()
     private val lossTold = HashMap<String, Long>()
@@ -672,11 +675,11 @@ class SfuTransport(
         else if (track != null) publish(listOf(PubKind.VIDEO))
     }
 
-    override fun setLocalScreen(track: VideoTrack?, bitrate: Int, fps: Int) {
+    override fun setLocalScreen(track: VideoTrack?, bitrate: Int, fps: Int, smooth: Boolean) {
         screenTrack = track
         screenBitrate = VideoCap.clampShareBitrate(bitrate)
         if (fps > 0) screenFps = fps
-        if (track != null) shareAdapter = ShareAdapter(screenFps)
+        if (track != null) shareAdapter = ShareAdapter(screenFps, smooth)
         val tr = senders[PubKind.SCREEN]
         // a share starting on a transceiver of the other codec is published again in the one the call can watch
         if (tr != null && track != null && wantsH264() != screenH264) {
@@ -737,6 +740,24 @@ class SfuTransport(
         scheduleSync()
     }
 
+    override fun setVideoShown(on: Boolean) {
+        if (on) {
+            hiddenJob?.cancel()
+            hiddenJob = null
+            if (videoShown) return
+            videoShown = true
+            scheduleSync()
+            return
+        }
+        if (!videoShown || hiddenJob != null) return
+        hiddenJob = scope.launch {
+            delay(VIDEO_HIDDEN_GRACE_MS)
+            hiddenJob = null
+            videoShown = false
+            scheduleSync()
+        }
+    }
+
     override fun setWatching(userId: String, on: Boolean) {
         if (on) watching += userId else watching -= userId
         playback.setWatching(userId, on)
@@ -746,7 +767,8 @@ class SfuTransport(
     /** Everyone's voice and camera, and the shares being watched. */
     private fun wanted(): Map<String, Want> {
         val out = LinkedHashMap<String, Want>()
-        val paused = videoPaused()
+        // pictures come in while the server allows video and someone can see them
+        val pictures = !videoPaused() && videoShown
         for ((userId, st) in roster) {
             if (userId == meId || userId !in peers) continue
             fun add(kind: PubKind) {
@@ -754,9 +776,9 @@ class SfuTransport(
                 if (!tag.isNullOrEmpty()) out[slot(userId, kind)] = Want(userId, kind, tag)
             }
             add(PubKind.AUDIO)
-            if (!paused) add(PubKind.VIDEO)
+            if (pictures) add(PubKind.VIDEO)
             if (st.streaming && userId in watching) {
-                if (!paused) add(PubKind.SCREEN)
+                if (pictures) add(PubKind.SCREEN)
                 add(PubKind.SCREEN_AUDIO)
             }
         }
@@ -1018,6 +1040,7 @@ class SfuTransport(
         sendSwitch?.cancel()
         recoverJob?.cancel()
         retryJob?.cancel()
+        hiddenJob?.cancel()
         for (p in pulled.values) {
             p.track = null
             p.transceiver = null
@@ -1057,5 +1080,11 @@ class SfuTransport(
         private const val LOSS_ONE_COPY = 0.02
         private const val LOSS_GRACE_MS = 4_000L
         private const val VIDEO_PAUSE_MS = 10 * 60_000L
+        /**
+         * How long the call's pictures stay pulled after they leave the screen:
+         * a look at another channel, or a moment in another app, finds them
+         * still there, rather than waiting on a pull and a keyframe.
+         */
+        private const val VIDEO_HIDDEN_GRACE_MS = 15_000L
     }
 }

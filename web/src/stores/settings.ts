@@ -3,7 +3,7 @@ import type { FavoriteGif } from "@/lib/gifFavorites";
 import { users as usersApi } from "@/api/users";
 import { ApiError } from "@/api/client";
 import { decryptSettings, encryptSettings } from "@/lib/settingsCrypto";
-import { fromStreamQuality, isShareFps, isShareResolution } from "@/voice/shareQuality";
+import { fromStreamQuality, isShareFps, isShareResolution, shareModeOf } from "@/voice/shareQuality";
 import { sanitizeRail, type RailLayout } from "@/lib/railLayout";
 import { EMPTY_DM_LIST, sanitizeDMList, type DMListLayout } from "@/lib/dmLayout";
 import type { CustomCss, CustomTheme, PluginEntry } from "@/lib/look/types";
@@ -18,6 +18,10 @@ export type NotificationLevel = "all" | "mentions" | "none";
 export type NotificationPreview = "full" | "name" | "none";
 export type ShareResolution = "720p" | "1080p" | "1440p" | "source";
 export type ShareFps = 15 | 30 | 60;
+/** How a share is tuned: smooth and light, sharp and full, or the person's own choices. */
+export type ShareMode = "performance" | "quality" | "custom";
+/** What a Custom share gives up first when the connection is short: frames (it stays sharp) or sharpness (it stays smooth). */
+export type ShareKeep = "sharp" | "smooth";
 /**
  * How a call takes the noise out of the microphone: "enhanced" runs RNNoise
  * on this device (voice/denoise.ts), "standard" asks the browser for its own,
@@ -50,9 +54,15 @@ export interface VoiceSettings {
   noiseSuppression: boolean;
   echoCancellation: boolean;
   autoGain: boolean;
-  /** Screen share size and frame rate; the share dialog starts from the last ones used. */
+  /** Which way a share is tuned (voice/shareQuality.ts sharePlan); the share dialog starts from the last one used. */
+  shareMode: ShareMode;
+  /** A Custom share's size and frame rate. */
   shareResolution: ShareResolution;
   shareFps: ShareFps;
+  /** A Custom share's bitrate limit in bits a second; null follows its size and frame rate. */
+  shareBitrate: number | null;
+  /** What a Custom share keeps when the connection is short. */
+  shareKeep: ShareKeep;
   /** Whether a screen share carries what the computer plays. */
   shareAudio: boolean;
 }
@@ -259,8 +269,11 @@ export const DEFAULT_SETTINGS: Settings = {
     noiseSuppression: true,
     echoCancellation: true,
     autoGain: true,
+    shareMode: "performance",
     shareResolution: "1080p",
     shareFps: 30,
+    shareBitrate: null,
+    shareKeep: "sharp",
     shareAudio: true,
   },
   serverPositions: [],
@@ -413,6 +426,7 @@ function mergeVoice(base: VoiceSettings, incoming: Partial<VoiceSettings> | unde
   // a size or frame rate this version does not offer (another device's, or a damaged copy) goes back to what it was
   if (!isShareResolution(voice.shareResolution)) voice.shareResolution = isShareResolution(base.shareResolution) ? base.shareResolution : "1080p";
   if (!isShareFps(voice.shareFps)) voice.shareFps = isShareFps(base.shareFps) ? base.shareFps : 30;
+  Object.assign(voice, shareModeOf(rest, voice));
   // Chromium's "default" and "communications" entries are no longer offered, so one saved earlier means the system's own device
   if (isAlias(voice.inputDeviceId)) Object.assign(voice, { inputDeviceId: null, inputDeviceLabel: null });
   if (isAlias(voice.outputDeviceId)) Object.assign(voice, { outputDeviceId: null, outputDeviceLabel: null });

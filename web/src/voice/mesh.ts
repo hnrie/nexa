@@ -92,6 +92,7 @@ export class MeshTransport implements VoiceTransport {
   private playback: Playback;
   private screenBitrate = 6_000_000;
   private screenFps = 30;
+  private screenSmooth = false;
   private closed = false;
   /** The peers this device has been connected to, so losing them reads as reconnecting rather than a first connect. */
   private upBefore = new Set<string>();
@@ -132,10 +133,11 @@ export class MeshTransport implements VoiceTransport {
     for (const p of this.peers.values()) this.syncSenders(p);
   }
 
-  setLocalScreen(stream: MediaStream | null, bitrate = 6_000_000, fps = 30): void {
+  setLocalScreen(stream: MediaStream | null, bitrate = 6_000_000, fps = 30, smooth = fps >= 50): void {
     this.screen = stream;
     this.screenBitrate = clampBitrate(bitrate, MIN_SHARE_BPS, MAX_SHARE_BPS, 6_000_000);
     this.screenFps = fps;
+    this.screenSmooth = smooth;
     this.screenStream = stream ?? new MediaStream();
     for (const p of this.peers.values()) this.syncSenders(p);
   }
@@ -458,7 +460,7 @@ export class MeshTransport implements VoiceTransport {
         if (t.kind === "video") {
           this.sendVp8(pc, sender);
           capSender(sender, this.screenBitrate, trackSize(t), "high");
-          peer.shareAdapter = new ShareAdapter(this.screenFps);
+          peer.shareAdapter = new ShareAdapter(this.screenFps, this.screenSmooth);
         }
         peer.screenSenders.push(sender);
       }
@@ -588,7 +590,7 @@ export class MeshTransport implements VoiceTransport {
       // what is sent stays within the size cap even when the picture going in grows,
       // and a share in motion is sized to what this peer's link carries
       if (p.videoSender?.track?.kind === "video") void recapSender(p.videoSender);
-      for (const sender of p.screenSenders) if (sender.track?.kind === "video") void retuneShare(sender, p.shareAdapter ?? (p.shareAdapter = new ShareAdapter(this.screenFps)));
+      for (const sender of p.screenSenders) if (sender.track?.kind === "video") void retuneShare(sender, p.shareAdapter ?? (p.shareAdapter = new ShareAdapter(this.screenFps, this.screenSmooth)));
       const report = await p.pc.getStats().catch(() => null);
       if (!report) continue;
       report.forEach((r) => {

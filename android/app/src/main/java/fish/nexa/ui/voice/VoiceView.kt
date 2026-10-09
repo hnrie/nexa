@@ -335,6 +335,11 @@ private fun Stage(channelId: String, state: CallState, byUser: Map<String, Voice
         Pip.callOnScreen = true
         onDispose { Pip.callOnScreen = false }
     }
+    // while this is open the call's cameras and shares come in (VideoShown)
+    DisposableEffect(channelId) {
+        val close = fish.nexa.voice.VideoShown.viewOpen(channelId)
+        onDispose { close() }
+    }
 
     Column(modifier.fillMaxSize().stageBackground(c)) {
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(GAP)) {

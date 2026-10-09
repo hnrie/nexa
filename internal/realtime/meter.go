@@ -26,7 +26,10 @@ func IsVideo(k string) bool { return k == KindVideo || k == KindScreen }
 // each kind can carry at most (the camera sender is capped to match), so the
 // estimate errs high rather than letting a bill through.
 const (
-	AudioBps         = 64_000
+	AudioBps = 64_000
+	// StreamAudioBps is a screen share's sound: stereo for music and games,
+	// asked for at 128 kbps (web voice/opus.ts STREAM_AUDIO_BITRATE).
+	StreamAudioBps   = 128_000
 	CameraBps        = 1_500_000
 	DefaultScreenBps = 5_000_000
 	minScreenBps     = 1_000_000
@@ -48,6 +51,8 @@ func RateFor(kind string, screenBps int64) int64 {
 		return CameraBps
 	case KindScreen:
 		return ClampScreenBps(screenBps)
+	case KindScreenAudio:
+		return StreamAudioBps
 	default:
 		return AudioBps
 	}

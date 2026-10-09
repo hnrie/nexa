@@ -34,7 +34,9 @@ class CallTestHooks : BroadcastReceiver() {
             "fish.nexa.debug.CAMERA" -> Calls.toggleCamera()
             "fish.nexa.debug.SHARE" -> Nexa.scope.launch {
                 val permission = ScreenConsent.ask() ?: return@launch
-                Calls.startScreenShare(permission, intent.getStringExtra("res") ?: "1080p", intent.getIntExtra("fps", 30))
+                // a mode ("performance", "quality"), or Custom from res, fps and keep
+                val plan = VideoCap.sharePlan(intent.getStringExtra("mode") ?: "custom", intent.getStringExtra("res") ?: "1080p", intent.getIntExtra("fps", 30), null, intent.getStringExtra("keep"))
+                Calls.startScreenShare(permission, plan)
             }
             "fish.nexa.debug.UNSHARE" -> Calls.stopScreenShare()
             "fish.nexa.debug.SOFTAVC" -> {

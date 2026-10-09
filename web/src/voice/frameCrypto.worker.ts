@@ -157,6 +157,10 @@ function transformer({ op, kind, id, voice = false, codec }: StreamOptions): Tra
   // what this receiver has reported so far: any frame at all, and one that opened
   let reportedFrame = false;
   let reportedOpened = false;
+  // A picture just pulled cannot show until a keyframe comes. The browser asks
+  // for one only after about 200 ms without; this asks the moment the first
+  // frame in turns out not to be one, so a share or camera shows that much sooner.
+  let keyAwaited = kind === "video" && op === "decrypt" && id !== undefined;
   // received video is held to the size cap; through the SFU only VP8 and H.264 are sent, peer to peer another codec is let be
   const guard = kind === "video" && op !== "encrypt" ? new SizeGuard(op === "inspect" ? "pass" : "drop") : null;
   let toldOver = false;
@@ -191,6 +195,10 @@ function transformer({ op, kind, id, voice = false, codec }: StreamOptions): Tra
         if (op === "inspect") {
           if (admit(frame, new Uint8Array(frame.data))) controller.enqueue(frame);
           return;
+        }
+        if (keyAwaited) {
+          keyAwaited = false;
+          if (frame.type !== "key") askers.get(id!)?.().catch(() => {});
         }
         await keysReady;
         const data = new Uint8Array(frame.data);

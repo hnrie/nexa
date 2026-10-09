@@ -100,12 +100,12 @@ object ShareAdapt {
 }
 
 /** One share sender's steering: the step it is at, and what it is for. */
-class ShareAdapter(val fps: Int) {
+class ShareAdapter(val fps: Int, val smooth: Boolean = fps >= 50) {
     private var state = ShareAdapt.State()
     private var checks = 0
 
-    /** Only a share at 50 frames a second or more is steered. */
-    val steering: Boolean get() = fps >= 50
+    /** Only a smooth share is steered (VideoCap.SharePlan); one that keeps sharp is only held to the size cap. */
+    val steering: Boolean get() = smooth
 
     /** The scale to send at for this look: whatever the size cap asks for, and for a share in motion whatever fits the budget. */
     fun scaleFor(sample: ShareAdapt.Sample): Double {

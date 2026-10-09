@@ -500,16 +500,52 @@ call's menus in `components/voice/callMenus.ts`; dragging people between channel
 
 How a screen share is sent was measured through the SFU with `tools/share_quality.py`, and the
 findings decide it (web `voice/media.ts`, `shareQuality.ts`, `shareAdapt.ts`; Android `VideoCap`,
-`ShareAdapt`). The track's content hint follows the chosen rate: none at 60 fps, `detail` at 30,
-`text` at 15. Chromium's `motion` hint shrinks a share while the bandwidth estimate is still low at
+`ShareAdapt`). A share has a mode, picked in the share dialog (web `ShareScreenModal.tsx`, Android
+`openShareScreen` in `ui/voice/CallMenus.kt`) and kept in the account's voice settings
+(`shareMode`; Custom's `shareResolution`, `shareFps`, `shareBitrate` in bits a second or null for
+automatic, and `shareKeep`). `sharePlan` (web `shareQuality.ts`, Android `VideoCap.sharePlan`)
+turns it into a `SharePlan`: Performance is 1080p at 60 fps within 6 Mbit/s, smooth; Quality is the
+screen's own size at up to 60 fps within 12 Mbit/s, sharp; Custom is as chosen. Settings from before
+modes read as Performance when they held the usual 1080p at 30 fps, otherwise as Custom (60 fps
+smooth, slower sharp), without being rewritten (`shareModeOf`). A smooth share gets no content hint
+and is steered by `ShareAdapter`; a sharp one gets `detail` (`text` at 15 fps), keeps its size and
+gives up frames. Chromium's `motion` hint shrinks a share while the bandwidth estimate is still low at
 the start and never grows it back (1080p60 stayed 480x270, 320x180 in Electron), and asking for
-`maintain-framerate` does the same, so a 60 fps share is sized by `ShareAdapter` instead: every few
+`maintain-framerate` does the same, so a smooth share is sized by `ShareAdapter` instead: every few
 seconds it reads the encoder's `targetBitrate` and scales the picture just far enough for about 0.06
 bits a pixel a frame, growing back when there is room. A share's sender has high priority and the bitrate
 `shareBitrate` gives (9.9 Mbit/s at 1080p60). A watched share whose picture is stuck behind a lost
 frame asks its sender for a keyframe within about half a second (`stallWatch.ts`, read by `sfu.ts`
 `watchStalls`, through `FrameCrypto.requestKeyFrame` and the transform's `sendKeyFrameRequest`)
-where the browser waits about 3 s; Android's WebRTC has no way to ask.
+where the browser waits about 3 s; Android's WebRTC has no way to ask. A video receiver whose first
+frame is not a keyframe asks for one at once from the frame worker (`frameCrypto.worker.ts`
+`keyAwaited`), rather than after Chromium's own wait of about 200 ms, so a share or camera just
+pulled shows sooner.
+
+Through the SFU, a share goes out in H.264 rather than VP8 when the sender's hardware encoder makes
+it and everyone else in the call said they can watch it (`codecs: ["h264"]` on their voice state);
+otherwise VP8. Android does this whenever its WebRTC can send H.264 (`VideoCap.sendsH264`,
+`SfuTransport` `wantsH264`). The web does it only in a Chromium on a Mac (the desktop app, Chrome, Edge) whose
+H.264 encoder the browser calls power efficient (`videoCap.ts` `sharesInH264`, which reads
+`navigator.mediaCapabilities.encodingInfo`): VideoToolbox there, where VP8 is software and a busy
+share dropped frames. Windows stays on VP8 (hardware H.264 in WebRTC varies by graphics driver), as
+does Safari. Someone joining who cannot watch H.264, or the last of them leaving, makes the sender
+publish the share again in the other codec (`republishScreen` in `sfu.ts`, closing its own track
+with `sfuClose`), and everyone pulls it afresh. The peer-to-peer mesh always sends VP8.
+
+Through the SFU, cameras and watched shares are pulled only while the call's pictures are on
+screen: a call view of that call is open on a visible page, or a call video floats in picture in
+picture (web `voice/videoShown.ts`, which `VoiceView` registers with and the engine watches;
+Android `voice/VideoShown`, from the call view, whether the app is in front, and `Pip.active`).
+When they leave the screen the transport keeps pulling them for `VIDEO_HIDDEN_GRACE_MS` (15 s),
+then drops them (`setVideoShown`), and pulls them again the moment they are back. Voices and a
+share's sound always come in. The mesh pulls nothing selectively and ignores it.
+
+A share's sound is Opus in stereo at 128 kbit/s without DTX (`opus.ts` `STREAM_AUDIO_BITRATE`),
+where voices are 48 kbit/s with DTX. `sfu.ts` passes the mids of every share-sound track, its own
+and those it pulls, to `tunedRemote` (which sets what the sender's encoder makes) and `tunedLocal`
+(this device's own descriptions, where a decoder learns to play stereo) at every exchange. The SFU
+meter charges a pulled share sound at `StreamAudioBps` (128 kbit/s). The mesh keeps the voice tuning.
 
 ### Nexa, moderation and safety
 

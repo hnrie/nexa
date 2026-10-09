@@ -46,7 +46,8 @@ export interface VoiceTransport {
   setLocalAudio(track: MediaStreamTrack | null): void;
   setLocalVideo(track: MediaStreamTrack | null): void;
   /** `fps` is the share's chosen rate: a share at 60 is steered to keep moving (shareAdapt.ts). */
-  setLocalScreen(stream: MediaStream | null, bitrate?: number, fps?: number): void;
+  /** `smooth`: the share keeps its frames and is made smaller when the link is short, rather than keeping its size (shareQuality.ts SharePlan). */
+  setLocalScreen(stream: MediaStream | null, bitrate?: number, fps?: number, smooth?: boolean): void;
   addPeer(userId: string): void;
   removePeer(userId: string): void;
   peerIds(): string[];
@@ -68,6 +69,11 @@ export interface VoiceTransport {
   /** Fresh relay credentials, for every connection and ICE restart from now on. */
   setIceServers?(servers: RTCIceServer[]): void;
   setWatching(userId: string, on: boolean): void;
+  /**
+   * Whether the call's pictures are on screen anywhere (videoShown.ts). While
+   * they are not, cameras and shares need not come in; voices always do.
+   */
+  setVideoShown?(on: boolean): void;
   setVolume(userId: string, pct: number): void;
   setLocalMute(userId: string, on: boolean): void;
   /** The level of someone's screen share sound, apart from their voice. */

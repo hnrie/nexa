@@ -15,7 +15,7 @@ import { ring } from "@/lib/keyring";
 import { playSound } from "@/lib/sounds";
 import { convForChannel } from "@/components/composer/send";
 import { useKeys } from "@/stores/keys";
-import { useSettings, type ShareFps, type ShareResolution } from "@/stores/settings";
+import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { participantsOf, useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
@@ -25,10 +25,11 @@ import { LevelMeter, audioContext, getCamera, getMic, getScreen, holdAudio, last
 import { MeshTransport, type SignalPayload } from "./mesh";
 import { asGuest, iceConfig, me, sendState } from "./session";
 import { SfuTransport } from "./sfu";
-import { shareBitrate } from "./shareQuality";
+import { type SharePlan, sharePlan } from "./shareQuality";
 import { makeDenoiser, prepareDenoiser, releaseDenoiser } from "./denoise";
 import { AUDIBLE_LEVEL, SpeakingGate } from "./speaking";
 import type { TransportEvents, VoiceTransport } from "./transport";
+import { recheckVideoShown, watchVideoShown } from "./videoShown";
 import { VoiceSend } from "./voiceSend";
 
 import { t as tr_ } from "@/i18n";
@@ -410,6 +411,8 @@ function watchWhileInCall(s: Session): void {
   // transport used to find it on its own four-second check, and every frame
   // sealed under it until then was dropped here.
   s.cleanups.push(useKeys.subscribe(() => session === s && s.transport.keysArrived?.()));
+  // cameras and shares come in only while the call's pictures are on screen somewhere
+  s.cleanups.push(watchVideoShown(() => s.channelId, (on) => session === s && s.transport.setVideoShown?.(on)));
   const ctx = audioContext();
   let blockedTimer: ReturnType<typeof setTimeout> | null = null;
   const onState = () => {
@@ -774,7 +777,7 @@ export async function toggleCamera(): Promise<void> {
 }
 
 /** Stops a share, or starts one at the given size and frame rate (the last ones chosen when not given). */
-export async function toggleScreen(quality?: { resolution: ShareResolution; fps: ShareFps; audio?: boolean }): Promise<void> {
+export async function toggleScreen(quality?: { plan: SharePlan; audio?: boolean }): Promise<void> {
   const s = session;
   if (!s || s.screenPending) return;
   if (s.screen) {
@@ -784,20 +787,19 @@ export async function toggleScreen(quality?: { resolution: ShareResolution; fps:
     useVoice.getState().setLocalScreen(null);
   } else {
     const v = useSettings.getState().settings.voice;
-    const res = quality?.resolution ?? v.shareResolution;
-    const fps = quality?.fps ?? v.shareFps;
+    const plan = quality?.plan ?? sharePlan(v);
     const audio = quality?.audio ?? v.shareAudio ?? true;
     s.screenPending = true;
     let stream: MediaStream | null = null;
     try {
-      stream = await getScreen(res, fps, audio);
+      stream = await getScreen(plan, audio);
     } catch (err) {
       // Cancelling the picker rejects with NotAllowedError. A share whose sound could not start
       // rejects as a whole: the desktop app then falls back to safer sound and shares the same
       // source again, without asking, and the share goes ahead.
       const soundFailed = audio && err instanceof DOMException && (err.name === "NotReadableError" || err.name === "AbortError");
       const again = soundFailed ? await desktopBridge()?.shareAudioFailed?.().catch(() => false) : false;
-      if (again && session === s) stream = await getScreen(res, fps, audio).catch(() => null);
+      if (again && session === s) stream = await getScreen(plan, audio).catch(() => null);
       if (!stream && session === s) {
         // A share that will not start is usually the computer refusing to let
         // the app record at all; blaming the sound sends people the wrong way.
@@ -816,7 +818,7 @@ export async function toggleScreen(quality?: { resolution: ShareResolution; fps:
     s.screen = stream;
     const video = stream.getVideoTracks()[0];
     if (video) video.onended = () => void toggleScreen();
-    s.transport.setLocalScreen(stream, shareBitrate(res, fps), fps);
+    s.transport.setLocalScreen(stream, plan.bitrate, plan.fps, plan.smooth);
     useVoice.getState().setLocalScreen(stream);
   }
   sendState(s.channelId);
@@ -904,6 +906,8 @@ export function onMine(vs: VoiceState): boolean {
     for (const id of s.transport.peerIds()) s.transport.removePeer(id), store.removePeer(id);
     s.channelId = vs.channel_id;
     s.transport.moveTo(vs.channel_id);
+    // whether the call's pictures are on screen is now a question about the new channel
+    recheckVideoShown();
     // An encrypted call needs the new room's key here. Until it lands the
     // transport has none, and every frame it sends is dropped, so it is told
     // the moment the fetch resolves rather than on its own check.

@@ -54,6 +54,7 @@ import { useVoiceLocal } from "@/stores/voiceLocal";
 import { callThroughSfu, flipCamera, guestLinksOn, holdToTalk, joinVoice, leaveVoice, pushToTalkButton, resumeCallAudio, retryMic, toggleCamera, toggleScreen } from "@/voice/session";
 import { canShareScreen, hasSeveralCameras } from "@/voice/media";
 import { safeAspect } from "@/voice/videoCap";
+import { callViewOpen } from "@/voice/videoShown";
 import s from "./Voice.module.css";
 
 import { t as tr_, translator } from "@/i18n";
@@ -398,6 +399,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   // ringing them: say who, rather than leave the caller alone on a silent stage
   const calling = useVoice((v) => v.calling === channel.id);
   const calledId = channel.type === "dm" ? channel.recipient_ids.find((id) => id !== meId) : undefined;
+  // while this is open the call's cameras and shares come in (voice/videoShown.ts)
+  useEffect(() => callViewOpen(channel.id), [channel.id]);
   // this device's own link to the call, apart from how each person is reached
   const connection = useVoice((v) => (v.mine?.channel_id === channel.id ? v.connection : null));
   const audioBlocked = useVoice((v) => v.audioBlocked);
