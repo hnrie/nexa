@@ -6,7 +6,7 @@
    line once anything has scrolled beneath it. It takes no room of its own. */
 .edge {
   position: sticky;
-  top: 0;
+  top: -16px;
   z-index: 1;
   height: 16px;
   margin: -16px -20px 0;
