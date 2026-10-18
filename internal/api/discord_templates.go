@@ -174,9 +174,6 @@ type discordTemplateChannel struct {
 	} `json:"default_reaction_emoji"`
 	DefaultSortOrder   *int `json:"default_sort_order"`
 	DefaultForumLayout *int `json:"default_forum_layout"`
-	IconEmoji          *struct {
-		Name *string `json:"name"`
-	} `json:"icon_emoji"`
 }
 
 type discordTemplatePreview struct {
@@ -582,13 +579,6 @@ func buildTemplateSpec(tpl *discordGuildTemplate, customName string) (store.Temp
 		if store.HoldsThreads(c.typ) && c.raw.DefaultAutoArchiveDuration != nil && validAutoArchive(*c.raw.DefaultAutoArchiveDuration) {
 			autoArchive = *c.raw.DefaultAutoArchiveDuration
 		}
-		glyph := ""
-		if c.raw.IconEmoji != nil && c.raw.IconEmoji.Name != nil {
-			em := strings.TrimSpace(*c.raw.IconEmoji.Name)
-			if em != "" && len(em) <= maxEmojiLen && isEmojiSequence(em) {
-				glyph = "emoji:" + em
-			}
-		}
 		var forum *store.ForumSettings
 		if c.typ == store.ChannelForum {
 			f := &store.ForumSettings{Sort: "activity", Layout: "list", Tags: []store.ForumTag{}}
@@ -640,7 +630,6 @@ func buildTemplateSpec(tpl *discordGuildTemplate, customName string) (store.Temp
 			NSFW:               c.raw.NSFW,
 			SlowmodeSeconds:    slowmode,
 			UserLimit:          userLimit,
-			Glyph:              glyph,
 			DefaultAutoArchive: autoArchive,
 			Forum:              forum,
 			Overwrites:         convertOverwrites(rawOWs),

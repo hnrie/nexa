@@ -96,6 +96,7 @@ func TestDiscordTemplatePreviewAndImport(t *testing.T) {
 						{
 							"id": 3, "type": 0, "name": "general-chat", "position": 1, "parent_id": 1,
 							"topic": "Say hello!", "rate_limit_per_user": 10,
+							"icon_emoji": map[string]any{"id": nil, "name": "👋"},
 							"permission_overwrites": []map[string]any{
 								{"id": 0, "type": 0, "allow": "2048", "deny": "0"},
 							},
@@ -228,6 +229,9 @@ func TestDiscordTemplatePreviewAndImport(t *testing.T) {
 	general := channelNamed(view, "general-chat")
 	if view["system_channel_id"] != general["id"] || general["slowmode_seconds"].(float64) != 10 {
 		t.Errorf("general-chat / system_channel_id: sys=%v general=%v", view["system_channel_id"], general)
+	}
+	if general["glyph"] != nil && general["glyph"] != "" {
+		t.Errorf("Discord's onboarding icon_emoji must not replace the channel's # icon: %v", general["glyph"])
 	}
 	ann := channelNamed(view, "announcements")
 	if ann["type"] != "announcement" || ann["topic"] != "Important class updates." {
