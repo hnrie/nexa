@@ -6275,6 +6275,16 @@
   "look.seasonal.valentines": "वैलेंटाइन डे",
   "look.seasonal.winter": "सर्दी",
   "look.seasonal.winterNight": "सर्दी की रात",
+  "modals.createServer.importTemplate": "Discord टेम्पलेट आयात करें",
+  "modals.createServer.importTemplateDesc": "टेम्पलेट लिंक से उसके चैनलों और भूमिकाओं के साथ शुरू करें।",
+  "modals.createServer.importTemplateHint": "चैनलों, श्रेणियों, भूमिकाओं और अनुमतियों के साथ सर्वर बनाने के लिए Discord सर्वर टेम्पलेट लिंक या कोड पेस्ट करें।",
+  "modals.createServer.invalidTemplateLink": "कोई Discord सर्वर टेम्पलेट लिंक पेस्ट करें, जैसे https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.inviteNotTemplate": "यह Discord आमंत्रण लिंक है, सर्वर टेम्पलेट लिंक नहीं। टेम्पलेट https://discord.new/2TffvPucqHkN जैसे दिखते हैं।",
+  "modals.createServer.readingTemplate": "टेम्पलेट पढ़ा जा रहा है…",
+  "modals.createServer.templateLink": "टेम्पलेट लिंक",
+  "modals.createServer.templatePlaceholder": "https://discord.new/2TffvPucqHkN",
+  "modals.createServer.templateSummary": "{channels} चैनल, {categories} श्रेणियाँ, {roles} भूमिकाएँ",
+  "modals.createServer.templatesLookLike": "टेम्पलेट https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN या केवल कोड जैसे दिखते हैं।",
   "moderation.action.discoveryRestore": "सर्वर को खोजें में फिर से दिखाया",
   "moderation.chat.caseStart": "यह इस मामले के बारे में {name} के साथ बातचीत है। आप जो लिखते हैं वह उन्हें Nexa के रूप में आपके नाम के साथ पहुँचता है, और यहाँ कुछ भी एंड-टू-एंड एन्क्रिप्टेड नहीं है।",
   "moderation.chat.reportStart": "यह {name} के साथ उनकी रिपोर्ट के बारे में बातचीत है। आप जो लिखते हैं वह उन्हें Nexa के रूप में आपके नाम के साथ पहुँचता है, और यहाँ कुछ भी एंड-टू-एंड एन्क्रिप्टेड नहीं है।",
@@ -6411,5 +6421,7 @@
   "whatsNew.r20261009.shareModesBody": "स्क्रीन शेयर करते समय सहज हलचल के लिए परफ़ॉर्मेंस, पूरे रेज़ोल्यूशन और फ़्रेम रेट वाली स्क्रीन के लिए क्वालिटी, या रेज़ोल्यूशन, फ़्रेम रेट और बिटरेट खुद तय करने के लिए कस्टम चुनें। आप जो स्ट्रीम देखते हैं, उनकी पहली तस्वीर भी अब जल्दी दिखती है।",
   "whatsNew.r20261009.shareModesTitle": "स्ट्रीम मोड",
   "whatsNew.r20261009.streamSoundBody": "जब आप आवाज़ के साथ स्क्रीन शेयर करते हैं, तो संगीत और गेम अब सभी तक स्टीरियो में और बेहतर क्वालिटी में पहुँचते हैं।",
-  "whatsNew.r20261009.streamSoundTitle": "स्ट्रीम में स्टीरियो आवाज़"
+  "whatsNew.r20261009.streamSoundTitle": "स्ट्रीम में स्टीरियो आवाज़",
+  "whatsNew.r20261017.templatesBody": "सर्वर जोड़ें, Discord टेम्पलेट आयात करें में किसी भी Discord टेम्पलेट लिंक से सर्वर बनाएँ। उसकी श्रेणियाँ, चैनल, भूमिकाएँ और अनुमतियाँ सब साथ आती हैं।",
+  "whatsNew.r20261017.templatesTitle": "Discord सर्वर टेम्पलेट आयात करें"
 }

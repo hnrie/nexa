@@ -6275,6 +6275,16 @@
   "look.seasonal.valentines": "Valentine's Day",
   "look.seasonal.winter": "Winter",
   "look.seasonal.winterNight": "Winter Night",
+  "modals.createServer.importTemplate": "Import Discord Template",
+  "modals.createServer.importTemplateDesc": "Start from a template link with its channels and roles.",
+  "modals.createServer.importTemplateHint": "Paste a Discord server template link or code to create a server with its channels, categories, roles and permissions.",
+  "modals.createServer.invalidTemplateLink": "Paste a Discord server template link, like https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.inviteNotTemplate": "That is a Discord invite link, not a server template link. Templates look like https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.readingTemplate": "Reading template…",
+  "modals.createServer.templateLink": "Template Link",
+  "modals.createServer.templatePlaceholder": "https://discord.new/2TffvPucqHkN",
+  "modals.createServer.templateSummary": "{channels} channels, {categories} categories, {roles} roles",
+  "modals.createServer.templatesLookLike": "Templates look like https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN, or just the code.",
   "moderation.action.discoveryRestore": "Showed a server on Discover again",
   "moderation.chat.caseStart": "This is the conversation with {name} about this case. What you write reaches them as Nexa, with your name shown, and nothing here is end-to-end encrypted.",
   "moderation.chat.reportStart": "This is the conversation with {name} about their report. What you write reaches them as Nexa, with your name shown, and nothing here is end-to-end encrypted.",
@@ -6411,5 +6421,7 @@
   "whatsNew.r20261009.shareModesBody": "When you share your screen, pick Performance for smooth motion, Quality for your screen at its full resolution and frame rate, or Custom to set the resolution, frame rate and bitrate yourself. Streams you watch also show their first picture sooner.",
   "whatsNew.r20261009.shareModesTitle": "Stream Modes",
   "whatsNew.r20261009.streamSoundBody": "When you share your screen with sound, music and games now reach everyone in stereo and at a higher quality.",
-  "whatsNew.r20261009.streamSoundTitle": "Stereo Stream Sound"
+  "whatsNew.r20261009.streamSoundTitle": "Stereo Stream Sound",
+  "whatsNew.r20261017.templatesBody": "Create a server from any Discord template link in Add a Server, Import Discord Template. Its categories, channels, roles and permission overwrites all come over.",
+  "whatsNew.r20261017.templatesTitle": "Import Discord Server Templates"
 }

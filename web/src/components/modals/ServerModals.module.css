@@ -31,4 +31,19 @@
 .keyNote { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--bg-base) 60%, var(--bg-floating)); box-shadow: inset 0 0 0 1px var(--border-subtle); font-size: 13px; color: var(--text-muted); line-height: 1.4; }
 .keyNote svg { flex: none; color: var(--positive); margin-top: 1px; }
 .keyNote[data-warn="true"] svg { color: var(--warning); }
+.actionCard { width: 100%; border: 0; font: inherit; text-align: start; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-md); background: color-mix(in oklab, var(--bg-base) 60%, var(--bg-floating)); box-shadow: inset 0 0 0 1px var(--border-subtle); cursor: pointer; color: var(--text); transition: box-shadow var(--transition), background var(--transition); }
+.actionCard:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.templateCard { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: var(--radius-md); background: color-mix(in oklab, var(--bg-base) 60%, var(--bg-floating)); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.templateTitle { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-strong); }
+.templateMeta { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
+.templateDesc { margin: 4px 0 0; font-size: 13px; color: var(--text-subtle); line-height: 1.4; }
+.templateRoles { display: flex; flex-wrap: wrap; gap: 6px; }
+.rolePill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: var(--radius-pill); background: var(--bg-surface); font-size: 12px; color: var(--text-subtle); }
+.roleDot { width: 8px; height: 8px; border-radius: var(--radius-pill); flex: none; }
+.templateTree { display: flex; flex-direction: column; gap: 6px; max-height: 112px; overflow-y: auto; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+.templateCat { font-size: 12px; font-weight: 600; color: var(--text-muted); padding-top: 2px; }
+.templateChans { display: flex; flex-wrap: wrap; gap: 6px; }
+.templateChan { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: var(--radius-xs); background: var(--bg-surface); font-size: 12px; color: var(--text); }
+.templateChan svg { color: var(--text-muted); flex: none; }
+.errorText { margin: 0; font-size: 13px; color: var(--danger); line-height: 1.4; }
 @media (max-width: 767px) { .row2 { grid-template-columns: 1fr; } }

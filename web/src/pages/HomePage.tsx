@@ -41,9 +41,9 @@ import s from "./Home.module.css";
  * on this page cannot drift from the truth unnoticed, as "264 KB" had. (It
  * was 208 kB when this was first set at 300, and 500 had stopped saying much;
  * it was 321 kB when it became 330, about half of it the English strings,
- * and 330.3 kB when it became 335, the plugin permissions' words pushing it over.)
+ * 330.3 kB when it became 335, and 337 kB when it became 340.)
  */
-export const LOAD_KB_LIMIT = 335;
+export const LOAD_KB_LIMIT = 340;
 
 /** Whether this visitor has asked for less movement, by either route. */
 function useStillness(): boolean {

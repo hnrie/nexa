@@ -246,6 +246,8 @@ func (s *Store) ChannelByID(ctx context.Context, id ids.ID) (*Channel, error) {
 			return nil, err
 		} else if own {
 			c.KeyConvID = c.ID
+		} else if flags, err := s.KeyFlags(ctx, c.ID); err == nil && flags.NeedsOwnKey {
+			c.KeyConvID = c.ID
 		} else if IsThread(c.Type) && c.ParentID != nil {
 			// a thread without keys of its own is sealed as its channel is
 			if _, parentOwn, err := s.LatestEpoch(ctx, *c.ParentID); err != nil {

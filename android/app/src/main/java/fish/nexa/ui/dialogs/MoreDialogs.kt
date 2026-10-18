@@ -3,17 +3,25 @@ package fish.nexa.ui.dialogs
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -23,9 +31,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import fish.nexa.Nexa
 import fish.nexa.crypto.Bytes
@@ -55,9 +67,12 @@ import fish.nexa.ui.profile.ProfileLinks
 import fish.nexa.ui.t
 import fish.nexa.ui.theme.Nx
 import fish.nexa.ui.theme.Radii
+import fish.nexa.ui.theme.mixOklab
+import fish.nexa.ui.theme.ring
 import fish.nexa.ui.theme.shadowLow
 import fish.nexa.ui.theme.sunken
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonNull
@@ -68,18 +83,95 @@ import kotlinx.serialization.json.putJsonObject
 import java.util.Calendar
 
 // ---------------------------------------------------------------------------
-// CreateServerModal: make a server, or join one with an invite
+// CreateServerModal: make a server, join one with an invite, or import a template
 
+private fun templateChannelIcon(type: String): String = when (type) {
+    "voice" -> "Volume2"
+    "announcement" -> "Megaphone"
+    "forum" -> "MessagesSquare"
+    else -> "Hash"
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun CreateServerSheet(layer: Layer, close: () -> Unit) {
     val c = Nx.colors
     val me = Nexa.users.me.value
-    var join by remember { mutableStateOf(false) }
+    var mode by remember { mutableStateOf("create") }
     var name by remember { mutableStateOf(me?.let { t("modals.createServer.namedServer", "name" to it.displayName.ifBlank { it.username }) } ?: t("modals.createServer.myServer")) }
     var code by remember { mutableStateOf("") }
     var icon by remember { mutableStateOf<Uri?>(null) }
     var busy by remember { mutableStateOf(false) }
+
+    var templateUrl by remember { mutableStateOf("") }
+    var templateName by remember { mutableStateOf("") }
+    var templateNameEdited by remember { mutableStateOf(false) }
+    var preview by remember { mutableStateOf<Invites.TemplatePreview?>(null) }
+    var previewLoading by remember { mutableStateOf(false) }
+    var templateErr by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(mode, templateUrl) {
+        if (mode != "template") return@LaunchedEffect
+        val raw = templateUrl.trim()
+        if (raw.isEmpty()) {
+            preview = null
+            previewLoading = false
+            templateErr = null
+            return@LaunchedEffect
+        }
+        when (val parsed = Invites.parseDiscordTemplate(raw)) {
+            is Invites.ParsedTemplate.Err -> {
+                preview = null
+                previewLoading = false
+                templateErr = if (parsed.reason == "invite") t("modals.createServer.inviteNotTemplate") else null
+            }
+            is Invites.ParsedTemplate.Ok -> {
+                templateErr = null
+                previewLoading = true
+                delay(250)
+                try {
+                    val res = Invites.previewDiscordTemplate(parsed.code)
+                    preview = res
+                    if (!templateNameEdited || templateName.isBlank()) templateName = res.serverName
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    preview = null
+                    templateErr = describeError(e, t("modals.createServer.couldNotCreateTheServer"))
+                } finally {
+                    previewLoading = false
+                }
+            }
+        }
+    }
+
+    suspend fun finishCreatedServer(view: ServerView) {
+        Nexa.channels.upsert(view.channels)
+        Nexa.servers.put(view)
+        for (ch in view.channels) {
+            if (ch.type != "category" && ch.keyConvId == ch.id) {
+                runCatching { Nexa.keys.ensureConvKey(ch.id) }
+            }
+        }
+        // the icon goes up once the server exists; a failure there still leaves the server made
+        icon?.let { picked ->
+            try {
+                Nexa.servers.setServer(wireJson.decodeFromJsonElement(Server.serializer(), uploadPicture("PUT", "/servers/${view.id}/icon", picked)))
+            } catch (e: Exception) {
+                Nexa.ui.toast(
+                    if (e is fish.nexa.net.ApiError) t("modals.createServer.theServerWasMadeButItsIcon", "error" to (e.message ?: "")) else t("modals.createServer.theServerWasMadeButIts"),
+                    "error",
+                )
+            }
+        }
+        close()
+        val first = (view.systemChannelId?.let { sys -> view.channels.firstOrNull { it.id == sys } })
+            ?: view.channels.firstOrNull { it.type == "text" || it.type == "announcement" || it.type == "forum" }
+        Nav.go(Route.Server(view.id, first?.id))
+        Nav.leftOpen = false
+    }
+
     fun create() {
         val clean = name.trim()
         if (clean.isEmpty() || busy) return
@@ -98,22 +190,7 @@ internal fun CreateServerSheet(layer: Layer, close: () -> Unit) {
                     }, captcha = captcha)
                 }
                 val view = wireJson.decodeFromJsonElement(ServerView.serializer(), res)
-                Nexa.channels.upsert(view.channels)
-                Nexa.servers.put(view)
-                // the icon goes up once the server exists; a failure there still leaves the server made
-                icon?.let { picked ->
-                    try {
-                        Nexa.servers.setServer(wireJson.decodeFromJsonElement(Server.serializer(), uploadPicture("PUT", "/servers/${view.id}/icon", picked)))
-                    } catch (e: Exception) {
-                        Nexa.ui.toast(
-                            if (e is fish.nexa.net.ApiError) t("modals.createServer.theServerWasMadeButItsIcon", "error" to (e.message ?: "")) else t("modals.createServer.theServerWasMadeButIts"),
-                            "error",
-                        )
-                    }
-                }
-                close()
-                Nav.go(Route.Server(view.id, view.channels.firstOrNull { it.type == "text" }?.id))
-                Nav.leftOpen = false
+                finishCreatedServer(view)
             } catch (e: Exception) {
                 Nexa.ui.toast(describeError(e, t("modals.createServer.couldNotCreateTheServer")), "error")
             } finally {
@@ -121,7 +198,43 @@ internal fun CreateServerSheet(layer: Layer, close: () -> Unit) {
             }
         }
     }
+
+    fun importTemplate() {
+        val raw = templateUrl.trim()
+        if (raw.isEmpty() || busy) return
+        val parsed = Invites.parseDiscordTemplate(raw)
+        if (parsed is Invites.ParsedTemplate.Err) {
+            templateErr = if (parsed.reason == "invite") t("modals.createServer.inviteNotTemplate") else t("modals.createServer.invalidTemplateLink")
+            return
+        }
+        busy = true
+        templateErr = null
+        scope.launch {
+            try {
+                val custom = templateName.trim()
+                val res = Nexa.auth.guarded("create_server") { captcha ->
+                    Nexa.api.request("POST", "/servers/import/discord", buildJsonObject {
+                        put("url", raw)
+                        if (custom.isNotEmpty()) put("name", custom)
+                    }, captcha = captcha)
+                }
+                val view = wireJson.decodeFromJsonElement(ServerView.serializer(), res)
+                finishCreatedServer(view)
+            } catch (e: Exception) {
+                templateErr = describeError(e, t("modals.createServer.couldNotCreateTheServer"))
+            } finally {
+                busy = false
+            }
+        }
+    }
+
     fun joinIt() {
+        val trimmed = code.trim()
+        if (Invites.isDiscordTemplateUrl(trimmed)) {
+            templateUrl = trimmed
+            mode = "template"
+            return
+        }
         val parsed = Invites.parseCode(code)
         if (parsed == null) {
             Nexa.ui.toast(t("modals.createServer.thatDoesnTLookLikeAn"), "error")
@@ -131,11 +244,12 @@ internal fun CreateServerSheet(layer: Layer, close: () -> Unit) {
         // the same sheet an invite link opens
         Dialogs.openInvite(parsed.first, parsed.second)
     }
-    if (join) {
+
+    if (mode == "join") {
         val example = "${ProfileLinks.origin()}/invite/hTKzmak"
         Sheet(layer, title = t("modals.createServer.joinAServer"), maxWidth = 440.dp, footer = {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                NxButton(t("modals.createServer.back"), { join = false }, kind = ButtonKind.GHOST)
+                NxButton(t("modals.createServer.back"), { mode = "create" }, kind = ButtonKind.GHOST)
                 NxButton(t("modals.createServer.joinServer"), ::joinIt, enabled = code.isNotBlank())
             }
         }) {
@@ -145,9 +259,141 @@ internal fun CreateServerSheet(layer: Layer, close: () -> Unit) {
         }
         return
     }
+
+    if (mode == "template") {
+        val prev = preview
+        val effectiveName = templateName.trim().ifEmpty { prev?.serverName?.ifEmpty { null } ?: name.ifBlank { "S" } }
+        Sheet(layer, title = t("modals.createServer.importTemplate"), maxWidth = 460.dp, footer = {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                NxButton(t("modals.createServer.back"), { mode = "create" }, kind = ButtonKind.GHOST)
+                NxButton(t("modals.createServer.create"), ::importTemplate, enabled = templateUrl.isNotBlank(), loading = busy)
+            }
+        }) {
+            DialogHint(t("modals.createServer.importTemplateHint"))
+            NxTextField(
+                templateUrl, { templateUrl = it },
+                label = t("modals.createServer.templateLink"),
+                required = true,
+                placeholder = t("modals.createServer.templatePlaceholder"),
+                keyboardType = KeyboardType.Uri,
+                imeAction = ImeAction.Go,
+                onIme = ::importTemplate,
+            )
+            templateErr?.let { err ->
+                Txt(err, style = Nx.type.bodySmall, color = c.danger)
+            }
+            if (previewLoading && prev == null) {
+                Txt(t("modals.createServer.readingTemplate"), style = Nx.type.hint, color = c.textMuted)
+            } else if (prev == null && templateErr == null) {
+                Txt(t("modals.createServer.templatesLookLike"), style = Nx.type.hint, color = c.textMuted)
+            }
+            if (prev != null) {
+                val cats = prev.channels.filter { it.type == "category" }
+                val loose = prev.channels.filter { it.type != "category" && it.parentIndex < 0 }
+                val chanCount = prev.channels.count { it.type != "category" }
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .ring(Radii.Md, c.borderSubtle)
+                        .background(mixOklab(c.bgFloating, c.bgBase, 0.6f), Radii.Md)
+                        .clip(Radii.Md)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Txt(prev.name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight.SemiBold), color = c.textStrong)
+                        Txt(
+                            t("modals.createServer.templateSummary", "channels" to chanCount, "categories" to cats.size, "roles" to prev.roles.size),
+                            style = Nx.type.hint,
+                            color = c.textMuted,
+                        )
+                        if (prev.description.isNotEmpty()) {
+                            Txt(prev.description, style = Nx.type.bodySmall, color = c.textSubtle, modifier = Modifier.padding(top = 2.dp))
+                        }
+                    }
+                    if (prev.roles.isNotEmpty()) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for (r in prev.roles) {
+                                val dotColor = if (r.color > 0) Color(0xFF000000 or r.color.toLong()) else c.textMuted
+                                Row(
+                                    Modifier.background(c.bgSurface, Radii.Pill).padding(horizontal = 8.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Box(Modifier.size(8.dp).background(dotColor, CircleShape))
+                                    Txt(r.name, style = Nx.type.hint, color = c.textSubtle)
+                                }
+                            }
+                        }
+                    }
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
+                    Column(
+                        Modifier.fillMaxWidth().heightIn(max = 112.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (loose.isNotEmpty()) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                for (ch in loose) {
+                                    Row(
+                                        Modifier.background(c.bgSurface, Radii.Xs).padding(horizontal = 8.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                    ) {
+                                        Icon(templateChannelIcon(ch.type), c.textMuted, size = 13.dp)
+                                        Txt(ch.name, style = Nx.type.hint, color = c.text)
+                                        if (ch.isPrivate) Icon("Lock", c.textMuted, size = 11.dp)
+                                    }
+                                }
+                            }
+                        }
+                        for (cat in cats) {
+                            val children = prev.channels.filter { it.type != "category" && it.parentIndex == cat.id }
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Txt(cat.name, style = Nx.type.hint.copy(fontWeight = FontWeight.SemiBold), color = c.textMuted)
+                                if (children.isNotEmpty()) {
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        for (ch in children) {
+                                            Row(
+                                                Modifier.background(c.bgSurface, Radii.Xs).padding(horizontal = 8.dp, vertical = 3.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                            ) {
+                                                Icon(templateChannelIcon(ch.type), c.textMuted, size = 13.dp)
+                                                Txt(ch.name, style = Nx.type.hint, color = c.text)
+                                                if (ch.isPrivate) Icon("Lock", c.textMuted, size = 11.dp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    IconPicker(null, icon, { icon = it }, { icon = null }, AvatarColor.initials(effectiveName), t("modals.createServer.serverIcon"))
+                }
+                NxTextField(
+                    templateName,
+                    {
+                        templateNameEdited = true
+                        templateName = it.take(100)
+                    },
+                    label = t("modals.createServer.serverName"),
+                    required = true,
+                    imeAction = ImeAction.Done,
+                    onIme = ::importTemplate,
+                    capitalize = true,
+                )
+            }
+        }
+        return
+    }
+
+    val tplInteraction = remember { MutableInteractionSource() }
+    val tplPressed by tplInteraction.collectIsPressedAsState()
     Sheet(layer, title = t("modals.createServer.createYourServer"), maxWidth = 440.dp, footer = {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
-            NxButton(t("modals.createServer.haveAnInviteAlready"), { join = true }, kind = ButtonKind.GHOST, modifier = Modifier.weight(1f, fill = false))
+            NxButton(t("modals.createServer.haveAnInviteAlready"), { mode = "join" }, kind = ButtonKind.GHOST, modifier = Modifier.weight(1f, fill = false))
             NxButton(t("modals.createServer.create"), ::create, enabled = name.isNotBlank(), loading = busy)
         }
     }) {
@@ -156,6 +402,25 @@ internal fun CreateServerSheet(layer: Layer, close: () -> Unit) {
             IconPicker(null, icon, { icon = it }, { icon = null }, AvatarColor.initials(name.ifBlank { "S" }), t("modals.createServer.serverIcon"))
         }
         NxTextField(name, { name = it.take(100) }, label = t("modals.createServer.serverName"), required = true, imeAction = ImeAction.Done, onIme = ::create, capitalize = true)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .ring(Radii.Md, if (tplPressed) c.borderStrong else c.borderSubtle)
+                .background(mixOklab(c.bgFloating, c.bgBase, 0.6f), Radii.Md)
+                .clip(Radii.Md)
+                .pressable(tplInteraction, role = Role.Button) { mode = "template" }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon("PanelsTopLeft", c.textMuted, size = 20.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Txt(t("modals.createServer.importTemplate"), style = Nx.type.body.copy(fontWeight = FontWeight(500)), color = c.text)
+                Txt(t("modals.createServer.importTemplateDesc"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(17.5f)), color = c.textMuted)
+            }
+            Icon("ChevronRight", c.textMuted, size = 18.dp)
+        }
         Txt(t("modals.createServer.byCreatingAServerYouAgree"), style = Nx.type.hint, color = c.textMuted)
     }
 }

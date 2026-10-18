@@ -6052,6 +6052,16 @@
   "look.seasonal.valentines": "情人节",
   "look.seasonal.winter": "冬天",
   "look.seasonal.winterNight": "冬夜",
+  "modals.createServer.importTemplate": "导入 Discord 模板",
+  "modals.createServer.importTemplateDesc": "从模板链接开始，保留其中的频道和身份组。",
+  "modals.createServer.importTemplateHint": "粘贴 Discord 服务器模板链接或代码，即可按其中的频道、分类、身份组和权限创建服务器。",
+  "modals.createServer.invalidTemplateLink": "请粘贴 Discord 服务器模板链接，例如 https://discord.new/2TffvPucqHkN。",
+  "modals.createServer.inviteNotTemplate": "这是 Discord 邀请链接，不是服务器模板链接。模板链接形如 https://discord.new/2TffvPucqHkN。",
+  "modals.createServer.readingTemplate": "正在读取模板…",
+  "modals.createServer.templateLink": "模板链接",
+  "modals.createServer.templatePlaceholder": "https://discord.new/2TffvPucqHkN",
+  "modals.createServer.templateSummary": "{channels} 个频道，{categories} 个分类，{roles} 个身份组",
+  "modals.createServer.templatesLookLike": "模板链接形如 https://discord.new/2TffvPucqHkN、https://discord.com/template/2TffvPucqHkN，或直接填写代码。",
   "moderation.action.discoveryRestore": "让服务器重新显示在发现中",
   "moderation.chat.caseStart": "这是与 {name} 关于此案件的对话。你写的内容会以 Nexa 的身份送达，并显示你的名字，这里的任何内容都没有端到端加密。",
   "moderation.chat.reportStart": "这是与 {name} 关于其报告的对话。你写的内容会以 Nexa 的身份送达，并显示你的名字，这里的任何内容都没有端到端加密。",
@@ -6186,5 +6196,7 @@
   "whatsNew.r20261009.shareModesBody": "共享屏幕时，可以选择“性能”获得流畅画面，选择“画质”按屏幕完整分辨率和帧率共享，或选择“自定义”自己设置分辨率、帧率和码率。你观看的直播也会更快显示第一帧画面。",
   "whatsNew.r20261009.shareModesTitle": "直播模式",
   "whatsNew.r20261009.streamSoundBody": "带声音共享屏幕时，音乐和游戏现在会以立体声和更高音质传给所有人。",
-  "whatsNew.r20261009.streamSoundTitle": "直播声音支持立体声"
+  "whatsNew.r20261009.streamSoundTitle": "直播声音支持立体声",
+  "whatsNew.r20261017.templatesBody": "在“添加服务器”中选择“导入 Discord 模板”，即可通过任意 Discord 模板链接创建服务器。其中的分类、频道、身份组和权限覆盖设置都会完整保留。",
+  "whatsNew.r20261017.templatesTitle": "导入 Discord 服务器模板"
 }

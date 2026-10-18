@@ -6377,6 +6377,16 @@
   "look.seasonal.valentines": "Dia dos Namorados",
   "look.seasonal.winter": "Inverno",
   "look.seasonal.winterNight": "Noite de inverno",
+  "modals.createServer.importTemplate": "Importar modelo do Discord",
+  "modals.createServer.importTemplateDesc": "Comece a partir de um link de modelo com seus canais e cargos.",
+  "modals.createServer.importTemplateHint": "Cole um link ou código de modelo de servidor do Discord para criar um servidor com seus canais, categorias, cargos e permissões.",
+  "modals.createServer.invalidTemplateLink": "Cole um link de modelo de servidor do Discord, como https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.inviteNotTemplate": "Esse é um link de convite do Discord, não um link de modelo de servidor. Os modelos se parecem com https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.readingTemplate": "Lendo modelo…",
+  "modals.createServer.templateLink": "Link do modelo",
+  "modals.createServer.templatePlaceholder": "https://discord.new/2TffvPucqHkN",
+  "modals.createServer.templateSummary": "{channels} canais, {categories} categorias, {roles} cargos",
+  "modals.createServer.templatesLookLike": "Os modelos se parecem com https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN ou apenas o código.",
   "moderation.action.discoveryRestore": "Voltou a mostrar um servidor em Descobrir",
   "moderation.chat.caseStart": "Esta é a conversa com {name} sobre este caso. O que você escrever chega como Nexa, com o seu nome visível, e nada aqui tem criptografia de ponta a ponta.",
   "moderation.chat.reportStart": "Esta é a conversa com {name} sobre o relatório. O que você escrever chega como Nexa, com o seu nome visível, e nada aqui tem criptografia de ponta a ponta.",
@@ -6513,5 +6523,7 @@
   "whatsNew.r20261009.shareModesBody": "Ao compartilhar a tela, escolha Desempenho para movimento suave, Qualidade para sua tela na resolução e taxa de quadros completas, ou Personalizado para definir você mesmo a resolução, a taxa de quadros e a taxa de bits. As transmissões que você assiste também mostram a primeira imagem mais rápido.",
   "whatsNew.r20261009.shareModesTitle": "Modos de transmissão",
   "whatsNew.r20261009.streamSoundBody": "Quando você compartilha a tela com som, músicas e jogos agora chegam a todos em estéreo e com mais qualidade.",
-  "whatsNew.r20261009.streamSoundTitle": "Som estéreo nas transmissões"
+  "whatsNew.r20261009.streamSoundTitle": "Som estéreo nas transmissões",
+  "whatsNew.r20261017.templatesBody": "Crie um servidor a partir de qualquer link de modelo do Discord em Adicionar um Servidor, Importar modelo do Discord. Suas categorias, canais, cargos e permissões vêm todos juntos.",
+  "whatsNew.r20261017.templatesTitle": "Importar modelos de servidor do Discord"
 }

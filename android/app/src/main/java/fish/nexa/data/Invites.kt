@@ -60,6 +60,98 @@ object Invites {
         return code to (if (hash.isNotEmpty()) "#$hash" else "")
     }
 
+    private val TEMPLATE_CODE_RE = Regex("^[A-Za-z0-9_-]{2,32}$")
+
+    sealed interface ParsedTemplate {
+        data class Ok(val code: String) : ParsedTemplate
+        data class Err(val reason: String) : ParsedTemplate
+    }
+
+    /** lib/discordTemplate.ts: parses a discord.new link, discord.com/template link, or bare code. */
+    fun parseDiscordTemplate(input: String): ParsedTemplate {
+        val s = input.trim()
+        if (s.isEmpty()) return ParsedTemplate.Err("empty")
+        if (!s.contains("://") && !s.contains('/') && !s.contains('.')) {
+            return if (TEMPLATE_CODE_RE.matches(s)) ParsedTemplate.Ok(s) else ParsedTemplate.Err("invalid")
+        }
+        val withScheme = if (s.contains("://")) s else "https://$s"
+        val uri = try { java.net.URI(withScheme) } catch (_: Exception) { return ParsedTemplate.Err("invalid") }
+        var host = (uri.host ?: return ParsedTemplate.Err("invalid")).lowercase()
+        for (prefix in listOf("www.", "ptb.", "canary.")) {
+            if (host.startsWith(prefix)) host = host.removePrefix(prefix)
+        }
+        val parts = (uri.rawPath ?: "").split('/').filter { it.isNotEmpty() }
+        if (host == "discord.gg") return ParsedTemplate.Err("invite")
+        if (host == "discord.new") {
+            val code = parts.firstOrNull()
+            return if (parts.size == 1 && code != null && TEMPLATE_CODE_RE.matches(code)) ParsedTemplate.Ok(code) else ParsedTemplate.Err("invalid")
+        }
+        if (host == "discord.com" || host == "discordapp.com") {
+            if (parts.firstOrNull()?.equals("invite", ignoreCase = true) == true) return ParsedTemplate.Err("invite")
+            if (parts.size == 2 && (parts[0].equals("template", ignoreCase = true) || parts[0].equals("templates", ignoreCase = true)) && TEMPLATE_CODE_RE.matches(parts[1])) {
+                return ParsedTemplate.Ok(parts[1])
+            }
+            if (parts.size == 4 && parts[0].equals("api", ignoreCase = true) && parts[1].equals("guilds", ignoreCase = true) && parts[2].equals("templates", ignoreCase = true) && TEMPLATE_CODE_RE.matches(parts[3])) {
+                return ParsedTemplate.Ok(parts[3])
+            }
+            if (parts.size == 5 && parts[0].equals("api", ignoreCase = true) && parts[2].equals("guilds", ignoreCase = true) && parts[3].equals("templates", ignoreCase = true) && TEMPLATE_CODE_RE.matches(parts[4])) {
+                return ParsedTemplate.Ok(parts[4])
+            }
+        }
+        return ParsedTemplate.Err("invalid")
+    }
+
+    fun isDiscordTemplateUrl(input: String): Boolean {
+        val s = input.trim()
+        if (!s.contains('/') && !s.contains('.')) return false
+        return parseDiscordTemplate(s) is ParsedTemplate.Ok
+    }
+
+    data class TemplateChannelPreview(
+        val id: Int,
+        val type: String,
+        val name: String,
+        val parentIndex: Int,
+        val isPrivate: Boolean,
+    )
+
+    data class TemplateRolePreview(
+        val name: String,
+        val color: Int,
+    )
+
+    data class TemplatePreview(
+        val code: String,
+        val name: String,
+        val description: String,
+        val serverName: String,
+        val channels: List<TemplateChannelPreview>,
+        val roles: List<TemplateRolePreview>,
+    )
+
+    suspend fun previewDiscordTemplate(code: String): TemplatePreview {
+        val res = Nexa.api.get("/servers/templates/discord/$code") as JsonObject
+        fun JsonObject.s(k: String) = (this[k] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: ""
+        fun JsonObject.n(k: String) = (this[k] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+        fun JsonObject.b(k: String) = (this[k] as? JsonPrimitive)?.content == "true"
+        val chans = ((res["channels"] as? JsonArray) ?: JsonArray(emptyList())).mapNotNull { el ->
+            val o = el as? JsonObject ?: return@mapNotNull null
+            TemplateChannelPreview(o.n("id"), o.s("type"), o.s("name"), o.n("parent_index"), o.b("private"))
+        }
+        val roles = ((res["roles"] as? JsonArray) ?: JsonArray(emptyList())).mapNotNull { el ->
+            val o = el as? JsonObject ?: return@mapNotNull null
+            TemplateRolePreview(o.s("name"), o.n("color"))
+        }
+        return TemplatePreview(
+            code = res.s("code"),
+            name = res.s("name"),
+            description = res.s("description"),
+            serverName = res.s("server_name"),
+            channels = chans,
+            roles = roles,
+        )
+    }
+
     data class Preview(
         val code: String,
         /** The server it leads to, or the group (see [group]). */

@@ -6275,6 +6275,16 @@
   "look.seasonal.valentines": "Alla hjärtans dag",
   "look.seasonal.winter": "Vinter",
   "look.seasonal.winterNight": "Vinternatt",
+  "modals.createServer.importTemplate": "Importera Discord-mall",
+  "modals.createServer.importTemplateDesc": "Börja från en mallänk med dess kanaler och roller.",
+  "modals.createServer.importTemplateHint": "Klistra in en länk eller kod till en Discord-servermall för att skapa en server med dess kanaler, kategorier, roller och behörigheter.",
+  "modals.createServer.invalidTemplateLink": "Klistra in en länk till en Discord-servermall, som https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.inviteNotTemplate": "Det där är en Discord-inbjudningslänk, inte en länk till en servermall. Mallar ser ut som https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.readingTemplate": "Läser in mall…",
+  "modals.createServer.templateLink": "Mallänk",
+  "modals.createServer.templatePlaceholder": "https://discord.new/2TffvPucqHkN",
+  "modals.createServer.templateSummary": "{channels} kanaler, {categories} kategorier, {roles} roller",
+  "modals.createServer.templatesLookLike": "Mallar ser ut som https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN eller bara koden.",
   "moderation.action.discoveryRestore": "Visade en server i Upptäck igen",
   "moderation.chat.caseStart": "Det här är konversationen med {name} om ärendet. Det du skriver når dem som Nexa, med ditt namn synligt, och inget här är end-to-end-krypterat.",
   "moderation.chat.reportStart": "Det här är konversationen med {name} om deras rapport. Det du skriver når dem som Nexa, med ditt namn synligt, och inget här är end-to-end-krypterat.",
@@ -6411,5 +6421,7 @@
   "whatsNew.r20261009.shareModesBody": "När du delar skärmen kan du välja Prestanda för mjuka rörelser, Kvalitet för skärmen i full upplösning och bildfrekvens eller Anpassat för att själv ställa in upplösning, bildfrekvens och bithastighet. Strömmar du tittar på visar också sin första bild snabbare.",
   "whatsNew.r20261009.shareModesTitle": "Strömningslägen",
   "whatsNew.r20261009.streamSoundBody": "När du delar skärmen med ljud når musik och spel nu alla i stereo och med högre kvalitet.",
-  "whatsNew.r20261009.streamSoundTitle": "Stereoljud i strömmar"
+  "whatsNew.r20261009.streamSoundTitle": "Stereoljud i strömmar",
+  "whatsNew.r20261017.templatesBody": "Skapa en server från valfri Discord-mallänk under Lägg till en server, Importera Discord-mall. Dess kategorier, kanaler, roller och behörigheter följer alla med.",
+  "whatsNew.r20261017.templatesTitle": "Importera Discord-servermallar"
 }

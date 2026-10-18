@@ -28,6 +28,8 @@ const (
 
 func (s *Server) serverRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/servers", s.authed(s.handleServerCreate))
+	mux.Handle("GET /api/v1/servers/templates/discord/{code}", s.userLimited(s.limDiscord, s.handleDiscordTemplatePreview))
+	mux.Handle("POST /api/v1/servers/import/discord", s.userLimited(s.limImport, s.handleDiscordTemplateImport))
 	mux.Handle("GET /api/v1/servers/{id}", s.authed(s.handleServerGet))
 	mux.Handle("PATCH /api/v1/servers/{id}", s.authed(s.handleServerPatch))
 	mux.Handle("DELETE /api/v1/servers/{id}", s.authed(s.handleServerDelete))

@@ -6694,6 +6694,16 @@
   "look.seasonal.valentines": "День святого Валентина",
   "look.seasonal.winter": "Зима",
   "look.seasonal.winterNight": "Зимняя ночь",
+  "modals.createServer.importTemplate": "Импортировать шаблон Discord",
+  "modals.createServer.importTemplateDesc": "Создайте сервер со всеми каналами и ролями по ссылке на шаблон.",
+  "modals.createServer.importTemplateHint": "Вставьте ссылку или код шаблона сервера Discord, чтобы создать сервер с его каналами, категориями, ролями и правами доступа.",
+  "modals.createServer.invalidTemplateLink": "Вставьте ссылку на шаблон сервера Discord, например https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.inviteNotTemplate": "Это ссылка-приглашение Discord, а не ссылка на шаблон сервера. Шаблоны выглядят как https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.readingTemplate": "Загрузка шаблона…",
+  "modals.createServer.templateLink": "Ссылка на шаблон",
+  "modals.createServer.templatePlaceholder": "https://discord.new/2TffvPucqHkN",
+  "modals.createServer.templateSummary": "Каналов: {channels}, категорий: {categories}, ролей: {roles}",
+  "modals.createServer.templatesLookLike": "Шаблоны выглядят как https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN или просто код.",
   "moderation.action.discoveryRestore": "Сервер снова показан в «Обзоре»",
   "moderation.chat.caseStart": "Это разговор с {name} об этом случае. То, что вы пишете, приходит от имени Nexa с вашим именем, и ничто здесь не защищено сквозным шифрованием.",
   "moderation.chat.reportStart": "Это разговор с {name} о его отчёте. То, что вы пишете, приходит от имени Nexa с вашим именем, и ничто здесь не защищено сквозным шифрованием.",
@@ -6834,5 +6844,7 @@
   "whatsNew.r20261009.shareModesBody": "При показе экрана выберите «Производительность» для плавного движения, «Качество» для экрана в полном разрешении и с его частотой кадров или «Свой», чтобы самому задать разрешение, частоту кадров и битрейт. Трансляции, которые вы смотрите, теперь быстрее показывают первую картинку.",
   "whatsNew.r20261009.shareModesTitle": "Режимы трансляции",
   "whatsNew.r20261009.streamSoundBody": "Когда вы показываете экран со звуком, музыка и игры теперь доходят до всех в стерео и в лучшем качестве.",
-  "whatsNew.r20261009.streamSoundTitle": "Стереозвук в трансляциях"
+  "whatsNew.r20261009.streamSoundTitle": "Стереозвук в трансляциях",
+  "whatsNew.r20261017.templatesBody": "Создавайте сервер из любой ссылки на шаблон Discord в окне «Добавить сервер», «Импортировать шаблон Discord». Все категории, каналы, роли и права доступа переносятся автоматически.",
+  "whatsNew.r20261017.templatesTitle": "Импорт шаблонов серверов Discord"
 }

@@ -7077,6 +7077,16 @@
   "look.seasonal.valentines": "عيد الحب",
   "look.seasonal.winter": "الشتاء",
   "look.seasonal.winterNight": "ليلة شتوية",
+  "modals.createServer.importTemplate": "استيراد قالب Discord",
+  "modals.createServer.importTemplateDesc": "ابدأ من رابط قالب بقنواته وأدواره.",
+  "modals.createServer.importTemplateHint": "الصق رابط قالب خادم Discord أو رمزه لإنشاء خادم بقنواته وفئاته وأدواره وصلاحياته.",
+  "modals.createServer.invalidTemplateLink": "الصق رابط قالب خادم Discord، مثل https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.inviteNotTemplate": "هذا رابط دعوة Discord وليس رابط قالب خادم. تبدو القوالب مثل https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.readingTemplate": "جارٍ قراءة القالب…",
+  "modals.createServer.templateLink": "رابط القالب",
+  "modals.createServer.templatePlaceholder": "https://discord.new/2TffvPucqHkN",
+  "modals.createServer.templateSummary": "{channels} قنوات، {categories} فئات، {roles} أدوار",
+  "modals.createServer.templatesLookLike": "تبدو القوالب مثل https://discord.new/2TffvPucqHkN أو https://discord.com/template/2TffvPucqHkN أو الرمز فقط.",
   "moderation.action.discoveryRestore": "أعاد إظهار خادم في الاستكشاف",
   "moderation.chat.caseStart": "هذه المحادثة مع {name} بشأن هذه القضية. ما تكتبه يصلهم باسم Nexa مع ظهور اسمك، ولا شيء هنا مشفر تشفيرًا تامًا بين الطرفين.",
   "moderation.chat.reportStart": "هذه المحادثة مع {name} بشأن بلاغهم. ما تكتبه يصلهم باسم Nexa مع ظهور اسمك، ولا شيء هنا مشفر تشفيرًا تامًا بين الطرفين.",
@@ -7221,5 +7231,7 @@
   "whatsNew.r20261009.shareModesBody": "عند مشاركة شاشتك، اختر الأداء لحركة سلسة، أو الجودة لعرض شاشتك بدقتها ومعدل إطاراتها الكاملين، أو مخصص لتحديد الدقة ومعدل الإطارات ومعدل البت بنفسك. كما تظهر الصورة الأولى للبثوث التي تشاهدها أسرع.",
   "whatsNew.r20261009.shareModesTitle": "أوضاع البث",
   "whatsNew.r20261009.streamSoundBody": "عند مشاركة شاشتك مع الصوت، تصل الموسيقى والألعاب الآن إلى الجميع بصوت ستيريو وبجودة أعلى.",
-  "whatsNew.r20261009.streamSoundTitle": "صوت بث ستيريو"
+  "whatsNew.r20261009.streamSoundTitle": "صوت بث ستيريو",
+  "whatsNew.r20261017.templatesBody": "أنشئ خادمًا من أي رابط قالب Discord من إضافة خادم، استيراد قالب Discord. تنتقل فئاته وقنواته وأدواره وصلاحياته كلها معه.",
+  "whatsNew.r20261017.templatesTitle": "استيراد قوالب خوادم Discord"
 }

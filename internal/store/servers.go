@@ -87,6 +87,190 @@ func (s *Store) CreateServer(ctx context.Context, owner ids.ID, name string, def
 	return srv, nil
 }
 
+// TemplateSpec is a server snapshot to build a new server from: its name and
+// description, its roles (@everyone's permissions plus custom roles from
+// lowest to highest), its categories and channels with their role overwrites,
+// and the index in Channels of the text channel join notices go to (-1 for none).
+type TemplateSpec struct {
+	Name                 string
+	Description          string
+	DefaultNotifications int
+	EveryonePerms        perms.Perm
+	Roles                []TemplateRole
+	Channels             []TemplateChannel
+	SystemChannelIndex   int
+}
+
+// TemplateRole is one custom role in a TemplateSpec.
+type TemplateRole struct {
+	Name        string
+	Color       int
+	Color2      *int
+	Color3      *int
+	Hoist       bool
+	Mentionable bool
+	Permissions perms.Perm
+	IconEmoji   string
+}
+
+// TemplateChannel is one category or channel in a TemplateSpec.
+type TemplateChannel struct {
+	Type               string
+	Name               string
+	Topic              string
+	Position           int
+	ParentIndex        int // -1 when not in a category, otherwise index in Channels
+	NSFW               bool
+	SlowmodeSeconds    int
+	UserLimit          int
+	Glyph              string
+	DefaultAutoArchive int
+	Forum              *ForumSettings
+	Overwrites         []TemplateOverwrite
+}
+
+// TemplateOverwrite is one role overwrite on a TemplateChannel.
+type TemplateOverwrite struct {
+	RoleIndex int // -1 for @everyone, otherwise index in Roles
+	Allow     perms.Perm
+	Deny      perms.Perm
+}
+
+// CreateServerFromTemplate builds a server, its roles, its categories and
+// channels, and their permission overwrites in one transaction, flagging any
+// channel @everyone cannot view so it gets its own conversation key.
+func (s *Store) CreateServerFromTemplate(ctx context.Context, owner ids.ID, spec TemplateSpec) (*Server, error) {
+	now := nowMs()
+	srv := &Server{
+		ID:                   ids.New(),
+		Name:                 spec.Name,
+		Description:          spec.Description,
+		DefaultNotifications: spec.DefaultNotifications,
+		OwnerID:              owner,
+		CreatedAt:            now,
+	}
+	roleIDs := make([]ids.ID, len(spec.Roles))
+	permRoles := make([]perms.Role, 0, len(spec.Roles)+1)
+	permRoles = append(permRoles, perms.Role{ID: srv.ID, Position: 0, Permissions: spec.EveryonePerms})
+	for i, r := range spec.Roles {
+		roleIDs[i] = ids.New()
+		permRoles = append(permRoles, perms.Role{ID: roleIDs[i], Position: i + 1, Permissions: r.Permissions})
+	}
+	chanIDs := make([]ids.ID, len(spec.Channels))
+	for i := range spec.Channels {
+		chanIDs[i] = ids.New()
+	}
+	var sysID *ids.ID
+	if spec.SystemChannelIndex >= 0 && spec.SystemChannelIndex < len(spec.Channels) && spec.Channels[spec.SystemChannelIndex].Type == "text" {
+		id := chanIDs[spec.SystemChannelIndex]
+		sysID = &id
+	}
+	err := s.Tx(ctx, func(tx *db.Tx) error {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO servers (`+serverCols+`, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+			int64(srv.ID), srv.Name, nil, nil, int64(owner), srv.Description, nil, srv.DefaultNotifications, 0, now, now); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO roles (`+roleCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			int64(srv.ID), int64(srv.ID), "@everyone", 0, 0, 0, 0, int64(spec.EveryonePerms), nil, now, nil, nil, ""); err != nil {
+			return err
+		}
+		for i, r := range spec.Roles {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO roles (`+roleCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+				int64(roleIDs[i]), int64(srv.ID), r.Name, r.Color, boolInt(r.Hoist), boolInt(r.Mentionable), i+1, int64(r.Permissions), nil, now, nullInt(r.Color2), nullInt(r.Color3), r.IconEmoji); err != nil {
+				return err
+			}
+		}
+		insertOne := func(i int) error {
+			tc := spec.Channels[i]
+			var parentID *ids.ID
+			if tc.Type != "category" && tc.ParentIndex >= 0 && tc.ParentIndex < len(chanIDs) && spec.Channels[tc.ParentIndex].Type == "category" {
+				pid := chanIDs[tc.ParentIndex]
+				parentID = &pid
+			}
+			var forum *ForumSettings
+			if tc.Forum != nil {
+				cp := *tc.Forum
+				cp.Tags = make([]ForumTag, len(tc.Forum.Tags))
+				for j, t := range tc.Forum.Tags {
+					if t.ID.IsZero() {
+						t.ID = ids.New()
+					}
+					cp.Tags[j] = t
+				}
+				forum = &cp
+			}
+			ch := &Channel{
+				ID:                 chanIDs[i],
+				ServerID:           &srv.ID,
+				Type:               tc.Type,
+				Name:               tc.Name,
+				Topic:              tc.Topic,
+				Position:           tc.Position,
+				ParentID:           parentID,
+				NSFW:               tc.NSFW,
+				SlowmodeSeconds:    tc.SlowmodeSeconds,
+				UserLimit:          tc.UserLimit,
+				Glyph:              tc.Glyph,
+				DefaultAutoArchive: tc.DefaultAutoArchive,
+				Forum:              forum,
+				CreatedAt:          now,
+			}
+			if err := s.insertChannel(ctx, tx, ch); err != nil {
+				return err
+			}
+			permOWs := make([]perms.Overwrite, 0, len(tc.Overwrites))
+			for _, ow := range tc.Overwrites {
+				target := srv.ID
+				if ow.RoleIndex >= 0 && ow.RoleIndex < len(roleIDs) {
+					target = roleIDs[ow.RoleIndex]
+				}
+				allow, deny := ow.Allow&^ow.Deny, ow.Deny
+				if _, err := tx.ExecContext(ctx, `INSERT INTO channel_overwrites (channel_id, target_id, target_type, allow, deny) VALUES (?,?,'role',?,?) ON CONFLICT(channel_id, target_id) DO UPDATE SET allow = excluded.allow, deny = excluded.deny`,
+					int64(ch.ID), int64(target), int64(allow), int64(deny)); err != nil {
+					return err
+				}
+				permOWs = append(permOWs, perms.Overwrite{TargetID: target, Kind: "role", Allow: allow, Deny: deny})
+			}
+			if tc.Type != "category" && !perms.Compute(srv.ID, permRoles, perms.Member{}, false, permOWs).Has(perms.ViewChannel) {
+				if _, err := tx.ExecContext(ctx, `INSERT INTO key_flags (conv_id, needs_rotation, needs_own_key, updated_at) VALUES (?,0,1,?) ON CONFLICT(conv_id) DO UPDATE SET needs_own_key = 1, updated_at = excluded.updated_at`,
+					int64(ch.ID), now); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		// Categories first so every child channel's parent_id already exists.
+		for i, tc := range spec.Channels {
+			if tc.Type == "category" {
+				if err := insertOne(i); err != nil {
+					return err
+				}
+			}
+		}
+		for i, tc := range spec.Channels {
+			if tc.Type != "category" {
+				if err := insertOne(i); err != nil {
+					return err
+				}
+			}
+		}
+		if sysID != nil {
+			if _, err := tx.ExecContext(ctx, `UPDATE servers SET system_channel_id = ? WHERE id = ?`, int64(*sysID), int64(srv.ID)); err != nil {
+				return err
+			}
+		}
+		_, err := tx.ExecContext(ctx, `INSERT INTO server_members (server_id, user_id, nickname, joined_at, flags, join_method) VALUES (?,?,?,?,0,'owner')`,
+			int64(srv.ID), int64(owner), "", now)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.serverChanged(srv.ID)
+	srv.SystemChannelID = sysID
+	return srv, nil
+}
+
 // ServerByID loads a server.
 func (s *Store) ServerByID(ctx context.Context, id ids.ID) (*Server, error) {
 	return scanServerTagged(s.db.R.QueryRowContext(ctx, `SELECT `+serverCols+`, `+serverTagCols+`, `+serverCommunityCols+` FROM servers WHERE id = ?`, int64(id)))
@@ -878,8 +1062,8 @@ func (s *Store) ServerChannels(ctx context.Context, serverID ids.ID) ([]*Channel
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	// channels with their own epochs encrypt under their own conversation
-	own, err := s.db.R.QueryContext(ctx, `SELECT DISTINCT conv_id FROM key_epochs WHERE conv_id IN (SELECT id FROM channels WHERE server_id = ?)`, int64(serverID))
+	// channels with their own epochs, or marked as needing their own key, encrypt under their own conversation
+	own, err := s.db.R.QueryContext(ctx, `SELECT conv_id FROM key_epochs WHERE conv_id IN (SELECT id FROM channels WHERE server_id = ?) UNION SELECT conv_id FROM key_flags WHERE needs_own_key = 1 AND conv_id IN (SELECT id FROM channels WHERE server_id = ?)`, int64(serverID), int64(serverID))
 	if err != nil {
 		return nil, err
 	}

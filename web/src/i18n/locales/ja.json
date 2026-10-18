@@ -6052,6 +6052,16 @@
   "look.seasonal.valentines": "バレンタイン",
   "look.seasonal.winter": "冬",
   "look.seasonal.winterNight": "冬の夜",
+  "modals.createServer.importTemplate": "Discordテンプレートをインポート",
+  "modals.createServer.importTemplateDesc": "テンプレートリンクからチャンネルとロールを引き継いで作成します。",
+  "modals.createServer.importTemplateHint": "Discordサーバーテンプレートのリンクまたはコードを貼り付けると、チャンネル、カテゴリー、ロール、権限をそのまま引き継いでサーバーを作成します。",
+  "modals.createServer.invalidTemplateLink": "https://discord.new/2TffvPucqHkN のようなDiscordサーバーテンプレートのリンクを貼り付けてください。",
+  "modals.createServer.inviteNotTemplate": "それはDiscordの招待リンクであり、サーバーテンプレートのリンクではありません。テンプレートは https://discord.new/2TffvPucqHkN のような形です。",
+  "modals.createServer.readingTemplate": "テンプレートを読み込み中…",
+  "modals.createServer.templateLink": "テンプレートリンク",
+  "modals.createServer.templatePlaceholder": "https://discord.new/2TffvPucqHkN",
+  "modals.createServer.templateSummary": "{channels}個のチャンネル、{categories}個のカテゴリー、{roles}個のロール",
+  "modals.createServer.templatesLookLike": "テンプレートは https://discord.new/2TffvPucqHkN や https://discord.com/template/2TffvPucqHkN、またはコードのみの形です。",
   "moderation.action.discoveryRestore": "サーバーを「見つける」に再表示",
   "moderation.chat.caseStart": "このケースについての {name} さんとの会話です。書いた内容はあなたの名前付きで Nexa として届き、ここではエンドツーエンド暗号化はされません。",
   "moderation.chat.reportStart": "{name} さんのレポートについての会話です。書いた内容はあなたの名前付きで Nexa として届き、ここではエンドツーエンド暗号化はされません。",
@@ -6186,5 +6196,7 @@
   "whatsNew.r20261009.shareModesBody": "画面を共有するとき、なめらかな動きなら「パフォーマンス」、画面本来の解像度とフレームレートなら「画質」、解像度・フレームレート・ビットレートを自分で決めるなら「カスタム」を選べます。見ている配信も最初の映像が早く表示されるようになりました。",
   "whatsNew.r20261009.shareModesTitle": "配信モード",
   "whatsNew.r20261009.streamSoundBody": "音声付きで画面を共有すると、音楽やゲームの音がステレオの高音質で全員に届くようになりました。",
-  "whatsNew.r20261009.streamSoundTitle": "配信の音がステレオに"
+  "whatsNew.r20261009.streamSoundTitle": "配信の音がステレオに",
+  "whatsNew.r20261017.templatesBody": "「サーバーを追加」の「Discordテンプレートをインポート」から、任意のDiscordテンプレートリンクを使ってサーバーを作成できます。カテゴリー、チャンネル、ロール、権限の上書きがすべて引き継がれます。",
+  "whatsNew.r20261017.templatesTitle": "Discordサーバーテンプレートのインポート"
 }

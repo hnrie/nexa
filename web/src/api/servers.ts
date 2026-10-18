@@ -114,6 +114,31 @@ function cropQuery(crop?: Crop): string {
   return `?x=${Math.round(crop.x)}&y=${Math.round(crop.y)}&w=${Math.round(crop.w)}&h=${Math.round(crop.h)}`;
 }
 
+export interface DiscordTemplatePreviewChannel {
+  id: number;
+  type: "category" | "text" | "voice" | "announcement" | "forum";
+  name: string;
+  topic?: string;
+  parent_index: number;
+  private?: boolean;
+}
+
+export interface DiscordTemplatePreviewRole {
+  name: string;
+  color: number;
+}
+
+export interface DiscordTemplatePreview {
+  code: string;
+  name: string;
+  description: string;
+  usage_count: number;
+  server_name: string;
+  server_description: string;
+  channels: DiscordTemplatePreviewChannel[];
+  roles: DiscordTemplatePreviewRole[];
+}
+
 export const servers = {
   /**
    * The first categories and channels are records people can rename, not
@@ -128,6 +153,12 @@ export const servers = {
       voice_channel: t("servers.defaults.generalVoice"),
     };
     return api.request<ServerView>("POST", "/servers", { name, defaults }, captchaOptions(captcha));
+  },
+  previewDiscordTemplate(code: string): Promise<DiscordTemplatePreview> {
+    return api.request<DiscordTemplatePreview>("GET", `/servers/templates/discord/${encodeURIComponent(code)}`);
+  },
+  importDiscordTemplate(url: string, name?: string, captcha?: string | null): Promise<ServerView> {
+    return api.request<ServerView>("POST", "/servers/import/discord", { url, ...(name ? { name } : {}) }, captchaOptions(captcha));
   },
   get(id: Snowflake): Promise<{ server: ServerView; users: PublicUser[] }> {
     return api.request("GET", `/servers/${id}`);

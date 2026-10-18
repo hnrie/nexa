@@ -6376,6 +6376,16 @@
   "look.seasonal.valentines": "Saint-Valentin",
   "look.seasonal.winter": "Hiver",
   "look.seasonal.winterNight": "Nuit d'hiver",
+  "modals.createServer.importTemplate": "Importer un modèle Discord",
+  "modals.createServer.importTemplateDesc": "Partir d'un lien de modèle avec ses salons et ses rôles.",
+  "modals.createServer.importTemplateHint": "Collez un lien ou un code de modèle de serveur Discord pour créer un serveur avec ses salons, catégories, rôles et permissions.",
+  "modals.createServer.invalidTemplateLink": "Collez un lien de modèle de serveur Discord, comme https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.inviteNotTemplate": "C'est un lien d'invitation Discord, pas un lien de modèle de serveur. Les modèles ressemblent à https://discord.new/2TffvPucqHkN.",
+  "modals.createServer.readingTemplate": "Lecture du modèle…",
+  "modals.createServer.templateLink": "Lien du modèle",
+  "modals.createServer.templatePlaceholder": "https://discord.new/2TffvPucqHkN",
+  "modals.createServer.templateSummary": "{channels} salons, {categories} catégories, {roles} rôles",
+  "modals.createServer.templatesLookLike": "Les modèles ressemblent à https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN ou simplement au code.",
   "moderation.action.discoveryRestore": "Serveur de nouveau affiché dans Découvrir",
   "moderation.chat.caseStart": "Voici la conversation avec {name} à propos de ce dossier. Ce que tu écris lui parvient au nom de Nexa, avec ton nom affiché, et rien ici n'est chiffré de bout en bout.",
   "moderation.chat.reportStart": "Voici la conversation avec {name} à propos de son signalement. Ce que tu écris lui parvient au nom de Nexa, avec ton nom affiché, et rien ici n'est chiffré de bout en bout.",
@@ -6512,5 +6522,7 @@
   "whatsNew.r20261009.shareModesBody": "Quand vous partagez votre écran, choisissez Performance pour des mouvements fluides, Qualité pour votre écran à sa pleine résolution et fréquence d'images, ou Personnalisé pour régler vous-même la résolution, la fréquence d'images et le débit. Les streams que vous regardez affichent aussi leur première image plus vite.",
   "whatsNew.r20261009.shareModesTitle": "Modes de diffusion",
   "whatsNew.r20261009.streamSoundBody": "Quand vous partagez votre écran avec le son, la musique et les jeux arrivent désormais à tout le monde en stéréo et en meilleure qualité.",
-  "whatsNew.r20261009.streamSoundTitle": "Son stéréo pour les streams"
+  "whatsNew.r20261009.streamSoundTitle": "Son stéréo pour les streams",
+  "whatsNew.r20261017.templatesBody": "Créez un serveur à partir de n'importe quel lien de modèle Discord dans Ajouter un serveur, Importer un modèle Discord. Ses catégories, salons, rôles et permissions sont tous repris.",
+  "whatsNew.r20261017.templatesTitle": "Importer des modèles de serveur Discord"
 }

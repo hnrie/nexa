@@ -104,7 +104,8 @@ they open the app after an update, and it is how they find out what changed.
 - Never describe the owner in the third person or sell Nexa as run by one person, in the app, the
   home page or the Terms. Contact details read "Contact the owner (nora) here: ...".
 - Describe Nexa on its own terms. Do not compare it to Discord. Naming Discord is fine only where a
-  feature really talks to the Discord program (the desktop app's Rich Presence relay).
+  feature really talks to Discord (the desktop app's Rich Presence relay, Discord activity sync, and
+  importing a Discord server template).
 - Never hardcode user-visible English. The web uses `t("key")` / `<Tr>` from `@/i18n`; Android uses
   `t("key")` on the same catalogues (its own keys start with `android.`). Add every new key to all
   twelve files in `web/src/i18n/locales/` with real translations
@@ -330,7 +331,7 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   profiles, deletion), `relationship_handlers`, `channel_handlers` (DMs, groups, icons, recipients,
   typing, attachments, pins), `group_handlers`, `subchat_handlers` (sub-conversations of a DM, with an
   optional password), `message_handlers` (history, send, edit, delete, bulk delete, ack, reactions),
-  `poll_handlers`, `key_handlers` (grants, needs, epochs, asking again), `server_handlers` (servers, channels,
+  `poll_handlers`, `key_handlers` (grants, needs, epochs, asking again), `server_handlers` and `discord_templates` (servers, Discord server template preview and import, channels,
   overwrites, roles, members, bans, invites, audit log), `member_admin` (member search, prune, bulk
   ban, server profiles, role icons), `threads` (threads and forum posts), `follows` (announcement
   follows and crossposts), `automod`, `discovery`, `server_tags`, `expression_handlers` (server
@@ -462,8 +463,9 @@ access goes through the hooks `server_glue.go` installs, answered from `store/pe
 Everything a person can make the server fetch goes through `internal/egress` (WARP's SOCKS5 proxy,
 `EGRESS_PROXY=warp|off|socks5://...`): link previews (`unfurl`, asked for by the sender's app,
 which puts the preview inside the encrypted message), the media proxy (only addresses the server
-signed; `POST /proxy/refresh` re-signs old ones), the YouTube player (`/yt/...`), IGDB, Deezer and
-Discord's Rich Presence apps. Discord's gateway, Cloudflare Realtime and the tunnel go out directly.
+signed; `POST /proxy/refresh` re-signs old ones), the YouTube player (`/yt/...`), IGDB, Deezer,
+Discord's Rich Presence apps and Discord server templates (`GET /servers/templates/discord/{code}`
+and `POST /servers/import/discord`). Discord's gateway, Cloudflare Realtime and the tunnel go out directly.
 
 ### Calls
 

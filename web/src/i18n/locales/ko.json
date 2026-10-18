@@ -6052,6 +6052,16 @@
   "look.seasonal.valentines": "밸런타인데이",
   "look.seasonal.winter": "겨울",
   "look.seasonal.winterNight": "겨울밤",
+  "modals.createServer.importTemplate": "Discord 템플릿 가져오기",
+  "modals.createServer.importTemplateDesc": "템플릿 링크의 채널과 역할로 서버를 시작하세요.",
+  "modals.createServer.importTemplateHint": "Discord 서버 템플릿 링크나 코드를 붙여넣어 채널, 카테고리, 역할 및 권한이 포함된 서버를 만드세요.",
+  "modals.createServer.invalidTemplateLink": "https://discord.new/2TffvPucqHkN 같은 Discord 서버 템플릿 링크를 붙여넣으세요.",
+  "modals.createServer.inviteNotTemplate": "Discord 서버 템플릿 링크가 아니라 초대 링크입니다. 템플릿은 https://discord.new/2TffvPucqHkN 형태입니다.",
+  "modals.createServer.readingTemplate": "템플릿 읽는 중…",
+  "modals.createServer.templateLink": "템플릿 링크",
+  "modals.createServer.templatePlaceholder": "https://discord.new/2TffvPucqHkN",
+  "modals.createServer.templateSummary": "채널 {channels}개, 카테고리 {categories}개, 역할 {roles}개",
+  "modals.createServer.templatesLookLike": "템플릿은 https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN 또는 코드 형태입니다.",
   "moderation.action.discoveryRestore": "서버를 탐색에 다시 표시함",
   "moderation.chat.caseStart": "이 케이스에 관한 {name} 님과의 대화입니다. 작성한 내용은 내 이름이 표시된 채 Nexa로 전달되며, 여기의 어떤 것도 종단 간 암호화되지 않습니다.",
   "moderation.chat.reportStart": "{name} 님의 신고에 관한 대화입니다. 작성한 내용은 내 이름이 표시된 채 Nexa로 전달되며, 여기의 어떤 것도 종단 간 암호화되지 않습니다.",
@@ -6186,5 +6196,7 @@
   "whatsNew.r20261009.shareModesBody": "화면을 공유할 때 매끄러운 움직임은 성능, 화면 원래의 해상도와 프레임 속도는 화질, 해상도·프레임 속도·비트레이트를 직접 정하려면 사용자 지정을 고르세요. 보고 있는 방송도 첫 화면이 더 빨리 나타나요.",
   "whatsNew.r20261009.shareModesTitle": "방송 모드",
   "whatsNew.r20261009.streamSoundBody": "소리와 함께 화면을 공유하면 이제 음악과 게임 소리가 모두에게 스테레오로, 더 좋은 품질로 전달돼요.",
-  "whatsNew.r20261009.streamSoundTitle": "스테레오 방송 소리"
+  "whatsNew.r20261009.streamSoundTitle": "스테레오 방송 소리",
+  "whatsNew.r20261017.templatesBody": "서버 추가, Discord 템플릿 가져오기에서 Discord 템플릿 링크로 서버를 만드세요. 카테고리, 채널, 역할 및 권한 설정이 모두 그대로 가져와집니다.",
+  "whatsNew.r20261017.templatesTitle": "Discord 서버 템플릿 가져오기"
 }

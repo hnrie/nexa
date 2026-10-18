@@ -46,7 +46,8 @@ type Server struct {
 	// none in particular and takes any
 	redirects []string
 	// asked is every redirect a code was exchanged with, in order
-	asked []string
+	asked     []string
+	templates map[string]any
 }
 
 // User is a Discord account.
@@ -61,7 +62,8 @@ type User struct {
 func New() *Server {
 	f := &Server{GuildID: "900000000000000001", OwnerID: "900000000000000002", BotID: "900000000000000003",
 		users: map[string]User{}, codes: map[string]string{}, access: map[string]string{}, refresh: map[string]string{},
-		members: map[string]bool{"900000000000000002": true, "900000000000000003": true}, scope: "identify guilds.join"}
+		members: map[string]bool{"900000000000000002": true, "900000000000000003": true}, scope: "identify guilds.join",
+		templates: map[string]any{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v10/gateway/bot", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bot bot-token" {
@@ -99,6 +101,17 @@ func New() *Server {
 		}
 		writeJSON(w, u)
 	})
+	mux.HandleFunc("GET /api/v10/guilds/templates/{code}", func(w http.ResponseWriter, r *http.Request) {
+		code := r.PathValue("code")
+		f.mu.Lock()
+		tpl, ok := f.templates[code]
+		f.mu.Unlock()
+		if !ok {
+			http.Error(w, `{"message":"Unknown Guild Template","code":10057}`, http.StatusNotFound)
+			return
+		}
+		writeJSON(w, tpl)
+	})
 	mux.HandleFunc("GET /api/v10/guilds/{guild}", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"id": f.GuildID, "owner_id": f.OwnerID})
 	})
@@ -119,6 +132,13 @@ func New() *Server {
 
 // API is the address the sync service calls as Discord's REST API.
 func (f *Server) API() string { return f.URL + "/api/v10" }
+
+// AddTemplate registers a guild template under code.
+func (f *Server) AddTemplate(code string, tpl any) {
+	f.mu.Lock()
+	f.templates[code] = tpl
+	f.mu.Unlock()
+}
 
 // AddUser makes a Discord account and returns a code that signs in as it, as
 // Discord's page would hand back to the redirect.
