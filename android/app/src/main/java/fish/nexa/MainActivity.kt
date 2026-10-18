@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
 import fish.nexa.ui.App
+import fish.nexa.voice.AudioRoute
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -76,6 +77,21 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         Nexa.ui.setVisible(true)
         Nexa.session.wake()
+        // back on screen, a call takes its audio back from whatever was playing over it
+        AudioRoute.refocus()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // a call's picture-in-picture window coming back to full size resumes without a start
+        AudioRoute.refocus()
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        // something can start playing over a call that never left the screen, from a floating
+        // window or a player's notification: the first touch on the call asks for its audio back
+        AudioRoute.refocus()
     }
 
     override fun onStop() {
