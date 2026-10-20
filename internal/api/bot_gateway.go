@@ -571,13 +571,20 @@ func (sess *botSession) end() {
 }
 
 // hubClosed is the hub ending the bot's connection: its token was reset, its
-// application deleted, or Nexa's staff banned it.
+// application deleted, or Nexa's staff banned it. A server restart is not the
+// bot's fault: it is told to reconnect, as Discord does, since its library
+// gives up for good on Authentication failed.
 func (sess *botSession) hubClosed(code int, reason string) {
 	sess.mu.Lock()
 	sock := sess.sock
 	sess.mu.Unlock()
 	if sock != nil {
-		sock.close(botproto.CloseAuthenticationFailed, "Authentication failed.")
+		if code == int(websocket.StatusGoingAway) {
+			sock.send(op(botproto.OpReconnect, nil))
+			sock.close(botproto.CloseUnknownError, "Reconnect")
+		} else {
+			sock.close(botproto.CloseAuthenticationFailed, "Authentication failed.")
+		}
 	}
 	sess.once.Do(func() {
 		close(sess.stop)
