@@ -204,6 +204,16 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if first || named {
 		u.Flags |= store.FlagAdmin
 	}
+	// at most two new accounts a day from one IP address, spent
+	// only once the request has passed every check above. Nexa's first
+	// account is never held back.
+	if !first {
+		if ok, retry := s.limSignup.Allow(auth.ClientIP(r)); !ok {
+			w.Header().Set("Retry-After", retryAfter(retry))
+			WriteError(w, E(http.StatusTooManyRequests, "too_many_signups", "Two accounts have already been made from this IP address today. Try again tomorrow."))
+			return
+		}
+	}
 	if signupInvite != "" {
 		if err := s.Store.UseInvite(ctx, signupInvite); errors.Is(err, store.ErrNotFound) {
 			// spent by someone else a moment ago

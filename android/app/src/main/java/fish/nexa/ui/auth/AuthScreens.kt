@@ -443,6 +443,7 @@ fun RegisterScreen(onLogin: () -> Unit) {
                     "registration_closed" -> error = t("register.thisServerIsNotAcceptingNew")
                     "invite_required" -> error = t("register.youNeedAnInviteOrRegistration")
                     "rate_limited" -> error = t("register.tooManySignUpsFromYour")
+                    "too_many_signups" -> error = t("register.twoAccountsADay")
                     else -> error = describeError(e, t("register.somethingWentWrongPleaseTryAgain"))
                 }
             } finally {

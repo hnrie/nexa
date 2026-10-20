@@ -54,6 +54,8 @@ func (s *Server) portalRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/applications/{id}/bot/reset", s.userLimited(s.limApps, s.handleAppTokenReset))
 	mux.Handle("POST /api/v1/applications/{id}/secret/reset", s.userLimited(s.limApps, s.handleAppSecretReset))
 	mux.Handle("GET /api/v1/applications/{id}/commands", s.authed(s.handleAppCommandsView))
+	mux.Handle("DELETE /api/v1/applications/{id}/commands", s.userLimited(s.limApps, s.handleAppCommandsClear))
+	mux.Handle("DELETE /api/v1/applications/{id}/commands/{cid}", s.userLimited(s.limApps, s.handleAppCommandRemove))
 	mux.Handle("GET /api/v1/applications/{id}/public", s.authed(s.handleAppPublic))
 }
 
@@ -928,6 +930,59 @@ func (s *Server) handleAppCommandsView(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	WriteJSON(w, http.StatusOK, out)
+}
+
+// handleAppCommandRemove takes one of an application's commands away, for its owner.
+func (s *Server) handleAppCommandRemove(w http.ResponseWriter, r *http.Request) {
+	app, _ := s.ownedApp(w, r)
+	if app == nil {
+		return
+	}
+	cid, err := ids.Parse(r.PathValue("cid"))
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	c, err := s.Store.CommandByID(r.Context(), cid)
+	if err != nil || c.ApplicationID != app.ID {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	if err := s.Store.DeleteCommand(r.Context(), c); err != nil {
+		WriteError(w, err)
+		return
+	}
+	s.commandsChanged(r.Context(), app.ID, c.GuildID)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleAppCommandsClear takes away every command an application made, everywhere
+// and for single servers, so its bot can register them again from nothing.
+func (s *Server) handleAppCommandsClear(w http.ResponseWriter, r *http.Request) {
+	app, _ := s.ownedApp(w, r)
+	if app == nil {
+		return
+	}
+	ctx := r.Context()
+	if err := s.Store.ReplaceCommands(ctx, app.ID, nil, nil); err != nil {
+		WriteError(w, err)
+		return
+	}
+	s.commandsChanged(ctx, app.ID, nil)
+	if servers, err := s.Store.ApplicationGuilds(ctx, app.ID); err == nil {
+		for _, g := range servers {
+			gid := g
+			if list, err := s.Store.Commands(ctx, app.ID, &gid); err != nil || len(list) == 0 {
+				continue
+			}
+			if err := s.Store.ReplaceCommands(ctx, app.ID, &gid, nil); err != nil {
+				WriteError(w, err)
+				return
+			}
+			s.commandsChanged(ctx, app.ID, &gid)
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // --- deleting one ---------------------------------------------------------------------------

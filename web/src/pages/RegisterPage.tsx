@@ -95,6 +95,7 @@ export default function RegisterPage() {
           registration_closed: t("register.thisServerIsNotAcceptingNew"),
           invite_required: t("register.youNeedAnInviteOrRegistration"),
           rate_limited: t("register.tooManySignUpsFromYour"),
+          too_many_signups: t("register.twoAccountsADay"),
         };
         setError(map[code] ?? describeError(err, t("register.somethingWentWrongPleaseTryAgain")));
       } else {

@@ -13,6 +13,7 @@ import { ImageCropModal } from "@/components/common/ImageCropModal";
 import { Select } from "@/components/common/Select";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
+import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { SaveBar } from "@/components/server/SettingsLayer";
 import { t } from "@/i18n";
 import { commandDescription, commandLeaves, optionName } from "@/lib/apps";
@@ -541,10 +542,16 @@ function OAuthTab({ app, draft, setApp, onChange }: TabProps & { onChange: (app:
   );
 }
 
-/** What an app's bot registered: its commands everywhere, as people are offered them. */
+/**
+ * What an app's bot registered: its commands everywhere, as people are offered
+ * them. The owner can take one away, or all of them for the bot to register
+ * again from nothing.
+ */
 function CommandsTab({ app }: { app: OwnedApp }) {
   const [list, setList] = useState<AppCommand[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [removing, setRemoving] = useState<AppCommand | "all" | null>(null);
+  const toast = useUI((u) => u.toast);
   useEffect(() => {
     let alive = true;
     appsApi
@@ -558,9 +565,32 @@ function CommandsTab({ app }: { app: OwnedApp }) {
   if (failed) return <p className={st.hint}>{t("apps.portal.commandsFailed")}</p>;
   if (!list) return null;
   if (!list.length) return <p className={st.hint}>{t("apps.portal.noCommands")}</p>;
+  const shownName = (c: AppCommand) => (c.type === 1 ? `/${c.name}` : c.name);
+  const remove = async () => {
+    if (!removing) return;
+    if (removing === "all") {
+      await appsApi.deleteAllCommands(app.id);
+      setList([]);
+      toast(t("apps.portal.commandsDeleted"), "success");
+    } else {
+      await appsApi.deleteCommand(app.id, removing.id);
+      setList((l) => l?.filter((x) => x.id !== removing.id) ?? null);
+      toast(t("apps.portal.commandDeleted", { name: shownName(removing) }), "success");
+    }
+  };
+  const del = (c: AppCommand) => (
+    <button type="button" className={s.cmdDelete} onClick={() => setRemoving(c)} aria-label={t("apps.portal.deleteCommandNamed", { name: shownName(c) })} title={t("apps.portal.deleteCommand")} data-testid="command-delete">
+      <Trash2 size={16} aria-hidden="true" />
+    </button>
+  );
   return (
     <div className={s.list}>
-      <p className={st.hint} style={{ marginTop: 0 }}>{t("apps.portal.commandsHint")}</p>
+      <div className={s.cmdHead}>
+        <p className={st.hint} style={{ margin: 0 }}>{t("apps.portal.commandsHint")}</p>
+        <Button size="sm" variant="danger" onClick={() => setRemoving("all")} data-testid="commands-delete-all">
+          {t("apps.portal.deleteAllCommands")}
+        </Button>
+      </div>
       {list.flatMap((c) =>
         c.type === 1
           ? commandLeaves(c).map((leaf) => (
@@ -569,6 +599,7 @@ function CommandsTab({ app }: { app: OwnedApp }) {
                   <span className={s.cmdName}>/{leaf.label}</span>
                   <span className={s.cmdKind}>{t("apps.portal.kindSlash")}</span>
                   {c.guild_id ? <span className={s.cmdWhere}>{t("apps.portal.onlyIn", { server: c.guild_name || c.guild_id })}</span> : null}
+                  {del(c)}
                 </div>
                 {leaf.description ? <span className={s.cmdDesc}>{leaf.description}</span> : null}
                 {leaf.options.length ? (
@@ -586,11 +617,22 @@ function CommandsTab({ app }: { app: OwnedApp }) {
                   <span className={s.cmdName}>{c.name}</span>
                   <span className={s.cmdKind}>{c.type === 2 ? t("apps.portal.kindUser") : t("apps.portal.kindMessage")}</span>
                   {c.guild_id ? <span className={s.cmdWhere}>{t("apps.portal.onlyIn", { server: c.guild_name || c.guild_id })}</span> : null}
+                  {del(c)}
                 </div>
                 {commandDescription(c) ? <span className={s.cmdDesc}>{commandDescription(c)}</span> : null}
               </div>,
             ],
       )}
+      {removing ? (
+        <ConfirmModal
+          onClose={() => setRemoving(null)}
+          title={removing === "all" ? t("apps.portal.deleteAllCommands") : t("apps.portal.deleteCommand")}
+          body={removing === "all" ? t("apps.portal.deleteAllCommandsBody") : t("apps.portal.deleteCommandBody", { name: shownName(removing) })}
+          confirmLabel={t("apps.portal.delete")}
+          danger
+          onConfirm={remove}
+        />
+      ) : null}
     </div>
   );
 }

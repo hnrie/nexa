@@ -66,6 +66,16 @@ object Apps {
     /** An app's commands everywhere, and those made for single servers, for its owner. */
     suspend fun commands(id: String): List<AppCommand> = wireJson.decodeFromJsonElement(ListSerializer(AppCommand.serializer()), call("GET", "/applications/$id/commands"))
 
+    /** Takes one of an app's commands away, for its owner. */
+    suspend fun deleteCommand(id: String, commandId: String) {
+        call("DELETE", "/applications/$id/commands/$commandId")
+    }
+
+    /** Takes every command an app made away, single servers' included, for its owner. */
+    suspend fun deleteAllCommands(id: String) {
+        call("DELETE", "/applications/$id/commands")
+    }
+
     /** What anyone is shown of an app. */
     suspend fun about(id: String): AppSummary = wireJson.decodeFromJsonElement(AppSummary.serializer(), call("GET", "/applications/$id/public"))
 

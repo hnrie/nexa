@@ -320,6 +320,10 @@ export const apps = {
   remove: (id: Snowflake, authKey: string) => api.request<void>("POST", `/applications/${id}/delete`, { auth_key: authKey }),
   /** An app's commands everywhere (not one server's own), for its owner. */
   commands: (id: Snowflake) => api.request<AppCommand[]>("GET", `/applications/${id}/commands`),
+  /** Takes one of an app's commands away, for its owner. */
+  deleteCommand: (id: Snowflake, commandId: Snowflake) => api.request<void>("DELETE", `/applications/${id}/commands/${commandId}`),
+  /** Takes every command an app made away, single servers' included, for its owner. */
+  deleteAllCommands: (id: Snowflake) => api.request<void>("DELETE", `/applications/${id}/commands`),
   /** What anyone is shown of an app. */
   about: (id: Snowflake) => api.request<AppSummary>("GET", `/applications/${id}/public`),
 

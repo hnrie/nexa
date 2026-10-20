@@ -55,6 +55,7 @@ func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 	srv.Media = m
 	// Tests hammer the API from one loopback address; keep only the per-username limiter meaningful.
 	srv.limReg = ratelimit.New(rate.Inf, 1000, time.Hour)
+	srv.limSignup = ratelimit.New(rate.Inf, 1000, time.Hour)
 	srv.limAuthIP = ratelimit.New(rate.Inf, 1000, time.Hour)
 	srv.limGeneric = ratelimit.New(rate.Inf, 1000, time.Hour)
 	srv.limMsg = ratelimit.New(rate.Inf, 1000, time.Hour)

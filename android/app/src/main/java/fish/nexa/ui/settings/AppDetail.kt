@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -498,7 +499,11 @@ private fun OAuthTab(form: PortalEditing.Form, onChange: (OwnedApp) -> Unit) {
     GeneratedLink(link)
 }
 
-/** What an app's bot registered: its commands everywhere and for single servers, as people are offered them. */
+/**
+ * What an app's bot registered: its commands everywhere and for single servers,
+ * as people are offered them. The owner can take one away, or all of them for
+ * the bot to register again from nothing.
+ */
 @Composable
 private fun CommandsTab(app: OwnedApp) {
     var list by remember { mutableStateOf<List<AppCommand>?>(null) }
@@ -510,37 +515,53 @@ private fun CommandsTab(app: OwnedApp) {
             failed = true
         }
     }
+    fun shownName(cmd: AppCommand) = if (cmd.type == AppCommands.CMD_SLASH) "/${cmd.name}" else cmd.name
+    fun delete(cmd: AppCommand) = fish.nexa.ui.shell.confirm(t("apps.portal.deleteCommand"), t("apps.portal.deleteCommandBody", "name" to shownName(cmd)), t("apps.portal.delete")) {
+        Apps.deleteCommand(app.id, cmd.id)
+        list = list?.filter { it.id != cmd.id }
+        Nexa.ui.toast(t("apps.portal.commandDeleted", "name" to shownName(cmd)), "success")
+    }
     val l = list
     when {
         failed -> Hint(t("apps.portal.commandsFailed"))
         l == null -> Unit
         l.isEmpty() -> Hint(t("apps.portal.noCommands"))
         else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Hint(t("apps.portal.commandsHint"), Modifier.padding(bottom = 4.dp))
+            Hint(t("apps.portal.commandsHint"))
+            NxButton(t("apps.portal.deleteAllCommands"), {
+                fish.nexa.ui.shell.confirm(t("apps.portal.deleteAllCommands"), t("apps.portal.deleteAllCommandsBody"), t("apps.portal.delete")) {
+                    Apps.deleteAllCommands(app.id)
+                    list = emptyList()
+                    Nexa.ui.toast(t("apps.portal.commandsDeleted"), "success")
+                }
+            }, Modifier.padding(bottom = 4.dp), kind = ButtonKind.DANGER, size = ButtonSize.SM)
             for (cmd in l) {
-                if (cmd.type == AppCommands.CMD_SLASH) for (leaf in AppCommands.leaves(cmd)) CommandCard("/${leaf.label}", t("apps.portal.kindSlash"), cmd, leaf.description, leaf.options.map { o -> (AppCommands.name(o) + if (o.required) "" else "?") to o.required })
-                else CommandCard(cmd.name, if (cmd.type == AppCommands.CMD_USER) t("apps.portal.kindUser") else t("apps.portal.kindMessage"), cmd, AppCommands.description(cmd), emptyList())
+                if (cmd.type == AppCommands.CMD_SLASH) for (leaf in AppCommands.leaves(cmd)) CommandCard("/${leaf.label}", t("apps.portal.kindSlash"), cmd, leaf.description, leaf.options.map { o -> (AppCommands.name(o) + if (o.required) "" else "?") to o.required }, shownName(cmd)) { delete(cmd) }
+                else CommandCard(cmd.name, if (cmd.type == AppCommands.CMD_USER) t("apps.portal.kindUser") else t("apps.portal.kindMessage"), cmd, AppCommands.description(cmd), emptyList(), shownName(cmd)) { delete(cmd) }
             }
         }
     }
 }
 
 @Composable
-private fun CommandCard(name: String, kind: String, cmd: AppCommand, description: String, options: List<Pair<String, Boolean>>) {
+private fun CommandCard(name: String, kind: String, cmd: AppCommand, description: String, options: List<Pair<String, Boolean>>, deleteName: String, onDelete: () -> Unit) {
     val c = Nx.colors
     val shape = Radii.Md
     Column(
         Modifier.fillMaxWidth().ring(shape, c.borderSubtle).background(c.bgSurface, shape).background(sheen(c), shape).topEdge(shape, c.edgeLight).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-            Txt(name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(650)), color = c.textBrand)
-            Txt(kind, style = Nx.type.hint.copy(fontSize = Nx.type.sp(12f), fontWeight = FontWeight(600)), color = c.textMuted)
-            if (cmd.guildId != null) Txt(
-                t("apps.portal.onlyIn", "server" to (cmd.guildName ?: cmd.guildId)),
-                style = Nx.type.hint.copy(fontSize = Nx.type.sp(12f), fontWeight = FontWeight(600)), color = c.textSubtle,
-                modifier = Modifier.background(c.bgHover, RoundedCornerShape(999.dp)).padding(horizontal = 8.dp, vertical = 1.dp),
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+                Txt(name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(650)), color = c.textBrand)
+                Txt(kind, style = Nx.type.hint.copy(fontSize = Nx.type.sp(12f), fontWeight = FontWeight(600)), color = c.textMuted)
+                if (cmd.guildId != null) Txt(
+                    t("apps.portal.onlyIn", "server" to (cmd.guildName ?: cmd.guildId)),
+                    style = Nx.type.hint.copy(fontSize = Nx.type.sp(12f), fontWeight = FontWeight(600)), color = c.textSubtle,
+                    modifier = Modifier.background(c.bgHover, RoundedCornerShape(999.dp)).padding(horizontal = 8.dp, vertical = 1.dp),
+                )
+            }
+            fish.nexa.ui.components.IconButton("Trash2", t("apps.portal.deleteCommandNamed", "name" to deleteName), onDelete, tint = c.textMuted, size = 36.dp, iconSize = 16.dp, modifier = Modifier.padding(start = 6.dp).offset(x = 6.dp, y = 0.dp))
         }
         if (description.isNotEmpty()) Txt(description, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textSubtle)
         if (options.isNotEmpty()) FlowRow(Modifier.padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

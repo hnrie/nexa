@@ -357,6 +357,9 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   `media_handlers`, `upload_handlers` (resumable uploads), `proxy_handlers` (the signed media proxy),
   `youtube_proxy`, `unfurl_handlers`,
   `static` (the SPA).
+- Sign-up is limited to two new accounts a day per IP address (`limSignup`, spent only once every
+  other check passed, never for the first account; `too_many_signups`), on top of `limReg`'s ten
+  attempts an hour.
 - Captchas (`captcha.go`, Cloudflare Turnstile, off until both keys are set): `requireCaptcha(w, r,
   action)` guards what a script would abuse (sign-up, sign-in, recovery, friend requests, a first DM
   to a stranger, creating and joining servers, joining notes and guest calls, bug reports, Discovery
@@ -785,7 +788,8 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
   `ui/apps/CommandMode.kt`). On a touch screen, a tap on the "used /name" line shows what the
   command was used with, names given for people, roles and channels. The Developer Portal is
   `settings/portal` (`DeveloperPortalPage`, `AppDetail` with its General, Bot, Install, OAuth2 and
-  Commands tabs), Settings, Authorized Apps is `settings/AuthorizedAppsPage.tsx`, a server's apps
+  Commands tabs; the Commands tab can delete one command or all of them, through
+  `DELETE /api/v1/applications/{id}/commands[/{cid}]`), Settings, Authorized Apps is `settings/AuthorizedAppsPage.tsx`, a server's apps
   and who may use their commands are `server/pages/AppsSection.tsx` in Integrations, and the
   consent page is `pages/AuthorizePage.tsx`.
 - Context menus: every menu the app opens is registered in `lib/contextMenus/registry.ts`, and none

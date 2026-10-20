@@ -76,6 +76,7 @@ type Server struct {
 	limAuthIP  *ratelimit.Limiter
 	limAuthUsr *ratelimit.Limiter
 	limReg     *ratelimit.Limiter
+	limSignup  *ratelimit.Limiter // accounts made, two a day from one address
 	limMsg     *ratelimit.Limiter
 	limUpload  *ratelimit.Limiter
 	limUnfurl  *ratelimit.Limiter
@@ -228,6 +229,7 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limAuthIP:  ratelimit.New(ratelimit.Every(20, time.Minute), 20, 10*time.Minute),
 		limAuthUsr: ratelimit.New(ratelimit.Every(5, time.Minute), 5, 10*time.Minute),
 		limReg:     ratelimit.New(ratelimit.Every(10, time.Hour), 10, 2*time.Hour),
+		limSignup:  ratelimit.New(ratelimit.Every(2, 24*time.Hour), 2, 25*time.Hour),
 		limMsg:     ratelimit.New(ratelimit.Every(5, 5*time.Second), 5, 5*time.Minute),
 		limUpload:  ratelimit.New(ratelimit.Every(120, time.Minute), 120, time.Hour),
 		limUnfurl:  ratelimit.New(ratelimit.Every(30, time.Minute), 30, 10*time.Minute),
@@ -337,7 +339,7 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 // here is neither swept (every key it ever saw stays in memory) nor shared.
 func (s *Server) limiters() map[string]*ratelimit.Limiter {
 	out := map[string]*ratelimit.Limiter{
-		"generic": s.limGeneric, "auth-ip": s.limAuthIP, "auth-user": s.limAuthUsr, "register": s.limReg, "message": s.limMsg,
+		"generic": s.limGeneric, "auth-ip": s.limAuthIP, "auth-user": s.limAuthUsr, "register": s.limReg, "signup": s.limSignup, "message": s.limMsg,
 		"upload": s.limUpload, "unfurl": s.limUnfurl, "proxy": s.limProxy, "youtube": s.limYouTube, "refresh": s.limRefresh, "voice": s.limVoice,
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
 		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile, "key-ask": s.limKeyAsk,

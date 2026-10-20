@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"evilion.xyz/chat/internal/ratelimit"
 )
 
 var (
@@ -362,5 +364,17 @@ func TestAnInviteLetsInAsManyAccountsAsItHasUses(t *testing.T) {
 	b["registration_key"] = "sesame"
 	if res, body := do(t, ts, "POST", "/api/v1/auth/register", "", b); res.StatusCode != 201 {
 		t.Errorf("sign-up with the key: %d %v", res.StatusCode, body)
+	}
+}
+
+func TestTwoAccountsADayFromOneAddress(t *testing.T) {
+	srv, ts := newTestServer(t)
+	srv.limSignup = ratelimit.New(ratelimit.Every(2, 24*time.Hour), 2, 25*time.Hour)
+	register(t, ts, "first") // the first account never counts
+	register(t, ts, "second")
+	register(t, ts, "third")
+	res, body := do(t, ts, "POST", "/api/v1/auth/register", "", registerBody("fourth"))
+	if res.StatusCode != 429 || errCode(body) != "too_many_signups" || res.Header.Get("Retry-After") == "" {
+		t.Fatalf("a third account today: %d %v", res.StatusCode, body)
 	}
 }

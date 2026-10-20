@@ -187,6 +187,28 @@ func TestOwnersSeeCommandsMadeForOneServer(t *testing.T) {
 	if seen["ping"] == nil || seen["ping"]["guild_id"] != sid || seen["ping"]["guild_name"] != "Lab" {
 		t.Fatalf("the server's command: %v", seen["ping"])
 	}
+
+	// the owner removes one by hand, and nobody else can
+	bob, _ := register(t, ts, "bob")
+	if res, _ := do(t, ts, "DELETE", "/api/v1/applications/"+id+"/commands/"+seen["help"]["id"].(string), bob, nil); res.StatusCode != 404 {
+		t.Fatalf("someone else removed a command: %d", res.StatusCode)
+	}
+	if res, body := do(t, ts, "DELETE", "/api/v1/applications/"+id+"/commands/"+seen["help"]["id"].(string), tok, nil); res.StatusCode != 204 {
+		t.Fatalf("remove one: %d %v", res.StatusCode, body)
+	}
+	_, body = do(t, ts, "GET", "/api/v1/applications/"+id+"/commands", tok, nil)
+	if l := body["_list"].([]any); len(l) != 1 || l[0].(map[string]any)["name"] != "ping" {
+		t.Fatalf("after removing one: %v", l)
+	}
+	// and then all of them, the server's own included
+	botDo(t, ts, "PUT", "/api/v10/applications/"+appOut+"/commands", botToken, []map[string]any{{"name": "help", "description": "Helps"}})
+	if res, body := do(t, ts, "DELETE", "/api/v1/applications/"+id+"/commands", tok, nil); res.StatusCode != 204 {
+		t.Fatalf("remove all: %d %v", res.StatusCode, body)
+	}
+	_, body = do(t, ts, "GET", "/api/v1/applications/"+id+"/commands", tok, nil)
+	if l := body["_list"].([]any); len(l) != 0 {
+		t.Fatalf("after removing all: %v", l)
+	}
 }
 
 func TestBotsThatReadEverythingAreListed(t *testing.T) {
