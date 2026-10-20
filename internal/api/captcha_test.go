@@ -89,6 +89,10 @@ func TestCaptchaGuardsAbusableActions(t *testing.T) {
 	if res, body := withCaptcha(t, ts, "POST", "/api/v1/auth/register", "", "good-register@evil.example", registerBody("bob")); res.StatusCode != 403 || errCode(body) != "captcha_failed" {
 		t.Errorf("a token solved on another site: %d %v", res.StatusCode, body)
 	}
+	// a real hCaptcha token is thousands of characters long
+	if res, body := withCaptcha(t, ts, "POST", "/api/v1/auth/register", "", "good-register-"+strings.Repeat("x", 4000), registerBody("carol")); res.StatusCode != 201 {
+		t.Fatalf("register with a token as long as hCaptcha's: %d %v", res.StatusCode, body)
+	}
 	if res, body := withCaptcha(t, ts, "POST", "/api/v1/auth/register", "", "good-register", registerBody("bob")); res.StatusCode != 201 {
 		t.Fatalf("register with a good token: %d %v", res.StatusCode, body)
 	}

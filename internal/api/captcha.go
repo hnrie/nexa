@@ -58,7 +58,9 @@ func (s *Server) requireCaptcha(w http.ResponseWriter, r *http.Request, action s
 	// would be asked: it solves the captcha for that action and sends again
 	w.Header().Set(CaptchaActionHeader, action)
 	token := strings.TrimSpace(r.Header.Get(CaptchaHeader))
-	if token == "" || len(token) > 2048 {
+	// hCaptcha's tokens run to several thousand characters (about 3,500 seen);
+	// the cap only keeps a giant header from being sent on to hCaptcha
+	if token == "" || len(token) > 16<<10 {
 		WriteError(w, E(http.StatusForbidden, "captcha_required", "Please complete the captcha."))
 		return false
 	}
