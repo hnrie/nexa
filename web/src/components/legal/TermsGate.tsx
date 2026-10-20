@@ -105,7 +105,7 @@ export function TermsGate() {
       {/* the legal text is English on purpose; it lays itself out as English (see LegalContent) */}
       <div className={s.gate} data-testid="terms-gate" ref={gate} dir="auto">
         <p className={s.gateLead}>{previous ? t("legal.gateUpdatedIntro", { version: LEGAL_EFFECTIVE }) : t("legal.gateIntro", { version: LEGAL_EFFECTIVE })}</p>
-        {previous ? <LegalChanges /> : null}
+        {previous ? <LegalChanges previous={previous} /> : null}
         <div className={s.readTabs} role="tablist" aria-label={t("legal.readSummary")}>
           {tabs.map((x) => (
             <button

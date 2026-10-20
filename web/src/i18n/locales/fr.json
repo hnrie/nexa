@@ -6632,6 +6632,7 @@
   "keybinds.pluginsHint": "Les touches des plugins activés. Celles d'un plugin restent enregistrées pendant qu'il est désactivé.",
   "keybinds.takenByOtherPlugin": "Un autre plugin utilise déjà ces touches.",
   "keybinds.takenByPlugin": "{name} de {plugin} utilise déjà ces touches.",
+  "legal.newCaptcha": "Le captcha est désormais hCaptcha. Ton navigateur ou l'app le charge depuis hcaptcha.com, et Nexa envoie ton adresse IP à hCaptcha quand il en vérifie un.",
   "look.plugins.back": "Retour",
   "look.plugins.continue": "Continuer",
   "look.plugins.dangerous": "Dangereux",

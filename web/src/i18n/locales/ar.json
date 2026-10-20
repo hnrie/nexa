@@ -7366,6 +7366,7 @@
   "keybinds.pluginsHint": "مفاتيح الإضافات المفعّلة. تبقى مفاتيح الإضافة محفوظة وهي معطّلة.",
   "keybinds.takenByOtherPlugin": "إضافة أخرى تستخدم هذه المفاتيح بالفعل.",
   "keybinds.takenByPlugin": "{name} من {plugin} يستخدم هذه المفاتيح بالفعل.",
+  "legal.newCaptcha": "أصبح اختبار captcha الآن من hCaptcha. يحمّله متصفحك أو تطبيقك من hcaptcha.com، ويرسل Nexa عنوان IP الخاص بك إلى hCaptcha عند التحقق منه.",
   "look.plugins.back": "رجوع",
   "look.plugins.continue": "متابعة",
   "look.plugins.dangerous": "خطير",

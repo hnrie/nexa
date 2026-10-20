@@ -1,6 +1,8 @@
 package fish.nexa.ui.auth
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.view.inputmethod.InputMethodManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -38,11 +40,12 @@ import kotlinx.coroutines.CompletableDeferred
 import org.json.JSONObject
 
 /**
- * Cloudflare Turnstile, in the one web view this app has. The server checks
+ * hCaptcha, in the one web view this app has. The server checks
  * the hostname a token was solved on, so the widget runs in a page whose
  * address is the instance's own (loadDataWithBaseURL); the token comes back
  * through a bridge and goes on the one request it was made for. Like the web,
- * the sheet only shows when Turnstile wants a click.
+ * the sheet only shows when hCaptcha puts up a challenge, and closing the
+ * challenge cancels.
  */
 object CaptchaHost : CaptchaProvider {
     private class Request(val siteKey: String, val action: String, val result: CompletableDeferred<String>)
@@ -61,7 +64,7 @@ object CaptchaHost : CaptchaProvider {
         }
     }
 
-    private fun page(siteKey: String, action: String, dark: Boolean, bg: Int): String {
+    private fun page(siteKey: String, dark: Boolean, bg: Int): String {
         val color = String.format("#%06x", bg and 0xFFFFFF)
         return """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>html,body{margin:0;background:$color;display:flex;align-items:center;justify-content:center;min-height:100%}</style></head>
@@ -69,14 +72,15 @@ object CaptchaHost : CaptchaProvider {
 <script>
 function done(t){NexaCaptcha.onToken(t)}
 function fail(c){NexaCaptcha.onError(c||"failed")}
-window.onload=function(){
-  var tries=0;(function wait(){
-    if(window.turnstile){turnstile.render("#slot",{sitekey:${JSONObject.quote(siteKey)},action:${JSONObject.quote(action)},theme:"${if (dark) "dark" else "light"}",appearance:"interaction-only",
-      callback:done,"error-callback":function(){fail("failed")},"timeout-callback":function(){fail("timeout")},
-      "before-interactive-callback":function(){NexaCaptcha.onShow()},"after-interactive-callback":function(){NexaCaptcha.onHide()}});return}
-    if(++tries>150)return fail("unavailable");setTimeout(wait,100)})()}
+// the API is ready only when it calls this (its onload), not when window.hcaptcha appears
+var started=false
+function ready(){started=true;var id=hcaptcha.render("slot",{sitekey:${JSONObject.quote(siteKey)},theme:"${if (dark) "dark" else "light"}",size:"invisible",
+  callback:done,"error-callback":function(){fail("failed")},"expired-callback":function(){fail("timeout")},"chalexpired-callback":function(){fail("timeout")},
+  "open-callback":function(){NexaCaptcha.onShow()},"close-callback":function(){NexaCaptcha.onCancel()}});hcaptcha.execute(id)}
+// a blocked script still loads and never calls ready
+setTimeout(function(){if(!started)fail("unavailable")},15000)
 </script>
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onerror="fail('unavailable')"></script>
+<script src="https://js.hcaptcha.com/1/api.js?render=explicit&recaptchacompat=off&onload=ready" async defer onerror="fail('unavailable')"></script>
 </body></html>"""
     }
 
@@ -95,14 +99,15 @@ window.onload=function(){
             Column(
                 Modifier
                     .padding(16.dp)
-                    .widthIn(max = 360.dp)
+                    .widthIn(max = 400.dp)
                     .then(if (shown) Modifier.panel(Radii.Lg, c, c.bgFloating, high = true).padding(20.dp) else Modifier.height(1.dp)),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (shown) Txt(t("captcha.oneQuickCheck"), style = Nx.type.sheetTitle, color = c.textStrong)
                 AndroidView(
-                    modifier = Modifier.fillMaxWidth().height(if (shown) 80.dp else 1.dp),
+                    // room for hCaptcha's challenge, which it draws inside this page
+                    modifier = Modifier.fillMaxWidth().height(if (shown) 580.dp else 1.dp),
                     factory = { ctx ->
                         WebView(ctx).apply {
                             setBackgroundColor(c.bgFloating.toArgb())
@@ -118,10 +123,18 @@ window.onload=function(){
                                     else ApiError(0, "captcha_failed", t("captcha.theCaptchaCheckFailedPleaseTry"))
                                     r.result.completeExceptionally(err)
                                 }
-                                @JavascriptInterface fun onShow() = post { shown = true }.let { }
-                                @JavascriptInterface fun onHide() = post { shown = false }.let { }
+                                // the challenge needs the whole sheet: the keyboard the form left
+                                // open would cover it, and the focus goes with it, as on the web
+                                @JavascriptInterface fun onShow() = post {
+                                    shown = true
+                                    requestFocus()
+                                    (ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(windowToken, 0)
+                                }.let { }
+                                @JavascriptInterface fun onCancel() {
+                                    r.result.completeExceptionally(ApiError(0, "captcha_cancelled", t("captcha.theCaptchaWasCancelled")))
+                                }
                             }, "NexaCaptcha")
-                            loadDataWithBaseURL(Nexa.api.baseUrl + "/", page(r.siteKey, r.action, !c.isLight, c.bgFloating.toArgb()), "text/html", "utf-8", null)
+                            loadDataWithBaseURL(Nexa.api.baseUrl + "/", page(r.siteKey, !c.isLight, c.bgFloating.toArgb()), "text/html", "utf-8", null)
                         }
                     },
                 )

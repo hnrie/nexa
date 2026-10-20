@@ -95,11 +95,11 @@ type Config struct {
 	// Portal (discordsync.redirectFor): the one under the address the person
 	// started at, else PublicURL's, else another of this Nexa's addresses.
 	DiscordRedirectURL string
-	// TurnstileSiteKey and TurnstileSecretKey turn on Cloudflare Turnstile
-	// captchas for the actions bots abuse. Both are free to get; without them
-	// nothing asks for a captcha.
-	TurnstileSiteKey   string
-	TurnstileSecretKey string
+	// HCaptchaSiteKey and HCaptchaSecretKey turn on hCaptcha captchas for the
+	// actions bots abuse. Both are free to get; without them nothing asks for
+	// a captcha.
+	HCaptchaSiteKey   string
+	HCaptchaSecretKey string
 	// RealtimeAppID and RealtimeAppSecret send every call through Cloudflare
 	// Realtime SFU, so nobody in a call learns another person's address.
 	// Without them calls go peer to peer.
@@ -188,8 +188,8 @@ func Load(getenv func(string) string) (Config, error) {
 	str("DISCORD_ACTIVITY_GUILD_ID", &c.DiscordGuildID)
 	str("DISCORD_API_URL", &c.DiscordAPIURL)
 	str("DISCORD_REDIRECT_URL", &c.DiscordRedirectURL)
-	str("TURNSTILE_SITE_KEY", &c.TurnstileSiteKey)
-	str("TURNSTILE_SECRET_KEY", &c.TurnstileSecretKey)
+	str("HCAPTCHA_SITE_KEY", &c.HCaptchaSiteKey)
+	str("HCAPTCHA_SECRET_KEY", &c.HCaptchaSecretKey)
 	str("REALTIME_APP_ID", &c.RealtimeAppID)
 	str("REALTIME_APP_SECRET", &c.RealtimeAppSecret)
 	str("EGRESS_PROXY", &c.EgressProxy)
@@ -294,8 +294,8 @@ func Load(getenv func(string) string) (Config, error) {
 		return c, fmt.Errorf("LOG_LEVEL: expected debug|info|warn|error, got %q", c.LogLevel)
 	}
 	// With one key and not the other captchas would be silently off.
-	if (c.TurnstileSiteKey == "") != (c.TurnstileSecretKey == "") {
-		return c, fmt.Errorf("TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY: set both to turn captchas on, or neither")
+	if (c.HCaptchaSiteKey == "") != (c.HCaptchaSecretKey == "") {
+		return c, fmt.Errorf("HCAPTCHA_SITE_KEY and HCAPTCHA_SECRET_KEY: set both to turn captchas on, or neither")
 	}
 	// With one and not the other calls would quietly go peer to peer.
 	if (c.RealtimeAppID == "") != (c.RealtimeAppSecret == "") {

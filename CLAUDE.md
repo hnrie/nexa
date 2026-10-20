@@ -360,13 +360,24 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
 - Sign-up is limited to two new accounts a day per IP address (`limSignup`, spent only once every
   other check passed, never for the first account; `too_many_signups`), on top of `limReg`'s ten
   attempts an hour.
-- Captchas (`captcha.go`, Cloudflare Turnstile, off until both keys are set): `requireCaptcha(w, r,
-  action)` guards what a script would abuse (sign-up, sign-in, recovery, friend requests, a first DM
+- Captchas (`captcha.go`, hCaptcha in its invisible size, off until both keys are set):
+  `requireCaptcha(w, r, action)` guards what a script would abuse (sign-up, sign-in, recovery, friend requests, a first DM
   to a stranger, creating and joining servers, joining notes and guest calls, bug reports, Discovery
   and public sticker packs, Telegram imports) and every password check and username change. A
   refusal names the action in `X-Captcha-Action`; the web's `api.captchaSolver` (`lib/captcha.ts`)
   and Android's `Api.captchaSolver` (set by `Auth.solveCaptcha`) solve it and send the request
-  again, so a guarded call needs nothing of its own.
+  again, so a guarded call needs nothing of its own. hCaptcha binds no action to a token, so the
+  server checks only that it passed and was solved on one of Nexa's own hostnames (the sitekey's
+  allowed domains in the hCaptcha dashboard should list the same ones); with hCaptcha's published
+  test secret the hostname is not checked. The web's sheet (`lib/captcha.ts`) dims the page while
+  hCaptcha's challenge is open and takes its theme from `data-scheme` on the root, which
+  `lib/theme.ts` sets; closing the challenge cancels. Both render only once hCaptcha's script calls
+  the function named in its `onload` (rendering when `window.hcaptcha` first appears is refused).
+  Android's (`ui/auth/Captcha.kt`) runs it in a web view on the instance's own address and closes
+  the keyboard when a challenge opens. Which challenges people get is the sitekey's setting in the
+  hCaptcha dashboard; the test sitekey `10000000-ffff-ffff-ffff-000000000001` never shows one, so a
+  real challenge can only be seen with the real keys on a throwaway server. The desktop app frames only `hcaptcha.com` and its
+  subdomains (`isFrameableUrl`), so desktop releases from before the change cannot show it.
 - Apps and bots (`bot_*.go`, guide for bot makers in `docs/bots.md`): the Developer Portal
   (`bot_portal`, `/api/v1/applications`), OAuth2 and installs (`bot_oauth`: the consent page's
   `/api/v1/oauth2/authorize`, Authorized Apps, a server's integrations and who may use their
@@ -395,7 +406,7 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
 - `static.go` serves `web/dist`: hashed assets immutable, `index.html` for any other path, and its
   own page heads (for link previews elsewhere) at `/invite/{code}`, `/call/{code}`, `/note/{token}`,
   `/@{username}` and `/`. The Content-Security-Policy is there too (plugins load from `blob:`,
-  Turnstile from Cloudflare).
+  hCaptcha from `hcaptcha.com` and `*.hcaptcha.com`).
 - `ChannelAccess`, `ConvForChannel`, `ServerChannelPatch` and `CanRotate` on `Server` are hooks the
   server-channel code (`server_glue.go`) installs; DM access is built in.
 
@@ -630,8 +641,8 @@ Every setting is documented in `chatd.env.example`; `internal/config` loads them
 addresses (`LISTEN`, `PUBLIC_URL`, `ALT_URLS`, `MOVED_FROM`), storage (`DATA_DIR`, `DATABASE_URL`,
 `REDIS_URL`, `WEB_DIST`, `DESKTOP_DIR`, `ANDROID_DIR`, `NODE_ID`), limits (`MAX_UPLOAD_BYTES`,
 `MAX_AVATAR_BYTES`, `MAX_EMOJI_BYTES`, `MAX_STICKER_BYTES`, `SESSION_TTL_DAYS`), sign-up
-(`REGISTRATION` open/invite/closed, `REGISTRATION_KEY`, `ADMIN_USERNAME`, `TURNSTILE_SITE_KEY`,
-`TURNSTILE_SECRET_KEY`), calls (`REALTIME_APP_ID`, `REALTIME_APP_SECRET`, `REALTIME_MONTHLY_GB`,
+(`REGISTRATION` open/invite/closed, `REGISTRATION_KEY`, `ADMIN_USERNAME`, `HCAPTCHA_SITE_KEY`,
+`HCAPTCHA_SECRET_KEY`), calls (`REALTIME_APP_ID`, `REALTIME_APP_SECRET`, `REALTIME_MONTHLY_GB`,
 `GUEST_LINKS_P2P`, `STUN_URLS`, `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL`, `TURN_KEY_ID`,
 `TURN_API_TOKEN`), outbound (`EGRESS_PROXY`, `WARP_PROXY_PORT`), integrations (`KLIPY_API_KEY`,
 `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `TELEGRAM_BOT_TOKEN`, `DISCORD_CLIENT_ID`,

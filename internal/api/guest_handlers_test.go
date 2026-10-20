@@ -302,9 +302,9 @@ func TestGuestLinkJoinNeedsCaptchaAndLimits(t *testing.T) {
 	}
 
 	secret := "1x0000000000000000000000000000000AA"
-	restore := turnstileStandIn(t, secret)
+	restore := hcaptchaStandIn(t, secret)
 	defer restore()
-	srv.Cfg.TurnstileSiteKey, srv.Cfg.TurnstileSecretKey = "site", secret
+	srv.Cfg.HCaptchaSiteKey, srv.Cfg.HCaptchaSecretKey = "site", secret
 	if res, body := do(t, ts, "POST", "/api/v1/guest/join", "", map[string]any{"code": code, "display_name": "Bot"}); res.StatusCode != 403 || errCode(body) != "captcha_required" {
 		t.Errorf("join without a captcha: %d %v", res.StatusCode, body)
 	}

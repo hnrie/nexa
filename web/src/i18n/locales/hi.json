@@ -6520,6 +6520,7 @@
   "keybinds.pluginsHint": "चालू प्लगइन की कुंजियाँ। प्लगइन बंद रहने पर भी उसकी कुंजियाँ सहेजी रहती हैं।",
   "keybinds.takenByOtherPlugin": "कोई दूसरा प्लगइन ये कुंजियाँ पहले से इस्तेमाल करता है।",
   "keybinds.takenByPlugin": "{plugin} का {name} ये कुंजियाँ पहले से इस्तेमाल करता है।",
+  "legal.newCaptcha": "कैप्चा अब hCaptcha है। आपका ब्राउज़र या ऐप इसे hcaptcha.com से लोड करता है, और कैप्चा जाँचते समय Nexa आपका IP पता hCaptcha को भेजता है।",
   "look.plugins.back": "वापस",
   "look.plugins.continue": "आगे बढ़ें",
   "look.plugins.dangerous": "खतरनाक",

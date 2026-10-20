@@ -6520,6 +6520,7 @@
   "keybinds.pluginsHint": "Tasten für deine eingeschalteten Plugins. Die Tasten eines Plugins bleiben gespeichert, solange es aus ist.",
   "keybinds.takenByOtherPlugin": "Ein anderes Plugin nutzt diese Tasten schon.",
   "keybinds.takenByPlugin": "{name} von {plugin} nutzt diese Tasten schon.",
+  "legal.newCaptcha": "Das Captcha ist jetzt hCaptcha. Dein Browser oder deine App lädt es von hcaptcha.com, und Nexa sendet hCaptcha deine IP-Adresse, wenn es eines prüft.",
   "look.plugins.back": "Zurück",
   "look.plugins.continue": "Weiter",
   "look.plugins.dangerous": "Gefährlich",

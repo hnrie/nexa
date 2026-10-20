@@ -6520,6 +6520,7 @@
   "keybinds.pluginsHint": "Tangenter för tilläggen du har påslagna. Ett tilläggs tangenter förblir sparade medan det är av.",
   "keybinds.takenByOtherPlugin": "Ett annat tillägg använder redan de här tangenterna.",
   "keybinds.takenByPlugin": "{name} från {plugin} använder redan de här tangenterna.",
+  "legal.newCaptcha": "Captchan är nu hCaptcha. Din webbläsare eller app laddar den från hcaptcha.com, och Nexa skickar din IP-adress till hCaptcha när den kontrollerar en.",
   "look.plugins.back": "Tillbaka",
   "look.plugins.continue": "Fortsätt",
   "look.plugins.dangerous": "Farligt",

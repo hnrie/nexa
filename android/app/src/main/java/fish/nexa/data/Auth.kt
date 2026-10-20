@@ -51,7 +51,7 @@ sealed interface AuthState {
     data class Ready(val me: MeUser) : AuthState
 }
 
-/** The UI's captcha sheet: a fresh Turnstile token made for `action` on the instance's own page. */
+/** The UI's captcha sheet: a fresh hCaptcha token made for `action` on the instance's own page. */
 fun interface CaptchaProvider {
     suspend fun token(siteKey: String, action: String): String
 }
@@ -97,7 +97,7 @@ class Auth(private val nx: Nexa) {
      */
     suspend fun solveCaptcha(action: String): String? {
         val info = _instance.value?.takeIf { it.captcha != null } ?: loadInstance()
-        val key = info?.captcha?.takeIf { it.provider == "turnstile" && it.siteKey.isNotEmpty() }?.siteKey ?: return null
+        val key = info?.captcha?.takeIf { it.provider == "hcaptcha" && it.siteKey.isNotEmpty() }?.siteKey ?: return null
         val p = captcha ?: return null
         return p.token(key, action)
     }
@@ -109,7 +109,7 @@ class Auth(private val nx: Nexa) {
     suspend fun <T> guarded(action: String, send: suspend (String?) -> T): T {
         val inst = _instance.value ?: loadInstance()
         suspend fun tokenFor(info: InstanceInfo?): String? {
-            val key = info?.captcha?.takeIf { it.provider == "turnstile" && it.siteKey.isNotEmpty() }?.siteKey ?: return null
+            val key = info?.captcha?.takeIf { it.provider == "hcaptcha" && it.siteKey.isNotEmpty() }?.siteKey ?: return null
             val p = captcha ?: throw ApiError(0, "captcha_unavailable", "The captcha could not start.")
             return p.token(key, action)
         }

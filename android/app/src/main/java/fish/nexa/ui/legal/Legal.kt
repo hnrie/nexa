@@ -210,22 +210,22 @@ object Legal {
                     }
                 },
             ) {
-                Gate(previous != null)
+                Gate(previous)
             }
         }
         Layers.open(layer)
     }
 
     @Composable
-    private fun Gate(updated: Boolean) {
+    private fun Gate(previous: String?) {
         val c = Nx.colors
         var tab by remember { mutableStateOf("summary") }
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Txt(
-                if (updated) t("legal.gateUpdatedIntro", "version" to effective) else t("legal.gateIntro", "version" to effective),
+                if (previous != null) t("legal.gateUpdatedIntro", "version" to effective) else t("legal.gateIntro", "version" to effective),
                 style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), lineHeight = Nx.type.sp(23.25f)), color = c.text,
             )
-            if (updated) Changes()
+            if (previous != null) Changes(previous)
             Row(Modifier.sidewaysScroll(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for ((id, label) in listOf("summary" to t("legal.readSummary"), "terms" to t("legal.termsTitle"), "privacy" to t("legal.privacyTitle"))) {
                     val on = tab == id
@@ -290,7 +290,8 @@ object Legal {
     }
 
     @Composable
-    private fun Changes() {
+    /** LegalContent.tsx LegalChanges: what changed since the version agreed to before. */
+    private fun Changes(previous: String) {
         val c = Nx.colors
         val shape = Radii.Sm
         Column(
@@ -304,7 +305,8 @@ object Legal {
                 Icon("Sparkles", c.textBrand, size = 14.dp)
                 Txt(t("legal.newTitle"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), fontWeight = FontWeight(700)), color = c.textBrand)
             }
-            Bullets(listOf(t("legal.new1"), t("legal.new2"), t("legal.new3"), t("legal.new4"), t("legal.new5")), ordered = false, size = 14f)
+            val items = listOf(t("legal.newCaptcha")) + if (previous < "2026-10-19") listOf(t("legal.new1"), t("legal.new2"), t("legal.new3"), t("legal.new4"), t("legal.new5")) else emptyList()
+            Bullets(items, ordered = false, size = 14f)
         }
     }
 

@@ -6633,6 +6633,7 @@
   "keybinds.pluginsHint": "Teclas dos plugins que você deixou ligados. As teclas de um plugin ficam salvas enquanto ele está desligado.",
   "keybinds.takenByOtherPlugin": "Outro plugin já usa estas teclas.",
   "keybinds.takenByPlugin": "{name} do {plugin} já usa estas teclas.",
+  "legal.newCaptcha": "O captcha agora é o hCaptcha. Seu navegador ou app o carrega de hcaptcha.com, e o Nexa envia seu endereço IP ao hCaptcha ao verificar um.",
   "look.plugins.back": "Voltar",
   "look.plugins.continue": "Continuar",
   "look.plugins.dangerous": "Perigoso",

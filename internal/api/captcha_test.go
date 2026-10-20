@@ -10,23 +10,24 @@ import (
 	"testing"
 )
 
-// turnstileStandIn answers siteverify the way Cloudflare does: tokens named
-// "good-<action>" pass for that action, solved on chat.example, or on <host>
-// for "good-<action>@<host>"; anything else fails.
-func turnstileStandIn(t *testing.T, secret string) func() {
+// hcaptchaStandIn answers siteverify the way hCaptcha does: tokens named
+// "good-<anything>" pass, solved on chat.example, or on <host> for
+// "good-<anything>@<host>"; anything else fails. hCaptcha binds no action to
+// a token, so the name after "good-" only keeps the tests readable.
+func hcaptchaStandIn(t *testing.T, secret string) func() {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
 		out := map[string]any{"success": false, "error-codes": []string{"invalid-input-response"}}
-		if r.PostForm.Get("secret") == "test-secret" {
-			// what Cloudflare's test secret keys answer, whatever the token
-			out = map[string]any{"success": true, "hostname": "example.com", "metadata": map[string]any{"result_with_testing_key": true}}
+		if r.PostForm.Get("secret") == hcaptchaTestSecret {
+			// what hCaptcha's test secret answers, whatever the token
+			out = map[string]any{"success": true, "hostname": "dummy-key-pass"}
 		} else if r.PostForm.Get("secret") == secret && strings.HasPrefix(r.PostForm.Get("response"), "good-") {
-			action, host, found := strings.Cut(strings.TrimPrefix(r.PostForm.Get("response"), "good-"), "@")
+			_, host, found := strings.Cut(strings.TrimPrefix(r.PostForm.Get("response"), "good-"), "@")
 			if !found {
 				host = "chat.example"
 			}
-			out = map[string]any{"success": true, "action": action, "hostname": host}
+			out = map[string]any{"success": true, "hostname": host}
 		}
 		_ = json.NewEncoder(w).Encode(out)
 	}))
@@ -63,33 +64,27 @@ func withCaptcha(t *testing.T, ts *httptest.Server, method, path, token, captcha
 func TestCaptchaGuardsAbusableActions(t *testing.T) {
 	srv, ts := newTestServer(t)
 	tokA, _ := register(t, ts, "alice") // before captchas are on
-	srv.Cfg.TurnstileSiteKey = "site-key"
-	srv.Cfg.TurnstileSecretKey = "secret-key"
+	srv.Cfg.HCaptchaSiteKey = "site-key"
+	srv.Cfg.HCaptchaSecretKey = "secret-key"
 	srv.Cfg.PublicURL = "https://chat.example"
-	defer turnstileStandIn(t, "secret-key")()
+	defer hcaptchaStandIn(t, "secret-key")()
 
 	// the public info about Nexa says how to show it, and never gives the secret away
 	res, info := do(t, ts, "GET", "/api/v1/instance", "", nil)
 	captcha, _ := info["captcha"].(map[string]any)
-	if res.StatusCode != 200 || captcha["provider"] != "turnstile" || captcha["site_key"] != "site-key" {
+	if res.StatusCode != 200 || captcha["provider"] != "hcaptcha" || captcha["site_key"] != "site-key" {
 		t.Fatalf("instance: %v", info["captcha"])
 	}
 	if raw, _ := json.Marshal(info); bytes.Contains(raw, []byte("secret-key")) {
 		t.Fatal("the secret key must never reach a browser")
 	}
 
-	// no token, a bad one, or one made for something else: refused
+	// no token, a bad one, or one solved on another site: refused
 	if res, body := withCaptcha(t, ts, "POST", "/api/v1/auth/register", "", "", registerBody("bob")); res.StatusCode != 403 || errCode(body) != "captcha_required" {
 		t.Errorf("register without a token: %d %v", res.StatusCode, body)
 	}
 	if res, body := withCaptcha(t, ts, "POST", "/api/v1/auth/register", "", "forged", registerBody("bob")); res.StatusCode != 403 || errCode(body) != "captcha_failed" {
 		t.Errorf("register with a bad token: %d %v", res.StatusCode, body)
-	}
-	if res, body := withCaptcha(t, ts, "POST", "/api/v1/auth/register", "", "good-login", registerBody("bob")); res.StatusCode != 403 || errCode(body) != "captcha_failed" {
-		t.Errorf("a token made for another action: %d %v", res.StatusCode, body)
-	}
-	if res, body := withCaptcha(t, ts, "POST", "/api/v1/auth/register", "", "good-", registerBody("bob")); res.StatusCode != 403 || errCode(body) != "captcha_failed" {
-		t.Errorf("a token made for no action at all: %d %v", res.StatusCode, body)
 	}
 	if res, body := withCaptcha(t, ts, "POST", "/api/v1/auth/register", "", "good-register@evil.example", registerBody("bob")); res.StatusCode != 403 || errCode(body) != "captcha_failed" {
 		t.Errorf("a token solved on another site: %d %v", res.StatusCode, body)
@@ -137,11 +132,11 @@ func TestCaptchaGuardsAbusableActions(t *testing.T) {
 
 func TestCaptchaTestKeysStillWork(t *testing.T) {
 	srv, ts := newTestServer(t)
-	srv.Cfg.TurnstileSiteKey = "1x00000000000000000000AA"
-	srv.Cfg.TurnstileSecretKey = "test-secret"
-	defer turnstileStandIn(t, "secret-key")()
-	if res, body := withCaptcha(t, ts, "POST", "/api/v1/auth/register", "", "XXXX.DUMMY.TOKEN.XXXX", registerBody("bob")); res.StatusCode != 201 {
-		t.Errorf("register with Cloudflare's test keys: %d %v", res.StatusCode, body)
+	srv.Cfg.HCaptchaSiteKey = "10000000-ffff-ffff-ffff-000000000001"
+	srv.Cfg.HCaptchaSecretKey = hcaptchaTestSecret
+	defer hcaptchaStandIn(t, "secret-key")()
+	if res, body := withCaptcha(t, ts, "POST", "/api/v1/auth/register", "", "10000000-aaaa-bbbb-cccc-000000000001", registerBody("bob")); res.StatusCode != 201 {
+		t.Errorf("register with hCaptcha's test keys: %d %v", res.StatusCode, body)
 	}
 	if res, body := withCaptcha(t, ts, "POST", "/api/v1/auth/login", "", "", map[string]any{"username": "bob", "auth_key": b64(key32)}); res.StatusCode != 403 || errCode(body) != "captcha_required" {
 		t.Errorf("even with test keys a token is required: %d %v", res.StatusCode, body)
@@ -150,8 +145,8 @@ func TestCaptchaTestKeysStillWork(t *testing.T) {
 
 func TestCaptchaUnreachableIsNotAPass(t *testing.T) {
 	srv, ts := newTestServer(t)
-	srv.Cfg.TurnstileSiteKey = "site-key"
-	srv.Cfg.TurnstileSecretKey = "secret-key"
+	srv.Cfg.HCaptchaSiteKey = "site-key"
+	srv.Cfg.HCaptchaSecretKey = "secret-key"
 	prev := captchaVerifyURL
 	captchaVerifyURL = "http://127.0.0.1:1/unreachable"
 	defer func() { captchaVerifyURL = prev }()
@@ -166,10 +161,10 @@ func TestCaptchaGuardsAccountChanges(t *testing.T) {
 	srv, ts := newTestServer(t)
 	tokA, _ := register(t, ts, "alice") // before captchas are on
 	_, bobID := register(t, ts, "bob")
-	srv.Cfg.TurnstileSiteKey = "site-key"
-	srv.Cfg.TurnstileSecretKey = "secret-key"
+	srv.Cfg.HCaptchaSiteKey = "site-key"
+	srv.Cfg.HCaptchaSecretKey = "secret-key"
 	srv.Cfg.PublicURL = "https://chat.example"
-	defer turnstileStandIn(t, "secret-key")()
+	defer hcaptchaStandIn(t, "secret-key")()
 
 	for _, c := range []struct {
 		name, method, path, action string
@@ -185,9 +180,6 @@ func TestCaptchaGuardsAccountChanges(t *testing.T) {
 	} {
 		if res, body := withCaptcha(t, ts, c.method, c.path, tokA, "", c.body); res.StatusCode != 403 || errCode(body) != "captcha_required" || res.Header.Get(CaptchaActionHeader) != c.action {
 			t.Errorf("%s without a token: %d %v, action %q", c.name, res.StatusCode, body, res.Header.Get(CaptchaActionHeader))
-		}
-		if res, body := withCaptcha(t, ts, c.method, c.path, tokA, "good-login", c.body); res.StatusCode != 403 || errCode(body) != "captcha_failed" {
-			t.Errorf("%s with another action's token: %d %v", c.name, res.StatusCode, body)
 		}
 	}
 	// the right token lets each through to its own checks
@@ -222,10 +214,10 @@ func TestCaptchaGuardsPublishingAndPasswords(t *testing.T) {
 		t.Fatalf("pack: %d %v", res.StatusCode, pack)
 	}
 	pid := pack["id"].(string)
-	srv.Cfg.TurnstileSiteKey = "site-key"
-	srv.Cfg.TurnstileSecretKey = "secret-key"
+	srv.Cfg.HCaptchaSiteKey = "site-key"
+	srv.Cfg.HCaptchaSecretKey = "secret-key"
 	srv.Cfg.PublicURL = "https://chat.example"
-	defer turnstileStandIn(t, "secret-key")()
+	defer hcaptchaStandIn(t, "secret-key")()
 
 	for _, c := range []struct {
 		name, method, path, action string

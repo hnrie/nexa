@@ -6961,6 +6961,7 @@
   "keybinds.pluginsHint": "Клавиши включённых плагинов. Пока плагин выключен, его клавиши сохраняются.",
   "keybinds.takenByOtherPlugin": "Эти клавиши уже занял другой плагин.",
   "keybinds.takenByPlugin": "Эти клавиши уже заняты: {name} из {plugin}.",
+  "legal.newCaptcha": "Теперь капча работает через hCaptcha. Браузер или приложение загружает её с hcaptcha.com, а Nexa отправляет hCaptcha ваш IP-адрес при проверке.",
   "look.plugins.back": "Назад",
   "look.plugins.continue": "Продолжить",
   "look.plugins.dangerous": "Опасно",

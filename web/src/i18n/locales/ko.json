@@ -6286,6 +6286,7 @@
   "keybinds.pluginsHint": "켜 둔 플러그인의 키입니다. 플러그인이 꺼져 있어도 키는 저장됩니다.",
   "keybinds.takenByOtherPlugin": "다른 플러그인이 이미 이 키를 씁니다.",
   "keybinds.takenByPlugin": "{plugin}의 {name}이(가) 이미 이 키를 씁니다.",
+  "legal.newCaptcha": "이제 캡차는 hCaptcha입니다. 브라우저나 앱이 hcaptcha.com에서 불러오며, Nexa는 캡차를 확인할 때 IP 주소를 hCaptcha에 보냅니다.",
   "look.plugins.back": "뒤로",
   "look.plugins.continue": "계속",
   "look.plugins.dangerous": "위험",

@@ -6286,6 +6286,7 @@
   "keybinds.pluginsHint": "已开启插件的按键。插件关闭期间，它的按键仍会保存。",
   "keybinds.takenByOtherPlugin": "另一个插件已在使用这些按键。",
   "keybinds.takenByPlugin": "{plugin} 的{name}已在使用这些按键。",
+  "legal.newCaptcha": "验证码现在使用 hCaptcha。你的浏览器或应用从 hcaptcha.com 加载它，Nexa 在检查验证码时会把你的 IP 地址发送给 hCaptcha。",
   "look.plugins.back": "返回",
   "look.plugins.continue": "继续",
   "look.plugins.dangerous": "危险",

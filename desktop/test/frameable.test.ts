@@ -3,7 +3,7 @@
  *
  * A guard stricter than the policy the page is already served under does not
  * add safety, it removes a feature. Blocking every off-origin subframe left
- * Turnstile's iframe unable to load, so signing in sat on "checking" with no
+ * the captcha's iframe unable to load, so signing in sat on "checking" with no
  * callback to fail — and every embedded video went blank with it.
  */
 import { describe, expect, it, vi } from "vitest";
@@ -16,8 +16,9 @@ const { isFrameableUrl } = await import("../src/main/config");
 
 describe("what may be framed", () => {
   it("allows exactly what the server's frame-src allows", () => {
-    // internal/api/static.go: frame-src 'self' youtube-nocookie challenges.cloudflare.com
-    expect(isFrameableUrl("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile/if/ov2/av0")).toBe(true);
+    // internal/api/static.go: frame-src 'self' hcaptcha.com *.hcaptcha.com youtube-nocookie
+    expect(isFrameableUrl("https://newassets.hcaptcha.com/captcha/v1/abc/static/hcaptcha.html#frame=challenge")).toBe(true);
+    expect(isFrameableUrl("https://hcaptcha.com/checksiteconfig")).toBe(true);
     expect(isFrameableUrl("https://www.youtube-nocookie.com/embed/abc123")).toBe(true);
   });
 
@@ -31,6 +32,8 @@ describe("what may be framed", () => {
     expect(isFrameableUrl("https://evil.example/")).toBe(false);
     expect(isFrameableUrl("https://youtube.com/embed/abc")).toBe(false);
     // a lookalike host must not pass on a prefix
-    expect(isFrameableUrl("https://challenges.cloudflare.com.evil.example/")).toBe(false);
+    expect(isFrameableUrl("https://newassets.hcaptcha.com.evil.example/")).toBe(false);
+    expect(isFrameableUrl("https://evilhcaptcha.com/")).toBe(false);
+    expect(isFrameableUrl("http://newassets.hcaptcha.com/")).toBe(false);
   });
 });

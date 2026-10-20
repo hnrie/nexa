@@ -6286,6 +6286,7 @@
   "keybinds.pluginsHint": "オンにしているプラグインのキーです。オフの間もキーは保存されたままです。",
   "keybinds.takenByOtherPlugin": "ほかのプラグインがすでにこのキーを使っています。",
   "keybinds.takenByPlugin": "{plugin} の {name} がすでにこのキーを使っています。",
+  "legal.newCaptcha": "キャプチャは hCaptcha になりました。ブラウザやアプリは hcaptcha.com から読み込み、Nexa はキャプチャを確認するときにあなたの IP アドレスを hCaptcha に送ります。",
   "look.plugins.back": "戻る",
   "look.plugins.continue": "続ける",
   "look.plugins.dangerous": "危険",

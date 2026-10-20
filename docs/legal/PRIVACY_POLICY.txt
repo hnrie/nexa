@@ -1,7 +1,7 @@
 NEXA - PRIVACY POLICY
 Site: nexa.fish (also at mathtest.lol, and formerly chat.evilion.xyz)
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-10-19
+Effective: 2026-10-20
 
 This policy lists exactly what Nexa holds. It is written against the
 actual database, so if something is not listed here, there is no place
@@ -295,12 +295,11 @@ calls.
   makes. Your messages, files, notes, and calls are already encrypted
   when they pass through it. Why: so the server is never reachable
   directly from the internet.
-- Cloudflare Turnstile, for the captcha when you sign up, sign in,
-  recover an account, send a friend request, invite someone to a
-  note, create or join a server, or join a call as a guest. Your
-  browser or app loads it from challenges.cloudflare.com, and the
-  server sends Cloudflare your IP address with its answer to check
-  it. Why: to stop bots from making accounts, guessing passwords, and
+- hCaptcha, for the captcha when you sign up, sign in, recover an
+  account, send a friend request, invite someone to a note, create or
+  join a server, or join a call as a guest. Your browser or app loads
+  it from hcaptcha.com, and the server sends hCaptcha your IP address
+  with its answer to check it. Why: to stop bots from making accounts, guessing passwords, and
   sending spam.
 - Cloudflare Realtime, for calls. It relays call audio and video, so
   your device connects to it and it sees your IP address, and the

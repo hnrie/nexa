@@ -38,7 +38,8 @@ class ApiError(
     /** On a refusal for want of a captcha, the action one has to be solved for. */
     val captchaAction: String? = null,
 ) : Exception(message) {
-    val isNetwork get() = status == 0
+    /** No answer came back. The app's own errors (a captcha cancelled, say) are status 0 too, with codes of their own. */
+    val isNetwork get() = status == 0 && (code == "network" || code == "timeout")
     /** Worth trying again later rather than telling the person it was refused. */
     val isTransient get() = status == 0 || status == 408 || status == 429 || status >= 500
 }

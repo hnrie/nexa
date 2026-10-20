@@ -40,7 +40,7 @@ func (s *Server) captchaInfo() map[string]string {
 	if !s.captchaEnabled() {
 		return nil
 	}
-	return map[string]string{"provider": "turnstile", "site_key": s.Cfg.TurnstileSiteKey}
+	return map[string]string{"provider": "hcaptcha", "site_key": s.Cfg.HCaptchaSiteKey}
 }
 
 func (s *Server) handleInstanceInfo(w http.ResponseWriter, r *http.Request) {

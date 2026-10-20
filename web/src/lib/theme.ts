@@ -183,6 +183,8 @@ export function applyTheme(s: Appearance, draft?: ThemeDraft | null): void {
   else root.dataset["theme"] = look.classic;
   // for custom CSS that wants to style one theme and not another
   root.dataset["look"] = look.id;
+  // light or dark, for what draws itself outside the theme's tokens (the captcha)
+  root.dataset["scheme"] = look.scheme;
   root.style.setProperty("--font-scale", String(Math.min(1.5, Math.max(0.75, s.fontScale || 1))));
   for (const v of ACCENT_VARS) root.style.removeProperty(v);
   // A theme being built is shown with its own accent, which is what is being chosen.
