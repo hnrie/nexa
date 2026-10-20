@@ -403,7 +403,7 @@ func (b *dBuilder) linkEmbed(l unfurl.Result) dEmbed {
 		u := b.s.absoluteURL(l.Image)
 		img := &dEmbedMedia{URL: u, ProxyURL: u}
 		if e.Type == "image" || e.Type == "gifv" {
-			img.URL = l.URL
+			img.URL = e.URL
 		}
 		if l.ImageW > 0 && l.ImageH > 0 {
 			img.Width, img.Height = intp(l.ImageW), intp(l.ImageH)
