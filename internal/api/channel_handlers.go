@@ -31,7 +31,7 @@ func (s *Server) channelRoutes(mux *http.ServeMux) {
 	mux.Handle("PATCH /api/v1/channels/{id}", s.authed(s.handleChannelPatch))
 	mux.Handle("PUT /api/v1/channels/{id}/icon", s.userLimited(s.limUpload, s.handleChannelIcon))
 	mux.Handle("DELETE /api/v1/channels/{id}/icon", s.authed(s.handleChannelIconDelete))
-	mux.Handle("POST /api/v1/channels/{id}/recipients/{uid}", s.authed(s.handleRecipientAdd))
+	mux.Handle("POST /api/v1/channels/{id}/recipients/{uid}", s.userLimited(s.limBuild, s.handleRecipientAdd))
 	mux.Handle("DELETE /api/v1/channels/{id}/recipients/{uid}", s.authed(s.handleRecipientRemove))
 	mux.Handle("DELETE /api/v1/channels/{id}/add-notice", s.authed(s.handleGroupAddNoticeDismiss))
 	mux.Handle("POST /api/v1/channels/{id}/typing", s.authed(s.handleTyping))

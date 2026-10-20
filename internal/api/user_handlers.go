@@ -31,7 +31,7 @@ func (s *Server) userRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/users/@me/settings", s.authed(s.handleSettingsGet))
 	mux.Handle("PUT /api/v1/users/@me/settings", s.authed(s.handleSettingsPut))
 	mux.Handle("GET /api/v1/users/@me/keys", s.authed(s.handleMyKeys))
-	mux.Handle("GET /api/v1/users/search", s.authed(s.handleUserSearch))
+	mux.Handle("GET /api/v1/users/search", s.userLimited(s.limSearch, s.handleUserSearch))
 	mux.Handle("GET /api/v1/users/{id}", s.authed(s.handleUserGet))
 	mux.Handle("GET /api/v1/users/{id}/profile", s.authed(s.handleUserProfile))
 	mux.Handle("GET /api/v1/users/{id}/public-key", s.authed(s.handlePublicKey))

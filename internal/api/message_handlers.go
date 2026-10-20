@@ -55,8 +55,8 @@ func (s *Server) messageRoutes(mux *http.ServeMux) {
 	mux.Handle("DELETE /api/v1/channels/{id}/messages/{mid}", s.authed(s.handleMessageDelete))
 	mux.Handle("POST /api/v1/channels/{id}/messages/bulk-delete", s.authed(s.handleMessageBulkDelete))
 	mux.Handle("POST /api/v1/channels/{id}/messages/{mid}/ack", s.authed(s.handleAck))
-	mux.Handle("PUT /api/v1/channels/{id}/messages/{mid}/reactions/{emoji}/@me", s.authed(s.handleReactionAdd))
-	mux.Handle("DELETE /api/v1/channels/{id}/messages/{mid}/reactions/{emoji}/@me", s.authed(s.handleReactionRemove))
+	mux.Handle("PUT /api/v1/channels/{id}/messages/{mid}/reactions/{emoji}/@me", s.userLimited(s.limReact, s.handleReactionAdd))
+	mux.Handle("DELETE /api/v1/channels/{id}/messages/{mid}/reactions/{emoji}/@me", s.userLimited(s.limReact, s.handleReactionRemove))
 	mux.Handle("GET /api/v1/channels/{id}/messages/{mid}/reactions/{emoji}", s.authed(s.handleReactors))
 }
 
@@ -474,9 +474,7 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	if ok, retry := s.limMsg.Allow("msg:" + me.ID.String() + ":" + ch.ID.String()); !ok {
-		w.Header().Set("Retry-After", retryAfter(retry))
-		WriteError(w, ErrRateLimited)
+	if !s.messageAllowed(w, "msg:", me, ch) {
 		return
 	}
 	if len(body.Nonce) > maxNonce {
@@ -662,6 +660,9 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 	var body messageBody
 	if err := ReadJSON(w, r, &body, maxEnvelopeBytes+16<<10); err != nil {
 		WriteError(w, err)
+		return
+	}
+	if !s.messageAllowed(w, "edit:", me, ch) {
 		return
 	}
 	if len(body.Ciphertext) == 0 || string(body.Ciphertext) == "null" {
@@ -1030,4 +1031,28 @@ func hasReaction(m *store.Message, emoji string) bool {
 		}
 	}
 	return false
+}
+
+// messageAllowed spends a message (or an edit, whose kind is "edit:") from
+// the account's allowance in this channel and across every channel, so a
+// script cannot spread a flood over many conversations.
+func (s *Server) messageAllowed(w http.ResponseWriter, kind string, me *store.User, ch *store.Channel) bool {
+	for _, try := range []func() (bool, time.Duration){
+		func() (bool, time.Duration) { return s.limMsg.Allow(kind + me.ID.String() + ":" + ch.ID.String()) },
+		func() (bool, time.Duration) {
+			// an app answers in many servers at once and has the bot API's
+			// own global limit instead
+			if me.Flags&store.FlagBot != 0 {
+				return true, 0
+			}
+			return s.limMsgAll.Allow("all:" + me.ID.String())
+		},
+	} {
+		if ok, retry := try(); !ok {
+			w.Header().Set("Retry-After", retryAfter(retry))
+			WriteError(w, ErrRateLimited)
+			return false
+		}
+	}
+	return true
 }

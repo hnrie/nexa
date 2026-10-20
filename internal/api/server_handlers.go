@@ -41,14 +41,14 @@ func (s *Server) serverRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/servers/{id}/leave", s.authed(s.handleServerLeave))
 	mux.Handle("POST /api/v1/servers/{id}/transfer", s.authed(s.handleServerTransfer))
 	mux.Handle("GET /api/v1/servers/{id}/channels", s.authed(s.handleServerChannels))
-	mux.Handle("POST /api/v1/servers/{id}/channels", s.authed(s.handleServerChannelCreate))
+	mux.Handle("POST /api/v1/servers/{id}/channels", s.userLimited(s.limBuild, s.handleServerChannelCreate))
 	mux.Handle("PATCH /api/v1/servers/{id}/channels", s.authed(s.handleServerChannelPositions))
 	mux.Handle("DELETE /api/v1/channels/{id}", s.authed(s.handleServerChannelDelete))
 	mux.Handle("PUT /api/v1/channels/{id}/permissions/{target}", s.authed(s.handleOverwritePut))
 	mux.Handle("DELETE /api/v1/channels/{id}/permissions/{target}", s.authed(s.handleOverwriteDelete))
 	mux.Handle("POST /api/v1/channels/{id}/permissions/sync", s.authed(s.handlePermissionsSync))
 	mux.Handle("GET /api/v1/servers/{id}/roles", s.authed(s.handleRoles))
-	mux.Handle("POST /api/v1/servers/{id}/roles", s.authed(s.handleRoleCreate))
+	mux.Handle("POST /api/v1/servers/{id}/roles", s.userLimited(s.limBuild, s.handleRoleCreate))
 	mux.Handle("PATCH /api/v1/servers/{id}/roles", s.authed(s.handleRolePositions))
 	mux.Handle("PATCH /api/v1/servers/{id}/roles/{rid}", s.authed(s.handleRolePatch))
 	mux.Handle("DELETE /api/v1/servers/{id}/roles/{rid}", s.authed(s.handleRoleDelete))
@@ -62,10 +62,10 @@ func (s *Server) serverRoutes(mux *http.ServeMux) {
 	mux.Handle("PUT /api/v1/servers/{id}/bans/{uid}", s.authed(s.handleBanPut))
 	mux.Handle("DELETE /api/v1/servers/{id}/bans/{uid}", s.authed(s.handleBanDelete))
 	mux.Handle("GET /api/v1/servers/{id}/invites", s.authed(s.handleServerInvites))
-	mux.Handle("POST /api/v1/channels/{id}/invites", s.authed(s.handleInviteCreate))
+	mux.Handle("POST /api/v1/channels/{id}/invites", s.userLimited(s.limBuild, s.handleInviteCreate))
 	// An invite code is meant to be shared, so anyone who has one can replay
 	// this; it is metered per address like every other public route.
-	mux.Handle("GET /api/v1/invites/{code}", ipLimited(s.limGeneric, s.handleInvitePreview))
+	mux.Handle("GET /api/v1/invites/{code}", ipLimited(s.limLookup, s.handleInvitePreview))
 	mux.Handle("POST /api/v1/invites/{code}", s.authed(s.handleInviteJoin))
 	mux.Handle("DELETE /api/v1/invites/{code}", s.authed(s.handleInviteDelete))
 	mux.Handle("GET /api/v1/servers/{id}/audit-log", s.authed(s.handleAuditLog))
@@ -795,6 +795,10 @@ func (s *Server) handleServerChannelCreate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	ch, err := s.Store.CreateServerChannel(r.Context(), srv.ID, req.Type, name, req.ParentID)
+	if errors.Is(err, store.ErrTooMany) {
+		WriteError(w, E(http.StatusBadRequest, "too_many_channels", "A server can have at most 500 channels."))
+		return
+	}
 	if err != nil {
 		WriteError(w, err)
 		return
@@ -1592,6 +1596,10 @@ func (s *Server) handleRoleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	role, err := s.Store.CreateRole(r.Context(), srv.ID, name, p, color)
+	if errors.Is(err, store.ErrTooMany) {
+		WriteError(w, E(http.StatusBadRequest, "too_many_roles", "A server can have at most 250 roles."))
+		return
+	}
 	if err != nil {
 		WriteError(w, err)
 		return

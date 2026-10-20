@@ -918,6 +918,13 @@ func (s *Store) createRole(ctx context.Context, serverID ids.ID, name string, pe
 		if _, err := tx.ExecContext(ctx, `UPDATE roles SET position = position + 1 WHERE server_id = ? AND position >= 1`, int64(serverID)); err != nil {
 			return err
 		}
+		var n int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM roles WHERE server_id = ?`, int64(serverID)).Scan(&n); err != nil {
+			return err
+		}
+		if n >= MaxServerRoles {
+			return ErrTooMany
+		}
 		ro.Position = 1
 		_, err := tx.ExecContext(ctx, `INSERT INTO roles (`+roleReadCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, int64(ro.ID), int64(serverID), ro.Name, ro.Color, 0, 0, ro.Position, int64(ro.Permissions), nil, ro.CreatedAt, nil, nil, "", nullID(managedBy))
 		return err
@@ -1049,11 +1056,28 @@ func (s *Store) SetRolePositions(ctx context.Context, serverID ids.ID, positions
 // --- server channels ------------------------------------------------------
 
 // CreateServerChannel adds a channel at the end of its parent.
+// A server holds at most this many channels (threads not counted) and roles
+// (@everyone and apps' roles counted), as on Discord.
+const (
+	MaxServerChannels = 500
+	MaxServerRoles    = 250
+)
+
 func (s *Store) CreateServerChannel(ctx context.Context, serverID ids.ID, typ, name string, parent *ids.ID) (*Channel, error) {
 	c := &Channel{ServerID: &serverID, Type: typ, Name: name, ParentID: parent}
 	err := s.Tx(ctx, func(tx *db.Tx) error {
 		// categories are ordered among categories, channels among the other
 		// channels under the same parent
+		if err := tx.Serialise(ctx, "channels", int64(serverID)); err != nil {
+			return err
+		}
+		var n int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM channels WHERE server_id = ? AND type NOT IN ('thread','private_thread')`, int64(serverID)).Scan(&n); err != nil {
+			return err
+		}
+		if n >= MaxServerChannels {
+			return ErrTooMany
+		}
 		kind := `type = 'category'`
 		if typ != "category" {
 			kind = `type != 'category'`

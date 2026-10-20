@@ -128,6 +128,13 @@ func TestCaptchaGuardsAbusableActions(t *testing.T) {
 		t.Errorf("invite join without a token: %d %v", res.StatusCode, body)
 	}
 
+	if res, body := withCaptcha(t, ts, "POST", "/api/v1/applications", tokA, "", map[string]any{"name": "Spambot"}); res.StatusCode != 403 || errCode(body) != "captcha_required" {
+		t.Errorf("app create without a token: %d %v", res.StatusCode, body)
+	}
+	if res, body := withCaptcha(t, ts, "POST", "/api/v1/applications", tokA, "good-create_app", map[string]any{"name": "Fine"}); res.StatusCode >= 300 {
+		t.Errorf("app create with a good token: %d %v", res.StatusCode, body)
+	}
+
 	// ordinary requests never ask
 	if res, _ := do(t, ts, "GET", "/api/v1/users/@me", tokA, nil); res.StatusCode != 200 {
 		t.Errorf("unguarded request: %d", res.StatusCode)

@@ -24,7 +24,7 @@ func (s *Server) WireActivities(hub *gateway.Hub) {
 }
 
 func (s *Server) activityRoutes(mux *http.ServeMux) {
-	mux.Handle("POST /api/v1/activities/preview", s.authed(s.handleActivityPreview))
+	mux.Handle("POST /api/v1/activities/preview", s.userLimited(s.limSearch, s.handleActivityPreview))
 }
 
 // handleActivityPreview shows the desktop app how activities will look to

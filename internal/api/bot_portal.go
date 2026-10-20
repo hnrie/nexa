@@ -260,6 +260,10 @@ func (s *Server) handleAppCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrForbidden)
 		return
 	}
+	// every app brings a bot account with it
+	if !s.requireCaptcha(w, r, "create_app") {
+		return
+	}
 	var req struct {
 		Name string `json:"name"`
 	}

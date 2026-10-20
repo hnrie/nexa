@@ -136,6 +136,16 @@ type Server struct {
 	bots *botRuntime
 	// limInteract paces someone using applications: commands, buttons, forms
 	limInteract *ratelimit.Limiter
+
+	// volume a bot would turn on other people or on paid services: reactions
+	// and messages across every channel (both fan out to whole channels),
+	// searches (people, GIFs, games), public lookups by IP (invite previews,
+	// profile links, KDF parameters) and building a server's structure
+	limReact  *ratelimit.Limiter
+	limMsgAll *ratelimit.Limiter
+	limSearch *ratelimit.Limiter
+	limLookup *ratelimit.Limiter
+	limBuild  *ratelimit.Limiter
 	// botHTTP, when set, is the client interactions go to applications'
 	// endpoints with (tests); otherwise endpointClient builds a guarded one
 	botHTTP *http.Client
@@ -331,6 +341,17 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		bots:    newBotRuntime(),
 		// using applications, per account: a command, a click, a form
 		limInteract: ratelimit.New(ratelimit.Every(60, time.Minute), 20, 10*time.Minute),
+		// adding or taking back a reaction, per account
+		limReact: ratelimit.New(ratelimit.Every(90, time.Minute), 30, 10*time.Minute),
+		// messages and edits per account across every channel, on top of
+		// limMsg's five every five seconds in one channel
+		limMsgAll: ratelimit.New(ratelimit.Every(120, time.Minute), 30, 10*time.Minute),
+		// searching people, GIFs and games, per account
+		limSearch: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
+		// what anyone can look up without signing in, per address
+		limLookup: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
+		// channels, roles, invites and sticker packs made, per account
+		limBuild: ratelimit.New(ratelimit.Every(120, time.Hour), 60, 2*time.Hour),
 	}
 }
 
@@ -347,6 +368,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"automod": s.limAutomod, "publish": s.limPublish, "thread": s.limThread, "discover": s.limDiscover,
 		"note": s.limNote, "note-save": s.limNoteSave, "note-update": s.limNoteUpdate, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,
 		"apps": s.limApps, "interact": s.limInteract,
+		"react": s.limReact, "message-all": s.limMsgAll, "search": s.limSearch, "lookup": s.limLookup, "build": s.limBuild,
 	}
 	for name, l := range s.botLim.all() {
 		out[name] = l

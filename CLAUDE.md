@@ -360,10 +360,18 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
 - Sign-up is limited to two new accounts a day per IP address (`limSignup`, spent only once every
   other check passed, never for the first account; `too_many_signups`), on top of `limReg`'s ten
   attempts an hour.
+- What a script would turn on other people or on paid services has a limit of its own, on top of
+  the generic 600 a minute: reactions (`limReact`), messages and edits across every channel
+  (`limMsgAll`, apps excepted, beside `limMsg` per channel), searching people, GIFs and games and
+  the activity preview (`limSearch`), the lookups anyone can make without signing in (invite
+  previews, profile links and KDF parameters, `limLookup` per address), and making channels,
+  roles, invites, sticker packs, subchats, guest links, note links, follows and group DM
+  additions (`limBuild`). A server holds at most 500 channels and 250 roles
+  (`store.MaxServerChannels`, `MaxServerRoles`, counted inside the creating transaction).
 - Captchas (`captcha.go`, hCaptcha in its invisible size, off until both keys are set):
   `requireCaptcha(w, r, action)` guards what a script would abuse (sign-up, sign-in, recovery, friend requests, a first DM
-  to a stranger, creating and joining servers, joining notes and guest calls, bug reports, Discovery
-  and public sticker packs, Telegram imports) and every password check and username change. A
+  to a stranger, creating and joining servers, creating apps, joining notes and guest calls, bug reports,
+  Discovery and public sticker packs, Telegram imports) and every password check and username change. A
   refusal names the action in `X-Captcha-Action`; the web's `api.captchaSolver` (`lib/captcha.ts`)
   and Android's `Api.captchaSolver` (set by `Auth.solveCaptcha`) solve it and send the request
   again, so a guarded call needs nothing of its own. hCaptcha binds no action to a token, so the

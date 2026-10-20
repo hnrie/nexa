@@ -14,7 +14,7 @@ const maxSubchatName = 48
 
 func (s *Server) subchatRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/channels/{id}/subchats", s.authed(s.handleSubchatList))
-	mux.Handle("POST /api/v1/channels/{id}/subchats", s.authed(s.handleSubchatCreate))
+	mux.Handle("POST /api/v1/channels/{id}/subchats", s.userLimited(s.limBuild, s.handleSubchatCreate))
 	mux.Handle("GET /api/v1/channels/{id}/lock", s.authed(s.handleLockParams))
 	mux.Handle("POST /api/v1/channels/{id}/unlock", s.userLimited(s.limAuthUsr, s.handleUnlock))
 }

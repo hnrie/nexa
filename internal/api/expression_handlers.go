@@ -34,7 +34,7 @@ func (s *Server) expressionRoutes(mux *http.ServeMux) {
 	mux.Handle("PATCH /api/v1/servers/{id}/emojis/{eid}", s.authed(s.handleEmojiPatch))
 	mux.Handle("DELETE /api/v1/servers/{id}/emojis/{eid}", s.authed(s.handleEmojiDelete))
 	mux.Handle("GET /api/v1/stickers/packs", s.authed(s.handlePacks))
-	mux.Handle("POST /api/v1/stickers/packs", s.authed(s.handlePackCreate))
+	mux.Handle("POST /api/v1/stickers/packs", s.userLimited(s.limBuild, s.handlePackCreate))
 	mux.Handle("GET /api/v1/stickers/recent", s.authed(s.handleRecents))
 	mux.Handle("POST /api/v1/stickers/recent", s.authed(s.handleRecentTouch))
 	mux.Handle("GET /api/v1/stickers/packs/public", s.authed(s.handlePacksPublic))
@@ -50,8 +50,8 @@ func (s *Server) expressionRoutes(mux *http.ServeMux) {
 	mux.Handle("DELETE /api/v1/stickers/packs/{id}/install", s.authed(s.handlePackInstall(false)))
 	mux.Handle("POST /api/v1/stickers/packs/import/telegram", s.userLimited(s.limImport, s.handleTelegramImport))
 	mux.Handle("GET /api/v1/gif/status", s.authed(s.handleGifStatus))
-	mux.Handle("GET /api/v1/gif/search", s.authed(s.handleGifSearch))
-	mux.Handle("GET /api/v1/gif/trending", s.authed(s.handleGifTrending))
+	mux.Handle("GET /api/v1/gif/search", s.userLimited(s.limSearch, s.handleGifSearch))
+	mux.Handle("GET /api/v1/gif/trending", s.userLimited(s.limSearch, s.handleGifTrending))
 }
 
 // --- recent stickers ------------------------------------------------------

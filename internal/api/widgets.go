@@ -119,7 +119,7 @@ var widgetID = regexp.MustCompile(`^[a-z0-9]{4,16}$`)
 func (s *Server) widgetRoutes(mux *http.ServeMux) {
 	mux.Handle("PUT /api/v1/users/@me/widgets", s.authed(s.handleWidgetsPut))
 	mux.Handle("POST /api/v1/users/@me/widgets/image", s.userLimited(s.limUpload, s.handleWidgetImage))
-	mux.Handle("GET /api/v1/games/search", s.authed(s.handleGameSearch))
+	mux.Handle("GET /api/v1/games/search", s.userLimited(s.limSearch, s.handleGameSearch))
 	// kept pictures are served like avatars; only fetching one counts against a limit (fetchLimited)
 	mux.HandleFunc("GET /media/game/{cover}", s.handleGameCover)
 	mux.Handle("GET /api/v1/music/search", s.userLimited(s.limMusic, s.handleMusicSearch))
