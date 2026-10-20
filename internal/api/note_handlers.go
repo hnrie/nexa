@@ -54,7 +54,7 @@ func (s *Server) noteRoutes(mux *http.ServeMux) {
 	mux.Handle("DELETE /api/v1/notes/{id}/invites/{invite}", s.authed(s.handleNoteInviteCancel))
 	mux.Handle("POST /api/v1/note-invites/{invite}/accept", s.authed(s.handleNoteInviteAccept))
 	mux.Handle("DELETE /api/v1/note-invites/{invite}", s.authed(s.handleNoteInviteDecline))
-	mux.Handle("POST /api/v1/notes/{id}/links", s.userLimited(s.limBuild, s.handleNoteLinkCreate))
+	mux.Handle("POST /api/v1/notes/{id}/links", s.stepUpUser(s.stepBuild, s.handleNoteLinkCreate))
 	mux.Handle("DELETE /api/v1/notes/{id}/links/{link}", s.authed(s.handleNoteLinkDelete))
 	mux.Handle("GET /api/v1/note-links/{token}", s.authed(s.handleNoteLinkGet))
 	mux.Handle("POST /api/v1/note-links/{token}/join", s.authed(s.handleNoteLinkJoin))

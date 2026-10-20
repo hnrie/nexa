@@ -71,7 +71,7 @@ func (s *Server) meView(ctx context.Context, u *store.User) MeUser {
 
 func (s *Server) authRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/auth/register", ipLimited(s.limReg, s.handleRegister))
-	mux.Handle("GET /api/v1/auth/kdf", ipLimited(s.limLookup, s.handleKDF))
+	mux.Handle("GET /api/v1/auth/kdf", s.stepUpIP(s.stepLookup, s.handleKDF))
 	mux.Handle("POST /api/v1/auth/login", ipLimited(s.limAuthIP, s.handleLogin))
 	mux.Handle("POST /api/v1/auth/recover/begin", ipLimited(s.limAuthIP, s.handleRecoverBegin))
 	mux.Handle("POST /api/v1/auth/recover/finish", ipLimited(s.limAuthIP, s.handleRecoverFinish))

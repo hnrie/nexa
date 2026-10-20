@@ -141,11 +141,13 @@ type Server struct {
 	// and messages across every channel (both fan out to whole channels),
 	// searches (people, GIFs, games), public lookups by IP (invite previews,
 	// profile links, KDF parameters) and building a server's structure
-	limReact  *ratelimit.Limiter
-	limMsgAll *ratelimit.Limiter
-	limSearch *ratelimit.Limiter
-	limLookup *ratelimit.Limiter
-	limBuild  *ratelimit.Limiter
+	limReact   *ratelimit.Limiter
+	limMsgAll  *ratelimit.Limiter
+	limSearch  *ratelimit.Limiter
+	limLookup  *ratelimit.Limiter
+	limBuild   *ratelimit.Limiter
+	stepLookup *stepUp // limLookup, extended by a captcha
+	stepBuild  *stepUp // limBuild, extended by a captcha
 	// botHTTP, when set, is the client interactions go to applications'
 	// endpoints with (tests); otherwise endpointClient builds a guarded one
 	botHTTP *http.Client
@@ -232,7 +234,7 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 	}
 	secret := make([]byte, 32)
 	_, _ = rand.Read(secret)
-	return &Server{
+	srv := &Server{
 		Cfg: cfg, Store: st, Log: log, Bcast: bc, Version: "dev", Secret: secret,
 		Auth:       &auth.Authenticator{Store: st, TTL: cfg.SessionTTL},
 		limGeneric: ratelimit.New(ratelimit.Every(600, time.Minute), 300, 10*time.Minute),
@@ -348,11 +350,19 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limMsgAll: ratelimit.New(ratelimit.Every(120, time.Minute), 30, 10*time.Minute),
 		// searching people, GIFs and games, per account
 		limSearch: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
-		// what anyone can look up without signing in, per address
+		// what anyone can look up without signing in, per address, before a
+		// captcha is asked for (stepLookup)
 		limLookup: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
-		// channels, roles, invites and sticker packs made, per account
-		limBuild: ratelimit.New(ratelimit.Every(120, time.Hour), 60, 2*time.Hour),
+		// channels, roles, invites and sticker packs made, per account,
+		// before a captcha is asked for (stepBuild)
+		limBuild: ratelimit.New(ratelimit.Every(60, time.Hour), 30, 2*time.Hour),
 	}
+	// past the free allowance a captcha buys a batch more: 100 lookups for
+	// ten minutes, ten captchas an hour from one address; 30 more made in
+	// an hour, ten captchas a day from one account
+	srv.stepLookup = newStepUp("lookup", srv.limLookup, ratelimit.New(ratelimit.Every(10, time.Hour), 10, 2*time.Hour), 100, 10*time.Minute)
+	srv.stepBuild = newStepUp("build", srv.limBuild, ratelimit.New(ratelimit.Every(10, 24*time.Hour), 10, 25*time.Hour), 30, time.Hour)
+	return srv
 }
 
 // limiters is every rate limiter this server keeps.
@@ -369,6 +379,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"note": s.limNote, "note-save": s.limNoteSave, "note-update": s.limNoteUpdate, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,
 		"apps": s.limApps, "interact": s.limInteract,
 		"react": s.limReact, "message-all": s.limMsgAll, "search": s.limSearch, "lookup": s.limLookup, "build": s.limBuild,
+		"lookup-captcha": s.stepLookup.solves, "build-captcha": s.stepBuild.solves,
 	}
 	for name, l := range s.botLim.all() {
 		out[name] = l

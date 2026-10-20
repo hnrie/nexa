@@ -366,7 +366,12 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   the activity preview (`limSearch`), the lookups anyone can make without signing in (invite
   previews, profile links and KDF parameters, `limLookup` per address), and making channels,
   roles, invites, sticker packs, subchats, guest links, note links, follows and group DM
-  additions (`limBuild`). A server holds at most 500 channels and 250 roles
+  additions (`limBuild`). The last two are step-up limits (`stepup.go`, `stepUpUser`,
+  `stepUpIP`): past the free allowance the route asks for a captcha (action `lookup` or `build`),
+  the apps solve it as for any guarded action, and a solved one buys a batch (100 lookups for ten
+  minutes, 30 more made for an hour), with the captchas themselves limited (ten an hour per
+  address, ten a day per account) so there is still a ceiling. With captchas off they are the
+  plain free limits. Batches are kept in memory, per process. A server holds at most 500 channels and 250 roles
   (`store.MaxServerChannels`, `MaxServerRoles`, counted inside the creating transaction).
 - Captchas (`captcha.go`, hCaptcha in its invisible size, off until both keys are set):
   `requireCaptcha(w, r, action)` guards what a script would abuse (sign-up, sign-in, recovery, friend requests, a first DM

@@ -28,7 +28,7 @@ const (
 )
 
 func (s *Server) followRoutes(mux *http.ServeMux) {
-	mux.Handle("POST /api/v1/channels/{id}/followers", s.userLimited(s.limBuild, s.handleFollowCreate))
+	mux.Handle("POST /api/v1/channels/{id}/followers", s.stepUpUser(s.stepBuild, s.handleFollowCreate))
 	mux.Handle("GET /api/v1/channels/{id}/followers", s.authed(s.handleFollowerKeys))
 	mux.Handle("GET /api/v1/channels/{id}/follows", s.authed(s.handleFollowsInto))
 	mux.Handle("GET /api/v1/servers/{id}/follows", s.authed(s.handleServerFollows))

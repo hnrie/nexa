@@ -30,7 +30,7 @@ const profilePath = "/@"
 
 func (s *Server) profileLinkRoutes(mux *http.ServeMux) {
 	// public, so metered per address like an invite's preview
-	mux.Handle("GET /api/v1/profiles/{username}", ipLimited(s.limLookup, s.handleSharedProfile))
+	mux.Handle("GET /api/v1/profiles/{username}", s.stepUpIP(s.stepLookup, s.handleSharedProfile))
 }
 
 // sharedProfile is the profile a link shows, or nil when it shows none: no

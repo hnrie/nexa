@@ -46,7 +46,7 @@ const (
 const guestPerms = perms.ViewChannel | perms.Connect | perms.Speak | perms.Stream | perms.UseVAD
 
 func (s *Server) guestRoutes(mux *http.ServeMux) {
-	mux.Handle("POST /api/v1/channels/{id}/guest-links", s.userLimited(s.limBuild, s.handleGuestLinkCreate))
+	mux.Handle("POST /api/v1/channels/{id}/guest-links", s.stepUpUser(s.stepBuild, s.handleGuestLinkCreate))
 	mux.Handle("GET /api/v1/channels/{id}/guest-links", s.authed(s.handleGuestLinks))
 	mux.Handle("DELETE /api/v1/channels/{id}/guest-links", s.authed(s.handleGuestLinksRevoke))
 	mux.Handle("DELETE /api/v1/channels/{id}/guest-links/{code}", s.authed(s.handleGuestLinkRevoke))

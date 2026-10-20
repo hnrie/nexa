@@ -72,7 +72,7 @@ func TestAbuseLimits(t *testing.T) {
 	var last map[string]any
 	made := 0
 	for i := 0; i < store.MaxServerRoles+1; i++ {
-		if i%50 == 0 {
+		if i%25 == 0 {
 			srv.limBuild.Reset(aliceID)
 			srv.limGeneric.Reset("u:" + aliceID)
 		}
@@ -86,5 +86,63 @@ func TestAbuseLimits(t *testing.T) {
 	}
 	if made != store.MaxServerRoles-1 || errCode(last) != "too_many_roles" {
 		t.Errorf("roles: made %d, then %v", made, last)
+	}
+}
+
+// Past the free allowance a captcha buys a batch more, and the captchas
+// themselves run out; with captchas off the free allowance is all there is.
+func TestStepUpLimits(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	view := createServer(t, ts, tok, "Home")
+	general := channelNamed(view, "general")["id"].(string)
+	invite := func(captcha string) (int, string) {
+		res, body := withCaptcha(t, ts, "POST", "/api/v1/channels/"+general+"/invites", tok, captcha, map[string]any{})
+		return res.StatusCode, errCode(body)
+	}
+	free := srv.limBuild.Burst()
+	for i := 0; i < free; i++ {
+		if code, e := invite(""); code != 200 && code != 201 {
+			t.Fatalf("free invite %d: %d %s", i, code, e)
+		}
+	}
+	// captchas off: past the free allowance is a plain 429
+	if code, _ := invite(""); code != 429 {
+		t.Fatalf("past the free allowance without captchas: %d", code)
+	}
+
+	srv.Cfg.HCaptchaSiteKey = "site-key"
+	srv.Cfg.HCaptchaSecretKey = "secret-key"
+	srv.Cfg.PublicURL = "https://chat.example"
+	defer hcaptchaStandIn(t, "secret-key")()
+	if code, e := invite(""); code != 403 || e != "captcha_required" {
+		t.Fatalf("past the free allowance: %d %s", code, e)
+	}
+	if code, e := invite("forged"); code != 403 || e != "captcha_failed" {
+		t.Fatalf("a bad captcha: %d %s", code, e)
+	}
+	// one captcha, then the rest of its batch with none
+	for i := 0; i < srv.stepBuild.batch; i++ {
+		captcha := ""
+		if i == 0 {
+			captcha = "good-build"
+		}
+		if code, e := invite(captcha); code != 200 && code != 201 {
+			t.Fatalf("batch request %d: %d %s", i, code, e)
+		}
+	}
+	if code, e := invite(""); code != 403 || e != "captcha_required" {
+		t.Fatalf("after the batch: %d %s", code, e)
+	}
+	// the captchas run out too: one was spent above, the rest buy a batch each
+	solves := 1
+	for ; solves <= srv.stepBuild.solves.Burst(); solves++ {
+		srv.stepBuild.left = map[string]permit{} // as though each batch were used up
+		if code, _ := invite("good-build"); code == 429 {
+			break
+		}
+	}
+	if solves != srv.stepBuild.solves.Burst() {
+		t.Errorf("captchas that counted: %d, want %d", solves, srv.stepBuild.solves.Burst())
 	}
 }

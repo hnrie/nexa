@@ -34,7 +34,7 @@ func (s *Server) expressionRoutes(mux *http.ServeMux) {
 	mux.Handle("PATCH /api/v1/servers/{id}/emojis/{eid}", s.authed(s.handleEmojiPatch))
 	mux.Handle("DELETE /api/v1/servers/{id}/emojis/{eid}", s.authed(s.handleEmojiDelete))
 	mux.Handle("GET /api/v1/stickers/packs", s.authed(s.handlePacks))
-	mux.Handle("POST /api/v1/stickers/packs", s.userLimited(s.limBuild, s.handlePackCreate))
+	mux.Handle("POST /api/v1/stickers/packs", s.stepUpUser(s.stepBuild, s.handlePackCreate))
 	mux.Handle("GET /api/v1/stickers/recent", s.authed(s.handleRecents))
 	mux.Handle("POST /api/v1/stickers/recent", s.authed(s.handleRecentTouch))
 	mux.Handle("GET /api/v1/stickers/packs/public", s.authed(s.handlePacksPublic))
