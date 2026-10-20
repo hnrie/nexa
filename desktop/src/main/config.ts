@@ -46,14 +46,17 @@ export function isAppUrl(url: string | undefined | null): boolean {
  *
  * Exactly what the server's own `frame-src` allows (internal/api/static.go):
  * hCaptcha (hcaptcha.com and its subdomains), and the privacy-preserving
- * YouTube host embeds use. A guard
+ * YouTube host embeds use. Cloudflare's Turnstile, the captcha before
+ * hCaptcha, stays allowed: an app updated before its server moves to hCaptcha
+ * still shows that server's captcha, and the server's own frame-src lets the
+ * page frame only the one it uses. A guard
  * here that is *stricter* than the policy the page is already served under
  * does not add safety, it removes a feature — and it did: blocking every
  * off-origin subframe left the captcha's iframe unable to load, so signing in
  * sat on "checking" for ever with no callback to fail, and every embedded
  * video went blank.
  */
-const FRAMEABLE = new Set(["https://hcaptcha.com", "https://www.youtube-nocookie.com"]);
+const FRAMEABLE = new Set(["https://hcaptcha.com", "https://challenges.cloudflare.com", "https://www.youtube-nocookie.com"]);
 
 /** https://*.hcaptcha.com, as the server's frame-src writes it. */
 const isHCaptcha = (origin: string): boolean => /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.hcaptcha\.com$/.test(origin);

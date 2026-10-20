@@ -376,8 +376,10 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   Android's (`ui/auth/Captcha.kt`) runs it in a web view on the instance's own address and closes
   the keyboard when a challenge opens. Which challenges people get is the sitekey's setting in the
   hCaptcha dashboard; the test sitekey `10000000-ffff-ffff-ffff-000000000001` never shows one, so a
-  real challenge can only be seen with the real keys on a throwaway server. The desktop app frames only `hcaptcha.com` and its
-  subdomains (`isFrameableUrl`), so desktop releases from before the change cannot show it.
+  real challenge can only be seen with the real keys on a throwaway server. From 1.2.4 the desktop
+  app frames `hcaptcha.com` and its subdomains (`isFrameableUrl`), and still Turnstile's
+  `challenges.cloudflare.com`, so an app updated before its server moved keeps working; 1.2.3 and
+  older cannot show hCaptcha at all.
 - Apps and bots (`bot_*.go`, guide for bot makers in `docs/bots.md`): the Developer Portal
   (`bot_portal`, `/api/v1/applications`), OAuth2 and installs (`bot_oauth`: the consent page's
   `/api/v1/oauth2/authorize`, Authorized Apps, a server's integrations and who may use their

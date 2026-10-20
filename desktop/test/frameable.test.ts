@@ -19,6 +19,8 @@ describe("what may be framed", () => {
     // internal/api/static.go: frame-src 'self' hcaptcha.com *.hcaptcha.com youtube-nocookie
     expect(isFrameableUrl("https://newassets.hcaptcha.com/captcha/v1/abc/static/hcaptcha.html#frame=challenge")).toBe(true);
     expect(isFrameableUrl("https://hcaptcha.com/checksiteconfig")).toBe(true);
+    // Turnstile, for a server not yet moved to hCaptcha
+    expect(isFrameableUrl("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile/if/ov2/av0")).toBe(true);
     expect(isFrameableUrl("https://www.youtube-nocookie.com/embed/abc123")).toBe(true);
   });
 
