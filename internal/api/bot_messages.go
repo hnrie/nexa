@@ -411,7 +411,8 @@ func (b *dBuilder) linkEmbed(l unfurl.Result) dEmbed {
 		e.Thumbnail = img
 	}
 	if l.Media != "" && l.MediaKind == "video" {
-		e.Video = &dEmbedMedia{URL: l.Media, ProxyURL: b.s.absoluteURL(b.s.ProxyURL(l.Media))}
+		// a GIF picked in the app's search is already one of our proxy paths
+		e.Video = &dEmbedMedia{URL: b.s.absoluteURL(l.Media), ProxyURL: b.s.absoluteURL(b.s.ProxyURL(l.Media))}
 	}
 	return e
 }
