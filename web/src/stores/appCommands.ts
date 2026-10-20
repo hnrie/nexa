@@ -4,9 +4,11 @@ import { apps as appsApi, type AppCommand, type ChannelCommands, type CommandApp
 /**
  * What apps offer in each channel: their slash commands and the entries of
  * people's and messages' menus, as GET /channels/{id}/commands answers. Kept
- * for a few minutes per channel, loaded when a channel opens, and forgotten
- * whenever the server says an app's commands changed (gateway
- * application_commands_update) or an app was added or taken away.
+ * for a few minutes per channel and loaded when a channel opens. When the
+ * server says an app's commands changed (gateway application_commands_update)
+ * or an app was added or taken away, every kept list goes stale: it stays in
+ * use until it is read again, and the channel asked for last is read again at
+ * once, so its menus and its message box never go without one.
  */
 
 /** How long a channel's list is trusted before it is asked for again. */
@@ -32,17 +34,20 @@ interface AppCommandsState {
   startCommand: (s: StartCommand | null) => void;
   /** Loads a channel's list unless a fresh one is kept; resolves to it (null when it could not load). */
   load: (channelId: string, force?: boolean) => Promise<ChannelCommands | null>;
-  /** Forgets every kept list, so each is loaded again when it is next needed. */
+  /** Marks every kept list stale, so each is loaded again when it is next needed, and reloads the channel asked for last. */
   forget: () => void;
 }
 
 const inFlight = new Map<string, Promise<ChannelCommands | null>>();
+/** The channel whose list was asked for last: the one open now. */
+let lastChannel: string | null = null;
 
 export const useAppCommands = create<AppCommandsState>((set, get) => ({
   byChannel: {},
   start: null,
   startCommand: (start) => set({ start }),
   load: (channelId, force = false) => {
+    lastChannel = channelId;
     const kept = get().byChannel[channelId];
     if (!force && kept?.data && Date.now() - kept.at < FRESH_MS) return Promise.resolve(kept.data);
     const going = inFlight.get(channelId);
@@ -60,11 +65,12 @@ export const useAppCommands = create<AppCommandsState>((set, get) => ({
   },
   forget: () => {
     inFlight.clear();
-    set({ byChannel: {} });
+    set((st) => ({ byChannel: Object.fromEntries(Object.entries(st.byChannel).map(([id, e]) => [id, { ...e, at: 0 }])) }));
+    if (lastChannel) void get().load(lastChannel, true);
   },
 }));
 
-/** A channel's kept list, as it is now (null until it has loaded). */
+/** A channel's kept list, as it is now, stale or not (null until it has first loaded). */
 export function channelCommands(channelId: string): ChannelCommands | null {
   return useAppCommands.getState().byChannel[channelId]?.data ?? null;
 }

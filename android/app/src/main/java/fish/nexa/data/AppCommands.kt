@@ -10,6 +10,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -18,9 +19,11 @@ import kotlinx.serialization.json.JsonPrimitive
 /**
  * What apps offer in each channel (web stores/appCommands.ts): their slash
  * commands and the entries of people's and messages' menus, as
- * GET /channels/{id}/commands answers. Kept for a few minutes per channel,
- * loaded when a channel opens, and forgotten whenever the server says an
- * app's commands changed or an app was added or taken away.
+ * GET /channels/{id}/commands answers. Kept for a few minutes per channel and
+ * loaded when a channel opens. When the server says an app's commands changed
+ * or an app was added or taken away, every kept list goes stale: it stays in
+ * use until it is read again, and the channel asked for last is read again at
+ * once, so its menus and its message box never go without one.
  */
 object AppCommands {
     /** How long a channel's list is trusted before it is asked for again. */
@@ -45,11 +48,15 @@ object AppCommands {
 
     private val inFlight = HashMap<String, CompletableDeferred<ChannelCommands?>>()
 
-    /** A channel's kept list, as it is now (null until it has loaded). */
+    /** The channel whose list was asked for last: the one open now. */
+    @Volatile private var lastChannel: String? = null
+
+    /** A channel's kept list, as it is now, stale or not (null until it has first loaded). */
     fun of(channelId: String): ChannelCommands? = _byChannel.value[channelId]?.data
 
     /** Loads a channel's list unless a fresh one is kept; null when it could not load. */
     suspend fun load(channelId: String, force: Boolean = false): ChannelCommands? {
+        lastChannel = channelId
         val kept = _byChannel.value[channelId]
         if (!force && kept?.data != null && System.currentTimeMillis() - kept.at < FRESH_MS) return kept.data
         val (going, mine) = synchronized(inFlight) {
@@ -64,10 +71,11 @@ object AppCommands {
         return out
     }
 
-    /** Forgets every kept list, so each is loaded again when it is next needed. */
+    /** Marks every kept list stale, so each is loaded again when it is next needed, and reloads the channel asked for last. */
     fun forget() {
         synchronized(inFlight) { inFlight.clear() }
-        _byChannel.value = emptyMap()
+        _byChannel.update { all -> all.mapValues { (_, e) -> e.copy(at = 0) } }
+        lastChannel?.let { id -> fish.nexa.Nexa.scope.launch { load(id, force = true) } }
     }
 
     // command types

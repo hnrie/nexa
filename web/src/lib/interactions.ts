@@ -9,6 +9,7 @@ import { describeError } from "@/lib/errors";
 import { idAt } from "@/lib/ids";
 import { protocolLocale } from "@/lib/apps";
 import { BOT_READS_ALL_FLAG } from "@/api/types";
+import { channelCommands } from "@/stores/appCommands";
 import { useMessages } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
@@ -161,7 +162,10 @@ export function dismiss(msg: DecryptedMessage): void {
  */
 export async function copyFor(appId: string, msg: DecryptedMessage): Promise<string | undefined> {
   if (msg.hook || !msg.payload) return undefined;
-  const bot = useUsers.getState().byId[appId];
+  // the channel's command list carries each app's bot with its key; the people
+  // kept here may not have the bot at all (an app on someone's own account)
+  const listed = channelCommands(msg.channel_id)?.applications.find((a) => a.id === appId)?.bot;
+  const bot = listed?.public_key ? listed : useUsers.getState().byId[appId];
   if (!bot?.public_key || (bot.flags & BOT_READS_ALL_FLAG) !== 0) return undefined;
   try {
     return b64.enc(await seal(b64.dec(bot.public_key), new TextEncoder().encode(JSON.stringify(msg.payload))));

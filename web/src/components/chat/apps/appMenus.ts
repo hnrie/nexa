@@ -7,6 +7,7 @@ import { MSG_FLAG_EPHEMERAL } from "@/api/types";
 import { CMD_MESSAGE, CMD_USER, channelCommands, commandsOfType, useAppCommands } from "@/stores/appCommands";
 import { useChannels } from "@/stores/channels";
 import { canI, useServers } from "@/stores/servers";
+import { useUI } from "@/stores/ui";
 import { P } from "@/lib/perms";
 
 /**
@@ -28,11 +29,9 @@ function mayUse(channelId: string): boolean {
 function appsItem(channelId: string, type: number, use: (appId: string, commandId: string) => void): ContextMenuItem | null {
   if (!mayUse(channelId)) return null;
   const list = channelCommands(channelId);
-  // not known yet: asked for now, for the next time the menu opens
-  if (!list) {
-    void useAppCommands.getState().load(channelId);
-    return null;
-  }
+  // not known yet, or stale: asked for now, for the next time the menu opens
+  void useAppCommands.getState().load(channelId);
+  if (!list) return null;
   const entries = commandsOfType(list, type);
   if (!entries.length) return null;
   const submenu: ContextMenuItem[] = [];
@@ -50,9 +49,22 @@ function appsItem(channelId: string, type: number, use: (appId: string, commandI
 export function messageAppsItem(msg: DecryptedMessage): ContextMenuItem | null {
   if (msg.local || msg.flags & MSG_FLAG_EPHEMERAL || msg.type.startsWith("system_")) return null;
   return appsItem(msg.channel_id, CMD_MESSAGE, (appId, commandId) => {
-    void copyFor(appId, msg).then((copy) =>
-      interact({ type: 2, application_id: appId, channel_id: msg.channel_id, data: { id: commandId, target_id: msg.id }, ...(copy ? { copy } : {}) }),
-    );
+    const go = () =>
+      void copyFor(appId, msg).then((copy) =>
+        interact({ type: 2, application_id: appId, channel_id: msg.channel_id, data: { id: commandId, target_id: msg.id }, ...(copy ? { copy } : {}) }),
+      );
+    // an app on the person's own account is not part of this conversation:
+    // they say so before it is handed someone's message
+    // (in a conversation with the app's own bot, the messages are already its)
+    const list = channelCommands(msg.channel_id);
+    const app = list?.applications.find((a) => a.id === appId);
+    if (!app || app.installed.includes("guild") || list?.context === 1) return go();
+    useUI.getState().openModal("confirm", {
+      title: t("apps.shareMessage.title", { app: app.name }),
+      body: t("apps.shareMessage.body", { app: app.name }),
+      confirmLabel: t("apps.shareMessage.continue"),
+      onConfirm: go,
+    });
   });
 }
 

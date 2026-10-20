@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from bot_e2e import Bot, bot_id, setup  # noqa: E402
-from e2e import Server, Session  # noqa: E402
+from e2e import Server, Session, png_bytes  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 
@@ -158,6 +158,32 @@ def flow(s, out, base, sid, general, failures):
         p.wait_for_selector("text=quoting: pressed by bob", timeout=15000)
         step(f"{size}: the entry reaches the app with the message")
 
+    def menu_on_a_picture():
+        # a person's message is sealed: the app gets its words and its picture
+        # through the copy the person's app seals for it (or the keys, when it reads everything)
+        words = f"look at this {size}"
+        p.set_input_files("input[type=file]", {"name": "pic.png", "mimeType": "image/png", "buffer": png_bytes(48, 32, (200, 90, 60))})
+        s.send(words)
+        row = p.locator(f"[data-id]:has-text('{words}')").last
+        row.locator("img").first.wait_for(timeout=20000)
+        p.wait_for_timeout(400)
+        for tries in range(3):
+            row.click(button="right", position={"x": 120, "y": 12})
+            try:
+                p.locator("[role=menu] [role=menuitem]:has-text('Apps')").click(timeout=4000)
+                p.locator("[role=menuitem]:has-text('Quote')").click(timeout=4000)
+                break
+            except Exception:
+                if tries == 2:
+                    raise
+                p.keyboard.press("Escape")
+                p.wait_for_timeout(400)
+        p.wait_for_selector(f"text=quoting: {words} [files: pic.png", timeout=15000)
+        got = p.locator(f"text=quoting: {words}").last.inner_text()
+        if "pic.png 0/" in got:
+            raise AssertionError(f"the picture did not download: {got}")
+        step(f"{size}: a message's entry hands the app its words and picture ({got})")
+
     def autocomplete():
         type_command(p, "fruit")
         pick_suggestion(p, "/fruit")
@@ -170,11 +196,11 @@ def flow(s, out, base, sid, general, failures):
         p.wait_for_selector("text=you picked apple", timeout=15000)
         step(f"{size}: a suggestion picked is sent")
 
-    for name, fn in [("message", message), ("commands", commands), ("echo", echo), ("slow", slow), ("button", button), ("select", select), ("form", form), ("menu", menu), ("autocomplete", autocomplete)]:
+    for name, fn in [("message", message), ("commands", commands), ("echo", echo), ("slow", slow), ("button", button), ("select", select), ("form", form), ("menu", menu), ("menu_on_a_picture", menu_on_a_picture), ("autocomplete", autocomplete)]:
         attempt(name, fn)
 
 
-def pages(alice, bob, base, sid, general, app, failures):
+def pages(alice, bob, base, sid, general, app, failures, a_api=None, b_api=None):
     """The pages around apps: the Developer Portal, the consent page, a server's
     apps, Authorized Apps, a bot's profile and the mark on a channel it reads."""
     a, b = alice.page, bob.page
@@ -259,6 +285,37 @@ def pages(alice, bob, base, sid, general, app, failures):
         step(f"{size}: Authorized Apps lists the app")
         bob.shot("authorized-apps")
 
+    def share_warning():
+        # in a DM the app is only on bob's account: he is asked before it gets alice's message
+        _, me_b = b_api.call("GET", "/api/v1/users/@me", expect=200)
+        _, dm = a_api.call("POST", "/api/v1/users/@me/channels", {"recipient_ids": [me_b["id"]]})
+        words = f"a secret for the dm {size}"
+        alice.page.goto(f"{base}/channels/@me/{dm['id']}", wait_until="networkidle")
+        alice.dismiss_whats_new()
+        alice.send(words)
+        b.goto(f"{base}/channels/@me/{dm['id']}", wait_until="networkidle")
+        bob.dismiss_whats_new()
+        row = b.locator(f"[data-id]:has-text('{words}')").last
+        row.wait_for(timeout=20000)
+        b.wait_for_timeout(400)
+        for tries in range(3):
+            row.click(button="right", position={"x": 120, "y": 12})
+            try:
+                b.locator("[role=menu] [role=menuitem]:has-text('Apps')").click(timeout=4000)
+                b.locator("[role=menuitem]:has-text('Peek')").click(timeout=4000)
+                break
+            except Exception:
+                if tries == 2:
+                    raise
+                b.keyboard.press("Escape")
+                b.wait_for_timeout(400)
+        b.wait_for_selector("text=Share This Message with Lab Bot?", timeout=8000)
+        step(f"{size}: bob is asked before an app on his account gets alice's message")
+        bob.shot("share-warning")
+        b.locator("[role=dialog] button:has-text('Continue')").click()
+        b.wait_for_selector(f"text=quoting: {words}", timeout=15000)
+        step(f"{size}: after Continue the app gets it")
+
     def server_apps():
         a.goto(f"{base}/channels/{sid}/{general}", wait_until="networkidle")
         alice.dismiss_whats_new()
@@ -282,6 +339,8 @@ def pages(alice, bob, base, sid, general, app, failures):
         b.goto(f"{base}/channels/{sid}/{general}", wait_until="networkidle")
         bob.dismiss_whats_new()
         # the header leaves the topic its room; the start of the channel names the app that reads it
+        if NO_CONTENT:
+            return profile()
         start = b.get_by_text("except from apps that read every message").first
         start.wait_for(state="attached", timeout=10000)
         start.scroll_into_view_if_needed()
@@ -290,22 +349,31 @@ def pages(alice, bob, base, sid, general, app, failures):
             raise AssertionError("the start of the channel should name the app that reads it, and the header say nothing")
         step(f"{size}: the start of the channel names the app that reads it")
         bob.shot("reading-start")
+        profile()
+
+    def profile():
         b.locator("[data-author='" + app["id"] + "']").first.click()
         b.wait_for_selector("[data-testid=profile-add-app], [data-testid=bot-tag], [data-testid=app-tag]", timeout=8000)
         step(f"{size}: the bot's profile says it is an app")
         bob.shot("bot-profile")
 
-    for name, fn, sess in [("portal", portal, alice), ("make-app", make_app, alice), ("consent", consent, bob), ("authorized", authorized, bob), ("server-apps", server_apps, alice), ("profile", profile_and_start, bob)]:
+    for name, fn, sess in [("portal", portal, alice), ("make-app", make_app, alice), ("consent", consent, bob), ("authorized", authorized, bob), ("share-warning", share_warning, bob), ("server-apps", server_apps, alice), ("profile", profile_and_start, bob)]:
         attempt(name, fn, sess)
 
 
+# --no-content: the app reads only what is sealed for it
+NO_CONTENT = False
+
+
 def main():
+    global NO_CONTENT
     ap = argparse.ArgumentParser()
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--serve", action="store_true", help="leave the server and the bot running afterwards")
     ap.add_argument("--sizes", default="1366x768,411x914")
     ap.add_argument("--pages-only", action="store_true", help="skip using the app in a channel; only visit the pages around apps")
     ap.add_argument("--port", type=int, help="the throwaway server's port (default: any free one)")
+    ap.add_argument("--no-content", action="store_true", help="the app has no Message Content: it reads only the copies people's apps seal for it")
     args = ap.parse_args()
     # each step shows as it happens, also when the output goes to a file and the run then keeps serving
     sys.stdout.reconfigure(line_buffering=True)
@@ -326,7 +394,12 @@ def main():
             bob = Session(browser, srv.base, "bob", out)
             bob.register()
             a, b, sid, general, app, token = setup(srv.base, alice, bob, out)
-            bot = Bot("discord.py", [py, str(ROOT / "tools/bots/dpy_bot.py"), srv.base, token, bot_id(sid)])
+            env = None
+            NO_CONTENT = args.no_content
+            if args.no_content:
+                a.call("PATCH", f"/api/v1/applications/{app['id']}", {"intents": {"presence": True, "members": True, "message_content": False}}, expect=200)
+                env = {**os.environ, "BOT_NO_CONTENT": "1"}
+            bot = Bot("discord.py", [py, str(ROOT / "tools/bots/dpy_bot.py"), srv.base, token, bot_id(sid)], env=env)
             bot.wait("steps_done", 90)
             # the app can also be added to people's accounts, for the consent page and Authorized Apps
             a.call("PATCH", f"/api/v1/applications/{app['id']}", {"integration_types": {"0": {"oauth2_install_params": {"scopes": ["bot", "applications.commands"], "permissions": "8"}}, "1": {"oauth2_install_params": {"scopes": ["applications.commands"], "permissions": "0"}}}}, expect=200)
@@ -338,7 +411,7 @@ def main():
                     flow(s, out, srv.base, sid, general, failures)
                 al = Session(browser, srv.base, "alice", out, viewport=(w, h))
                 al.login()
-                pages(al, s, srv.base, sid, general, app, failures)
+                pages(al, s, srv.base, sid, general, app, failures, a, b)
                 for e in s.errors + al.errors:
                     print("  page:", e)
             browser.close()

@@ -454,6 +454,14 @@ func (s *Store) PutBotCopies(ctx context.Context, msgID ids.ID, copies map[ids.I
 	})
 }
 
+// KeepBotCopy keeps a copy of a message for one bot unless it has one: the
+// copy someone's app seals for a message command, which the bot reads the
+// message's files through afterwards. A copy the author's app made stays.
+func (s *Store) KeepBotCopy(ctx context.Context, msgID, bot ids.ID, sealed []byte) error {
+	_, err := s.db.W.ExecContext(ctx, `INSERT INTO bot_copies (message_id, bot_id, sealed) VALUES (?,?,?) ON CONFLICT (message_id, bot_id) DO NOTHING`, int64(msgID), int64(bot), sealed)
+	return err
+}
+
 // BotCopies returns the sealed copies a bot has of the listed messages.
 func (s *Store) BotCopies(ctx context.Context, bot ids.ID, msgs []ids.ID) (map[ids.ID][]byte, error) {
 	out := map[ids.ID][]byte{}

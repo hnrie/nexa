@@ -324,3 +324,67 @@ func snowID(t *testing.T, s string) ids.ID {
 	}
 	return id
 }
+
+// Libraries such as oceanic.js answer "thinking" and then send a follow-up;
+// the protocol fills in the thinking message with that first follow-up
+// rather than leaving it thinking beside a second message.
+func TestFirstFollowupFillsInTheThinkingMessage(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tok, uid := register(t, ts, "alice")
+	view := createServer(t, ts, tok, "Lab")
+	sid := view["id"].(string)
+	general := channelNamed(view, "general")["id"].(string)
+	app, botToken := makeApp(t, ts, tok, "Lab Bot")
+	appID := snowID(t, app["id"].(string))
+	addBot(t, ts, tok, app["id"].(string), sid)
+
+	ask := func() (string, string) {
+		token := "token-" + ids.New().String()
+		guild, channel := snowID(t, sid), snowID(t, general)
+		it := &store.Interaction{ID: ids.New(), ApplicationID: appID, Type: 2, TokenHash: tokenHash(token), UserID: snowID(t, uid),
+			GuildID: &guild, ChannelID: &channel, Data: json.RawMessage(`{"type":2,"data":{"id":"1","name":"ping","type":1}}`),
+			CreatedAt: time.Now().UnixMilli(), ExpiresAt: time.Now().Add(interactionLife).UnixMilli()}
+		if err := srv.Store.CreateInteraction(context.Background(), it); err != nil {
+			t.Fatal(err)
+		}
+		return botproto.OutString(it.ID), token
+	}
+	hook := "/api/v10/webhooks/" + botproto.OutString(appID) + "/"
+	messages := func() []any {
+		res, body := botDo(t, ts, "GET", "/api/v10/channels/"+botproto.OutString(snowID(t, general))+"/messages", botToken, nil)
+		if res.StatusCode != 200 {
+			t.Fatalf("messages: %d %v", res.StatusCode, body)
+		}
+		var out []any
+		for _, m := range body["_list"].([]any) {
+			if _, answer := m.(map[string]any)["interaction_metadata"]; answer {
+				out = append(out, m)
+			}
+		}
+		return out
+	}
+
+	id, token := ask()
+	if res, body := botDo(t, ts, "POST", "/api/v10/interactions/"+id+"/"+token+"/callback", botToken, map[string]any{"type": 5}); res.StatusCode != 204 {
+		t.Fatalf("defer: %d %v", res.StatusCode, body)
+	}
+	res, first := botDo(t, ts, "POST", hook+token, botToken, map[string]any{"content": "pong", "flags": 64})
+	if res.StatusCode != 200 || first["content"] != "pong" {
+		t.Fatalf("first follow-up: %d %v", res.StatusCode, first)
+	}
+	got := messages()
+	if len(got) != 1 {
+		t.Fatalf("a deferred answer and its first follow-up made %d messages: %v", len(got), got)
+	}
+	m := got[0].(map[string]any)
+	if m["content"] != "pong" || int64(m["flags"].(float64))&(64|128) != 0 {
+		t.Fatalf("the thinking message should now say pong, in the channel: %v", m)
+	}
+	// later follow-ups are messages of their own
+	if res, body := botDo(t, ts, "POST", hook+token, botToken, map[string]any{"content": "again"}); res.StatusCode != 200 || body["id"] == m["id"] {
+		t.Fatalf("second follow-up: %d %v", res.StatusCode, body)
+	}
+	if n := len(messages()); n != 2 {
+		t.Fatalf("after a second follow-up there are %d messages", n)
+	}
+}

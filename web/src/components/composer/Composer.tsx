@@ -508,14 +508,12 @@ export function Composer({ channel }: { channel: Channel }) {
         const list = channelCommands(channel.id);
         // the apps' commands lead: they are what a slash is mostly typed for where there are any
         items = [...appCommandItems(list, tok.query), ...items];
-        // not loaded yet: the list follows once it is, if a command is still being typed
-        if (!list) {
-          const forChannel = channel.id;
-          void useAppCommands.getState().load(forChannel).then((loaded) => {
-            const ta = taRef.current;
-            if (loaded && ta && channelRef.current === forChannel && ta.value.startsWith("/")) refreshAcRef.current(ta.value, ta.selectionStart ?? ta.value.length);
-          });
-        }
+        // not loaded yet, or stale: the new list follows once it is, if a command is still being typed
+        const forChannel = channel.id;
+        void useAppCommands.getState().load(forChannel).then((loaded) => {
+          const ta = taRef.current;
+          if (loaded && loaded !== list && ta && channelRef.current === forChannel && ta.value.startsWith("/")) refreshAcRef.current(ta.value, ta.selectionStart ?? ta.value.length);
+        });
       }
     }
     setAc(items.length ? { items, index: 0, start: tok.start, kind: tok.kind } : null);

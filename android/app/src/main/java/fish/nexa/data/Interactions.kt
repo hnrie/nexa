@@ -137,7 +137,10 @@ object Interactions {
     fun copyFor(appId: String, cm: ChatMessage): String? {
         if (cm.hook != null) return null
         val payload = cm.payload ?: return null
-        val bot = Nexa.users.get(appId) ?: return null
+        // the channel's command list carries each app's bot with its key; the people
+        // kept here may not have the bot at all (an app on someone's own account)
+        val listed = AppCommands.of(cm.channelId)?.applications?.firstOrNull { it.id == appId }?.bot
+        val bot = listed?.takeIf { it.publicKey.isNotEmpty() } ?: Nexa.users.get(appId) ?: return null
         if (bot.publicKey.isEmpty() || bot.readsAll) return null
         return runCatching { Bytes.b64(Keys.seal(Bytes.unb64(bot.publicKey), Bytes.utf8(payload.toJson().toString()))) }.getOrNull()
     }

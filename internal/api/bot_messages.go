@@ -398,15 +398,17 @@ func (b *dBuilder) linkEmbed(l unfurl.Result) dEmbed {
 		}
 	}
 	if l.Image != "" {
-		img := &dEmbedMedia{URL: l.URL, ProxyURL: b.s.absoluteURL(l.Image)}
+		// a link straight to a picture is the picture's own address; a page's
+		// picture is known only through the media proxy
+		u := b.s.absoluteURL(l.Image)
+		img := &dEmbedMedia{URL: u, ProxyURL: u}
+		if e.Type == "image" || e.Type == "gifv" {
+			img.URL = l.URL
+		}
 		if l.ImageW > 0 && l.ImageH > 0 {
 			img.Width, img.Height = intp(l.ImageW), intp(l.ImageH)
 		}
-		if e.Type == "image" || e.Type == "gifv" {
-			e.Thumbnail = img
-		} else {
-			e.Thumbnail = img
-		}
+		e.Thumbnail = img
 	}
 	if l.Media != "" && l.MediaKind == "video" {
 		e.Video = &dEmbedMedia{URL: l.Media, ProxyURL: b.s.absoluteURL(b.s.ProxyURL(l.Media))}

@@ -8,6 +8,7 @@ import fish.nexa.data.P
 import fish.nexa.net.InteractRequest
 import fish.nexa.ui.layers.MenuItem
 import fish.nexa.ui.t
+import fish.nexa.ui.shell.confirm
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -31,11 +32,9 @@ private fun mayUse(channelId: String): Boolean {
 private fun appsItem(channelId: String, type: Int, use: (appId: String, commandId: String) -> Unit): MenuItem.Submenu? {
     if (!mayUse(channelId)) return null
     val list = AppCommands.of(channelId)
-    // not known yet: asked for now, for the next time the menu opens
-    if (list == null) {
-        Nexa.scope.launch { AppCommands.load(channelId) }
-        return null
-    }
+    // not known yet, or stale: asked for now, for the next time the menu opens
+    Nexa.scope.launch { AppCommands.load(channelId) }
+    if (list == null) return null
     val entries = AppCommands.ofType(list, type)
     if (entries.isEmpty()) return null
     val several = entries.map { it.app.id }.toSet().size > 1
@@ -53,12 +52,22 @@ private fun appsItem(channelId: String, type: Int, use: (appId: String, commandI
 fun messageAppsItem(cm: ChatMessage): MenuItem.Submenu? {
     if (cm.local || cm.m.ephemeral || cm.m.type.startsWith("system_")) return null
     return appsItem(cm.channelId, AppCommands.CMD_MESSAGE) { appId, commandId ->
-        val copy = Interactions.copyFor(appId, cm)
-        Nexa.scope.launch {
+        val go: suspend () -> Unit = {
+            val copy = Interactions.copyFor(appId, cm)
             Interactions.interact(InteractRequest(2, appId, cm.channelId, data = buildJsonObject {
                 put("id", commandId)
                 put("target_id", cm.id)
             }, copy = copy))
+        }
+        // an app on the person's own account is not part of this conversation:
+        // they say so before it is handed someone's message (in a conversation
+        // with the app's own bot, the messages are already its)
+        val list = AppCommands.of(cm.channelId)
+        val app = list?.applications?.firstOrNull { it.id == appId }
+        if (app == null || "guild" in app.installed || list.context == 1) {
+            Nexa.scope.launch { go() }
+        } else {
+            confirm(t("apps.shareMessage.title", "app" to app.name), t("apps.shareMessage.body", "app" to app.name), t("apps.shareMessage.continue"), danger = false) { go() }
         }
     }
 }

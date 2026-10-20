@@ -488,8 +488,15 @@ func (s *Server) commandInteraction(r *http.Request, sc *interactionScene, req *
 		}
 		s.withServerExtras(ctx, sc.ch, []*store.Message{m})
 		opts := msgOpts{content: true}
-		if sc.bot.Flags&store.FlagBotReadsAll == 0 {
-			opts.copy = req.Copy
+		// the copy the person's app sealed is kept, so the message's files
+		// open for the bot later (its file links read the kept copy); one the
+		// author's app made already stays and is what the bot is shown
+		if sc.bot.Flags&store.FlagBotReadsAll == 0 && req.Copy != nil {
+			if _, err := s.decryptForBot(ctx, sc.bot, m, req.Copy); err == nil {
+				if err := s.Store.KeepBotCopy(ctx, m.ID, sc.bot.ID, req.Copy); err != nil {
+					opts.copy = req.Copy
+				}
+			}
 		}
 		res.Messages = map[string]dMessage{botproto.OutString(m.ID): sc.b.messageObj(m, sc.ch, opts)}
 		t := snow(m.ID)
@@ -1897,6 +1904,25 @@ func (s *Server) followupCreate(w http.ResponseWriter, r *http.Request) {
 		writeBotError(w, derr, nil)
 		return
 	}
+	// The protocol's first follow-up after "thinking" fills in the thinking
+	// message instead of adding another, keeping whether only the person
+	// sees it (libraries such as oceanic.js defer and then follow up).
+	if orig := s.stillThinking(ctx, it); orig != nil {
+		in, errs := parseWebhookBody(raw, whParseOpts{edit: true, app: true, withComponents: true})
+		if !errs.empty() {
+			s.dropFiles(files)
+			writeBotError(w, errs.err(), nil)
+			return
+		}
+		updated, ephemeral, err := s.editAnswer(r, it, app, ch, *orig, in, files, true)
+		if err != nil {
+			s.dropFiles(files)
+			writeBotError(w, err, dErrUnknownMessage)
+			return
+		}
+		s.followupView(w, r, app, bot, updated, ephemeral)
+		return
+	}
 	in, errs := parseWebhookBody(raw, whParseOpts{app: true, ephemeral: true})
 	if !errs.empty() {
 		s.dropFiles(files)
@@ -1920,6 +1946,25 @@ func (s *Server) followupCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.followupView(w, r, app, bot, m, ephemeral)
+}
+
+// stillThinking is the id of an interaction's answer when it was deferred
+// with a message that still shows the app thinking, otherwise nil.
+func (s *Server) stillThinking(ctx context.Context, it *store.Interaction) *ids.ID {
+	if it.ResponseType != cbDeferredMessage || it.ResponseMessageID == nil {
+		return nil
+	}
+	id := *it.ResponseMessageID
+	if m, err := s.Store.MessageByID(ctx, id, 0); err == nil {
+		if m.Flags&store.MsgFlagLoading != 0 {
+			return &id
+		}
+		return nil
+	}
+	if e, err := s.Store.EphemeralByID(ctx, id); err == nil && e.Flags&store.MsgFlagLoading != 0 {
+		return &id
+	}
+	return nil
 }
 
 func (s *Server) followupGet(w http.ResponseWriter, r *http.Request) {

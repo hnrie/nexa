@@ -10,6 +10,7 @@ off as a person. Each step prints one JSON line on stdout for the harness.
 """
 import asyncio
 import json
+import os
 import sys
 import traceback
 
@@ -30,6 +31,9 @@ def out(kind, **kw):
 
 
 intents = discord.Intents.all()
+# BOT_NO_CONTENT=1: a bot without Message Content, which reads only what is sealed for it
+if os.environ.get("BOT_NO_CONTENT") == "1":
+    intents.message_content = False
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
@@ -93,8 +97,22 @@ async def inspect_user(interaction: discord.Interaction, member: discord.Member)
 
 @tree.context_menu(name="Quote")
 async def quote(interaction: discord.Interaction, message: discord.Message):
-    await interaction.response.send_message(f"quoting: {message.content}")
-    out("quote", target=message.id, content=message.content)
+    # a message's files as a bot gets them: each must download as it was sent
+    files = []
+    for a in message.attachments:
+        data = await a.read()
+        files.append(f"{a.filename} {len(data)}/{a.size}")
+    said = f"quoting: {message.content}" + (f" [files: {', '.join(files)}]" if files else "")
+    await interaction.response.send_message(said)
+    out("quote", target=message.id, content=message.content, files=files)
+
+
+# made global after the server's commands are synced: an entry people add to their own accounts
+@app_commands.context_menu(name="Peek")
+@app_commands.allowed_installs(guilds=False, users=True)
+@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+async def peek(interaction: discord.Interaction, message: discord.Message):
+    await quote.callback(interaction, message)
 
 
 class Buttons(discord.ui.View):
@@ -133,6 +151,9 @@ async def run_steps():
     out("guild", name=guild.name, members=guild.member_count, channels=[c.name for c in guild.channels], roles=[r.name for r in guild.roles])
     tree.copy_global_to(guild=discord.Object(GUILD))
     synced = await tree.sync(guild=discord.Object(GUILD))
+    tree.clear_commands(guild=None)
+    tree.add_command(peek)
+    await tree.sync()
     out("synced", names=sorted(c.name for c in synced))
     ch = discord.utils.get(guild.text_channels, name="general") or guild.text_channels[0]
     embed = discord.Embed(title="An Embed", description="Made by **discord.py**", color=0x5865F2)
