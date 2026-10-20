@@ -33,6 +33,7 @@ function verbs(): Record<string, string> {
     channel_positions: t("server.auditLog.verb.channel_positions"),
     overwrite_update: t("server.auditLog.verb.overwrite_update"),
     overwrite_delete: t("server.auditLog.verb.overwrite_delete"),
+    overwrite_sync: t("server.auditLog.verb.overwrite_sync"),
     role_create: t("server.auditLog.verb.role_create"),
     role_update: t("server.auditLog.verb.role_update"),
     role_delete: t("server.auditLog.verb.role_delete"),

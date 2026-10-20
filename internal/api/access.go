@@ -23,6 +23,8 @@ const (
 	NeedPolls = "polls"
 	// NeedExternalEmoji is Use External Emojis in the channel.
 	NeedExternalEmoji = "external_emoji"
+	// NeedEmbed is Embed Links in the channel.
+	NeedEmbed = "embed"
 )
 
 // channel loads the channel from the path and checks the caller may act in it.

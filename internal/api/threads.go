@@ -328,7 +328,7 @@ func (s *Server) postFirstMessage(r *http.Request, th *store.Channel, me *store.
 		return nil, E(http.StatusBadRequest, "unknown_epoch", "That key epoch does not exist yet.")
 	}
 	m := &store.Message{ChannelID: th.ID, AuthorID: me.ID, Type: "default", Ciphertext: body.Ciphertext, KeyConvID: &env.Conv, KeyEpoch: &env.Epoch,
-		Mentions: dedupeIDs(body.Mentions, maxMentions), MentionRoles: s.allowedRoleMentions(ctx, me, th, body.MentionRoles), Nonce: body.Nonce, Flags: body.Flags & store.MsgFlagSuppressEmbeds}
+		Mentions: dedupeIDs(body.Mentions, maxMentions), MentionRoles: s.allowedRoleMentions(ctx, me, th, body.MentionRoles), Nonce: body.Nonce, Flags: s.embedFlags(ctx, me, th, body.Flags&store.MsgFlagSuppressEmbeds)}
 	seen := map[ids.ID]bool{}
 	for _, a := range body.Attachments {
 		if seen[a.BlobID] {

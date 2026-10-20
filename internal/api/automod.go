@@ -945,7 +945,7 @@ func (s *Server) automodTimeout(r *http.Request, srv *store.Server, uid ids.ID, 
 	if updated, err := s.Store.Member(ctx, srv.ID, uid); err == nil {
 		s.emitServer(ctx, srv.ID, "member_update", updated)
 	}
-	s.syncVisibility(ctx, srv.ID, before, nil)
+	s.syncVisibility(ctx, srv.ID, before)
 	return true
 }
 
@@ -985,7 +985,7 @@ func (s *Server) setQuarantine(r *http.Request, srv *store.Server, uid ids.ID, o
 	if updated, err := s.Store.Member(ctx, srv.ID, uid); err == nil {
 		s.emitServer(ctx, srv.ID, "member_update", updated)
 	}
-	s.syncVisibility(ctx, srv.ID, before, nil)
+	s.syncVisibility(ctx, srv.ID, before)
 	if !on {
 		actor := automodActor
 		if by != nil {

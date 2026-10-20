@@ -303,6 +303,10 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 		}
 		// Priority Speaker is a server's permission: never in a DM call or for a guest
 		priority := req.Priority && guest == nil && ch.ServerID != nil && p.Has(perms.PrioritySpeaker)
+		// a camera or a screen share is Video (Stream) in the channel
+		if !p.Has(perms.Stream) {
+			req.Video, req.Streaming = false, false
+		}
 		// guests waiting in a call do not make it one: the first account to join still starts it
 		wasEmpty := s.Voice.MemberCount(ch.ID) == 0
 		// Only a device rejoining the call it was in (after a reconnect or a
@@ -929,7 +933,7 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if dest != nil && dest.ID != cur.ID {
 		if latest, ok := s.Voice.Get(uid); ok && latest.ChannelID == cur.ID {
-			old, _ := s.Voice.Join(voice.State{UserID: uid, ChannelID: dest.ID, SessionID: latest.SessionID, ConnID: latest.ConnID, SelfMute: latest.SelfMute, SelfDeaf: latest.SelfDeaf, Video: latest.Video, Streaming: latest.Streaming, JoinedAt: latest.JoinedAt, Suppress: !destPerms.Has(perms.Speak), Priority: latest.Priority && destPerms.Has(perms.PrioritySpeaker), Name: latest.Name, AvatarID: latest.AvatarID}, true)
+			old, _ := s.Voice.Join(voice.State{UserID: uid, ChannelID: dest.ID, SessionID: latest.SessionID, ConnID: latest.ConnID, SelfMute: latest.SelfMute, SelfDeaf: latest.SelfDeaf, Video: latest.Video && destPerms.Has(perms.Stream), Streaming: latest.Streaming && destPerms.Has(perms.Stream), JoinedAt: latest.JoinedAt, Suppress: !destPerms.Has(perms.Speak), Priority: latest.Priority && destPerms.Has(perms.PrioritySpeaker), Name: latest.Name, AvatarID: latest.AvatarID}, true)
 			if old != nil {
 				// what they pulled in the old channel stops; their client makes a new session
 				s.closeSFUSession(old.SFUSession)

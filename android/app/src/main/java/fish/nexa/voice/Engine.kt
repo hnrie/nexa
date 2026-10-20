@@ -97,7 +97,7 @@ internal object Engine {
         val st = Voice.state.value
         // a moderator's deafen takes the voice away too, as it does the sound
         if (local.muted || local.deafened || st.mine?.serverMute == true || st.mine?.serverDeaf == true || st.interrupted) return false
-        if (Voice.setting("mode") == "ptt") return session?.pttHeld == true
+        if (CallPerms.pushToTalkOn()) return session?.pttHeld == true
         return true
     }
 
@@ -105,7 +105,7 @@ internal object Engine {
     private fun gateOpen(): Boolean {
         val s = session ?: return true
         if (s.pttHeld) return true
-        if (Voice.setting("mode") == "ptt") return true
+        if (CallPerms.pushToTalkOn()) return true
         return s.vadOpen
     }
 
@@ -538,6 +538,7 @@ internal object Engine {
             CallService.update()
             return
         }
+        if (!CallPerms.mayStream(s.channelId)) return Nexa.ui.toast(t("voice.callPerms.noVideo"), "error")
         s.cameraPending = true
         scope.launch {
             try {
@@ -647,6 +648,7 @@ internal object Engine {
         val fps = plan.fps
         val s = session ?: return
         if (s.screenPending || s.screen != null) return
+        if (!CallPerms.mayStream(s.channelId)) return Nexa.ui.toast(t("voice.callPerms.noVideo"), "error")
         s.screenPending = true
         scope.launch {
             try {

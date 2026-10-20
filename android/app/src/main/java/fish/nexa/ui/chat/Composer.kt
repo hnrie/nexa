@@ -415,7 +415,9 @@ fun Composer(channel: Channel) {
         val screened = Send.screen(channelId, text, files.map { it.name })
         if (screened is Send.Screened.Stopped) return false
         // previews are asked for when the message is sent, never while it is typed, and only if the setting allows
-        val urls = if (Nexa.settings.linkPreviews) fish.nexa.data.Mentions.urls(text) else emptyList()
+        // a server channel without Embed Links sends no previews: the server would hide them anyway
+        val mayEmbed = Nexa.channels.get(channelId)?.serverId?.let { sid -> Nexa.servers.canI(Nexa.servers.get(sid), P.EMBED_LINKS, channelId) } ?: true
+        val urls = if (Nexa.settings.linkPreviews && mayEmbed) fish.nexa.data.Mentions.urls(text) else emptyList()
         val opts = SendOptions(
             replyTo = reply?.messageId,
             ping = reply?.ping,

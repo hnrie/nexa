@@ -208,7 +208,7 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 		s.emitLog(r.Context(), entry)
 	}
 	for i, srv := range servers {
-		s.syncVisibility(r.Context(), srv.ID, before[i], nil)
+		s.syncVisibility(r.Context(), srv.ID, before[i])
 	}
 	if req.Disabled != nil && *req.Disabled {
 		// out of any call first: closing its sockets only detaches a call,

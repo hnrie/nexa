@@ -508,7 +508,11 @@ private fun ChannelPermissionsPage(ch: Channel, serverId: String) {
     var adding by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    val editable = Nexa.servers.canI(st, P.MANAGE_ROLES, ch.id) || Nexa.servers.canI(st, P.MANAGE_CHANNELS, ch.id)
+    // a channel's permissions are Manage Roles there, as the server holds them
+    val editable = Nexa.servers.canI(st, P.MANAGE_ROLES, ch.id)
+    val channels by Nexa.channels.byId.collectAsState()
+    val parent = ch.parentId?.let { channels[it] }
+    val synced = parent != null && Perms.sameOverwrites(ch.overwrites, parent.overwrites)
     // what the editor holds here is all they may set or clear; an administrator holds everything
     val mine = Nexa.servers.channelPerms(st, ch.id, st.me.userId)
     val grantable: Long? = if (P.has(mine, P.ADMINISTRATOR)) null else mine
@@ -556,6 +560,26 @@ private fun ChannelPermissionsPage(ch: Channel, serverId: String) {
             busy = false
         }
     }
+    // Sync Now: the channel takes its category's overwrites
+    fun syncNow() {
+        busy = true
+        scope.launch {
+            try {
+                val res = Nexa.api.request("POST", "/channels/${ch.id}/permissions/sync")
+                ServerApi.reloadChannels(serverId)
+                if (((res as? JsonObject)?.get("key_actions") as? JsonObject)?.get("needs_own_key")?.jsonPrimitive?.booleanOrNull == true) {
+                    Nexa.keys.ensureConvKey(ch.id)
+                    ServerApi.reloadChannels(serverId)
+                }
+                selected = serverId
+                Nexa.ui.toast(t("server.channelSettings.permissionsSynced"), "success")
+            } catch (e: Exception) {
+                Nexa.ui.toast((e as? fish.nexa.net.ApiError)?.message ?: t("server.channelSettings.couldNotSavePermissions"), "error")
+            } finally {
+                busy = false
+            }
+        }
+    }
     fun remove(targetId: String) {
         busy = true
         scope.launch {
@@ -597,8 +621,26 @@ private fun ChannelPermissionsPage(ch: Channel, serverId: String) {
         Hint(
             (if (ch.isCategory) t("server.channelSettings.permsCategory") else t("server.channelSettings.permsChannel")) +
                 (if (isPrivate) " " + t("server.channelSettings.permsPrivate") else ""),
-            Modifier.padding(bottom = 16.dp),
+            Modifier.padding(bottom = if (parent != null && !ch.isCategory) 12.dp else 16.dp),
         )
+        // `.syncBar`: whether this channel follows its category's permissions
+        if (parent != null && !ch.isCategory) {
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 16.dp).heightIn(min = 48.dp)
+                    .background(c.bgSurface, Radii.Sm)
+                    .border(1.dp, if (synced) c.borderSubtle else c.warning.copy(alpha = 0.45f), Radii.Sm)
+                    .padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(if (synced) "Link2" else "Link2Off", if (synced) c.brand else c.textWarning, size = 16.dp)
+                Txt(
+                    if (synced) t("server.channelSettings.syncedWith", "category" to parent.name) else t("server.channelSettings.notSyncedWith", "category" to parent.name),
+                    style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = c.textMuted, modifier = Modifier.weight(1f),
+                )
+                if (!synced && editable) SmallButton(t("server.channelSettings.syncNow"), t("server.channelSettings.syncNow")) { if (!busy) Holds.unlessUnsaved { syncNow() } }
+            }
+        }
         // who: @everyone, then every role and member with an entry here
         Wrap(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             Txt(t("server.channelSettings.rolesMembers"), style = Nx.type.label.copy(fontWeight = FontWeight(700)), color = c.textSubtle, modifier = Modifier.weight(1f))

@@ -500,6 +500,37 @@ Application Commands (1 << 31) and Use External Apps (1 << 50) are for apps, and
 both. Server channel
 access goes through the hooks `server_glue.go` installs, answered from `store/permcache.go`.
 
+How each permission is held, as Discord holds it:
+
+- Categories sync as Discord's do (`api/category_sync.go`): a channel is synced with its category
+  when their overwrites are the same (`sameOverwrites`; nothing else records it). A channel made in
+  a category starts with its overwrites, an overwrite written or removed on a category is written
+  or removed on every channel synced with it, and a channel moved into another category (positions
+  `PATCH`, with Discord's optional `lock_permissions`) takes the new category's overwrites when it
+  was synced where it came from (or had none outside a category) and the mover has Manage Roles
+  there. `POST /channels/{id}/permissions/sync` is Sync Now. A channel that becomes hidden from
+  @everyone this way is flagged to get its own key (`markIfPrivate`); create and sync answer with
+  `key_actions` so the actor's app makes it at once. The apps show a channel's state on its
+  Permissions page (web `ChannelSettingsModal` `.syncBar`, Android `ChannelPermissionsPage`) with
+  `sameOverwrites` of their own (web `lib/perms.ts`, Android `Perms`).
+- Editing a channel's overwrites needs Manage Roles in it (`channelManageCtx`), not Manage Channels.
+- Embed Links: link previews are made by the sender's app and sealed in the message, so the server
+  sets Suppress Embeds (flag 4) on any message, new or edited, whose author lacks Embed Links there
+  (`embedFlags`), and refuses to clear it while they still lack it. Every app already hides a
+  flagged message's previews; the composers do not fetch previews there.
+- Add Reactions is needed only for a new reaction; joining one already there, like every reaction,
+  needs Read Message History. Without Read Message History a channel's history answers an empty
+  list, so only what arrives live is seen.
+- Video (Stream): a voice state without it never says `video` or `streaming`, and the SFU refuses to
+  publish or pull a camera or a share (`mayStream` in `sfu_handlers.go`, asked at every request).
+  The apps refuse to start one and stop one that loses it (web `voice/callPerms.ts`, Android
+  `voice/CallPerms`). The peer-to-peer mesh cannot be held by the server.
+- What the server cannot see is held by every reader's app: Use Voice Activity (the call switches
+  to push to talk in a channel without it, `pushToTalkOn`), and Use External Emoji and Use External
+  Stickers in messages, which draw as their `:name:` when the author lacks them in the channel
+  (web `lib/authorPerms.ts` with `RenderCtx.plainEmoji`, Android `data/AuthorPerms` with
+  `RenderCtx.plainEmoji`; an author whose roles are not loaded counts as allowed).
+
 ### Media and uploads (`internal/media`)
 
 - Files are content-addressed on disk under `DATA_DIR/media`, described by the `blobs` table.

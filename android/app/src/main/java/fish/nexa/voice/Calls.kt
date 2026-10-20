@@ -77,6 +77,18 @@ object Calls {
         WebRtc.init(context)
         CallNotifications.init(context)
         scope.launch { Nexa.session.events.collect { e -> runCatching { onEvent(e) }.onFailure { Log.w(TAG, "voice event ${e.t}", it) } } }
+        // A role or overwrite changing mid-call: a camera or share no longer
+        // allowed stops, and push to talk comes in or goes as Use Voice Activity does
+        scope.launch {
+            Nexa.servers.byId.collect {
+                val cur = Engine.current() ?: return@collect
+                if (!CallPerms.mayStream(cur.channelId)) {
+                    if (Voice.state.value.localVideo != null) Engine.toggleCamera()
+                    if (Engine.sharing()) Engine.stopScreen()
+                }
+                Engine.applyTransmit()
+            }
+        }
         // mute and deafen: the sound, the output, the gate, and the server told (only once the join was announced)
         scope.launch {
             var prev = VoiceLocal.state.value
@@ -221,6 +233,8 @@ object Calls {
             return
         }
         Log.i(TAG, "joined $channelId as $myId (${if (ice.sfu) "SFU" else "peer to peer"})")
+        // a channel without Use Voice Activity is push to talk only, whatever the settings say
+        if (Voice.setting("mode") != "ptt" && !CallPerms.allowsVoiceActivity(channelId)) Nexa.ui.toast(t("voice.callPerms.pttRequiredButton"))
         if (isConversation(channelId) && othersIn(channelId) == 0) {
             startCallingTone(channelId)
             CallRecord.started(channelId)

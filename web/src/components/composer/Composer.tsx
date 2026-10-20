@@ -245,7 +245,9 @@ export function Composer({ channel }: { channel: Channel }) {
   // the message is sent, never while it is typed: a link in a draft that is
   // abandoned, or pasted in the wrong box and deleted, is nobody's business,
   // which is what the setting promises.
-  const linkPreviews = useSettings((st) => st.settings.linkPreviews);
+  // a server channel without Embed Links sends no previews: the server would hide them anyway
+  const mayEmbed = useServers((x) => !channel.server_id || canI(x.byId[channel.server_id], P.EMBED_LINKS, channel.id));
+  const linkPreviews = useSettings((st) => st.settings.linkPreviews) && mayEmbed;
   const [previews] = useState(createLinkPreviews);
   /** The eye: the message drawn as it will look once sent, above the box, as it is typed. */
   const [preview, setPreview] = useState(false);

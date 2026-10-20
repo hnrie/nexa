@@ -18,7 +18,11 @@
 .sidebar[data-banner="true"] .head[data-over-banner="true"] { background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0)) border-box; border-bottom-color: transparent; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7); }
 .sidebar[data-banner="true"] .head[data-over-banner="true"]:hover, .sidebar[data-banner="true"] .head[data-over-banner="true"][data-open="true"] { background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.4) 60%, rgba(0, 0, 0, 0)) border-box; }
 .banner { height: 138px; margin-inline: -8px; margin-bottom: 12px; background-size: cover; background-position: center; }
-.category { margin-top: 16px; }
+.category { position: relative; margin-top: 16px; }
+/* a dragged category's landing: a line above a category's head, or under the last category */
+.category[data-drop="before"]::before, .category[data-drop="after"]::after { content: ""; position: absolute; inset-inline: 0; height: 2px; background: var(--brand); border-radius: 1px; pointer-events: none; }
+.category[data-drop="before"]::before { top: -3px; }
+.category[data-drop="after"]::after { bottom: -3px; }
 .catHead { position: relative; display: flex; align-items: center; justify-content: space-between; height: 26px; padding-inline-end: 4px; color: var(--text-muted); }
 .catHead:hover { color: var(--text); }
 .catToggle { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; height: 100%; padding-inline-start: 2px; color: inherit; font-size: 12.5px; font-weight: 650; letter-spacing: 0.01em; text-align: start; }

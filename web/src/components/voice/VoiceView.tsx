@@ -54,6 +54,7 @@ import { participantsOf, useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 import { callThroughSfu, flipCamera, guestLinksOn, holdToTalk, joinVoice, leaveVoice, pushToTalkButton, resumeCallAudio, retryMic, toggleCamera, toggleScreen } from "@/voice/session";
 import { canShareScreen, hasSeveralCameras } from "@/voice/media";
+import { usePushToTalkOn } from "@/voice/callPerms";
 import { safeAspect } from "@/voice/videoCap";
 import { callViewOpen } from "@/voice/videoShown";
 import s from "./Voice.module.css";
@@ -407,7 +408,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const audioBlocked = useVoice((v) => v.audioBlocked);
   const leftAlone = useVoice((v) => v.leftAlone === channel.id);
   // push to talk on a touch screen is a button to hold in the call
-  const ptt = useSettings((x) => x.settings.voice.mode === "ptt") && pushToTalkButton();
+  const ptt = usePushToTalkOn() && pushToTalkButton();
   const [micNoteDismissed, setMicNoteDismissed] = useState(false);
   const muted = useVoiceLocal((v) => v.muted);
   const deafened = useVoiceLocal((v) => v.deafened);

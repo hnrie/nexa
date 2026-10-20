@@ -215,8 +215,9 @@ export const servers = {
   channels(id: Snowflake): Promise<Channel[]> {
     return api.request<Channel[]>("GET", `/servers/${id}/channels`);
   },
-  createChannel(id: Snowflake, body: { type: "text" | "voice" | "category" | "announcement" | "forum"; name: string; parent_id?: Snowflake | null }): Promise<Channel> {
-    return api.request<Channel>("POST", `/servers/${id}/channels`, body);
+  createChannel(id: Snowflake, body: { type: "text" | "voice" | "category" | "announcement" | "forum"; name: string; parent_id?: Snowflake | null }): Promise<Channel & { key_actions?: { needs_own_key: boolean; conv_id: Snowflake } }> {
+    // key_actions: made in a private category, the channel needs its own key now
+    return api.request("POST", `/servers/${id}/channels`, body);
   },
   setChannelPositions(id: Snowflake, list: ChannelPositionPatch[]): Promise<Channel[]> {
     return api.request<Channel[]>("PATCH", `/servers/${id}/channels`, list);
@@ -229,6 +230,10 @@ export const servers = {
   },
   putOverwrite(channelId: Snowflake, targetId: Snowflake, body: { type: "role" | "member"; allow: PermString; deny: PermString }): Promise<{ overwrite: unknown; key_actions?: { needs_own_key: boolean; conv_id: Snowflake } }> {
     return api.request("PUT", `/channels/${channelId}/permissions/${targetId}`, body);
+  },
+  /** Gives a channel its category's overwrites (Sync Now). */
+  syncPermissions(channelId: Snowflake): Promise<{ key_actions?: { needs_own_key: boolean; conv_id: Snowflake } }> {
+    return api.request("POST", `/channels/${channelId}/permissions/sync`);
   },
   deleteOverwrite(channelId: Snowflake, targetId: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/channels/${channelId}/permissions/${targetId}`);

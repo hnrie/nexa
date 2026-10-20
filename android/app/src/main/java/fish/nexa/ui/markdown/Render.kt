@@ -115,6 +115,8 @@ data class RenderCtx(
     val gap: Dp = 0.dp,
     /** The words' weight when it is not the usual (an embed's title). */
     val weight: FontWeight? = null,
+    /** Emoji drawn as their :name: in words: another server's, in a message whose author may not use them there. */
+    val plainEmoji: ((String) -> Boolean)? = null,
 )
 
 /**
@@ -337,7 +339,7 @@ private class Builder(
             }
             is Node.Link -> link(n, sp, covered)
             is Node.Mention -> mention(n, covered)
-            is Node.Emoji -> emoji(n, n.name, covered)
+            is Node.Emoji -> if (ctx.plainEmoji?.invoke(n.id) == true) append(":${n.name}:") else emoji(n, n.name, covered)
             is Node.UnicodeEmoji -> emoji(n, n.text, covered)
             is Node.Timestamp -> {
                 stamps = true

@@ -36,6 +36,7 @@ import { NoteCards } from "@/components/notes/NoteCards";
 import { MSG_FLAG_EPHEMERAL, MSG_FLAG_LOADING, MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
 import { useAutomodHeld } from "@/lib/automod/useHeld";
 import { canI, P } from "@/stores/servers";
+import { authorHas } from "@/lib/authorPerms";
 import { ThreadChip } from "./ThreadChip";
 import { canPublish, publish } from "./publish";
 import type { UnfurlResult } from "@/api/types";
@@ -412,7 +413,18 @@ export function MessageBody({ msg, name, id, pending, upload }: { msg: Decrypted
 }
 
 function MessageContent({ msg, name, id, pending, upload }: { msg: DecryptedMessage; name: string; id?: string | undefined; pending?: "sending" | "failed" | undefined; upload?: PendingUpload | undefined }) {
-  const ctx = useRowRenderCtx();
+  const rowCtx = useRowRenderCtx();
+  // Use External Emoji and Use External Stickers, held by every reader: what
+  // the author may not use here draws as words
+  const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
+  const noOutsideEmoji = useServers((x) => (serverId ? authorHas(x.byId[serverId], msg, P.USE_EXTERNAL_EMOJIS) === false : false));
+  const noOutsideStickers = useServers((x) => (serverId ? authorHas(x.byId[serverId], msg, P.USE_EXTERNAL_STICKERS) === false : false));
+  const ownEmoji = useExpressions((x) => (serverId ? x.emojis[serverId] : undefined));
+  const stickerOutside = useExpressions((x) => {
+    const st = msg.payload?.sticker;
+    return !!st && noOutsideStickers && !Object.values(x.packs).some((p) => p.server_id === serverId && p.stickers.some((s) => s.id === st.id));
+  });
+  const ctx = useMemo(() => (noOutsideEmoji ? { ...rowCtx, plainEmoji: (eid: string) => !ownEmoji?.some((e) => e.blob_id === eid) } : rowCtx), [rowCtx, noOutsideEmoji, ownEmoji]);
   const hook = msg.hook;
   const imagePreviews = useSettings((st) => st.settings.imagePreviews);
   const embeds = msg.payload?.embeds?.length && !(msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) ? (msg.payload.embeds as UnfurlResult[]) : null;
@@ -443,7 +455,7 @@ function MessageContent({ msg, name, id, pending, upload }: { msg: DecryptedMess
           {msg.edited_at ? <span className={s.edited} title={formatFull(msg.edited_at)}>{t("chat.messageItem.edited")}</span> : null}
         </>
       )}
-      {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
+      {msg.payload?.sticker ? stickerOutside ? <span className={s.edited}>{msg.payload.sticker.name ? `:${msg.payload.sticker.name}:` : t("chat.messageItem.sticker")}</span> : <StickerView sticker={msg.payload.sticker} /> : null}
       {msg.payload?.poll && !hook ? <PersonPoll msg={msg} poll={msg.payload.poll} pending={!!pending} /> : null}
       {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} from={name} /> : null}
       {embeds ? <Embeds list={embeds} onRemove={!pending && canRemoveEmbeds(msg) ? (ev) => confirmRemoveEmbeds(msg, ev.shiftKey) : undefined} /> : null}

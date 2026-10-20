@@ -143,6 +143,15 @@ object Perms {
         return actorIsOwner || actorHighest > targetHighest
     }
 
+    /** Whether two channels' overwrites say the same: a channel is synced with its category when they do (web sameOverwrites). */
+    fun sameOverwrites(a: List<Overwrite>?, b: List<Overwrite>?): Boolean {
+        val x = a.orEmpty()
+        val y = b.orEmpty()
+        if (x.size != y.size) return false
+        val byTarget = x.associateBy { it.targetId }
+        return y.all { o -> byTarget[o.targetId]?.let { it.targetType == o.targetType && P.parse(it.allow) == P.parse(o.allow) && P.parse(it.deny) == P.parse(o.deny) } == true }
+    }
+
     fun isPrivateChannel(everyoneId: String, overwrites: List<Overwrite>?): Boolean {
         val ow = overwrites?.firstOrNull { it.targetType == "role" && it.targetId == everyoneId } ?: return false
         return P.has(P.parse(ow.deny), P.VIEW_CHANNEL)

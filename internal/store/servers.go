@@ -1156,6 +1156,25 @@ func (s *Store) SetOverwrite(ctx context.Context, ow Overwrite) error {
 	return err
 }
 
+// SetOverwrites replaces every overwrite of a channel with list, in one
+// transaction: a channel synced with its category takes the category's.
+func (s *Store) SetOverwrites(ctx context.Context, channelID ids.ID, list []Overwrite) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM channel_overwrites WHERE channel_id = ?`, int64(channelID)); err != nil {
+			return err
+		}
+		for _, ow := range list {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO channel_overwrites (channel_id, target_id, target_type, allow, deny) VALUES (?,?,?,?,?)`,
+				int64(channelID), int64(ow.TargetID), ow.TargetType, int64(ow.Allow), int64(ow.Deny)); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	s.changedIn(channelServer(ctx, s.db.R, channelID))
+	return err
+}
+
 // DeleteOverwrite removes an overwrite.
 func (s *Store) DeleteOverwrite(ctx context.Context, channelID, targetID ids.ID) error {
 	res, err := s.db.W.ExecContext(ctx, `DELETE FROM channel_overwrites WHERE channel_id = ? AND target_id = ?`, int64(channelID), int64(targetID))

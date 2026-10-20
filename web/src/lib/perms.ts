@@ -253,3 +253,18 @@ export function isPrivateChannel(everyoneId: string, overwrites: Overwrite[] | u
   const ow = overwrites?.find((o) => o.target_type === "role" && o.target_id === everyoneId);
   return !!ow && has(parsePerm(ow.deny), P.VIEW_CHANNEL);
 }
+
+/**
+ * Whether two channels' overwrites say the same: a channel is synced with its
+ * category when they do (the server's sameOverwrites, category_sync.go).
+ */
+export function sameOverwrites(a: Overwrite[] | undefined, b: Overwrite[] | undefined): boolean {
+  const x = a ?? [];
+  const y = b ?? [];
+  if (x.length !== y.length) return false;
+  const byTarget = new Map(x.map((o) => [o.target_id, o]));
+  return y.every((o) => {
+    const m = byTarget.get(o.target_id);
+    return !!m && m.target_type === o.target_type && parsePerm(m.allow) === parsePerm(o.allow) && parsePerm(m.deny) === parsePerm(o.deny);
+  });
+}

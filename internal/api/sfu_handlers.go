@@ -10,6 +10,7 @@ import (
 
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/perms"
 	"evilion.xyz/chat/internal/realtime"
 	"evilion.xyz/chat/internal/store"
 	"evilion.xyz/chat/internal/voice"
@@ -54,6 +55,25 @@ func (s *Server) sfuCaller(w http.ResponseWriter, r *http.Request) (*store.User,
 		return nil, voice.State{}, false
 	}
 	return me, st, true
+}
+
+// mayStream reports whether someone in a call may send a camera or a screen
+// share there: Video (Stream) in a server's channel, always in a DM call or
+// through a guest link. Asked again at every publish and pull, so a role
+// that loses it mid-call stops being seen.
+func (s *Server) mayStream(ctx context.Context, st voice.State) bool {
+	if st.Guest {
+		return guestPerms.Has(perms.Stream)
+	}
+	ch, err := s.Store.ChannelByID(ctx, st.ChannelID)
+	if err != nil {
+		return false
+	}
+	if ch.ServerID == nil {
+		return true
+	}
+	p, err := s.Store.PermsIn(ctx, ch, st.UserID)
+	return err == nil && p.Has(perms.Stream)
 }
 
 func sfuUnavailable(w http.ResponseWriter, err error) {
@@ -141,6 +161,10 @@ func (s *Server) handleSFUPublish(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		seen[t.Kind] = true
+		if t.Kind != realtime.KindAudio && !s.mayStream(r.Context(), st) {
+			WriteError(w, E(http.StatusForbidden, "missing_permission", "You cannot share video in this channel."))
+			return
+		}
 		if realtime.IsVideo(t.Kind) && !s.Meter.VideoAllowed(r.Context()) {
 			WriteError(w, E(http.StatusForbidden, "video_paused", "Video is paused until next month to keep calls free."))
 			return
@@ -230,6 +254,15 @@ func (s *Server) handleSFUSubscribe(w http.ResponseWriter, r *http.Request) {
 	videoAllowed := true
 	checkedVideo := false
 	asked := map[string]bool{}
+	streams := map[ids.ID]bool{}
+	mayStream := func(target voice.State) bool {
+		ok, seen := streams[target.UserID]
+		if !seen {
+			ok = s.mayStream(r.Context(), target)
+			streams[target.UserID] = ok
+		}
+		return ok
+	}
 	for _, t := range req.Tracks {
 		p := sfuPulled{UserID: t.UserID, Kind: t.Kind}
 		target, ok := s.Voice.Get(t.UserID)
@@ -245,6 +278,8 @@ func (s *Server) handleSFUSubscribe(w http.ResponseWriter, r *http.Request) {
 			p.Error = "not_in_call"
 		case target.Tracks.Get(t.Kind) == "":
 			p.Error = "not_published"
+		case t.Kind != realtime.KindAudio && !mayStream(target):
+			p.Error = "missing_permission"
 		default:
 			if realtime.IsVideo(t.Kind) {
 				if !checkedVideo {

@@ -13,6 +13,7 @@ import (
 
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/perms"
 	"evilion.xyz/chat/internal/store"
 )
 
@@ -262,6 +263,30 @@ func (s *Server) allowedRoleMentions(ctx context.Context, me *store.User, ch *st
 	return out
 }
 
+// embedFlags adds Suppress Embeds to a message whose author may not embed
+// links in the channel. Previews are made by the sender's app and sealed in
+// the message, where the server cannot see them, so this flag is how the
+// server holds Embed Links: every app leaves a flagged message's previews
+// out, and the author cannot clear it (handleMessageEdit).
+func (s *Server) embedFlags(ctx context.Context, me *store.User, ch *store.Channel, flags int64) int64 {
+	if s.isDM(ch) || s.ChannelAccess == nil {
+		return flags
+	}
+	if ok, _ := s.ChannelAccess(ctx, me, ch, NeedEmbed); !ok {
+		return flags | store.MsgFlagSuppressEmbeds
+	}
+	return flags
+}
+
+// mayEmbed reports whether someone may embed links in a channel now.
+func (s *Server) mayEmbed(ctx context.Context, ch *store.Channel, uid ids.ID) bool {
+	if s.isDM(ch) {
+		return true
+	}
+	p, err := s.Store.PermsIn(ctx, ch, uid)
+	return err == nil && p.Has(perms.EmbedLinks)
+}
+
 func dedupeIDs(list []ids.ID, max int) []ids.ID {
 	seen := map[ids.ID]bool{}
 	out := make([]ids.ID, 0, len(list))
@@ -333,8 +358,14 @@ func (s *Server) checkEnvelope(w http.ResponseWriter, r *http.Request, ch *store
 }
 
 func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
-	ch, me := s.channel(w, r, NeedHistory)
+	ch, me := s.channel(w, r, NeedView)
 	if ch == nil {
+		return
+	}
+	// without Read Message History a channel shows only what is said while
+	// one is in it: what came before answers as nothing, not as an error
+	if ok, err := s.canAccess(r, me, ch, NeedHistory); err != nil || !ok {
+		WriteJSON(w, http.StatusOK, []*store.Message{})
 		return
 	}
 	q := store.MessageQuery{}
@@ -515,7 +546,7 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	m := &store.Message{ChannelID: ch.ID, AuthorID: me.ID, Type: "default", Ciphertext: body.Ciphertext, KeyConvID: &env.Conv, KeyEpoch: &env.Epoch,
-		Mentions: dedupeIDs(body.Mentions, maxMentions), MentionRoles: s.allowedRoleMentions(ctx, me, ch, body.MentionRoles), MentionEveryone: body.MentionEveryone, Nonce: body.Nonce, Flags: body.Flags & store.MsgFlagSuppressEmbeds, NewPoll: poll}
+		Mentions: dedupeIDs(body.Mentions, maxMentions), MentionRoles: s.allowedRoleMentions(ctx, me, ch, body.MentionRoles), MentionEveryone: body.MentionEveryone, Nonce: body.Nonce, Flags: s.embedFlags(ctx, me, ch, body.Flags&store.MsgFlagSuppressEmbeds), NewPoll: poll}
 	// AutoMod's rules about what the server can see for itself: how many
 	// people a message pings, and how fast its sender is going
 	if !s.isDM(ch) {
@@ -641,6 +672,11 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		flags := (m.Flags &^ store.MsgFlagSuppressEmbeds) | (body.Flags & store.MsgFlagSuppressEmbeds)
+		// previews hidden because the author may not embed links here stay
+		// hidden, whoever asks to show them
+		if flags&store.MsgFlagSuppressEmbeds == 0 && m.WebhookID == nil && !s.mayEmbed(r.Context(), ch, m.AuthorID) {
+			flags |= store.MsgFlagSuppressEmbeds
+		}
 		if err := s.Store.SetMessageFlags(r.Context(), mid, flags); err != nil {
 			WriteError(w, err)
 			return
@@ -688,6 +724,13 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 		if err := s.Store.UpdateMessage(r.Context(), mid, body.Ciphertext, env.Conv, env.Epoch, dedupeIDs(body.Mentions, maxMentions), s.allowedRoleMentions(r.Context(), me, ch, body.MentionRoles), body.MentionEveryone, time.Now().UnixMilli()); err != nil {
 			WriteError(w, err)
 			return
+		}
+		// new words are held to Embed Links as new messages are
+		if flags := s.embedFlags(r.Context(), me, ch, m.Flags); flags != m.Flags {
+			if err := s.Store.SetMessageFlags(r.Context(), mid, flags); err != nil {
+				WriteError(w, err)
+				return
+			}
 		}
 	}
 	updated, err := s.Store.MessageByID(r.Context(), mid, me.ID)
@@ -912,9 +955,17 @@ func (s *Server) reactionTarget(w http.ResponseWriter, r *http.Request, need str
 }
 
 func (s *Server) handleReactionAdd(w http.ResponseWriter, r *http.Request) {
-	ch, me, m, emoji := s.reactionTarget(w, r, NeedReact)
+	// Reacting needs Read Message History; a new reaction needs Add Reactions
+	// too, while adding oneself to one already there does not
+	ch, me, m, emoji := s.reactionTarget(w, r, NeedHistory)
 	if ch == nil || s.dmBlocked(w, r, ch, me) {
 		return
+	}
+	if !hasReaction(m, emoji) {
+		if ok, _ := s.canAccess(r, me, ch, NeedReact); !ok {
+			WriteError(w, E(http.StatusForbidden, "missing_permission", "You cannot add new reactions here."))
+			return
+		}
 	}
 	// someone else's emoji from another server, where the server allows it;
 	// joining a reaction already there is always fine

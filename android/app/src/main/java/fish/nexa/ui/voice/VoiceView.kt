@@ -320,7 +320,7 @@ private fun Stage(channelId: String, state: CallState, byUser: Map<String, Voice
     val mix by Voice.mix.collectAsState()
     val doc by Nexa.settings.doc.collectAsState()
     @Suppress("UNUSED_VARIABLE") val touch = doc.size
-    val ptt = Voice.setting("mode") == "ptt"
+    val ptt = fish.nexa.voice.CallPerms.pushToTalkOn()
     val participants = remember(byUser, channelId) { Voice.participants(channelId, byUser) }
     val tiles = remember(participants, state.localScreen, state.localVideo, state.remoteScreen, state.remoteVideo, state.calling) { tilesOf(channelId, state, participants) }
     val focusedTile = state.focused?.let { k -> tiles.firstOrNull { it.key == k } }

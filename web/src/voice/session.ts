@@ -16,8 +16,6 @@ import { mutedSentence } from "@/lib/moderation";
 import { playSound, startCalling, startRinging, stopCalling, stopRinging } from "@/lib/sounds";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
-import { canI, useServers } from "@/stores/servers";
-import { P } from "@/lib/perms";
 import { activeMute, useNexa } from "@/stores/nexa";
 import { usePresence } from "@/stores/presence";
 import { useSettings } from "@/stores/settings";
@@ -30,6 +28,8 @@ import { allDeclined, callDeclined, callEnded, callLine, callStarted, callTimedO
 import { audioContext, resumeAudio } from "./media";
 import type { SharePlan } from "./shareQuality";
 import { canReceiveH264 } from "./videoCap";
+import { allowsVoiceActivity, mayBePriority, mayStream, pushToTalkOn } from "./callPerms";
+import { useServers } from "@/stores/servers";
 
 import { t as tr_ } from "@/i18n";
 
@@ -235,12 +235,6 @@ export async function iceConfig(): Promise<{ servers: RTCIceServer[]; sfu: boole
   }
 }
 
-/** Whether this person may talk as Priority Speaker in a call: only in a server's voice channel that allows it. */
-export function mayBePriority(channelId: string): boolean {
-  const serverId = useChannels.getState().byId[channelId]?.server_id;
-  return !!serverId && canI(useServers.getState().byId[serverId], P.PRIORITY_SPEAKER, channelId);
-}
-
 /** A touch screen with no hover has no key to hold: push to talk there is a button in the call. */
 export function noKeyToHold(): boolean {
   return typeof matchMedia === "function" && matchMedia("(hover: none) and (pointer: coarse)").matches;
@@ -248,7 +242,7 @@ export function noKeyToHold(): boolean {
 
 /** Whether the call shows a button to hold for push to talk, on a device with no key for it. */
 export function pushToTalkButton(): boolean {
-  return useSettings.getState().settings.voice.mode === "ptt" && noKeyToHold();
+  return pushToTalkOn() && noKeyToHold();
 }
 
 /** Join a voice channel (or DM call). Leaves the current one first. */
@@ -286,6 +280,11 @@ export async function joinVoice(channelId: string): Promise<void> {
   stopAloneTimer();
   const announced = await loaded.join(channelId, ice, () => seq === joinSeq, refuse);
   if (!announced || seq !== joinSeq) return;
+  // a channel without Use Voice Activity is push to talk only, whatever the settings say
+  const voiceSettings = useSettings.getState().settings.voice;
+  if (voiceSettings.mode !== "ptt" && !allowsVoiceActivity(channelId)) {
+    useUI.getState().toast(noKeyToHold() ? tr_("voice.callPerms.pttRequiredButton") : tr_("voice.callPerms.pttRequired", { key: voiceSettings.pttKey }), "info");
+  }
   if (isConversation(channelId) && othersIn(channelId) === 0) {
     startCallingTone(channelId);
     callStarted(channelId);
@@ -319,7 +318,16 @@ export function flipCamera(): Promise<void> {
 
 /** Called straight from a click: iOS only opens the camera in a gesture. */
 export function toggleCamera(): Promise<void> {
+  if (!useVoice.getState().localVideo && !streamAllowed()) return Promise.resolve();
   return engine?.toggleCamera() ?? Promise.resolve();
+}
+
+/** Whether the call this device is in lets it start a camera or a share; says why not when it does not. */
+function streamAllowed(): boolean {
+  const cur = engine?.current();
+  if (!cur || mayStream(cur.channelId)) return true;
+  useUI.getState().toast(tr_("voice.callPerms.noVideo"), "error");
+  return false;
 }
 
 /**
@@ -328,12 +336,13 @@ export function toggleCamera(): Promise<void> {
  * the browser only opens its screen picker during a user gesture.
  */
 export function startScreen(quality?: { plan: SharePlan; audio?: boolean }): Promise<void> {
-  if (!engine || engine.sharing()) return Promise.resolve();
+  if (!engine || engine.sharing() || !streamAllowed()) return Promise.resolve();
   return engine.toggleScreen(quality);
 }
 
 /** Stops a share, or starts one the way startScreen does. */
 export function toggleScreen(quality?: { plan: SharePlan; audio?: boolean }): Promise<void> {
+  if (!engine?.sharing() && !streamAllowed()) return Promise.resolve();
   return engine?.toggleScreen(quality) ?? Promise.resolve();
 }
 
@@ -634,13 +643,24 @@ export function installVoice(): void {
       for (const id of new Set([...Object.keys(st.watching), ...Object.keys(prev.watching)])) engine.setWatching(id, !!st.watching[id]);
     }
   });
+  // A role or overwrite changing mid-call: a camera or share no longer
+  // allowed stops, and push to talk comes in or goes as Use Voice Activity does
+  useServers.subscribe(() => {
+    const cur = engine?.current();
+    if (!engine || !cur) return;
+    if (!mayStream(cur.channelId)) {
+      if (useVoice.getState().localVideo) void engine.toggleCamera();
+      if (engine.sharing()) void engine.toggleScreen();
+    }
+    engine.applyTransmit();
+  });
   // turning on Do Not Disturb quiets a call that is already ringing
   usePresence.subscribe(() => {
     if (doNotDisturb()) stopRinging();
   });
   const isPtt = (e: KeyboardEvent) => {
     const v = useSettings.getState().settings.voice;
-    return v.mode === "ptt" && (e.key === v.pttKey || e.code === v.pttKey);
+    return pushToTalkOn() && (e.key === v.pttKey || e.code === v.pttKey);
   };
   window.addEventListener("keydown", (e) => {
     if (!engine?.current() || !isPtt(e) || e.repeat) return;

@@ -63,6 +63,8 @@ export interface RenderCtx {
    * line is already the way to the message.
    */
   inert?: boolean;
+  /** Emoji drawn as their :name: in words: another server's, in a message whose author may not use them there. */
+  plainEmoji?: (id: string) => boolean;
   /** Draws a note's file where the text has it; without it the file's name stands in. */
   /** Draws a note's file where its text has it; `width` is the share of the line a picture takes, in percent, when not all of it. */
   renderFile?: (id: string, name: string, width?: number, align?: "left" | "right") => import("react").ReactNode;

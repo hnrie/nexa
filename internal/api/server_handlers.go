@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +46,7 @@ func (s *Server) serverRoutes(mux *http.ServeMux) {
 	mux.Handle("DELETE /api/v1/channels/{id}", s.authed(s.handleServerChannelDelete))
 	mux.Handle("PUT /api/v1/channels/{id}/permissions/{target}", s.authed(s.handleOverwritePut))
 	mux.Handle("DELETE /api/v1/channels/{id}/permissions/{target}", s.authed(s.handleOverwriteDelete))
+	mux.Handle("POST /api/v1/channels/{id}/permissions/sync", s.authed(s.handlePermissionsSync))
 	mux.Handle("GET /api/v1/servers/{id}/roles", s.authed(s.handleRoles))
 	mux.Handle("POST /api/v1/servers/{id}/roles", s.authed(s.handleRoleCreate))
 	mux.Handle("PATCH /api/v1/servers/{id}/roles", s.authed(s.handleRolePositions))
@@ -177,9 +179,9 @@ func (s *Server) snapshotVisibility(ctx context.Context, serverID ids.ID) (visib
 }
 
 // syncVisibility emits channel_create/channel_delete to members whose view of
-// the server changed, and channel_update for a changed channel to those who
+// the server changed, and channel_update for the changed channels to those who
 // still see it. It also flags conversations whose viewer set shrank.
-func (s *Server) syncVisibility(ctx context.Context, serverID ids.ID, before visibility, changed *ids.ID) {
+func (s *Server) syncVisibility(ctx context.Context, serverID ids.ID, before visibility, changed ...ids.ID) {
 	// A snapshot that failed comes back nil, which is not the same as a server
 	// nobody can see anything in. Diffing against nil makes every channel look
 	// newly visible to every member, which is one channel_create per pair —
@@ -210,7 +212,7 @@ func (s *Server) syncVisibility(ctx context.Context, serverID ids.ID, before vis
 				if c := byID[chID]; c != nil {
 					s.Bcast.EmitUsers([]ids.ID{uid}, "channel_create", c)
 				}
-			} else if changed != nil && chID == *changed {
+			} else if slices.Contains(changed, chID) {
 				if c := byID[chID]; c != nil {
 					s.Bcast.EmitUsers([]ids.ID{uid}, "channel_update", c)
 				}
@@ -687,7 +689,7 @@ func (s *Server) handleServerTransfer(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	s.syncVisibility(r.Context(), srv.ID, before, nil)
+	s.syncVisibility(r.Context(), srv.ID, before)
 	updated, err := s.Store.ServerByID(r.Context(), srv.ID)
 	if err != nil {
 		WriteError(w, err)
@@ -763,10 +765,12 @@ func (s *Server) handleServerChannelCreate(w http.ResponseWriter, r *http.Reques
 		WriteError(w, E(http.StatusBadRequest, "invalid_name", "Channel names are 1–100 characters."))
 		return
 	}
+	var parent *store.Channel
 	if req.Type == "category" {
 		req.ParentID = nil
 	} else if req.ParentID != nil {
-		parent, err := s.Store.ChannelByID(r.Context(), *req.ParentID)
+		var err error
+		parent, err = s.Store.ChannelByID(r.Context(), *req.ParentID)
 		if err != nil || parent.ServerID == nil || *parent.ServerID != srv.ID || parent.Type != "category" {
 			WriteError(w, E(http.StatusBadRequest, "invalid_parent", "parent_id must be a category of this server."))
 			return
@@ -795,8 +799,28 @@ func (s *Server) handleServerChannelCreate(w http.ResponseWriter, r *http.Reques
 		WriteError(w, err)
 		return
 	}
+	// a channel made in a category starts synced with it
+	own := false
+	if parent != nil && len(parent.Overwrites) > 0 {
+		if own, err = s.copyOverwrites(r.Context(), ch, parent.Overwrites); err != nil {
+			WriteError(w, err)
+			return
+		}
+		if ch, err = s.Store.ChannelByID(r.Context(), ch.ID); err != nil {
+			WriteError(w, err)
+			return
+		}
+	}
 	s.audit(r, srv.ID, me.ID, "channel_create", "channel", &ch.ID, map[string]any{"name": name, "type": req.Type}, "")
-	s.syncVisibility(r.Context(), srv.ID, before, nil)
+	s.syncVisibility(r.Context(), srv.ID, before)
+	if own {
+		// the maker's app makes the key at once, as for a channel made private
+		WriteJSON(w, http.StatusCreated, struct {
+			*store.Channel
+			KeyActions map[string]any `json:"key_actions"`
+		}{ch, map[string]any{"needs_own_key": true, "conv_id": ch.ID}})
+		return
+	}
 	WriteJSON(w, http.StatusCreated, ch)
 }
 
@@ -809,6 +833,10 @@ func (s *Server) handleServerChannelPositions(w http.ResponseWriter, r *http.Req
 		ID       ids.ID          `json:"id"`
 		Position int             `json:"position"`
 		ParentID json.RawMessage `json:"parent_id"`
+		// LockPermissions syncs a channel moved into a category with it; left
+		// out, a channel that was synced where it came from (or had no
+		// overwrites outside a category) is synced with where it goes
+		LockPermissions *bool `json:"lock_permissions"`
 	}
 	if err := ReadJSON(w, r, &req, 64<<10); err != nil {
 		WriteError(w, err)
@@ -826,6 +854,11 @@ func (s *Server) handleServerChannelPositions(w http.ResponseWriter, r *http.Req
 		byID[c.ID] = c
 	}
 	var list []store.ChannelPosition
+	type move struct {
+		ch     *store.Channel
+		parent *store.Channel
+	}
+	var syncs []move
 	for _, item := range req {
 		c := byID[item.ID]
 		if c == nil {
@@ -847,15 +880,55 @@ func (s *Server) handleServerChannelPositions(w http.ResponseWriter, r *http.Req
 					return
 				}
 				pos.ParentID = &pid
+				if c.ParentID == nil || *c.ParentID != pid {
+					var was []store.Overwrite
+					if c.ParentID != nil && byID[*c.ParentID] != nil {
+						was = byID[*c.ParentID].Overwrites
+					}
+					lock := sameOverwrites(c.Overwrites, was)
+					if item.LockPermissions != nil {
+						lock = *item.LockPermissions
+					}
+					// syncing changes who may do what, which is Manage Roles
+					// in the channel; without it a move keeps the overwrites
+					if lock && !s.hasIn(r.Context(), c.ID, me.ID, perms.ManageRoles) {
+						if item.LockPermissions != nil {
+							WriteError(w, E(http.StatusForbidden, "missing_permission", "You need Manage Roles to sync a channel's permissions."))
+							return
+						}
+						lock = false
+					}
+					if lock && !sameOverwrites(c.Overwrites, parent.Overwrites) {
+						syncs = append(syncs, move{c, parent})
+					}
+				}
 			}
 		}
 		list = append(list, pos)
+	}
+	var before visibility
+	if len(syncs) > 0 {
+		if before, err = s.snapshotVisibility(r.Context(), srv.ID); err != nil {
+			WriteError(w, err)
+			return
+		}
 	}
 	if err := s.Store.SetChannelPositions(r.Context(), srv.ID, list); err != nil {
 		WriteError(w, err)
 		return
 	}
 	s.audit(r, srv.ID, me.ID, "channel_positions", "server", &srv.ID, req, "")
+	if len(syncs) > 0 {
+		var touched []ids.ID
+		for _, m := range syncs {
+			if _, err := s.copyOverwrites(r.Context(), m.ch, m.parent.Overwrites); err != nil {
+				WriteError(w, err)
+				return
+			}
+			touched = append(touched, m.ch.ID)
+		}
+		s.syncVisibility(r.Context(), srv.ID, before, touched...)
+	}
 	updated, err := s.Store.ServerChannels(r.Context(), srv.ID)
 	if err != nil {
 		WriteError(w, err)
@@ -1123,8 +1196,10 @@ func (s *Server) channelManageCtx(w http.ResponseWriter, r *http.Request) (*stor
 		WriteError(w, ErrNotFound)
 		return nil, nil, 0
 	}
-	if !p.Has(perms.ManageRoles) && !p.Has(perms.ManageChannels) {
-		WriteError(w, E(http.StatusForbidden, "missing_permission", "You need Manage Roles or Manage Channels to edit permissions."))
+	// a channel's permissions are Manage Roles there (Manage Permissions in a
+	// channel's own list), as in Discord; Manage Channels alone edits the rest
+	if !p.Has(perms.ManageRoles) {
+		WriteError(w, E(http.StatusForbidden, "missing_permission", "You need Manage Roles to edit permissions."))
 		return nil, nil, 0
 	}
 	return ch, me, p
@@ -1183,19 +1258,107 @@ func (s *Server) handleOverwritePut(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	// the channels synced with a category follow it
+	var synced []*store.Channel
+	if ch.Type == "category" {
+		if synced, err = s.syncedChildren(r.Context(), ch); err != nil {
+			WriteError(w, err)
+			return
+		}
+	}
 	ow := store.Overwrite{ChannelID: ch.ID, TargetID: target, TargetType: req.Type, Allow: req.Allow &^ req.Deny, Deny: req.Deny}
 	if err := s.Store.SetOverwrite(r.Context(), ow); err != nil {
 		WriteError(w, err)
 		return
 	}
+	touched := []ids.ID{ch.ID}
+	for _, c := range synced {
+		cow := ow
+		cow.ChannelID = c.ID
+		if err := s.Store.SetOverwrite(r.Context(), cow); err != nil {
+			WriteError(w, err)
+			return
+		}
+		s.markIfPrivate(r.Context(), c)
+		touched = append(touched, c.ID)
+	}
 	s.audit(r, *ch.ServerID, me.ID, "overwrite_update", "channel", &ch.ID, ow, "")
 	resp := map[string]any{"overwrite": ow}
-	if s.channelBecamePrivate(r.Context(), ch) {
-		tr := true
-		_ = s.Store.SetKeyFlags(r.Context(), ch.ID, nil, &tr)
+	if s.markIfPrivate(r.Context(), ch) {
 		resp["key_actions"] = map[string]any{"needs_own_key": true, "conv_id": ch.ID}
 	}
-	s.syncVisibility(r.Context(), *ch.ServerID, before, &ch.ID)
+	s.syncVisibility(r.Context(), *ch.ServerID, before, touched...)
+	WriteJSON(w, http.StatusOK, resp)
+}
+
+// handlePermissionsSync gives a channel its category's overwrites, the Sync
+// Now of a channel's permissions. Each overwrite it changes is held to what
+// writing that overwrite by hand would be: the actor's own permissions and
+// the role hierarchy.
+func (s *Server) handlePermissionsSync(w http.ResponseWriter, r *http.Request) {
+	ch, me, actorPerms := s.channelManageCtx(w, r)
+	if ch == nil {
+		return
+	}
+	if ch.ParentID == nil || ch.Type == "category" {
+		WriteError(w, E(http.StatusBadRequest, "no_category", "This channel is not in a category."))
+		return
+	}
+	parent, err := s.Store.ChannelByID(r.Context(), *ch.ParentID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	srv, err := s.Store.ServerByID(r.Context(), *ch.ServerID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	mine := map[ids.ID]store.Overwrite{}
+	for _, ow := range ch.Overwrites {
+		mine[ow.TargetID] = ow
+	}
+	theirs := map[ids.ID]store.Overwrite{}
+	for _, ow := range parent.Overwrites {
+		theirs[ow.TargetID] = ow
+	}
+	check := func(target ids.ID, kind string, a, b store.Overwrite) bool {
+		bits := (a.Allow ^ b.Allow) | (a.Deny ^ b.Deny)
+		if bits == 0 {
+			return true
+		}
+		if actorPerms != perms.All && bits&^actorPerms != 0 {
+			WriteError(w, E(http.StatusForbidden, "missing_permission", "You cannot manage permissions you do not have."))
+			return false
+		}
+		return s.canOverwrite(w, r, srv, me.ID, kind, target)
+	}
+	for id, ow := range theirs {
+		if !check(id, ow.TargetType, mine[id], ow) {
+			return
+		}
+	}
+	for id, ow := range mine {
+		if _, kept := theirs[id]; !kept && !check(id, ow.TargetType, ow, store.Overwrite{}) {
+			return
+		}
+	}
+	before, err := s.snapshotVisibility(r.Context(), *ch.ServerID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	own, err := s.copyOverwrites(r.Context(), ch, parent.Overwrites)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	s.audit(r, *ch.ServerID, me.ID, "overwrite_sync", "channel", &ch.ID, map[string]any{"category": parent.ID}, "")
+	s.syncVisibility(r.Context(), *ch.ServerID, before, ch.ID)
+	resp := map[string]any{}
+	if own {
+		resp["key_actions"] = map[string]any{"needs_own_key": true, "conv_id": ch.ID}
+	}
 	WriteJSON(w, http.StatusOK, resp)
 }
 
@@ -1305,12 +1468,27 @@ func (s *Server) handleOverwriteDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	var synced []*store.Channel
+	if fresh.Type == "category" {
+		if synced, err = s.syncedChildren(r.Context(), fresh); err != nil {
+			WriteError(w, err)
+			return
+		}
+	}
 	if err := s.Store.DeleteOverwrite(r.Context(), ch.ID, target); err != nil {
 		WriteError(w, err)
 		return
 	}
+	changed := []ids.ID{ch.ID}
+	for _, c := range synced {
+		if err := s.Store.DeleteOverwrite(r.Context(), c.ID, target); err != nil && !errors.Is(err, store.ErrNotFound) {
+			WriteError(w, err)
+			return
+		}
+		changed = append(changed, c.ID)
+	}
 	s.audit(r, *ch.ServerID, me.ID, "overwrite_delete", "channel", &ch.ID, map[string]any{"target": target}, "")
-	s.syncVisibility(r.Context(), *ch.ServerID, before, &ch.ID)
+	s.syncVisibility(r.Context(), *ch.ServerID, before, changed...)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1570,7 +1748,7 @@ func (s *Server) handleRolePatch(w http.ResponseWriter, r *http.Request) {
 	s.audit(r, srv.ID, me.ID, "role_update", "role", &role.ID, changes, "")
 	s.emitServer(r.Context(), srv.ID, "role_update", updated)
 	if req.Permissions != nil {
-		s.syncVisibility(r.Context(), srv.ID, before, nil)
+		s.syncVisibility(r.Context(), srv.ID, before)
 	}
 	WriteJSON(w, http.StatusOK, updated)
 }
@@ -1619,7 +1797,7 @@ func (s *Server) handleRoleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit(r, srv.ID, me.ID, "role_delete", "role", &role.ID, map[string]any{"name": role.Name}, "")
 	s.emitServer(r.Context(), srv.ID, "role_delete", map[string]any{"id": role.ID, "server_id": srv.ID})
-	s.syncVisibility(r.Context(), srv.ID, before, nil)
+	s.syncVisibility(r.Context(), srv.ID, before)
 	s.tagRoleGone(r.Context(), srv, role.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -2015,7 +2193,7 @@ func (s *Server) handleMemberPatch(w http.ResponseWriter, r *http.Request) {
 	}
 	s.emitServer(r.Context(), srv.ID, "member_update", updated)
 	if rolesSet || patch.TimeoutUntil != nil {
-		s.syncVisibility(r.Context(), srv.ID, before, nil)
+		s.syncVisibility(r.Context(), srv.ID, before)
 	}
 	// AutoMod reads a nickname or a server profile when it changes
 	if patch.Nickname != nil || patch.Bio != nil || patch.Pronouns != nil {
@@ -2085,7 +2263,7 @@ func (s *Server) handleMemberRole(add bool) http.HandlerFunc {
 		}
 		s.audit(r, srv.ID, me.ID, map[bool]string{true: "member_role_add", false: "member_role_remove"}[add], "user", &m.UserID, map[string]any{"role": rid}, "")
 		s.emitServer(r.Context(), srv.ID, "member_update", updated)
-		s.syncVisibility(r.Context(), srv.ID, before, nil)
+		s.syncVisibility(r.Context(), srv.ID, before)
 		if !add {
 			s.RecheckTagWearers(r.Context(), srv.ID, []ids.ID{m.UserID})
 		}

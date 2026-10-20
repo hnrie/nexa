@@ -220,13 +220,19 @@ internal fun CreateChannelSheet(layer: Layer, serverId: String, parentId: String
         scope.launch {
             var made: Channel? = null
             try {
-                val res = Nexa.api.request("POST", "/servers/$serverId/channels", Channel.serializer(), buildJsonObject {
+                val raw = Nexa.api.request("POST", "/servers/$serverId/channels", buildJsonObject {
                     put("type", type)
                     put("name", clean)
                     if (parentId != null) put("parent_id", parentId)
-                })
+                }) as JsonObject
+                val res = fish.nexa.net.wireJson.decodeFromJsonElement(Channel.serializer(), raw)
                 made = res
                 Nexa.channels.upsert(listOf(res))
+                // made in a private category, it starts private like it: its key is made now
+                if (((raw["key_actions"] as? JsonObject)?.get("needs_own_key") as? JsonPrimitive)?.contentOrNull == "true") {
+                    Nexa.keys.ensureConvKey(res.id)
+                    refreshChannels(serverId)
+                }
                 if (private) {
                     // @everyone may not see it, and it gets its own key, so members outside it never hold one
                     val ow = Nexa.api.request("PUT", "/channels/${res.id}/permissions/$serverId", buildJsonObject {

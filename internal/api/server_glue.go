@@ -23,6 +23,8 @@ func needBits(need string) perms.Perm {
 		return perms.ViewChannel | perms.UseExternalEmojis
 	case NeedHistory:
 		return perms.ViewChannel | perms.ReadMessageHistory
+	case NeedEmbed:
+		return perms.ViewChannel | perms.EmbedLinks
 	case NeedReact:
 		return perms.ViewChannel | perms.AddReactions
 	case NeedAttach:

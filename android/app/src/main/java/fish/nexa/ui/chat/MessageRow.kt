@@ -575,13 +575,27 @@ internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     val mediaOnly = embeds != null && remember(doc) { Nexa.settings.imagePreviews } &&
         remember(payload?.t, embeds) { isOnlyMediaLinks(payload?.t ?: "", embeds.mapNotNull { Unfurl.of(it) }) }
     val text = if (mediaOnly) null else payload?.t
+    // Use External Emoji and Use External Stickers, held by every reader: what the author may not use here draws as words
+    val emojiMap by Nexa.expressions.emojis.collectAsState()
+    val packMap by Nexa.expressions.packs.collectAsState()
+    val serverId = ctx.server?.server?.id
+    val plainEmoji: ((String) -> Boolean)? = if (cm != null && serverId != null && fish.nexa.data.AuthorPerms.has(ctx.server, cm, P.USE_EXTERNAL_EMOJIS) == false) {
+        val own = emojiMap[serverId].orEmpty().map { it.blobId }.toSet()
+        val outside: (String) -> Boolean = { id -> id !in own }
+        outside
+    } else null
+    val stickerOutside = cm != null && serverId != null && payload?.sticker != null && fish.nexa.data.AuthorPerms.has(ctx.server, cm, P.USE_EXTERNAL_STICKERS) == false &&
+        packMap.values.none { p -> p.serverId == serverId && p.stickers.any { it.id == payload.sticker.id } }
     val edited = cm?.m?.editedAt?.let { t("chat.messageItem.edited") }
     if (cm != null && ChatUi.editing[cm.channelId]?.messageId == cm.id) EditMessage(cm)
     else if (!text.isNullOrEmpty()) fish.nexa.ui.markdown.MarkdownView(
         text,
-        fish.nexa.ui.markdown.RenderCtx(serverId = ctx.server?.server?.id, color = if (failed) c.textDanger else null, edited = edited, surface = c.bgRaised),
+        fish.nexa.ui.markdown.RenderCtx(serverId = ctx.server?.server?.id, color = if (failed) c.textDanger else null, edited = edited, surface = c.bgRaised, plainEmoji = plainEmoji),
     )
-    payload?.sticker?.let { StickerView(it) }
+    payload?.sticker?.let { st ->
+        if (stickerOutside) Txt(st.name?.let { ":$it:" } ?: t("chat.messageItem.sticker"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(10f)), color = c.textMuted)
+        else StickerView(st)
+    }
     payload?.poll?.let { if (cm != null) PollCard(cm, ctx) }
     // files on their way up show their progress until the message is in (Sending… once they are up)
     val up = item.pending?.upload

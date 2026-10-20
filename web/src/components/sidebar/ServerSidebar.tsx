@@ -139,18 +139,55 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   // dragover fires some sixty times a second; a fresh object each time re-rendered
   // the whole channel tree, every tooltip and every call's participant rows
   const dropAt = (id: string, where: Drop["where"]) => setDrop((d) => (d && d.id === id && d.where === where ? d : { id, where }));
-  const onDragOver = (e: DragEvent, target: Channel) => {
-    // a person being moved is the voice channel's to take, below
-    if (memberDrag) return;
-    if (!drag || drag.id === target.id) return;
-    if (drag.kind === "category" && target.type !== "category" && !target.parent_id) return;
-    e.preventDefault();
-    const r = e.currentTarget.getBoundingClientRect();
-    if (drag.kind === "channel" && target.type === "category") {
-      dropAt(target.id, e.clientY < r.top + r.height * 0.35 ? "before" : "into");
-      return;
+  /**
+   * Where what is dragged would land, from the pointer's height alone. The
+   * whole list answers, gaps between rows and above categories included, so
+   * no spot along it refuses the drop. A category lands between categories: before the first one
+   * whose head's middle is below the pointer, else after the last. A channel
+   * lands by the row nearest the pointer: above or below a channel, at the
+   * end of whatever comes before a category's head when over the top of it,
+   * or at the top of the category when over the rest.
+   */
+  const dropFor = (y: number): Drop | null => {
+    const list = listRef.current;
+    if (!list || !drag) return null;
+    if (drag.kind === "category") {
+      const heads = [...list.querySelectorAll<HTMLElement>("[data-cat-head]")].filter((h) => h.dataset.catHead !== drag.id);
+      for (const h of heads) {
+        const r = h.getBoundingClientRect();
+        if (y < r.top + r.height / 2) return { id: h.dataset.catHead!, where: "before" };
+      }
+      const last = heads[heads.length - 1];
+      return last ? { id: last.dataset.catHead!, where: "after" } : null;
     }
-    dropAt(target.id, e.clientY > r.top + r.height / 2 ? "after" : "before");
+    let best: HTMLElement | null = null;
+    let bestGap = Infinity;
+    for (const el of list.querySelectorAll<HTMLElement>("[data-dnd]")) {
+      if (el.dataset.dnd === drag.id) continue;
+      const r = el.getBoundingClientRect();
+      const gap = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
+      if (gap < bestGap) {
+        best = el;
+        bestGap = gap;
+      }
+      if (gap === 0) break;
+    }
+    if (!best) return null;
+    const r = best.getBoundingClientRect();
+    if (best.dataset.catHead) return { id: best.dataset.dnd!, where: y < r.top + r.height * 0.3 ? "before" : "into" };
+    return { id: best.dataset.dnd!, where: y < r.top + r.height / 2 ? "before" : "after" };
+  };
+  const onListDragOver = (e: DragEvent) => {
+    // a person being moved is the voice channel's to take
+    if (memberDrag || !drag) return;
+    const at = dropFor(e.clientY);
+    if (!at) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    dropAt(at.id, at.where);
+  };
+  const onListDragLeave = (e: DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop(null);
   };
   const finish = async (list: ChannelPositionPatch[]) => {
     applyPositions(list.map((p) => ({ id: p.id, position: p.position, parent_id: p.parent_id === undefined ? (channels[p.id]?.parent_id ?? null) : p.parent_id })));
@@ -166,9 +203,10 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
     }
   };
   const onDrop = (e: DragEvent) => {
+    if (memberDrag) return;
     e.preventDefault();
     const d = drag;
-    const at = drop;
+    const at = dropFor(e.clientY) ?? drop;
     setDrag(null);
     setDrop(null);
     if (!d || !at || d.id === at.id) return;
@@ -302,10 +340,9 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
         data-drop={drop?.id === ch.id ? drop.where : undefined}
         data-dragging={drag?.id === ch.id}
         data-channel={ch.id}
+        data-dnd={ch.id}
         draggable={canManage}
         onDragStart={(e) => onDragStart(e, { id: ch.id, kind: "channel" })}
-        onDragOver={(e) => onDragOver(e, ch)}
-        onDrop={onDrop}
         onDragEnd={endDrag}
         onContextMenu={(e) => onChannelContext(e, ch.id)}
       >
@@ -354,20 +391,20 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
         <span className={s.headName}>{st.server.name}</span>
         {menuOpen ? <X size={18} /> : <ChevronDown size={18} />}
       </button>
-      <div className={s.scroll} ref={listRef} onScroll={banner ? measureBanner : undefined}>
+      <div className={s.scroll} ref={listRef} onScroll={banner ? measureBanner : undefined} onDragOver={onListDragOver} onDragLeave={onListDragLeave} onDrop={onDrop}>
         {banner ? <div className={s.banner} style={{ backgroundImage: `url(${banner})` }} aria-hidden="true" /> : <div className={s.top} />}
         {tree.loose.map(renderChannel)}
         {tree.categories.map(({ category, children }) => {
           const isCollapsed = collapsed.includes(category.id);
           return (
-            <div key={category.id} className={s.category} data-dragging={drag?.id === category.id}>
+            <div key={category.id} className={s.category} data-dragging={drag?.id === category.id} data-drop={drag?.kind === "category" && drop?.id === category.id ? drop.where : undefined}>
               <div
                 className={s.catHead}
-                data-drop={drop?.id === category.id ? drop.where : undefined}
+                data-dnd={category.id}
+                data-cat-head={category.id}
+                data-drop={drag?.kind === "channel" && drop?.id === category.id ? drop.where : undefined}
                 draggable={canManage}
                 onDragStart={(e) => onDragStart(e, { id: category.id, kind: "category" })}
-                onDragOver={(e) => onDragOver(e, category)}
-                onDrop={onDrop}
                 onDragEnd={endDrag}
                 onContextMenu={(e) => onCategoryContext(e, category.id)}
               >

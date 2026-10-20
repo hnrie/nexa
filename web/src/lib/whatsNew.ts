@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { AtSign, AudioLines, BadgeCheck, Bot, CodeXml, ScanEye, Compass, Gavel, KeyRound, Megaphone, MonitorUp, Pause, ScrollText, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, Feather, FolderPlus, Gamepad2, Globe, Headphones, House, IdCard, ImagePlay, ImagePlus, Images, Keyboard, LayoutGrid, Leaf, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessageSquareText, MessagesSquare, MousePointerClick, Move, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Snowflake, Sparkles, SpellCheck, Sticker, StickyNote, Tag, Timer, Trash2, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Volume2, Vote, Webhook, ZoomIn, type LucideIcon } from "lucide-react";
+import { AtSign, AudioLines, BadgeCheck, Bot, CodeXml, ScanEye, Compass, Gavel, KeyRound, Link2, Megaphone, MonitorUp, Pause, ScrollText, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, Feather, FolderPlus, Gamepad2, Globe, Headphones, House, IdCard, ImagePlay, ImagePlus, Images, Keyboard, LayoutGrid, Leaf, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessageSquareText, MessagesSquare, MousePointerClick, Move, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Snowflake, Sparkles, SpellCheck, Sticker, StickyNote, Tag, Timer, Trash2, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Volume2, Vote, Webhook, ZoomIn, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -29,6 +29,9 @@ export const RELEASES: Release[] = [
     id: "2026-10-20.2",
     items: [
       { icon: Megaphone, title: "whatsNew.r202610202.priorityTitle", body: "whatsNew.r202610202.priorityBody" },
+      { icon: Link2, title: "whatsNew.r202610202.syncTitle", body: "whatsNew.r202610202.syncBody" },
+      { icon: ShieldCheck, title: "whatsNew.r202610202.permsTitle", body: "whatsNew.r202610202.permsBody" },
+      { icon: Move, title: "whatsNew.r202610202.dragTitle", body: "whatsNew.r202610202.dragBody" },
     ],
   },
   {

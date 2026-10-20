@@ -306,6 +306,7 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
     // In a box the pointer lands on rather than the picture (see Twemoji's
     // boxClassName), which EmojiDetails names; a copy takes the picture's alt text.
     case "emoji":
+      if (ctx.plainEmoji?.(node.id)) return <>{":" + node.name + ":"}</>;
       return (
         <span
           className={jumbo ? "md-emoji-box md-emoji-box-jumbo" : "md-emoji-box"}

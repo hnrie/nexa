@@ -66,6 +66,11 @@ export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: (
       const ch = await serversApi.createChannel(serverId, body);
       made = ch;
       upsert(ch);
+      // made in a private category, it starts private like it: its key is made now
+      if (ch.key_actions?.needs_own_key) {
+        await useKeys.getState().ensureConvKey(ch.id);
+        upsert(await serversApi.channels(serverId));
+      }
       if (priv) {
         // deny @everyone view, then give the channel its own key so members outside it never hold one
         const res = await serversApi.putOverwrite(ch.id, serverId, { type: "role", allow: "0", deny: permString(P.VIEW_CHANNEL) });

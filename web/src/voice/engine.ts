@@ -24,6 +24,7 @@ import { hasGuestKeys, openRelayedKeys, sealKeysForGuest } from "./guestKeys";
 import { LevelMeter, audioContext, getCamera, getMic, getScreen, holdAudio, lastInputChoice, sensitivityToThreshold, sentStream, type CameraFacing } from "./media";
 import { MeshTransport, type SignalPayload } from "./mesh";
 import { asGuest, iceConfig, me, sendState } from "./session";
+import { pushToTalkOn } from "./callPerms";
 import { SfuTransport } from "./sfu";
 import { type SharePlan, sharePlan } from "./shareQuality";
 import { makeDenoiser, prepareDenoiser, releaseDenoiser } from "./denoise";
@@ -189,7 +190,7 @@ function shouldTransmit(): boolean {
   // a moderator's deafen takes the voice away too, as it does the sound
   if (local.muted || local.deafened || mine?.server_mute || mine?.server_deaf) return false;
   if (session?.priorityHeld) return true;
-  if (useSettings.getState().settings.voice.mode === "ptt") return !!session?.pttHeld;
+  if (pushToTalkOn()) return !!session?.pttHeld;
   return true;
 }
 
@@ -198,7 +199,7 @@ function gateOpen(): boolean {
   const s = session;
   if (!s) return true;
   if (s.pttHeld || s.priorityHeld) return true;
-  if (useSettings.getState().settings.voice.mode === "ptt") return true;
+  if (pushToTalkOn()) return true;
   // The gate is worked by a timer, which a hidden page has throttled or
   // frozen; it stays open there rather than cut the speaker off mid-sentence.
   if (typeof document !== "undefined" && document.visibilityState === "hidden") return true;

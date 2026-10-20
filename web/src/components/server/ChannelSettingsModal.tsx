@@ -1,4 +1,4 @@
-import { Lock, Plus, Trash2, X } from "lucide-react";
+import { Link2, Link2Off, Lock, Plus, Trash2, X } from "lucide-react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -10,7 +10,7 @@ import { Select } from "@/components/common/Select";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
 import { memberName } from "@/lib/names";
-import { P, has, isPrivateChannel, parsePerm, permString, canManageRole, canActOn } from "@/lib/perms";
+import { P, has, isPrivateChannel, parsePerm, permString, canManageRole, canActOn, sameOverwrites } from "@/lib/perms";
 import { useChannels } from "@/stores/channels";
 import { useKeys } from "@/stores/keys";
 import { canI, rolesByPosition, useServers, channelPerms, memberHighest } from "@/stores/servers";
@@ -328,7 +328,10 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
   const [adding, setAdding] = useState<"role" | "member" | null>(null);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
-  const editable = canI(server, P.MANAGE_ROLES, channel.id) || canI(server, P.MANAGE_CHANNELS, channel.id);
+  // a channel's permissions are Manage Roles there, as the server holds them
+  const editable = canI(server, P.MANAGE_ROLES, channel.id);
+  const parent = useChannels((c) => (channel.parent_id ? c.byId[channel.parent_id] : undefined));
+  const synced = !!parent && sameOverwrites(channel.overwrites, parent.overwrites);
   // what the editor holds here, which is all they may set or clear; an
   // administrator holds everything
   const mine = server ? channelPerms(server, channel.id, server.me.user_id) : 0n;
@@ -384,6 +387,24 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
       setBusy(false);
     }
   };
+  // Sync Now: the channel takes its category's overwrites
+  const syncNow = async () => {
+    setBusy(true);
+    try {
+      const res = await serversApi.syncPermissions(channel.id);
+      await refresh();
+      if (res.key_actions?.needs_own_key) {
+        await useKeys.getState().ensureConvKey(channel.id);
+        await refresh();
+      }
+      setSelected(serverId);
+      toast(tr_("server.channelSettings.permissionsSynced"), "success");
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : tr_("server.channelSettings.couldNotSavePermissions"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
   const remove = async (targetId: string) => {
     setBusy(true);
     try {
@@ -426,6 +447,13 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
     <>
       <h2 className={st.title}>{tr_("server.channelSettings.permissions")}</h2>
       <p className={st.hint}>{channel.type === "category" ? tr_("server.channelSettings.permsCategory") : tr_("server.channelSettings.permsChannel")} {isPrivate ? tr_("server.channelSettings.permsPrivate") : ""}</p>
+      {parent && channel.type !== "category" ? (
+        <div className={s.syncBar} data-synced={synced} data-testid="perm-sync">
+          {synced ? <Link2 size={16} aria-hidden="true" /> : <Link2Off size={16} aria-hidden="true" />}
+          <span className={s.syncText}>{synced ? tr_("server.channelSettings.syncedWith", { category: parent.name }) : tr_("server.channelSettings.notSyncedWith", { category: parent.name })}</span>
+          {!synced && editable ? <button className={s.smallBtn} disabled={busy} onClick={unlessUnsaved(() => void syncNow())}>{tr_("server.channelSettings.syncNow")}</button> : null}
+        </div>
+      ) : null}
       <div className={s.permLayout}>
         <div className={s.permList}>
           <div className={s.permListHead}>
