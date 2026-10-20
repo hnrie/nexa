@@ -6606,6 +6606,15 @@
   "modals.createServer.templateSummary": "{channels} Kanäle, {categories} Kategorien, {roles} Rollen",
   "modals.createServer.templatesLookLike": "Vorlagen sehen aus wie https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN oder nur der Code.",
   "moderation.action.discoveryRestore": "Server wieder in Entdecken gezeigt",
+  "moderation.bots.disabled": "Sein Bot ist gesperrt oder ausgeschaltet, daher tut die App nichts.",
+  "moderation.bots.none": "Noch keine Apps.",
+  "moderation.bots.readsAll": "Liest jede Nachricht",
+  "moderation.bots.search": "Nach Name, Beschreibung, Bot, Inhaber oder ID suchen",
+  "moderation.bots.sortServers": "Meiste Server",
+  "moderation.bots.total": {
+    "one": "{count} App",
+    "other": "{count} Apps"
+  },
   "moderation.chat.caseStart": "Das ist die Unterhaltung mit {name} zu diesem Fall. Was du schreibst, erreicht die Person als Nexa, mit deinem Namen dabei, und nichts hier ist Ende-zu-Ende-verschlüsselt.",
   "moderation.chat.reportStart": "Das ist die Unterhaltung mit {name} zu der Meldung. Was du schreibst, erreicht die Person als Nexa, mit deinem Namen dabei, und nichts hier ist Ende-zu-Ende-verschlüsselt.",
   "moderation.field.serverDiscovery": "Eintrag in Entdecken",
@@ -6625,6 +6634,7 @@
     "one": "Auf {count} Server",
     "other": "Auf {count} Servern"
   },
+  "moderation.tabs.bots": "Bots",
   "nexa.chat.caseStart": "Das ist deine Unterhaltung mit dem Nexa-Team zu diesem Fall. Nachrichten und Dateien hier sind nicht Ende-zu-Ende-verschlüsselt: Das Team kann sie sehen.",
   "nexa.chat.fileTooBig": "Bilder dürfen bis zu 10 MB groß sein, Aufnahmen bis zu 50 MB.",
   "nexa.chat.notE2E": "Nicht Ende-zu-Ende-verschlüsselt: Das Nexa-Team kann diese Unterhaltung lesen.",

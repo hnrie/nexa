@@ -6372,6 +6372,14 @@
   "modals.createServer.templateSummary": "{channels}個のチャンネル、{categories}個のカテゴリー、{roles}個のロール",
   "modals.createServer.templatesLookLike": "テンプレートは https://discord.new/2TffvPucqHkN や https://discord.com/template/2TffvPucqHkN、またはコードのみの形です。",
   "moderation.action.discoveryRestore": "サーバーを「見つける」に再表示",
+  "moderation.bots.disabled": "ボットが禁止またはオフのため、このアプリは動作しません。",
+  "moderation.bots.none": "アプリはまだありません。",
+  "moderation.bots.readsAll": "すべてのメッセージを読む",
+  "moderation.bots.search": "名前、説明、ボット、オーナー、IDで検索",
+  "moderation.bots.sortServers": "サーバー数が多い順",
+  "moderation.bots.total": {
+    "other": "アプリ {count} 件"
+  },
   "moderation.chat.caseStart": "このケースについての {name} さんとの会話です。書いた内容はあなたの名前付きで Nexa として届き、ここではエンドツーエンド暗号化はされません。",
   "moderation.chat.reportStart": "{name} さんのレポートについての会話です。書いた内容はあなたの名前付きで Nexa として届き、ここではエンドツーエンド暗号化はされません。",
   "moderation.field.serverDiscovery": "「見つける」への掲載",
@@ -6390,6 +6398,7 @@
   "moderation.sheet.inServers": {
     "other": "{count} 個のサーバー"
   },
+  "moderation.tabs.bots": "ボット",
   "nexa.chat.caseStart": "このケースについての Nexa チームとの会話です。ここでのメッセージとファイルはエンドツーエンドで暗号化されていないため、チームが見ることができます。",
   "nexa.chat.fileTooBig": "画像は 10 MB まで、録画は 50 MB までです。",
   "nexa.chat.notE2E": "エンドツーエンドで暗号化されていません。Nexa チームはこの会話を読むことができます。",

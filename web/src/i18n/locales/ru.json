@@ -7047,6 +7047,17 @@
   "modals.createServer.templateSummary": "Каналов: {channels}, категорий: {categories}, ролей: {roles}",
   "modals.createServer.templatesLookLike": "Шаблоны выглядят как https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN или просто код.",
   "moderation.action.discoveryRestore": "Сервер снова показан в «Обзоре»",
+  "moderation.bots.disabled": "Его бот заблокирован или отключён, поэтому приложение ничего не делает.",
+  "moderation.bots.none": "Приложений пока нет.",
+  "moderation.bots.readsAll": "Читает все сообщения",
+  "moderation.bots.search": "Поиск по названию, описанию, боту, владельцу или ID",
+  "moderation.bots.sortServers": "Больше всего серверов",
+  "moderation.bots.total": {
+    "one": "{count} приложение",
+    "few": "{count} приложения",
+    "many": "{count} приложений",
+    "other": "{count} приложения"
+  },
   "moderation.chat.caseStart": "Это разговор с {name} об этом случае. То, что вы пишете, приходит от имени Nexa с вашим именем, и ничто здесь не защищено сквозным шифрованием.",
   "moderation.chat.reportStart": "Это разговор с {name} о его отчёте. То, что вы пишете, приходит от имени Nexa с вашим именем, и ничто здесь не защищено сквозным шифрованием.",
   "moderation.field.serverDiscovery": "Место в «Обзоре»",
@@ -7068,6 +7079,7 @@
     "many": "На {count} серверах",
     "other": "На {count} сервера"
   },
+  "moderation.tabs.bots": "Боты",
   "nexa.chat.caseStart": "Это ваш разговор с командой Nexa об этом случае. Сообщения и файлы здесь не защищены сквозным шифрованием: команда может их видеть.",
   "nexa.chat.fileTooBig": "Изображения могут весить до 10 МБ, записи до 50 МБ.",
   "nexa.chat.notE2E": "Без сквозного шифрования: команда Nexa может читать этот разговор.",

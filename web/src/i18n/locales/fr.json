@@ -6718,6 +6718,16 @@
   "modals.createServer.templateSummary": "{channels} salons, {categories} catégories, {roles} rôles",
   "modals.createServer.templatesLookLike": "Les modèles ressemblent à https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN ou simplement au code.",
   "moderation.action.discoveryRestore": "Serveur de nouveau affiché dans Découvrir",
+  "moderation.bots.disabled": "Son bot est banni ou désactivé, l’app ne fait donc rien.",
+  "moderation.bots.none": "Aucune app pour l’instant.",
+  "moderation.bots.readsAll": "Lit tous les messages",
+  "moderation.bots.search": "Rechercher par nom, description, bot, propriétaire ou ID",
+  "moderation.bots.sortServers": "Le plus de serveurs",
+  "moderation.bots.total": {
+    "one": "{count} app",
+    "many": "{count} apps",
+    "other": "{count} apps"
+  },
   "moderation.chat.caseStart": "Voici la conversation avec {name} à propos de ce dossier. Ce que tu écris lui parvient au nom de Nexa, avec ton nom affiché, et rien ici n'est chiffré de bout en bout.",
   "moderation.chat.reportStart": "Voici la conversation avec {name} à propos de son signalement. Ce que tu écris lui parvient au nom de Nexa, avec ton nom affiché, et rien ici n'est chiffré de bout en bout.",
   "moderation.field.serverDiscovery": "Référencement dans Découvrir",
@@ -6737,6 +6747,7 @@
     "one": "Sur {count} serveur",
     "other": "Sur {count} serveurs"
   },
+  "moderation.tabs.bots": "Bots",
   "nexa.chat.caseStart": "Voici ta conversation avec l'équipe Nexa à propos de ce dossier. Les messages et fichiers ici ne sont pas chiffrés de bout en bout : l'équipe peut les voir.",
   "nexa.chat.fileTooBig": "Les images peuvent faire jusqu'à 10 Mo et les enregistrements jusqu'à 50 Mo.",
   "nexa.chat.notE2E": "Pas de chiffrement de bout en bout : l'équipe Nexa peut lire cette conversation.",

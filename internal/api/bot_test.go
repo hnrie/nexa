@@ -444,3 +444,32 @@ func TestBotLinksGetPreviews(t *testing.T) {
 		t.Fatalf("the bot should see the preview as a link embed with its picture: %v", got["embeds"])
 	}
 }
+
+// The staff see apps in a Bots tab of their own, and their bots are not
+// listed with the people.
+func TestStaffListAppsApartFromPeople(t *testing.T) {
+	_, ts := newTestServer(t)
+	admin, _ := register(t, ts, "alice") // the first account is Nexa's admin
+	tok, _ := register(t, ts, "bob")
+	app, _ := makeApp(t, ts, tok, "Lab Bot")
+	res, body := do(t, ts, "GET", "/api/v1/moderation/apps", admin, nil)
+	if res.StatusCode != 200 {
+		t.Fatalf("apps: %d %v", res.StatusCode, body)
+	}
+	apps, _ := body["apps"].([]any)
+	if len(apps) != 1 || apps[0].(map[string]any)["id"] != app["id"] || body["total"] != float64(1) {
+		t.Fatalf("the staff should see bob's app: %v", body)
+	}
+	if people, _ := body["people"].(map[string]any); people[apps[0].(map[string]any)["owner_id"].(string)] == nil {
+		t.Fatalf("its owner comes along: %v", body["people"])
+	}
+	_, users := do(t, ts, "GET", "/api/v1/moderation/users", admin, nil)
+	for _, u := range users["users"].([]any) {
+		if u.(map[string]any)["id"] == app["id"] {
+			t.Fatal("the app's bot is listed with the people")
+		}
+	}
+	if res, _ := do(t, ts, "GET", "/api/v1/moderation/apps", tok, nil); res.StatusCode != 403 {
+		t.Fatalf("someone who is not staff: %d", res.StatusCode)
+	}
+}

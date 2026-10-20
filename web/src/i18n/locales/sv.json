@@ -6606,6 +6606,15 @@
   "modals.createServer.templateSummary": "{channels} kanaler, {categories} kategorier, {roles} roller",
   "modals.createServer.templatesLookLike": "Mallar ser ut som https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN eller bara koden.",
   "moderation.action.discoveryRestore": "Visade en server i Upptäck igen",
+  "moderation.bots.disabled": "Dess bott är bannad eller avstängd, så appen gör ingenting.",
+  "moderation.bots.none": "Inga appar än.",
+  "moderation.bots.readsAll": "Läser alla meddelanden",
+  "moderation.bots.search": "Sök på namn, beskrivning, bott, ägare eller ID",
+  "moderation.bots.sortServers": "Flest servrar",
+  "moderation.bots.total": {
+    "one": "{count} app",
+    "other": "{count} appar"
+  },
   "moderation.chat.caseStart": "Det här är konversationen med {name} om ärendet. Det du skriver når dem som Nexa, med ditt namn synligt, och inget här är end-to-end-krypterat.",
   "moderation.chat.reportStart": "Det här är konversationen med {name} om deras rapport. Det du skriver når dem som Nexa, med ditt namn synligt, och inget här är end-to-end-krypterat.",
   "moderation.field.serverDiscovery": "Listning i Upptäck",
@@ -6625,6 +6634,7 @@
     "one": "I {count} server",
     "other": "I {count} servrar"
   },
+  "moderation.tabs.bots": "Bottar",
   "nexa.chat.caseStart": "Det här är din konversation med Nexa-teamet om ärendet. Meddelanden och filer här är inte end-to-end-krypterade: teamet kan se dem.",
   "nexa.chat.fileTooBig": "Bilder får vara högst 10 MB och inspelningar högst 50 MB.",
   "nexa.chat.notE2E": "Inte end-to-end-krypterat: Nexa-teamet kan läsa konversationen.",

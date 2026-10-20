@@ -274,6 +274,25 @@ export interface ModServer {
 
 export type ServerSort = "newest" | "oldest" | "members" | "name";
 
+/** An app as the staff's Bots tab lists it. Its id is its bot's. */
+export interface ModApp {
+  id: Snowflake;
+  owner_id: Snowflake;
+  name: string;
+  description: string;
+  icon_id: Snowflake | null;
+  /** It has the Message Content intent: it reads every message it can see. */
+  reads_all: boolean;
+  /** Its bot's account is turned off, so the app does nothing. */
+  disabled: boolean;
+  public: boolean;
+  servers: number;
+  accounts: number;
+  created_at: number;
+}
+
+export type AppSort = "newest" | "oldest" | "servers" | "name";
+
 /** A sticker or emoji pack as the panel shows it: its first stickers in lists, all of them on its page. */
 export interface ModPack extends StickerPack {
   sticker_count: number;
@@ -406,6 +425,9 @@ export const moderation = {
   },
   servers(p: { q?: string; sort?: ServerSort; offset?: number; limit?: number }): Promise<{ servers: ModServer[]; people: People; total: number; has_more: boolean }> {
     return api.request("GET", "/moderation/servers", undefined, { query: { q: p.q?.trim() || undefined, sort: p.sort, offset: p.offset || undefined, limit: p.limit } });
+  },
+  apps(p: { q?: string; sort?: AppSort; offset?: number; limit?: number }): Promise<{ apps: ModApp[]; people: People; total: number; has_more: boolean }> {
+    return api.request("GET", "/moderation/apps", undefined, { query: { q: p.q?.trim() || undefined, sort: p.sort, offset: p.offset || undefined, limit: p.limit } });
   },
   server(id: Snowflake): Promise<{ server: ModServer; cases: StaffCase[]; people: People; emojis?: Emoji[]; packs?: ModPack[] }> {
     return api.request("GET", `/moderation/servers/${id}`);

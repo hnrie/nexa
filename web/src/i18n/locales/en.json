@@ -6606,6 +6606,15 @@
   "modals.createServer.templateSummary": "{channels} channels, {categories} categories, {roles} roles",
   "modals.createServer.templatesLookLike": "Templates look like https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN, or just the code.",
   "moderation.action.discoveryRestore": "Showed a server on Discover again",
+  "moderation.bots.disabled": "Its bot is banned or turned off, so the app does nothing.",
+  "moderation.bots.none": "No apps yet.",
+  "moderation.bots.readsAll": "Reads every message",
+  "moderation.bots.search": "Search by name, description, bot, owner or ID",
+  "moderation.bots.sortServers": "Most servers",
+  "moderation.bots.total": {
+    "one": "{count} app",
+    "other": "{count} apps"
+  },
   "moderation.chat.caseStart": "This is the conversation with {name} about this case. What you write reaches them as Nexa, with your name shown, and nothing here is end-to-end encrypted.",
   "moderation.chat.reportStart": "This is the conversation with {name} about their report. What you write reaches them as Nexa, with your name shown, and nothing here is end-to-end encrypted.",
   "moderation.field.serverDiscovery": "Discover listing",
@@ -6625,6 +6634,7 @@
     "one": "In {count} server",
     "other": "In {count} servers"
   },
+  "moderation.tabs.bots": "Bots",
   "nexa.chat.caseStart": "This is your conversation with the Nexa team about this case. Messages and files here aren't end-to-end encrypted: the team can see them.",
   "nexa.chat.fileTooBig": "Pictures can be up to 10 MB and recordings up to 50 MB.",
   "nexa.chat.notE2E": "Not end-to-end encrypted: the Nexa team can read this conversation.",

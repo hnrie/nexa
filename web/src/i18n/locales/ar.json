@@ -7452,6 +7452,19 @@
   "modals.createServer.templateSummary": "{channels} قنوات، {categories} فئات، {roles} أدوار",
   "modals.createServer.templatesLookLike": "تبدو القوالب مثل https://discord.new/2TffvPucqHkN أو https://discord.com/template/2TffvPucqHkN أو الرمز فقط.",
   "moderation.action.discoveryRestore": "أعاد إظهار خادم في الاستكشاف",
+  "moderation.bots.disabled": "بوته محظور أو متوقف، لذا لا يفعل التطبيق شيئًا.",
+  "moderation.bots.none": "لا توجد تطبيقات بعد.",
+  "moderation.bots.readsAll": "يقرأ كل رسالة",
+  "moderation.bots.search": "ابحث بالاسم أو الوصف أو البوت أو المالك أو المعرّف",
+  "moderation.bots.sortServers": "الأكثر خوادم",
+  "moderation.bots.total": {
+    "zero": "لا تطبيقات",
+    "one": "تطبيق واحد",
+    "two": "تطبيقان",
+    "few": "{count} تطبيقات",
+    "many": "{count} تطبيقًا",
+    "other": "{count} تطبيق"
+  },
   "moderation.chat.caseStart": "هذه المحادثة مع {name} بشأن هذه القضية. ما تكتبه يصلهم باسم Nexa مع ظهور اسمك، ولا شيء هنا مشفر تشفيرًا تامًا بين الطرفين.",
   "moderation.chat.reportStart": "هذه المحادثة مع {name} بشأن بلاغهم. ما تكتبه يصلهم باسم Nexa مع ظهور اسمك، ولا شيء هنا مشفر تشفيرًا تامًا بين الطرفين.",
   "moderation.field.serverDiscovery": "الإدراج في الاستكشاف",
@@ -7475,6 +7488,7 @@
     "many": "في {count} خادمًا",
     "other": "في {count} خادم"
   },
+  "moderation.tabs.bots": "البوتات",
   "nexa.chat.caseStart": "هذه محادثتك مع فريق Nexa بشأن هذه القضية. الرسائل والملفات هنا غير مشفرة تشفيرًا تامًا بين الطرفين: يستطيع الفريق رؤيتها.",
   "nexa.chat.fileTooBig": "يمكن أن يصل حجم الصور إلى 10 ميغابايت والتسجيلات إلى 50 ميغابايت.",
   "nexa.chat.notE2E": "غير مشفرة تشفيرًا تامًا بين الطرفين: يستطيع فريق Nexa قراءة هذه المحادثة.",

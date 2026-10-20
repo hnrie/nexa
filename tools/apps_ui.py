@@ -336,6 +336,17 @@ def pages(alice, bob, base, sid, general, app, failures, a_api=None, b_api=None)
         b.wait_for_url(here, timeout=10000)
         step(f"{size}: its Add App comes back to the channel")
 
+    def staff_bots():
+        # Nexa's staff (alice, the first account) see apps in a Bots tab of their own
+        a.goto(f"{base}/channels/@admin/bots", wait_until="networkidle")
+        alice.dismiss_whats_new()
+        a.wait_for_selector(f"[data-testid=bot-card][data-app='{app['id']}']", timeout=10000)
+        step(f"{size}: the staff's Bots tab lists the app with its owner")
+        alice.shot("staff-bots")
+        a.click(f"[data-testid=bot-card][data-app='{app['id']}'] [data-testid=bot-card-moderate]")
+        a.wait_for_url(f"**/channels/@admin/users/{app['id']}", timeout=10000)
+        step(f"{size}: Moderate opens the bot's own page")
+
     def server_apps():
         a.goto(f"{base}/channels/{sid}/{general}", wait_until="networkidle")
         alice.dismiss_whats_new()
@@ -390,7 +401,7 @@ def pages(alice, bob, base, sid, general, app, failures, a_api=None, b_api=None)
         step(f"{size}: Add App on the bot's card brings bob back to the channel he was in")
         bob.shot("add-app-back")
 
-    for name, fn, sess in [("portal", portal, alice), ("make-app", make_app, alice), ("consent", consent, bob), ("authorized", authorized, bob), ("share-warning", share_warning, bob), ("app-link", app_link, bob), ("server-apps", server_apps, alice), ("profile", profile_and_start, bob)]:
+    for name, fn, sess in [("portal", portal, alice), ("make-app", make_app, alice), ("consent", consent, bob), ("authorized", authorized, bob), ("share-warning", share_warning, bob), ("app-link", app_link, bob), ("staff-bots", staff_bots, alice), ("server-apps", server_apps, alice), ("profile", profile_and_start, bob)]:
         attempt(name, fn, sess)
 
 

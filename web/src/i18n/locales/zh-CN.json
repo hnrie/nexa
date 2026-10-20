@@ -6372,6 +6372,14 @@
   "modals.createServer.templateSummary": "{channels} 个频道，{categories} 个分类，{roles} 个身份组",
   "modals.createServer.templatesLookLike": "模板链接形如 https://discord.new/2TffvPucqHkN、https://discord.com/template/2TffvPucqHkN，或直接填写代码。",
   "moderation.action.discoveryRestore": "让服务器重新显示在发现中",
+  "moderation.bots.disabled": "它的机器人已被封禁或关闭，因此该应用不起作用。",
+  "moderation.bots.none": "还没有应用。",
+  "moderation.bots.readsAll": "读取每条消息",
+  "moderation.bots.search": "按名称、描述、机器人、所有者或 ID 搜索",
+  "moderation.bots.sortServers": "服务器最多",
+  "moderation.bots.total": {
+    "other": "{count} 个应用"
+  },
   "moderation.chat.caseStart": "这是与 {name} 关于此案件的对话。你写的内容会以 Nexa 的身份送达，并显示你的名字，这里的任何内容都没有端到端加密。",
   "moderation.chat.reportStart": "这是与 {name} 关于其报告的对话。你写的内容会以 Nexa 的身份送达，并显示你的名字，这里的任何内容都没有端到端加密。",
   "moderation.field.serverDiscovery": "发现上架",
@@ -6390,6 +6398,7 @@
   "moderation.sheet.inServers": {
     "other": "在 {count} 个服务器中"
   },
+  "moderation.tabs.bots": "机器人",
   "nexa.chat.caseStart": "这是你与 Nexa 团队关于此案件的对话。这里的消息和文件没有端到端加密：团队可以看到它们。",
   "nexa.chat.fileTooBig": "图片最大 10 MB，录像最大 50 MB。",
   "nexa.chat.notE2E": "未端到端加密：Nexa 团队可以阅读此对话。",

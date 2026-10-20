@@ -33,7 +33,7 @@ sealed interface Route {
         val tab: String get() = parts.firstOrNull()?.takeIf { it in TABS } ?: "users"
 
         companion object {
-            val TABS = listOf("users", "servers", "expressions", "cases", "bugs", "logs", "announcements")
+            val TABS = listOf("users", "bots", "servers", "expressions", "cases", "bugs", "logs", "announcements")
         }
     }
     /** `/channels/@discover`: servers anyone can join. */

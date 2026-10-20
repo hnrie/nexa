@@ -6606,6 +6606,15 @@
   "modals.createServer.templateSummary": "{channels} चैनल, {categories} श्रेणियाँ, {roles} भूमिकाएँ",
   "modals.createServer.templatesLookLike": "टेम्पलेट https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN या केवल कोड जैसे दिखते हैं।",
   "moderation.action.discoveryRestore": "सर्वर को खोजें में फिर से दिखाया",
+  "moderation.bots.disabled": "इसका बॉट प्रतिबंधित या बंद है, इसलिए ऐप कुछ नहीं करता।",
+  "moderation.bots.none": "अभी कोई ऐप नहीं।",
+  "moderation.bots.readsAll": "हर संदेश पढ़ता है",
+  "moderation.bots.search": "नाम, विवरण, बॉट, मालिक या ID से खोजें",
+  "moderation.bots.sortServers": "सबसे ज़्यादा सर्वर",
+  "moderation.bots.total": {
+    "one": "{count} ऐप",
+    "other": "{count} ऐप"
+  },
   "moderation.chat.caseStart": "यह इस मामले के बारे में {name} के साथ बातचीत है। आप जो लिखते हैं वह उन्हें Nexa के रूप में आपके नाम के साथ पहुँचता है, और यहाँ कुछ भी एंड-टू-एंड एन्क्रिप्टेड नहीं है।",
   "moderation.chat.reportStart": "यह {name} के साथ उनकी रिपोर्ट के बारे में बातचीत है। आप जो लिखते हैं वह उन्हें Nexa के रूप में आपके नाम के साथ पहुँचता है, और यहाँ कुछ भी एंड-टू-एंड एन्क्रिप्टेड नहीं है।",
   "moderation.field.serverDiscovery": "खोजें में सूची",
@@ -6625,6 +6634,7 @@
     "one": "{count} सर्वर पर",
     "other": "{count} सर्वर पर"
   },
+  "moderation.tabs.bots": "बॉट",
   "nexa.chat.caseStart": "यह इस मामले के बारे में Nexa टीम के साथ आपकी बातचीत है। यहाँ के संदेश और फ़ाइलें एंड-टू-एंड एन्क्रिप्टेड नहीं हैं: टीम उन्हें देख सकती है।",
   "nexa.chat.fileTooBig": "तस्वीरें 10 MB तक और रिकॉर्डिंग 50 MB तक हो सकती हैं।",
   "nexa.chat.notE2E": "एंड-टू-एंड एन्क्रिप्टेड नहीं: Nexa टीम यह बातचीत पढ़ सकती है।",

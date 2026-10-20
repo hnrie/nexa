@@ -181,6 +181,24 @@ data class ModMembership(
     val hasProfile get() = bio.isNotEmpty() || pronouns.isNotEmpty() || (widgets.isNotEmpty() && widgets != "[]")
 }
 
+/** An app as the staff's Bots tab lists it; its id is its bot's (web api/moderation.ts ModApp). */
+@Serializable
+data class ModApp(
+    val id: String,
+    @SerialName("owner_id") val ownerId: String = "",
+    val name: String = "",
+    val description: String = "",
+    @SerialName("icon_id") val iconId: String? = null,
+    /** It reads every message it can see. */
+    @SerialName("reads_all") val readsAll: Boolean = false,
+    /** Its bot is banned or turned off, so the app does nothing. */
+    val disabled: Boolean = false,
+    val public: Boolean = true,
+    val servers: Int = 0,
+    val accounts: Int = 0,
+    @SerialName("created_at") val createdAt: Long = 0,
+)
+
 /** A server as the panel shows it. */
 @Serializable
 data class ModServer(
@@ -435,6 +453,15 @@ object Moderation {
     }
 
     data class ServerPage(val servers: List<ModServer>, val total: Int, val more: Boolean)
+
+    data class AppPage(val apps: List<ModApp>, val total: Int, val more: Boolean)
+
+    /** Every app on the instance, for the staff's Bots tab (GET /moderation/apps). */
+    suspend fun apps(q: String, sort: String, offset: Int, limit: Int): AppPage {
+        val o = obj(Nexa.api.get("/moderation/apps" + q("q" to q.trim(), "sort" to sort, "offset" to offset.takeIf { it > 0 }, "limit" to limit)))
+        peopleIn(o)
+        return AppPage(list(o, "apps", ModApp.serializer()), (o["total"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0, bool(o, "has_more"))
+    }
 
     suspend fun servers(q: String, sort: String, offset: Int, limit: Int): ServerPage {
         val o = obj(Nexa.api.get("/moderation/servers" + q("q" to q.trim(), "sort" to sort, "offset" to offset.takeIf { it > 0 }, "limit" to limit)))

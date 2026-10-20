@@ -1346,8 +1346,9 @@ func (s *Store) ModUsers(ctx context.Context, f ModUserFilter) ([]*ModUser, erro
 	if f.Limit <= 0 || f.Limit > 120 {
 		f.Limit = 60
 	}
+	// apps' bots are in the Bots tab, not with the people
 	where := []string{`u.flags & ? = 0`}
-	args := []any{f.Now, f.Now, FlagDeleted | NotPeople}
+	args := []any{f.Now, f.Now, FlagDeleted | NotPeople | FlagBot}
 	switch f.Show {
 	case "muted":
 		where = append(where, `mr.case_id IS NOT NULL`)

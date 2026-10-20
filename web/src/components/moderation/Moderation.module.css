@@ -1675,3 +1675,6 @@ td.logReason {
     display: block;
   }
 }
+
+/* the Bots tab: an app that reads every message it can see says so on its card */
+.readsAll { align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--text-warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }

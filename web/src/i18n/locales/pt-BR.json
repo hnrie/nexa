@@ -6719,6 +6719,16 @@
   "modals.createServer.templateSummary": "{channels} canais, {categories} categorias, {roles} cargos",
   "modals.createServer.templatesLookLike": "Os modelos se parecem com https://discord.new/2TffvPucqHkN, https://discord.com/template/2TffvPucqHkN ou apenas o código.",
   "moderation.action.discoveryRestore": "Voltou a mostrar um servidor em Descobrir",
+  "moderation.bots.disabled": "O bot está banido ou desligado, então o app não faz nada.",
+  "moderation.bots.none": "Ainda não há apps.",
+  "moderation.bots.readsAll": "Lê todas as mensagens",
+  "moderation.bots.search": "Pesquisar por nome, descrição, bot, dono ou ID",
+  "moderation.bots.sortServers": "Mais servidores",
+  "moderation.bots.total": {
+    "one": "{count} app",
+    "many": "{count} apps",
+    "other": "{count} apps"
+  },
   "moderation.chat.caseStart": "Esta é a conversa com {name} sobre este caso. O que você escrever chega como Nexa, com o seu nome visível, e nada aqui tem criptografia de ponta a ponta.",
   "moderation.chat.reportStart": "Esta é a conversa com {name} sobre o relatório. O que você escrever chega como Nexa, com o seu nome visível, e nada aqui tem criptografia de ponta a ponta.",
   "moderation.field.serverDiscovery": "Divulgação em Descobrir",
@@ -6738,6 +6748,7 @@
     "one": "Em {count} servidor",
     "other": "Em {count} servidores"
   },
+  "moderation.tabs.bots": "Bots",
   "nexa.chat.caseStart": "Esta é a sua conversa com a equipe do Nexa sobre este caso. As mensagens e arquivos aqui não têm criptografia de ponta a ponta: a equipe pode vê-los.",
   "nexa.chat.fileTooBig": "As imagens podem ter até 10 MB e as gravações até 50 MB.",
   "nexa.chat.notE2E": "Sem criptografia de ponta a ponta: a equipe do Nexa pode ler esta conversa.",

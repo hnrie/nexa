@@ -99,6 +99,7 @@ fun AdminPanel(route: Route.Admin) {
     val tab = route.tab
     val tabs = listOf(
         PanelTab("users", t("moderation.tabs.users"), "LayoutGrid"),
+        PanelTab("bots", t("moderation.tabs.bots"), "Bot"),
         PanelTab("servers", t("moderation.tabs.servers"), "Server"),
         PanelTab("expressions", t("moderation.tabs.expressions"), "Sticker"),
         // what waits on the staff and is new to this person; reading it, or Mark as Read, takes it off
@@ -126,6 +127,7 @@ fun AdminPanel(route: Route.Admin) {
             val parts = route.parts
             when (tab) {
                 "users" -> if (parts.size >= 2) PersonPage(parts[1], cases = parts.getOrNull(2) == "cases", caseId = parts.getOrNull(3)) else UsersTab()
+                "bots" -> BotsTab()
                 "servers" -> if (parts.size >= 2) StaffServerPage(parts[1]) else ServersTab()
                 "expressions" -> when {
                     parts.getOrNull(1) == "packs" && parts.size >= 3 -> PackPage(parts[2])
