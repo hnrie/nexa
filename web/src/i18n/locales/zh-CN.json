@@ -6463,6 +6463,9 @@
   "settings.chat.typingChannels": "在频道上显示输入状态",
   "settings.chat.typingChannelsHint": "有人在服务器频道里输入时，频道旁会显示小点。",
   "settings.chat.typingHeading": "输入状态",
+  "settings.voice.priorityKey": "优先发言人按键",
+  "settings.voice.priorityKeyHint": "在你的身份组允许的语音频道中按住它，即可作为优先发言人说话。你说话时其他人的音量会降低。按退格键清除。",
+  "settings.voice.priorityKeyNone": "未设置",
   "threads.card.count": {
     "other": "{count} 条消息"
   },
@@ -6561,5 +6564,7 @@
   "whatsNew.r20261019.readingBody": "应用只读取提及它、回复它或发给它的消息，这些消息由你的应用专门为它密封。读取所有消息的应用会在被添加之前说明这一点。",
   "whatsNew.r20261019.readingTitle": "应用只读取发给它们的内容",
   "whatsNew.r20261020.privacyBody": "出于安全考虑，Nexa 现在会保存你的账号登录时使用的 IP 地址，以便管理团队发现为规避封禁而注册的账号。管理面板永远不会显示地址本身。详情请见设置中“关于”里的隐私政策。",
-  "whatsNew.r20261020.privacyTitle": "隐私政策已更新"
+  "whatsNew.r20261020.privacyTitle": "隐私政策已更新",
+  "whatsNew.r202610202.priorityBody": "拥有优先发言人权限的身份组在语音频道中按住按键，即可盖过其他人被听到。在设置的语音与视频中设置按键。",
+  "whatsNew.r202610202.priorityTitle": "优先发言人"
 }

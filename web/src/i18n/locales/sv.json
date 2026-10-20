@@ -6699,6 +6699,9 @@
   "settings.chat.typingChannels": "Visa skrivande på kanaler",
   "settings.chat.typingChannelsHint": "Prickar visas bredvid en servers kanaler medan någon skriver i dem.",
   "settings.chat.typingHeading": "Skrivindikatorer",
+  "settings.voice.priorityKey": "Tangent för prioriterad talare",
+  "settings.voice.priorityKeyHint": "Håll in den för att tala som prioriterad talare i röstkanaler där din roll tillåter det. Alla andra sänks medan du pratar. Backsteg rensar den.",
+  "settings.voice.priorityKeyNone": "Inte vald",
   "threads.card.count": {
     "one": "{count} meddelande",
     "other": "{count} meddelanden"
@@ -6798,5 +6801,7 @@
   "whatsNew.r20261019.readingBody": "En app läser meddelanden som nämner den, svarar den eller skickas till den, förseglade för den av din app. En app som läser alla meddelanden säger det innan någon lägger till den.",
   "whatsNew.r20261019.readingTitle": "Appar läser bara det som är menat för dem",
   "whatsNew.r20261020.privacyBody": "Av säkerhetsskäl sparar Nexa nu IP-adresserna ditt konto loggar in från, så att teamet kan hitta konton som skapats för att komma runt en avstängning. Modereringspanelen visar aldrig själva adresserna. Detaljerna finns i integritetspolicyn under Inställningar, Om.",
-  "whatsNew.r20261020.privacyTitle": "Uppdaterad integritetspolicy"
+  "whatsNew.r20261020.privacyTitle": "Uppdaterad integritetspolicy",
+  "whatsNew.r202610202.priorityBody": "Roller med Prioriterad talare kan hålla in sin tangent i en röstkanal för att höras över alla andra. Välj tangenten i Inställningar, Röst och video.",
+  "whatsNew.r202610202.priorityTitle": "Prioriterad talare"
 }

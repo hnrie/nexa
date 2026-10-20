@@ -45,8 +45,10 @@ type voiceStatePayload struct {
 	// Suppress is set when the channel denies Speak. server_mute carries it
 	// too, for apps that know nothing else; this says which of the two it is,
 	// so a moderator's menu does not offer to lift a mute nobody gave.
-	Suppress bool  `json:"suppress,omitempty"`
-	JoinedAt int64 `json:"joined_at"`
+	Suppress bool `json:"suppress,omitempty"`
+	// PrioritySpeaker: talking as Priority Speaker now; the others are turned down while they are heard.
+	PrioritySpeaker bool  `json:"priority_speaker,omitempty"`
+	JoinedAt        int64 `json:"joined_at"`
 	// CallSince is when the call in this channel began, the same for everyone
 	// in it, so the apps can show how long it has been going.
 	CallSince int64 `json:"call_since,omitempty"`
@@ -81,7 +83,7 @@ type guestMark struct {
 
 func statePayload(st voice.State) voiceStatePayload {
 	ch := st.ChannelID
-	out := voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, Suppress: st.Suppress, JoinedAt: st.JoinedAt, CallSince: st.CallSince, Media: st.Tracks.Tags(), Codecs: st.Codecs,
+	out := voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, Suppress: st.Suppress, JoinedAt: st.JoinedAt, CallSince: st.CallSince, Media: st.Tracks.Tags(), Codecs: st.Codecs, PrioritySpeaker: st.Priority,
 		User: &callUser{ID: st.UserID, DisplayName: st.Name, AvatarID: st.AvatarID}}
 	if st.Guest {
 		out.User.Flags = store.FlagGuest
@@ -229,6 +231,9 @@ type voiceStateReq struct {
 	SelfDeaf  bool    `json:"self_deaf"`
 	Video     bool    `json:"video"`
 	Streaming bool    `json:"streaming"`
+	// Priority is set while the person holds their Priority Speaker key; it
+	// counts only in a server's channel where they have Priority Speaker.
+	Priority bool `json:"priority"`
 	// Resume is set when a client rejoins the call it was in after a
 	// reconnect; that is not a new call and deserves no new call message.
 	Resume bool `json:"resume"`
@@ -296,6 +301,8 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 			voiceErr(c, code, msg)
 			return
 		}
+		// Priority Speaker is a server's permission: never in a DM call or for a guest
+		priority := req.Priority && guest == nil && ch.ServerID != nil && p.Has(perms.PrioritySpeaker)
 		// guests waiting in a call do not make it one: the first account to join still starts it
 		wasEmpty := s.Voice.MemberCount(ch.ID) == 0
 		// Only a device rejoining the call it was in (after a reconnect or a
@@ -341,6 +348,7 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 					// removes. What Resume gave us is the last real thing.
 					if fresh, ok := s.Voice.Update(me.ID, func(x *voice.State) {
 						x.SelfMute, x.SelfDeaf, x.Video, x.Streaming = req.SelfMute, req.SelfDeaf, req.Video, req.Streaming
+						x.Priority = priority
 						x.Codecs = callCodecs(req.Codecs)
 					}); ok {
 						st = fresh
@@ -361,7 +369,7 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 				keep = true
 			}
 		}
-		next := voice.State{UserID: me.ID, ChannelID: ch.ID, SessionID: c.SessionID(), ConnID: c.ID(), SelfMute: req.SelfMute, SelfDeaf: req.SelfDeaf, Video: req.Video, Streaming: req.Streaming, Suppress: !p.Has(perms.Speak), Name: me.DisplayName, AvatarID: me.AvatarID, Codecs: callCodecs(req.Codecs)}
+		next := voice.State{Priority: priority, UserID: me.ID, ChannelID: ch.ID, SessionID: c.SessionID(), ConnID: c.ID(), SelfMute: req.SelfMute, SelfDeaf: req.SelfDeaf, Video: req.Video, Streaming: req.Streaming, Suppress: !p.Has(perms.Speak), Name: me.DisplayName, AvatarID: me.AvatarID, Codecs: callCodecs(req.Codecs)}
 		if guest != nil {
 			next.Guest, next.GuestEpoch = true, guest.Epoch
 		} else if haveFlags {
@@ -921,7 +929,7 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if dest != nil && dest.ID != cur.ID {
 		if latest, ok := s.Voice.Get(uid); ok && latest.ChannelID == cur.ID {
-			old, _ := s.Voice.Join(voice.State{UserID: uid, ChannelID: dest.ID, SessionID: latest.SessionID, ConnID: latest.ConnID, SelfMute: latest.SelfMute, SelfDeaf: latest.SelfDeaf, Video: latest.Video, Streaming: latest.Streaming, JoinedAt: latest.JoinedAt, Suppress: !destPerms.Has(perms.Speak), Name: latest.Name, AvatarID: latest.AvatarID}, true)
+			old, _ := s.Voice.Join(voice.State{UserID: uid, ChannelID: dest.ID, SessionID: latest.SessionID, ConnID: latest.ConnID, SelfMute: latest.SelfMute, SelfDeaf: latest.SelfDeaf, Video: latest.Video, Streaming: latest.Streaming, JoinedAt: latest.JoinedAt, Suppress: !destPerms.Has(perms.Speak), Priority: latest.Priority && destPerms.Has(perms.PrioritySpeaker), Name: latest.Name, AvatarID: latest.AvatarID}, true)
 			if old != nil {
 				// what they pulled in the old channel stops; their client makes a new session
 				s.closeSFUSession(old.SFUSession)

@@ -1280,6 +1280,10 @@ export class SfuTransport implements VoiceTransport {
     this.playback.setModMuted(userId, on);
   }
 
+  setPriority(userId: string, on: boolean): void {
+    this.playback.setPriority(userId, on);
+  }
+
   setMasterVolume(pct: number): void {
     this.playback.setMasterVolume(pct);
   }

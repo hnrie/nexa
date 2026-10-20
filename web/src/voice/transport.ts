@@ -82,6 +82,8 @@ export interface VoiceTransport {
   setOutputMuted(on: boolean): void;
   /** Keeps someone a moderator muted or deafened silent here, whatever their app sends. */
   setModMuted(userId: string, on: boolean): void;
+  /** Someone talking as Priority Speaker, who turns everyone else down while heard. */
+  setPriority(userId: string, on: boolean): void;
   setMasterVolume(pct: number): void;
   setOutputDevice(deviceId: string | null): Promise<void>;
   stats(): Promise<{ rtt: number; loss: number }>;

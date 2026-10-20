@@ -428,6 +428,8 @@ export interface VoiceState {
   server_deaf: boolean;
   /** The channel denies Speak: server_mute is set for that, not for anything a moderator did. */
   suppress?: boolean;
+  /** Talking as Priority Speaker now: everyone else is turned down while they are heard (absent from older servers). */
+  priority_speaker?: boolean;
   joined_at: number;
   /** When the call in this channel began, the same for everyone in it (absent from older servers). */
   call_since?: number;

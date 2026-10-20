@@ -190,7 +190,10 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
     let siblings: Channel[];
     let index: number;
     if (target.type === "category") {
-      parent = at.where === "into" ? target.id : null;
+      // the line above a category's head is the end of whatever comes before it:
+      // the category above, or the channels outside any category when it is the first
+      const ci = tree.categories.findIndex((c) => c.category.id === target.id);
+      parent = at.where === "into" ? target.id : ci > 0 ? (tree.categories[ci - 1]?.category.id ?? null) : null;
       siblings = parent ? (tree.categories.find((c) => c.category.id === parent)?.children ?? []) : tree.loose;
       index = at.where === "into" ? 0 : siblings.length;
     } else {

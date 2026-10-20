@@ -44,6 +44,8 @@ export interface VoiceSettings {
   outputVolume: number;
   mode: "vad" | "ptt";
   pttKey: string;
+  /** The key held to talk as Priority Speaker, in a server's voice channel where that is allowed; empty for none. */
+  priorityKey: string;
   sensitivity: number;
   autoSensitivity: boolean;
   noiseMode: NoiseMode;
@@ -263,6 +265,7 @@ export const DEFAULT_SETTINGS: Settings = {
     outputVolume: 100,
     mode: "vad",
     pttKey: "`",
+    priorityKey: "",
     sensitivity: -50,
     autoSensitivity: true,
     noiseMode: "enhanced",

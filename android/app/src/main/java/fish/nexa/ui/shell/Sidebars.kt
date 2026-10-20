@@ -474,6 +474,7 @@ private fun VoiceParticipantRow(serverId: String, v: fish.nexa.net.VoiceState) {
         }
         val modMute = fish.nexa.ui.voice.VoiceModeration.modMuted(v)
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (v.prioritySpeaker) Icon("Megaphone", c.textMuted, size = 14.dp)
             if (v.video) Icon("Video", c.textMuted, size = 14.dp)
             if (v.streaming) Icon("MonitorUp", c.textMuted, size = 14.dp)
             // a moderator's mute or deafen in red, wherever the person is shown

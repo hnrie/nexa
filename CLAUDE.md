@@ -562,6 +562,17 @@ taking the call). On the web the moderator's buttons are `components/voice/voice
 call's menus in `components/voice/callMenus.ts`; dragging people between channels is
 `stores/voiceDrag.ts`. On Android it is `ui/voice/VoiceModeration.kt`.
 
+Priority Speaker: while someone holds the Priority Speaker key (the account's voice setting
+`priorityKey`, recorded in Settings, Voice & Video; not offered on touch screens, where nothing is
+held) their mic opens as with push to talk and their voice state op carries `priority: true`. The
+server keeps it only in a server's channel where they have Priority Speaker and never for a guest
+(`voice.State.Priority`), and every voice state then says `priority_speaker`. Listeners turn
+everyone else, voices and share sound, down to `PRIORITY_DUCK` (a quarter) while a priority
+speaker is heard (web `voice/playback.ts`, Android `voice/Playback.kt`), and a megaphone shows by
+their name in the sidebar and on their call tile. Android only listens: it has no key to hold. Use
+Soundboard (1 << 42) stays in the permission maths for the bot API and Discord templates, but
+Nexa has no soundboard and the role editors do not offer it.
+
 How a screen share is sent was measured through the SFU with `tools/share_quality.py`, and the
 findings decide it (web `voice/media.ts`, `shareQuality.ts`, `shareAdapt.ts`; Android `VideoCap`,
 `ShareAdapt`). A share has a mode, picked in the share dialog (web `ShareScreenModal.tsx`, Android

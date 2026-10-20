@@ -42,6 +42,7 @@ export const P = {
   USE_EXTERNAL_STICKERS: 1n << 37n,
   SEND_MESSAGES_IN_THREADS: 1n << 38n,
   MODERATE_MEMBERS: 1n << 40n,
+  /** Kept for the bot API and Discord templates only: Nexa has no soundboard, so the role editor does not offer it. */
   USE_SOUNDBOARD: 1n << 42n,
   CREATE_EXPRESSIONS: 1n << 43n,
   CREATE_POLLS: 1n << 49n,
@@ -115,7 +116,6 @@ export function permGroups(): { group: string; items: { name: PermName; label: s
       { name: "CONNECT", label: t("perms.connect"), description: t("perms.allowsMembersToJoinVoiceChannels"), channel: ["voice"] },
       { name: "SPEAK", label: t("perms.speak"), description: t("perms.allowsMembersToTalkInVoice"), channel: ["voice"] },
       { name: "STREAM", label: t("perms.video"), description: t("perms.allowsMembersToShareTheirVideo"), channel: ["voice"] },
-      { name: "USE_SOUNDBOARD", label: t("perms.useSoundboard"), description: t("perms.allowsMembersToSendSoundsFrom"), channel: ["voice"] },
       { name: "USE_VAD", label: t("perms.useVoiceActivity"), description: t("perms.allowsMembersToSpeakInVoice"), channel: ["voice"] },
       { name: "PRIORITY_SPEAKER", label: t("perms.prioritySpeaker"), description: t("perms.allowsMembersToBeMoreEasily"), channel: ["voice"] },
       { name: "MUTE_MEMBERS", label: t("perms.muteMembers"), description: t("perms.allowsMembersToMuteOtherMembers"), channel: ["voice"] },

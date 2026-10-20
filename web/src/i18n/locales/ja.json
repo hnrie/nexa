@@ -6463,6 +6463,9 @@
   "settings.chat.typingChannels": "チャンネルに入力中を表示する",
   "settings.chat.typingChannelsHint": "誰かが入力している間、サーバーのチャンネルの横に点が表示されます。",
   "settings.chat.typingHeading": "入力中の表示",
+  "settings.voice.priorityKey": "優先スピーカーキー",
+  "settings.voice.priorityKeyHint": "ロールで許可されたボイスチャンネルで、押している間は優先スピーカーとして話せます。話している間はほかの人の音量が下がります。Backspaceで解除します。",
+  "settings.voice.priorityKeyNone": "未設定",
   "threads.card.count": {
     "other": "{count} 件のメッセージ"
   },
@@ -6561,5 +6564,7 @@
   "whatsNew.r20261019.readingBody": "アプリが読むのは、メンション、返信、アプリに送られたメッセージで、あなたのアプリがアプリ用に封をしたものです。すべてのメッセージを読むアプリは、追加される前にそのことを示します。",
   "whatsNew.r20261019.readingTitle": "アプリが読むのは宛てられたものだけ",
   "whatsNew.r20261020.privacyBody": "セキュリティのため、Nexa はアカウントがサインインした IP アドレスを保存するようになりました。BAN を逃れるために作られたアカウントをスタッフが見つけられるようにするためです。モデレーションパネルにアドレスそのものが表示されることはありません。詳しくは設定の「概要」にあるプライバシーポリシーをご覧ください。",
-  "whatsNew.r20261020.privacyTitle": "プライバシーポリシーを更新しました"
+  "whatsNew.r20261020.privacyTitle": "プライバシーポリシーを更新しました",
+  "whatsNew.r202610202.priorityBody": "優先スピーカー権限のあるロールは、ボイスチャンネルでキーを押している間ほかの人より聞こえやすくなります。キーは設定の音声・ビデオで選べます。",
+  "whatsNew.r202610202.priorityTitle": "優先スピーカー"
 }

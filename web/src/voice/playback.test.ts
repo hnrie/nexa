@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { Playback } from "./playback";
+import { PRIORITY_DUCK, Playback } from "./playback";
 
 const gains: { gain: { value: number } }[] = [];
+let level = 0;
 vi.mock("./media", () => {
   const node = () => ({ connect: (n: unknown) => n, disconnect: () => {} });
   return {
@@ -16,7 +17,7 @@ vi.mock("./media", () => {
     }),
     LevelMeter: class {
       level() {
-        return 0;
+        return level;
       }
       close() {}
     },
@@ -92,5 +93,35 @@ describe("screen share sound", () => {
     p.setHeld("u1", "voice", true);
     p.attachVoice("u1", new FakeStream() as unknown as MediaStream);
     expect(gains[2]!.gain.value).toBeCloseTo(1.5);
+  });
+});
+
+describe("priority speaker", () => {
+  beforeAll(() => {
+    (globalThis as unknown as { MediaStream: unknown }).MediaStream = FakeStream;
+    HTMLMediaElement.prototype.play = () => Promise.resolve();
+  });
+
+  it("turns everyone else down while a priority speaker is heard", () => {
+    vi.useFakeTimers();
+    gains.length = 0;
+    level = 0;
+    const p = new Playback(() => {});
+    p.attachVoice("loud", new FakeStream() as unknown as MediaStream);
+    p.attachVoice("other", new FakeStream() as unknown as MediaStream);
+    const [loud, other] = gains;
+    p.setPriority("loud", true);
+    expect(other!.gain.value).toBe(1);
+    // both meters hear sound: the priority speaker is speaking, so the other is turned down
+    level = 1;
+    vi.advanceTimersByTime(300);
+    expect(loud!.gain.value).toBe(1);
+    expect(other!.gain.value).toBeCloseTo(PRIORITY_DUCK);
+    // letting go of the key brings them back
+    p.setPriority("loud", false);
+    expect(other!.gain.value).toBe(1);
+    p.close();
+    level = 0;
+    vi.useRealTimers();
   });
 });

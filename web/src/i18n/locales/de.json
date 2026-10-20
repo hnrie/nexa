@@ -6699,6 +6699,9 @@
   "settings.chat.typingChannels": "Tippen an Kanälen zeigen",
   "settings.chat.typingChannelsHint": "Neben den Kanälen eines Servers erscheinen Punkte, solange jemand darin schreibt.",
   "settings.chat.typingHeading": "Tipp-Anzeigen",
+  "settings.voice.priorityKey": "Taste für Prioritätssprecher",
+  "settings.voice.priorityKeyHint": "Halte sie gedrückt, um in Sprachkanälen, in denen deine Rolle es erlaubt, als Prioritätssprecher zu reden. Alle anderen werden leiser, während du sprichst. Rücktaste entfernt sie.",
+  "settings.voice.priorityKeyNone": "Nicht festgelegt",
   "threads.card.count": {
     "one": "{count} Nachricht",
     "other": "{count} Nachrichten"
@@ -6798,5 +6801,7 @@
   "whatsNew.r20261019.readingBody": "Eine App liest Nachrichten, die sie erwähnen, ihr antworten oder an sie gehen, von deiner App für sie versiegelt. Eine App, die jede Nachricht liest, sagt das, bevor jemand sie hinzufügt.",
   "whatsNew.r20261019.readingTitle": "Apps lesen nur, was für sie bestimmt ist",
   "whatsNew.r20261020.privacyBody": "Aus Sicherheitsgründen speichert Nexa jetzt die IP-Adressen, von denen sich dein Konto anmeldet, damit das Team Konten erkennt, die eine Sperre umgehen sollen. Das Moderationspanel zeigt die Adressen selbst nie an. Details stehen in der Datenschutzerklärung unter Einstellungen, Über.",
-  "whatsNew.r20261020.privacyTitle": "Aktualisierte Datenschutzerklärung"
+  "whatsNew.r20261020.privacyTitle": "Aktualisierte Datenschutzerklärung",
+  "whatsNew.r202610202.priorityBody": "Rollen mit Prioritätssprecher können in einem Sprachkanal ihre Taste gedrückt halten, um über allen anderen gehört zu werden. Lege die Taste unter Einstellungen, Sprache & Video fest.",
+  "whatsNew.r202610202.priorityTitle": "Prioritätssprecher"
 }

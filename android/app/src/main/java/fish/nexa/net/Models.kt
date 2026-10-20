@@ -525,6 +525,8 @@ data class VoiceState(
     @SerialName("server_deaf") val serverDeaf: Boolean = false,
     /** The channel denies Speak: serverMute is set for that, not for anything a moderator did. */
     val suppress: Boolean = false,
+    /** Talking as Priority Speaker now: everyone else is turned down while they are heard. */
+    @SerialName("priority_speaker") val prioritySpeaker: Boolean = false,
     @SerialName("joined_at") val joinedAt: Long = 0,
     /** When the call in this channel began, the same for everyone in it (0 from older servers). */
     @SerialName("call_since") val callSince: Long = 0,

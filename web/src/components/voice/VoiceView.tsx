@@ -19,6 +19,7 @@ import {
   VideoOff,
   Volume2,
   VolumeX,
+  Megaphone,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -813,6 +814,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           {t.kind !== "screen" && isGuest(users[t.userId]) ? <span className={s.guestTag}>{tr_("voice.voiceParticipants.guest")}</span> : null}
           {/* their server tag, as beside their name everywhere else (none on a guest's page, which knows nobody) */}
           {t.kind !== "screen" && t.kind !== "ringing" && !guest && !isGuest(users[t.userId]) ? <UserTag userId={t.userId} size="sm" /> : null}
+          {t.kind !== "screen" && vs?.priority_speaker ? <Megaphone size={14} className={s.tileIcon} aria-label={tr_("perms.prioritySpeaker")} /> : null}
           {t.kind !== "screen" && (vs?.self_mute || vs?.server_mute || (t.me && micBlocked)) ? <MicOff size={14} className={s.tileIcon} data-server={!!vs?.server_mute && !vs.suppress} /> : null}
           {t.kind !== "screen" && (vs?.self_deaf || vs?.server_deaf) ? <HeadphoneOff size={14} className={s.tileIcon} data-server={!!vs?.server_deaf} /> : null}
           {(t.kind === "screen" ? streamMutes[t.userId] : localMutes[t.userId]) ? <VolumeX size={14} className={s.tileIcon} /> : null}

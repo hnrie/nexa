@@ -6463,6 +6463,9 @@
   "settings.chat.typingChannels": "채널에 입력 중 표시",
   "settings.chat.typingChannelsHint": "누군가 입력하는 동안 서버 채널 옆에 점이 표시돼요.",
   "settings.chat.typingHeading": "입력 중 표시",
+  "settings.voice.priorityKey": "우선 발언자 키",
+  "settings.voice.priorityKeyHint": "역할이 허용하는 음성 채널에서 누르고 있으면 우선 발언자로 말합니다. 말하는 동안 다른 사람의 소리가 줄어듭니다. Backspace로 지웁니다.",
+  "settings.voice.priorityKeyNone": "설정 안 됨",
   "threads.card.count": {
     "other": "메시지 {count}개"
   },
@@ -6561,5 +6564,7 @@
   "whatsNew.r20261019.readingBody": "앱은 자신을 멘션하거나 답장하거나 자신에게 보낸 메시지만 읽고, 그 메시지는 내 앱이 앱을 위해 봉인해요. 모든 메시지를 읽는 앱은 추가되기 전에 그 사실을 알려요.",
   "whatsNew.r20261019.readingTitle": "앱은 자신에게 온 것만 읽어요",
   "whatsNew.r20261020.privacyBody": "보안을 위해 Nexa는 이제 계정이 로그인한 IP 주소를 보관합니다. 차단을 피하려고 만든 계정을 운영진이 찾을 수 있도록 하기 위해서입니다. 관리 패널에는 주소 자체가 표시되지 않습니다. 자세한 내용은 설정, 정보의 개인정보 처리방침에 있습니다.",
-  "whatsNew.r20261020.privacyTitle": "개인정보 처리방침 업데이트"
+  "whatsNew.r20261020.privacyTitle": "개인정보 처리방침 업데이트",
+  "whatsNew.r202610202.priorityBody": "우선 발언자 권한이 있는 역할은 음성 채널에서 키를 누르고 있으면 다른 사람보다 크게 들립니다. 키는 설정, 음성 및 비디오에서 정합니다.",
+  "whatsNew.r202610202.priorityTitle": "우선 발언자"
 }

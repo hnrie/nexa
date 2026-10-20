@@ -6812,6 +6812,9 @@
   "settings.chat.typingChannels": "Afficher la saisie sur les salons",
   "settings.chat.typingChannelsHint": "Des points apparaissent à côté des salons d’un serveur quand quelqu’un y écrit.",
   "settings.chat.typingHeading": "Indicateurs de saisie",
+  "settings.voice.priorityKey": "Touche d'orateur prioritaire",
+  "settings.voice.priorityKeyHint": "Maintiens-la pour parler en orateur prioritaire dans les salons vocaux où ton rôle le permet. Tous les autres sont baissés pendant que tu parles. Retour arrière l'efface.",
+  "settings.voice.priorityKeyNone": "Non défini",
   "threads.card.count": {
     "one": "{count} message",
     "other": "{count} messages"
@@ -6911,5 +6914,7 @@
   "whatsNew.r20261019.readingBody": "Une app lit les messages qui la mentionnent, lui répondent ou lui sont envoyés, scellés pour elle par votre app. Celle qui lit tous les messages l’indique avant qu’on l’ajoute.",
   "whatsNew.r20261019.readingTitle": "Les apps ne lisent que ce qui leur est destiné",
   "whatsNew.r20261020.privacyBody": "Pour la sécurité, Nexa conserve désormais les adresses IP depuis lesquelles votre compte se connecte, afin que l'équipe repère les comptes créés pour contourner un bannissement. Le panneau de modération n'affiche jamais les adresses elles-mêmes. Les détails sont dans la politique de confidentialité, dans Paramètres, À propos.",
-  "whatsNew.r20261020.privacyTitle": "Politique de confidentialité mise à jour"
+  "whatsNew.r20261020.privacyTitle": "Politique de confidentialité mise à jour",
+  "whatsNew.r202610202.priorityBody": "Les rôles avec Orateur prioritaire peuvent maintenir leur touche dans un salon vocal pour être entendus par-dessus les autres. Choisis la touche dans Paramètres, Voix et vidéo.",
+  "whatsNew.r202610202.priorityTitle": "Orateur prioritaire"
 }

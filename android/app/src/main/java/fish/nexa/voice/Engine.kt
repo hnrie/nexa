@@ -721,7 +721,11 @@ internal object Engine {
     /** Whoever a moderator muted or deafened stays silent here (a channel that denies Speak is the same). */
     private fun syncModMutes(s: Session, everyone: List<VoiceState>) {
         val myId = me()
-        for (p in everyone) if (p.userId != myId) s.transport.playback.setModMuted(p.userId, p.serverMute || p.serverDeaf)
+        for (p in everyone) {
+            if (p.userId == myId) continue
+            s.transport.playback.setModMuted(p.userId, p.serverMute || p.serverDeaf)
+            s.transport.playback.setPriority(p.userId, p.prioritySpeaker)
+        }
     }
 
     fun setMasterVolume(pct: Int) {

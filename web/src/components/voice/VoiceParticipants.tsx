@@ -1,4 +1,4 @@
-import { HeadphoneOff, MicOff, MonitorUp, Video } from "lucide-react";
+import { HeadphoneOff, Megaphone, MicOff, MonitorUp, Video } from "lucide-react";
 import type { KeyboardEvent, MouseEvent } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { UserTag } from "@/components/servertag/UserTag";
@@ -74,6 +74,7 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
             <span className={s.pName}>{name}</span>
             {guest ? <span className={s.pGuest}>{t("voice.voiceParticipants.guest")}</span> : <UserTag userId={p.user_id} size="sm" />}
             <span className={s.pIcons}>
+              {p.priority_speaker ? <Megaphone size={14} aria-label={t("perms.prioritySpeaker")} data-testid="priority-speaker" /> : null}
               {p.video ? <Video size={14} /> : null}
               {p.streaming ? <MonitorUp size={14} /> : null}
               {p.self_mute || p.server_mute ? <MicOff size={14} data-server={serverMuted || undefined} aria-label={serverMuted ? t("voice.moderation.mutedByModerator") : undefined} /> : null}

@@ -733,3 +733,38 @@ func mustSnowflake(t *testing.T, s string) ids.ID {
 	}
 	return id
 }
+
+// TestPrioritySpeaker checks that holding the Priority Speaker key counts only
+// for someone the channel gives Priority Speaker.
+func TestPrioritySpeaker(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, idA := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	view := createServer(t, ts, tokA, "Voice")
+	sid := view["id"].(string)
+	general := channelNamed(view, "general")["id"].(string)
+	voiceCh := channelNamed(view, "General")["id"].(string)
+	join(t, ts, tokB, inviteFor(t, ts, tokA, general))
+	ga := connectGW(t, ts, tokA)
+	gb := connectGW(t, ts, tokB)
+
+	ga.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "priority": true})
+	if ev := ga.nextVoice(idA, voiceCh, 3*time.Second); ev == nil || ev["priority_speaker"] != true {
+		t.Errorf("the owner may be Priority Speaker: %v", ev)
+	}
+	gb.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "priority": true})
+	if ev := gb.nextVoice(idB, voiceCh, 3*time.Second); ev == nil || ev["priority_speaker"] != nil {
+		t.Errorf("without the permission the key does nothing: %v", ev)
+	}
+	if res, body := do(t, ts, "PUT", "/api/v1/channels/"+voiceCh+"/permissions/"+sid, tokA, map[string]any{"type": "role", "allow": permStr(perms.PrioritySpeaker)}); res.StatusCode != 200 {
+		t.Fatalf("allow: %d %v", res.StatusCode, body)
+	}
+	gb.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "priority": true})
+	if ev := gb.nextVoice(idB, voiceCh, 3*time.Second); ev == nil || ev["priority_speaker"] != true {
+		t.Errorf("allowed in the channel: %v", ev)
+	}
+	gb.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	if ev := gb.nextVoice(idB, voiceCh, 3*time.Second); ev == nil || ev["priority_speaker"] != nil {
+		t.Errorf("letting go of the key: %v", ev)
+	}
+}

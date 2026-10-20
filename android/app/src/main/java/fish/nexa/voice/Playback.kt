@@ -19,6 +19,9 @@ import kotlin.math.sqrt
  * sound at its own volume, playing only while the share is watched. Who is
  * speaking comes from the level of what arrives.
  */
+/** Everyone else's level while a Priority Speaker talks (playback.ts PRIORITY_DUCK): about 12 dB down. */
+const val PRIORITY_DUCK = 0.25
+
 class Playback(private val scope: CoroutineScope, private val onSpeaking: (String, Boolean) -> Unit) {
     /** Hears a remote track's decoded audio and keeps the loudest 10 ms since it was last asked. */
     private class LevelSink : AudioTrackSink {
@@ -58,6 +61,8 @@ class Playback(private val scope: CoroutineScope, private val onSpeaking: (Strin
     private var localMutes = setOf<String>()
     /** People a moderator muted or deafened in the server: silent here too, should their app keep sending. */
     private val modMutes = HashSet<String>()
+    /** People talking as Priority Speaker: while one of them is heard, everyone else is turned down. */
+    private val priority = HashSet<String>()
     private var streamVolumes = mapOf<String, Int>()
     private var streamMutes = setOf<String>()
     private val watching = HashSet<String>()
@@ -68,12 +73,16 @@ class Playback(private val scope: CoroutineScope, private val onSpeaking: (Strin
 
     private fun effectiveGain(userId: String): Double {
         if (outputMuted || interrupted || userId in localMutes || userId in modMutes || "voice:$userId" in held) return 0.0
-        return ((volumes[userId] ?: 100) / 100.0) * (masterVolume / 100.0)
+        return ((volumes[userId] ?: 100) / 100.0) * (masterVolume / 100.0) * duck(userId)
     }
+
+    /** How far someone is turned down while a Priority Speaker other than them is talking. */
+    private fun duck(userId: String): Double =
+        if (priority.any { it != userId && voices[it]?.speaking == true }) PRIORITY_DUCK else 1.0
 
     private fun screenGain(userId: String): Double {
         if (userId !in watching || outputMuted || interrupted || userId in streamMutes || "screen:$userId" in held) return 0.0
-        return ((streamVolumes[userId] ?: 100) / 100.0) * (masterVolume / 100.0)
+        return ((streamVolumes[userId] ?: 100) / 100.0) * (masterVolume / 100.0) * duck("")
     }
 
     private fun apply() {
@@ -96,7 +105,10 @@ class Playback(private val scope: CoroutineScope, private val onSpeaking: (Strin
     fun detachVoice(userId: String) {
         val out = voices.remove(userId) ?: return
         runCatching { out.track.removeSink(out.sink) }
-        if (out.speaking) onSpeaking(userId, false)
+        if (out.speaking) {
+            onSpeaking(userId, false)
+            if (userId in priority) apply()
+        }
     }
 
     fun attachScreenAudio(userId: String, track: AudioTrack, isHeld: Boolean) {
@@ -144,6 +156,13 @@ class Playback(private val scope: CoroutineScope, private val onSpeaking: (Strin
         apply()
     }
 
+    /** Whether someone is talking as Priority Speaker now, from the call's voice states. */
+    fun setPriority(userId: String, on: Boolean) {
+        if (on == userId in priority) return
+        if (on) priority += userId else priority -= userId
+        apply()
+    }
+
     /** Something else took the audio: quiet until it comes back. */
     fun setInterrupted(on: Boolean) {
         interrupted = on
@@ -168,6 +187,7 @@ class Playback(private val scope: CoroutineScope, private val onSpeaking: (Strin
                     if (on != out.speaking) {
                         out.speaking = on
                         onSpeaking(id, on)
+                        if (id in priority) apply()
                     }
                 }
             }

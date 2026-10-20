@@ -37,6 +37,9 @@ type State struct {
 	// Suppress is set when the channel denies Speak; it silences the user
 	// like a server mute but belongs to the channel, not to a moderator.
 	Suppress bool `json:"-"`
+	// Priority is set while the person talks as Priority Speaker (the key
+	// held, and the channel allows it).
+	Priority bool `json:"-"`
 	// SFUSession is this device's Cloudflare Realtime session when calls go
 	// through the SFU, Tracks what it publishes there, and ScreenBps the
 	// bitrate its screen share declared.

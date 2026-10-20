@@ -6812,6 +6812,9 @@
   "settings.chat.typingChannels": "Mostrar la escritura en los canales",
   "settings.chat.typingChannelsHint": "Aparecen puntos junto a los canales de un servidor mientras alguien escribe en ellos.",
   "settings.chat.typingHeading": "Indicadores de escritura",
+  "settings.voice.priorityKey": "Tecla de orador prioritario",
+  "settings.voice.priorityKeyHint": "Mantenla pulsada para hablar como orador prioritario en los canales de voz donde tu rol lo permita. Todos los demás bajan de volumen mientras hablas. Retroceso la borra.",
+  "settings.voice.priorityKeyNone": "Sin asignar",
   "threads.card.count": {
     "one": "{count} mensaje",
     "other": "{count} mensajes"
@@ -6911,5 +6914,7 @@
   "whatsNew.r20261019.readingBody": "Una app lee los mensajes que la mencionan, le responden o se le envían, sellados para ella por tu app. La que lee todos los mensajes lo indica antes de que alguien la añada.",
   "whatsNew.r20261019.readingTitle": "Las apps solo leen lo que es para ellas",
   "whatsNew.r20261020.privacyBody": "Por seguridad, Nexa ahora guarda las direcciones IP desde las que inicia sesión tu cuenta, para que el equipo detecte cuentas creadas para saltarse un baneo. El panel de moderación nunca muestra las direcciones. Los detalles están en la Política de privacidad, en Ajustes, Acerca de.",
-  "whatsNew.r20261020.privacyTitle": "Política de privacidad actualizada"
+  "whatsNew.r20261020.privacyTitle": "Política de privacidad actualizada",
+  "whatsNew.r202610202.priorityBody": "Los roles con Orador prioritario pueden mantener pulsada su tecla en un canal de voz para oírse por encima de los demás. Elige la tecla en Ajustes, Voz y vídeo.",
+  "whatsNew.r202610202.priorityTitle": "Orador prioritario"
 }

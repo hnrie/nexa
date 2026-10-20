@@ -650,6 +650,7 @@ private fun NameBar(
         if (t.kind != Tile.Kind.SCREEN && t.kind != Tile.Kind.RINGING && !guest) (if (t.me) Nexa.users.me.value?.serverTag else Nexa.users.get(t.userId)?.serverTag)?.takeIf { it.text.isNotEmpty() }?.let { fish.nexa.ui.chat.ServerTagChip(it, small = true) }
         // a moderator's mute or deafen in red, wherever the person is shown
         val modMute = vs?.let { VoiceModeration.modMuted(it) } == true
+        if (t.kind != Tile.Kind.SCREEN && vs?.prioritySpeaker == true) Icon("Megaphone", c.textStrong, size = 14.dp)
         if (t.kind != Tile.Kind.SCREEN && (vs?.selfMute == true || vs?.serverMute == true || (t.me && state.micBlocked))) Icon("MicOff", if (modMute) c.textDanger else c.textStrong, size = 14.dp)
         if (t.kind != Tile.Kind.SCREEN && (vs?.selfDeaf == true || vs?.serverDeaf == true)) Icon("HeadphoneOff", if (vs?.serverDeaf == true) c.textDanger else c.textStrong, size = 14.dp)
         if (if (t.kind == Tile.Kind.SCREEN) t.userId in streamMutes else t.userId in localMutes) Icon("VolumeX", c.textStrong, size = 14.dp)

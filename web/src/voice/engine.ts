@@ -63,6 +63,8 @@ interface Session {
   micRetrying: boolean;
   noiseFloor: number;
   pttHeld: boolean;
+  /** The Priority Speaker key is held: the mic is open, as with push to talk, and everyone else is turned down. */
+  priorityHeld: boolean;
   /** Whether voice activity currently hears speech, and until when it keeps listening after. */
   vadOpen: boolean;
   vadHoldUntil: number;
@@ -186,6 +188,7 @@ function shouldTransmit(): boolean {
   const mine = useVoice.getState().mine;
   // a moderator's deafen takes the voice away too, as it does the sound
   if (local.muted || local.deafened || mine?.server_mute || mine?.server_deaf) return false;
+  if (session?.priorityHeld) return true;
   if (useSettings.getState().settings.voice.mode === "ptt") return !!session?.pttHeld;
   return true;
 }
@@ -194,7 +197,7 @@ function shouldTransmit(): boolean {
 function gateOpen(): boolean {
   const s = session;
   if (!s) return true;
-  if (s.pttHeld) return true;
+  if (s.pttHeld || s.priorityHeld) return true;
   if (useSettings.getState().settings.voice.mode === "ptt") return true;
   // The gate is worked by a timer, which a hidden page has throttled or
   // frozen; it stays open there rather than cut the speaker off mid-sentence.
@@ -222,6 +225,19 @@ export function setPttHeld(on: boolean): void {
   session.pttHeld = on;
   useVoice.getState().setPttHeld(on);
   applyTransmit();
+}
+
+/** The Priority Speaker key went down or came up; the server hears of it with the voice state. */
+export function setPriorityHeld(on: boolean): boolean {
+  if (!session || session.priorityHeld === on) return false;
+  session.priorityHeld = on;
+  applyTransmit();
+  return true;
+}
+
+/** Whether this device is talking as Priority Speaker now. */
+export function priorityHeld(): boolean {
+  return !!session?.priorityHeld;
 }
 
 /** Scales the microphone before it reaches the peers, for the input slider. */
@@ -338,7 +354,7 @@ export async function join(channelId: string, ice: { servers: RTCIceServer[]; sf
     },
   };
   const transport: VoiceTransport = ice.sfu ? new SfuTransport(myId, channelId, ice.servers, events) : new MeshTransport(myId, ice.servers, events);
-  s = { channelId, transport, mic: null, micRaw: null, send: new VoiceSend(), inputGain: null, inputSource: null, denoiser: null, rnnoise: false, noiseNoticed: false, inputGen: 0, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, micRetrying: false, noiseFloor: 0.01, pttHeld: false, vadOpen: false, vadHoldUntil: 0, speaking: new SpeakingGate(), announced: false, iceTimer: null, cleanups: [] };
+  s = { channelId, transport, mic: null, micRaw: null, send: new VoiceSend(), inputGain: null, inputSource: null, denoiser: null, rnnoise: false, noiseNoticed: false, inputGen: 0, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, micRetrying: false, noiseFloor: 0.01, pttHeld: false, priorityHeld: false, vadOpen: false, vadHoldUntil: 0, speaking: new SpeakingGate(), announced: false, iceTimer: null, cleanups: [] };
   session = s;
   useVoice.getState().setConnection("connecting");
   releaseCall ??= holdReload("call");
@@ -881,7 +897,11 @@ function syncPeers(): void {
 /** Whoever a moderator muted or deafened stays silent here (a channel that denies Speak is the same). */
 function syncModMutes(s: Session, everyone: VoiceState[]): void {
   const myId = me();
-  for (const p of everyone) if (p.user_id !== myId) s.transport.setModMuted(p.user_id, p.server_mute || p.server_deaf);
+  for (const p of everyone) {
+    if (p.user_id === myId) continue;
+    s.transport.setModMuted(p.user_id, p.server_mute || p.server_deaf);
+    s.transport.setPriority(p.user_id, !!p.priority_speaker);
+  }
 }
 
 /**

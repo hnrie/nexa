@@ -572,6 +572,10 @@ export class MeshTransport implements VoiceTransport {
     this.playback.setModMuted(userId, on);
   }
 
+  setPriority(userId: string, on: boolean): void {
+    this.playback.setPriority(userId, on);
+  }
+
   /** Master output level for every peer, 0–200 %. */
   setMasterVolume(pct: number): void {
     this.playback.setMasterVolume(pct);

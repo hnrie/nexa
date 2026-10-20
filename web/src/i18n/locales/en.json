@@ -6699,6 +6699,9 @@
   "settings.chat.typingChannels": "Show typing on channels",
   "settings.chat.typingChannelsHint": "Dots appear beside a server's channels while someone types in them.",
   "settings.chat.typingHeading": "Typing Indicators",
+  "settings.voice.priorityKey": "Priority Speaker Key",
+  "settings.voice.priorityKeyHint": "Hold it to talk as Priority Speaker in voice channels where your role allows it. Everyone else is turned down while you speak. Backspace clears it.",
+  "settings.voice.priorityKeyNone": "Not Set",
   "threads.card.count": {
     "one": "{count} Message",
     "other": "{count} Messages"
@@ -6798,5 +6801,7 @@
   "whatsNew.r20261019.readingBody": "An app reads messages that mention it, reply to it or are sent to it, sealed for it by your app. One that reads every message says so before anyone adds it.",
   "whatsNew.r20261019.readingTitle": "Apps Read Only What Is Meant for Them",
   "whatsNew.r20261020.privacyBody": "For security, Nexa now keeps the IP addresses your account signs in from, so staff can spot accounts made to get around a ban. The moderation panel never shows the addresses themselves. The details are in the Privacy Policy, in Settings, About.",
-  "whatsNew.r20261020.privacyTitle": "Updated Privacy Policy"
+  "whatsNew.r20261020.privacyTitle": "Updated Privacy Policy",
+  "whatsNew.r202610202.priorityBody": "Roles with Priority Speaker can hold their Priority Speaker key in a voice channel to be heard over everyone else. Set the key in Settings, Voice & Video.",
+  "whatsNew.r202610202.priorityTitle": "Priority Speaker"
 }

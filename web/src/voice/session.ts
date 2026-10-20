@@ -16,6 +16,8 @@ import { mutedSentence } from "@/lib/moderation";
 import { playSound, startCalling, startRinging, stopCalling, stopRinging } from "@/lib/sounds";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
+import { canI, useServers } from "@/stores/servers";
+import { P } from "@/lib/perms";
 import { activeMute, useNexa } from "@/stores/nexa";
 import { usePresence } from "@/stores/presence";
 import { useSettings } from "@/stores/settings";
@@ -205,6 +207,7 @@ export function sendState(channelId: string | null, resume = false, sfuSession?:
     self_deaf: local.deafened,
     video: !!st.localVideo,
     streaming: !!st.localScreen,
+    ...(channelId && engine?.priorityHeld() ? { priority: true } : {}),
     // how this device connects, so the server can turn away a page set up for the other kind
     ...(channelId ? { sfu: !!engine?.throughSfu() } : {}),
     // what it can watch besides VP8: a phone shares its screen in H.264 only when everyone can
@@ -230,6 +233,12 @@ export async function iceConfig(): Promise<{ servers: RTCIceServer[]; sfu: boole
     // must not have one go peer to peer because this request failed.
     return null;
   }
+}
+
+/** Whether this person may talk as Priority Speaker in a call: only in a server's voice channel that allows it. */
+export function mayBePriority(channelId: string): boolean {
+  const serverId = useChannels.getState().byId[channelId]?.server_id;
+  return !!serverId && canI(useServers.getState().byId[serverId], P.PRIORITY_SPEAKER, channelId);
 }
 
 /** A touch screen with no hover has no key to hold: push to talk there is a button in the call. */
@@ -641,7 +650,26 @@ export function installVoice(): void {
     if (!engine?.current() || !isPtt(e)) return;
     engine.setPttHeld(false);
   });
-  window.addEventListener("blur", () => engine?.setPttHeld(false));
+  const isPriority = (e: KeyboardEvent) => {
+    const k = useSettings.getState().settings.voice.priorityKey;
+    return !!k && (e.key === k || e.code === k);
+  };
+  // Priority Speaker: only where this person may be one, and the server checks again
+  const holdPriority = (on: boolean) => {
+    const cur = engine?.current();
+    if (!cur || (on && !mayBePriority(cur.channelId))) return;
+    if (engine?.setPriorityHeld(on) && cur.announced) sendState(cur.channelId);
+  };
+  window.addEventListener("keydown", (e) => {
+    if (isPriority(e) && !e.repeat) holdPriority(true);
+  });
+  window.addEventListener("keyup", (e) => {
+    if (isPriority(e)) holdPriority(false);
+  });
+  window.addEventListener("blur", () => {
+    engine?.setPttHeld(false);
+    holdPriority(false);
+  });
   document.addEventListener("visibilitychange", () => engine?.applyTransmit());
   // iOS keeps a suspended AudioContext silent until a gesture resumes it.
   const wake = () => {

@@ -32,6 +32,8 @@ export default function VoicePage() {
   const [wrongDevice, setWrongDevice] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const captureRef = useRef<HTMLButtonElement>(null);
+  const [capturingPriority, setCapturingPriority] = useState(false);
+  const priorityRef = useRef<HTMLButtonElement>(null);
   // A touch screen has no key to hold, so calls there fall back to voice
   // activity (voice/session.ts); the page says so instead of promising a key.
   const [starting, setStarting] = useState(false);
@@ -184,6 +186,27 @@ export default function VoicePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [capturing]);
 
+  // the Priority Speaker key, recorded the same way; Backspace or Delete leaves it unset
+  useEffect(() => {
+    if (!capturingPriority) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key !== "Escape") set({ priorityKey: e.key === "Backspace" || e.key === "Delete" ? "" : e.key.length === 1 ? e.key : e.code });
+      setCapturingPriority(false);
+    };
+    const onDown = (e: PointerEvent) => {
+      if (!priorityRef.current?.contains(e.target as Node)) setCapturingPriority(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("pointerdown", onDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("pointerdown", onDown, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capturingPriority]);
+
   const level = testing ? testLevel : inCall ? liveLevel : 0;
   // voice activity is judged on what a call sends: after noise suppression and the input volume
   const sendLevel = testing ? sentLevel : inCall ? liveLevel : 0;
@@ -293,6 +316,14 @@ export default function VoicePage() {
             ) : null}
           </>
         )}
+        {!holdButton ? (
+          <Field label={tr_("settings.voice.priorityKey")} hint={tr_("settings.voice.priorityKeyHint")}>
+            <button ref={priorityRef} type="button" className={v.keyCapture} data-capturing={capturingPriority} onClick={() => setCapturingPriority((c) => !c)} aria-pressed={capturingPriority} data-testid="priority-key">
+              <span>{capturingPriority ? tr_("settings.voice.pressAKey") : settings.priorityKey || tr_("settings.voice.priorityKeyNone")}</span>
+              <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{capturingPriority ? tr_("settings.voice.escToCancel") : tr_("settings.security.change")}</span>
+            </button>
+          </Field>
+        ) : null}
       </div>
       <h3 data-setting="noiseSuppression" className={st.h5}>{tr_("voice.noise.title")}</h3>
       <div role="radiogroup" aria-label={tr_("voice.noise.title")}>

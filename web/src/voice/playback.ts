@@ -40,6 +40,9 @@ function outputOf(ctx: AudioContext): AudioNode {
   return routed?.dest ?? ctx.destination;
 }
 
+/** Everyone else's level while a Priority Speaker talks, as Discord does: about 12 dB down. */
+export const PRIORITY_DUCK = 0.25;
+
 export class Playback {
   private voices = new Map<string, VoiceOut>();
   private screens = new Map<string, ScreenOut>();
@@ -53,6 +56,8 @@ export class Playback {
    * nothing then; this keeps them silent here too, should an app keep sending.
    */
   private modMutes = new Set<string>();
+  /** People talking as Priority Speaker: while one of them is heard, everyone else is turned down. */
+  private priority = new Set<string>();
   /** A screen share's sound has its own level and mute, apart from the person's voice. */
   private streamVolumes = new Map<string, number>();
   private streamMutes = new Set<string>();
@@ -111,6 +116,7 @@ export class Playback {
       if (on !== out.speaking) {
         out.speaking = on;
         this.onSpeaking(userId, on);
+        if (this.priority.has(userId)) this.applyGains();
       }
     }, 100);
     this.voices.set(userId, out);
@@ -130,7 +136,10 @@ export class Playback {
     }
     out.el.srcObject = null;
     out.el.remove();
-    if (out.speaking) this.onSpeaking(userId, false);
+    if (out.speaking) {
+      this.onSpeaking(userId, false);
+      if (this.priority.has(userId)) this.applyGains();
+    }
   }
 
   /** Plays the sound of someone's screen share, while it is watched; `held` as for attachVoice. */
@@ -207,13 +216,19 @@ export class Playback {
 
   private effectiveGain(userId: string): number {
     if (this.outputMuted || this.localMutes.has(userId) || this.modMutes.has(userId) || this.held.has(`voice:${userId}`)) return 0;
-    return ((this.volumes.get(userId) ?? 100) / 100) * (this.masterVolume / 100);
+    return ((this.volumes.get(userId) ?? 100) / 100) * (this.masterVolume / 100) * this.duck(userId);
+  }
+
+  /** How far someone is turned down while a Priority Speaker other than them is talking. */
+  private duck(userId: string): number {
+    for (const id of this.priority) if (id !== userId && this.voices.get(id)?.speaking) return PRIORITY_DUCK;
+    return 1;
   }
 
   /** A share is offered, not forced: its sound only plays while it is watched, at the stream's own level. */
   private screenGain(userId: string): number {
     if (!this.watching.has(userId) || this.outputMuted || this.streamMutes.has(userId) || this.held.has(`screen:${userId}`)) return 0;
-    return ((this.streamVolumes.get(userId) ?? 100) / 100) * (this.masterVolume / 100);
+    return ((this.streamVolumes.get(userId) ?? 100) / 100) * (this.masterVolume / 100) * this.duck("");
   }
 
   private applyGains(): void {
@@ -247,6 +262,14 @@ export class Playback {
     if (on === this.modMutes.has(userId)) return;
     if (on) this.modMutes.add(userId);
     else this.modMutes.delete(userId);
+    this.applyGains();
+  }
+
+  /** Whether someone is talking as Priority Speaker now, from the call's voice states. */
+  setPriority(userId: string, on: boolean): void {
+    if (on === this.priority.has(userId)) return;
+    if (on) this.priority.add(userId);
+    else this.priority.delete(userId);
     this.applyGains();
   }
 
