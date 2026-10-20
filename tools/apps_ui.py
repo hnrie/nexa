@@ -316,6 +316,26 @@ def pages(alice, bob, base, sid, general, app, failures, a_api=None, b_api=None)
         b.wait_for_selector(f"text=quoting: {words}", timeout=15000)
         step(f"{size}: after Continue the app gets it")
 
+    def app_link():
+        # an app's install link in chat is a card of the app, whose Add App comes back here
+        a.goto(f"{base}/channels/{sid}/{general}", wait_until="networkidle")
+        alice.dismiss_whats_new()
+        alice.send(f"{base}/oauth2/authorize?client_id={app['protocol_id']}&scope=applications.commands&integration_type=1 ({size})")
+        b.goto(f"{base}/channels/{sid}/{general}", wait_until="networkidle")
+        bob.dismiss_whats_new()
+        card = b.locator("[data-testid=app-link-card][data-app-state=ready]").last
+        card.wait_for(timeout=15000)
+        card.scroll_into_view_if_needed()
+        b.wait_for_timeout(400)
+        step(f"{size}: an app's install link shows the app's card")
+        bob.shot("app-link-card")
+        here = b.url
+        card.locator("[data-testid=app-link-add]").click()
+        b.wait_for_selector("[data-testid=authorize-page] [data-testid=authorize]", timeout=10000)
+        b.click("[data-testid=authorize]")
+        b.wait_for_url(here, timeout=10000)
+        step(f"{size}: its Add App comes back to the channel")
+
     def server_apps():
         a.goto(f"{base}/channels/{sid}/{general}", wait_until="networkidle")
         alice.dismiss_whats_new()
@@ -370,7 +390,7 @@ def pages(alice, bob, base, sid, general, app, failures, a_api=None, b_api=None)
         step(f"{size}: Add App on the bot's card brings bob back to the channel he was in")
         bob.shot("add-app-back")
 
-    for name, fn, sess in [("portal", portal, alice), ("make-app", make_app, alice), ("consent", consent, bob), ("authorized", authorized, bob), ("share-warning", share_warning, bob), ("server-apps", server_apps, alice), ("profile", profile_and_start, bob)]:
+    for name, fn, sess in [("portal", portal, alice), ("make-app", make_app, alice), ("consent", consent, bob), ("authorized", authorized, bob), ("share-warning", share_warning, bob), ("app-link", app_link, bob), ("server-apps", server_apps, alice), ("profile", profile_and_start, bob)]:
         attempt(name, fn, sess)
 
 

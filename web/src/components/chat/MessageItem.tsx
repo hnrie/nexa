@@ -31,6 +31,7 @@ import { Embeds } from "./Embeds";
 import { InviteCards } from "./InviteCards";
 import { PackCards } from "./PackCards";
 import { ProfileCards } from "./ProfileCards";
+import { AppLinkCards } from "./AppLinkCards";
 import { NoteCards } from "@/components/notes/NoteCards";
 import { MSG_FLAG_EPHEMERAL, MSG_FLAG_LOADING, MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
 import { useAutomodHeld } from "@/lib/automod/useHeld";
@@ -456,6 +457,7 @@ function MessageContent({ msg, name, id, pending, upload }: { msg: DecryptedMess
       ) : null}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <InviteCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <ProfileCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
+      {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <AppLinkCards nodes={nodes} />}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <NoteCards nodes={nodes} />}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <PackCards nodes={nodes} />}
       {pending === "failed" ? (

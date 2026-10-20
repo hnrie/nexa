@@ -44,7 +44,7 @@ func (s *Server) handleUnfurl(w http.ResponseWriter, r *http.Request) {
 	// A note's share link gets no preview from here: what it leads to can
 	// only be read with the key in the part after the #, which never reaches
 	// the server, so the app draws its card itself.
-	if s.ownPath(raw, "/note/") != "" {
+	if s.ownPath(raw, "/note/") != "" || s.isAppInstallLink(raw) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -115,6 +115,13 @@ func (s *Server) inviteCodeOf(raw string) string {
 // ownPath returns what follows prefix when raw is a link to one of Nexa's
 // own pages under it ("/invite/CODE", "/note/TOKEN", "/@NAME"), at any of
 // its addresses, or "".
+// isAppInstallLink reports whether raw is one of our own pages for adding an
+// app (/oauth2/authorize), which the apps draw as the app's own card: no
+// preview of the page is fetched for it.
+func (s *Server) isAppInstallLink(raw string) bool {
+	return s.ownPath(raw, "/oauth2/") == "authorize"
+}
+
 func (s *Server) ownPath(raw, prefix string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {

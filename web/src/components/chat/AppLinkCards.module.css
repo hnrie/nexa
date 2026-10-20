@@ -1,0 +1,3 @@
+/* An app's install link in a message (AppLinkCards.tsx): a pack card's shape. */
+.card { padding-bottom: var(--pad); }
+.picture { flex: none; display: flex; border-radius: 17px; overflow: hidden; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); }

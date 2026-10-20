@@ -598,6 +598,7 @@ internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
         ProfileCards(payload?.t, sealed)
         fish.nexa.ui.notes.NoteCards(payload?.t)
         PackCards(payload?.t)
+        AppLinkCards(payload?.t)
     }
 }
 

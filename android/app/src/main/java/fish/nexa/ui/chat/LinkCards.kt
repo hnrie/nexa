@@ -75,12 +75,15 @@ import java.net.URI
 private const val MAX_INVITE_CARDS = 3
 private const val MAX_PROFILE_CARDS = 3
 private const val MAX_PACK_CARDS = 3
+private const val MAX_APP_CARDS = 3
 
 /** Nexa's own addresses a message can link to (lib/appLinks.ts appLink): invites, profiles, and sticker and emoji packs. */
 sealed interface AppLink {
     data class Invite(val code: String, val hash: String, val url: String) : AppLink
     data class Profile(val username: String, val url: String) : AppLink
     data class Pack(val id: String, val url: String) : AppLink
+    /** An app's install link: the app it adds (its client id) and the link's query. */
+    data class App(val clientId: String, val query: String, val url: String) : AppLink
 }
 
 private fun ownHosts(): Set<String> = listOfNotNull(
@@ -98,6 +101,7 @@ private fun Modifier.overlapAbove(by: Dp): Modifier = layout { measurable, const
 private val INVITE_PATH = Regex("^/invite/([A-Za-z0-9_-]{1,64})/?$")
 private val PROFILE_PATH = Regex("^/@([A-Za-z0-9_.]{2,32})/?$")
 private val PACK_PATH = Regex("^/stickers/pack/(\\d{1,20})/?$")
+private val AUTHORIZE_PATH = Regex("^/oauth2/authorize/?$")
 
 fun appLink(href: String): AppLink? = runCatching {
     val u = URI(href)
@@ -107,6 +111,11 @@ fun appLink(href: String): AppLink? = runCatching {
     PROFILE_PATH.find(path)?.let { return AppLink.Profile(it.groupValues[1].lowercase(), href) }
     INVITE_PATH.find(path)?.let { return AppLink.Invite(it.groupValues[1], u.rawFragment?.let { f -> "#$f" } ?: "", href) }
     PACK_PATH.find(path)?.let { return AppLink.Pack(it.groupValues[1], href) }
+    if (AUTHORIZE_PATH.matches(path)) {
+        val query = u.rawQuery ?: ""
+        val clientId = query.split('&').firstOrNull { it.startsWith("client_id=") }?.substringAfter('=')
+        if (clientId != null && Regex("^\\d{1,20}$").matches(clientId)) return AppLink.App(clientId, query, href)
+    }
     null
 }.getOrNull()
 
@@ -616,3 +625,56 @@ private fun PackSkeleton() {
     }
 }
 
+
+/** What each app link said, asked once a session: the app as its install page shows it, or null when it cannot be added. */
+private val appLinkInfo = androidx.compose.runtime.mutableStateMapOf<String, fish.nexa.net.AuthorizeInfo?>()
+
+/** Up to three cards under a message for the apps it links to the install page of (web AppLinkCards.tsx). */
+@Composable
+fun AppLinkCards(text: String?) {
+    val links = remember(text) {
+        val out = ArrayList<AppLink.App>()
+        for (url in cardLinksIn(text ?: "")) {
+            val l = appLink(url) as? AppLink.App ?: continue
+            if (out.none { it.clientId == l.clientId }) out += l
+            if (out.size >= MAX_APP_CARDS) break
+        }
+        out
+    }
+    if (links.isEmpty()) return
+    Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (l in links) AppLinkCard(l)
+    }
+}
+
+/**
+ * A pack card's shape: the app's picture, its name with the APP tag, Add App
+ * beside them (the consent sheet over this conversation), and what the app
+ * says about itself.
+ */
+@Composable
+private fun AppLinkCard(link: AppLink.App) {
+    LaunchedEffect(link.clientId) {
+        if (link.clientId !in appLinkInfo) appLinkInfo[link.clientId] = runCatching { fish.nexa.data.Apps.authorizeInfo("client_id=${link.clientId}") }.getOrNull()
+    }
+    if (link.clientId !in appLinkInfo) return PackSkeleton()
+    val info = appLinkInfo[link.clientId] ?: return GoneCard("Bot", t("apps.linkCard.goneTitle"), t("apps.linkCard.goneBody"))
+    val app = info.application
+    val c = Nx.colors
+    val shape = Radii.Lg
+    Column(
+        Modifier.widthIn(max = 432.dp).fillMaxWidth().shadowMedium(shape, c).ring(shape, c.borderSubtle).clip(shape).background(c.embedBg).topEdge(shape, c.edgeLight)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            fish.nexa.ui.components.Avatar(app.id, app.name, app.iconId ?: app.bot?.avatarId, 56.dp, icon = app.iconId != null, shape = RoundedCornerShape(17.dp))
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Txt(app.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(16.5f), fontWeight = FontWeight(680), lineHeight = Nx.type.sp(21.45f)), color = c.textStrong, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
+                fish.nexa.ui.media.AppTag()
+            }
+            NxButton(t("apps.profile.addApp"), { fish.nexa.ui.apps.openAuthorize(link.query, fromApp = true) }, size = ButtonSize.SM)
+        }
+        if (app.description.isNotBlank()) Txt(app.description, style = Nx.type.body.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(19.6f)), color = c.text, maxLines = 2)
+    }
+}

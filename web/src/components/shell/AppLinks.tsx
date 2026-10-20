@@ -33,6 +33,11 @@ function follow(link: AppLink, anchor: Element, nav: NavigateFunction): void {
   }
   // a link in a dialog (a profile, a topic) leads away from it
   if (anchor.closest("[data-modal-layer]")) ui.closeAllModals();
+  if (link.kind === "app") {
+    // adding an app brings the person back to where they were
+    nav(link.path, { state: inApp() ? { from: window.location.pathname + window.location.search } : undefined });
+    return;
+  }
   const here = window.location.pathname + window.location.search + window.location.hash;
   if (link.path === here) {
     // the page is already open: a message link still jumps to its message

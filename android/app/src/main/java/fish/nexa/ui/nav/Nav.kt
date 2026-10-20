@@ -119,7 +119,8 @@ object Nav {
         }
         // a link that adds an app: what it is, where it goes and what it may do, before saying yes
         if (parts == listOf("oauth2", "authorize")) {
-            fish.nexa.ui.apps.openAuthorize(path.substringAfter('?', "").substringBefore('#'))
+            // over whatever is open, which it leaves the person on once they are done
+            fish.nexa.ui.apps.openAuthorize(path.substringAfter('?', "").substringBefore('#'), fromApp = true)
             return true
         }
         if (parts.firstOrNull() != "channels" || parts.size < 2) return false

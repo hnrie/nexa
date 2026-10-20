@@ -11,7 +11,12 @@
  */
 
 /** Where a link to this app leads. `hash` keeps an invite's or a note's key, which never leaves the device. */
-export type AppLink = { kind: "invite"; code: string; hash: string } | { kind: "note"; token: string; hash: string } | { kind: "profile"; username: string } | { kind: "route"; path: string };
+export type AppLink =
+  | { kind: "invite"; code: string; hash: string }
+  | { kind: "note"; token: string; hash: string }
+  | { kind: "profile"; username: string }
+  | { kind: "app"; clientId: string; path: string }
+  | { kind: "route"; path: string };
 
 /** An invite link found in a message: its code, and the key in its fragment when it has one. */
 export interface InviteLinkRef {
@@ -61,6 +66,8 @@ const MESSAGE_PATH = /^\/channels\/(@me|\d+)\/(\d+)\/(\d+)\/?$/;
 const PACK_PATH = /^\/stickers\/pack\/(\d{1,20})\/?$/;
 /** A profile link (lib/profileLinks): an @ and a username, which may have dots in it like a file's name. */
 const PROFILE_PATH = /^\/@([A-Za-z0-9_.]{2,32})\/?$/;
+/** The page that adds an app (pages/AuthorizePage), which an app's install link opens. */
+const AUTHORIZE_PATH = /^\/oauth2\/authorize\/?$/;
 
 interface Here {
   href: string;
@@ -95,6 +102,9 @@ export function appLink(href: string, here: Here = window.location): AppLink | n
   if (invite) return { kind: "invite", code: invite[1]!, hash: u.hash };
   const note = NOTE_PATH.exec(path);
   if (note) return { kind: "note", token: note[1]!, hash: u.hash };
+  // an app's install link (the Developer Portal's): the app it adds
+  const clientId = AUTHORIZE_PATH.test(path) ? u.searchParams.get("client_id") : null;
+  if (clientId && /^\d{1,20}$/.test(clientId)) return { kind: "app", clientId, path: path + u.search };
   return { kind: "route", path: path + u.search + u.hash };
 }
 
@@ -115,6 +125,7 @@ export const MAX_INVITE_CARDS = 3;
 export const MAX_NOTE_CARDS = 3;
 export const MAX_PROFILE_CARDS = 3;
 export const MAX_PACK_CARDS = 3;
+export const MAX_APP_CARDS = 3;
 
 /** A note's share link found in a message: its token, the key in its fragment, and the link as written. */
 export interface NoteLinkRef {
@@ -197,6 +208,28 @@ export function profileLinksIn(nodes: unknown, here: Here = window.location): Pr
       out.push({ username: link.username, url });
     }
     return out.length < MAX_PROFILE_CARDS;
+  });
+  return out;
+}
+
+/** An app's install link found in a message: the app (its client id, as the link names it) and the link as written. */
+export interface AppInstallLinkRef {
+  clientId: string;
+  path: string;
+  url: string;
+}
+
+/** The apps a message links to the install page of, in order and each once. */
+export function appInstallLinksIn(nodes: unknown, here: Here = window.location): AppInstallLinkRef[] {
+  const out: AppInstallLinkRef[] = [];
+  const seen = new Set<string>();
+  eachLink(nodes, (url) => {
+    const link = appLink(url, here);
+    if (link?.kind === "app" && !seen.has(link.clientId)) {
+      seen.add(link.clientId);
+      out.push({ clientId: link.clientId, path: link.path, url });
+    }
+    return out.length < MAX_APP_CARDS;
   });
   return out;
 }

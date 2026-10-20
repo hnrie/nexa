@@ -72,6 +72,9 @@ func (s *Server) unfurlWebhookMessage(msgID, chID ids.ID, content string) {
 		defer cancel()
 		var results []unfurl.Result
 		for _, link := range links {
+			if s.isAppInstallLink(link) {
+				continue
+			}
 			if res := s.inviteUnfurlLink(ctx, link); res != nil {
 				results = append(results, *res)
 				continue
