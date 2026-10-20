@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 	"evilion.xyz/chat/internal/botproto"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/store"
+	"evilion.xyz/chat/internal/unfurl"
 )
 
 // The bot API's own behaviour is put through real bot libraries by
@@ -386,5 +388,59 @@ func TestFirstFollowupFillsInTheThinkingMessage(t *testing.T) {
 	}
 	if n := len(messages()); n != 2 {
 		t.Fatalf("after a second follow-up there are %d messages", n)
+	}
+}
+
+// A link a bot sends gets a preview as a person's would, made by the server
+// (the bot has no app of a person's to fetch it), for the people reading and
+// for bots, as the protocol's link embed.
+func TestBotLinksGetPreviews(t *testing.T) {
+	srv, ts := newTestServer(t)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<html><head><meta property="og:title" content="A Bird"><meta property="og:image" content="https://pics.example.net/bird.jpg"></head></html>`))
+	}))
+	defer upstream.Close()
+	tr := &http.Transport{DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, network, upstream.Listener.Addr().String())
+	}}
+	t.Cleanup(tr.CloseIdleConnections)
+	srv.Unfurl = &unfurl.Service{Fetcher: &unfurl.Fetcher{Timeout: 5 * time.Second, Transport: tr, Resolver: proxyResolver{[]net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}}}}
+
+	tok, _ := register(t, ts, "alice")
+	view := createServer(t, ts, tok, "Lab")
+	sid := view["id"].(string)
+	general := channelNamed(view, "general")["id"].(string)
+	app, botToken := makeApp(t, ts, tok, "Lab Bot")
+	addBot(t, ts, tok, app["id"].(string), sid)
+	ch := botproto.OutString(snowID(t, general))
+	res, sent := botDo(t, ts, "POST", "/api/v10/channels/"+ch+"/messages", botToken, map[string]any{"content": "a bird: http://pics.example.net/birds/1"})
+	if res.StatusCode != 200 {
+		t.Fatalf("send: %d %v", res.StatusCode, sent)
+	}
+	id, err := botproto.ParseID(sent["id"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		_, m := do(t, ts, "GET", "/api/v1/channels/"+general+"/messages/"+id.String(), tok, nil)
+		hook, _ := m["webhook"].(map[string]any)
+		if links, _ := hook["link_embeds"].([]any); len(links) == 1 {
+			if links[0].(map[string]any)["title"] != "A Bird" {
+				t.Fatalf("the preview: %v", links[0])
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the bot's link got no preview: %v", m)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	_, got := botDo(t, ts, "GET", "/api/v10/channels/"+ch+"/messages/"+sent["id"].(string), botToken, nil)
+	embeds, _ := got["embeds"].([]any)
+	if len(embeds) != 1 || embeds[0].(map[string]any)["title"] != "A Bird" || embeds[0].(map[string]any)["thumbnail"] == nil {
+		t.Fatalf("the bot should see the preview as a link embed with its picture: %v", got["embeds"])
 	}
 }

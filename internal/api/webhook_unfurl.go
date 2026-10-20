@@ -13,8 +13,8 @@ import (
 )
 
 // A person's app fetches the previews for the links in their message before
-// sealing it. A webhook's message has no app behind it, so the server fetches
-// them, the same way and through the same guarded fetcher, and adds them to
+// sealing it. A webhook's or a bot's message has no such app behind it, so the
+// server fetches them, the same way and through the same guarded fetcher, and adds them to
 // the message once they are in, as Discord does with the links a webhook
 // posts.
 
@@ -86,12 +86,16 @@ func (s *Server) unfurlWebhookMessage(msgID, chID ids.ID, content string) {
 			return
 		}
 		m, err := s.Store.MessageByID(ctx, msgID, 0)
-		if err != nil || m.WebhookID == nil || m.Flags&store.MsgFlagSuppressEmbeds != 0 {
+		if err != nil || m.Flags&store.MsgFlagSuppressEmbeds != 0 {
 			return
 		}
 		var p wmPlain
 		if err := json.Unmarshal(m.Webhook, &p); err != nil || p.Content != content {
 			// edited since: the edit fetches its own
+			return
+		}
+		// a webhook's message, or an app's (which has no webhook id unless it answers someone)
+		if m.WebhookID == nil && p.ApplicationID == nil {
 			return
 		}
 		p.LinkEmbeds = results
