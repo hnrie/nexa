@@ -1,4 +1,4 @@
-import { Ban, CalendarDays, Clock, Crown, Ellipsis, FolderOpen, Gavel, MessageSquareOff, Search, ShieldCheck, UserRoundX, Users } from "lucide-react";
+import { Ban, CalendarDays, Check, Clock, Crown, Ellipsis, FolderOpen, Gavel, ListChecks, MessageSquareOff, Search, ShieldCheck, UserRoundCheck, UserRoundX, Users, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { moderation as modApi, type GridShow, type GridSort, type ModUser } from "@/api/moderation";
@@ -74,7 +74,8 @@ const userGridMenu = defineMenu<UserGridMenuCtx>("userGrid", [
 ]);
 about(userGridMenu, ["user"], ({ user }) => ({ userId: user.id }));
 
-import { ModerateModal } from "./ModerateModal";
+import { AltAccountsModal, AltBadge } from "./AltAccounts";
+import { AvatarStack, ModerateModal } from "./ModerateModal";
 import { modStatus, StatusSummary } from "./ModStatus";
 import m from "./Moderation.module.css";
 
@@ -110,6 +111,24 @@ export function UserGrid() {
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [moderating, setModerating] = useState<ModUser | null>(null);
+  const [altsOf, setAltsOf] = useState<ModUser | null>(null);
+  // the accounts picked for an action on all of them at once, by id
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<Map<string, ModUser>>(new Map());
+  const [bulk, setBulk] = useState<ModUser[] | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const togglePick = (u: ModUser) =>
+    setPicked((cur) => {
+      const next = new Map(cur);
+      if (next.has(u.id)) next.delete(u.id);
+      else next.set(u.id, u);
+      return next;
+    });
+  const pickable = (u: ModUser) => !u.blocked && u.id !== ownerId;
+  const stopPicking = () => {
+    setPicking(false);
+    setPicked(new Map());
+  };
   const request = useRef(0);
   const sentinel = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -201,6 +220,43 @@ export function UserGrid() {
     );
   };
 
+  /** Disables or enables every picked account, one at a time. */
+  const bulkAccess = async (disabled: boolean) => {
+    const list = [...picked.values()];
+    setBulkBusy(true);
+    let failed = 0;
+    for (const u of list) {
+      try {
+        await modApi.access(u.id, { disabled });
+        await refresh(u.id);
+      } catch {
+        failed++;
+      }
+    }
+    setBulkBusy(false);
+    if (failed) toast(t("moderation.bulk.partly", { done: list.length - failed, count: list.length }), "error");
+    else toast(t("moderation.bulk.done", { count: list.length }), "success");
+  };
+  const askBulkAccess = (disabled: boolean) => {
+    const count = picked.size;
+    if (!disabled) return void bulkAccess(false);
+    openModal("confirm", {
+      title: t("moderation.bulk.disableTitle", { count }),
+      body: t("moderation.menu.disableBody"),
+      confirmLabel: t("moderation.menu.disable"),
+      danger: true,
+      onConfirm: () => bulkAccess(true),
+    });
+  };
+  const allPicked = !!users?.length && users.filter(pickable).every((u) => picked.has(u.id));
+  const pickAll = () =>
+    setPicked((cur) => {
+      const next = new Map(cur);
+      for (const u of users ?? []) if (allPicked) next.delete(u.id);
+      else if (pickable(u)) next.set(u.id, u);
+      return next;
+    });
+
   const shows: { id: GridShow; label: string }[] = [
     { id: "all", label: t("moderation.show.all") },
     { id: "online", label: t("moderation.show.online") },
@@ -230,6 +286,20 @@ export function UserGrid() {
           <option value="oldest">{t("moderation.sort.oldest")}</option>
           <option value="name">{t("moderation.sort.name")}</option>
         </Select>
+        {picking ? (
+          <>
+            <Button size="sm" variant="secondary" onClick={pickAll} data-testid="grid-pick-all">
+              <ListChecks size={15} aria-hidden="true" /> {allPicked ? t("moderation.bulk.unselectAll") : t("moderation.bulk.selectAll")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={stopPicking}>
+              {t("moderation.cancel")}
+            </Button>
+          </>
+        ) : (
+          <Button size="sm" variant="secondary" onClick={() => setPicking(true)} data-testid="grid-select">
+            <ListChecks size={15} aria-hidden="true" /> {t("moderation.bulk.select")}
+          </Button>
+        )}
       </div>
 
       {users === null && !failed ? (
@@ -269,6 +339,10 @@ export function UserGrid() {
               onCases={() => nav(`/channels/@admin/users/${u.id}/cases`)}
               onProfile={() => nav(`/channels/@admin/users/${u.id}`)}
               onMenu={(e) => menu(e, u)}
+              onAlts={() => setAltsOf(u)}
+              picking={picking}
+              picked={picked.has(u.id)}
+              onPick={pickable(u) ? () => togglePick(u) : undefined}
             />
           ))}
         </div>
@@ -286,12 +360,63 @@ export function UserGrid() {
           <Spinner size={24} label={t("chat.pins.loading")} />
         </div>
       ) : null}
+      {picking && picked.size > 0 ? (
+        <div className={m.bulkBar} role="region" aria-label={t("moderation.bulk.selected", { count: picked.size })} data-testid="bulk-bar">
+          <AvatarStack users={[...picked.values()]} size={28} />
+          <span className={m.bulkCount}>{t("moderation.bulk.selected", { count: picked.size })}</span>
+          <span className={m.grow} />
+          <Button size="sm" variant="ghost" onClick={() => setPicked(new Map())} aria-label={t("moderation.bulk.clear")}>
+            <X size={15} aria-hidden="true" /> {t("moderation.bulk.clear")}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => askBulkAccess(false)} loading={bulkBusy}>
+            <UserRoundCheck size={15} aria-hidden="true" /> {t("moderation.menu.enable")}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => askBulkAccess(true)} loading={bulkBusy}>
+            <UserRoundX size={15} aria-hidden="true" /> {t("moderation.menu.disable")}
+          </Button>
+          <Button size="sm" variant="primary" onClick={() => setBulk([...picked.values()])} data-testid="bulk-moderate">
+            <Gavel size={15} aria-hidden="true" /> {t("moderation.moderate")}
+          </Button>
+        </div>
+      ) : null}
+      {bulk ? (
+        <ModerateModal
+          user={bulk[0]!}
+          bulk={bulk}
+          onClose={() => setBulk(null)}
+          onDone={(c) => {
+            setPicked((cur) => {
+              const next = new Map(cur);
+              next.delete(c.user_id);
+              return next;
+            });
+            if (c.action === "delete") setUsers((cur) => cur?.filter((x) => x.id !== c.user_id) ?? cur);
+            else void refresh(c.user_id);
+          }}
+        />
+      ) : null}
+      {altsOf ? <AltAccountsModal user={altsOf} onClose={() => setAltsOf(null)} /> : null}
       {moderating ? <ModerateModal user={moderating} onClose={() => setModerating(null)} onDone={(c) => (c.action === "delete" ? setUsers((cur) => cur?.filter((x) => x.id !== c.user_id) ?? cur) : void refresh(c.user_id))} /> : null}
     </div>
   );
 }
 
-function UserCard({ u, owner, onModerate, onCases, onProfile, onMenu }: { u: ModUser; owner: boolean; onModerate: () => void; onCases: () => void; onProfile: () => void; onMenu: (e: MouseEvent) => void }) {
+interface UserCardProps {
+  u: ModUser;
+  owner: boolean;
+  onModerate: () => void;
+  onCases: () => void;
+  onProfile: () => void;
+  onMenu: (e: MouseEvent) => void;
+  onAlts: () => void;
+  /** The grid is picking accounts for an action on all of them. */
+  picking: boolean;
+  picked: boolean;
+  /** Unset for an account nobody may act on. */
+  onPick: (() => void) | undefined;
+}
+
+function UserCard({ u, owner, onModerate, onCases, onProfile, onMenu, onAlts, picking, picked, onPick }: UserCardProps) {
   const live = usePresence((p) => p.byUser[u.id]);
   const st = modStatus(u, live);
   const banner = bannerUrl(u.banner_id, 320);
@@ -305,9 +430,18 @@ function UserCard({ u, owner, onModerate, onCases, onProfile, onMenu }: { u: Mod
     </Button>
   );
   return (
-    <article className={m.card} data-state={state} onContextMenu={onMenu} data-testid="user-card" data-user={u.id}>
+    <article className={m.card} data-state={state} data-picked={picked || undefined} onContextMenu={onMenu}
+      // while picking, a click on the card (not on one of its buttons) picks it
+      onClick={picking && onPick ? (e) => !(e.target as HTMLElement).closest("button, a, input, label") && onPick() : undefined} data-testid="user-card" data-user={u.id}>
+      {picking ? (
+        <label className={m.pickBox} data-disabled={!onPick || undefined} title={onPick ? undefined : blockedText(u.blocked) || t("moderation.blocked.owner")}>
+          <input type="checkbox" checked={picked} disabled={!onPick} onChange={() => onPick?.()} aria-label={t("moderation.bulk.pick", { name: u.display_name })} data-testid="card-pick" />
+          <span aria-hidden="true">{picked ? <Check size={15} strokeWidth={3} /> : null}</span>
+        </label>
+      ) : null}
       <div className={m.cardBanner} style={banner ? { backgroundImage: `url(${banner})` } : { background: profileTheme(u.accent_color, u.accent_color_2, u.id) }} />
       <div className={m.cardFlags}>
+        <AltBadge user={u} onOpen={onAlts} />
         {u.ban ? (
           <span className={m.flag} data-tone="danger" title={u.ban.expires_at ? relativeTo(u.ban.expires_at) : undefined}>
             <Ban size={12} aria-hidden="true" />

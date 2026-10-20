@@ -155,3 +155,4 @@ From the owner (CLAUDE.md and standing feedback):
 | Long-press a member card on the Members page (Server Settings) to pick it | Done: ModMembers cards on phones |
 | An X on an app's command being filled in, to leave it in one tap | Done: CommandMode (Close Command) |
 | Tabs that do not fit on a phone (an app's five) slide sideways in their bar, not the whole page | Done: Designer.module.css `.scopeTabs` |
+| While picking accounts in the staff panel, a tap anywhere on a card picks it | Done: UserGrid cards |

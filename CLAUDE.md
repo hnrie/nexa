@@ -468,7 +468,7 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   `tools/gen_pg_schema.sh` prints the Postgres schema the SQLite migrations add up to, to diff
   against. chatd refuses to start on a database a newer build has migrated, so a release with a
   migration cannot roll back to `bin/chatd.prev`.
-- The tables, by area: accounts (`users`, `sessions`, `user_settings`, `user_mfa`,
+- The tables, by area: accounts (`users`, `sessions`, `user_ips`, `user_settings`, `user_mfa`,
   `mfa_backup_codes`, `user_sounds`, `username_holds`), people (`relationships`), conversations
   (`channels` for every kind, `dm_participants`, `channel_overwrites`, `channel_unlocks`,
   `thread_members`, `channel_follows`, `crossposts`), messages (`messages` with `ciphertext`, and
@@ -622,8 +622,19 @@ meter charges a pulled share sound at `StreamAudioBps` (128 kbit/s). The mesh ke
   other `moderation_*` files). The Bots tab (`GET /api/v1/moderation/apps`, `moderation_apps.go`,
   web `components/moderation/BotsTab.tsx`, Android `ui/moderation/Bots.kt`) lists every app with its
   owner, reach and whether it reads every message, while the people grid leaves bots out; Moderate
-  opens the bot's person page. Actions are recorded in `mod_log`; one on an account comes with a case
+  opens the bot's person page. The grid picks many accounts at once (Select, then a bar to
+  Moderate, Disable or Restore Sign-In all of them; web `UserGrid.tsx` with `ModerateModal`'s
+  `bulk`, Android `Users.kt` with `openModerate(bulk = ...)`): the apps send the same per-account
+  action for each one in turn, so every member gets a case of their own. Actions are recorded in `mod_log`; one on an account comes with a case
   (`mod_cases`) whose thread the member sees.
+- Alt accounts: `user_ips` keeps every address an account signed in or was active from
+  (`Store.RecordUserIP`, written when a session is made and whenever `auth.Check` sees a session
+  used from a new address or touches it, which also keeps `sessions.ip` current; deleted 180 days
+  after last use by the maintenance loop, and with the account). The grid and a person's page show
+  "Alt Accounts: N" (`alt_count`, `Store.AltCounts`) for accounts that share one, and
+  `GET /moderation/users/{id}/alts` lists them with how many addresses they share, never the
+  addresses (web `moderation/AltAccounts.tsx`, Android `ui/moderation/Alts.kt`). Only the
+  admin's legal report prints the addresses. The Privacy Policy, section 3e, describes it.
 - Bug reports (`/api/v1/bugs`), client crash reports (`/api/v1/client-errors`) and the admin's
   instance settings (registration mode and key, which override `chatd.env` until cleared).
 - Case threads and bug reports are conversations: either side writes and sends pictures and

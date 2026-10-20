@@ -192,6 +192,8 @@ fun SortField(options: List<Pair<String, String>>, selected: String, modifier: M
 fun Modifier.modCard(c: NexaColors, state: String? = null): Modifier {
     val shape = Radii.Lg
     val edged = when (state) {
+        // picked for an action on many: a ring of the accent (`.card[data-picked]`)
+        "picked" -> this.ring(shape, c.brand, 2.dp).boxShadow(shape, 12f, 30f, c.brand.copy(alpha = 0.6f), spread = -14f)
         "banned" -> this.ring(shape, c.danger.copy(alpha = 0.55f)).boxShadow(shape, 10f, 30f, c.danger.copy(alpha = 0.55f), spread = -14f)
         "muted" -> this.ring(shape, c.warning.copy(alpha = 0.5f)).boxShadow(shape, 10f, 30f, c.warning.copy(alpha = 0.45f), spread = -14f)
         else -> this.ring(shape, c.panelEdge).shadowMedium(shape, c)
@@ -220,6 +222,8 @@ fun Flag(label: String, tone: String = "", icon: String? = null) {
         "danger" -> null to c.onDanger
         "warn" -> mixSrgb(c.warning, Color.Black, 0.08f) to c.onWarning
         "muted" -> mixSrgb(c.statusOffline, Color.Black, 0.30f) to Color.White
+        // glass with the words in amber (`.altBadge`), set apart from a mute's solid amber
+        "alt" -> Color(0x9E0A0614) to c.warning
         else -> Color(0x8C0A0614) to Color.White
     }
     Row(
@@ -227,7 +231,7 @@ fun Flag(label: String, tone: String = "", icon: String? = null) {
             .height(22.dp)
             .boxShadow(shape, 2f, 8f, Color.Black.copy(alpha = 0.25f))
             .then(if (bg == null) Modifier.background(dangerGradient(c), shape) else Modifier.background(bg, shape))
-            .topEdge(shape, Color.White.copy(alpha = 0.14f))
+            .then(if (tone == "alt") Modifier.ring(shape, c.warning.copy(alpha = 0.55f)) else Modifier.topEdge(shape, Color.White.copy(alpha = 0.14f)))
             .padding(horizontal = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),

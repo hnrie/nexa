@@ -295,6 +295,11 @@ func maintenance(ctx context.Context, log *slog.Logger, st *store.Store, m *medi
 		} else if n > 0 {
 			log.Info("session sweep", "removed", n)
 		}
+		if n, err := st.DeleteStaleUserIPs(ctx, time.Now().AddDate(0, 0, -store.UserIPRetentionDays).UnixMilli()); err != nil {
+			log.Warn("address sweep", "err", err)
+		} else if n > 0 {
+			log.Info("address sweep", "removed", n)
+		}
 		// transfers nobody came back to finish, and the bytes they left behind
 		if stale, err := st.StaleUploads(ctx, time.Now().Add(-24*time.Hour).UnixMilli()); err == nil && len(stale) > 0 {
 			for _, id := range stale {

@@ -124,6 +124,16 @@ data class StaffBug(
 @Serializable
 data class ModPresence(val status: String = "offline", val activities: List<Activity>? = null)
 
+/** An account that shares an address with another (an alt account, or someone on the same network). */
+@Serializable
+data class ModAlt(
+    val user: ModUser,
+    /** How many addresses the two have in common. */
+    @SerialName("shared_ips") val sharedIps: Int = 0,
+    /** When either was last at a shared address. */
+    @SerialName("last_shared_at") val lastSharedAt: Long = 0,
+)
+
 /** An account in the panel's grid (ModUser). */
 @Serializable
 data class ModUser(
@@ -148,6 +158,8 @@ data class ModUser(
     @SerialName("open_cases") val openCases: Int = 0,
     @SerialName("awaiting_cases") val awaitingCases: Int = 0,
     @SerialName("last_seen_at") val lastSeenAt: Long? = null,
+    /** How many other accounts have used one of this account's addresses. */
+    @SerialName("alt_count") val altCount: Int = 0,
     val mute: Restriction? = null,
     val ban: Restriction? = null,
     /** Why the viewer cannot act on this account ("" when they can). */
@@ -541,6 +553,9 @@ object Moderation {
             put("fields", JsonArray(fields.map { JsonPrimitive(it) }))
             put("reason", reason)
         })
+
+    /** The accounts seen at the same addresses as this one, the most shared first. */
+    suspend fun alts(id: String): List<ModAlt> = list(obj(Nexa.api.get("/moderation/users/$id/alts")), "alts", ModAlt.serializer())
 
     suspend fun purgePreview(id: String): PurgeCounts = request(PurgeCounts.serializer(), "GET", "/moderation/users/$id/purge-preview")
 

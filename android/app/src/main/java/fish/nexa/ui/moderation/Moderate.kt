@@ -290,15 +290,23 @@ private class ModerateState(u: ModUser, initial: String?, preset: ModeratePreset
  * up, say why. The reason goes to the member, word for word, with the
  * moderator's name, so the dialog says so beside the box it is typed in.
  */
-fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = null, preset: ModeratePreset? = null, onDone: (StaffCase) -> Unit) {
+fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = null, preset: ModeratePreset? = null, bulk: List<ModUser>? = null, onDone: (StaffCase) -> Unit) {
+    // everyone the action is for when it is more than one account (u is the first); each gets a case of their own
+    val many = bulk?.takeIf { it.size > 1 }
     val s = ModerateState(u, initial, preset, servers)
+    if (many != null) {
+        s.avatar = true
+        s.banner = false
+    }
+    // for many accounts, the number of them is what is typed
+    val confirmWord = many?.size?.toString() ?: u.username
     val nicknamed = servers?.filter { it.nickname.isNotEmpty() }
     val profiled = servers?.filter { it.hasProfile }
     // a picture of theirs in one of their servers counts as theirs to take down
     val serverAvatar = servers?.any { it.avatarId != null } == true
     val serverBanner = servers?.any { it.bannerId != null } == true
-    val hasAvatar = u.avatarId != null || serverAvatar
-    val hasBanner = u.bannerId != null || serverBanner
+    val hasAvatar = many != null || u.avatarId != null || serverAvatar
+    val hasBanner = many != null || u.bannerId != null || serverBanner
     val widgets = (u.widgets as? JsonArray)?.mapNotNull { it as? JsonObject }?.let { Widgets.read(it) } ?: emptyList()
     val values = mapOf(
         "username" to "@" + u.username,
@@ -322,7 +330,7 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
             "field_reset" -> s.fields.isNotEmpty()
             "mute" -> s.muteFor.value in MINUTE..MAX_MUTE
             "ban" -> s.banFor.value == -1L || s.banFor.value in MINUTE..MAX_BAN
-            else -> s.confirm.trim().lowercase() == u.username
+            else -> s.confirm.trim().lowercase() == confirmWord
         }
     }
 
@@ -345,13 +353,40 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
             if (a == "field_reset") put("fields", JsonArray(s.fields.map { JsonPrimitive(it) }))
             if (a == "mute") put("duration_ms", s.muteFor.value)
             if (a == "ban") { if (s.banFor.value == -1L) put("permanent", true) else put("duration_ms", s.banFor.value) }
-            if (a == "delete") put("confirm", u.username)
         }
         s.busy = true
         s.error = null
+        if (many != null) {
+            // one at a time, so each member gets their own case and message
+            Nexa.scope.launch {
+                var done = 0
+                val failed = ArrayList<String>()
+                for (x in many) {
+                    try {
+                        val cs = actOnOne(x, if (a == "delete") JsonObject(body + ("confirm" to JsonPrimitive(x.username))) else body)
+                        if (cs != null) {
+                            done++
+                            onDone(cs)
+                        }
+                    } catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        failed += x.displayName + ": " + describeError(e, t("moderation.failed"))
+                    }
+                }
+                s.busy = false
+                if (failed.isEmpty()) {
+                    Nexa.ui.toast(t("moderation.bulk.done", "count" to done), "success")
+                    close()
+                } else {
+                    s.error = (listOf(t("moderation.bulk.partly", "done" to done, "count" to many.size)) + failed).joinToString("\n")
+                }
+            }
+            return
+        }
+        val one = if (a == "delete") JsonObject(body + ("confirm" to JsonPrimitive(u.username))) else body
         Nexa.scope.launch {
             try {
-                val cs = Moderation.act(u.id, body)
+                val cs = Moderation.act(u.id, one)
                 Nexa.ui.toast(t("moderation.done", "number" to cs.number, "name" to u.displayName), "success")
                 onDone(cs)
                 close()
@@ -367,11 +402,14 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
         "moderate",
         top = { close ->
             ModSheetTop(
-                s.action?.let { actionTitle(it) } ?: t("moderation.moderateNamed", "name" to u.displayName),
+                s.action?.let { actionTitle(it) } ?: if (many != null) t("moderation.bulk.title", "count" to many.size) else t("moderation.moderateNamed", "name" to u.displayName),
                 close,
                 onBack = if (s.action != null && initial == null) ({ s.action = null; s.error = null }) else null,
-                leading = { Avatar(u.id, u.displayName, u.avatarId, 40.dp, status = modStatus(u).status) },
-            ) { TargetLine(u) }
+                leading = { if (many != null) AvatarStack(many) else Avatar(u.id, u.displayName, u.avatarId, 40.dp, status = modStatus(u).status) },
+            ) {
+                if (many != null) Txt(many.joinToString(", ") { "@" + it.username }, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = Nx.colors.textMuted, maxLines = 1)
+                else TargetLine(u)
+            }
         },
         foot = { close ->
             ModSheetFoot(if (s.action != null) t("moderation.form.notifies") else t("moderation.form.chooseHint"), close) {
@@ -386,6 +424,7 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
                 for (a in ACTIONS) {
                     val nothing = a == "avatar_remove" && !hasAvatar && !hasBanner
                     val desc = when {
+                        many != null -> actionBlurb(a)
                         nothing -> t("moderation.act.avatarNone")
                         a == "mute" && u.mute != null -> u.mute.expiresAt?.let { t("moderation.act.alreadyMuted", "when" to Time.relativeTo(it)) } ?: t("moderation.act.alreadyMutedForever")
                         a == "ban" && u.ban != null -> u.ban.expiresAt?.let { t("moderation.act.alreadyBanned", "when" to Time.relativeTo(it)) } ?: t("moderation.act.alreadyBannedForever")
@@ -394,7 +433,11 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
                     ActionTile(a, desc, !nothing) { s.action = a }
                 }
             }
-            "avatar_remove" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            "avatar_remove" -> if (many != null) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel(t("moderation.form.whatToRemove"))
+                PickBox(s.avatar, true, { s.avatar = !s.avatar }, label = t("moderation.field.avatar")) { PickText(t("moderation.field.avatar"), t("moderation.bulk.whereSet")) }
+                PickBox(s.banner, true, { s.banner = !s.banner }, label = t("moderation.field.banner")) { PickText(t("moderation.field.banner"), t("moderation.bulk.whereSet")) }
+            } else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel(t("moderation.form.whatToRemove"))
                 PickBox(s.avatar, hasAvatar, { s.avatar = !s.avatar }, label = t("moderation.field.avatar")) {
                     Avatar(u.id, u.displayName, u.avatarId, 32.dp)
@@ -408,14 +451,17 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
             "field_reset" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel(t("moderation.form.whatToReset"))
                 for (f in RESET_FIELDS) {
-                    val empty = when (f) {
+                    val empty = when {
+                        many != null -> false
+                        else -> when (f) {
                         "nicknames" -> nicknamed != null && nicknamed.isEmpty()
                         "server_profiles" -> profiled != null && profiled.isEmpty()
                         "username", "display_name" -> false
                         else -> values[f].isNullOrEmpty()
+                        }
                     }
                     PickBox(f in s.fields, !empty, { s.fields = if (f in s.fields) s.fields - f else s.fields + f }, label = fieldLabel(f)) {
-                        PickText(fieldLabel(f), if (empty) t("moderation.form.empty") else values[f])
+                        PickText(fieldLabel(f), if (many != null) t("moderation.bulk.whereSet") else if (empty) t("moderation.form.empty") else values[f])
                     }
                 }
                 NoteBox(
@@ -435,11 +481,12 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
                 NoteBox(t("moderation.form.banNote"))
             }
             "delete" -> {
-                LaunchedEffect(Unit) { if (s.preview == null) s.preview = runCatching { Moderation.purgePreview(u.id) }.getOrNull() }
+                LaunchedEffect(Unit) { if (s.preview == null && many == null) s.preview = runCatching { Moderation.purgePreview(u.id) }.getOrNull() }
                 DangerBox {
-                    Txt(t("moderation.delete.warning"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(700)), color = c.textDanger)
+                    Txt(if (many != null) t("moderation.bulk.deleteWarning", "count" to many.size) else t("moderation.delete.warning"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(700)), color = c.textDanger)
                     val p = s.preview
-                    if (p == null) Box(Modifier.padding(8.dp)) { Spinner(size = 20.dp) }
+                    if (many != null) Unit
+                    else if (p == null) Box(Modifier.padding(8.dp)) { Spinner(size = 20.dp) }
                     else Column(Modifier.padding(start = 6.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         for (line in listOf(
                             t("moderation.delete.messages", "count" to p.messages),
@@ -454,13 +501,45 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
                 }
                 // not in capitals like the other labels: the username in it is typed exactly as shown
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Txt(t("moderation.delete.confirmLabel", "username" to u.username), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), fontWeight = FontWeight(600)), color = c.textSubtle)
-                    NxTextField(s.confirm, { s.confirm = it }, placeholder = u.username)
+                    Txt(if (many != null) t("moderation.bulk.confirmLabel", "count" to many.size) else t("moderation.delete.confirmLabel", "username" to u.username), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), fontWeight = FontWeight(600)), color = c.textSubtle)
+                    NxTextField(s.confirm, { s.confirm = it }, placeholder = confirmWord)
                 }
             }
         }
         if (s.action != null) ReasonSection(s.reason, { s.reason = it }, t("moderation.form.reasonPlaceholder"), t("moderation.form.reasonVisible"), quickReasons(t("moderation.quick.evasion")))
         s.error?.let { e -> DangerBox { Txt(e, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text) } }
+    }
+}
+
+/**
+ * One account's part of an action for many. Pictures they do not have are
+ * left out rather than failing: null when there was nothing of theirs to take.
+ */
+private suspend fun actOnOne(u: ModUser, body: JsonObject): StaffCase? {
+    try {
+        return Moderation.act(u.id, body)
+    } catch (e: fish.nexa.net.ApiError) {
+        val images = body["images"] as? JsonObject
+        if (images == null || (e.code != "no_avatar" && e.code != "no_banner")) throw e
+        val avatar = e.code == "no_banner" && (images["avatar"] as? JsonPrimitive)?.content == "true"
+        val banner = e.code == "no_avatar" && (images["banner"] as? JsonPrimitive)?.content == "true"
+        if (!avatar && !banner) return null
+        return actOnOne(u, JsonObject(body + ("images" to buildJsonObject { put("avatar", avatar); put("banner", banner) })))
+    }
+}
+
+/** `.avatarStack`: the first few of the accounts a dialog is for, overlapping. */
+@Composable
+fun AvatarStack(users: List<ModUser>, size: androidx.compose.ui.unit.Dp = 32.dp) {
+    val c = Nx.colors
+    val shown = users.take(4)
+    Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
+        for (u in shown) {
+            Box(Modifier.border(2.dp, c.bgFloating, CircleShape)) { Avatar(u.id, u.displayName, u.avatarId, size) }
+        }
+        if (users.size > shown.size) Box(Modifier.size(size).background(c.bgActive, CircleShape).border(2.dp, c.bgFloating, CircleShape), contentAlignment = Alignment.Center) {
+            Txt("+" + (users.size - shown.size), style = Nx.type.hint.copy(fontSize = Nx.type.sp(11f), fontWeight = FontWeight(700)), color = c.textStrong)
+        }
     }
 }
 

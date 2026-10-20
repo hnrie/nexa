@@ -40,6 +40,8 @@ type AccountRecord struct {
 
 	Sessions []LegalSession // sessions
 	Unlocks  int            // channel_unlocks, through those sessions
+	// Addresses are every address the account has used, kept for security.
+	Addresses []LegalAddress // user_ips
 
 	Outgoing []LegalRelationship // relationships, user_id = them
 	Incoming []LegalRelationship // relationships, target_id = them
@@ -133,6 +135,13 @@ type LegalSession struct {
 	IP         string
 	CreatedAt  int64
 	LastSeenAt int64
+}
+
+// LegalAddress is one user_ips row.
+type LegalAddress struct {
+	IP          string
+	FirstSeenAt int64
+	LastSeenAt  int64
 }
 
 // LegalRelationship is one relationships row. Nickname is the private note the
@@ -483,6 +492,21 @@ func (s *Store) legalSessions(ctx context.Context, rec *AccountRecord, uid int64
 		rec.Sessions = append(rec.Sessions, se)
 	}
 	if err := rows.Err(); err != nil {
+		return err
+	}
+	addrs, err := s.db.R.QueryContext(ctx, `SELECT ip, first_seen_at, last_seen_at FROM user_ips WHERE user_id = ? ORDER BY first_seen_at`, uid)
+	if err != nil {
+		return err
+	}
+	defer addrs.Close()
+	for addrs.Next() {
+		var a LegalAddress
+		if err := addrs.Scan(&a.IP, &a.FirstSeenAt, &a.LastSeenAt); err != nil {
+			return err
+		}
+		rec.Addresses = append(rec.Addresses, a)
+	}
+	if err := addrs.Err(); err != nil {
 		return err
 	}
 	return s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM channel_unlocks WHERE session_id IN (SELECT id FROM sessions WHERE user_id = ?)`, uid).Scan(&rec.Unlocks)

@@ -2389,7 +2389,7 @@ func (s *Server) liveInvite(r *http.Request, code string) (*store.Invite, error)
 	if u == nil {
 		// the preview is public, and says more to the account it was spent on
 		if token := auth.BearerToken(r); token != "" {
-			u, _, _ = s.Auth.Check(r.Context(), token)
+			u, _, _ = s.Auth.Check(r.Context(), token, auth.ClientIP(r))
 		}
 	}
 	if u == nil || s.Store.SignupInvite(r.Context(), u.ID) != code {

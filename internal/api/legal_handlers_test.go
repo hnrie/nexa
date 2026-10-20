@@ -77,7 +77,8 @@ func TestLegalReport(t *testing.T) {
 	// What Bob actually did is in it, from the tables it came from.
 	for _, want := range []string{
 		"Bob's place",    // servers, through his membership and his ownership
-		"IP at sign-in:", // sessions.ip
+		"IP last used:", // sessions.ip
+		"Addresses used:", // user_ips
 		"User agent:",    // sessions.user_agent
 		"account " + idA, // relationships, both directions
 		"dm " + dm,       // dm_participants joined to channels
@@ -195,7 +196,7 @@ func TestLegalReportEmptyAccount(t *testing.T) {
 	if got := fieldValue(doc, "Sessions held now:"); got != "1" {
 		t.Errorf("sessions reads %q, want the registration session", got)
 	}
-	if got := fieldValue(doc, "IP at sign-in:"); got == "" {
+	if got := fieldValue(doc, "IP last used:"); got == "" {
 		t.Error("the registration session has no address in the report")
 	}
 }

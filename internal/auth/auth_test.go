@@ -108,7 +108,7 @@ func TestMiddleware(t *testing.T) {
 	}
 	// expired by TTL
 	a2 := &Authenticator{Store: st, TTL: time.Minute}
-	_ = st.TouchSession(ctx, se.ID, time.Now().UnixMilli()-2*time.Minute.Milliseconds())
+	_ = st.TouchSession(ctx, se, "", time.Now().UnixMilli()-2*time.Minute.Milliseconds())
 	rec = httptest.NewRecorder()
 	a2.Middleware(h).ServeHTTP(rec, req)
 	if rec.Code != 401 {

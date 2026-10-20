@@ -327,6 +327,7 @@ func (c *conn) revoke() {
 // ServeHTTP upgrades the request and runs the connection until it ends.
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ip := auth.RateKey(r)
+	clientIP := auth.ClientIP(r)
 	// A socket that has not identified still costs a goroutine and a file
 	// descriptor for as long as identifyTimeout allows, and it needs no
 	// account at all, so the room for it is taken before the upgrade — a
@@ -367,7 +368,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	var idd identifyData
 	_ = json.Unmarshal(frame.D, &idd)
-	user, session, err := h.auth.Check(ctx, idd.Token)
+	user, session, err := h.auth.Check(ctx, idd.Token, clientIP)
 	if err != nil {
 		// the database failed, not the token: the client tries again rather
 		// than signing out

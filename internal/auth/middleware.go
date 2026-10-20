@@ -39,15 +39,16 @@ var ErrUnavailable = errors.New("auth: the token could not be checked")
 // token is missing, unknown, expired, or the account cannot log in — or when
 // it could not be checked; Check tells those apart.
 func (a *Authenticator) Resolve(ctx context.Context, token string) (*store.User, *store.Session) {
-	u, se, _ := a.Check(ctx, token)
+	u, se, _ := a.Check(ctx, token, "")
 	return u, se
 }
 
 // Check is Resolve that also says when the token could not be checked at
 // all (ErrUnavailable). A client told its session is gone throws away its
 // keys and signs out, so a database that is down for a moment must not look
-// like every session ending.
-func (a *Authenticator) Check(ctx context.Context, token string) (*store.User, *store.Session, error) {
+// like every session ending. ip is the address the token came from ("" when
+// not known), which the session and the account's addresses keep.
+func (a *Authenticator) Check(ctx context.Context, token, ip string) (*store.User, *store.Session, error) {
 	if token == "" || len(token) > 256 {
 		return nil, nil, nil
 	}
@@ -73,8 +74,11 @@ func (a *Authenticator) Check(ctx context.Context, token string) (*store.User, *
 	if u.Flags&(store.FlagDisabled|store.FlagDeleted) != 0 {
 		return nil, nil, nil
 	}
-	if now-se.LastSeenAt > touchInterval.Milliseconds() {
-		_ = a.Store.TouchSession(ctx, se.ID, now)
+	if now-se.LastSeenAt > touchInterval.Milliseconds() || (ip != "" && ip != se.IP) {
+		_ = a.Store.TouchSession(ctx, se, ip, now)
+		if ip != "" {
+			se.IP = ip
+		}
 		se.LastSeenAt = now
 	}
 	return u, se, nil
@@ -110,7 +114,7 @@ func (a *Authenticator) GuestAlive(ctx context.Context, id ids.ID) bool {
 func (a *Authenticator) CallMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := BearerToken(r)
-		u, se, err := a.Check(r.Context(), token)
+		u, se, err := a.Check(r.Context(), token, ClientIP(r))
 		if err != nil {
 			unavailable(w)
 			return
@@ -156,7 +160,7 @@ func unauthorized(w http.ResponseWriter) {
 func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := BearerToken(r)
-		u, se, err := a.Check(r.Context(), token)
+		u, se, err := a.Check(r.Context(), token, ClientIP(r))
 		if err != nil {
 			unavailable(w)
 			return

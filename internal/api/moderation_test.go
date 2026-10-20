@@ -73,7 +73,7 @@ func TestModerationIsStaffOnly(t *testing.T) {
 	_, ts := newTestServer(t)
 	register(t, ts, "owner")
 	tok, _ := register(t, ts, "member")
-	for _, p := range []string{"/api/v1/moderation/summary", "/api/v1/moderation/users", "/api/v1/moderation/cases", "/api/v1/moderation/log", "/api/v1/moderation/announcements", "/api/v1/moderation/packs", "/api/v1/moderation/uploads"} {
+	for _, p := range []string{"/api/v1/moderation/summary", "/api/v1/moderation/users", "/api/v1/moderation/cases", "/api/v1/moderation/log", "/api/v1/moderation/announcements", "/api/v1/moderation/packs", "/api/v1/moderation/uploads", "/api/v1/moderation/users/1/alts"} {
 		if res, body := do(t, ts, "GET", p, tok, nil); res.StatusCode != 403 || errCode(body) != "admin_only" {
 			t.Errorf("%s as a member: %d %v", p, res.StatusCode, body)
 		}
@@ -951,5 +951,51 @@ func TestModGridPresence(t *testing.T) {
 	}
 	if p, _ := body["user"].(map[string]any)["presence"].(map[string]any); p["status"] != "online" {
 		t.Fatalf("user presence: %v", body["user"])
+	}
+}
+
+// Accounts used from the same address show as each other's alts, in the grid
+// and in the full list; a deleted one drops out of both.
+func TestModerationAltAccounts(t *testing.T) {
+	srv, ts := newTestServer(t)
+	ownTok, _ := register(t, ts, "owner")
+	_, aID := register(t, ts, "alta")
+	_, bID := register(t, ts, "altb")
+	_, cID := register(t, ts, "altc")
+	// the test server sees every request from one address; give c its own
+	if _, err := srv.Store.DB().W.Exec(`DELETE FROM user_ips WHERE user_id = ?`, modID(cID)); err != nil {
+		t.Fatal(err)
+	}
+	_ = srv.Store.RecordUserIP(context.Background(), modID(cID), "192.0.2.77", 1)
+	_, body := do(t, ts, "GET", "/api/v1/moderation/users?show=all", ownTok, nil)
+	counts := map[string]float64{}
+	for _, u := range body["users"].([]any) {
+		m := u.(map[string]any)
+		counts[m["id"].(string)] = m["alt_count"].(float64)
+	}
+	if counts[aID] != 2 || counts[bID] != 2 || counts[cID] != 0 {
+		t.Fatalf("alt counts: %v", counts)
+	}
+	res, body := do(t, ts, "GET", "/api/v1/moderation/users/"+aID+"/alts", ownTok, nil)
+	alts, _ := body["alts"].([]any)
+	if res.StatusCode != 200 || len(alts) != 2 {
+		t.Fatalf("alts of a: %d %v", res.StatusCode, body)
+	}
+	found := false
+	for _, a := range alts {
+		m := a.(map[string]any)
+		if m["user"].(map[string]any)["id"] == bID && m["shared_ips"].(float64) == 1 {
+			found = true
+		}
+		if _, leaked := m["ip"]; leaked {
+			t.Error("the address itself is shown")
+		}
+	}
+	if !found {
+		t.Errorf("b missing from a's alts: %v", alts)
+	}
+	_, body = do(t, ts, "GET", "/api/v1/moderation/users/"+aID, ownTok, nil)
+	if n := body["user"].(map[string]any)["alt_count"]; n != float64(2) {
+		t.Errorf("detail alt_count %v", n)
 	}
 }

@@ -95,7 +95,9 @@ Please keep Nexa decent. These rules apply everywhere on it:
      pretend to be Nexa or a member of staff.
   6. Do not abuse the service. No spam, no scraping, no trying to get
      around access controls, rate limits, or anyone's security, and
-     no new accounts to get around a mute or a ban.
+     no new accounts to get around a mute or a ban. To enforce this,
+     staff can see which accounts have signed in from the same IP
+     addresses (the Privacy Policy, section 3e, says what is kept).
 
 5. HOW MODERATION WORKS
 

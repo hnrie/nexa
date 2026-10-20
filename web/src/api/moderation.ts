@@ -206,6 +206,15 @@ export type FeedItem =
 
 export type BlockReason = "" | "self" | "system" | "deleted" | "owner" | "staff";
 
+/** An account that shares an address with another (an alt account, or someone on the same network). */
+export interface ModAlt {
+  user: ModUser;
+  /** How many addresses the two have in common. */
+  shared_ips: number;
+  /** When either was last at a shared address. */
+  last_shared_at: number;
+}
+
 /** An account in the moderation grid. */
 export interface ModUser extends PublicUser {
   /** Every flag, including disabled and deleted. */
@@ -214,6 +223,8 @@ export interface ModUser extends PublicUser {
   open_cases: number;
   awaiting_cases: number;
   last_seen_at: number | null;
+  /** How many other accounts have used one of this account's addresses. Absent from older servers. */
+  alt_count?: number;
   mute: Restriction | null;
   ban: Restriction | null;
   /** Why the viewer cannot act on this account ("" when they can). */
@@ -462,6 +473,10 @@ export const moderation = {
   /** Puts one file up for a staff line not sent yet. */
   upload(file: Blob, name: string, opts?: Pick<UploadOptions, "onProgress" | "signal">): Promise<CaseFile> {
     return uploadCaseFile("/moderation/cases/attachments", file, name, opts);
+  },
+  /** The accounts seen at the same addresses as this one, the most shared first. */
+  alts(id: Snowflake): Promise<{ alts: ModAlt[] }> {
+    return api.request("GET", `/moderation/users/${id}/alts`);
   },
   purgePreview(id: Snowflake): Promise<PurgeCounts> {
     return api.request("GET", `/moderation/users/${id}/purge-preview`);

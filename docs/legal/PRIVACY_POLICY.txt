@@ -22,6 +22,10 @@ under data protection law, including the GDPR (sections 9 to 11).
   server needs (who sent what, where, and when), bug reports you send,
   and moderation records: the actions taken on an account or a server,
   and the case threads with Nexa that go with them.
+- For security, Nexa keeps the IP addresses each account signs in and
+  is active from (section 3e). Staff use them only to find accounts
+  that share an address, such as a second account made to get around
+  a ban. The moderation panel never shows the addresses themselves.
 - Nexa uses a few outside services, listed in section 6 with what
   each one gets. Cloudflare carries all traffic to and from Nexa, runs
   the captcha, and relays calls. None of them can read your messages.
@@ -112,16 +116,31 @@ d) Membership and structure (typed by users, stored as typed):
    A message a webhook posts is stored readable, as it arrived, with
    any files that came with it.
 
-e) Sessions and guest entries (the only places an IP address is
-   written): one entry per signed in device, with the session ID, the
-   IP address noted once at sign in (never updated), the browser or
-   app description, and the sign in and last active times. You can
-   see your own, and sign any of them out, in Settings → Devices.
-   Staff see when an account was last active in the moderation panel.
-   Entries are deleted on sign out or after 90 days without use. A
-   locked subchat also notes which sessions typed its password (the
-   password itself is not kept; it only unlocks the screen, and
-   messages stay encrypted under the conversation key).
+e) Sessions, account addresses and guest entries (the only places an
+   IP address is written): one entry per signed in device, with the
+   session ID, the IP address it was last used from (kept up to date
+   while you use it), the browser or app description, and the sign in
+   and last active times. You can see your own, and sign any of them
+   out, in Settings → Devices. Staff see when an account was last
+   active in the moderation panel. Entries are deleted on sign out or
+   after 90 days without use. A locked subchat also notes which
+   sessions typed its password (the password itself is not kept; it
+   only unlocks the screen, and messages stay encrypted under the
+   conversation key).
+   - Account addresses: every IP address your
+     account has signed in or been active from, with when it was first
+     and last seen there. The list is kept up to date while you use
+     Nexa and stays after you sign out. It is there for security: the
+     moderation panel shows staff which other accounts have used the
+     same addresses (marked "Alt Accounts", with how many addresses
+     they share), so they can spot accounts made to get around a mute
+     or a ban. The panel never shows the addresses themselves; the
+     owner produces them only to answer a valid legal order (Terms
+     section 5). Several people on one network (a home, a school, a
+     VPN) can share an address, so staff treat a match as something to
+     look into, not proof. An address is deleted 180 days after your
+     account last used it, and all of them are deleted with your
+     account.
    - Guest entries: someone who joins a call through a guest link gets
      an entry with the name they typed, the call, the IP address they
      joined from, and when they joined. Nobody sees that address in
@@ -225,19 +244,20 @@ j) Apps (not end-to-end encrypted, added only by people who choose
 4. WHAT IS NEVER COLLECTED
 
 No email address. No phone number. No legal name, birth date, age, or
-ID documents. No payment details. No registration IP or last known IP
-field beyond the sign in and guest entries above. No IP or access
-history. No online time history. No call records beyond the line in
-3c: who joined a call, and for how long, is held in memory while the
-call lasts and otherwise exists only inside that line's encrypted
-summary. No device or advertising IDs and no push tokens. No location.
-No address book imports. No link clicks, analytics, or tracking of any
-kind. No record of what you search for: message search runs on your
-device, using messages it already decrypted, and GIF, game, and music
-searches pass through the server to the services in section 6, with
-recent results kept in memory (GIFs for two minutes, games and music
-for a day) and nothing saying who searched. No readable drafts or
-unsent copies: drafts live only inside your encrypted settings.
+ID documents. No payment details. No IP addresses beyond the sessions,
+account addresses and guest entries above. No access history beyond
+when each of those addresses was first and last used. No online time
+history. No call records beyond the line in 3c: who joined a call, and
+for how long, is held in memory while the call lasts and otherwise
+exists only inside that line's encrypted summary. No device or
+advertising IDs and no push tokens. No location. No address book
+imports. No link clicks, analytics, or tracking of any kind. No record
+of what you search for: message search runs on your device, using
+messages it already decrypted, and GIF, game, and music searches pass
+through the server to the services in section 6, with recent results
+kept in memory (GIFs for two minutes, games and music for a day) and
+nothing saying who searched. No readable drafts or unsent copies:
+drafts live only inside your encrypted settings.
 
 5. WHO SEES WHAT
 
@@ -246,8 +266,9 @@ unsent copies: drafts live only inside your encrypted settings.
   them.
 - The owner and the staff they appoint see sections 3a to 3j. Staff
   use a moderation panel that shows public profiles, what servers
-  show everyone, when accounts were last active, moderation cases and
-  their threads, the log, announcements, and bug reports. It shows
+  show everyone, when accounts were last active, which accounts have
+  used the same IP addresses (never the addresses), moderation cases
+  and their threads, the log, announcements, and bug reports. It shows
   nothing that is encrypted, because nothing here can decrypt it.
 - Link previews, pictures and videos linked from elsewhere, GIFs, and
   YouTube videos are fetched by the Nexa server, not by your device,
@@ -344,6 +365,8 @@ calls.
   after they joined, whichever comes first. Guest links: until they
   are revoked, or once they have expired and nobody who joined
   through them is left.
+- Account addresses: 180 days after the account last used each one,
+  or until the account is deleted.
 - IP addresses counted in memory: a few hours after the last request.
 - Messages and files: until they are deleted: by their author, by a
   conversation or server owner, with the author's account, or, in a
@@ -386,11 +409,11 @@ calls.
   invite and guest links you made, the servers and group chats you own
   (for everyone in them), the apps you made with their bots, and your
   direct message conversations, for both people in them. Its profile
-  is overwritten, and its sessions, relationships, settings, keys,
-  second factor, linked Discord account, and crash reports are
-  deleted. What is left is a stand-in named Deleted User, with the
-  account ID, when it was made, its public key, and its color and
-  privacy choices, which nobody can sign in as.
+  is overwritten, and its sessions, account addresses, relationships,
+  settings, keys, second factor, linked Discord account, and crash
+  reports are deleted. What is left is a stand-in named Deleted User,
+  with the account ID, when it was made, its public key, and its color
+  and privacy choices, which nobody can sign in as.
 - When someone you have a direct message conversation with deletes
   their own account, that conversation is deleted for you too.
 - When staff delete an account, everything it posted and uploaded is
@@ -433,11 +456,13 @@ of your data. These are Nexa's:
 - To keep Nexa secure and working (legitimate interests, Nexa's and
   every member's): the captcha, rate limits, the IP addresses in
   section 3e, crash reports, and backups.
-- To enforce the rules (legitimate interests): moderation cases and
-  their threads, the moderation log, held usernames, and fingerprints
-  of removed pictures. They are kept after an account is deleted so
-  that what was done, by whom, and why stays on record, and so a name
-  or picture that was taken down stays down.
+- To enforce the rules (legitimate interests): the account addresses
+  in section 3e, which show staff the accounts that share one and go
+  with the account; and moderation cases and their threads, the
+  moderation log, held usernames, and fingerprints of removed
+  pictures, which are kept after an account is deleted so that what
+  was done, by whom, and why stays on record, and so a name or picture
+  that was taken down stays down.
 - To follow the law (a legal obligation): answering a valid legal
   order, as Terms section 5 explains.
 

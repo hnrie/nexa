@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,7 +34,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
@@ -57,7 +63,12 @@ import fish.nexa.ui.shell.copyText
 import fish.nexa.ui.shell.openProfile
 import fish.nexa.ui.t
 import fish.nexa.ui.theme.Nx
+import fish.nexa.ui.Icon
+import fish.nexa.ui.theme.Radii
 import fish.nexa.ui.theme.ring
+import fish.nexa.ui.theme.shadowHigh
+import fish.nexa.ui.theme.sheen
+import fish.nexa.ui.theme.topEdge
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -88,6 +99,16 @@ fun UsersTab() {
     var loading by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var request by remember { mutableStateOf(0) }
+    // the accounts picked for an action on all of them at once
+    var picking by remember { mutableStateOf(false) }
+    val picked = remember { mutableStateListOf<ModUser>() }
+    var bulkBusy by remember { mutableStateOf(false) }
+    val ownerId by Moderation.ownerId.collectAsState()
+    fun pickable(u: ModUser) = u.blocked.isEmpty() && u.id != ownerId
+    fun togglePick(u: ModUser) {
+        val i = picked.indexOfFirst { it.id == u.id }
+        if (i >= 0) picked.removeAt(i) else picked.add(u)
+    }
 
     fun load(from: String) {
         val id = ++request
@@ -151,16 +172,47 @@ fun UsersTab() {
     val nearEnd by remember { derivedStateOf { list.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let { it >= list.layoutInfo.totalItemsCount - 4 } == true } }
     LaunchedEffect(nearEnd, cursor, loading, failed) { if (nearEnd && cursor.isNotEmpty() && !loading && !failed && loaded) load(cursor) }
 
+    /** Disables or enables every picked account, one at a time. */
+    fun bulkAccess(disabled: Boolean) {
+        val list = picked.toList()
+        bulkBusy = true
+        scope.launch {
+            var failedCount = 0
+            for (u in list) {
+                try {
+                    Moderation.access(u.id, disabled = disabled)
+                    refresh(u.id)
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    failedCount++
+                }
+            }
+            bulkBusy = false
+            if (failedCount > 0) Nexa.ui.toast(t("moderation.bulk.partly", "done" to (list.size - failedCount), "count" to list.size), "error")
+            else Nexa.ui.toast(t("moderation.bulk.done", "count" to list.size), "success")
+        }
+    }
+    val allPicked = users.isNotEmpty() && users.filter { pickable(it) }.all { u -> picked.any { it.id == u.id } }
+
     val shows = listOf(
         "all" to t("moderation.show.all"), "online" to t("moderation.show.online"), "cases" to t("moderation.show.cases"),
         "muted" to t("moderation.show.muted"), "banned" to t("moderation.show.banned"), "staff" to t("moderation.show.staff"), "disabled" to t("moderation.show.disabled"),
     )
-    LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PanelPad, verticalArrangement = Arrangement.spacedBy(18.dp)) {
+    Box(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = if (picking && picked.isNotEmpty()) PaddingValues(start = 12.dp, end = 12.dp, top = 14.dp, bottom = 150.dp) else PanelPad, verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item("tools") {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SearchField(q, { q = it }, t("moderation.searchUsers"), Modifier.fillMaxWidth())
                 ChipRow(t("moderation.show.label")) { for ((id, label) in shows) ModChip(label, show == id, { show = id }) }
-                SortField(listOf("newest" to t("moderation.sort.newest"), "oldest" to t("moderation.sort.oldest"), "name" to t("moderation.sort.name")), sort) { sort = it }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SortField(listOf("newest" to t("moderation.sort.newest"), "oldest" to t("moderation.sort.oldest"), "name" to t("moderation.sort.name")), sort, Modifier.weight(1f)) { sort = it }
+                    if (picking) {
+                        NxButton(if (allPicked) t("moderation.bulk.unselectAll") else t("moderation.bulk.selectAll"), {
+                            if (allPicked) picked.clear() else for (u in users) if (pickable(u) && picked.none { it.id == u.id }) picked.add(u)
+                        }, kind = ButtonKind.SECONDARY, size = ButtonSize.TOUCH, icon = "ListChecks")
+                        NxButton(t("moderation.cancel"), { picking = false; picked.clear() }, kind = ButtonKind.GHOST, size = ButtonSize.TOUCH)
+                    } else NxButton(t("moderation.bulk.select"), { picking = true }, kind = ButtonKind.SECONDARY, size = ButtonSize.TOUCH, icon = "ListChecks")
+                }
             }
         }
         when {
@@ -172,13 +224,60 @@ fun UsersTab() {
                 }
             }
             else -> items(users, key = { it.id }) { u ->
-                UserCard(u, onModerate = { openModerate(u, null) { cs -> if (cs.action == "delete") users.removeAll { it.id == cs.userId } else refresh(cs.userId) } }, onMenu = { userMenu(u) { refresh(u.id) } })
+                UserCard(u, picking = picking, picked = picked.any { it.id == u.id }, onPick = if (pickable(u)) ({ togglePick(u) }) else null, onModerate = { openModerate(u, null) { cs -> if (cs.action == "delete") users.removeAll { it.id == cs.userId } else refresh(cs.userId) } }, onMenu = { userMenu(u) { refresh(u.id) } })
             }
         }
         if (failed && users.isNotEmpty() && cursor.isNotEmpty()) item("retry") {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { NxButton(t("moderation.retry"), { load(cursor) }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, loading = loading) }
         }
         if (loading && loaded) item("more") { LoadingRow() }
+    }
+    if (picking && picked.isNotEmpty()) BulkBar(
+        picked.toList(), bulkBusy, Modifier.align(Alignment.BottomCenter),
+        onClear = { picked.clear() },
+        onEnable = { bulkAccess(false) },
+        onDisable = { confirm(t("moderation.bulk.disableTitle", "count" to picked.size), t("moderation.menu.disableBody"), t("moderation.menu.disable")) { bulkAccess(true) } },
+        onModerate = {
+            val list = picked.toList()
+            openModerate(list.first(), null, bulk = list) { cs ->
+                picked.removeAll { it.id == cs.userId }
+                if (cs.action == "delete") users.removeAll { it.id == cs.userId } else refresh(cs.userId)
+            }
+        },
+    )
+    }
+}
+
+/** `.bulkBar`: what to do with the picked accounts, floating over the foot of the grid. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BulkBar(picked: List<ModUser>, busy: Boolean, modifier: Modifier, onClear: () -> Unit, onEnable: () -> Unit, onDisable: () -> Unit, onModerate: () -> Unit) {
+    val c = Nx.colors
+    val shape = Radii.Xl
+    Column(
+        modifier
+            .navigationBarsPadding()
+            .padding(horizontal = 8.dp, vertical = 10.dp)
+            .fillMaxWidth()
+            .shadowHigh(shape, c)
+            .ring(shape, c.panelEdge)
+            .background(c.bgFloating, shape)
+            .background(sheen(c), shape)
+            .topEdge(shape, c.edgeLightStrong)
+            .padding(12.dp)
+            .semantics { contentDescription = t("moderation.bulk.selected", "count" to picked.size) },
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            AvatarStack(picked, 28.dp)
+            Txt(t("moderation.bulk.selected", "count" to picked.size), style = Nx.type.name.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(690)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f))
+            NxButton(t("moderation.bulk.clear"), onClear, kind = ButtonKind.GHOST, size = ButtonSize.SM, icon = "X")
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            NxButton(t("moderation.menu.enable"), onEnable, kind = ButtonKind.SECONDARY, size = ButtonSize.TOUCH, icon = "UserRoundCheck", loading = busy)
+            NxButton(t("moderation.menu.disable"), onDisable, kind = ButtonKind.SECONDARY, size = ButtonSize.TOUCH, icon = "UserRoundX", loading = busy)
+            NxButton(t("moderation.moderate"), onModerate, icon = "Gavel", size = ButtonSize.TOUCH)
+        }
     }
 }
 
@@ -227,7 +326,7 @@ fun userMenu(u: ModUser, onChanged: () -> Unit) {
 /** `.card`: an account, from its banner to what can be done about it. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun UserCard(u: ModUser, onModerate: () -> Unit, onMenu: () -> Unit) {
+private fun UserCard(u: ModUser, picking: Boolean, picked: Boolean, onPick: (() -> Unit)?, onModerate: () -> Unit, onMenu: () -> Unit) {
     val c = Nx.colors
     Nexa.presence.byId.collectAsState().value
     val st = modStatus(u)
@@ -237,7 +336,8 @@ private fun UserCard(u: ModUser, onModerate: () -> Unit, onMenu: () -> Unit) {
         else -> null
     }
     val blocked = blockedText(u.blocked)
-    Box(Modifier.fillMaxWidth().modCard(c, state).pressable(remember { MutableInteractionSource() }, onLongClick = onMenu) { goPanel("users/${u.id}") }.semantics { contentDescription = u.displayName }) {
+    // while picking, a tap on the card picks it
+    Box(Modifier.fillMaxWidth().modCard(c, if (picked) "picked" else state).pressable(remember { MutableInteractionSource() }, onLongClick = onMenu) { if (picking) onPick?.invoke() else goPanel("users/${u.id}") }.semantics { contentDescription = u.displayName }) {
         Column(Modifier.fillMaxWidth()) {
             CardBanner(u.bannerId, profileBrush(u.accentColor, u.accentColor2, u.id), 88.dp)
             Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 44.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -270,7 +370,8 @@ private fun UserCard(u: ModUser, onModerate: () -> Unit, onMenu: () -> Unit) {
             }
         }
         // the flags on the banner, and the picture where the banner meets the card
-        FlowRow(Modifier.align(Alignment.TopEnd).padding(10.dp).widthIn(max = 260.dp), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        FlowRow(Modifier.align(Alignment.TopEnd).padding(10.dp).widthIn(max = 260.dp), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(4.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+            AltBadge(u)
             u.ban?.let { b -> Flag(b.expiresAt?.let { t("moderation.state.bannedUntil", "when" to Time.relativeTo(it)) } ?: t("moderation.state.bannedForever"), "danger", "Ban") }
             u.mute?.let { m -> Flag(m.expiresAt?.let { t("moderation.state.mutedUntil", "when" to Time.relativeTo(it)) } ?: t("moderation.state.muted"), "warn", "MessageSquareOff") }
             if (u.isDisabled) Flag(t("moderation.state.disabled"), "muted", "UserRoundX")
@@ -282,6 +383,31 @@ private fun UserCard(u: ModUser, onModerate: () -> Unit, onMenu: () -> Unit) {
                 .background(cardFill(c), CircleShape)
                 .padding(5.dp),
         ) { Avatar(u.id, u.displayName, u.avatarId, 64.dp, status = st.status) }
+        if (picking) PickCorner(picked, onPick, t("moderation.bulk.pick", "name" to u.displayName))
+    }
+}
+
+/** `.pickBox`: the box on the banner's start corner, glass like the flags opposite it. */
+@Composable
+private fun PickCorner(picked: Boolean, onPick: (() -> Unit)?, label: String) {
+    val c = Nx.colors
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(9.dp)
+    Box(
+        Modifier
+            .padding(4.dp)
+            .size(48.dp)
+            .alpha(if (onPick == null) 0.4f else 1f)
+            .toggleable(picked, enabled = onPick != null, role = Role.Checkbox) { onPick?.invoke() }
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(28.dp)
+                .background(if (picked) c.brand else Color(0x8C0A0614), shape)
+                .ring(shape, if (picked) Color.White.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.55f), 1.5.dp),
+            contentAlignment = Alignment.Center,
+        ) { if (picked) Icon("Check", Color.White, size = 15.dp) }
     }
 }
 

@@ -44,8 +44,9 @@ const undoCommunities = `
 	ALTER TABLE channels DROP COLUMN forum;
 `
 
-// undoBots takes away what migration 0034 adds, for the same tests.
+// undoBots takes away what migrations 0034 and 0035 add, for the same tests.
 const undoBots = `
+	DROP TABLE user_ips;
 	DROP TABLE bot_copies;
 	DROP TABLE ephemeral_files;
 	DROP TABLE interaction_files;

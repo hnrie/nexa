@@ -11,6 +11,7 @@ import { usePresence } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
 import { CaseList, StaffCasePane } from "./CaseWorkspace";
+import { AltAccountsModal, AltBadge } from "./AltAccounts";
 import { ModerateModal, type ModeratePreset } from "./ModerateModal";
 import { modStatus, StatusSummary } from "./ModStatus";
 import { ProfileSheet } from "./ProfileSheet";
@@ -40,6 +41,7 @@ export function PersonPage() {
   const [people, setPeople] = useState<People>({});
   const [failed, setFailed] = useState(false);
   const [moderating, setModerating] = useState<ModerateIntent | null>(null);
+  const [altsOpen, setAltsOpen] = useState(false);
   const live = usePresence((p) => p.byUser[userId]);
   // the cases tab is open on its own address, so a case can be linked to
   const loc = useLocation();
@@ -123,6 +125,7 @@ export function PersonPage() {
           <div className={m.userNames}>
             <span className={m.userName}>
               <span>{deleted ? t("nexa.deletedUser") : user.display_name}</span>
+              <AltBadge user={user} onOpen={() => setAltsOpen(true)} />
               {user.id === ownerId ? <span className={m.staffBadge}>{t("profile.profileCard.owner")}</span> : (user.admin_flags & FLAG_ADMIN) !== 0 ? <span className={m.staffBadge}>{t("moderation.staff")}</span> : null}
             </span>
             <span className={m.userSub}>
@@ -184,6 +187,7 @@ export function PersonPage() {
           </div>
         </div>
       )}
+      {altsOpen ? <AltAccountsModal user={user} onClose={() => setAltsOpen(false)} /> : null}
       {moderating ? (
         <ModerateModal
           user={user}

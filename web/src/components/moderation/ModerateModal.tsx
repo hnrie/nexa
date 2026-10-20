@@ -1,6 +1,7 @@
 import { ArrowLeft, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { hasServerProfile, moderation as modApi, type ActionRequest, type ModAction, type ModMembership, type ModUser, type PurgeCounts, type ResetField, type StaffCase } from "@/api/moderation";
+import { ApiError } from "@/api/client";
 import { bannerUrl } from "@/api/users";
 import { statusEmojiText } from "@/components/activity/StatusEmoji";
 import { Avatar } from "@/components/common/Avatar";
@@ -138,6 +139,12 @@ interface ModerateProps {
   preset?: ModeratePreset | undefined;
   /** The servers they own or have a server profile in, where it is known: which nicknames a reset would clear. */
   servers?: ModMembership[] | undefined;
+  /**
+   * Everyone the action is for, when it is more than one account (user is
+   * then the first of them). Each gets a case of their own, as if acted on
+   * one at a time.
+   */
+  bulk?: ModUser[] | undefined;
 }
 
 /**
@@ -145,7 +152,8 @@ interface ModerateProps {
  * reason goes to the member, word for word, with the moderator's name — so
  * the dialog says so beside the box it is typed in.
  */
-export function ModerateModal({ user, onClose, onDone, initial, preset, servers }: ModerateProps) {
+export function ModerateModal({ user, onClose, onDone, initial, preset, servers, bulk }: ModerateProps) {
+  const many = bulk && bulk.length > 1 ? bulk : null;
   const toast = useUI((u) => u.toast);
   const live = usePresence((p) => p.byUser[user.id]);
   const presence = modStatus(user, live);
@@ -157,13 +165,15 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
   const [banFor, setBanFor] = useState<number | "permanent">(SPAN.WEEK);
   const [confirm, setConfirm] = useState("");
   // usernames are lower case, and a phone keyboard capitalises the first letter
-  const confirmed = confirm.trim().toLowerCase() === user.username;
+  // for many accounts, the number of them is what is typed
+  const confirmWord = many ? String(many.length) : user.username;
+  const confirmed = confirm.trim().toLowerCase() === confirmWord;
   const [preview, setPreview] = useState<PurgeCounts | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (action !== "delete" || preview) return;
+    if (action !== "delete" || preview || many) return;
     let alive = true;
     modApi
       .purgePreview(user.id)
@@ -179,8 +189,8 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
   // a picture of theirs in one of their servers counts as theirs to take down
   const serverAvatar = !!servers?.some((x) => x.avatar_id);
   const serverBanner = !!servers?.some((x) => x.banner_id);
-  const hasAvatar = !!user.avatar_id || serverAvatar;
-  const hasBanner = !!user.banner_id || serverBanner;
+  const hasAvatar = many ? true : !!user.avatar_id || serverAvatar;
+  const hasBanner = many ? true : !!user.banner_id || serverBanner;
   const values: Record<ResetField, string> = {
     username: `@${user.username}`,
     display_name: user.display_name,
@@ -240,9 +250,33 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
       if (banFor === "permanent") body.permanent = true;
       else body.duration_ms = banFor;
     }
-    if (action === "delete") body.confirm = user.username;
     setBusy(true);
     setError(null);
+    if (many) {
+      // one at a time, so each member gets their own case and message
+      let done = 0;
+      const failed: string[] = [];
+      for (const u of many) {
+        try {
+          const r = await actOnOne(u, action === "delete" ? { ...body, confirm: u.username } : body);
+          if (r) {
+            done++;
+            onDone(r.case);
+          }
+        } catch (err) {
+          failed.push(`${u.display_name}: ${describeError(err, t("moderation.failed"))}`);
+        }
+      }
+      setBusy(false);
+      if (!failed.length) {
+        toast(t("moderation.bulk.done", { count: done }), "success");
+        onClose();
+      } else {
+        setError([t("moderation.bulk.partly", { done, count: many.length }), ...failed].join("\n"));
+      }
+      return;
+    }
+    if (action === "delete") body.confirm = user.username;
     try {
       const r = await modApi.act(user.id, body);
       toast(t("moderation.done", { number: r.case.number, name: user.display_name }), "success");
@@ -260,7 +294,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
   const tone = action ? severity(action) : "info";
 
   return (
-    <Modal open onClose={onClose} bare width={620} ariaLabel={t("moderation.moderateNamed", { name: user.display_name })}>
+    <Modal open onClose={onClose} bare width={620} ariaLabel={many ? t("moderation.bulk.title", { count: many.length }) : t("moderation.moderateNamed", { name: user.display_name })}>
       <div className={m.modal} data-testid="moderate-modal">
         <div className={m.modalTop}>
           {action && !initial ? (
@@ -268,14 +302,24 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
               <ArrowLeft size={20} className={m.flip} />
             </button>
           ) : null}
-          <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={40} status={presence.status} />
+          {many ? (
+            <AvatarStack users={many} />
+          ) : (
+            <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={40} status={presence.status} />
+          )}
           <div style={{ minWidth: 0 }}>
-            <h2 className={m.modalTitle}>{action ? actionTitle(action) : t("moderation.moderateNamed", { name: user.display_name })}</h2>
+            <h2 className={m.modalTitle}>{action ? actionTitle(action) : many ? t("moderation.bulk.title", { count: many.length }) : t("moderation.moderateNamed", { name: user.display_name })}</h2>
+            {many ? (
+              <div className={m.modalTarget}>
+                <span className={m.bulkNames}>{many.map((u) => `@${u.username}`).join(", ")}</span>
+              </div>
+            ) : (
             <div className={m.modalTarget}>
               <span>@{user.username}</span>
               {user.mute ? <span className={m.tag} data-tone="warn">{t("moderation.state.muted")}</span> : null}
               {user.ban ? <span className={m.tag} data-tone="danger">{t("moderation.state.banned")}</span> : null}
             </div>
+            )}
           </div>
           <button type="button" className={m.modalClose} onClick={onClose} aria-label={t("chat.attachments.close")}>
             <X size={20} />
@@ -292,8 +336,9 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
                   const nothing = a === "avatar_remove" && !hasAvatar && !hasBanner;
                   let desc = actionBlurb(a);
                   if (nothing) desc = t("moderation.act.avatarNone");
-                  if (a === "mute" && user.mute) desc = user.mute.expires_at ? t("moderation.act.alreadyMuted", { when: relativeTo(user.mute.expires_at) }) : t("moderation.act.alreadyMutedForever");
-                  if (a === "ban" && user.ban) desc = user.ban.expires_at ? t("moderation.act.alreadyBanned", { when: relativeTo(user.ban.expires_at) }) : t("moderation.act.alreadyBannedForever");
+                  if (many) desc = actionBlurb(a);
+                  if (a === "mute" && user.mute && !many) desc = user.mute.expires_at ? t("moderation.act.alreadyMuted", { when: relativeTo(user.mute.expires_at) }) : t("moderation.act.alreadyMutedForever");
+                  if (a === "ban" && user.ban && !many) desc = user.ban.expires_at ? t("moderation.act.alreadyBanned", { when: relativeTo(user.ban.expires_at) }) : t("moderation.act.alreadyBannedForever");
                   return (
                     <button key={a} type="button" className={m.actionTile} data-tone={severity(a)} disabled={nothing} onClick={() => setAction(a)} data-testid={`action-${a}`}>
                       <span className={m.actionIcon} aria-hidden="true">
@@ -310,7 +355,24 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
             </div>
           ) : null}
 
-          {action === "avatar_remove" ? (
+          {action === "avatar_remove" && many ? (
+            <div className={m.section}>
+              <span className={m.sectionLabel}>{t("moderation.form.whatToRemove")}</span>
+              <div className={m.choiceRow}>
+                {(["avatar", "banner"] as const).map((k) => (
+                  <label key={k} className={m.pick} data-checked={images[k]}>
+                    <input type="checkbox" checked={images[k]} onChange={(e) => setImages((v) => ({ ...v, [k]: e.target.checked }))} />
+                    <span className={m.pickText}>
+                      <span className={m.pickName}>{t(k === "avatar" ? "moderation.field.avatar" : "moderation.field.banner")}</span>
+                      <span className={m.pickValue}>{t("moderation.bulk.whereSet")}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {action === "avatar_remove" && !many ? (
             <div className={m.section}>
               <span className={m.sectionLabel}>{t("moderation.form.whatToRemove")}</span>
               <div className={m.choiceRow}>
@@ -339,13 +401,13 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
               <span className={m.sectionLabel}>{t("moderation.form.whatToReset")}</span>
               <div className={m.choiceRow}>
                 {(["username", "display_name", "about_me", "pronouns", "status", "nicknames", "server_profiles", "typing_style", "widgets", "server_tag"] as ResetField[]).map((f) => {
-                  const empty = f === "nicknames" ? !!nicknamed && nicknamed.length === 0 : f === "server_profiles" ? !!profiled && profiled.length === 0 : f !== "username" && f !== "display_name" && !values[f];
+                  const empty = many ? false : f === "nicknames" ? !!nicknamed && nicknamed.length === 0 : f === "server_profiles" ? !!profiled && profiled.length === 0 : f !== "username" && f !== "display_name" && !values[f];
                   return (
                     <label key={f} className={m.pick} data-checked={fields.includes(f)} data-disabled={empty} data-testid={`field-${f}`}>
                       <input type="checkbox" checked={fields.includes(f)} disabled={empty} onChange={() => toggleField(f)} />
                       <span className={m.pickText}>
                         <span className={m.pickName}>{fieldLabel(f)}</span>
-                        <span className={m.pickValue} title={values[f]}>{empty ? t("moderation.form.empty") : values[f]}</span>
+                        <span className={m.pickValue} title={many ? undefined : values[f]}>{many ? t("moderation.bulk.whereSet") : empty ? t("moderation.form.empty") : values[f]}</span>
                       </span>
                     </label>
                   );
@@ -372,8 +434,8 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
           {action === "delete" ? (
             <div className={m.section}>
               <div className={m.danger}>
-                <strong>{t("moderation.delete.warning")}</strong>
-                {preview ? (
+                <strong>{many ? t("moderation.bulk.deleteWarning", { count: many.length }) : t("moderation.delete.warning")}</strong>
+                {many ? null : preview ? (
                   <ul>
                     <li>{t("moderation.delete.messages", { count: preview.messages })}</li>
                     <li>{t("moderation.delete.files", { count: preview.attachments, size: formatBytes(preview.attachment_bytes) })}</li>
@@ -391,8 +453,8 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
               </div>
               <label className={m.section}>
                 {/* not in capitals like the other labels: the username in it is typed exactly as shown */}
-                <span className={m.confirmLabel}>{t("moderation.delete.confirmLabel", { username: user.username })}</span>
-                <TextInput value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={user.username} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} data-testid="delete-confirm" />
+                <span className={m.confirmLabel}>{many ? t("moderation.bulk.confirmLabel", { count: many.length }) : t("moderation.delete.confirmLabel", { username: user.username })}</span>
+                <TextInput value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={confirmWord} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} data-testid="delete-confirm" />
               </label>
             </div>
           ) : null}
@@ -418,7 +480,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
             </div>
           ) : null}
           {error ? (
-            <p className={m.danger} role="alert">
+            <p className={m.danger} role="alert" style={{ whiteSpace: "pre-line" }}>
               {error}
             </p>
           ) : null}
@@ -438,5 +500,37 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers 
         </div>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * One account's part of an action for many. Pictures they do not have are
+ * left out rather than failing: null when there was nothing of theirs to take.
+ */
+async function actOnOne(u: ModUser, body: ActionRequest): Promise<{ case: StaffCase } | null> {
+  try {
+    return await modApi.act(u.id, body);
+  } catch (err) {
+    const missing = err instanceof ApiError ? err.code : "";
+    if (body.images && (missing === "no_avatar" || missing === "no_banner")) {
+      const rest = { avatar: missing === "no_banner" && body.images.avatar, banner: missing === "no_avatar" && body.images.banner };
+      return rest.avatar || rest.banner ? actOnOne(u, { ...body, images: rest }) : null;
+    }
+    throw err;
+  }
+}
+
+/** The first few of the accounts a dialog is for, overlapping. */
+export function AvatarStack({ users, size = 32 }: { users: ModUser[]; size?: number }) {
+  const shown = users.slice(0, 4);
+  return (
+    <span className={m.avatarStack} aria-hidden="true">
+      {shown.map((u) => (
+        <span key={u.id} className={m.avatarStackItem}>
+          <Avatar id={u.id} avatarId={u.avatar_id} name={u.display_name} size={size} />
+        </span>
+      ))}
+      {users.length > shown.length ? <span className={m.avatarStackMore} style={{ width: size, height: size }}>+{users.length - shown.length}</span> : null}
+    </span>
   );
 }

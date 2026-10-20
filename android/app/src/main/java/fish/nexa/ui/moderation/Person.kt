@@ -124,7 +124,10 @@ fun PersonPage(userId: String, cases: Boolean, caseId: String?) {
             leading = { Avatar(user.id, user.displayName, user.avatarId, 48.dp, status = if (deleted) null else st.status) },
             title = if (deleted) t("nexa.deletedUser") else user.displayName,
             sub = listOf(if (deleted) t("moderation.user.deleted") else "@${user.username}", t("moderation.casesCount", "count" to d.cases.size)).plus(standing).joinToString(" · "),
-            badge = { if (user.id == ownerId) StaffBadge(t("profile.profileCard.owner"), null) else if (user.isStaff) StaffBadge(t("moderation.staff"), null) },
+            badge = {
+                AltBadge(user)
+                if (user.id == ownerId) StaffBadge(t("profile.profileCard.owner"), null) else if (user.isStaff) StaffBadge(t("moderation.staff"), null)
+            },
             below = if (deleted) null else ({ StatusSummary(st, compact = true) }),
             actions = if (deleted) null else ({
                 NxButton(t("moderation.menu.profile"), { openProfile(user.id) }, kind = ButtonKind.GHOST, size = ButtonSize.TOUCH, icon = "UserRound")

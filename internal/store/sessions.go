@@ -21,7 +21,10 @@ func (s *Store) CreateSession(ctx context.Context, se *Session) error {
 	}
 	_, err := s.db.W.ExecContext(ctx, `INSERT INTO sessions (id, user_id, token_hash, user_agent, ip, created_at, last_seen_at) VALUES (?,?,?,?,?,?,?)`,
 		int64(se.ID), int64(se.UserID), se.TokenHash, se.UserAgent, se.IP, se.CreatedAt, se.LastSeenAt)
-	return err
+	if err != nil {
+		return err
+	}
+	return s.RecordUserIP(ctx, se.UserID, se.IP, se.LastSeenAt)
 }
 
 func scanSession(r rowScanner) (*Session, error) {
@@ -45,10 +48,16 @@ func (s *Store) SessionByID(ctx context.Context, id ids.ID) (*Session, error) {
 	return scanSession(s.db.R.QueryRowContext(ctx, `SELECT id, user_id, token_hash, user_agent, ip, created_at, last_seen_at FROM sessions WHERE id = ?`, int64(id)))
 }
 
-// TouchSession records activity.
-func (s *Store) TouchSession(ctx context.Context, id ids.ID, lastSeen int64) error {
-	_, err := s.db.W.ExecContext(ctx, `UPDATE sessions SET last_seen_at = ? WHERE id = ?`, lastSeen, int64(id))
-	return err
+// TouchSession records activity on se from ip ("" when not known), keeping
+// the session's address and the account's addresses up to date.
+func (s *Store) TouchSession(ctx context.Context, se *Session, ip string, lastSeen int64) error {
+	if ip == "" {
+		ip = se.IP
+	}
+	if _, err := s.db.W.ExecContext(ctx, `UPDATE sessions SET last_seen_at = ?, ip = ? WHERE id = ?`, lastSeen, ip, int64(se.ID)); err != nil {
+		return err
+	}
+	return s.RecordUserIP(ctx, se.UserID, ip, lastSeen)
 }
 
 // DeleteSession removes one session.

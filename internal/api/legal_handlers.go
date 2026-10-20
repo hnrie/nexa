@@ -363,16 +363,14 @@ func legalCredentials(d *legalDoc, rec *store.AccountRecord) {
 }
 
 func legalSessions(d *legalDoc, rec *store.AccountRecord) {
-	d.head("LOGIN SESSIONS AND IP ADDRESSES", "sessions, channel_unlocks")
+	d.head("LOGIN SESSIONS AND IP ADDRESSES", "sessions, user_ips, channel_unlocks")
 	d.para(
-		"  One row per signed-in device that has not been signed out or expired. This",
-		"  is the only place Nexa writes an IP address for an account.",
+		"  One row per signed-in device that has not been signed out or expired, then",
+		"  every address the account has used. These are the only places Nexa writes an",
+		"  IP address for an account.",
 		"",
-		"  The address is the one the session was opened from, recorded once when the",
-		"  session was created and never updated afterwards. It is therefore a record of",
-		"  where a login happened, not of where the account has been since. The earliest",
-		"  row for an account is normally its registration, because registering signs the",
-		"  new account in; it is not separately labelled as such.",
+		"  A session's address is the one it was last used from, kept up to date while it",
+		"  is used. The earliest session row is not separately labelled as registration.",
 		"",
 		"  Sessions are deleted when the holder signs out, when an administrator disables",
 		"  the account, and when they go idle past Nexa's session lifetime. A",
@@ -387,10 +385,23 @@ func legalSessions(d *legalDoc, rec *store.AccountRecord) {
 	for i, se := range rec.Sessions {
 		d.line("  Session " + strconv.Itoa(i+1) + " of " + strconv.Itoa(len(rec.Sessions)))
 		d.field("  Session id:", se.ID.String())
-		d.field("  IP at sign-in:", legalText(se.IP))
+		d.field("  IP last used:", legalText(se.IP))
 		d.field("  User agent:", legalText(se.UserAgent))
 		d.field("  Signed in:", legalTime(se.CreatedAt))
 		d.field("  Last activity:", legalTime(se.LastSeenAt))
+		d.blank()
+	}
+	d.field("Addresses used:", legalCount(len(rec.Addresses)))
+	d.note("Every address the account signed in or was active from, kept for security")
+	d.note("for 180 days after its last use, and deleted with the account.")
+	d.blank()
+	if len(rec.Addresses) == 0 {
+		d.empty("No address rows exist for this account.")
+	}
+	for _, a := range rec.Addresses {
+		d.field("  Address:", legalText(a.IP))
+		d.field("  First seen:", legalTime(a.FirstSeenAt))
+		d.field("  Last seen:", legalTime(a.LastSeenAt))
 		d.blank()
 	}
 	d.field("Subchats unlocked:", legalCount(rec.Unlocks))

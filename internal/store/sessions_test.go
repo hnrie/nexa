@@ -25,7 +25,7 @@ func TestSessions(t *testing.T) {
 	if err != nil || got.ID != a.ID || got.UserID != u.ID || got.UserAgent != "ua" {
 		t.Fatalf("lookup: %v %+v", err, got)
 	}
-	if err := s.TouchSession(ctx, a.ID, a.CreatedAt+5000); err != nil {
+	if err := s.TouchSession(ctx, a, "", a.CreatedAt+5000); err != nil {
 		t.Fatal(err)
 	}
 	list, _ := s.SessionsByUser(ctx, u.ID)

@@ -24,6 +24,7 @@ func (s *Server) moderationRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/moderation/summary", s.admin(s.handleModSummary))
 	mux.Handle("GET /api/v1/moderation/users", s.admin(s.handleModUsers))
 	mux.Handle("GET /api/v1/moderation/users/{id}", s.admin(s.handleModUser))
+	mux.Handle("GET /api/v1/moderation/users/{id}/alts", s.admin(s.handleModAlts))
 	mux.Handle("GET /api/v1/moderation/users/{id}/purge-preview", s.admin(s.handleModPurgePreview))
 	mux.Handle("POST /api/v1/moderation/users/{id}/actions", s.admin(s.handleModAction))
 	mux.Handle("GET /api/v1/moderation/cases", s.admin(s.handleModCases))
@@ -109,13 +110,16 @@ func (s *Server) handleModSummary(w http.ResponseWriter, r *http.Request) {
 // its public profile and where it stands.
 type modUserView struct {
 	store.PublicUser
-	AdminFlags    int64            `json:"admin_flags"`
-	CaseCount     int              `json:"case_count"`
-	OpenCases     int              `json:"open_cases"`
-	AwaitingCases int              `json:"awaiting_cases"`
-	LastSeenAt    *int64           `json:"last_seen_at"`
-	Mute          *restrictionView `json:"mute"`
-	Ban           *restrictionView `json:"ban"`
+	AdminFlags    int64  `json:"admin_flags"`
+	CaseCount     int    `json:"case_count"`
+	OpenCases     int    `json:"open_cases"`
+	AwaitingCases int    `json:"awaiting_cases"`
+	LastSeenAt    *int64 `json:"last_seen_at"`
+	// AltCount is how many other accounts have used one of this account's
+	// addresses (alt accounts, or people behind the same network).
+	AltCount int              `json:"alt_count"`
+	Mute     *restrictionView `json:"mute"`
+	Ban      *restrictionView `json:"ban"`
 	// Blocked is why this moderator cannot act on the account ("" when they can).
 	Blocked string `json:"blocked"`
 	// Widgets are the profile's widgets, on one account's page only.
@@ -160,10 +164,19 @@ func (s *Server) handleModUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	owner, _ := s.Store.InstanceOwnerID(ctx)
+	listIDs := make([]ids.ID, 0, len(list))
+	for _, m := range list {
+		listIDs = append(listIDs, m.ID)
+	}
+	alts, err := s.Store.AltCounts(ctx, listIDs)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	out := make([]modUserView, 0, len(list))
 	for _, m := range list {
 		v := modUserView{PublicUser: m.PublicUser, AdminFlags: m.AdminFlags, CaseCount: m.CaseCount, OpenCases: m.OpenCases, AwaitingCases: m.AwaitingCase, LastSeenAt: m.LastSeenAt,
-			Mute: shortRestriction(m.Mute), Ban: shortRestriction(m.Ban)}
+			Mute: shortRestriction(m.Mute), Ban: shortRestriction(m.Ban), AltCount: alts[m.ID]}
 		v.Presence = s.presenceFor(ctx, &store.User{ID: m.ID, PresencePref: m.PresencePref, StatusText: m.StatusText, StatusEmoji: m.StatusEmoji, StatusExpiresAt: m.StatusExpiresAt})
 		switch {
 		case m.ID == me.ID:
@@ -217,6 +230,9 @@ func (s *Server) modUserDetail(ctx context.Context, me, u *store.User) (modUserV
 	v := modUserView{PublicUser: u.Public(), AdminFlags: u.Flags, Blocked: s.moderationBlock(ctx, me, u), Presence: s.presenceFor(ctx, u)}
 	if seen, err := s.Store.LastSeen(ctx, u.ID); err == nil {
 		v.LastSeenAt = seen
+	}
+	if alts, err := s.Store.AltCounts(ctx, []ids.ID{u.ID}); err == nil {
+		v.AltCount = alts[u.ID]
 	}
 	if raw, err := s.Store.UserWidgets(ctx, u.ID); err == nil && raw != "" {
 		v.Widgets = json.RawMessage(raw)
@@ -305,6 +321,43 @@ func (s *Server) handleModUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"user": view, "cases": views, "people": s.people(ctx, who...), "servers": servers, "packs": packs})
+}
+
+// modAlt is one account that shares an address with the one asked about.
+type modAlt struct {
+	User         modUserView `json:"user"`
+	SharedIPs    int         `json:"shared_ips"`
+	LastSharedAt int64       `json:"last_shared_at"`
+}
+
+// handleModAlts lists the accounts seen at the same addresses as this one.
+// The addresses themselves are not shown, only how many are shared.
+func (s *Server) handleModAlts(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	me := auth.UserFrom(ctx)
+	u := s.modTarget(w, r)
+	if u == nil {
+		return
+	}
+	alts, err := s.Store.AltAccounts(ctx, u.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	out := make([]modAlt, 0, len(alts))
+	for _, a := range alts {
+		au, err := s.Store.UserByID(ctx, a.UserID)
+		if err != nil {
+			continue
+		}
+		view, err := s.modUserDetail(ctx, me, au)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		out = append(out, modAlt{User: view, SharedIPs: a.SharedIPs, LastSharedAt: a.LastSharedAt})
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"alts": out})
 }
 
 func (s *Server) handleModPurgePreview(w http.ResponseWriter, r *http.Request) {
