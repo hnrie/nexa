@@ -376,7 +376,7 @@ func (b *dBuilder) plainEmbeds(p *wmPlain, channel ids.ID) []dEmbed {
 
 // linkEmbed is a link preview as the protocol's embed of a link.
 func (b *dBuilder) linkEmbed(l unfurl.Result) dEmbed {
-	e := dEmbed{Type: "link", URL: l.URL, Title: l.Title, Description: l.Description}
+	e := dEmbed{Type: "link", URL: b.s.absoluteURL(l.URL), Title: l.Title, Description: l.Description}
 	switch l.Type {
 	case "image":
 		e.Type = "image"

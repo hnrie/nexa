@@ -14,11 +14,11 @@ func TestLinkEmbedVideoIsAbsolute(t *testing.T) {
 	s, _ := newTestServer(t)
 	s.Cfg.PublicURL = "https://nexa.example"
 	b := s.builder(context.Background(), nil, nil)
-	e := b.linkEmbed(unfurl.Result{URL: "https://klipy.com/gifs/x", Type: "gifv",
+	e := b.linkEmbed(unfurl.Result{URL: "/media/proxy/1-sig/aHR0cHM6Ly9zdGF0aWMua2xpcHkuY29tL3guZ2lm", Type: "gif",
 		Media: "/media/proxy/1-sig/aHR0cHM6Ly9zdGF0aWMua2xpcHkuY29tL3guZ2lm", MediaKind: "video"})
-	for _, u := range []string{e.Video.URL, e.Video.ProxyURL} {
+	for _, u := range []string{e.URL, e.Video.URL, e.Video.ProxyURL} {
 		if !strings.HasPrefix(u, "https://nexa.example/media/proxy/") {
-			t.Fatalf("video address %q is not absolute", u)
+			t.Fatalf("embed address %q is not absolute", u)
 		}
 	}
 }
