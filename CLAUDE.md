@@ -246,7 +246,8 @@ sizes), `tools/bot_e2e.py` (real bot libraries: the discord.py, discord.js and d
 in `tools/bots/`, pointed at Nexa as the portal says, used by a person in a headless browser;
 `BOT_E2E_PYTHON`, `BOT_E2E_NODE_MODULES` and `BOT_E2E_GOPATH` name where each library is),
 `tools/apps_ui.py` (every app screen as a person uses it, at both sizes, into
-`tools/out/apps-ui`, including `menu_on_a_picture`, `share-warning`, `app-link` and `staff-bots`;
+`tools/out/apps-ui`, including `menu_on_a_picture`, `share-warning`, `app-link`, `staff-bots` and
+`apps-used-options`;
 `--no-content` tries an app without Message Content, and `--serve --port N` leaves the server and
 its discord.py bot running, for the Android emulator), `tools/discord_e2e.py` (Discord activity sync against the fake Discord in
 `internal/discordsync/fakediscord/cmd/fakediscord`), `tools/sfu_call.py` and `tools/sfu_guest.py`
@@ -369,8 +370,10 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   commands), people using apps (`bot_interactions`: `POST /api/v1/interactions`, files sent with
   one, a channel's commands, dismissing an answer only one person sees; the first follow-up after a
   type 5 defer fills in the thinking message rather than making a second one, and a message
-  command's sealed copy is kept with `Store.KeepBotCopy` so the bot can fetch its files), and the
-  bot API itself:
+  command's sealed copy is kept with `Store.KeepBotCopy` so the bot can fetch its files). An answer
+  to a slash command keeps the submitted option values in the user-facing `webhook.interaction`
+  (`wmInteraction`) for the clients' invocation tooltip; the bot protocol's `interaction_metadata`
+  is unchanged. The bot API itself:
   the REST side of the bot libraries' protocol under `/api/v6` to `/api/v10` (`bot_auth` mounts it,
   taking `Authorization: Bot <token>` or an OAuth2 `Bearer` token, with per-route buckets, a global
   limit and the protocol's error shapes; `bot_rest_*`, `bot_message_routes`, `bot_commands`,
@@ -764,13 +767,23 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
   app and reads its answer, `lib/botCopies.ts` seals the copies for bots, `lib/pickables.ts` lists
   people, roles and channels for an app's select menus, and `lib/passwordProof.ts` turns a password
   into the proof the portal's resets ask for. `components/chat/apps` draws an app's messages (the
-  line saying who used which command, buttons, select menus, thinking, answers only you see) and
+  line saying who used which command, with submitted options on hover, buttons, select menus,
+  thinking, answers only you see) and
   the Apps entries in the message, person and member menus (`ContextMenuItem.picture` draws each
   app's picture beside its entry); `components/chat/AppLinkCards.tsx` draws cards for app install
   links (`/oauth2/authorize?client_id=...`) in chat;
   `components/apps` holds what they share (`SelectBox`, `AppFormModal` for an app's forms,
   `ReadingGlass`, `PermissionPicker`, `AppIcon`, `BotTag`). `composer/CommandMode.tsx` is the box
-  while an app's command is filled in, an option at a time. The Developer Portal is
+  while an app's command is filled in, an option at a time: `:name` in a text option offers emoji
+  (the list shared with the message box, `composer/emojiSuggestions.ts`), the emoji picker fills
+  the option being written (`insert`), and Ctrl+A where no option's words are selected (or a
+  second time) takes the whole command for Backspace to clear. A slash typed in the box opens
+  `Autocomplete`'s `CommandPicker`: a rail of the apps that offer commands there and Nexa's own,
+  then each app's commands under its picture and name. The composer's lists and the option bar
+  are `docked` over the box, in the page's flow, so the messages move up rather than being
+  covered (Android: `CommandPicker` and `dockedListMax` in `ui/chat/Composer.kt`, the same in
+  `ui/apps/CommandMode.kt`). On a touch screen, a tap on the "used /name" line shows what the
+  command was used with, names given for people, roles and channels. The Developer Portal is
   `settings/portal` (`DeveloperPortalPage`, `AppDetail` with its General, Bot, Install, OAuth2 and
   Commands tabs), Settings, Authorized Apps is `settings/AuthorizedAppsPage.tsx`, a server's apps
   and who may use their commands are `server/pages/AppsSection.tsx` in Integrations, and the
@@ -938,7 +951,7 @@ notes.
   `AppMessage`, `AppForm`, `SelectBox`, `Authorize` for the consent sheet that `/oauth2/authorize`
   links open, `ReadingApps` for the apps a channel's start names, `ReadingGlass`, `AppMenus` with
   `MenuItem.Action.picture` in `ui/layers/Layers.kt`), `AppLinkCards` in `ui/chat/LinkCards.kt`, the
-  portal in `ui/settings`
+  tap-to-show command invocation in `AppMessage.InteractionLine`, and the portal in `ui/settings`
   (`DeveloperPortal`, `AppDetail`, `PortalParts`, `AuthorizedApps`) and `ui/server/AppsSection`.
   `ui/markdown/Webhook.kt` is the one parser of webhook and app messages (the web's
   `lib/webhookMessage.ts`, checked by `web-hook-vectors.json.gz`).

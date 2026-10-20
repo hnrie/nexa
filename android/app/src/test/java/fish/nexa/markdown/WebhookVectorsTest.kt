@@ -159,10 +159,18 @@ class WebhookVectorsTest {
         put("user_id", i.userId)
         opt("name", i.name)
         opt("command_type", i.commandType)
+        if (i.options.isNotEmpty()) put("options", buildJsonArray { for (o in i.options) add(interactionOption(o)) })
         opt("target_user_id", i.targetUserId)
         opt("target_message_id", i.targetMessageId)
         opt("original_response_message_id", i.originalResponseMessageId)
         i.trigger?.let { put("trigger", interaction(it)) }
+    }
+
+    private fun interactionOption(o: Webhook.InteractionOption): JsonObject = buildJsonObject {
+        put("name", o.name)
+        put("type", o.type)
+        o.value?.let { put("value", it) }
+        if (o.options.isNotEmpty()) put("options", buildJsonArray { for (child in o.options) add(interactionOption(child)) })
     }
 
     private fun content(h: Webhook.Content): JsonObject = buildJsonObject {
@@ -244,5 +252,34 @@ class WebhookVectorsTest {
             if (Webhook.sameSender(got, app) != c["sameApp"]!!.jsonPrimitive.contentOrNull?.toBoolean()) problems += "sameApp"
             if (problems.isEmpty()) null else "raw ${c["raw"].toString().take(800)}\n" + problems.joinToString("\n")
         }
+    }
+
+    @Test
+    fun commandOptionsAreKeptAndShownAsEntered() {
+        val raw = buildJsonObject {
+            put("name", "Lab Bot")
+            put("content", "captioned")
+            put("application_id", "77")
+            put("interaction", buildJsonObject {
+                put("id", "5"); put("type", 2); put("user_id", "9"); put("name", "caption"); put("command_type", 1)
+                put("options", buildJsonArray {
+                    add(buildJsonObject {
+                        put("name", "format"); put("type", 2)
+                        put("options", buildJsonArray {
+                            add(buildJsonObject {
+                                put("name", "short"); put("type", 1)
+                                put("options", buildJsonArray {
+                                    add(buildJsonObject { put("name", "text"); put("type", 3); put("value", "hello there") })
+                                    add(buildJsonObject { put("name", "count"); put("type", 4); put("value", 0) })
+                                    add(buildJsonObject { put("name", "quiet"); put("type", 5); put("value", false) })
+                                })
+                            })
+                        })
+                    })
+                })
+            })
+        }
+        val interaction = Webhook.sanitize(raw)?.interaction ?: error("no interaction")
+        org.junit.Assert.assertEquals("/caption format short text: hello there count: 0 quiet: false", Webhook.commandInvocation(interaction))
     }
 }

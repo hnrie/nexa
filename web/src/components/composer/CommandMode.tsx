@@ -25,7 +25,10 @@ import { describeError } from "@/lib/errors";
 import { choicesOf, interact } from "@/lib/interactions";
 import { channelsFor, findMembers, peopleFor, rolesFor } from "@/lib/pickables";
 import { displayName } from "@/stores/users";
+import { emojiLoaded, loadEmoji, withTone } from "@/components/pickers/emojiIndex";
+import { emojiToken } from "@/stores/expressions";
 import { Autocomplete, type AcItem } from "./Autocomplete";
+import { emojiSuggestionItems } from "./emojiSuggestions";
 import s from "./Composer.module.css";
 
 /**
@@ -122,6 +125,15 @@ export interface CommandModeApi {
   list: ReactNode;
   /** Sends the command; false when something is missing, which the slot then says. */
   submit: () => boolean;
+  /** Puts an emoji the picker chose into the option being written (false when none takes words). */
+  insert: (text: string) => boolean;
+}
+
+/** What follows a ":" at the end of a text option's words (two letters or more), or null. */
+function emojiQuery(slot: Slot): string | null {
+  if (slot.opt.type !== OPT_STRING || slot.value !== undefined || slot.opt.choices?.length) return null;
+  const m = /(?:^|\s):([\w+-]{2,32})$/.exec(slot.text);
+  return m ? m[1]!.toLowerCase() : null;
 }
 
 /**
@@ -148,6 +160,10 @@ export function useCommandMode(channel: Channel, opts: { onLeave: (text: string)
   /** The slot to put the caret in once the box has drawn it (the trailing one past the last slot too). */
   const wantFocus = useRef(-1);
   const [focusTick, setFocusTick] = useState(0);
+  // the whole command is taken (Ctrl+A), for Backspace to clear it
+  const [allSelected, setAllSelected] = useState(false);
+  const allSelectedRef = useRef(false);
+  allSelectedRef.current = allSelected;
   useLayoutEffect(() => {
     const i = wantFocus.current;
     if (i < 0) return;
@@ -194,6 +210,12 @@ export function useCommandMode(channel: Channel, opts: { onLeave: (text: string)
   const suggestions = useCallback(
     (slot: Slot, fromApp: CommandChoice[] | null): AcItem[] => {
       const o = slot.opt;
+      // ":name" at the end of an option's words offers emoji, as in the message box
+      const emoji = emojiQuery(slot);
+      if (emoji !== null) {
+        if (!emojiLoaded()) void loadEmoji().then(() => rerender((n) => n + 1), () => undefined);
+        return emojiSuggestionItems(emoji, channel.server_id);
+      }
       const q = slot.text.trim().toLowerCase();
       const entity = entityOf(o);
       if (entity) {
@@ -281,6 +303,16 @@ export function useCommandMode(channel: Channel, opts: { onLeave: (text: string)
     } else if (it.kind === "choice") {
       value = it.value;
       label = it.name;
+    } else if (it.kind === "emoji" || it.kind === "customEmoji") {
+      // the ":name" typed becomes the emoji itself, as a message carries it
+      const slot = m.slots[i]!;
+      const typed = emojiQuery(slot);
+      const glyph = it.kind === "emoji" ? withTone(it.entry, opts.tone) : emojiToken(it.emoji);
+      const text = typed === null ? slot.text + glyph : slot.text.slice(0, slot.text.length - typed.length - 1) + glyph;
+      update(i, { text, error: undefined }, false);
+      setAc(null);
+      focusSlot(i);
+      return;
     } else return;
     const slots = m.slots.map((slot, j) => (j === i ? { ...slot, value, label, text: "", error: undefined } : slot));
     // on to the next slot still empty, if there is one
@@ -334,9 +366,43 @@ export function useCommandMode(channel: Channel, opts: { onLeave: (text: string)
     return true;
   };
 
+  /**
+   * Ctrl+A (Cmd+A on a Mac) takes the whole command when the caret is not in
+   * words of an option, or a second time once an option's words are all
+   * taken; Backspace or Delete then clears it, and typing replaces it.
+   * Returns whether the key was handled here.
+   */
+  const wholeCommandKey = (e: KeyboardEvent<HTMLInputElement>): boolean => {
+    const el = e.currentTarget;
+    const text = typeof el.value === "string" ? el.value : "";
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "a") {
+      const allTaken = text.length === 0 || (el.selectionStart === 0 && el.selectionEnd === text.length);
+      if (!allTaken) return false;
+      e.preventDefault();
+      setAllSelected(true);
+      return true;
+    }
+    if (!allSelectedRef.current) return false;
+    if (e.key === "Backspace" || e.key === "Delete") {
+      e.preventDefault();
+      setAllSelected(false);
+      leave("");
+      return true;
+    }
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      setAllSelected(false);
+      leave(e.key);
+      return true;
+    }
+    if (!["Shift", "Control", "Meta", "Alt"].includes(e.key)) setAllSelected(false);
+    return false;
+  };
+
   const onKey = (i: number, e: KeyboardEvent<HTMLInputElement>) => {
     const m = modeRef.current;
     if (!m || e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (wholeCommandKey(e)) return;
     const slot = m.slots[i]!;
     if (ac) {
       if (e.key === "ArrowDown") {
@@ -391,6 +457,7 @@ export function useCommandMode(channel: Channel, opts: { onLeave: (text: string)
   const onTailKey = (e: KeyboardEvent<HTMLInputElement>) => {
     const m = modeRef.current;
     if (!m || e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (wholeCommandKey(e)) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       submit();
@@ -416,7 +483,17 @@ export function useCommandMode(channel: Channel, opts: { onLeave: (text: string)
 
   const filePick = useRef<number>(-1);
   const box: ReactNode = mode ? (
-    <div className={s.cmdBox} role="group" aria-label={t("apps.command.label", { command: mode.leaf.label })} data-testid="command-box">
+    <div
+      className={s.cmdBox}
+      role="group"
+      aria-label={t("apps.command.label", { command: mode.leaf.label })}
+      data-testid="command-box"
+      data-all-selected={allSelected || undefined}
+      onPointerDown={() => setAllSelected(false)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setAllSelected(false);
+      }}
+    >
       <span className={s.cmdHead}>
         <Avatar id={mode.app.id} avatarId={mode.app.bot.avatar_id} name={mode.app.name} size={20} />
         <span className={s.cmdName} dir="auto">/{mode.leaf.label}</span>
@@ -544,9 +621,9 @@ export function useCommandMode(channel: Channel, opts: { onLeave: (text: string)
   ) : null;
   const list: ReactNode = mode ? (
     ac ? (
-      <Autocomplete kind="command" items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={(i) => { const it = ac.items[i]; if (it) pick(mode.focus, it); }} tone={opts.tone} heading={focused ? `${optionName(focused.opt)}: ${optionDescription(focused.opt)}` : undefined} />
+      <Autocomplete docked kind="command" items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={(i) => { const it = ac.items[i]; if (it) pick(mode.focus, it); }} tone={opts.tone} heading={focused ? `${optionName(focused.opt)}: ${optionDescription(focused.opt)}` : undefined} />
     ) : (
-      <div className={s.cmdBar} data-invalid={focused?.error ? true : undefined}>
+      <div className={[s.cmdBar, s.docked].join(" ")} data-invalid={focused?.error ? true : undefined}>
         {hint}
         <span className={s.cmdPlain}>
           <LockOpen size={13} aria-hidden="true" />
@@ -556,5 +633,18 @@ export function useCommandMode(channel: Channel, opts: { onLeave: (text: string)
     )
   ) : null;
 
-  return { active: !!mode, start, box, list, submit };
+  /** Puts what the emoji picker chose into the option being written; false when the caret is in none that takes words. */
+  const insert = (text: string): boolean => {
+    const m = modeRef.current;
+    const slot = m?.slots[m.focus];
+    if (!m || !slot || slot.opt.type !== OPT_STRING || slot.value !== undefined) return false;
+    const el = inputs.current[m.focus];
+    const at = el && typeof el.selectionStart === "number" ? el.selectionStart : slot.text.length;
+    const end = el && typeof el.selectionEnd === "number" ? el.selectionEnd : at;
+    update(m.focus, { text: slot.text.slice(0, at) + text + slot.text.slice(end), error: undefined }, false);
+    focusSlot(m.focus);
+    return true;
+  };
+
+  return { active: !!mode, start, box, list, submit, insert };
 }

@@ -1,5 +1,7 @@
 package fish.nexa.ui.apps
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -40,6 +42,11 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -223,6 +230,9 @@ data class CmdSuggestion(
     val user: PublicUser? = null,
     val role: Role? = null,
     val channel: Channel? = null,
+    /** An emoji for ":name" in a text option: what goes in, and its glyph's key to draw. */
+    val emojiInsert: String? = null,
+    val emojiKey: String? = null,
 )
 
 /**
@@ -267,7 +277,63 @@ class CommandMode(val channelId: String, private val scope: CoroutineScope, priv
         mode?.let { refresh(it) }
     }
 
+    /** The whole command is taken (Ctrl+A on a hardware keyboard), for Backspace to clear it. */
+    var allSelected by mutableStateOf(false)
+    private var lastSelectAll = -1
+
+    /**
+     * A hardware keyboard's Ctrl+A takes the whole command when the caret is
+     * in an empty option or past them, or on a second press in one with words
+     * (the first takes its words); Backspace or Delete then clears it, and a
+     * typed character replaces it (web CommandMode.tsx wholeCommandKey).
+     * [at] is the slot, or the number of slots for the end. True when handled.
+     */
+    fun wholeCommandKey(e: androidx.compose.ui.input.key.KeyEvent, at: Int, text: String): Boolean {
+        if (e.type != KeyEventType.KeyDown) return false
+        // the modifier keys' own presses change nothing (the Ctrl of a second Ctrl+A among them)
+        if (e.key == Key.CtrlLeft || e.key == Key.CtrlRight || e.key == Key.ShiftLeft || e.key == Key.ShiftRight || e.key == Key.MetaLeft || e.key == Key.MetaRight || e.key == Key.AltLeft || e.key == Key.AltRight) return false
+        if (e.isCtrlPressed && !e.isAltPressed && !e.isShiftPressed && e.key == Key.A) {
+            val second = lastSelectAll == at
+            lastSelectAll = at
+            if (text.isNotEmpty() && !second) return false
+            allSelected = true
+            return true
+        }
+        lastSelectAll = -1
+        if (!allSelected) return false
+        if (e.key == Key.Backspace || e.key == Key.Delete) {
+            allSelected = false
+            leave("")
+            return true
+        }
+        val ch = e.utf16CodePoint
+        if (ch > 31 && !e.isCtrlPressed && !e.isAltPressed && !e.isMetaPressed) {
+            allSelected = false
+            leave(String(Character.toChars(ch)))
+            return true
+        }
+        allSelected = false
+        return false
+    }
+
+    /** What follows a ":" at the end of a text option's words (two letters or more), or null. */
+    private fun emojiQuery(slot: CmdSlot): String? {
+        if (slot.opt.type != AppCommands.OPT_STRING || slot.value != null || !slot.opt.choices.isNullOrEmpty()) return null
+        return Regex("(?:^|\\s):([\\w+-]{2,32})$").find(slot.text)?.groupValues?.get(1)?.lowercase()
+    }
+
+    /** Puts what the emoji picker chose into the option being written; false when the caret is in none that takes words. */
+    fun insert(text: String): Boolean {
+        val m = mode ?: return false
+        val slot = m.slots.getOrNull(m.focus) ?: return false
+        if (slot.opt.type != AppCommands.OPT_STRING || slot.value != null) return false
+        type(m.focus, slot.text + text)
+        focusSlot(m.focus)
+        return true
+    }
+
     fun leave(text: String = "") {
+        allSelected = false
         asking?.cancel()
         mode = null
         suggestions = emptyList()
@@ -277,6 +343,13 @@ class CommandMode(val channelId: String, private val scope: CoroutineScope, priv
     /** The suggestions for a slot, for what is typed in it. */
     private fun suggestionsFor(slot: CmdSlot, fromApp: List<CommandChoice>?): List<CmdSuggestion> {
         val o = slot.opt
+        // ":name" at the end of an option's words offers emoji, as in the message box (web emojiQuery)
+        emojiQuery(slot)?.let { q ->
+            val ch = Nexa.channels.get(channelId) ?: return emptyList()
+            return fish.nexa.ui.chat.emojiSuggestions(ch, q, raw = true).map { a ->
+                CmdSuggestion("e" + a.title + a.insert, a.title, JsonPrimitive(a.insert), a.title, emojiInsert = a.insert.trimEnd(), emojiKey = a.emoji)
+            }
+        }
         val q = slot.text.trim().lowercase()
         val entity = entityOf(o)
         if (entity != null) {
@@ -346,6 +419,15 @@ class CommandMode(val channelId: String, private val scope: CoroutineScope, priv
 
     fun type(i: Int, text: String) {
         val m = mode ?: return
+        // with the whole command taken, an edit through the keyboard (which sends no key
+        // events) clears it, or replaces it with what was typed
+        if (allSelected) {
+            val old = m.slots.getOrNull(i)?.text.orEmpty()
+            val typed = if (text.length > old.length && text.startsWith(old)) text.substring(old.length) else if (text.length > old.length) text else ""
+            allSelected = false
+            leave(typed)
+            return
+        }
         val next = m.copy(slots = m.slots.mapIndexed { j, s -> if (j == i) s.copy(text = text, error = null) else s }, focus = i)
         mode = next
         refresh(next)
@@ -368,6 +450,16 @@ class CommandMode(val channelId: String, private val scope: CoroutineScope, priv
     fun pick(s: CmdSuggestion) {
         val m = mode ?: return
         val i = m.focus
+        if (s.emojiInsert != null) {
+            // the ":name" typed becomes the emoji itself, as a message carries it
+            val slot = m.slots[i]
+            val q = emojiQuery(slot)
+            val text = if (q == null) slot.text + s.emojiInsert else slot.text.dropLast(q.length + 1) + s.emojiInsert
+            mode = m.copy(slots = m.slots.mapIndexed { j, x -> if (j == i) x.copy(text = text, error = null) else x })
+            suggestions = emptyList()
+            focusSlot(i)
+            return
+        }
         val slots = m.slots.mapIndexed { j, slot -> if (j == i) slot.copy(value = s.value, label = s.shown, text = "", error = null) else slot }
         // on to the next slot still empty, if there is one
         val nextEmpty = slots.withIndex().indexOfFirst { (j, slot) -> j > i && slotValue(slot) == null }
@@ -497,6 +589,8 @@ fun CommandBox(cm: CommandMode, modifier: Modifier = Modifier) {
     FlowRow(
         modifier
             .fillMaxWidth()
+            // Ctrl+A took the whole command: it reads as selected text does
+            .then(if (cm.allSelected) Modifier.background(c.brand.copy(alpha = 0.32f), Radii.Sm) else Modifier)
             .padding(vertical = 8.dp)
             .semantics { contentDescription = t("apps.command.label", "command" to m.leaf.label) },
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -570,7 +664,8 @@ fun CommandBox(cm: CommandMode, modifier: Modifier = Modifier) {
                             .focusRequester(requester(i))
                             .onFocusChanged { if (it.isFocused) cm.focused(i) }
                             .onPreviewKeyEvent { e ->
-                                if (e.type == KeyEventType.KeyDown && e.key == Key.Backspace && slot.text.isEmpty()) {
+                                if (cm.wholeCommandKey(e, i, slot.text)) true
+                                else if (e.type == KeyEventType.KeyDown && e.key == Key.Backspace && slot.text.isEmpty()) {
                                     cm.backspace(i)
                                     true
                                 } else false
@@ -625,7 +720,8 @@ fun CommandBox(cm: CommandMode, modifier: Modifier = Modifier) {
                 .focusRequester(requester(m.slots.size))
                 .onFocusChanged { if (it.isFocused) cm.focusedTail() }
                 .onPreviewKeyEvent { e ->
-                    if (e.type == KeyEventType.KeyDown && e.key == Key.Backspace) {
+                    if (cm.wholeCommandKey(e, m.slots.size, "")) true
+                    else if (e.type == KeyEventType.KeyDown && e.key == Key.Backspace) {
                         cm.backspace(m.slots.size)
                         true
                     } else false
@@ -664,12 +760,15 @@ fun CommandList(cm: CommandMode, modifier: Modifier = Modifier) {
     val m = cm.mode ?: return
     val c = Nx.colors
     val focused = m.slots.getOrNull(m.focus)
+    // docked on the box (web .docked): rounded only at its top, joined to the box under it
+    val dockShape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)
     val panel = modifier
-        .padding(horizontal = 16.dp)
         .fillMaxWidth()
-        .floatingPanel()
+        .ring(dockShape, c.panelEdge)
+        .background(c.bgFloating, dockShape)
+        .topEdge(dockShape, c.edgeLight)
     if (cm.suggestions.isNotEmpty()) {
-        Column(panel.padding(8.dp)) {
+        Column(panel.heightIn(max = fish.nexa.ui.chat.dockedListMax()).verticalScroll(rememberScrollState()).padding(8.dp)) {
             if (focused != null) Txt(
                 "${AppCommands.name(focused.opt)}: ${AppCommands.description(focused.opt)}",
                 style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(650)),
@@ -695,6 +794,7 @@ fun CommandList(cm: CommandMode, modifier: Modifier = Modifier) {
                         s.user != null -> Avatar(s.user.id, s.user.name, s.user.avatarId, 24.dp)
                         s.role != null -> Icon("AtSign", s.role.color.takeIf { it != 0L }?.let { mixSrgb(c.textStrong, Color(0xFF000000 or it), 0.72f) } ?: c.icon, size = 18.dp)
                         s.channel != null -> Icon("Hash", c.textMuted, size = 18.dp)
+                        s.emojiKey != null -> fish.nexa.ui.chat.EmojiGlyph(s.emojiKey, 22.dp)
                     }
                     Txt(s.label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     if (s.user != null) Txt(s.user.username, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)

@@ -24,11 +24,12 @@ import { P } from "@/lib/perms";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { GifPicker } from "@/components/pickers/GifPicker";
 import { StickerPicker } from "@/components/pickers/StickerPicker";
-import { emojiToken, searchCustomEmoji, searchPackEmoji, useExpressions } from "@/stores/expressions";
+import { emojiToken, useExpressions } from "@/stores/expressions";
 import { expressions as expressionsApi } from "@/api/expressions";
 import { extractUrls } from "@/markdown";
-import { allEmoji, emojiLoaded, loadEmoji, preloadEmoji, searchEmoji, withTone, type EmojiEntry } from "@/components/pickers/emojiIndex";
-import { learnEmojiHistory, noteEmojiUse, suggestEmoji, type EmojiCandidate } from "@/lib/emojiSuggest";
+import { emojiLoaded, loadEmoji, preloadEmoji, withTone } from "@/components/pickers/emojiIndex";
+import { learnEmojiHistory, noteEmojiUse } from "@/lib/emojiSuggest";
+import { emojiSuggestionItems } from "./emojiSuggestions";
 import { emojiKeysIn } from "@/lib/emojiUsage";
 import { channelDisplayName } from "@/lib/names";
 import { Autocomplete, type AcItem, AC_LIST_ID, acOptionId } from "./Autocomplete";
@@ -118,14 +119,6 @@ export function acToken(text: string, caret: number, channels: boolean, smartEmo
   if (token.startsWith(":")) return { kind: "emoji", query: token.slice(1).toLowerCase(), start };
   if (start === 0 && token.startsWith("/")) return { kind: "command", query: token.slice(1).toLowerCase(), start };
   return null;
-}
-
-/** Unicode's emoji as suggestions, made once for the set. */
-let unicodeCandidates: { from: EmojiEntry[]; list: EmojiCandidate[] } | null = null;
-function unicodeEmojiCandidates(): EmojiCandidate[] {
-  const all = allEmoji();
-  if (unicodeCandidates?.from !== all) unicodeCandidates = { from: all, list: all.map((entry) => ({ kind: "emoji", entry })) };
-  return unicodeCandidates.list;
 }
 
 /**
@@ -466,13 +459,9 @@ export function Composer({ channel }: { channel: Channel }) {
           () => undefined,
         );
       }
-      const ex = useExpressions.getState();
-      // this server's own emoji first: its :name: is the one a message here gets
-      const sid = channel.server_id;
       if (smart) {
-        // one list of everything, ranked by how well it matches and by how much this account uses it
-        const st = useSettings.getState().settings;
         // the first time, what this account already sent is counted too, and the list follows
+        const st = useSettings.getState().settings;
         if (!st.emojiLearned && me?.id) {
           const forChannel = channelRef.current;
           void learnEmojiHistory(me.id).then((learned) => {
@@ -480,28 +469,11 @@ export function Composer({ channel }: { channel: Channel }) {
             if (learned && ta && channelRef.current === forChannel) refreshAcRef.current(ta.value, ta.selectionStart ?? ta.value.length);
           });
         }
-        const packEmoji = Object.values(ex.packs)
-          .filter((p) => p.kind === "emoji")
-          .flatMap((p) => p.stickers.map((r) => ({ id: r.id, server_id: "", name: r.name, blob_id: r.blob_id, animated: r.animated, creator_id: r.creator_id, created_at: r.created_at })));
-        const candidates: EmojiCandidate[] = [
-          ...(sid ? (ex.emojis[sid] ?? []) : []).map((emoji): EmojiCandidate => ({ kind: "customEmoji", emoji, own: true })),
-          ...Object.entries(ex.emojis).filter(([id]) => id !== sid).flatMap(([, list]) => list.map((emoji): EmojiCandidate => ({ kind: "customEmoji", emoji }))),
-          ...packEmoji.map((emoji): EmojiCandidate => ({ kind: "customEmoji", emoji })),
-          ...unicodeEmojiCandidates(),
-        ];
-        items = suggestEmoji({ query: tok.query, candidates, usage: st.emojiUsage, recent: st.recentEmoji, now: Date.now() }).map((c) => (c.kind === "emoji" ? { kind: "emoji", entry: c.entry, name: c.name } : { kind: "customEmoji", emoji: c.emoji }));
+        items = emojiSuggestionItems(tok.query, channel.server_id);
         setAc(items.length ? { items, index: 0, start: tok.start, kind: tok.kind, frequent: !tok.query } : null);
         return;
       }
-      const others = Object.fromEntries(Object.entries(ex.emojis).filter(([id]) => id !== sid));
-      const own = sid ? searchCustomEmoji({ [sid]: ex.emojis[sid] ?? [] }, tok.query, 4) : [];
-      const custom = [...own, ...searchCustomEmoji(others, tok.query, 4 - own.length)].map((e) => ({ kind: "customEmoji" as const, emoji: e }));
-      const fromPacks = searchPackEmoji(ex.packs, tok.query, 4 - Math.min(custom.length, 4)).map((r) => ({
-        kind: "customEmoji" as const,
-        emoji: { id: r.sticker.id, server_id: "", name: r.sticker.name, blob_id: r.sticker.blob_id, animated: r.sticker.animated, creator_id: r.sticker.creator_id, created_at: r.sticker.created_at },
-      }));
-      const all = [...custom, ...fromPacks];
-      items = [...all, ...searchEmoji(tok.query, Math.max(2, 8 - all.length)).map((e) => ({ kind: "emoji" as const, entry: e }))];
+      items = emojiSuggestionItems(tok.query, channel.server_id);
     } else {
       items = commands().filter((c) => c.name.startsWith(tok.query)).map((c) => ({ kind: "command", name: c.name, desc: c.desc }));
       if (canUseApps) {
@@ -899,7 +871,7 @@ export function Composer({ channel }: { channel: Channel }) {
   return (
     <div className={s.wrap}>
       <DropOverlay name={name} hash={!!channel.server_id} onFiles={(list) => takeFiles.current?.(list)} disabled={!canSend || selecting} />
-      {cmd.active ? cmd.list : ac ? <Autocomplete kind={ac.kind} items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} heading={ac.frequent ? tr_("composer.autocomplete.frequentlyUsed") : undefined} /> : null}
+      {cmd.active ? cmd.list : ac ? <Autocomplete docked kind={ac.kind} items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} heading={ac.frequent ? tr_("composer.autocomplete.frequentlyUsed") : undefined} /> : null}
       {formatting ? (
         <Suspense fallback={null}>
           <FormatEditor
@@ -926,6 +898,11 @@ export function Composer({ channel }: { channel: Channel }) {
         <ExpressionPicker
           onClose={() => setPicker(false)}
           onEmoji={(em) => {
+            // while an app's command is filled in, the emoji goes into the option being written
+            if (cmd.active) {
+              cmd.insert(em.unicode);
+              return;
+            }
             const caret = taRef.current?.selectionStart ?? text.length;
             // a custom emoji shows as its :name: when that name sends this very emoji
             const custom = /^<a?:(\w+):\d+>$/.exec(em.unicode);

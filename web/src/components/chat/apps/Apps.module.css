@@ -1,8 +1,10 @@
 /* An app's parts of a message: who used what, an answer on its way, an answer only you see, and its buttons and menus. */
 
 /* --- who used what (on the reply line's frame) ------------------------------------------- */
-.used { cursor: default; }
+.used { position: relative; cursor: default; }
 .usedText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* what a command was used with, shown under its line by a tap on a touch screen */
+.usedDetails { position: absolute; inset-inline-start: 22px; bottom: calc(100% + 4px); z-index: 4; max-width: min(320px, calc(100vw - 48px)); padding: 6px 10px; border-radius: var(--radius-sm); background: var(--bg-floating); box-shadow: 0 0 0 1px var(--panel-edge), var(--shadow-medium); font-size: 13px; line-height: 1.4; color: var(--text); overflow-wrap: anywhere; white-space: normal; }
 .usedCommand { font-weight: 650; color: var(--text-brand); font-size: inherit; line-height: inherit; }
 button.usedCommand:hover { text-decoration: underline; }
 button.usedCommand:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-radius: 3px; }

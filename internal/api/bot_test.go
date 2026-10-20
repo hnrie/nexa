@@ -391,6 +391,88 @@ func TestFirstFollowupFillsInTheThinkingMessage(t *testing.T) {
 	}
 }
 
+// The answer line has the options someone used, while the bot's own
+// interaction metadata stays unchanged.
+func TestAppAnswerKeepsCommandOptionsForPeople(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tok, uid := register(t, ts, "alice")
+	view := createServer(t, ts, tok, "Lab")
+	sid := view["id"].(string)
+	general := channelNamed(view, "general")["id"].(string)
+	app, botToken := makeApp(t, ts, tok, "Lab Bot")
+	appID := snowID(t, app["id"].(string))
+	addBot(t, ts, tok, app["id"].(string), sid)
+
+	itID := ids.New()
+	token := "caption-token-" + itID.String()
+	guild, channel := snowID(t, sid), snowID(t, general)
+	data := dInteraction{
+		ID: snow(itID), ApplicationID: snow(appID), Type: itCommand,
+		AuthorizingIntegrationOwners: map[string]snow{"0": snow(guild)},
+		Data: dCommandData{ID: 1, Name: "caption", Type: cmdChatInput, Options: []dOptionValue{
+			{Name: "text", Type: optString, Value: "hello there"},
+			{Name: "times", Type: optInteger, Value: json.Number("0")},
+			{Name: "quiet", Type: optBoolean, Value: false},
+			{Name: "format", Type: optSubcommand, Options: []dOptionValue{{Name: "style", Type: optString, Value: "short"}}},
+			{Name: "who", Type: optUser, Value: botproto.OutString(snowID(t, uid))},
+		}},
+	}
+	raw, err := json.Marshal(storedInteraction{dInteraction: data})
+	if err != nil {
+		t.Fatal(err)
+	}
+	it := &store.Interaction{ID: itID, ApplicationID: appID, Type: itCommand, TokenHash: tokenHash(token), UserID: snowID(t, uid), GuildID: &guild, ChannelID: &channel,
+		Data: raw, CreatedAt: time.Now().UnixMilli(), ExpiresAt: time.Now().Add(interactionLife).UnixMilli()}
+	if err := srv.Store.CreateInteraction(context.Background(), it); err != nil {
+		t.Fatal(err)
+	}
+	path := "/api/v10/interactions/" + botproto.OutString(itID) + "/" + token + "/callback"
+	if res, body := botDo(t, ts, "POST", path, botToken, map[string]any{"type": cbMessage, "data": map[string]any{"content": "captioned"}}); res.StatusCode != http.StatusNoContent {
+		t.Fatalf("answer command: %d %v", res.StatusCode, body)
+	}
+
+	res, page := do(t, ts, "GET", "/api/v1/channels/"+general+"/messages?limit=50", tok, nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("history: %d %v", res.StatusCode, page)
+	}
+	for _, row := range page["_list"].([]any) {
+		message := row.(map[string]any)
+		hook, _ := message["webhook"].(map[string]any)
+		if hook == nil || hook["content"] != "captioned" {
+			continue
+		}
+		interaction := hook["interaction"].(map[string]any)
+		options := interaction["options"].([]any)
+		if len(options) != 5 || options[4].(map[string]any)["value"] != uid {
+			t.Fatalf("a person is kept by their own id, for the apps to name: %v", options)
+		}
+		if options[0].(map[string]any)["value"] != "hello there" || options[1].(map[string]any)["value"] != float64(0) || options[2].(map[string]any)["value"] != false {
+			t.Fatalf("the command's values should be kept for people: %v", interaction)
+		}
+		nested := options[3].(map[string]any)["options"].([]any)
+		if nested[0].(map[string]any)["value"] != "short" {
+			t.Fatalf("subcommand options should be kept too: %v", interaction)
+		}
+		botRes, botPage := botDo(t, ts, "GET", "/api/v10/channels/"+botproto.OutString(channel)+"/messages?limit=50", botToken, nil)
+		if botRes.StatusCode != http.StatusOK {
+			t.Fatalf("bot history: %d %v", botRes.StatusCode, botPage)
+		}
+		for _, botRow := range botPage["_list"].([]any) {
+			botMessage := botRow.(map[string]any)
+			if botMessage["content"] != "captioned" {
+				continue
+			}
+			metadata := botMessage["interaction_metadata"].(map[string]any)
+			if _, leaked := metadata["options"]; leaked {
+				t.Fatalf("command options are client-only interaction metadata: %v", metadata)
+			}
+			return
+		}
+		t.Fatal("the bot did not get its command answer")
+	}
+	t.Fatalf("the command answer was not in history: %v", page)
+}
+
 // A link a bot sends gets a preview as a person's would, made by the server
 // (the bot has no app of a person's to fetch it), for the people reading and
 // for bots, as the protocol's link embed.

@@ -93,6 +93,60 @@ def flow(s, out, base, sid, general, failures):
         p.locator("[data-id]:has-text('hello there hello there')").last.scroll_into_view_if_needed()
         step(f"{size}: an answer only bob sees says so")
         s.shot("apps-ephemeral")
+        if size == "1366":
+            line = p.locator("[data-testid=interaction-line]").last
+            line.get_by_test_id("used-command").hover()
+            tip = p.get_by_role("tooltip")
+            tip.wait_for(timeout=3000)
+            expected = "/echo text: hello there times: 2"
+            if tip.inner_text().strip() != expected:
+                raise AssertionError(f"command tooltip should show its submitted options: {tip.inner_text()!r}")
+            step(f"{size}: hovering the used command shows its options")
+            s.shot("apps-used-options")
+            p.mouse.move(0, 0)
+        else:
+            # a touch screen has no hover: a tap shows them under the line
+            line = p.locator("[data-testid=interaction-line]").last
+            line.get_by_test_id("used-command").tap()
+            details = line.get_by_test_id("used-command-details")
+            details.wait_for(timeout=3000)
+            if details.inner_text().strip() != "/echo text: hello there times: 2":
+                raise AssertionError(f"a tap should show the submitted options: {details.inner_text()!r}")
+            step(f"{size}: tapping the used command shows its options")
+            s.shot("apps-used-options")
+
+    def whole_command():
+        # Ctrl+A in an empty option takes the whole command, and Backspace clears it
+        type_command(p, "ec")
+        pick_suggestion(p, "/echo")
+        p.wait_for_selector("[data-testid=command-box]", timeout=5000)
+        p.keyboard.type("words")
+        p.keyboard.press("ControlOrMeta+a")  # the option's words
+        p.keyboard.press("ControlOrMeta+a")  # then the whole command
+        p.wait_for_selector("[data-testid=command-box][data-all-selected]", timeout=3000)
+        step(f"{size}: Ctrl+A twice takes the whole command")
+        s.shot("apps-whole-command")
+        p.keyboard.press("Backspace")
+        p.wait_for_selector("[data-testid=command-box]", state="detached", timeout=3000)
+        if composer(p).input_value() != "":
+            raise AssertionError(f"the box should be empty: {composer(p).input_value()!r}")
+        step(f"{size}: Backspace then clears it")
+
+    def option_emoji():
+        # ":name" in a command's text option offers emoji, as the message box does
+        type_command(p, "ec")
+        pick_suggestion(p, "/echo")
+        p.wait_for_selector("[data-testid=command-box]", timeout=5000)
+        p.keyboard.type("hi :grinning")
+        p.wait_for_selector("#composer-suggestions button[role=option]", timeout=8000)
+        step(f"{size}: a command option offers emoji for :name")
+        s.shot("apps-option-emoji")
+        p.keyboard.press("Enter")
+        value = p.locator("[data-testid=slot-text] input").input_value()
+        if "\U0001F600" not in value:
+            raise AssertionError(f"the emoji should go into the option: {value!r}")
+        step(f"{size}: picking one puts the emoji in the option")
+        p.keyboard.press("Escape")
 
     def slow():
         type_command(p, "slow")
@@ -196,7 +250,7 @@ def flow(s, out, base, sid, general, failures):
         p.wait_for_selector("text=you picked apple", timeout=15000)
         step(f"{size}: a suggestion picked is sent")
 
-    for name, fn in [("message", message), ("commands", commands), ("echo", echo), ("slow", slow), ("button", button), ("select", select), ("form", form), ("menu", menu), ("menu_on_a_picture", menu_on_a_picture), ("autocomplete", autocomplete)]:
+    for name, fn in [("message", message), ("commands", commands), ("echo", echo), ("whole-command", whole_command), ("option-emoji", option_emoji), ("slow", slow), ("button", button), ("select", select), ("form", form), ("menu", menu), ("menu_on_a_picture", menu_on_a_picture), ("autocomplete", autocomplete)]:
         attempt(name, fn)
 
 

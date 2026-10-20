@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { namedByHook, sameHookSender, sanitizeHook } from "./webhookMessage";
+import { commandInvocation, namedByHook, sameHookSender, sanitizeHook } from "./webhookMessage";
 
 describe("an app's message", () => {
   const raw = {
@@ -19,6 +19,29 @@ describe("an app's message", () => {
     expect(h.application_id).toBe("77");
     expect(h.interaction).toMatchObject({ id: "5", type: 2, user_id: "9", name: "ping", command_type: 1, trigger: { id: "4", name: "form" } });
     expect(h.stickers).toEqual([{ id: "8", name: "wave", blob_id: "12", format: "apng" }]);
+  });
+
+  it("keeps command options and formats nested commands with their submitted values", () => {
+    const hook = sanitizeHook({
+      ...raw,
+      interaction: {
+        id: "5", type: 2, user_id: "9", name: "caption", command_type: 1,
+        options: [
+          { name: "format", type: 2, options: [{ name: "short", type: 1, options: [{ name: "text", type: 3, value: "hello there" }, { name: "count", type: 4, value: 0 }, { name: "quiet", type: 5, value: false }] }] },
+          { name: "ignored", type: 3, value: { bad: true } },
+        ],
+      },
+    })!;
+    expect(hook.interaction?.options).toEqual([
+      { name: "format", type: 2, options: [{ name: "short", type: 1, options: [{ name: "text", type: 3, value: "hello there" }, { name: "count", type: 4, value: 0 }, { name: "quiet", type: 5, value: false }] }] },
+    ]);
+    expect(commandInvocation(hook.interaction!)).toBe("/caption format short text: hello there count: 0 quiet: false");
+  });
+
+  it("names the people, roles and channels a command was used on", () => {
+    const it2 = { id: "5", type: 2, user_id: "9", name: "poke", command_type: 1, options: [{ name: "who", type: 6, value: "42" }, { name: "where", type: 7, value: "43" }, { name: "gone", type: 8, value: "44" }] };
+    const names: Record<string, string> = { "6:42": "@Maya", "7:43": "#general" };
+    expect(commandInvocation(it2, (type, id) => names[`${type}:${id}`])).toBe("/poke who: @Maya where: #general gone: 44");
   });
 
   it("keeps what its select menus offer, and drops what is malformed", () => {

@@ -1551,14 +1551,17 @@ func interactionMeta(it *store.Interaction, st *storedInteraction) *wmInteractio
 	}
 	raw, _ := json.Marshal(st.Data)
 	var data struct {
-		Name     string `json:"name"`
-		Type     int    `json:"type"`
-		TargetID snow   `json:"target_id"`
+		Name     string         `json:"name"`
+		Type     int            `json:"type"`
+		TargetID snow           `json:"target_id"`
+		Options  []dOptionValue `json:"options"`
+		Resolved *dResolved     `json:"resolved"`
 	}
 	_ = json.Unmarshal(raw, &data)
 	switch it.Type {
 	case itCommand:
 		meta.Name, meta.CommandType = data.Name, data.Type
+		meta.Options = optionsForPeople(data.Options, data.Resolved)
 		if data.TargetID != 0 {
 			t := ids.ID(data.TargetID)
 			if data.Type == cmdUser {
@@ -1571,6 +1574,39 @@ func interactionMeta(it *store.Interaction, st *storedInteraction) *wmInteractio
 		meta.InteractedMessageID = it.MessageID
 	}
 	return meta
+}
+
+// optionsForPeople is what someone filled in, as the line over the answer
+// shows it: people, roles and channels by Nexa's own ids (the apps draw them
+// by name), a file by its name.
+func optionsForPeople(in []dOptionValue, res *dResolved) []dOptionValue {
+	out := make([]dOptionValue, 0, len(in))
+	for _, o := range in {
+		o.Focused = false
+		switch o.Type {
+		case optSubcommand, optGroup:
+			o.Options = optionsForPeople(o.Options, res)
+		case optUser, optRole, optChannel, optMentionable:
+			raw, _ := o.Value.(string)
+			id, err := botproto.ParseID(raw)
+			if err != nil {
+				continue
+			}
+			o.Value = id.String()
+		case optAttachment:
+			raw, _ := o.Value.(string)
+			a, ok := dAttachment{}, false
+			if res != nil {
+				a, ok = res.Attachments[raw]
+			}
+			if !ok {
+				continue
+			}
+			o.Value = a.Filename
+		}
+		out = append(out, o)
+	}
+	return out
 }
 
 // answerMessage makes the message an answer posts (4), the message that

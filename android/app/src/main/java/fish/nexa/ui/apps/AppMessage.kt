@@ -9,10 +9,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -36,9 +40,14 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import fish.nexa.Nexa
 import fish.nexa.data.AppCommands
 import fish.nexa.data.ChatMessage
@@ -54,12 +63,17 @@ import fish.nexa.ui.components.ButtonSize
 import fish.nexa.ui.components.NxButton
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
+import fish.nexa.ui.components.touchOutset
 import fish.nexa.ui.markdown.Webhook
 import fish.nexa.ui.media.HookEmojiGlyph
 import fish.nexa.ui.shell.Names
 import fish.nexa.ui.shell.openProfile
 import fish.nexa.ui.t
 import fish.nexa.ui.theme.Nx
+import fish.nexa.ui.theme.Radii
+import fish.nexa.ui.theme.ring
+import fish.nexa.ui.theme.shadowHigh
+import fish.nexa.ui.theme.topEdge
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -106,6 +120,16 @@ fun InteractionLine(cm: ChatMessage, it: Webhook.Interaction, ctx: ListCtx) {
     val name = Names.member(ctx.server?.server?.id, it.userId)
     val slash = (it.commandType ?: 1.0) == 1.0
     val command = if (slash) "/${it.name}" else it.name ?: ""
+    val invocation = Webhook.commandInvocation(it) { type, id ->
+        // a mentionable is a person or a role
+        (if (type == 6 || type == 9) Nexa.users.get(id)?.let { "@" + Names.shown(id) } else null)
+            ?: (if (type == 8 || type == 9) ctx.server?.roles?.get(id)?.let { r -> "@" + r.name } else null)
+            ?: (if (type == 7) Nexa.channels.get(id)?.name?.let { n -> "#$n" } else null)
+    }
+    val hasOptions = invocation != command
+    var detailsOpen by remember(it.id) { mutableStateOf(false) }
+    val detailsInteraction = remember(it.id) { MutableInteractionSource() }
+    val density = LocalDensity.current
     val appId = Webhook.of(cm.hook)?.applicationId
     val nameStyle = TextLinkStyles(SpanStyle(color = c.text, fontWeight = FontWeight(500)))
     val commandStyle = SpanStyle(color = c.textBrand, fontWeight = FontWeight(650))
@@ -129,9 +153,36 @@ fun InteractionLine(cm: ChatMessage, it: Webhook.Interaction, ctx: ListCtx) {
         }
         append(template.substring(i))
     }
-    ReplyFrame {
-        Avatar(it.userId, name, Nexa.users.get(it.userId)?.avatarId, 16.dp)
-        BasicText(line, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), color = c.textMuted), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+    Box {
+        ReplyFrame(
+            rowModifier = if (hasOptions) Modifier
+                .touchOutset(8.dp, 12.dp)
+                .pressable(detailsInteraction) { detailsOpen = !detailsOpen } else Modifier,
+        ) {
+            Avatar(it.userId, name, Nexa.users.get(it.userId)?.avatarId, 16.dp)
+            BasicText(line, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), color = c.textMuted), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        }
+        if (detailsOpen && hasOptions) Popup(
+            alignment = Alignment.BottomStart,
+            offset = IntOffset(0, with(density) { (-6).dp.roundToPx() }),
+            onDismissRequest = { detailsOpen = false },
+            properties = PopupProperties(focusable = true),
+        ) {
+            val shape = Radii.Md
+            Column(
+                Modifier
+                    .widthIn(max = 280.dp)
+                    .heightIn(max = 240.dp)
+                    .shadowHigh(shape, c)
+                    .ring(shape, c.panelEdge)
+                    .background(c.bgFloating, shape)
+                    .topEdge(shape, c.edgeLight)
+                    .verticalScroll(rememberScrollState())
+                    .padding(12.dp),
+            ) {
+                Txt(invocation, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), textDirection = TextDirection.Ltr), color = c.text)
+            }
+        }
     }
 }
 

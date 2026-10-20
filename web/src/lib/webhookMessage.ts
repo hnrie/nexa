@@ -125,12 +125,43 @@ export interface HookInteraction {
   name?: string;
   /** 1 typed, 2 from a person's menu, 3 from a message's menu. */
   command_type?: number;
+  options?: HookInteractionOption[];
   target_user_id?: string;
   target_message_id?: string;
   /** For a followup, the message the first answer made. */
   original_response_message_id?: string;
   /** For a form's answer, what opened the form. */
   trigger?: HookInteraction;
+}
+
+/** A command option as the person submitted it; subcommand and group options contain children. */
+export interface HookInteractionOption {
+  name: string;
+  type: number;
+  value?: string | number | boolean;
+  options?: HookInteractionOption[];
+}
+
+/**
+ * The invocation as it appeared in the command box. `nameOf` names a person,
+ * role or channel an option picked (the option's type and Nexa id), as the
+ * box showed it; without it, or when it does not know them, the id stands.
+ */
+export function commandInvocation(it: HookInteraction, nameOf?: (type: number, id: string) => string | undefined): string {
+  const args: string[] = [];
+  const add = (options: HookInteractionOption[]) => {
+    for (const option of options) {
+      if (option.type === 1 || option.type === 2) {
+        args.push(option.name);
+        add(option.options ?? []);
+      } else if (option.value !== undefined) {
+        const named = option.type >= 6 && option.type <= 9 ? nameOf?.(option.type, String(option.value)) : undefined;
+        args.push(`${option.name}: ${named ?? option.value}`);
+      }
+    }
+  };
+  add(it.options ?? []);
+  return `/${it.name ?? ""}${args.length ? ` ${args.join(" ")}` : ""}`;
 }
 
 /** A sticker an app sent. */
@@ -411,6 +442,28 @@ function component(x: unknown, depth: number): HookComponent | null {
   return out;
 }
 
+function interactionOption(x: unknown, depth = 0): HookInteractionOption | undefined {
+  if (!isObj(x) || depth > 3) return undefined;
+  const name = str(x["name"]);
+  const type = num(x["type"]);
+  if (!name || type === undefined || !Number.isInteger(type) || type < 1 || type > 11) return undefined;
+  const out: HookInteractionOption = { name: name.slice(0, 32), type };
+  const value = x["value"];
+  let hasValue = false;
+  if (typeof value === "string") { out.value = value.slice(0, 6000); hasValue = true; }
+  else if (typeof value === "boolean") { out.value = value; hasValue = true; }
+  else {
+    const n = num(value);
+    if (n !== undefined) { out.value = n; hasValue = true; }
+  }
+  if (type > 2 && !hasValue) return undefined;
+  if (Array.isArray(x["options"])) {
+    const options = x["options"].slice(0, 25).map((o) => interactionOption(o, depth + 1)).filter((o): o is HookInteractionOption => o !== undefined);
+    if (options.length) out.options = options;
+  }
+  return out;
+}
+
 function interaction(x: unknown, depth = 0): HookInteraction | undefined {
   if (!isObj(x) || depth > 1) return undefined;
   const iid = id(x["id"]);
@@ -422,6 +475,10 @@ function interaction(x: unknown, depth = 0): HookInteraction | undefined {
   if (name) out.name = name.slice(0, 100);
   const ct = num(x["command_type"]);
   if (ct !== undefined) out.command_type = ct;
+  if (Array.isArray(x["options"])) {
+    const options = x["options"].slice(0, 25).map((o) => interactionOption(o)).filter((o): o is HookInteractionOption => o !== undefined);
+    if (options.length) out.options = options;
+  }
   for (const k of ["target_user_id", "target_message_id", "original_response_message_id"] as const) {
     const v = id(x[k]);
     if (v) out[k] = v;

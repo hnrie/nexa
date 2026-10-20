@@ -120,12 +120,21 @@ object Webhook {
         val name: String? = null,
         /** 1 typed, 2 from a person's menu, 3 from a message's menu. */
         val commandType: Double? = null,
+        val options: List<InteractionOption> = emptyList(),
         val targetUserId: String? = null,
         val targetMessageId: String? = null,
         /** For a followup, the message the first answer made. */
         val originalResponseMessageId: String? = null,
         /** For a form's answer, what opened the form. */
         val trigger: Interaction? = null,
+    )
+
+    /** One submitted command option; groups and subcommands contain their children. */
+    data class InteractionOption(
+        val name: String,
+        val type: Double,
+        val value: JsonPrimitive? = null,
+        val options: List<InteractionOption> = emptyList(),
     )
 
     /** A sticker an app sent; `format` is the file's kind as Nexa keeps it (png, apng, gif, webp, tgs, webm). */
@@ -331,11 +340,48 @@ object Webhook {
             id = iid, type = type, userId = uid,
             name = str(o["name"])?.takeIf { it.isNotEmpty() }?.let { slice(it, 100) },
             commandType = num(o["command_type"]),
+            options = arr(o["options"])?.take(25)?.mapNotNull { interactionOption(it) } ?: emptyList(),
             targetUserId = id(o["target_user_id"]),
             targetMessageId = id(o["target_message_id"]),
             originalResponseMessageId = id(o["original_response_message_id"]),
             trigger = interaction(o["trigger"], depth + 1),
         )
+    }
+
+    private fun interactionOption(x: JsonElement?, depth: Int = 0): InteractionOption? {
+        val o = obj(x) ?: return null
+        if (depth > 3) return null
+        val name = str(o["name"])?.takeIf { it.isNotEmpty() } ?: return null
+        val type = num(o["type"])?.takeIf { it in 1.0..11.0 && it == Math.floor(it) } ?: return null
+        val rawValue = o["value"] as? JsonPrimitive
+        val value = rawValue?.takeIf { it != JsonNull && (it.isString || it.booleanOrNull != null || it.doubleOrNull?.isFinite() == true) }
+        if (type > 2.0 && value == null) return null
+        val children = arr(o["options"])?.take(25)?.mapNotNull { interactionOption(it, depth + 1) } ?: emptyList()
+        return InteractionOption(slice(name, 32), type, value, children)
+    }
+
+    /**
+     * The invocation as it appeared in the command box. [nameOf] names a person,
+     * role or channel an option picked (the option's type and Nexa id); the id
+     * stands when it does not know them.
+     */
+    fun commandInvocation(it: Interaction, nameOf: (type: Int, id: String) -> String? = { _, _ -> null }): String {
+        val args = ArrayList<String>()
+        fun add(options: List<InteractionOption>) {
+            for (option in options) {
+                if (option.type == 1.0 || option.type == 2.0) {
+                    args += option.name
+                    add(option.options)
+                } else {
+                    option.value?.let { value ->
+                        val named = if (option.type in 6.0..9.0) nameOf(option.type.toInt(), value.content) else null
+                        args += "${option.name}: ${named ?: value.content}"
+                    }
+                }
+            }
+        }
+        add(it.options)
+        return "/${it.name.orEmpty()}${if (args.isEmpty()) "" else " ${args.joinToString(" ")}"}"
     }
 
     private val STICKER_FORMAT = Regex("^(png|apng|gif|webp|tgs|webm)$")

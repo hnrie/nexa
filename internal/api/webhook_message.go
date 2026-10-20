@@ -57,6 +57,9 @@ type wmInteraction struct {
 	UserID      ids.ID `json:"user_id"`
 	Name        string `json:"name,omitempty"`
 	CommandType int    `json:"command_type,omitempty"`
+	// the options someone filled in for a slash command; kept for the line
+	// above its answer, not included in the bot protocol's interaction metadata
+	Options []dOptionValue `json:"options,omitempty"`
 	// the message a component sat on, and the one an answer to a form's
 	// component went on from
 	InteractedMessageID *ids.ID `json:"interacted_message_id,omitempty"`

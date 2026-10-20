@@ -1,4 +1,4 @@
-import { AtSign, Hash } from "lucide-react";
+import { AtSign, Hash, SquareSlash } from "lucide-react";
 import type { Channel, Emoji, PublicUser, Role } from "@/api/types";
 import type { CommandApp } from "@/api/apps";
 import type { CommandLeaf } from "@/lib/apps";
@@ -9,7 +9,7 @@ import type { EmojiEntry } from "@/components/pickers/emojiIndex";
 import { withTone } from "@/components/pickers/emojiIndex";
 import { pointerMoved } from "@/lib/pointerMoved";
 import { optionName } from "@/lib/apps";
-import { Fragment, useEffect, useRef, type CSSProperties } from "react";
+import { Fragment, useEffect, useMemo, useRef, type CSSProperties } from "react";
 import s from "./Composer.module.css";
 import { t } from "@/i18n";
 
@@ -76,24 +76,112 @@ function roleStyle(role: Role): CSSProperties | undefined {
  * as mentions there, not as commands. `heading` names the whole list in place
  * of its groups, as the emoji used most do.
  */
-export function Autocomplete({ kind, items, index, onHover, onPick, tone, heading: title, style }: { kind: string; items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number; heading?: string | undefined; style?: CSSProperties | undefined }) {
-  const listRef = useRef<HTMLDivElement>(null);
-  // The list scrolls when it is taller than the room above the keyboard, so the
-  // highlighted row is kept in view. Only the list itself is scrolled:
-  // scrollIntoView would also shift the app's clipped containers.
+export function Autocomplete({ kind, items, index, onHover, onPick, tone, heading: title, style, docked }: { kind: string; items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number; heading?: string | undefined; style?: CSSProperties | undefined; docked?: boolean }) {
+  // a slash typed at the start: every command there is, by app, with a rail to jump between apps
+  const slash = kind === "command" && items.length > 0 && items.every((it) => it.kind === "appCommand" || it.kind === "command");
+  if (slash) return <CommandPicker items={items} index={index} onHover={onHover} onPick={onPick} docked={docked} />;
+  return <SuggestionList kind={kind} items={items} index={index} onHover={onHover} onPick={onPick} tone={tone} heading={title} style={style} docked={docked} />;
+}
+
+/** Keeps the highlighted row of a list that scrolls in view. Only the list itself scrolls: scrollIntoView would also shift the app's clipped containers. */
+function useRowInView(listRef: React.RefObject<HTMLDivElement | null>, index: number, items: AcItem[]) {
   useEffect(() => {
     const list = listRef.current;
     const row = list?.querySelector<HTMLElement>(`#${acOptionId(index)}`);
     if (!list || !row) return;
-    const top = row.offsetTop;
+    // where the row sits in the list's own scrolled content, however the list is placed
+    const top = row.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop;
     const bottom = top + row.offsetHeight;
     if (top < list.scrollTop) list.scrollTop = top;
     else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
-  }, [index, items]);
+  }, [listRef, index, items]);
+}
+
+/** The app a slash command row belongs to: its id (the app's, or "" for Nexa's own commands), name and picture. */
+function appOf(it: AcItem): { id: string; name: string; app: CommandApp | null } {
+  return it.kind === "appCommand" ? { id: it.app.id, name: it.app.name, app: it.app } : { id: "", name: t("composer.autocomplete.commands"), app: null };
+}
+
+/**
+ * The slash command list: a rail of the apps that offer commands here (and
+ * Nexa's own), and the commands under each app's picture and name, a row
+ * each with its name, the options it needs, what it does and whose it is.
+ */
+function CommandPicker({ items, index, onHover, onPick, docked }: { items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; docked?: boolean | undefined }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  useRowInView(listRef, index, items);
+  const apps = useMemo(() => {
+    const out: { id: string; name: string; app: CommandApp | null; first: number }[] = [];
+    items.forEach((it, i) => {
+      const a = appOf(it);
+      if (!out.some((x) => x.id === a.id)) out.push({ ...a, first: i });
+    });
+    return out;
+  }, [items]);
+  const current = appOf(items[index] ?? items[0]!).id;
+  return (
+    <div className={[s.cmdPicker, docked ? s.docked : ""].join(" ")} data-testid="command-picker" onMouseDown={(e) => e.preventDefault()}>
+      {apps.length > 1 ? (
+        <nav className={s.cmdRail} aria-label={t("composer.autocomplete.commands")}>
+          {apps.map((a) => (
+            <button
+              key={a.id || "nexa"}
+              type="button"
+              className={s.cmdRailItem}
+              data-current={a.id === current || undefined}
+              title={a.name}
+              aria-label={a.name}
+              tabIndex={-1}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onHover(a.first)}
+            >
+              {a.app ? <Avatar id={a.app.id} avatarId={a.app.bot.avatar_id} name={a.app.name} size={32} square /> : <span className={s.cmdRailNexa} aria-hidden="true"><SquareSlash size={18} /></span>}
+            </button>
+          ))}
+        </nav>
+      ) : null}
+      <div ref={listRef} id={AC_LIST_ID} className={s.cmdList} role="listbox">
+        {items.map((it, i) => {
+          const a = appOf(it);
+          const heading = i === 0 || appOf(items[i - 1]!).id !== a.id ? (
+            <div className={s.cmdSection} aria-hidden="true">
+              {a.app ? <Avatar id={a.app.id} avatarId={a.app.bot.avatar_id} name={a.app.name} size={20} square /> : <SquareSlash size={16} />}
+              <span>{a.name}</span>
+            </div>
+          ) : null;
+          return (
+            <Fragment key={keyOf(it)}>
+              {heading}
+              <button className={s.cmdRow} id={acOptionId(i)} data-selected={i === index} role="option" aria-selected={i === index} onMouseMove={(e) => i !== index && pointerMoved(e.nativeEvent) && onHover(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(i)}>
+                <span className={s.cmdRowMain}>
+                  <span className={s.cmdRowName}>
+                    /{it.kind === "appCommand" ? it.leaf.label : it.kind === "command" ? it.name : ""}
+                    {it.kind === "appCommand"
+                      ? it.leaf.options.filter((o) => o.required).map((o) => (
+                          <span key={o.name} className={s.acOption}>{optionName(o)}</span>
+                        ))
+                      : null}
+                  </span>
+                  <span className={s.cmdRowDesc}>{it.kind === "appCommand" ? it.leaf.description : it.kind === "command" ? it.desc : ""}</span>
+                </span>
+                {a.app ? <span className={s.cmdRowApp}>{a.name}</span> : null}
+              </button>
+            </Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SuggestionList({ kind, items, index, onHover, onPick, tone, heading: title, style, docked }: { kind: string; items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number; heading?: string | undefined; style?: CSSProperties | undefined; docked?: boolean | undefined }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  // the list scrolls when it is taller than the room above the keyboard
+  useRowInView(listRef, index, items);
   if (items.length === 0) return null;
   return (
     // style: where it floats, for a page that hangs it from the caret (a note) rather than over the message box
-    <div ref={listRef} id={AC_LIST_ID} className={s.ac} style={style} role="listbox" onMouseDown={(e) => e.preventDefault()}>
+    <div ref={listRef} id={AC_LIST_ID} className={[s.ac, docked ? s.docked : ""].join(" ")} style={style} role="listbox" onMouseDown={(e) => e.preventDefault()}>
       {items.map((it, i) => {
         const group = title ?? groupOf(it, kind);
         const heading = i === 0 || (!title && groupOf(items[i - 1]!, kind) !== group) ? <div className={s.acHead} aria-hidden="true">{group}</div> : null;

@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { emojiUrl } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
+import { Tooltip, coarsePointer } from "@/components/common/Tooltip";
 import { Twemoji } from "@/components/common/Twemoji";
 import { Tr, t } from "@/i18n";
 import { dismiss, interact } from "@/lib/interactions";
@@ -16,6 +17,7 @@ import {
   BUTTON_PRIMARY,
   BUTTON_SUCCESS,
   C_STRING_SELECT,
+  commandInvocation,
   type HookComponent,
   type HookEmoji,
   type HookInteraction,
@@ -23,6 +25,7 @@ import {
 import { useAppCommands } from "@/stores/appCommands";
 import { useChannels } from "@/stores/channels";
 import { openProfilePopout } from "@/stores/profilePopout";
+import { useServers } from "@/stores/servers";
 import { useUsers, displayName } from "@/stores/users";
 import { useShownName } from "../useShownName";
 import c from "../Chat.module.css";
@@ -67,8 +70,27 @@ export function InteractionLine({ msg, it }: { msg: DecryptedMessage; it: HookIn
   const name = useShownName(msg.channel_id, it.user_id);
   const slash = (it.command_type ?? 1) === 1;
   const command = slash ? `/${it.name}` : it.name!;
-  const appId = msg.hook?.application_id;
   const serverId = useChannels((ch) => ch.byId[msg.channel_id]?.server_id ?? undefined);
+  const serverRoles = useServers((sv) => (serverId ? sv.byId[serverId]?.roles : undefined));
+  const invocation = commandInvocation(it, (type, id) => {
+    // a mentionable is a person or a role
+    if (type === 6 || type === 9) {
+      const u = useUsers.getState().byId[id];
+      if (u) return `@${displayName(u)}`;
+    }
+    if (type === 8 || type === 9) {
+      const r = serverRoles?.[id];
+      if (r) return `@${r.name}`;
+    }
+    if (type === 7) {
+      const ch = useChannels.getState().byId[id];
+      if (ch?.name) return `#${ch.name}`;
+    }
+    return undefined;
+  });
+  const hasOptions = invocation !== command;
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const appId = msg.hook?.application_id;
   return (
     <div className={[c.replyLine, s.used].join(" ")} data-testid="interaction-line">
       <span className={c.replyAvatar} aria-hidden="true">
@@ -85,15 +107,32 @@ export function InteractionLine({ msg, it }: { msg: DecryptedMessage; it: HookIn
             ),
             command:
               slash && appId ? (
-                <button type="button" className={s.usedCommand} title={t("apps.useThisCommand")} onClick={() => useAppCommands.getState().startCommand({ channelId: msg.channel_id, applicationId: appId, name: it.name! })}>
-                  {command}
-                </button>
+                <Tooltip text={hasOptions ? invocation : t("apps.useThisCommand")} side="top" delay={180}>
+                  <button
+                    type="button"
+                    className={s.usedCommand}
+                    data-testid="used-command"
+                    aria-expanded={hasOptions && coarsePointer() ? detailsOpen : undefined}
+                    onClick={() => {
+                      // a touch screen has no hover: a tap shows what was filled in, as on Android
+                      if (hasOptions && coarsePointer()) setDetailsOpen((o) => !o);
+                      else useAppCommands.getState().startCommand({ channelId: msg.channel_id, applicationId: appId, name: it.name! });
+                    }}
+                  >
+                    {command}
+                  </button>
+                </Tooltip>
+              ) : hasOptions ? (
+                <Tooltip text={invocation} side="top" delay={180}>
+                  <span className={s.usedCommand} data-static="" tabIndex={0}>{command}</span>
+                </Tooltip>
               ) : (
                 <span className={s.usedCommand} data-static="">{command}</span>
               ),
           }}
         />
       </span>
+      {detailsOpen ? <span className={s.usedDetails} data-testid="used-command-details" dir="ltr">{invocation}</span> : null}
     </div>
   );
 }

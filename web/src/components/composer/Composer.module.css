@@ -79,6 +79,30 @@
 .counter[data-over="true"] { color: var(--text-danger); font-weight: 600; }
 .ac { position: absolute; inset-inline: 16px; bottom: 100%; margin-bottom: 10px; z-index: 40; background: var(--bg-floating); border-radius: var(--radius-md); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); padding: 8px; max-height: min(456px, 45dvh); overflow-y: auto; overscroll-behavior: contain; animation: acIn 160ms var(--ease-out); }
 @keyframes acIn { from { opacity: 0; transform: translateY(6px); } }
+/* Docked over the message box (the composer's own lists and the option bar):
+   part of the page rather than floating, so the messages move up to make room
+   instead of being covered, and joined to the box's top edge. */
+.docked { position: relative; inset: auto; margin: 0; border-end-start-radius: 0; border-end-end-radius: 0; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge); }
+.wrap:has(> .docked) .box { border-start-start-radius: 0; border-start-end-radius: 0; }
+/* the slash command list: a rail of the apps, then their commands */
+.cmdPicker { position: absolute; inset-inline: 16px; bottom: 100%; margin-bottom: 10px; z-index: 40; display: flex; max-height: min(420px, 42dvh); background: var(--bg-floating); border-radius: var(--radius-md); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); overflow: hidden; animation: acIn 160ms var(--ease-out); }
+.cmdPicker.docked { position: relative; inset: auto; margin: 0; }
+.cmdRail { flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 56px; padding: 10px 0; overflow-y: auto; background: color-mix(in srgb, var(--bg-base, var(--bg-floating)) 55%, var(--bg-floating)); box-shadow: inset -1px 0 0 var(--border-subtle); }
+.cmdRailItem { position: relative; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; opacity: 0.62; transition: opacity var(--transition), background var(--transition); }
+.cmdRailItem:hover { opacity: 1; background: var(--bg-hover); }
+.cmdRailItem[data-current] { opacity: 1; }
+/* the server rail's own marker: a pill at the edge beside the app in view */
+.cmdRailItem[data-current]::before { content: ""; position: absolute; inset-inline-start: -8px; top: 8px; bottom: 8px; width: 4px; border-radius: 0 4px 4px 0; background: var(--text-strong); }
+.cmdRailNexa { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--bg-active); color: var(--text-strong); }
+.cmdList { flex: 1; min-width: 0; padding: 4px 8px 8px; overflow-y: auto; overscroll-behavior: contain; }
+.cmdSection { position: sticky; top: -4px; z-index: 1; display: flex; align-items: center; gap: 8px; margin: 0 -8px; padding: 10px 16px 6px; background: var(--bg-floating); font-size: 13px; font-weight: 650; color: var(--text-strong); }
+.cmdSection > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmdRow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 50px; padding: 6px 10px; border-radius: var(--radius-sm); color: var(--text); text-align: start; }
+.cmdRow[data-selected="true"] { background: color-mix(in srgb, var(--brand) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 24%, transparent); }
+.cmdRowMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cmdRowName { font-size: 15px; font-weight: 650; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmdRowDesc { font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmdRowApp { flex: none; max-width: 30%; font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acHead { padding: 4px 8px 8px; font-size: 12.5px; font-weight: 650; color: var(--text-muted); }
 .acRow { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; padding: 0 8px; border-radius: var(--radius-sm); color: var(--text); text-align: start; font-size: 15px; }
 /* a heading between groups (members, then roles) gets a little air above it */
@@ -128,6 +152,8 @@
 
 /* --- an app's command being filled in (CommandMode) ---------------------------------------- */
 /* the box holds the command and a slot per option, wrapping onto more lines as they fill */
+/* Ctrl+A took the whole command: it reads as selected text does, for Backspace to clear */
+.cmdBox[data-all-selected] > * { background-color: color-mix(in srgb, var(--brand) 32%, transparent); border-radius: var(--radius-xs, 4px); }
 .cmdBox { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-block: 8px; padding-inline: 0 8px; min-height: 48px; box-sizing: border-box; }
 .cmdHead { display: inline-flex; align-items: center; gap: 6px; padding-inline-end: 2px; min-width: 0; }
 .cmdName { font-size: 15.5px; font-weight: 650; color: var(--text-brand); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -150,6 +176,7 @@
 .cmdAdd:hover { background: var(--bg-hover); color: var(--text-strong); }
 .cmdAdd:focus-visible, .slotRemove:focus-visible, .slotFile:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 /* above the box, what the option being filled in asks for, and that the app reads it as it is */
+.cmdBar.docked { position: relative; inset: auto; margin: 0; border-end-start-radius: 0; border-end-end-radius: 0; }
 .cmdBar { position: absolute; inset-inline: 16px; bottom: 100%; margin-bottom: 10px; z-index: 40; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; padding: 10px 14px; background: var(--bg-floating); border-radius: var(--radius-md); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); font-size: 13.5px; line-height: 18px; color: var(--text-muted); animation: acIn 160ms var(--ease-out); }
 .cmdHint { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
 .cmdHint b { color: var(--text-strong); font-weight: 650; }

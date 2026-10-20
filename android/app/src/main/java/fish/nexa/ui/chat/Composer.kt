@@ -1,5 +1,15 @@
 package fish.nexa.ui.chat
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import fish.nexa.ui.components.SQUARE_AVATAR
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
@@ -427,8 +437,31 @@ fun Composer(channel: Channel) {
     val bottomPad = 8.dp
     Box(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = bottomPad)) {
         Column(Modifier.fillMaxWidth()) {
+            val token = ac
+            // what the command's slot asks for, or the suggestions, sit on the box in the page's flow
+            // (web .docked): the messages move up to make room rather than being covered
+            if (cmd.active) fish.nexa.ui.apps.CommandList(cmd)
+            else if (token != null) Autocomplete(channel, token, canUseApps) { item ->
+                val app = item.app
+                val leaf = item.leaf
+                if (app != null && leaf != null) {
+                    // the box becomes the command, with a slot for each option it needs
+                    ac = null
+                    state.clearText()
+                    Nexa.settings.setDraft(channelId, "")
+                    cmd.start(app, leaf)
+                    return@Autocomplete
+                }
+                state.edit {
+                    val end = selection.end
+                    replace(token.start, end, item.insert)
+                }
+                ac = null
+            }
             // the stacked bars join the box into one shape
             val stack = buildList {
+                // a list docked over the box is the top of the shape
+                if (cmd.active || token != null) add("list")
                 if (amNotice != null) add("automod")
                 if (notice != null) add("notice")
                 if (preview && state.text.isNotEmpty()) add("preview")
@@ -482,7 +515,10 @@ fun Composer(channel: Channel) {
                                     )
                                 },
                                 MenuItem.Action(t("composer.preview.show"), checked = preview, toggle = true) { preview = !preview },
-                                MenuItem.Action(t("composer.more.emoji")) { openExpressionPicker(channelId) { token -> insertAtCaret(state, "$token ") } },
+                                MenuItem.Action(t("composer.more.emoji")) {
+                                    // while an app's command is filled in, the emoji goes into the option being written
+                                    openExpressionPicker(channelId) { token -> if (cmd.mode == null || !cmd.insert(token)) insertAtCaret(state, "$token ") }
+                                },
                             ),
                             title = t("composer.more.label"),
                             haptic = false,
@@ -513,26 +549,6 @@ fun Composer(channel: Channel) {
                     else Txt(t("composer.composer.slowModeIsEnabled"), style = Nx.type.hint, color = c.textMuted)
                 }
             }
-        }
-        val token = ac
-        // what the command's slot asks for, or its suggestions, float over the box as the message box's own suggestions do
-        if (cmd.active) fish.nexa.ui.apps.CommandList(cmd, Modifier.align(Alignment.TopCenter).floatAbove(10.dp))
-        else if (token != null) Autocomplete(channel, token, canUseApps, Modifier.align(Alignment.TopCenter)) { item ->
-            val app = item.app
-            val leaf = item.leaf
-            if (app != null && leaf != null) {
-                // the box becomes the command, with a slot for each option it needs
-                ac = null
-                state.clearText()
-                Nexa.settings.setDraft(channelId, "")
-                cmd.start(app, leaf)
-                return@Autocomplete
-            }
-            state.edit {
-                val end = selection.end
-                replace(token.start, end, item.insert)
-            }
-            ac = null
         }
     }
 }
@@ -981,44 +997,148 @@ private fun PreviewBox(text: String, serverId: String?, onHide: () -> Unit) {
     }
 }
 
+/**
+ * How tall a list docked over the box may grow: a share of the room the
+ * keyboard leaves (web .ac's min(456px, 45dvh)), so the box under it always
+ * stays in view.
+ */
+@Composable
+internal fun dockedListMax(): androidx.compose.ui.unit.Dp {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val ime = with(density) { WindowInsets.ime.getBottom(density).toDp() }
+    val room = LocalConfiguration.current.screenHeightDp.dp - ime
+    return minOf(456.dp, room * 0.4f)
+}
+
 /** The autocomplete card above the composer: people, roles, channels, emoji or commands. */
 @Composable
-private fun Autocomplete(channel: Channel, token: AcToken, canUseApps: Boolean, modifier: Modifier, pick: (AcItem) -> Unit) {
+private fun Autocomplete(channel: Channel, token: AcToken, canUseApps: Boolean, modifier: Modifier = Modifier, pick: (AcItem) -> Unit) {
     val c = Nx.colors
     // the apps' commands, once they have loaded (a slash may be typed before they are)
     val appLists by fish.nexa.data.AppCommands.byChannel.collectAsState()
     val apps = if (canUseApps && token.kind == "command") appLists[channel.id]?.data else null
     val sections = remember(token, channel, apps) { (if (apps != null) appCommandSections(apps, token.query) else emptyList()) + suggestions(channel, token) }
     if (sections.all { it.second.isEmpty() }) return
-    val maxH = minOf(456f, LocalConfiguration.current.screenHeightDp * 0.45f).dp
+    val maxH = dockedListMax()
     val reduced = Nx.motion.reduced
     val enter = remember { Animatable(if (reduced) 1f else 0f) }
     val ease = Nx.motion.easeOut
     LaunchedEffect(Unit) { enter.animateTo(1f, tween(160, easing = ease)) }
-    val shape = Radii.Md
-    Box(modifier.fillMaxWidth().floatAbove(10.dp)) {
-        Column(
-            Modifier
-                .padding(horizontal = 16.dp)
-                .graphicsLayer {
-                    alpha = enter.value
-                    translationY = (1f - enter.value) * 6f * density
-                }
-                .fillMaxWidth()
-                .heightIn(max = maxH)
-                .shadowHigh(shape, c)
-                .background(c.bgFloating, shape)
-                .topEdge(shape, c.edgeLight)
-                .verticalScroll(rememberScrollState())
-                .padding(8.dp),
+    // docked on the box (web .docked): rounded only at its top, joined to the box under it
+    val shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)
+    val panel = modifier
+        .graphicsLayer {
+            alpha = enter.value
+            translationY = (1f - enter.value) * 6f * density
+        }
+        .fillMaxWidth()
+        .heightIn(max = maxH)
+        .ring(shape, c.panelEdge)
+        .background(c.bgFloating, shape)
+        .topEdge(shape, c.edgeLight)
+        .clip(shape)
+    if (token.kind == "command") {
+        CommandPicker(sections, panel, pick)
+        return
+    }
+    Column(panel.verticalScroll(rememberScrollState()).padding(8.dp)) {
+        var first = true
+        for ((heading, rows) in sections) {
+            if (rows.isEmpty()) continue
+            Txt(heading, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(650)), color = c.textMuted, modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp))
+            for (row in rows) {
+                AcRow(row, selected = first) { pick(row) }
+                first = false
+            }
+        }
+    }
+}
+
+/**
+ * The slash command list (web Autocomplete CommandPicker): a rail of the apps
+ * that offer commands here and Nexa's own, then the commands under each app's
+ * picture and name, a row each with its name, the options it needs, what it
+ * does and whose it is. A tap on the rail brings that app's commands into view.
+ */
+@Composable
+private fun CommandPicker(sections: List<Pair<String, List<AcItem>>>, modifier: Modifier, pick: (AcItem) -> Unit) {
+    val c = Nx.colors
+    val shown = sections.filter { it.second.isNotEmpty() }
+    val list = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val tops = remember(shown) { HashMap<Int, Int>() }
+    var current by remember(shown) { mutableStateOf(0) }
+    // the rail is as tall as the list beside it
+    Row(modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+        if (shown.size > 1) Column(
+            Modifier.width(56.dp).fillMaxHeight().background(c.bgHover.copy(alpha = 0.5f)).verticalScroll(rememberScrollState()).padding(vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            var first = true
-            for ((heading, rows) in sections) {
-                if (rows.isEmpty()) continue
-                Txt(heading, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(650)), color = c.textMuted, modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp))
-                for (row in rows) {
-                    AcRow(row, selected = first) { pick(row) }
-                    first = false
+            shown.forEachIndexed { i, (name, rows) ->
+                val app = rows.first().app
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .drawBehind {
+                            // the server rail's marker beside the app in view
+                            if (i == current) drawRoundRect(c.textStrong, topLeft = Offset(-8.dp.toPx(), 8.dp.toPx()), size = Size(4.dp.toPx(), size.height - 16.dp.toPx()), cornerRadius = CornerRadius(2.dp.toPx()))
+                        }
+                        .clip(RoundedCornerShape(12.dp))
+                        .graphicsLayer { alpha = if (i == current) 1f else 0.62f }
+                        .pressable(remember { MutableInteractionSource() }) {
+                            current = i
+                            scope.launch { list.animateScrollTo(tops[i] ?: 0) }
+                        }
+                        .semantics { contentDescription = name },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (app != null) Avatar(app.id, app.name, app.bot?.avatarId, 32.dp, shape = SQUARE_AVATAR)
+                    else Box(Modifier.size(32.dp).background(c.bgActive, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) { Icon("SquareSlash", c.textStrong, size = 18.dp) }
+                }
+            }
+        }
+        Column(Modifier.weight(1f).verticalScroll(list).padding(start = 8.dp, end = 8.dp, bottom = 8.dp, top = 4.dp)) {
+            shown.forEachIndexed { i, (name, rows) ->
+                val app = rows.first().app
+                Row(
+                    Modifier.fillMaxWidth().onGloballyPositioned { tops[i] = it.positionInParent().y.toInt() }.padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (app != null) Avatar(app.id, app.name, app.bot?.avatarId, 20.dp, shape = SQUARE_AVATAR) else Icon("SquareSlash", c.textStrong, size = 16.dp)
+                    Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1)
+                }
+                rows.forEachIndexed { j, row ->
+                    val selected = i == 0 && j == 0
+                    val rowShape = Radii.Sm
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 50.dp)
+                            .then(if (selected) Modifier.ring(rowShape, c.brand.copy(alpha = 0.24f)).background(c.brand.copy(alpha = 0.18f), rowShape) else Modifier)
+                            .clip(rowShape)
+                            .pressable(remember { MutableInteractionSource() }) { pick(row) }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Txt(row.title, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                                row.leaf?.options?.filter { it.required }?.take(3)?.forEach { o ->
+                                    Txt(
+                                        fish.nexa.data.AppCommands.name(o),
+                                        style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(550)),
+                                        color = c.textMuted, maxLines = 1,
+                                        modifier = Modifier.background(c.bgHover, RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 1.dp),
+                                    )
+                                }
+                            }
+                            if (row.sub.isNotEmpty()) Txt(row.sub, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
+                        }
+                        if (app != null) Txt(app.name, style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted, maxLines = 1, modifier = Modifier.widthIn(max = 110.dp))
+                    }
                 }
             }
         }
@@ -1141,7 +1261,7 @@ private fun suggestions(channel: Channel, token: AcToken): List<Pair<String, Lis
  * your frequent ones); without, this server's own custom emoji first, then
  * other servers' and packs' (up to four in all), filled with standard ones.
  */
-private fun emojiSuggestions(channel: Channel, query: String): List<AcItem> {
+internal fun emojiSuggestions(channel: Channel, query: String, raw: Boolean = false): List<AcItem> {
     val md = fish.nexa.ui.markdown.EmojiData
     if (!md.loaded()) {
         md.preload()
@@ -1153,7 +1273,8 @@ private fun emojiSuggestions(channel: Channel, query: String): List<AcItem> {
     val packEmoji = ex.packs.value.values.filter { it.kind == "emoji" }.flatMap { p ->
         p.stickers.map { r -> fish.nexa.net.Emoji(r.id, "", r.name, r.blobId, r.animated, r.creatorId, r.createdAt) }
     }
-    fun custom(e: fish.nexa.net.Emoji) = AcItem("emoji", fish.nexa.data.Mentions.emojiText(fish.nexa.ui.markdown.CustomEmoji.token(e), e.name, channel.id) + " ", ":${e.name}:", emoji = fish.nexa.ui.markdown.CustomEmoji.reactionKey(e))
+    // [raw]: a custom emoji goes in as its token (an app command's option); the message box shows it as :name:
+    fun custom(e: fish.nexa.net.Emoji) = AcItem("emoji", (if (raw) fish.nexa.ui.markdown.CustomEmoji.token(e) else fish.nexa.data.Mentions.emojiText(fish.nexa.ui.markdown.CustomEmoji.token(e), e.name, channel.id)) + " ", ":${e.name}:", emoji = fish.nexa.ui.markdown.CustomEmoji.reactionKey(e))
     fun std(e: fish.nexa.ui.markdown.EmojiEntry, name: String) = md.withTone(e, tone).let { u -> AcItem("emoji", "$u ", ":$name:", emoji = u) }
     if (Nexa.settings.smartEmoji) {
         val candidates = ArrayList<fish.nexa.ui.markdown.EmojiSuggest.Candidate>()

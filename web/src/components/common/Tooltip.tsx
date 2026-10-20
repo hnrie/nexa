@@ -18,7 +18,7 @@ interface Props {
 }
 
 /** Touch devices report a hover that never ends, which strands tooltips on screen. */
-function coarsePointer(): boolean {
+export function coarsePointer(): boolean {
   return typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
 }
 
