@@ -356,6 +356,19 @@ def pages(alice, bob, base, sid, general, app, failures, a_api=None, b_api=None)
         b.wait_for_selector("[data-testid=profile-add-app], [data-testid=bot-tag], [data-testid=app-tag]", timeout=8000)
         step(f"{size}: the bot's profile says it is an app")
         bob.shot("bot-profile")
+        # Add App on the card, and back to the channel once it is added
+        here = b.url
+        b.click("[data-testid=profile-popout-card] [data-testid=profile-add-app]")
+        b.wait_for_selector("[data-testid=authorize-page]", timeout=10000)
+        choice = b.locator("[data-testid=authorize-page] [data-testid=install-account]")
+        if choice.count():
+            choice.first.click()
+        b.wait_for_selector("[data-testid=authorize-page] [data-testid=authorize]", timeout=10000)
+        b.click("[data-testid=authorize]")
+        b.wait_for_url(here, timeout=10000)
+        b.wait_for_selector("text=/added to your account/", timeout=5000)
+        step(f"{size}: Add App on the bot's card brings bob back to the channel he was in")
+        bob.shot("add-app-back")
 
     for name, fn, sess in [("portal", portal, alice), ("make-app", make_app, alice), ("consent", consent, bob), ("authorized", authorized, bob), ("share-warning", share_warning, bob), ("server-apps", server_apps, alice), ("profile", profile_and_start, bob)]:
         attempt(name, fn, sess)

@@ -372,6 +372,8 @@ sealed interface MenuItem {
         val toggle: Boolean = false,
         val warn: Boolean = false,
         val separatorAfter: Boolean = false,
+        /** A small picture before the label: whose item it is, such as an app's for its commands. */
+        val picture: (@Composable () -> Unit)? = null,
         val onClick: () -> Unit,
     ) : MenuItem
 
@@ -473,6 +475,7 @@ private fun MenuRow(item: MenuItem.Action, back: Boolean = false, chevron: Boole
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (back) Icon("ChevronLeft", c.textMuted, size = 16.dp)
+        item.picture?.let { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { it() } }
         val color = when {
             item.danger -> c.textDanger
             back -> c.textMuted

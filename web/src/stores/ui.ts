@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { ReactNode } from "react";
 import type { GatewayStatus } from "@/gateway/client";
 
 export interface ModalState {
@@ -14,6 +15,8 @@ export interface ContextMenuItem {
   danger?: boolean;
   disabled?: boolean;
   icon?: string;
+  /** A small picture in the icon's place: whose item it is, such as an app's for its commands. */
+  picture?: ReactNode;
   onSelect?: () => void;
   separatorAfter?: boolean;
   /** Marks the chosen one of a set of choices, such as the microphone in use. */

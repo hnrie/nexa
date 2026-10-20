@@ -1014,7 +1014,7 @@ private fun rememberBotApp(user: PublicUser, active: Boolean): fish.nexa.net.App
 private fun canAddApp(app: fish.nexa.net.AppSummary?): Boolean = app != null && (app.botPublic || app.ownerId == Nexa.users.meId)
 
 /** The app's own consent page, with its install settings. */
-private fun addApp(appId: String) = fish.nexa.ui.apps.openAuthorize("client_id=$appId")
+private fun addApp(appId: String) = fish.nexa.ui.apps.openAuthorize("client_id=$appId", fromApp = true)
 
 /** Opens your own profile in Settings, where it is changed. */
 private fun editOwnProfile(anchor: String? = null) = fish.nexa.ui.settings.Settings.open("profiles", anchor)
@@ -1063,7 +1063,7 @@ fun ProfilePopoutCard(user: PublicUser, serverId: String?, close: () -> Unit, de
             ) {
                 if (design == null) {
                     if (isMe) BannerButton("Pencil", t("profile.profileCard.editProfile"), iconSize = 16.dp) { close(); editOwnProfile() }
-                    else if (bot) { if (canAddApp(app)) BannerButton("CirclePlus", t("apps.profile.addApp")) { close(); addApp(user.id) } }
+                    else if (bot) Unit // Add App is across the card, over the message box
                     else if (rel == null) BannerButton("UserPlus", if (busy) t("people.request.sending") else t("profile.profileCard.addFriend"), busy = busy) { Nexa.scope.launch { People.sendRequest(user) } }
                     BannerButton("Maximize2", t("profile.profileCard.viewFullProfile"), iconSize = 16.dp) { viewFull() }
                     if (!isMe) BannerButton("MoreHorizontal", t("chat.chat.more")) { openProfileMenu(user, popout = true) { viewFull() } }
@@ -1090,6 +1090,8 @@ fun ProfilePopoutCard(user: PublicUser, serverId: String?, close: () -> Unit, de
                         if (inServer != null && design == null) ServerRoles(inServer, user.id, popout = true)
                     }
                 }
+                // an app's card leads with adding it, the one thing people open it for
+                if (bot && design == null && canAddApp(app)) PrimaryPill("CirclePlus", t("apps.profile.addApp"), modifier = Modifier.fillMaxWidth()) { close(); addApp(user.id) }
                 if (!isMe && rel?.type != "blocked" && design == null) MessageBox(user, onSent = close)
             }
         }
@@ -1102,13 +1104,13 @@ private fun previewStatus(user: PublicUser): Presences.Custom? =
 
 /** The full profile's main button: the accent made into light, as the web's .primary. */
 @Composable
-private fun PrimaryPill(icon: String?, text: String, busy: Boolean = false, onClick: () -> Unit) {
+private fun PrimaryPill(icon: String?, text: String, busy: Boolean = false, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val p = LocalProfile.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val shape = RoundedCornerShape(999.dp)
     Row(
-        Modifier
+        modifier
             .height(40.dp)
             .sink(pressed && !busy)
             .graphicsLayer { alpha = if (busy) 0.65f else 1f }
@@ -1119,7 +1121,7 @@ private fun PrimaryPill(icon: String?, text: String, busy: Boolean = false, onCl
             .pressable(interaction, enabled = !busy, onClick = onClick)
             .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
     ) {
         if (busy) Spinner(Color.White, size = 16.dp) else if (icon != null) Icon(icon, Color.White, size = 16.dp)
         Txt(text, style = Nx.type.button.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(650)), color = Color.White, maxLines = 1)

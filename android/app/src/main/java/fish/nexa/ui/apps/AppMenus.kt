@@ -9,6 +9,7 @@ import fish.nexa.net.InteractRequest
 import fish.nexa.ui.layers.MenuItem
 import fish.nexa.ui.t
 import fish.nexa.ui.shell.confirm
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -43,7 +44,9 @@ private fun appsItem(channelId: String, type: Int, use: (appId: String, commandI
     for ((app, command) in entries) {
         if (several && app.id != lastApp) items += MenuItem.Heading(app.name)
         lastApp = app.id
-        items += MenuItem.Action(AppCommands.name(command)) { use(app.id, command.id) }
+        items += MenuItem.Action(AppCommands.name(command), picture = {
+            fish.nexa.ui.components.Avatar(app.id, app.name, app.iconId ?: app.bot?.avatarId, 22.dp, icon = app.iconId != null)
+        }) { use(app.id, command.id) }
     }
     return MenuItem.Submenu(t("apps.menu.apps"), items)
 }

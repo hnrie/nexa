@@ -16,6 +16,7 @@ import { describeError } from "@/lib/errors";
 import { P, parsePerm, permString } from "@/lib/perms";
 import { formatShortDate } from "@/lib/time";
 import { useAppCommands } from "@/stores/appCommands";
+import { useUI } from "@/stores/ui";
 import { usePageTitle } from "./AuthLayout";
 import s from "./InvitePage.module.css";
 import a from "./AuthorizePage.module.css";
@@ -36,6 +37,9 @@ export default function AuthorizePage() {
   const [granted, setGranted] = useState<bigint>(0n);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ guildId?: string; redirecting?: boolean } | null>(null);
+  // opened from inside the app (Add App on a profile, an app's link in chat):
+  // where the person was, to go back to once they are done
+  const from = (location.state as { from?: string } | null)?.from;
   usePageTitle(info ? t("apps.consent.pageTitle", { app: info.application.name }) : t("apps.consent.pageTitleBare"));
 
   useEffect(() => {
@@ -91,6 +95,12 @@ export default function AuthorizePage() {
         window.location.href = res.location;
         return;
       }
+      if (from) {
+        const name = info.application.name;
+        useUI.getState().toast(toAccount ? t("apps.consent.addedToAccount", { app: name }) : t("apps.consent.addedToServer", { app: name, server: pickedServer?.name ?? "" }), "success");
+        navigate(from, { replace: true });
+        return;
+      }
       setDone(res.guild_id ? { guildId: res.guild_id } : {});
     } catch (err) {
       setError(describeError(err, t("apps.consent.failed")));
@@ -108,7 +118,7 @@ export default function AuthorizePage() {
       window.location.href = u.toString();
       return;
     }
-    navigate("/channels/@me");
+    navigate(from ?? "/channels/@me", { replace: !!from });
   };
 
   return (
@@ -151,8 +161,8 @@ export default function AuthorizePage() {
             </div>
             {canChoose ? (
               <div className={a.ways} role="tablist" aria-label={t("apps.consent.howToAdd")}>
-                <button type="button" role="tab" aria-selected={!toAccount} className={a.way} onClick={() => choose(0)}>{t("apps.consent.addToServer")}</button>
-                <button type="button" role="tab" aria-selected={toAccount} className={a.way} onClick={() => choose(1)}>{t("apps.consent.addToAccount")}</button>
+                <button type="button" role="tab" aria-selected={!toAccount} className={a.way} onClick={() => choose(0)} data-testid="install-server">{t("apps.consent.addToServer")}</button>
+                <button type="button" role="tab" aria-selected={toAccount} className={a.way} onClick={() => choose(1)} data-testid="install-account">{t("apps.consent.addToAccount")}</button>
               </div>
             ) : null}
             {!toAccount ? (

@@ -487,7 +487,9 @@ export function ContextMenuHost() {
                   item.onSelect?.();
                 }}
               >
-                {item.icon ? (
+                {item.picture ? (
+                  <span className={s.itemPicture} aria-hidden="true">{item.picture}</span>
+                ) : item.icon ? (
                   <Suspense fallback={<span className={s.itemIcon} />}>
                     <MenuIcon name={item.icon} className={s.itemIcon} />
                   </Suspense>

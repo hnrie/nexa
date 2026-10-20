@@ -139,9 +139,14 @@ object Interactions {
         val payload = cm.payload ?: return null
         // the channel's command list carries each app's bot with its key; the people
         // kept here may not have the bot at all (an app on someone's own account)
-        val listed = AppCommands.of(cm.channelId)?.applications?.firstOrNull { it.id == appId }?.bot
-        val bot = listed?.takeIf { it.publicKey.isNotEmpty() } ?: Nexa.users.get(appId) ?: return null
-        if (bot.publicKey.isEmpty() || bot.readsAll) return null
+        val list = AppCommands.of(cm.channelId)
+        val app = list?.applications?.firstOrNull { it.id == appId }
+        val bot = app?.bot?.takeIf { it.publicKey.isNotEmpty() } ?: Nexa.users.get(appId) ?: return null
+        if (bot.publicKey.isEmpty()) return null
+        // one that reads every message reads this one only where it is: in the
+        // server it was added to, or a conversation with its own bot
+        val present = app != null && ("guild" in app.installed || list.context == 1)
+        if (bot.readsAll && present) return null
         return runCatching { Bytes.b64(Keys.seal(Bytes.unb64(bot.publicKey), Bytes.utf8(payload.toJson().toString()))) }.getOrNull()
     }
 }

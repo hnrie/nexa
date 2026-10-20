@@ -62,3 +62,5 @@
 /* a plugin's button may bring an icon: it sits before the label, in the label's colour */
 .itemIcon { flex: none; width: 16px; height: 16px; margin-inline-end: 8px; color: currentColor; opacity: 0.85; }
 .itemIcon + .itemLabel { flex: 1; }
+.itemPicture { flex: none; display: inline-flex; width: 18px; height: 18px; margin-inline-end: 8px; }
+.itemPicture + .itemLabel { flex: 1; }

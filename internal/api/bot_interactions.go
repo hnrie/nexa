@@ -491,7 +491,9 @@ func (s *Server) commandInteraction(r *http.Request, sc *interactionScene, req *
 		// the copy the person's app sealed is kept, so the message's files
 		// open for the bot later (its file links read the kept copy); one the
 		// author's app made already stays and is what the bot is shown
-		if sc.bot.Flags&store.FlagBotReadsAll == 0 && req.Copy != nil {
+		// (an app that reads every message it can see still needs one where it
+		// is not, as for one only on someone's account in their DMs)
+		if req.Copy != nil {
 			if _, err := s.decryptForBot(ctx, sc.bot, m, req.Copy); err == nil {
 				if err := s.Store.KeepBotCopy(ctx, m.ID, sc.bot.ID, req.Copy); err != nil {
 					opts.copy = req.Copy

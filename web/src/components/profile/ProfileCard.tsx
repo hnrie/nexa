@@ -548,7 +548,8 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const canAddApp = bot && !!app && (app.bot_public !== false || app.owner_id === useAuth.getState().me?.id);
   const addApp = () => {
     onClose?.();
-    nav(`/oauth2/authorize?client_id=${userId}`);
+    // the consent page brings them back here once they are done
+    nav(`/oauth2/authorize?client_id=${userId}`, { state: { from: location.pathname + location.search } });
   };
   const editNickname = async () => {
     if (!rel || rel.type !== "friend") return;
@@ -645,9 +646,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
           <>
             {isMe ? (
               <BannerButton label={t("profile.profileCard.editProfile")} onClick={() => { onClose?.(); openModal("settings", { page: "profiles" }); }}><Pencil size={16} /></BannerButton>
-            ) : bot ? (
-              canAddApp ? <BannerButton label={t("apps.profile.addApp")} onClick={addApp} testId="profile-add-app"><CirclePlus size={18} /></BannerButton> : null
-            ) : !rel ? (
+            ) : bot ? null : !rel ? (
               <BannerButton label={busy ? t("people.request.sending") : t("profile.profileCard.addFriend")} onClick={addFriend} busy={busy} testId="profile-add-friend">
                 {busy ? <LoaderCircle size={18} className={s.spin} /> : <UserPlus size={18} />}
               </BannerButton>
@@ -904,6 +903,12 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
               {shownWidgets.length ? <WidgetPeek widgets={shownWidgets} onOpen={interactive ? () => viewFull("widgets") : undefined} /> : null}
               {inServer && interactive ? <ServerRoles serverId={inServer} userId={userId} popout /> : null}
             </div>
+          ) : null}
+          {/* an app's card leads with adding it, the one thing people open it for */}
+          {interactive && canAddApp ? (
+            <button className={[s.primary, s.popoutAddApp].join(" ")} onClick={addApp} data-testid="profile-add-app">
+              <CirclePlus size={16} aria-hidden="true" /> {t("apps.profile.addApp")}
+            </button>
           ) : null}
           {interactive && !isMe && rel?.type !== "blocked" ? <MessageBox user={user} onSent={onClose} /> : null}
         </div>

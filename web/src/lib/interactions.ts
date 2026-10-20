@@ -164,9 +164,14 @@ export async function copyFor(appId: string, msg: DecryptedMessage): Promise<str
   if (msg.hook || !msg.payload) return undefined;
   // the channel's command list carries each app's bot with its key; the people
   // kept here may not have the bot at all (an app on someone's own account)
-  const listed = channelCommands(msg.channel_id)?.applications.find((a) => a.id === appId)?.bot;
-  const bot = listed?.public_key ? listed : useUsers.getState().byId[appId];
-  if (!bot?.public_key || (bot.flags & BOT_READS_ALL_FLAG) !== 0) return undefined;
+  const list = channelCommands(msg.channel_id);
+  const app = list?.applications.find((a) => a.id === appId);
+  const bot = app?.bot?.public_key ? app.bot : useUsers.getState().byId[appId];
+  if (!bot?.public_key) return undefined;
+  // one that reads every message reads this one only where it is: in the
+  // server it was added to, or a conversation with its own bot
+  const present = !!app && (app.installed.includes("guild") || list?.context === 1);
+  if ((bot.flags & BOT_READS_ALL_FLAG) !== 0 && present) return undefined;
   try {
     return b64.enc(await seal(b64.dec(bot.public_key), new TextEncoder().encode(JSON.stringify(msg.payload))));
   } catch {

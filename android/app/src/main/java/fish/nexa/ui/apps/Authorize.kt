@@ -101,14 +101,15 @@ fun scopeWords(scopes: List<String>, installed: Boolean): List<String> {
  * permission its bot asks for can be taken away before saying yes; none can
  * be added. `query` is the link's query (client_id, scope, permissions, ...).
  */
-fun openAuthorize(query: String) {
+fun openAuthorize(query: String, fromApp: Boolean = false) {
     lateinit var layer: Layer
-    layer = Layer("authorize") { close -> AuthorizeSheet(layer, query, close) }
+    layer = Layer("authorize") { close -> AuthorizeSheet(layer, query, close, fromApp) }
     Layers.open(layer)
 }
 
+/** [fromApp]: opened by Add App inside the app, so a yes closes the sheet with a toast, leaving the person where they were. */
 @Composable
-private fun AuthorizeSheet(layer: Layer, initialQuery: String, close: () -> Unit) {
+private fun AuthorizeSheet(layer: Layer, initialQuery: String, close: () -> Unit, fromApp: Boolean) {
     val c = Nx.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -174,6 +175,10 @@ private fun AuthorizeSheet(layer: Layer, initialQuery: String, close: () -> Unit
                 if (location != null) {
                     done = null to true
                     browse(location)
+                } else if (fromApp) {
+                    val name = info?.application?.name.orEmpty()
+                    Nexa.ui.toast(if (toAccount) t("apps.consent.addedToAccount", "app" to name) else t("apps.consent.addedToServer", "app" to name, "server" to (picked?.name ?: "")), "success")
+                    close()
                 } else done = Api.str(res, "guild_id") to false
             } catch (e: Exception) {
                 error = describeError(e, t("apps.consent.failed"))

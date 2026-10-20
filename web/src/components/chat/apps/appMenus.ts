@@ -1,4 +1,6 @@
+import { createElement } from "react";
 import type { ContextMenuItem } from "@/stores/ui";
+import { AppIcon } from "@/components/apps/AppIcon";
 import { t } from "@/i18n";
 import { commandName } from "@/lib/apps";
 import type { DecryptedMessage } from "@/lib/decrypt";
@@ -40,7 +42,7 @@ function appsItem(channelId: string, type: number, use: (appId: string, commandI
   for (const { app, command } of entries) {
     if (apps.size > 1 && app.id !== lastApp) submenu.push({ id: `app${app.id}`, label: app.name, heading: true });
     lastApp = app.id;
-    submenu.push({ id: `cmd${command.id}`, label: commandName(command), onSelect: () => use(app.id, command.id) });
+    submenu.push({ id: `cmd${command.id}`, label: commandName(command), picture: createElement(AppIcon, { app, size: 18 }), onSelect: () => use(app.id, command.id) });
   }
   return { id: "apps", label: t("apps.menu.apps"), submenu };
 }
