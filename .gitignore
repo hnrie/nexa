@@ -28,3 +28,10 @@ __pycache__/
 
 # trailer footage (tools/trailer.py), large and made again at will
 /examplevideos/
+
+# working notes for handing work between sessions (see todo.md)
+/todo.md
+
+# the published Android app: each server builds its own (make build, tools/android_release.py)
+/downloads/android/*.apk
+/downloads/android/manifest.json

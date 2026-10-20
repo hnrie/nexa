@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
-"""Builds the Android app's release APKs and publishes them into the repository.
+"""Builds the Android app's release APKs and publishes them where chatd serves them.
 
-  python3 tools/android_release.py [--notes "What changed"]
+  python3 tools/android_release.py [--notes "What changed"] [--if-changed]
 
-Builds android/ with Gradle (`:app:assembleRelease`, signed with the key that
-android/keystore.properties names, pointed at https://nexa.fish), checks every
-APK it made (package, version, minimum Android, signing certificate, and that
-no test server is baked into it), then copies the 64-bit, 32-bit and universal
-builds into downloads/android under names that stay the same from version to
-version, and writes manifest.json beside them.
+Builds android/ with Gradle (`:app:assembleRelease`, signed with the release
+key kept in the repository, android/signing, pointed at https://nexa.fish),
+checks every APK it made (package, version, minimum Android, signing
+certificate, and that no test server is baked into it), then copies the
+64-bit, 32-bit and universal builds into downloads/android under names that
+stay the same from version to version, and writes manifest.json beside them.
 
-chatd reads that folder on every request (internal/api/android_handlers.go), so
-committing it and pulling it on the server is the whole release:
+`make build` runs it with --if-changed: a release is built only when something
+the app is made from (android/, and the web files it copies in) changed since
+the one published in that folder, so a deploy that touched only the server or
+the web offers phones no update. Each release is numbered after the one
+published there: versionCode one higher, versionName's last number one
+higher (both given to Gradle, so nothing in the repository is edited).
 
-  git add downloads/android && git commit -m "Nexa for Android 1.0.1" && git push
-  # then, on the server:
-  git pull
+chatd reads that folder on every request (internal/api/android_handlers.go),
+so the app's updater offers the new build at once. The APKs and manifest are
+not kept in git: each server builds and publishes its own.
 
-It never touches web/dist or bin/. A chatd running from this same checkout
-offers the new APKs as soon as the script finishes; any other one, once the
-folder is pulled there.
-
+  --if-changed      do nothing when the app's sources match the published build
   --skip-build      publish the APKs already in android/app/build/outputs/apk/release
   --from DIR        publish the release APKs in DIR instead (implies --skip-build)
   --to DIR          where to publish (default downloads/android)
   --server URL      the server the build talks to (default https://nexa.fish)
 
-Before the next release, raise versionCode (and versionName) in
-android/app/build.gradle.kts: Android installs an update only over a lower
-versionCode signed with the same key.
+Android installs an update only over a lower versionCode signed with the same
+key, which is why the key lives in android/signing and must never change.
 """
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ def sdk_dir() -> Path | None:
         for line in props.read_text().splitlines():
             if line.strip().startswith("sdk.dir="):
                 return Path(line.split("=", 1)[1].strip().replace("\\:", ":"))
-    for guess in ("/opt/homebrew/share/android-commandlinetools", "/usr/local/share/android-commandlinetools", "~/Library/Android/sdk", "~/Android/Sdk"):
+    for guess in ("/opt/homebrew/share/android-commandlinetools", "/usr/local/share/android-commandlinetools", "~/android/sdk", "~/Library/Android/sdk", "~/Android/Sdk"):
         p = Path(guess).expanduser()
         if (p / "build-tools").is_dir():
             return p
@@ -91,6 +91,9 @@ def java_home() -> str | None:
             out = subprocess.run(["/usr/libexec/java_home", "-v", want], capture_output=True, text=True)
             if out.returncode == 0 and out.stdout.strip():
                 return out.stdout.strip()
+    # the Linux server keeps its JDK beside the SDK (CLAUDE.md, Commands)
+    if (Path.home() / "android/jdk/bin/java").exists():
+        return str(Path.home() / "android/jdk")
     return None
 
 
@@ -102,13 +105,48 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def build(server: str) -> None:
-    props = ANDROID / "keystore.properties"
+# What the app is made from: android/ and the web client's files its build copies in
+# (CopyWebAssets in android/app/build.gradle.kts).
+SOURCES = ("android", "web/src/i18n/locales", "web/public/sounds", "web/src/assets/twemoji-sprites", "web/src/assets/seasonal",
+           "web/src/lib/whatsNew.ts", "docs/legal", "web/src/lib/legal.ts")
+
+
+def source_hash(server: str) -> str:
+    """One hash of every file the app is built from, as it is on disk now (git's list, so build output is left out)."""
+    out = subprocess.run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", *SOURCES], cwd=ROOT, capture_output=True)
+    if out.returncode != 0:
+        fail("git could not list the app's sources")
+    h = hashlib.sha256(server.encode() + b"\0")
+    for name in sorted(set(out.stdout.decode().split("\0")) - {""}):
+        path = ROOT / name
+        if not path.is_file():
+            continue  # deleted but not yet committed
+        h.update(name.encode() + b"\0" + sha256(path).encode() + b"\0")
+    return h.hexdigest()
+
+
+def next_version(previous: dict) -> tuple[int, str]:
+    """The release after the one published (or after what Gradle carries when nothing is)."""
+    gradle = (ANDROID / "app/build.gradle.kts").read_text()
+    base_code = int(m.group(1)) if (m := re.search(r"toIntOrNull\(\) \?: (\d+)", gradle)) else 1
+    base_name = m.group(1) if (m := re.search(r'takeIf \{ it.isNotEmpty\(\) \} \?: "([^"]+)"', gradle)) else "1.0.0"
+    code = max(int(previous.get("version_code") or 0), base_code) + 1
+    name = str(previous.get("version") or base_name)
+    parts = name.split(".")
+    if parts[-1].isdigit():
+        parts[-1] = str(int(parts[-1]) + 1)
+    else:
+        parts.append("1")
+    return code, ".".join(parts)
+
+
+def build(server: str, code: int, name: str) -> None:
+    props = ANDROID / "signing/release.properties"
     if not props.is_file():
-        fail("A release is signed with the key android/keystore.properties names (storeFile, storePassword, keyAlias, keyPassword), and that file is missing.")
+        fail("A release is signed with the key android/signing/release.properties names, and that file is missing (it is kept in git).")
     store = next((l.split("=", 1)[1].strip() for l in props.read_text().splitlines() if l.strip().startswith("storeFile=")), "")
     if not store or not (ANDROID / store).is_file():
-        fail(f"android/keystore.properties names the keystore {store or '(nothing)'}, which is not in android/.")
+        fail(f"android/signing/release.properties names the keystore {store or '(nothing)'}, which is not in android/.")
     env = dict(os.environ)
     if jh := java_home():
         env["JAVA_HOME"] = jh
@@ -118,8 +156,8 @@ def build(server: str) -> None:
     if OUTPUT.is_dir():
         for old in OUTPUT.glob("*.apk"):
             old.unlink()
-    print(f"building the release against {server} (this takes a few minutes)")
-    run = subprocess.run(["./gradlew", ":app:assembleRelease", f"-PserverUrl={server}"], cwd=ANDROID, env=env)
+    print(f"building Nexa for Android {name} ({code}) against {server} (this takes a few minutes)")
+    run = subprocess.run(["./gradlew", ":app:assembleRelease", f"-PserverUrl={server}", f"-PnexaVersionCode={code}", f"-PnexaVersionName={name}"], cwd=ANDROID, env=env)
     if run.returncode != 0:
         fail("the Gradle build failed; nothing was published")
 
@@ -184,28 +222,13 @@ def check_server(apk: Path, server: str) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Build and publish the Android app's release APKs into the repository.")
     ap.add_argument("--notes", default="", help="what changed, which the app can show when it offers the update")
+    ap.add_argument("--if-changed", action="store_true", help="do nothing when the app's sources match the published build (what make build runs)")
     ap.add_argument("--skip-build", action="store_true", help="publish the APKs already built in android/app/build/outputs/apk/release")
     ap.add_argument("--from", dest="src", help="publish the release APKs in this folder (implies --skip-build)")
     ap.add_argument("--to", default=str(ROOT / "downloads/android"), help="where to publish (default downloads/android)")
     ap.add_argument("--server", default=SERVER, help=f"the server the build talks to (default {SERVER})")
     ap.add_argument("--package", default=PACKAGE, help=f"the application id every build must carry (default {PACKAGE})")
     args = ap.parse_args()
-
-    src = Path(args.src) if args.src else OUTPUT
-    if not args.src and not args.skip_build:
-        build(args.server)
-
-    found: dict[str, Path] = {}
-    for apk in sorted(src.glob("*.apk")) if src.is_dir() else []:
-        m = APK_NAME.match(apk.name)
-        if not m:
-            continue
-        if m["unsigned"]:
-            fail(f"{apk.name} is unsigned: android/keystore.properties was not picked up")
-        found[m["abi"]] = apk
-    missing = [abi for abi in ABIS if abi not in found]
-    if missing:
-        fail(f"no release APK for {', '.join(missing)} in {src}")
 
     dest = Path(args.to)
     previous: dict = {}
@@ -214,6 +237,27 @@ def main() -> int:
             previous = json.loads((dest / "manifest.json").read_text())
         except ValueError:
             previous = {}
+    source = source_hash(args.server)
+    published = previous.get("files") and all((dest / f.get("name", "")).is_file() for f in previous["files"])
+    if args.if_changed and published and previous.get("source") == source:
+        print(f"Nexa for Android {previous.get('version')} ({previous.get('version_code')}) is up to date; nothing to build")
+        return 0
+
+    src = Path(args.src) if args.src else OUTPUT
+    if not args.src and not args.skip_build:
+        build(args.server, *next_version(previous))
+
+    found: dict[str, Path] = {}
+    for apk in sorted(src.glob("*.apk")) if src.is_dir() else []:
+        m = APK_NAME.match(apk.name)
+        if not m:
+            continue
+        if m["unsigned"]:
+            fail(f"{apk.name} is unsigned: android/signing/release.properties was not picked up")
+        found[m["abi"]] = apk
+    missing = [abi for abi in ABIS if abi not in found]
+    if missing:
+        fail(f"no release APK for {', '.join(missing)} in {src}")
 
     builds = []
     for abi in ABIS:
@@ -236,16 +280,18 @@ def main() -> int:
         fail("could not read the version from the APKs")
     min_sdk = builds[0][2].get("min_sdk", 0)
 
+    # The key is kept in git, so a change of key is a decision, not an accident: the
+    # owner moved to the key in android/signing on 2026-10-19 and had everyone reinstall.
     old_cert = previous.get("signing_sha256")
     if old_cert and old_cert != cert:
-        fail(f"these builds are signed with {cert},\nbut the published app with {old_cert}.\nNo installed copy could take this update: check android/keystore.properties.")
+        print(f"note: this build is signed with a new key ({cert});\n  phones with the build signed by {old_cert} cannot update to it and must uninstall and install again")
     old_code = int(previous.get("version_code") or 0)
     if previous.get("files") and version_code <= old_code:
         same = {f.get("abi"): f.get("sha256") for f in previous.get("files", [])} == {abi: sha256(apk) for abi, apk, _, _ in builds}
         if same:
             print(f"{version} ({version_code}) is already published in {dest}; nothing to do")
             return 0
-        fail(f"versionCode {version_code} is not above the published {old_code}: raise it in android/app/build.gradle.kts, or a phone will refuse the update")
+        fail(f"versionCode {version_code} is not above the published {old_code}: a phone would refuse the update")
 
     dest.mkdir(parents=True, exist_ok=True)
     files = []
@@ -275,6 +321,9 @@ def main() -> int:
         "signing_sha256": cert,
         "files": files,
     }
+    if not args.src and not args.skip_build:
+        # what it was built from, so --if-changed knows when the next one is due
+        manifest["source"] = source
     if args.notes:
         manifest["notes"] = args.notes
     fd, tmp = tempfile.mkstemp(dir=dest, prefix=".manifest-", suffix=".json")
@@ -287,9 +336,7 @@ def main() -> int:
         shown = dest.resolve().relative_to(ROOT)
     except ValueError:
         shown = dest
-    print(f"\npublished Nexa for Android {version} ({version_code}) to {shown}. To release it:")
-    print(f'  git add {shown} && git commit -m "Nexa for Android {version}" && git push')
-    print("  then, on the server: git pull (chatd lists it at once; no restart needed for the APKs)")
+    print(f"\npublished Nexa for Android {version} ({version_code}) to {shown}; chatd offers it at once")
     return 0
 
 

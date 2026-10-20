@@ -8,9 +8,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-/** Release signing lives beside this file (see android/README.md); a debug build never needs it. */
+/**
+ * The release key and its passwords are kept in the repository, in android/signing (the owner's
+ * choice, so the key is never lost again); a debug build never needs them.
+ */
 val keystoreProps = Properties().apply {
-    val f = rootProject.file("keystore.properties")
+    val f = rootProject.file("signing/release.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
 
@@ -115,8 +118,10 @@ android {
         applicationId = "fish.nexa"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.1.0"
+        // tools/android_release.py numbers each release after the one it published last
+        // (-PnexaVersionCode, -PnexaVersionName); these are what a build without them carries
+        versionCode = (findProperty("nexaVersionCode") as String?)?.trim()?.toIntOrNull() ?: 3
+        versionName = (findProperty("nexaVersionName") as String?)?.trim()?.takeIf { it.isNotEmpty() } ?: "1.1.0"
 
         // -PserverUrl=http://127.0.0.1:18555 points a build at a local chatd (through adb reverse)
         val server = (findProperty("serverUrl") as String?)?.trim().takeUnless { it.isNullOrEmpty() } ?: "https://nexa.fish"
@@ -178,7 +183,7 @@ android {
             // update an installed copy, so it fails rather than falls back.
             signingConfig = signingConfigs.findByName("release")
                 ?: if (gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }) {
-                    error("a release build needs android/keystore.properties and the keystore it names")
+                    error("a release build needs android/signing/release.properties and the keystore it names")
                 } else {
                     signingConfigs.getByName("debug")
                 }
