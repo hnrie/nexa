@@ -246,8 +246,9 @@ sizes), `tools/bot_e2e.py` (real bot libraries: the discord.py, discord.js and d
 in `tools/bots/`, pointed at Nexa as the portal says, used by a person in a headless browser;
 `BOT_E2E_PYTHON`, `BOT_E2E_NODE_MODULES` and `BOT_E2E_GOPATH` name where each library is),
 `tools/apps_ui.py` (every app screen as a person uses it, at both sizes, into
-`tools/out/apps-ui`; `--serve --port N` leaves the server and its discord.py bot running, for the
-Android emulator), `tools/discord_e2e.py` (Discord activity sync against the fake Discord in
+`tools/out/apps-ui`, including `menu_on_a_picture`, `share-warning`, `app-link` and `staff-bots`;
+`--no-content` tries an app without Message Content, and `--serve --port N` leaves the server and
+its discord.py bot running, for the Android emulator), `tools/discord_e2e.py` (Discord activity sync against the fake Discord in
 `internal/discordsync/fakediscord/cmd/fakediscord`), `tools/sfu_call.py` and `tools/sfu_guest.py`
 (real calls and a guest through Cloudflare Realtime, keys from `chatd.env`), `tools/call_quality.py`
 (calls over bad networks made by `tools/netsim`), `tools/share_quality.py` (a screen share of hard
@@ -366,7 +367,10 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   (`bot_portal`, `/api/v1/applications`), OAuth2 and installs (`bot_oauth`: the consent page's
   `/api/v1/oauth2/authorize`, Authorized Apps, a server's integrations and who may use their
   commands), people using apps (`bot_interactions`: `POST /api/v1/interactions`, files sent with
-  one, a channel's commands, dismissing an answer only one person sees), and the bot API itself:
+  one, a channel's commands, dismissing an answer only one person sees; the first follow-up after a
+  type 5 defer fills in the thinking message rather than making a second one, and a message
+  command's sealed copy is kept with `Store.KeepBotCopy` so the bot can fetch its files), and the
+  bot API itself:
   the REST side of the bot libraries' protocol under `/api/v6` to `/api/v10` (`bot_auth` mounts it,
   taking `Authorization: Bot <token>` or an OAuth2 `Bearer` token, with per-route buckets, a global
   limit and the protocol's error shapes; `bot_rest_*`, `bot_message_routes`, `bot_commands`,
@@ -380,7 +384,8 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   Integrations lists apps for Manage Server and webhooks for Manage Webhooks.
 - Webhooks are used with their token at `/api/webhooks/{wid}/{token}` and at the versioned paths
   Discord's libraries build (`/api/v1`, `/api/v6` to `/api/v10`), with `/slack` and `/github`
-  variants, taking Discord's JSON.
+  variants, taking Discord's JSON. Links in webhook and app messages get server-side previews
+  (`unfurlWebhookMessage`, skipping app install links).
 - `static.go` serves `web/dist`: hashed assets immutable, `index.html` for any other path, and its
   own page heads (for link previews elsewhere) at `/invite/{code}`, `/call/{code}`, `/note/{token}`,
   `/@{username}` and `/`. The Content-Security-Policy is there too (plugins load from `blob:`,
@@ -595,7 +600,10 @@ meter charges a pulled share sound at `StreamAudioBps` (128 kbit/s). The mesh ke
   `/channels/@admin` (`/api/v1/moderation/*`); the member's side is `/api/v1/nexa/*`.
 - Staff can act on accounts (mutes, bans, purges, removing pictures, resetting fields), servers
   (including Discovery holds), sticker packs, emoji and uploads (`moderation_actions.go` and the
-  other `moderation_*` files). Actions are recorded in `mod_log`; one on an account comes with a case
+  other `moderation_*` files). The Bots tab (`GET /api/v1/moderation/apps`, `moderation_apps.go`,
+  web `components/moderation/BotsTab.tsx`, Android `ui/moderation/Bots.kt`) lists every app with its
+  owner, reach and whether it reads every message, while the people grid leaves bots out; Moderate
+  opens the bot's person page. Actions are recorded in `mod_log`; one on an account comes with a case
   (`mod_cases`) whose thread the member sees.
 - Bug reports (`/api/v1/bugs`), client crash reports (`/api/v1/client-errors`) and the admin's
   instance settings (registration mode and key, which override `chatd.env` until cleared).
@@ -757,7 +765,9 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
   people, roles and channels for an app's select menus, and `lib/passwordProof.ts` turns a password
   into the proof the portal's resets ask for. `components/chat/apps` draws an app's messages (the
   line saying who used which command, buttons, select menus, thinking, answers only you see) and
-  the Apps entries in the message, person and member menus;
+  the Apps entries in the message, person and member menus (`ContextMenuItem.picture` draws each
+  app's picture beside its entry); `components/chat/AppLinkCards.tsx` draws cards for app install
+  links (`/oauth2/authorize?client_id=...`) in chat;
   `components/apps` holds what they share (`SelectBox`, `AppFormModal` for an app's forms,
   `ReadingGlass`, `PermissionPicker`, `AppIcon`, `BotTag`). `composer/CommandMode.tsx` is the box
   while an app's command is filled in, an option at a time. The Developer Portal is
@@ -920,13 +930,14 @@ notes.
   and bug report threads) and `data/Moderation` the staff's (what waits on them, `mod_unread`, the
   panel's requests, and `events` its open views follow). `ui/nexa/ThreadChat` draws a case thread or
   a bug report as a conversation for both sides, as the web's does. The staff panel is native
-  (`ui/moderation`: `Panel` with its tabs, `Users`, `Person`, `Moderate` and the other takedown
+  (`ui/moderation`: `Panel` with its tabs, `Users`, `Bots`, `Person`, `Moderate` and the other takedown
   sheets, `Cases`, `Bugs`, `Servers`, `Expressions`, `Logs`, `Parts`, `Words`), at
   `Route.Admin(path)`, whose path is the web's below `/channels/@admin`.
 - Apps (`data/Apps`, `AppCommands`, `Interactions`, `BotCopies`, `Pickables`, `net/AppModels`) and
   their screens in `ui/apps` (`CommandMode` with `CommandBox` and `CommandList` in the composer,
   `AppMessage`, `AppForm`, `SelectBox`, `Authorize` for the consent sheet that `/oauth2/authorize`
-  links open, `ReadingApps` for the apps a channel's start names, `ReadingGlass`, `AppMenus`), the
+  links open, `ReadingApps` for the apps a channel's start names, `ReadingGlass`, `AppMenus` with
+  `MenuItem.Action.picture` in `ui/layers/Layers.kt`), `AppLinkCards` in `ui/chat/LinkCards.kt`, the
   portal in `ui/settings`
   (`DeveloperPortal`, `AppDetail`, `PortalParts`, `AuthorizedApps`) and `ui/server/AppsSection`.
   `ui/markdown/Webhook.kt` is the one parser of webhook and app messages (the web's
