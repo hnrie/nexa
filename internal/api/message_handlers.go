@@ -122,6 +122,51 @@ type messageBody struct {
 	// in the ciphertext with the rest of the message; this is only what the
 	// server needs to take votes (see pollBody).
 	Poll json.RawMessage `json:"poll"`
+	// BotCopies are the message sealed again, by the sender's app, to each
+	// bot it is addressed to (a direct message with the bot, a mention of it,
+	// a reply to it), so that bot can read it (bot_crypto.go); by bot id.
+	BotCopies map[string][]byte `json:"bot_copies"`
+}
+
+// checkBotCopies reads the copies a message carries for bots: each for a bot
+// that can see the channel and that the message is addressed to.
+func (s *Server) checkBotCopies(r *http.Request, ch *store.Channel, body *messageBody, replyTo *ids.ID) (map[ids.ID][]byte, error) {
+	if len(body.BotCopies) == 0 {
+		return nil, nil
+	}
+	if len(body.BotCopies) > store.MaxBotCopies {
+		return nil, E(http.StatusBadRequest, "too_many_copies", "A message carries copies for at most 10 apps.")
+	}
+	ctx := r.Context()
+	var repliedTo ids.ID
+	if replyTo != nil {
+		if target, err := s.Store.MessageByID(ctx, *replyTo, 0); err == nil {
+			repliedTo = target.AuthorID
+		}
+	}
+	out := map[ids.ID][]byte{}
+	for raw, sealed := range body.BotCopies {
+		id, err := ids.Parse(raw)
+		if err != nil || len(sealed) == 0 || len(sealed) > maxEnvelopeBytes {
+			return nil, E(http.StatusBadRequest, "bad_copy", "A copy for an app is malformed.")
+		}
+		// A copy the message has no business carrying is left behind, not
+		// refused: mentioning an app that cannot see the channel still sends
+		// the message, the app just never reads it.
+		bot, err := s.Store.UserByID(ctx, id)
+		if err != nil || bot.Flags&store.FlagBot == 0 {
+			continue
+		}
+		addressed := hasID(body.Mentions, id) || repliedTo == id || (ch.Type == "dm" && hasID(ch.Recipients, id))
+		if !addressed {
+			continue
+		}
+		if ok, err := s.canAccess(r, bot, ch, NeedView); err != nil || !ok {
+			continue
+		}
+		out[id] = sealed
+	}
+	return out, nil
 }
 
 // pollBody is what a person's poll tells the server: how many answers it has
@@ -496,6 +541,11 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		m.ReplyToID = body.ReplyToID
 		m.Type = "reply"
 	}
+	copies, err := s.checkBotCopies(r, ch, &body, m.ReplyToID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	seenBlobs := map[ids.ID]bool{}
 	for _, a := range body.Attachments {
 		if seenBlobs[a.BlobID] {
@@ -526,6 +576,14 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		WriteError(w, err)
 		return
+	}
+	// the copies for bots go in before anyone is told of the message, so a
+	// bot hearing of it can read it
+	if len(copies) > 0 {
+		if err := s.Store.PutBotCopies(ctx, m.ID, copies); err != nil {
+			WriteError(w, err)
+			return
+		}
 	}
 	if s.isDM(ch) {
 		// A conversation someone closed, or has not been shown yet because
@@ -617,6 +675,16 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		// readers open a message with the key its row names, so the row follows the new envelope
+		// an edit carries the copies for bots again; ones it leaves out go
+		copies, err := s.checkBotCopies(r, ch, &body, m.ReplyToID)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		if err := s.Store.PutBotCopies(r.Context(), mid, copies); err != nil {
+			WriteError(w, err)
+			return
+		}
 		if err := s.Store.UpdateMessage(r.Context(), mid, body.Ciphertext, env.Conv, env.Epoch, dedupeIDs(body.Mentions, maxMentions), s.allowedRoleMentions(r.Context(), me, ch, body.MentionRoles), body.MentionEveryone, time.Now().UnixMilli()); err != nil {
 			WriteError(w, err)
 			return

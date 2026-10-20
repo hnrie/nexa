@@ -127,6 +127,25 @@ func (s *Server) serverViewUsers(ctx context.Context, srv *store.Server, uid ids
 		return nil, nil, err
 	}
 	var users []*store.User
+	// A big server's members come a page at a time, but the bots that read
+	// every message they can see come at once: members' apps mark the
+	// channels those bots can read, and need their roles to tell which.
+	if count > readyMemberLimit {
+		if readers, err := s.Store.ReadingBotIDs(ctx, srv.ID); err == nil && len(readers) > 0 {
+			byID, err := s.Store.UsersByIDs(ctx, readers)
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, id := range readers {
+				m, err := s.Store.Member(ctx, srv.ID, id)
+				if err != nil || byID[id] == nil {
+					continue
+				}
+				view.Members = append(view.Members, m)
+				users = append(users, byID[id])
+			}
+		}
+	}
 	if count <= readyMemberLimit {
 		members, err := s.Store.Members(ctx, srv.ID, 0, readyMemberLimit, "")
 		if err != nil {

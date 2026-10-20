@@ -61,6 +61,13 @@ const (
 	PinMessages Perm = 1 << 51
 	// BypassSlowmode sends without waiting out a channel's slow mode.
 	BypassSlowmode Perm = 1 << 52
+	// UseApplicationCommands is using the commands of the applications
+	// added to a server: their slash commands and their menu entries.
+	UseApplicationCommands Perm = 1 << 31
+	// UseExternalApps lets what someone's own applications (added to their
+	// account rather than to the server) answer in a channel be seen by
+	// everyone; without it only they see it.
+	UseExternalApps Perm = 1 << 50
 )
 
 // All is every permission this server knows.
@@ -68,12 +75,12 @@ const All = CreateInstantInvite | KickMembers | BanMembers | Administrator | Man
 	PrioritySpeaker | Stream | ViewChannel | SendMessages | ManageMessages | EmbedLinks | AttachFiles | ReadMessageHistory | MentionEveryone |
 	UseExternalEmojis | Connect | Speak | MuteMembers | DeafenMembers | MoveMembers | UseVAD | ChangeNickname | ManageNicknames | ManageRoles |
 	ManageWebhooks | ManageEmojis | ManageThreads | CreatePublicThreads | CreatePrivateThreads | UseExternalStickers | SendMessagesInThreads |
-	ModerateMembers | UseSoundboard | CreateExpressions | CreatePolls | PinMessages | BypassSlowmode
+	ModerateMembers | UseSoundboard | CreateExpressions | CreatePolls | PinMessages | BypassSlowmode | UseApplicationCommands | UseExternalApps
 
 // DefaultEveryone is what a fresh server's @everyone role gets.
 const DefaultEveryone = CreateInstantInvite | AddReactions | Stream | ViewChannel | SendMessages | EmbedLinks | AttachFiles |
 	ReadMessageHistory | UseExternalEmojis | Connect | Speak | UseVAD | ChangeNickname | UseSoundboard | CreatePolls |
-	CreatePublicThreads | CreatePrivateThreads | UseExternalStickers | SendMessagesInThreads
+	CreatePublicThreads | CreatePrivateThreads | UseExternalStickers | SendMessagesInThreads | UseApplicationCommands | UseExternalApps
 
 // TimedOutKeep is all a timed-out member retains.
 const TimedOutKeep = ViewChannel | ReadMessageHistory
@@ -90,6 +97,7 @@ var Names = map[string]Perm{
 	"CREATE_POLLS": CreatePolls, "USE_EXTERNAL_EMOJIS": UseExternalEmojis, "MANAGE_THREADS": ManageThreads, "CREATE_PUBLIC_THREADS": CreatePublicThreads,
 	"CREATE_PRIVATE_THREADS": CreatePrivateThreads, "USE_EXTERNAL_STICKERS": UseExternalStickers, "SEND_MESSAGES_IN_THREADS": SendMessagesInThreads,
 	"CREATE_EXPRESSIONS": CreateExpressions, "PIN_MESSAGES": PinMessages, "BYPASS_SLOWMODE": BypassSlowmode,
+	"USE_APPLICATION_COMMANDS": UseApplicationCommands, "USE_EXTERNAL_APPS": UseExternalApps,
 }
 
 // MarshalJSON writes the bitset as a decimal string.

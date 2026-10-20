@@ -189,6 +189,8 @@ private fun PersonRow(row: MemberRow.Person, list: String, ownerLabel: String, o
                     Crown.ADMIN -> Icon("Hammer", c.textBrand, size = 14.dp, label = t("profile.profileCard.admin"))
                     Crown.NONE -> Unit
                 }
+                // an app's bot is marked as one wherever it is listed
+                if (row.user?.isBot == true) fish.nexa.ui.media.AppTag()
                 row.user?.serverTag?.let { ServerTagChip(it, small = true) }
             }
             StatusLine(
@@ -346,6 +348,13 @@ fun memberModerationItems(serverId: String, userId: String): List<MenuItem.Actio
     return mod
 }
 
+/** A menu item with the line under it that ends its group. */
+private fun MenuItem.withSeparator(): MenuItem = when (this) {
+    is MenuItem.Action -> copy(separatorAfter = true)
+    is MenuItem.Submenu -> copy(separatorAfter = true)
+    else -> this
+}
+
 /** memberMenuItems: profile, mention; friends and blocking; nickname, roles; timeout, kick, ban; the ID. */
 fun memberMenuItems(serverId: String, userId: String): List<MenuItem.Action> {
     val st = Nexa.servers.get(serverId) ?: return emptyList()
@@ -390,7 +399,10 @@ private fun openMemberMenu(serverId: String, userId: String, name: String, list:
     if (Pick.list == list && !Pick.mode && Pick.ids.isNotEmpty()) Pick.clear()
     val items = ArrayList<MenuItem>(memberMenuItems(serverId, userId))
     if (items.isEmpty()) return
-    items[items.lastIndex] = (items.last() as MenuItem.Action).copy(separatorAfter = true)
+    // what apps can do with someone, used in the conversation open in this server
+    val here = Nexa.ui.activeChannel.value?.takeIf { Nexa.channels.get(it)?.serverId == serverId }
+    fish.nexa.ui.apps.withApps(items, fish.nexa.ui.apps.userAppsItem(here, userId))
+    items[items.lastIndex] = items.last().withSeparator()
     items += MenuItem.Action(t("pick.select")) { Pick.start(list, userId) }
     openMenu(items, name)
 }
@@ -630,7 +642,9 @@ private fun openGroupMemberMenu(channelId: String, userId: String, name: String,
     if (Pick.list == list && !Pick.mode && Pick.ids.isNotEmpty()) Pick.clear()
     val items = ArrayList<MenuItem>(groupMemberMenuItems(channelId, userId))
     if (items.isEmpty()) return
-    items[items.lastIndex] = (items.last() as MenuItem.Action).copy(separatorAfter = true)
+    // what apps can do with someone, used in this group
+    fish.nexa.ui.apps.withApps(items, fish.nexa.ui.apps.userAppsItem(channelId, userId))
+    items[items.lastIndex] = items.last().withSeparator()
     items += MenuItem.Action(t("pick.select")) { Pick.start(list, userId) }
     openMenu(items, name)
 }

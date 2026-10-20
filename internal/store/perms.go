@@ -113,6 +113,24 @@ func (s *Store) PermsIn(ctx context.Context, ch *Channel, uid ids.ID) (perms.Per
 	return snap.channelPerms(ch.ID, uid, nowMs()), nil
 }
 
+// EveryonePermsIn is what @everyone may do in a server channel, which is
+// what an application added to someone's account (and not to the server)
+// gets there when that person uses it.
+func (s *Store) EveryonePermsIn(ctx context.Context, ch *Channel) (perms.Perm, error) {
+	if ch.ServerID == nil {
+		return 0, nil
+	}
+	snap, err := s.snapshot(ctx, *ch.ServerID)
+	if err != nil {
+		return 0, err
+	}
+	target := ch.ID
+	if parent, ok := snap.threads[ch.ID]; ok {
+		target = parent
+	}
+	return perms.Compute(snap.serverID, snap.roles, perms.Member{}, false, snap.overwrites[target]), nil
+}
+
 // ChannelViewers lists who can see a channel: a server channel's members who
 // may view it, or a conversation's participants.
 func (s *Store) ChannelViewers(ctx context.Context, channelID ids.ID) ([]ids.ID, error) {
@@ -142,6 +160,11 @@ func (s *Store) channelViewers(ctx context.Context, serverID, channelID ids.ID) 
 		return []ids.ID{}, nil
 	}
 	return snap.viewersOf(channelID), nil
+}
+
+// ServerIDsOf lists the servers uid is a member of, oldest membership first.
+func (s *Store) ServerIDsOf(ctx context.Context, uid ids.ID) ([]ids.ID, error) {
+	return s.serversOf(ctx, uid)
 }
 
 // serversOf lists the servers uid is a member of.
@@ -226,6 +249,28 @@ func (s *Store) CoMembers(ctx context.Context, uid ids.ID) ([]ids.ID, error) {
 		}
 	}
 	return out, nil
+}
+
+// keyFilter keeps, of list, the members of a server who may hold its keys
+// (keyEligible), read from its snapshot.
+func (s *Store) keyFilter(ctx context.Context, serverID ids.ID, list []ids.ID) ([]ids.ID, error) {
+	snap, err := s.snapshot(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ids.ID, 0, len(list))
+	for _, uid := range list {
+		if m := snap.members[uid]; m == nil || keyEligible(m.userFlags) {
+			out = append(out, uid)
+		}
+	}
+	return out, nil
+}
+
+// keyParticipants lists the people of a conversation who hold its keys:
+// every participant but a bot, which reads only the copies sealed to it.
+func (s *Store) keyParticipants(ctx context.Context, convID ids.ID) ([]ids.ID, error) {
+	return s.idList(ctx, `SELECT p.user_id FROM dm_participants p JOIN users u ON u.id = p.user_id WHERE p.channel_id = ? AND u.flags & ? = 0 ORDER BY p.added_at, p.user_id`, int64(convID), FlagBot)
 }
 
 // serverMemberIDs lists a server's members from its snapshot.

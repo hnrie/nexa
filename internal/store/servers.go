@@ -666,6 +666,25 @@ func (s *Store) Member(ctx context.Context, serverID, uid ids.ID) (*Member, erro
 }
 
 // Members lists memberships (with roles) after a user id, optionally filtered.
+// ReadingBotIDs are the bots in a server whose application reads every
+// message it can see (FlagBotReadsAll), which members' apps mark channels for.
+func (s *Store) ReadingBotIDs(ctx context.Context, serverID ids.ID) ([]ids.ID, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT m.user_id FROM server_members m JOIN users u ON u.id = m.user_id WHERE m.server_id = ? AND (u.flags & ?) != 0`, int64(serverID), FlagBotReadsAll)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ids.ID{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, ids.ID(id))
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) Members(ctx context.Context, serverID ids.ID, after ids.ID, limit int, q string) ([]*Member, error) {
 	if limit <= 0 || limit > 1000 {
 		limit = 100
@@ -851,11 +870,15 @@ func (s *Store) SetMemberRoles(ctx context.Context, serverID, uid ids.ID, roleID
 
 const roleCols = `id, server_id, name, color, hoist, mentionable, position, permissions, icon_id, created_at, color2, color3, icon_emoji`
 
+// roleReadCols are what a role is read with: roleCols and, for a role a bot
+// brought with it, the bot (written only by CreateManagedRole).
+const roleReadCols = roleCols + `, managed_by`
+
 func scanRole(r rowScanner) (*Role, error) {
 	var ro Role
 	var hoist, mention, permsRaw int64
-	var icon, color2, color3 sql.NullInt64
-	if err := r.Scan(&ro.ID, &ro.ServerID, &ro.Name, &ro.Color, &hoist, &mention, &ro.Position, &permsRaw, &icon, &ro.CreatedAt, &color2, &color3, &ro.IconEmoji); err != nil {
+	var icon, color2, color3, managed sql.NullInt64
+	if err := r.Scan(&ro.ID, &ro.ServerID, &ro.Name, &ro.Color, &hoist, &mention, &ro.Position, &permsRaw, &icon, &ro.CreatedAt, &color2, &color3, &ro.IconEmoji, &managed); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -865,12 +888,24 @@ func scanRole(r rowScanner) (*Role, error) {
 	ro.Permissions = perms.Perm(uint64(permsRaw))
 	ro.IconID = idPtr(icon)
 	ro.Color2, ro.Color3 = intPtr(color2), intPtr(color3)
+	ro.ManagedBy = idPtr(managed)
 	return &ro, nil
 }
 
 // CreateRole adds a role at the top of the hierarchy (below nothing but the owner).
 func (s *Store) CreateRole(ctx context.Context, serverID ids.ID, name string, permsBits perms.Perm, color int) (*Role, error) {
-	ro := &Role{ID: ids.New(), ServerID: serverID, Name: name, Color: color, Permissions: permsBits, CreatedAt: nowMs()}
+	return s.createRole(ctx, serverID, name, permsBits, color, nil)
+}
+
+// CreateManagedRole adds the role a bot brings with it when it is added to a
+// server: named after it, holding the permissions it asked for, and given to
+// nobody but the bot.
+func (s *Store) CreateManagedRole(ctx context.Context, serverID, botID ids.ID, name string, permsBits perms.Perm) (*Role, error) {
+	return s.createRole(ctx, serverID, name, permsBits, 0, &botID)
+}
+
+func (s *Store) createRole(ctx context.Context, serverID ids.ID, name string, permsBits perms.Perm, color int, managedBy *ids.ID) (*Role, error) {
+	ro := &Role{ID: ids.New(), ServerID: serverID, Name: name, Color: color, Permissions: permsBits, CreatedAt: nowMs(), ManagedBy: managedBy}
 	defer s.serverChanged(serverID)
 	err := s.Tx(ctx, func(tx *db.Tx) error {
 		// Postgres runs these side by side; one at a time, so two cannot both
@@ -884,7 +919,7 @@ func (s *Store) CreateRole(ctx context.Context, serverID ids.ID, name string, pe
 			return err
 		}
 		ro.Position = 1
-		_, err := tx.ExecContext(ctx, `INSERT INTO roles (`+roleCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, int64(ro.ID), int64(serverID), ro.Name, ro.Color, 0, 0, ro.Position, int64(ro.Permissions), nil, ro.CreatedAt, nil, nil, "")
+		_, err := tx.ExecContext(ctx, `INSERT INTO roles (`+roleReadCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, int64(ro.ID), int64(serverID), ro.Name, ro.Color, 0, 0, ro.Position, int64(ro.Permissions), nil, ro.CreatedAt, nil, nil, "", nullID(managedBy))
 		return err
 	})
 	if err != nil {
@@ -895,12 +930,12 @@ func (s *Store) CreateRole(ctx context.Context, serverID ids.ID, name string, pe
 
 // RoleByID loads a role.
 func (s *Store) RoleByID(ctx context.Context, id ids.ID) (*Role, error) {
-	return scanRole(s.db.R.QueryRowContext(ctx, `SELECT `+roleCols+` FROM roles WHERE id = ?`, int64(id)))
+	return scanRole(s.db.R.QueryRowContext(ctx, `SELECT `+roleReadCols+` FROM roles WHERE id = ?`, int64(id)))
 }
 
 // Roles lists a server's roles, lowest position first (@everyone at 0).
 func (s *Store) Roles(ctx context.Context, serverID ids.ID) ([]*Role, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+roleCols+` FROM roles WHERE server_id = ? ORDER BY position, id`, int64(serverID))
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+roleReadCols+` FROM roles WHERE server_id = ? ORDER BY position, id`, int64(serverID))
 	if err != nil {
 		return nil, err
 	}

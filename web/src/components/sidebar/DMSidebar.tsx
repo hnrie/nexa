@@ -39,6 +39,7 @@ import { useNotes } from "@/stores/notes";
 import { unreadCount, useModeration } from "@/stores/moderation";
 import { moderationMenu } from "@/components/moderation/modMenu";
 import { UserTag } from "@/components/servertag/UserTag";
+import { BotTag } from "@/components/apps/BotTag";
 import s from "./Sidebar.module.css";
 
 import { t } from "@/i18n";
@@ -476,6 +477,7 @@ export function DMSidebar() {
                 <span className={s.name} dir="auto">{name}</span>
                 {/* the owner of Nexa is crowned wherever they are listed, and its admins carry the hammer */}
                 {crowned ? <OwnerCrown size={14} /> : admin ? <AdminHammer size={14} /> : null}
+                {tagOf ? <BotTag userId={tagOf} /> : null}
                 {tagOf ? <UserTag userId={tagOf} size="sm" /> : null}
               </span>
               {sub}

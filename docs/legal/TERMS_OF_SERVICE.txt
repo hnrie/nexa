@@ -1,7 +1,7 @@
 NEXA - TERMS OF SERVICE
 Site: nexa.fish (also at mathtest.lol, and formerly chat.evilion.xyz)
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-10-04
+Effective: 2026-10-19
 
 These Terms are the agreement between you and the owner of Nexa.
 They are short on purpose and written in plain language. The Privacy
@@ -12,7 +12,9 @@ Policy is part of them.
 Nexa is a chat service. Your messages, files, and calls are encrypted
 on your device with keys the server never has. Nobody who runs Nexa
 can read them, monitor them, or switch that off. That is how the
-software works, not a promise that could be quietly waived later.
+software works, not a promise that could be quietly waived later. The
+one way around it is an app that you or a server's manager choose to
+add: what is meant for an app reaches it (section 3).
 
 The owner and a team of moderators (called staff in these Terms) keep
 Nexa running. Staff only ever work with the small part of Nexa that is
@@ -44,15 +46,30 @@ needs to work.
 - Message text, file contents and names, notes, call audio and
   video, and your settings are encrypted before they leave your
   device. The server stores only ciphertext it cannot read.
-- Nobody who runs Nexa holds a key to any of it. There is no admin
-  panel, setting, or software switch that decrypts content already
-  sent, and nothing in the software that intercepts future content
-  in readable form.
+- Nobody who runs Nexa holds a key to any of it, apart from the keys
+  of the apps people add (below). Other than adding an app, there is
+  no admin panel, setting, or software switch that decrypts content
+  already sent, and nothing in the software that intercepts future
+  content in readable form.
 - A few things are not end-to-end encrypted, because Nexa itself
   has to read them: your public profile, moderation cases and the
   threads that go with them, announcements from Nexa, bug reports
-  you send, and messages that programs post through a server's
-  webhooks. The Privacy Policy explains each of them.
+  you send, messages that programs post through a server's webhooks,
+  and what apps post and receive. The Privacy Policy explains each
+  of them.
+- Apps are programs other people make in Settings, Developer Portal.
+  Anyone can add one to their account, or to a server they manage.
+  What reaches an app is not end-to-end encrypted from it: messages
+  meant for it (the sender's app seals a copy for it, which the
+  server opens to hand over), what you send it with its commands and
+  forms, and, for an app made to read every message, every message in
+  the channels it can see. An app shows what it can read before
+  anyone adds it, and the start of each channel where one reads every
+  message names it. Whoever made an app runs it and decides what it
+  does with what it gets. Nexa does not check apps, so add only ones
+  you trust.
+- If you make an app, you are responsible for what it does, and these
+  Terms apply to it as they do to you.
 - The Privacy Policy lists exactly what is stored and who can see it.
 
 4. THE RULES
@@ -133,7 +150,7 @@ Everything else only comes up if there is a valid legal order that
 has to be followed. Even then, only what the server actually holds
 can be handed over (see the Privacy Policy). Message text, file
 contents, and call audio still cannot be handed over, because nobody
-here has a way to read them.
+here has a way to read them, apart from what was opened for an app.
 
 6. NEXA, THE OFFICIAL ACCOUNT
 
@@ -158,23 +175,24 @@ here has a way to read them.
   custom emoji, stickers) are stored as uploaded and are visible to
   everyone.
 - Encrypted things (messages and files) stay readable only to the
-  people holding the conversation key. Deleting a message deletes its
-  server row.
+  people holding the conversation key, and to the apps they reach
+  (section 3). Deleting a message deletes its server row.
 - If you delete your own account, everything it made is deleted with
   it: your messages everywhere, the files you uploaded, your
   reactions, votes, and packs, the servers and group chats you own
-  (for everyone in them), and your direct message conversations, for
-  both people in them. Its profile is overwritten, and its sessions,
-  relationships, settings, keys, and second factor are deleted. What
-  is left is a stand-in named Deleted User, which nobody can
-  sign in as.
+  (for everyone in them), the apps you made with their bots, and your
+  direct message conversations, for both people in them. Its profile
+  is overwritten, and its sessions, relationships, settings, keys, and
+  second factor are deleted. What is left is a stand-in named Deleted
+  User, which nobody can sign in as.
 - So when someone you have a direct message conversation with deletes
   their own account, that conversation is deleted for you too.
 - If staff delete your account, everything it posted and uploaded is
-  removed with it, everywhere, and servers and group chats it owns are
-  deleted for everyone in them. Its direct message conversations stay
-  for the people on the other side, without its messages. The
-  moderation case and the log entry about it stay.
+  removed with it, everywhere, servers and group chats it owns are
+  deleted for everyone in them, and so are the apps it made, with
+  their bots. Its direct message conversations stay for the people on
+  the other side, without its messages. The moderation case and the
+  log entry about it stay.
 
 8. AVAILABILITY AND CHANGES
 

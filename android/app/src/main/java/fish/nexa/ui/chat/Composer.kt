@@ -69,6 +69,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import fish.nexa.Nexa
@@ -94,6 +95,7 @@ import fish.nexa.ui.Icon
 import fish.nexa.ui.Time
 import fish.nexa.ui.components.Avatar
 import fish.nexa.ui.components.Txt
+import fish.nexa.ui.components.floatAbove
 import fish.nexa.ui.components.pressable
 import fish.nexa.ui.layers.MenuItem
 import fish.nexa.ui.layers.openMenu
@@ -122,6 +124,8 @@ data class AcToken(val kind: String, val query: String, val start: Int)
 
 fun acToken(text: String, caret: Int, channels: Boolean, smartEmoji: Boolean): AcToken? {
     val before = text.substring(0, caret.coerceIn(0, text.length))
+    // a command at the very start, an app's subcommands too ("/config set")
+    Regex("^/([\\p{L}\\p{N}_-]*(?: [\\p{L}\\p{N}_-]*){0,2})$").find(before)?.let { return AcToken("command", it.groupValues[1].lowercase(), 0) }
     if (smartEmoji && Regex("(?:^|\\s):$").containsMatchIn(before)) return AcToken("emoji", "", caret - 1)
     val m = Regex("(?:^|\\s)(@[\\p{L}\\p{N}_.-]*|#[\\p{L}\\p{N}_-]*|:[\\w+-]{2,}|^/\\w*)$").find(before) ?: return null
     val token = m.groupValues[1]
@@ -259,6 +263,30 @@ fun Composer(channel: Channel) {
     val canAttach = st == null || Nexa.servers.canI(st, P.ATTACH_FILES, channelId)
     val canPoll = st == null || (Nexa.servers.canI(st, P.SEND_MESSAGES, channelId) && Nexa.servers.canI(st, P.CREATE_POLLS, channelId))
     val state = remember(channelId) { TextFieldState(Nexa.settings.draft(channelId)) }
+    // apps' commands are offered where this account may use them
+    val canUseApps = st == null || Nexa.servers.canI(st, P.USE_APPLICATION_COMMANDS, channelId)
+    val cmd = remember(channelId) {
+        fish.nexa.ui.apps.CommandMode(channelId, scope) { text ->
+            state.setTextAndPlaceCursorAtEnd(text)
+            Nexa.settings.setDraft(channelId, text)
+        }
+    }
+    // what apps offer here is ready by the time a slash is typed
+    LaunchedEffect(channelId, canUseApps) { if (canUseApps) fish.nexa.data.AppCommands.load(channelId) }
+    // a command tapped where someone used it starts here, in its conversation
+    val startCmd by fish.nexa.data.AppCommands.start.collectAsState()
+    LaunchedEffect(startCmd) {
+        val want = startCmd ?: return@LaunchedEffect
+        if (want.channelId != channelId) return@LaunchedEffect
+        fish.nexa.data.AppCommands.startCommand(null)
+        val list = fish.nexa.data.AppCommands.load(channelId)
+        for ((app, command) in fish.nexa.data.AppCommands.ofType(list, fish.nexa.data.AppCommands.CMD_SLASH).filter { it.app.id == want.applicationId }) {
+            val leaf = fish.nexa.data.AppCommands.leaves(command).firstOrNull { (listOf(command.name) + it.path).joinToString(" ") == want.name } ?: continue
+            state.clearText()
+            cmd.start(app, leaf)
+            return@LaunchedEffect
+        }
+    }
     val insert = ChatUi.inserts[channelId]
     LaunchedEffect(insert) {
         if (insert != null) {
@@ -348,6 +376,7 @@ fun Composer(channel: Channel) {
 
     /** Sends what the box holds; false when it could not go (slow mode, too long, an unknown command). */
     fun send(): Boolean {
+        if (cmd.active) return cmd.submit()
         if (slowLeft > 0) {
             Nexa.ui.toast(t("composer.composer.slowModeOnSeconds", "seconds" to kotlin.math.ceil(slowLeft).toInt()), "error")
             return false
@@ -427,7 +456,8 @@ fun Composer(channel: Channel) {
                 ComposerBox(
                     channel, state, boxShape, borderTop = tray.isNotEmpty(),
                     canAttach = canAttach, canPoll = canPoll,
-                    sendEnabled = (state.text.isNotBlank() || tray.isNotEmpty()) && slowLeft <= 0,
+                    sendEnabled = cmd.active || ((state.text.isNotBlank() || tray.isNotEmpty()) && slowLeft <= 0),
+                    command = cmd,
                     optionsOn = preview,
                     onAttach = { kind ->
                         when (kind) {
@@ -485,10 +515,22 @@ fun Composer(channel: Channel) {
             }
         }
         val token = ac
-        if (token != null) Autocomplete(channel, token, Modifier.align(Alignment.TopCenter)) { insert ->
+        // what the command's slot asks for, or its suggestions, float over the box as the message box's own suggestions do
+        if (cmd.active) fish.nexa.ui.apps.CommandList(cmd, Modifier.align(Alignment.TopCenter).floatAbove(10.dp))
+        else if (token != null) Autocomplete(channel, token, canUseApps, Modifier.align(Alignment.TopCenter)) { item ->
+            val app = item.app
+            val leaf = item.leaf
+            if (app != null && leaf != null) {
+                // the box becomes the command, with a slot for each option it needs
+                ac = null
+                state.clearText()
+                Nexa.settings.setDraft(channelId, "")
+                cmd.start(app, leaf)
+                return@Autocomplete
+            }
             state.edit {
                 val end = selection.end
-                replace(token.start, end, insert)
+                replace(token.start, end, item.insert)
             }
             ac = null
         }
@@ -581,6 +623,7 @@ private fun ComposerBox(
     canPoll: Boolean,
     sendEnabled: Boolean,
     optionsOn: Boolean,
+    command: fish.nexa.ui.apps.CommandMode,
     onAttach: (String) -> Unit,
     onOptions: () -> Unit,
     onPasteTooLong: (String) -> Unit,
@@ -631,7 +674,8 @@ private fun ComposerBox(
             ) { Icon("CirclePlus", c.icon, size = 24.dp) }
         }
         val placeholder = composerPlaceholder(channel)
-        Box(Modifier.weight(1f).padding(top = 13.dp, bottom = 13.dp, end = 8.dp)) {
+        if (command.active) fish.nexa.ui.apps.CommandBox(command, Modifier.weight(1f).padding(end = 8.dp))
+        else Box(Modifier.weight(1f).padding(top = 13.dp, bottom = 13.dp, end = 8.dp)) {
             BasicTextField(
                 state = state,
                 modifier = Modifier
@@ -659,7 +703,8 @@ private fun ComposerBox(
             )
         }
         Row(Modifier.height(48.dp).padding(end = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            ComposerIconButton("ChevronUp", t("composer.more.label"), on = optionsOn, onClick = onOptions)
+            // a command's options are its slots: formatting, the preview and emoji are for words
+            if (!command.active) ComposerIconButton("ChevronUp", t("composer.more.label"), on = optionsOn, onClick = onOptions)
             SendButton(sendEnabled, onSend)
         }
     }
@@ -731,8 +776,9 @@ private fun ReplyBar(channel: Channel, reply: ChatUi.Reply, shape: androidx.comp
     val ease = Nx.motion.easeOut
     LaunchedEffect(reply.messageId) { enter.animateTo(1f, tween(180, easing = ease)) }
     val authorId = target?.authorId
-    // a webhook's message is named by the webhook
-    val name = fish.nexa.data.Hooks.of(target?.hook)?.name ?: authorId?.let { Names.member(channel.serverId, it) } ?: ""
+    // a webhook's message is answered by the name it was sent with; an app's, by its bot's
+    val byHook = target?.hook != null && target.m.webhookId != null
+    val name = (if (byHook) fish.nexa.ui.markdown.Webhook.of(target?.hook)?.name else null) ?: authorId?.let { Names.member(channel.serverId, it) } ?: ""
     val other = authorId != null && authorId != Nexa.users.meId && target.m.webhookId == null
     Row(
         Modifier
@@ -937,9 +983,12 @@ private fun PreviewBox(text: String, serverId: String?, onHide: () -> Unit) {
 
 /** The autocomplete card above the composer: people, roles, channels, emoji or commands. */
 @Composable
-private fun Autocomplete(channel: Channel, token: AcToken, modifier: Modifier, pick: (String) -> Unit) {
+private fun Autocomplete(channel: Channel, token: AcToken, canUseApps: Boolean, modifier: Modifier, pick: (AcItem) -> Unit) {
     val c = Nx.colors
-    val sections = remember(token, channel) { suggestions(channel, token) }
+    // the apps' commands, once they have loaded (a slash may be typed before they are)
+    val appLists by fish.nexa.data.AppCommands.byChannel.collectAsState()
+    val apps = if (canUseApps && token.kind == "command") appLists[channel.id]?.data else null
+    val sections = remember(token, channel, apps) { (if (apps != null) appCommandSections(apps, token.query) else emptyList()) + suggestions(channel, token) }
     if (sections.all { it.second.isEmpty() }) return
     val maxH = minOf(456f, LocalConfiguration.current.screenHeightDp * 0.45f).dp
     val reduced = Nx.motion.reduced
@@ -947,14 +996,13 @@ private fun Autocomplete(channel: Channel, token: AcToken, modifier: Modifier, p
     val ease = Nx.motion.easeOut
     LaunchedEffect(Unit) { enter.animateTo(1f, tween(160, easing = ease)) }
     val shape = Radii.Md
-    BoxWithConstraints(modifier.fillMaxWidth()) {
+    Box(modifier.fillMaxWidth().floatAbove(10.dp)) {
         Column(
             Modifier
                 .padding(horizontal = 16.dp)
-                .offset { androidx.compose.ui.unit.IntOffset(0, -(10 * density).toInt()) }
                 .graphicsLayer {
                     alpha = enter.value
-                    translationY = (1f - enter.value) * 6f * density - size.height
+                    translationY = (1f - enter.value) * 6f * density
                 }
                 .fillMaxWidth()
                 .heightIn(max = maxH)
@@ -969,7 +1017,7 @@ private fun Autocomplete(channel: Channel, token: AcToken, modifier: Modifier, p
                 if (rows.isEmpty()) continue
                 Txt(heading, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(650)), color = c.textMuted, modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp))
                 for (row in rows) {
-                    AcRow(row, selected = first) { pick(row.insert) }
+                    AcRow(row, selected = first) { pick(row) }
                     first = false
                 }
             }
@@ -977,7 +1025,41 @@ private fun Autocomplete(channel: Channel, token: AcToken, modifier: Modifier, p
     }
 }
 
-data class AcItem(val kind: String, val insert: String, val title: String, val sub: String = "", val user: PublicUser? = null, val color: Long? = null, val emoji: String? = null)
+data class AcItem(
+    val kind: String,
+    val insert: String,
+    val title: String,
+    val sub: String = "",
+    val user: PublicUser? = null,
+    val color: Long? = null,
+    val emoji: String? = null,
+    /** An app's slash command: the app, and the command (or subcommand) itself. */
+    val app: fish.nexa.net.CommandApp? = null,
+    val leaf: fish.nexa.data.AppCommands.Leaf? = null,
+)
+
+/**
+ * The slash commands of apps that match what was typed after the slash, a
+ * row per command or subcommand, under each app's name; the words of a
+ * subcommand's name are matched one by one, so "/conf s" finds "config set".
+ */
+fun appCommandSections(list: fish.nexa.net.ChannelCommands?, query: String): List<Pair<String, List<AcItem>>> {
+    val words = query.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    val trailing = query.endsWith(" ")
+    val byApp = LinkedHashMap<String, MutableList<AcItem>>()
+    var count = 0
+    for ((app, command) in fish.nexa.data.AppCommands.ofType(list, fish.nexa.data.AppCommands.CMD_SLASH)) {
+        for (leaf in fish.nexa.data.AppCommands.leaves(command)) {
+            val parts = leaf.label.lowercase().split(" ")
+            val fits = words.withIndex().all { (i, w) -> if (i < words.size - 1 || trailing) parts.getOrNull(i) == w else parts.getOrNull(i)?.startsWith(w) == true } &&
+                (!trailing || parts.size > words.size)
+            if (!fits || count >= 50) continue
+            count++
+            byApp.getOrPut(app.name) { ArrayList() } += AcItem("appCommand", "", "/${leaf.label}", leaf.description, app = app, leaf = leaf)
+        }
+    }
+    return byApp.map { (name, rows) -> name to rows }
+}
 
 @Composable
 internal fun AcRow(item: AcItem, selected: Boolean, onClick: () -> Unit) {
@@ -1000,11 +1082,21 @@ internal fun AcRow(item: AcItem, selected: Boolean, onClick: () -> Unit) {
             "role", "everyone" -> Icon("AtSign", roleTint ?: c.icon, size = 18.dp)
             "channel" -> Icon("Hash", c.textMuted, size = 18.dp)
             "emoji" -> item.emoji?.let { EmojiGlyph(it, 22.dp) }
+            "appCommand" -> item.app?.let { Avatar(it.id, it.name, it.bot?.avatarId, 24.dp) }
             "command" -> Unit
         }
-        Txt(item.title, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = roleTint ?: c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false).widthIn(max = 220.dp))
-        Spacer(Modifier.weight(1f))
-        if (item.sub.isNotEmpty()) Txt(item.sub, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+        Txt(item.title, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = roleTint ?: c.text, maxLines = 1, modifier = Modifier.widthIn(max = 220.dp))
+        // the options a command needs, named after it
+        item.leaf?.options?.filter { it.required }?.take(3)?.forEach { o ->
+            Txt(
+                fish.nexa.data.AppCommands.name(o),
+                style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(550)),
+                color = c.textMuted, maxLines = 1,
+                modifier = Modifier.background(c.bgHover, RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 1.dp),
+            )
+        }
+        // what it is takes the rest of the row, kept to its end (Composer.module.css .acSub)
+        if (item.sub.isNotEmpty()) Txt(item.sub, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), textAlign = TextAlign.End), color = c.textMuted, maxLines = 1, modifier = Modifier.weight(1f))
     }
 }
 

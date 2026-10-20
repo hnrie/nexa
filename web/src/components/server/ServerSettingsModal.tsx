@@ -36,7 +36,8 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
     { id: "roles", label: t("server.members.roles"), ok: canI(st, P.MANAGE_ROLES), group: 0 },
     { id: "emoji", label: t("modals.customStatus.emoji"), ok: true, group: 0 },
     { id: "stickers", label: t("pickers.expressionPicker.stickers"), ok: true, group: 0 },
-    { id: "integrations", label: t("integrations.title"), ok: canI(st, P.MANAGE_WEBHOOKS) || Object.values(useChannels.getState().byId).some((c) => c.server_id === serverId && c.type === "text" && canI(st, P.MANAGE_WEBHOOKS, c.id)), group: 0 },
+    // its apps for whoever manages the server, its webhooks for whoever manages them somewhere
+    { id: "integrations", label: t("integrations.title"), ok: canI(st, P.MANAGE_SERVER) || canI(st, P.MANAGE_WEBHOOKS) || Object.values(useChannels.getState().byId).some((c) => c.server_id === serverId && c.type === "text" && canI(st, P.MANAGE_WEBHOOKS, c.id)), group: 0 },
     { id: "encryption", label: t("server.encryption.encryption"), ok: true, group: 0 },
     { id: "discovery", label: t("discovery.title"), ok: canI(st, P.MANAGE_SERVER), group: 0 },
     { id: "members", label: t("server.serverSettings.members"), ok: true, group: 1 },

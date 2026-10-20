@@ -304,7 +304,7 @@ object Legal {
                 Icon("Sparkles", c.textBrand, size = 14.dp)
                 Txt(t("legal.newTitle"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), fontWeight = FontWeight(700)), color = c.textBrand)
             }
-            Bullets(listOf(t("legal.new5"), t("legal.new1"), t("legal.new2"), t("legal.new3"), t("legal.new4")), ordered = false, size = 14f)
+            Bullets(listOf(t("legal.new1"), t("legal.new2"), t("legal.new3"), t("legal.new4"), t("legal.new5")), ordered = false, size = 14f)
         }
     }
 

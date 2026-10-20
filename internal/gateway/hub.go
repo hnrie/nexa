@@ -358,6 +358,10 @@ func (h *Hub) sweepSessions(ctx context.Context) {
 	h.mu.RUnlock()
 	gone := map[ids.ID]bool{}
 	for _, c := range all {
+		// an external connection checks its own token
+		if c.external != nil {
+			continue
+		}
 		dead, checked := gone[c.session.ID]
 		if !checked {
 			if c.guest != nil {

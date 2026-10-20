@@ -115,7 +115,8 @@ object SearchDocs {
         var hx = p.poll?.let { pollWords(it) }
         var hn: String? = null
         if (hook != null) {
-            hn = hook.name
+            // a webhook is found by the name it was sent with; an app, by its bot, like anyone
+            if (m.webhookId != null) hn = hook.name
             // the content is already t; what is left is the rest of what it says
             val rest = fish.nexa.ui.markdown.Webhook.text(hook.copy(content = ""))
             if (rest.isNotEmpty()) hx = rest.take(8000)

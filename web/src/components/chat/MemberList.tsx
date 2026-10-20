@@ -28,6 +28,7 @@ import { memberLook, nameClass, nameStyle, type RoleLook } from "@/lib/roleLook"
 import { RoleIcon } from "@/components/common/RoleIcon";
 import s from "./MemberList.module.css";
 import { UserTag } from "@/components/servertag/UserTag";
+import { BotTag } from "@/components/apps/BotTag";
 
 import { t } from "@/i18n";
 
@@ -267,6 +268,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
                 {row.look?.icon ? <RoleIcon icon={row.look.icon} size={16} /> : null}
                 {isOwner(row.member.user_id) ? <OwnerCrown /> : st.server.owner_id === row.member.user_id ? <Crown size={14} className={s.crown} aria-label={t("chat.memberList.serverOwner")} /> : null}
                 {!isOwner(row.member.user_id) && isInstanceAdmin(row.member.user_id) ? <AdminHammer /> : null}
+                <BotTag userId={row.member.user_id} />
                 <UserTag userId={row.member.user_id} size="sm" />
               </span>
               <StatusLine

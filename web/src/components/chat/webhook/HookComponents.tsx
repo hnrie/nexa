@@ -1,5 +1,5 @@
 import { ExternalLink } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import { emojiUrl } from "@/api/users";
 import { Twemoji } from "@/components/common/Twemoji";
 import { Markdown } from "@/markdown";
@@ -18,6 +18,7 @@ import {
   C_SEPARATOR,
   C_TEXT,
   C_THUMBNAIL,
+  isSelect,
   mediaAttachment,
   type HookComponent,
   type HookContent,
@@ -28,16 +29,19 @@ import { Attachments } from "../Attachments";
 import { Lightbox, type LightboxItem } from "../Lightbox";
 import { VideoPlayer } from "../VideoPlayer";
 import { useHookSrc } from "./useHookSrc";
+import { AppButton, AppMsg, AppSelect } from "../apps/AppMessage";
 import s from "./Webhook.module.css";
 
 import { t } from "@/i18n";
 
 /**
- * A webhook message's components: rows of link buttons under its content, or,
- * for a message laid out by them (v2), the whole of it: text, sections with a
- * picture or a button beside them, galleries, files, separators and boxes.
- * Only link buttons are ever sent (there is no app to answer any other), and
- * a link opens in a new tab like any link in a message.
+ * A webhook's or an app's message components: rows of buttons and select
+ * menus under its content, or, for a message laid out by them (v2), the whole
+ * of it: text, sections with a picture or a button beside them, galleries,
+ * files, separators and boxes. A link opens in a new tab like any link in a
+ * message. Other buttons and select menus only do something on an app's
+ * message, which the app answers (apps/AppMessage); a webhook has nobody
+ * behind it to answer them, so its show only its links.
  */
 export function HookComponents({ hook, v2, from }: { hook: HookContent; v2: boolean; from: string }) {
   if (!hook.components.length) return null;
@@ -56,11 +60,11 @@ function Component({ c, hook, from }: { c: HookComponent; hook: HookContent; fro
     case C_ACTION_ROW:
       return (
         <div className={s.row}>
-          {c.components.map((b, i) => (b.type === C_BUTTON ? <LinkButton key={i} b={b} /> : null))}
+          {c.components.map((b, i) => (b.type === C_BUTTON ? <ButtonView key={i} b={b} /> : isSelect(b.type) ? <SelectView key={i} c={b} /> : null))}
         </div>
       );
     case C_BUTTON:
-      return <LinkButton b={c} />;
+      return <ButtonView b={c} />;
     case C_TEXT:
       return c.content ? (
         <div className={s.text} dir="auto">
@@ -77,7 +81,7 @@ function Component({ c, hook, from }: { c: HookComponent; hook: HookContent; fro
           </div>
           {c.accessory ? (
             <div className={s.accessory}>
-              {c.accessory.type === C_THUMBNAIL && c.accessory.media ? <Thumbnail hook={hook} c={c.accessory} /> : c.accessory.type === C_BUTTON ? <LinkButton b={c.accessory} /> : null}
+              {c.accessory.type === C_THUMBNAIL && c.accessory.media ? <Thumbnail hook={hook} c={c.accessory} /> : c.accessory.type === C_BUTTON ? <ButtonView b={c.accessory} /> : null}
             </div>
           ) : null}
         </div>
@@ -96,7 +100,7 @@ function Component({ c, hook, from }: { c: HookComponent; hook: HookContent; fro
     case C_CONTAINER:
       return <Container c={c} hook={hook} from={from} />;
     default:
-      return null;
+      return isSelect(c.type) ? <SelectView c={c} /> : null;
   }
 }
 
@@ -125,6 +129,19 @@ function Container({ c, hook, from }: { c: HookComponent; hook: HookContent; fro
 function EmojiGlyph({ e, size = 18 }: { e: HookEmoji; size?: number }) {
   if (e.id) return <img className={s.buttonEmoji} src={emojiUrl(e.id, !!e.animated, size)} alt={e.name ? `:${e.name}:` : ""} width={size} height={size} loading="lazy" draggable={false} />;
   return e.name ? <Twemoji text={e.name} className={s.buttonEmoji} /> : null;
+}
+
+/** A button: a link anywhere, any other kind on an app's message only. */
+function ButtonView({ b }: { b: HookComponent }) {
+  const app = useContext(AppMsg);
+  if (b.style === BUTTON_LINK) return <LinkButton b={b} />;
+  return app ? <AppButton b={b} /> : null;
+}
+
+/** A select menu, on an app's message only. */
+function SelectView({ c }: { c: HookComponent }) {
+  const app = useContext(AppMsg);
+  return app ? <div className={s.selectRow}><AppSelect c={c} /></div> : null;
 }
 
 function LinkButton({ b }: { b: HookComponent }) {

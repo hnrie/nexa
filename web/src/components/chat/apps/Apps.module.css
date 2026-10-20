@@ -1,0 +1,29 @@
+/* An app's parts of a message: who used what, an answer on its way, an answer only you see, and its buttons and menus. */
+
+/* --- who used what (on the reply line's frame) ------------------------------------------- */
+.used { cursor: default; }
+.usedText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usedCommand { font-weight: 650; color: var(--text-brand); font-size: inherit; line-height: inherit; }
+button.usedCommand:hover { text-decoration: underline; }
+button.usedCommand:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-radius: 3px; }
+
+/* --- still thinking ------------------------------------------------------------------------ */
+.thinking { display: inline-flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 15px; line-height: 22px; }
+.dots { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: dot 1.2s infinite ease-in-out; }
+.dots i:nth-child(2) { animation-delay: 0.15s; }
+.dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes dot { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .dots i { animation: none; opacity: 0.7; } }
+[data-reduced-motion="true"] .dots i { animation: none; opacity: 0.7; }
+
+/* --- only you can see this ---------------------------------------------------------------- */
+.onlyYou { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 4px; font-size: 12.5px; line-height: 16px; color: var(--text-muted); }
+.onlyYou svg { flex: none; color: var(--text-brand); }
+.dismiss { color: var(--link); font-size: inherit; line-height: inherit; font-weight: 550; margin-inline-start: 4px; }
+.dismiss:hover { text-decoration: underline; }
+
+/* --- buttons --------------------------------------------------------------------------- */
+.button { min-width: 60px; max-width: 100%; }
+.buttonLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.glyph { width: 18px; height: 18px; object-fit: contain; flex: none; }

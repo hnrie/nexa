@@ -105,7 +105,8 @@ export function toDoc(m: DecryptedMessage): SearchDoc | null {
   if (p.sticker) doc.st = { ...p.sticker };
   if (p.poll) doc.hx = pollWords(p.poll);
   if (m.hook) {
-    doc.hn = m.hook.name;
+    // a webhook is found by the name it was sent with; an app, by its bot, like anyone
+    if (m.webhook_id) doc.hn = m.hook.name;
     // the content is already t; what is left is the rest of what it says
     const rest = hookText({ ...m.hook, content: "" });
     if (rest) doc.hx = rest.slice(0, 8000);

@@ -1,0 +1,326 @@
+package api
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"testing"
+	"time"
+
+	"evilion.xyz/chat/internal/botproto"
+	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/store"
+)
+
+// The bot API's own behaviour is put through real bot libraries by
+// tools/bot_e2e.py; these are the server's side of what people's apps do with
+// apps: making them, adding them, the copies sealed for them.
+
+// makeApp makes an app as its owner, returning it and its bot's token.
+func makeApp(t *testing.T, ts *httptest.Server, token, name string) (map[string]any, string) {
+	t.Helper()
+	res, body := do(t, ts, "POST", "/api/v1/applications", token, map[string]any{"name": name})
+	if res.StatusCode != 200 {
+		t.Fatalf("make app: %d %v", res.StatusCode, body)
+	}
+	return body["application"].(map[string]any), body["token"].(string)
+}
+
+// botDo makes a request as a bot, the way bot libraries sign in.
+func botDo(t *testing.T, ts *httptest.Server, method, path, botToken string, body any) (*http.Response, map[string]any) {
+	t.Helper()
+	var rd io.Reader
+	if body != nil {
+		b, _ := json.Marshal(body)
+		rd = bytes.NewReader(b)
+	}
+	req, _ := http.NewRequest(method, ts.URL+path, rd)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set("Authorization", "Bot "+botToken)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	out := map[string]any{}
+	var v any
+	if json.Unmarshal(raw, &v) == nil {
+		if m, ok := v.(map[string]any); ok {
+			out = m
+		} else {
+			out["_list"] = v
+		}
+	}
+	return res, out
+}
+
+// addBot adds an app's bot to a server, as its consent page does.
+func addBot(t *testing.T, ts *httptest.Server, token, appID, serverID string) {
+	t.Helper()
+	q := url.Values{"client_id": {appID}, "scope": {"bot applications.commands"}, "permissions": {"8"}}
+	res, body := do(t, ts, "POST", "/api/v1/oauth2/authorize", token, map[string]any{"query": q.Encode(), "guild_id": serverID})
+	if res.StatusCode != 200 {
+		t.Fatalf("add bot: %d %v", res.StatusCode, body)
+	}
+}
+
+func TestBotSignsInWithItsToken(t *testing.T) {
+	_, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	app, botToken := makeApp(t, ts, tok, "Lab Bot")
+	res, me := botDo(t, ts, "GET", "/api/v10/users/@me", botToken, nil)
+	if res.StatusCode != 200 || me["bot"] != true || me["id"] != botproto.OutString(snowID(t, app["id"].(string))) {
+		t.Fatalf("users/@me as the bot: %d %v", res.StatusCode, me)
+	}
+	if res, body := botDo(t, ts, "GET", "/api/v10/users/@me", botToken+"x", nil); res.StatusCode != 401 || body["code"] != float64(0) {
+		t.Fatalf("a wrong token: %d %v", res.StatusCode, body)
+	}
+}
+
+func TestBareInstallLinkUsesTheAppsSettings(t *testing.T) {
+	_, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	app, _ := makeApp(t, ts, tok, "Lab Bot")
+	id := app["id"].(string)
+	if res, body := do(t, ts, "PATCH", "/api/v1/applications/"+id, tok, map[string]any{"integration_types": map[string]any{
+		"0": map[string]any{"oauth2_install_params": map[string]any{"scopes": []string{"bot", "applications.commands"}, "permissions": "2048"}},
+	}}); res.StatusCode != 200 {
+		t.Fatalf("install settings: %d %v", res.StatusCode, body)
+	}
+	res, info := do(t, ts, "GET", "/api/v1/oauth2/authorize?client_id="+id, tok, nil)
+	if res.StatusCode != 200 {
+		t.Fatalf("bare link: %d %v", res.StatusCode, info)
+	}
+	scopes, _ := json.Marshal(info["scopes"])
+	if string(scopes) != `["bot","applications.commands"]` || info["permissions"] != "2048" || info["integration_type"] != float64(0) {
+		t.Fatalf("the bare link should ask for the app's own settings: %v", info)
+	}
+	// an app only for accounts goes that way when the link does not say
+	if res, body := do(t, ts, "PATCH", "/api/v1/applications/"+id, tok, map[string]any{"integration_types": map[string]any{
+		"1": map[string]any{"oauth2_install_params": map[string]any{"scopes": []string{"applications.commands"}, "permissions": "0"}},
+	}}); res.StatusCode != 200 {
+		t.Fatalf("account only: %d %v", res.StatusCode, body)
+	}
+	res, info = do(t, ts, "GET", "/api/v1/oauth2/authorize?client_id="+id, tok, nil)
+	if res.StatusCode != 200 || info["integration_type"] != float64(1) || info["type_chosen"] != false {
+		t.Fatalf("an account-only app's bare link: %d %v", res.StatusCode, info)
+	}
+}
+
+func TestCopiesGoOnlyToBotsAMessageIsAddressedTo(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	view := createServer(t, ts, tok, "Lab")
+	sid := view["id"].(string)
+	general := channelNamed(view, "general")["id"].(string)
+	app, _ := makeApp(t, ts, tok, "Lab Bot")
+	bot := app["id"].(string)
+	addBot(t, ts, tok, bot, sid)
+	copy := base64.StdEncoding.EncodeToString([]byte("sealed for the bot, opaque here"))
+
+	epoch := createEpoch(t, ts, tok, sid)
+	send := func(mentions []string) string {
+		if mentions == nil {
+			mentions = []string{}
+		}
+		res, body := sendMsg(t, ts, tok, general, sid, epoch, "hi", "", map[string]any{"mentions": mentions, "bot_copies": map[string]string{bot: copy}})
+		if res.StatusCode != 200 && res.StatusCode != 201 {
+			t.Fatalf("send: %d %v", res.StatusCode, body)
+		}
+		return body["id"].(string)
+	}
+	copies := func(mid string) int {
+		got, err := srv.Store.BotCopies(context.Background(), snowID(t, bot), []ids.ID{snowID(t, mid)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(got)
+	}
+	// not addressed to it: the message goes, its copy does not
+	if n := copies(send(nil)); n != 0 {
+		t.Fatalf("a copy for a bot the message is not for was kept (%d)", n)
+	}
+	if n := copies(send([]string{bot})); n != 1 {
+		t.Fatalf("a mention's copy was not kept (%d)", n)
+	}
+}
+
+func TestOwnersSeeCommandsMadeForOneServer(t *testing.T) {
+	_, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	view := createServer(t, ts, tok, "Lab")
+	sid := view["id"].(string)
+	app, botToken := makeApp(t, ts, tok, "Lab Bot")
+	id := app["id"].(string)
+	addBot(t, ts, tok, id, sid)
+	appOut := botproto.OutString(snowID(t, id))
+	guildOut := botproto.OutString(snowID(t, sid))
+	if res, body := botDo(t, ts, "PUT", "/api/v10/applications/"+appOut+"/guilds/"+guildOut+"/commands", botToken, []map[string]any{{"name": "ping", "description": "Pong"}}); res.StatusCode != 200 {
+		t.Fatalf("server commands: %d %v", res.StatusCode, body)
+	}
+	if res, body := botDo(t, ts, "PUT", "/api/v10/applications/"+appOut+"/commands", botToken, []map[string]any{{"name": "help", "description": "Helps"}}); res.StatusCode != 200 {
+		t.Fatalf("global commands: %d %v", res.StatusCode, body)
+	}
+	res, body := do(t, ts, "GET", "/api/v1/applications/"+id+"/commands", tok, nil)
+	if res.StatusCode != 200 {
+		t.Fatalf("owner's commands: %d %v", res.StatusCode, body)
+	}
+	list := body["_list"].([]any)
+	seen := map[string]map[string]any{}
+	for _, c := range list {
+		cm := c.(map[string]any)
+		seen[cm["name"].(string)] = cm
+	}
+	if seen["help"] == nil || seen["help"]["guild_id"] != nil {
+		t.Fatalf("the global command: %v", seen["help"])
+	}
+	if seen["ping"] == nil || seen["ping"]["guild_id"] != sid || seen["ping"]["guild_name"] != "Lab" {
+		t.Fatalf("the server's command: %v", seen["ping"])
+	}
+}
+
+func TestBotsThatReadEverythingAreListed(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	view := createServer(t, ts, tok, "Lab")
+	sid := view["id"].(string)
+	quiet, _ := makeApp(t, ts, tok, "Quiet Bot")
+	reader, _ := makeApp(t, ts, tok, "Reader Bot")
+	addBot(t, ts, tok, quiet["id"].(string), sid)
+	addBot(t, ts, tok, reader["id"].(string), sid)
+	if res, body := do(t, ts, "PATCH", "/api/v1/applications/"+reader["id"].(string), tok, map[string]any{"intents": map[string]any{"message_content": true}}); res.StatusCode != 200 {
+		t.Fatalf("message content: %d %v", res.StatusCode, body)
+	}
+	got, err := srv.Store.ReadingBotIDs(context.Background(), snowID(t, sid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].String() != reader["id"].(string) {
+		t.Fatalf("reading bots: %v", got)
+	}
+}
+
+func TestRefreshTokenRenewsAnAccessTokenThatRanOut(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	app, _ := makeApp(t, ts, tok, "Lab Bot")
+	id := app["id"].(string)
+	clientID := botproto.OutString(snowID(t, id))
+	const back = "https://example.com/back"
+	if res, body := do(t, ts, "PATCH", "/api/v1/applications/"+id, tok, map[string]any{"redirect_uris": []string{back}}); res.StatusCode != 200 {
+		t.Fatalf("redirect: %d %v", res.StatusCode, body)
+	}
+	res, made := do(t, ts, "POST", "/api/v1/applications/"+id+"/secret/reset", tok, map[string]any{"auth_key": b64(key32)})
+	if res.StatusCode != 200 {
+		t.Fatalf("secret: %d %v", res.StatusCode, made)
+	}
+	q := url.Values{"client_id": {clientID}, "response_type": {"code"}, "redirect_uri": {back}, "scope": {"identify"}}
+	res, granted := do(t, ts, "POST", "/api/v1/oauth2/authorize", tok, map[string]any{"query": q.Encode()})
+	if res.StatusCode != 200 {
+		t.Fatalf("authorize: %d %v", res.StatusCode, granted)
+	}
+	loc, err := url.Parse(granted["location"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// what an OAuth2 client sends to the token endpoint
+	token := func(form url.Values) (int, map[string]any) {
+		t.Helper()
+		form.Set("client_id", clientID)
+		form.Set("client_secret", made["secret"].(string))
+		res, err := http.PostForm(ts.URL+"/api/v10/oauth2/token", form)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		out := map[string]any{}
+		_ = json.NewDecoder(res.Body).Decode(&out)
+		return res.StatusCode, out
+	}
+	me := func(access string) int {
+		t.Helper()
+		req, _ := http.NewRequest("GET", ts.URL+"/api/v10/users/@me", nil)
+		req.Header.Set("Authorization", "Bearer "+access)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	st, first := token(url.Values{"grant_type": {"authorization_code"}, "code": {loc.Query().Get("code")}, "redirect_uri": {back}})
+	if st != 200 || first["refresh_token"] == nil || me(first["access_token"].(string)) != 200 {
+		t.Fatalf("code for a token: %d %v", st, first)
+	}
+	// the access token runs out, and the sweep that follows keeps the refresh token
+	ctx := context.Background()
+	past := time.Now().Add(-time.Hour).UnixMilli()
+	if _, err := srv.Store.DB().W.Exec(`UPDATE oauth_tokens SET expires_at = ?`, past); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Store.SweepInteractions(ctx, time.Now().UnixMilli()); err != nil {
+		t.Fatal(err)
+	}
+	if code := me(first["access_token"].(string)); code != 401 {
+		t.Fatalf("an access token that ran out still works: %d", code)
+	}
+	st, second := token(url.Values{"grant_type": {"refresh_token"}, "refresh_token": {first["refresh_token"].(string)}})
+	if st != 200 || me(second["access_token"].(string)) != 200 {
+		t.Fatalf("renewing: %d %v", st, second)
+	}
+	// a refresh token is spent once used
+	if st, body := token(url.Values{"grant_type": {"refresh_token"}, "refresh_token": {first["refresh_token"].(string)}}); st != 400 || body["error"] != "invalid_grant" {
+		t.Fatalf("a spent refresh token: %d %v", st, body)
+	}
+	// and renews nothing past its own time
+	if _, err := srv.Store.DB().W.Exec(`UPDATE oauth_tokens SET refresh_expires_at = ?`, past); err != nil {
+		t.Fatal(err)
+	}
+	if st, body := token(url.Values{"grant_type": {"refresh_token"}, "refresh_token": {second["refresh_token"].(string)}}); st != 400 || body["error"] != "invalid_grant" {
+		t.Fatalf("a refresh token past its time: %d %v", st, body)
+	}
+}
+
+// A bot that restarts starts a new session while its old one waits for a
+// resume that never comes: what people do with it goes to the connected one.
+func TestInteractionsGoToAConnectedSession(t *testing.T) {
+	srv, _ := newTestServer(t)
+	bot := &store.User{ID: ids.New()}
+	waiting := &botSession{s: srv, id: "waiting", bot: bot}
+	live := &botSession{s: srv, id: "live", bot: bot, sock: newBotSocket(nil, &botproto.Codec{})}
+	srv.bots.add(waiting)
+	srv.bots.add(live)
+	// sessions are kept in a map, so every try has to find the live one
+	for i := 0; i < 20; i++ {
+		if !srv.deliverInteraction(bot.ID, nil, map[string]any{"n": i}) {
+			t.Fatal("not delivered")
+		}
+	}
+	if len(waiting.replay) != 0 || len(live.replay) != 20 {
+		t.Fatalf("the waiting session got %d, the live one %d", len(waiting.replay), len(live.replay))
+	}
+	// with none connected, one waiting for its resume keeps it
+	live.mu.Lock()
+	live.sock = nil
+	live.mu.Unlock()
+	if !srv.deliverInteraction(bot.ID, nil, map[string]any{}) || len(waiting.replay)+len(live.replay) != 21 {
+		t.Fatal("an interaction with nobody connected is lost")
+	}
+}
+
+func snowID(t *testing.T, s string) ids.ID {
+	t.Helper()
+	id, err := ids.Parse(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}

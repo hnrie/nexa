@@ -4,6 +4,7 @@ import { parse, plainText } from "@/markdown";
 import type { DecryptedMessage } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
+import { displayName, useUsers } from "@/stores/users";
 import { doNotDisturb } from "./dnd";
 import { appOnScreen } from "./notify";
 
@@ -26,7 +27,9 @@ function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): voi
   if (useUI.getState().activeChannelId !== m.channel_id || !appOnScreen()) return;
   const text = plainText(parse(hook.content)).slice(0, MAX_SPOKEN).trim();
   if (!text) return;
-  const u = new SpeechSynthesisUtterance(t("webhook.ttsSaid", { name: hook.name, text }));
+  // an app's message is said with its bot's name, as the conversation shows it
+  const name = m.webhook_id ? hook.name : displayName(useUsers.getState().byId[m.author_id], hook.name);
+  const u = new SpeechSynthesisUtterance(t("webhook.ttsSaid", { name, text }));
   u.lang = translator().locale;
   window.speechSynthesis.speak(u);
 }

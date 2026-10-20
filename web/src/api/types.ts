@@ -452,6 +452,14 @@ export interface VoiceState {
 
 /** The flag on a user who is a guest in a call rather than an account. */
 export const GUEST_FLAG = 8;
+/** The flag on an app's bot: an account a program runs (lib/apps). */
+export const BOT_FLAG = 64;
+/**
+ * The flag on a bot whose app reads every message it can see (the Message
+ * Content intent): the server opens messages for it with keys the members'
+ * apps hand it, so it is marked wherever it can read.
+ */
+export const BOT_READS_ALL_FLAG = 128;
 
 export interface CallUser {
   id: Snowflake;
@@ -611,7 +619,11 @@ export interface Message {
   nonce?: string;
   edited_at: number | null;
   created_at: number;
-  /** Set on a message a webhook posted: which webhook, and what it said (not encrypted; see lib/webhookMessage). */
+  /**
+   * Set on a message a webhook posted: which webhook, and what it said (not
+   * encrypted; see lib/webhookMessage). An app's messages carry `webhook`
+   * alone, with the app named in it, and their bot as the author.
+   */
   webhook_id?: Snowflake;
   webhook?: unknown;
   /** How a message's poll stands (a webhook's, or a person's), for whoever loaded it. */
@@ -673,6 +685,10 @@ export const MSG_FLAG_SUPPRESS_NOTIFICATIONS = 1 << 12;
 export const MSG_FLAG_PUBLISHED = 1 << 20;
 /** A webhook message laid out entirely by its components. */
 export const MSG_FLAG_COMPONENTS_V2 = 1 << 15;
+/** An app's answer only the person who used it sees; it lives until they dismiss it or reload. */
+export const MSG_FLAG_EPHEMERAL = 1 << 6;
+/** An app's answer still being thought about: the app deferred it and will fill it in. */
+export const MSG_FLAG_LOADING = 1 << 7;
 
 /** A poll's votes, as the server counts them for the reader. */
 export interface PollTally {
@@ -1198,6 +1214,8 @@ export interface SendMessageRequest {
   flags?: number;
   /** Opens a poll with the message. */
   poll?: PollRequest;
+  /** The message sealed to each app's bot it is addressed to, base64 by bot id (lib/botCopies). */
+  bot_copies?: Record<Snowflake, string>;
 }
 
 /** One AutoMod rule (see api/automod and lib/automod). */

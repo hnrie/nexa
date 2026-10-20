@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"evilion.xyz/chat/internal/botproto"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/store"
 )
@@ -62,6 +63,22 @@ type whInput struct {
 	Mentions   *allowedMentions
 	Attach     []whAttachReq
 	ThreadName string
+
+	// what only an application's messages carry (whParseOpts.app): stickers,
+	// what it replies to, and a nonce to tell a repeat by
+	StickerIDs   []ids.ID
+	Reference    *msgReference
+	Nonce        string
+	EnforceNonce bool
+}
+
+// msgReference is what a message points at: the message it replies to (type
+// 0), or one it forwards (type 1).
+type msgReference struct {
+	Type            int
+	MessageID       ids.ID
+	ChannelID       ids.ID
+	FailIfNotExists bool
 }
 
 // whAttachReq is one entry of the request's attachments: metadata for a
@@ -81,11 +98,20 @@ type whParseOpts struct {
 	// components are only read when the caller asks (with_components=true),
 	// or the message is laid out by them, as Discord's own webhooks do
 	withComponents bool
+	// app is an application's message (its bot's, or an answer to an
+	// interaction): its buttons and menus do something, so every kind of
+	// component is taken, with stickers, a reply and a nonce
+	app bool
+	// ephemeral lets an answer to an interaction be seen by its user alone
+	ephemeral bool
 }
 
 // messageFlags a webhook may set: suppress embeds, no notifications, and a
 // message laid out by components.
 const whAllowedFlags = store.MsgFlagSuppressEmbeds | store.MsgFlagSuppressNotifications | store.MsgFlagComponentsV2
+
+// MsgFlagEphemeral is an answer to an interaction only its user sees.
+const MsgFlagEphemeral = store.MsgFlagEphemeral
 
 // fieldPath builds a path for formErrors from mixed names and indexes.
 func fieldPath(parts ...any) []string {
@@ -275,8 +301,40 @@ func parseWebhookBody(raw map[string]any, opts whParseOpts) (*whInput, *formErro
 		in.Present[k] = true
 	}
 	if s, ok := r.str(raw, "content", nil); ok {
-		in.Content = clean(s)
+		in.Content = botproto.InText(clean(s))
 		r.maxLen(in.Content, whMaxContent, fieldPath("content"))
+	}
+	if opts.app {
+		if s, ok := r.str(raw, "nonce", nil); ok {
+			if len(s) > 25 {
+				errs.add(fieldPath("nonce"), "BASE_TYPE_MAX_LENGTH", "Must be 25 or fewer in length.")
+			}
+			in.Nonce = s
+		}
+		in.EnforceNonce, _ = r.boolean(raw, "enforce_nonce", nil)
+		if list, ok := r.list(raw, "sticker_ids", nil); ok {
+			if len(list) > 3 {
+				errs.add(fieldPath("sticker_ids"), "BASE_TYPE_MAX_LENGTH", "Must be 3 or fewer in length.")
+			}
+			for i, v := range list {
+				var sv string
+				switch x := v.(type) {
+				case string:
+					sv = x
+				case json.Number:
+					sv = x.String()
+				}
+				id, err := parseBotID(sv)
+				if err != nil {
+					errs.add(fieldPath("sticker_ids", i), "NUMBER_TYPE_COERCE", fmt.Sprintf("Value \"%s\" is not snowflake.", truncate(sv, 30)))
+					continue
+				}
+				in.StickerIDs = append(in.StickerIDs, id)
+			}
+		}
+		if ref, ok := r.object(raw, "message_reference", nil); ok && !opts.edit {
+			in.Reference = parseReference(r, ref)
+		}
 	}
 	if !opts.edit {
 		if s, ok := r.str(raw, "username", nil); ok {
@@ -301,7 +359,11 @@ func parseWebhookBody(raw map[string]any, opts whParseOpts) (*whInput, *formErro
 		}
 	}
 	if f, ok := r.integer(raw, "flags", nil); ok {
-		in.Flags = f & whAllowedFlags
+		allowed := whAllowedFlags
+		if opts.ephemeral {
+			allowed |= MsgFlagEphemeral
+		}
+		in.Flags = f & allowed
 	}
 	v2 := in.Flags&store.MsgFlagComponentsV2 != 0
 	if list, ok := r.list(raw, "embeds", nil); ok {
@@ -310,8 +372,8 @@ func parseWebhookBody(raw map[string]any, opts whParseOpts) (*whInput, *formErro
 	if am, ok := r.object(raw, "allowed_mentions", nil); ok {
 		in.Mentions = parseAllowedMentions(r, am)
 	}
-	if list, ok := r.list(raw, "components", nil); ok && (opts.withComponents || v2) {
-		in.Components = parseComponents(r, list, v2)
+	if list, ok := r.list(raw, "components", nil); ok && (opts.withComponents || v2 || opts.app) {
+		in.Components = parseComponents(r, list, v2, opts.app)
 	}
 	if list, ok := r.list(raw, "attachments", nil); ok {
 		in.Attach = parseAttachReqs(r, list)
@@ -346,6 +408,9 @@ func isEmptyValue(v any) bool {
 func parseAllowedMentions(r jsonReader, am map[string]any) *allowedMentions {
 	out := &allowedMentions{set: true, Parse: []string{}, Users: []ids.ID{}, Roles: []ids.ID{}}
 	path := fieldPath("allowed_mentions")
+	if b, ok := r.boolean(am, "replied_user", path); ok {
+		out.RepliedUser = &b
+	}
 	if list, ok := r.list(am, "parse", path); ok {
 		for i, v := range list {
 			s, _ := v.(string)
@@ -375,7 +440,7 @@ func parseAllowedMentions(r jsonReader, am map[string]any) *allowedMentions {
 			case json.Number:
 				s = x.String()
 			}
-			id, err := ids.Parse(s)
+			id, err := parseBotID(s)
 			if err != nil || id.IsZero() {
 				r.errs.add(fieldPath(path, key, i), "NUMBER_TYPE_COERCE", fmt.Sprintf("Value \"%s\" is not snowflake.", truncate(s, 30)))
 				continue
@@ -426,7 +491,7 @@ func parseEmbeds(r jsonReader, list []any) []wmEmbed {
 			if !ok {
 				return ""
 			}
-			s = clean(s)
+			s = botproto.InText(clean(s))
 			r.maxLen(s, max, fieldPath(path, key))
 			total += utf8.RuneCountInString(s)
 			return s
@@ -457,7 +522,7 @@ func parseEmbeds(r jsonReader, list []any) []wmEmbed {
 		if f, ok := r.object(obj, "footer", path); ok {
 			fp := fieldPath(path, "footer")
 			s, _ := r.str(f, "text", fp)
-			s = clean(s)
+			s = botproto.InText(clean(s))
 			if s == "" {
 				r.errs.add(fieldPath(fp, "text"), "BASE_TYPE_REQUIRED", "This field is required")
 			} else {
@@ -524,7 +589,7 @@ func parseEmbeds(r jsonReader, list []any) []wmEmbed {
 				}
 				name, _ := r.str(fo, "name", fp)
 				value, _ := r.str(fo, "value", fp)
-				name, value = clean(name), clean(value)
+				name, value = botproto.InText(clean(name)), botproto.InText(clean(value))
 				if name == "" {
 					r.errs.add(fieldPath(fp, "name"), "BASE_TYPE_REQUIRED", "This field is required")
 				}
@@ -558,7 +623,7 @@ func parseWMEmoji(r jsonReader, obj map[string]any, path []string) *wmEmoji {
 	ep := fieldPath(path, "emoji")
 	out := &wmEmoji{}
 	if s, ok := r.str(e, "id", ep); ok && s != "" {
-		id, err := ids.Parse(s)
+		id, err := parseBotID(s)
 		if err != nil {
 			r.errs.add(fieldPath(ep, "id"), "NUMBER_TYPE_COERCE", fmt.Sprintf("Value \"%s\" is not snowflake.", truncate(s, 30)))
 		} else {
@@ -577,11 +642,14 @@ func parseWMEmoji(r jsonReader, obj map[string]any, path []string) *wmEmoji {
 
 // parseComponents reads a message's components. A message laid out by them
 // (v2) takes every non-interactive kind at the top; one that is not takes
-// rows of buttons under its content. Only link buttons can work without an
-// app to answer the others, so only they are taken, as Discord takes them
-// from webhooks no app owns.
-func parseComponents(r jsonReader, list []any, v2 bool) []wmComponent {
+// rows of buttons under its content. Only link buttons can work on a
+// webhook's message, with no app to answer the others, so only they are
+// taken from one, as Discord takes them from webhooks no app owns; an
+// application's message (interactive) takes buttons of every style and
+// select menus.
+func parseComponents(r jsonReader, list []any, v2, interactive bool) []wmComponent {
 	count, textLen, nextID := 0, 0, 1
+	selects := map[int]bool{compStringSel: true, compUserSel: true, compRoleSel: true, compMentionSel: true, compChannelSel: true}
 	var one func(v any, path []string, allowed map[int]bool, depth int) (wmComponent, bool)
 	one = func(v any, path []string, allowed map[int]bool, depth int) (wmComponent, bool) {
 		obj, ok := v.(map[string]any)
@@ -649,33 +717,162 @@ func parseComponents(r jsonReader, list []any, v2 bool) []wmComponent {
 			}
 			return &wmMedia{URL: u}
 		}
+		customID := func() {
+			id, _ := r.str(obj, "custom_id", path)
+			if id == "" {
+				r.errs.add(fieldPath(path, "custom_id"), "BASE_TYPE_REQUIRED", "This field is required")
+			}
+			r.maxLen(id, 100, fieldPath(path, "custom_id"))
+			c.CustomID = id
+		}
+		bounds := func(key string, lo, hi int) *int {
+			n, ok := r.integer(obj, key, path)
+			if !ok {
+				return nil
+			}
+			if n < int64(lo) || n > int64(hi) {
+				r.errs.add(fieldPath(path, key), "NUMBER_TYPE_MAX", fmt.Sprintf("int value should be between %d and %d.", lo, hi))
+				return nil
+			}
+			v := int(n)
+			return &v
+		}
+		buttons := map[int]bool{compButton: true}
+		if interactive {
+			for k := range selects {
+				buttons[k] = true
+			}
+		}
 		switch c.Type {
 		case compActionRow:
-			c.Components = children("components", map[int]bool{compButton: true}, 1, 5)
+			c.Components = children("components", buttons, 1, 5)
+			// a row holds buttons, or one select menu alone
+			for _, ch := range c.Components {
+				if selects[ch.Type] && len(c.Components) > 1 {
+					r.errs.add(fieldPath(path, "components"), "COMPONENT_LAYOUT_WIDTH_EXCEEDED", "A select menu fills its row on its own.")
+					break
+				}
+			}
 		case compButton:
 			style, _ := r.integer(obj, "style", path)
 			c.Style = int(style)
-			if c.Style != btnLink {
+			switch {
+			case c.Style == btnLink:
+				u, _ := r.str(obj, "url", path)
+				if len(u) > whMaxButtonURL {
+					r.errs.add(fieldPath(path, "url"), "BASE_TYPE_MAX_LENGTH", fmt.Sprintf("Must be %d or fewer in length.", whMaxButtonURL))
+				}
+				c.URL = r.webURL(u, fieldPath(path, "url"), false)
+				if c.URL == "" {
+					r.errs.add(fieldPath(path, "url"), "BASE_TYPE_REQUIRED", "This field is required")
+				}
+			case !interactive:
 				r.errs.add(fieldPath(path, "style"), "COMPONENT_INVALID_STYLE", "Only link buttons can be sent by a webhook no app owns.")
+				return wmComponent{}, false
+			case c.Style >= btnPrimary && c.Style <= btnDanger:
+				customID()
+			case c.Style == btnPremium:
+				sv, _ := r.str(obj, "sku_id", path)
+				if id, err := parseBotID(sv); err == nil {
+					c.SKUID = &id
+				} else {
+					r.errs.add(fieldPath(path, "sku_id"), "BASE_TYPE_REQUIRED", "This field is required")
+				}
+			default:
+				r.errs.add(fieldPath(path, "style"), "BASE_TYPE_CHOICES", "Value must be one of {1, 2, 3, 4, 5, 6}.")
 				return wmComponent{}, false
 			}
 			if s, ok := r.str(obj, "label", path); ok {
-				c.Label = clean(s)
+				c.Label = botproto.InText(clean(s))
 				r.maxLen(c.Label, whMaxButtonLabel, fieldPath(path, "label"))
 			}
 			c.Emoji = parseWMEmoji(r, obj, path)
-			if c.Label == "" && c.Emoji == nil {
+			if c.Label == "" && c.Emoji == nil && c.Style != btnPremium {
 				r.errs.add(fieldPath(path, "label"), "BASE_TYPE_REQUIRED", "A button needs a label or an emoji.")
 			}
-			u, _ := r.str(obj, "url", path)
-			if len(u) > whMaxButtonURL {
-				r.errs.add(fieldPath(path, "url"), "BASE_TYPE_MAX_LENGTH", fmt.Sprintf("Must be %d or fewer in length.", whMaxButtonURL))
+			c.Disabled, _ = r.boolean(obj, "disabled", path)
+		case compStringSel, compUserSel, compRoleSel, compMentionSel, compChannelSel:
+			customID()
+			if s, ok := r.str(obj, "placeholder", path); ok {
+				c.Placeholder = clean(s)
+				r.maxLen(c.Placeholder, 150, fieldPath(path, "placeholder"))
 			}
-			c.URL = r.webURL(u, fieldPath(path, "url"), false)
-			if c.URL == "" {
-				r.errs.add(fieldPath(path, "url"), "BASE_TYPE_REQUIRED", "This field is required")
+			c.MinValues, c.MaxValues = bounds("min_values", 0, 25), bounds("max_values", 1, 25)
+			if c.MinValues != nil && c.MaxValues != nil && *c.MinValues > *c.MaxValues {
+				r.errs.add(fieldPath(path, "min_values"), "SELECT_COMPONENT_MIN_VALUES_TOO_LARGE", "min_values may not exceed max_values.")
 			}
 			c.Disabled, _ = r.boolean(obj, "disabled", path)
+			if b, ok := r.boolean(obj, "required", path); ok {
+				c.Required = &b
+			}
+			if c.Type == compStringSel {
+				l, _ := r.list(obj, "options", path)
+				if len(l) < 1 || len(l) > 25 {
+					r.errs.add(fieldPath(path, "options"), "BASE_TYPE_BAD_LENGTH", "Must be between 1 and 25 in length.")
+					if len(l) > 25 {
+						l = l[:25]
+					}
+				}
+				seen := map[string]bool{}
+				for i, ov := range l {
+					op := fieldPath(path, "options", i)
+					o, ok := ov.(map[string]any)
+					if !ok {
+						r.errs.add(op, "MODEL_TYPE_CONVERT", "Only dictionaries may be used in a ModelType")
+						continue
+					}
+					opt := wmSelectOption{}
+					opt.Label, _ = r.str(o, "label", op)
+					opt.Value, _ = r.str(o, "value", op)
+					opt.Description, _ = r.str(o, "description", op)
+					opt.Label, opt.Description = clean(opt.Label), clean(opt.Description)
+					if opt.Label == "" {
+						r.errs.add(fieldPath(op, "label"), "BASE_TYPE_REQUIRED", "This field is required")
+					}
+					if opt.Value == "" {
+						r.errs.add(fieldPath(op, "value"), "BASE_TYPE_REQUIRED", "This field is required")
+					}
+					if seen[opt.Value] {
+						r.errs.add(fieldPath(op, "value"), "SELECT_COMPONENT_OPTION_VALUE_DUPLICATED", "Each option's value must be unique.")
+					}
+					seen[opt.Value] = true
+					r.maxLen(opt.Label, 100, fieldPath(op, "label"))
+					r.maxLen(opt.Value, 100, fieldPath(op, "value"))
+					r.maxLen(opt.Description, 100, fieldPath(op, "description"))
+					opt.Emoji = parseWMEmoji(r, o, op)
+					opt.Default, _ = r.boolean(o, "default", op)
+					c.Options = append(c.Options, opt)
+				}
+			} else {
+				if l, ok := r.list(obj, "default_values", path); ok {
+					for i, dv := range l {
+						dp := fieldPath(path, "default_values", i)
+						d, ok := dv.(map[string]any)
+						if !ok {
+							continue
+						}
+						idStr, _ := r.str(d, "id", dp)
+						typ, _ := r.str(d, "type", dp)
+						id, err := parseBotID(idStr)
+						if err != nil || (typ != "user" && typ != "role" && typ != "channel") {
+							r.errs.add(dp, "BASE_TYPE_CHOICES", "A default value names a user, a role or a channel by its id.")
+							continue
+						}
+						c.DefaultValues = append(c.DefaultValues, wmDefaultValue{ID: id, Type: typ})
+					}
+				}
+				if c.Type == compChannelSel {
+					if l, ok := r.list(obj, "channel_types", path); ok {
+						for _, tv := range l {
+							if n, ok := tv.(json.Number); ok {
+								if v, err := n.Int64(); err == nil {
+									c.ChannelTypes = append(c.ChannelTypes, int(v))
+								}
+							}
+						}
+					}
+				}
+			}
 		case compSection:
 			c.Components = children("components", map[int]bool{compTextDisplay: true}, 1, 3)
 			acc, ok := r.object(obj, "accessory", path)
@@ -688,7 +885,7 @@ func parseComponents(r jsonReader, list []any, v2 bool) []wmComponent {
 			}
 		case compTextDisplay:
 			s, _ := r.str(obj, "content", path)
-			c.Content = clean(s)
+			c.Content = botproto.InText(clean(s))
 			if c.Content == "" {
 				r.errs.add(fieldPath(path, "content"), "BASE_TYPE_REQUIRED", "This field is required")
 			}
@@ -775,6 +972,39 @@ func parseComponents(r jsonReader, list []any, v2 bool) []wmComponent {
 	}
 	if textLen > whMaxTextDisplay {
 		r.errs.add(fieldPath("components"), "BASE_TYPE_MAX_LENGTH", fmt.Sprintf("The text of a message's components must be %d or fewer in length.", whMaxTextDisplay))
+	}
+	return out
+}
+
+// parseReference reads what a message points at: the message it replies to,
+// or (type 1) one it forwards.
+func parseReference(r jsonReader, ref map[string]any) *msgReference {
+	path := fieldPath("message_reference")
+	out := &msgReference{FailIfNotExists: true}
+	if t, ok := r.integer(ref, "type", path); ok {
+		if t != 0 && t != 1 {
+			r.errs.add(fieldPath(path, "type"), "BASE_TYPE_CHOICES", "Value must be one of {0, 1}.")
+		}
+		out.Type = int(t)
+	}
+	read := func(key string) ids.ID {
+		s, ok := r.str(ref, key, path)
+		if !ok || s == "" {
+			return 0
+		}
+		id, err := parseBotID(s)
+		if err != nil {
+			r.errs.add(fieldPath(path, key), "NUMBER_TYPE_COERCE", fmt.Sprintf("Value \"%s\" is not snowflake.", truncate(s, 30)))
+			return 0
+		}
+		return id
+	}
+	out.MessageID, out.ChannelID = read("message_id"), read("channel_id")
+	if out.MessageID.IsZero() {
+		r.errs.add(fieldPath(path, "message_id"), "BASE_TYPE_REQUIRED", "This field is required")
+	}
+	if b, ok := r.boolean(ref, "fail_if_not_exists", path); ok {
+		out.FailIfNotExists = b
 	}
 	return out
 }

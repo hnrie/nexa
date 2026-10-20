@@ -40,6 +40,8 @@ const AdminPage = lazyPage(() => import("./AdminPage"));
 const DesktopPage = lazyPage(() => import("./DesktopPage"));
 const LicensesPage = lazyPage(() => import("./LicensesPage"));
 const AboutPage = lazyPage(() => import("./AboutPage"));
+const DeveloperPortalPage = lazyPage(() => import("./portal/DeveloperPortalPage"));
+const AuthorizedAppsPage = lazyPage(() => import("./AuthorizedAppsPage"));
 
 /**
  * The navigation, built per render so it follows the language. Grouped by
@@ -63,6 +65,7 @@ function navGroups(opts: { inApp: boolean; admin: boolean }): NavGroup[] {
       items: [
         { id: "privacy", label: t("settings.privacy.title") },
         { id: "blocked", label: t("people.blockedPage.title") },
+        { id: "authorizedApps", label: t("apps.authorized.title") },
         { id: "data", label: t("settings.privacy.yourData") },
       ],
     },
@@ -94,6 +97,7 @@ function navGroups(opts: { inApp: boolean; admin: boolean }): NavGroup[] {
         // only where there is a desktop app to have settings for
         ...(opts.inApp ? [{ id: "desktop", label: t("settings.desktop.desktopApp") }] : []),
         { id: "advanced", label: t("settings.privacy.advanced") },
+        { id: "developers", label: t("apps.portal.title") },
       ],
     },
     {
@@ -196,6 +200,8 @@ export default function SettingsModal({ onClose, page: initial, packId, modalId,
     page === "advanced" ? <AdvancedPage /> :
     page === "blocked" ? <BlockedPage /> :
     page === "licenses" ? <LicensesPage /> :
+    page === "developers" ? <DeveloperPortalPage /> :
+    page === "authorizedApps" ? <AuthorizedAppsPage /> :
     page === "about" ? <AboutPage /> :
     page === "admin" && isAdmin ? <AdminPage /> :
     page === "desktop" && inApp ? <DesktopPage onActivity={() => setPage("activity")} /> :

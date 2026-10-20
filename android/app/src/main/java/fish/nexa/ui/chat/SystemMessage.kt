@@ -116,7 +116,7 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
         "system_join" -> fill(t("chat.systemMessage.joined"), mapOf("actor" to person(actor)))
         // a poll's closing line speaks for whoever asked: the webhook that posted it, or the person
         "system_poll_result" -> if (m.webhookId != null) {
-            val hook = fish.nexa.data.Hooks.of(cm.hook)
+            val hook = fish.nexa.ui.markdown.Webhook.of(cm.hook)
             hookPollResult(hook, ::fill, hook?.let { h -> { withStyle(nameStyle) { append(h.name) } } } ?: person(actor), jumpLink(t("chat.systemMessage.viewPoll"), m.replyToId))
         } else pollResult(cm, poll, ::fill, person(actor), jumpLink(t("chat.systemMessage.viewPoll"), m.replyToId))
         else -> fill(t("chat.systemMessage.didSomething"), mapOf("actor" to person(actor)))
@@ -205,7 +205,7 @@ private fun pollResult(
 
 /** How a webhook's poll went, from the result its closing carries (the poll_result embed). */
 private fun hookPollResult(
-    hook: fish.nexa.data.HookContent?,
+    hook: fish.nexa.ui.markdown.Webhook.Content?,
     fill: (String, Map<String, AnnotatedString.Builder.() -> Unit>) -> AnnotatedString,
     actor: AnnotatedString.Builder.() -> Unit,
     view: AnnotatedString.Builder.() -> Unit,

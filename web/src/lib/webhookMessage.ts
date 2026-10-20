@@ -8,6 +8,11 @@
  * message, embed, component and poll objects (internal/api/webhook_message.go).
  * The app says so wherever one is shown.
  *
+ * An app's messages (internal/api/bot_messages.go) come the same way and in
+ * the same shape, with `application_id` naming the app and, on an answer to
+ * something someone used, `interaction` saying who used what. Their buttons
+ * and select menus do something: the app answers them (lib/interactions).
+ *
  * Everything here is read defensively: the server checked it, but the UI
  * trusts these types while drawing, and a wrong one must not crash a client.
  */
@@ -89,6 +94,52 @@ export interface HookComponent {
   spacing?: number;
   accent_color?: number;
   placeholder?: string;
+  /** What the app is told was used: buttons other than links, and select menus. */
+  custom_id?: string;
+  /** A string select menu's choices. */
+  options: HookSelectOption[];
+  min_values?: number;
+  max_values?: number;
+  /** What a person, role, mentionable or channel select menu starts with picked. */
+  default_values: { id: string; type: "user" | "role" | "channel" }[];
+  /** The kinds of channel a channel select menu offers (the protocol's numbers). */
+  channel_types?: number[];
+}
+
+/** One choice of a select menu. */
+export interface HookSelectOption {
+  label: string;
+  value: string;
+  description?: string;
+  emoji?: HookEmoji;
+  default?: boolean;
+}
+
+/** What someone used that an app's message answers. */
+export interface HookInteraction {
+  id: string;
+  /** 2 a command, 3 a button or select menu, 5 a form. */
+  type: number;
+  user_id: string;
+  /** The command's name, with its subcommands ("config set"). */
+  name?: string;
+  /** 1 typed, 2 from a person's menu, 3 from a message's menu. */
+  command_type?: number;
+  target_user_id?: string;
+  target_message_id?: string;
+  /** For a followup, the message the first answer made. */
+  original_response_message_id?: string;
+  /** For a form's answer, what opened the form. */
+  trigger?: HookInteraction;
+}
+
+/** A sticker an app sent. */
+export interface HookSticker {
+  id: string;
+  name: string;
+  blob_id: string;
+  /** The file's kind as Nexa keeps it (png, apng, gif, webp, tgs, webm). */
+  format?: string;
 }
 
 export interface HookPollAnswer {
@@ -138,6 +189,11 @@ export interface HookContent {
   /** Previews the server fetched for the links in the content. */
   link_embeds: UnfurlResult[];
   source?: string;
+  /** The app that wrote it, for an app's message (its bot is the message's author). */
+  application_id?: string;
+  /** What someone used that this answers. */
+  interaction?: HookInteraction;
+  stickers: HookSticker[];
 }
 
 // Component types and button styles, at Discord's numbers.
@@ -150,7 +206,22 @@ export const C_GALLERY = 12;
 export const C_FILE = 13;
 export const C_SEPARATOR = 14;
 export const C_CONTAINER = 17;
+export const C_STRING_SELECT = 3;
+export const C_USER_SELECT = 5;
+export const C_ROLE_SELECT = 6;
+export const C_MENTIONABLE_SELECT = 7;
+export const C_CHANNEL_SELECT = 8;
+export const BUTTON_PRIMARY = 1;
+export const BUTTON_SECONDARY = 2;
+export const BUTTON_SUCCESS = 3;
+export const BUTTON_DANGER = 4;
 export const BUTTON_LINK = 5;
+export const BUTTON_PREMIUM = 6;
+
+/** Whether a component is a select menu of any kind. */
+export function isSelect(type: number): boolean {
+  return type === C_STRING_SELECT || (type >= C_USER_SELECT && type <= C_CHANNEL_SELECT);
+}
 
 type Obj = Record<string, unknown>;
 const isObj = (x: unknown): x is Obj => typeof x === "object" && x !== null && !Array.isArray(x);
@@ -260,7 +331,7 @@ function component(x: unknown, depth: number): HookComponent | null {
   if (!isObj(x) || depth > 4) return null;
   const type = num(x["type"]);
   if (type === undefined) return null;
-  const out: HookComponent = { type, components: [], items: [] };
+  const out: HookComponent = { type, components: [], items: [], options: [], default_values: [] };
   if (Array.isArray(x["components"])) {
     out.components = x["components"].slice(0, 40).map((c) => component(c, depth + 1)).filter((c): c is HookComponent => c !== null);
   }
@@ -306,7 +377,57 @@ function component(x: unknown, depth: number): HookComponent | null {
   const accent = num(x["accent_color"]);
   if (accent !== undefined && accent >= 0 && accent <= 0xffffff) out.accent_color = accent;
   const ph = str(x["placeholder"]);
-  if (ph) out.placeholder = ph;
+  if (ph) out.placeholder = ph.slice(0, 150);
+  const cid = str(x["custom_id"]);
+  if (cid) out.custom_id = cid.slice(0, 100);
+  if (Array.isArray(x["options"])) {
+    for (const o of x["options"].slice(0, 25)) {
+      if (!isObj(o)) continue;
+      const label = str(o["label"]);
+      const value = str(o["value"]);
+      if (label === undefined || value === undefined) continue;
+      const opt: HookSelectOption = { label: label.slice(0, 100), value: value.slice(0, 100) };
+      const od = str(o["description"]);
+      if (od) opt.description = od.slice(0, 100);
+      const oe = emoji(o["emoji"]);
+      if (oe) opt.emoji = oe;
+      if (o["default"] === true) opt.default = true;
+      out.options.push(opt);
+    }
+  }
+  const minV = num(x["min_values"]);
+  if (minV !== undefined && minV >= 0 && minV <= 25) out.min_values = Math.floor(minV);
+  const maxV = num(x["max_values"]);
+  if (maxV !== undefined && maxV >= 1 && maxV <= 25) out.max_values = Math.floor(maxV);
+  if (Array.isArray(x["default_values"])) {
+    for (const d of x["default_values"].slice(0, 25)) {
+      if (!isObj(d)) continue;
+      const did = id(d["id"]);
+      const dt = d["type"];
+      if (did && (dt === "user" || dt === "role" || dt === "channel")) out.default_values.push({ id: did, type: dt });
+    }
+  }
+  if (Array.isArray(x["channel_types"])) out.channel_types = x["channel_types"].filter((n): n is number => num(n) !== undefined).slice(0, 20);
+  return out;
+}
+
+function interaction(x: unknown, depth = 0): HookInteraction | undefined {
+  if (!isObj(x) || depth > 1) return undefined;
+  const iid = id(x["id"]);
+  const uid = id(x["user_id"]);
+  const type = num(x["type"]);
+  if (!iid || !uid || type === undefined) return undefined;
+  const out: HookInteraction = { id: iid, type, user_id: uid };
+  const name = str(x["name"]);
+  if (name) out.name = name.slice(0, 100);
+  const ct = num(x["command_type"]);
+  if (ct !== undefined) out.command_type = ct;
+  for (const k of ["target_user_id", "target_message_id", "original_response_message_id"] as const) {
+    const v = id(x[k]);
+    if (v) out[k] = v;
+  }
+  const trig = interaction(x["trigger"], depth + 1);
+  if (trig) out.trigger = trig;
   return out;
 }
 
@@ -366,7 +487,24 @@ export function sanitizeHook(raw: unknown): HookContent | null {
     components: [],
     attachments: [],
     link_embeds: [],
+    stickers: [],
   };
+  const app = id(raw["application_id"]);
+  if (app) out.application_id = app;
+  const it = interaction(raw["interaction"]);
+  if (it) out.interaction = it;
+  if (Array.isArray(raw["stickers"])) {
+    for (const st of raw["stickers"].slice(0, 3)) {
+      if (!isObj(st)) continue;
+      const sid = id(st["id"]);
+      const blob = id(st["blob_id"]);
+      if (!sid || !blob) continue;
+      const sticker: HookSticker = { id: sid, name: (str(st["name"]) ?? "").slice(0, 30), blob_id: blob };
+      const fmt = str(st["format"]);
+      if (fmt && /^(png|apng|gif|webp|tgs|webm)$/.test(fmt)) sticker.format = fmt;
+      out.stickers.push(sticker);
+    }
+  }
   const avatar = id(raw["avatar_id"]);
   if (avatar) out.avatar_id = avatar;
   const avatarProxy = proxied(raw["avatar_proxy_url"]);
@@ -440,5 +578,16 @@ export function hookText(h: HookContent): string {
 /** Whether two webhook messages look like they came from the same sender, for grouping them. */
 export function sameHookSender(a: HookContent | undefined, b: HookContent | undefined): boolean {
   if (!a || !b) return !a && !b;
+  // an app's messages are its bot's, which the rows group by author
+  if (a.application_id || b.application_id) return a.application_id === b.application_id;
   return a.name === b.name && a.avatar_id === b.avatar_id && a.avatar_url === b.avatar_url;
+}
+
+/**
+ * Whether a message goes by the name and picture it was sent with: a
+ * webhook's. An app's messages are its bot's, and go by the bot's name, like
+ * anyone's, though their content is read here.
+ */
+export function namedByHook(m: { webhook_id?: string | undefined; hook?: HookContent | undefined }): boolean {
+  return !!m.hook && !!m.webhook_id;
 }

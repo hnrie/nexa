@@ -95,6 +95,13 @@ object PermInfo {
                 PermItem(P.MOVE_MEMBERS, t("perms.moveMembers"), t("perms.allowsMembersToMoveOtherMembers"), VOICE),
             ),
         ),
+        PermGroup(
+            t("perms.appPermissions"),
+            listOf(
+                PermItem(P.USE_APPLICATION_COMMANDS, t("perms.useApplicationCommands"), t("perms.useApplicationCommandsDescription"), BOTH),
+                PermItem(P.USE_EXTERNAL_APPS, t("perms.useExternalApps"), t("perms.useExternalAppsDescription"), BOTH),
+            ),
+        ),
         PermGroup(t("perms.advancedPermissions"), listOf(PermItem(P.ADMINISTRATOR, t("perms.administrator"), t("perms.membersWithThisPermissionHaveEvery"), NONE))),
     )
 

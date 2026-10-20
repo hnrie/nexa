@@ -9,11 +9,14 @@
 .intro { margin: -12px 0 18px; font-size: 14.5px; line-height: 1.45; color: var(--text-muted); max-width: 62ch; }
 
 /* the main profile, or one for a server: the page's own tabs, under its title */
-.scopeTabs { display: flex; gap: 4px; margin: -8px 0 18px; border-bottom: 1px solid var(--border-subtle); }
-.scopeTab { position: relative; min-height: 40px; padding: 0 14px; font-size: 15px; font-weight: 600; color: var(--text-muted); }
+/* more tabs than fit (an app's five on a phone) slide sideways in their bar, not the page; the hairline is
+   a shadow inside the bar so the chosen tab's bar can lie on it although the bar scrolls */
+.scopeTabs { display: flex; gap: 4px; margin: -8px 0 18px; box-shadow: inset 0 -1px 0 var(--border-subtle); overflow-x: auto; scrollbar-width: none; }
+.scopeTabs::-webkit-scrollbar { display: none; }
+.scopeTab { position: relative; flex: none; white-space: nowrap; min-height: 40px; padding: 0 14px; font-size: 15px; font-weight: 600; color: var(--text-muted); }
 .scopeTab:hover { color: var(--text); }
 .scopeTab[aria-selected="true"] { color: var(--text-strong); }
-.scopeTab[aria-selected="true"]::after { content: ""; position: absolute; inset-inline: 10px; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--focus-ring); }
+.scopeTab[aria-selected="true"]::after { content: ""; position: absolute; inset-inline: 10px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--focus-ring); }
 .scopeTab:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: var(--radius-xs); }
 @media (pointer: coarse) { .scopeTab { min-height: 44px; } }
 .scopeTabs ~ .intro { margin-top: 0; }

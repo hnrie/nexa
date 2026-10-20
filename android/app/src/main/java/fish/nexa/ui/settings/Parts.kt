@@ -138,7 +138,10 @@ fun ToggleRow(
     }
 }
 
-/** `.radio`: an option card; chosen, it is tinted with the accent and ringed in it. */
+/**
+ * `.radio`: an option card; chosen, it is tinted with the accent and ringed in it.
+ * With [tick] it is one of several that can all be on, with a checkbox for its dot.
+ */
 @Composable
 fun RadioCard(
     label: String,
@@ -147,6 +150,7 @@ fun RadioCard(
     description: String? = null,
     enabled: Boolean = true,
     leading: (@Composable () -> Unit)? = null,
+    tick: Boolean = false,
 ) {
     val c = Nx.colors
     val shape = Radii.Md
@@ -165,14 +169,14 @@ fun RadioCard(
             .background(sheen(c), shape)
             .topEdge(shape, c.edgeLight)
             .clip(shape)
-            .pressable(interaction, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+            .pressable(interaction, enabled = enabled, role = if (tick) Role.Checkbox else Role.RadioButton, onClick = onClick)
             .semantics { this.selected = selected }
             .heightIn(min = 52.dp)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        RadioDot(selected)
+        if (tick) fish.nexa.ui.components.TickBox(selected) else RadioDot(selected)
         leading?.invoke()
         Column(Modifier.weight(1f)) {
             Txt(label, style = Nx.type.body, color = if (enabled) c.text else c.textMuted)

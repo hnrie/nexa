@@ -46,12 +46,7 @@ import androidx.compose.ui.unit.em
 import coil3.compose.AsyncImage
 import fish.nexa.Nexa
 import fish.nexa.data.ChatMessage
-import fish.nexa.data.HookComponent
-import fish.nexa.data.HookContent
-import fish.nexa.data.HookEmbed
-import fish.nexa.data.HookEmoji
-import fish.nexa.data.HookMedia
-import fish.nexa.data.Hooks
+import fish.nexa.ui.markdown.Webhook
 import fish.nexa.media.Fit
 import fish.nexa.media.Media
 import fish.nexa.media.Priority
@@ -78,14 +73,21 @@ import fish.nexa.ui.theme.topEdge
 import java.net.URI
 
 /**
- * HookBody.tsx: what a webhook posted under its words and files: its rich
- * embeds, its own link previews, its components and its poll. Embeds go when
- * the message's embeds were removed; a "components v2" message is drawn by its
- * components alone.
+ * HookBody.tsx: what a webhook or an app posted under its words and files: its
+ * rich embeds, its own link previews, its components and its poll. Embeds go
+ * when the message's embeds were removed; a "components v2" message is drawn
+ * by its components alone. An app's buttons and menus do something, once its
+ * message is known to the server (not a line only this device made).
  */
 @Composable
 fun HookBody(cm: ChatMessage, ctx: ListCtx) {
-    val hook = Hooks.of(cm.hook) ?: return
+    val hook = Webhook.of(cm.hook) ?: return
+    if (hook.applicationId != null) fish.nexa.ui.apps.AppMsgProvider(cm, interactive = !cm.local) { HookParts(cm, ctx, hook) }
+    else HookParts(cm, ctx, hook)
+}
+
+@Composable
+private fun HookParts(cm: ChatMessage, ctx: ListCtx, hook: Webhook.Content) {
     val suppressed = cm.m.suppressEmbeds
     val v2 = cm.m.flags and Message.MSG_FLAG_COMPONENTS_V2 != 0L
     val from = senderName(cm, ctx)
@@ -104,9 +106,9 @@ fun HookBody(cm: ChatMessage, ctx: ListCtx) {
 
 /** A webhook picture: its own upload (fetched with the token) or a proxied address; null never shows, "" is on its way. */
 @Composable
-private fun hookSrc(hook: HookContent, blobId: String?, proxy: String?): Any? {
+private fun hookSrc(hook: Webhook.Content, blobId: String?, proxy: String?): Any? {
     if (blobId != null) {
-        val att = Hooks.mediaAttachment(hook, HookMedia(url = "", blobId = blobId)) ?: return null
+        val att = Webhook.mediaAttachment(hook, Webhook.Media(url = "", blobId = blobId)) ?: return null
         var file by remember(blobId) { mutableStateOf(Media.cached(blobId, true)) }
         LaunchedEffect(blobId) {
             if (file == null) file = runCatching { loadAttachment(att, Priority.NEAR) }.getOrNull()
@@ -118,16 +120,16 @@ private fun hookSrc(hook: HookContent, blobId: String?, proxy: String?): Any? {
 
 private fun nameOf(url: String): String = runCatching { URI(url).path.split('/').lastOrNull { it.isNotEmpty() } }.getOrNull() ?: "image"
 
-private fun lightboxItem(hook: HookContent, m: HookMedia): LightboxItem {
-    val att = Hooks.mediaAttachment(hook, m)
+private fun lightboxItem(hook: Webhook.Content, m: Webhook.Media): LightboxItem {
+    val att = Webhook.mediaAttachment(hook, m)
     if (att != null) return LightboxItem(att.name, att.type, att = att)
     return LightboxItem(nameOf(m.url), src = fish.nexa.media.MediaLinks.src(m.proxyUrl)?.takeIf { it.isNotEmpty() } ?: m.proxyUrl)
 }
 
 /** mergeGalleries: embeds sharing a URL show as one, their pictures as its gallery of up to four. */
-private data class Shown(val embed: HookEmbed, val images: MutableList<HookMedia>)
+private data class Shown(val embed: Webhook.Embed, val images: MutableList<Webhook.Media>)
 
-private fun mergeGalleries(embeds: List<HookEmbed>): List<Shown> {
+private fun mergeGalleries(embeds: List<Webhook.Embed>): List<Shown> {
     val out = ArrayList<Shown>()
     val byUrl = HashMap<String, Shown>()
     for (e in embeds) {
@@ -144,10 +146,10 @@ private fun mergeGalleries(embeds: List<HookEmbed>): List<Shown> {
 }
 
 /** fieldRows: inline fields three to a row (two beside a thumbnail), others full width, as fractions of the row. */
-private fun fieldRows(fields: List<fish.nexa.data.HookEmbedField>, thumbnail: Boolean): List<List<fish.nexa.data.HookEmbedField>> {
+private fun fieldRows(fields: List<Webhook.Field>, thumbnail: Boolean): List<List<Webhook.Field>> {
     val per = if (thumbnail) 2 else 3
-    val out = ArrayList<List<fish.nexa.data.HookEmbedField>>()
-    var run = ArrayList<fish.nexa.data.HookEmbedField>()
+    val out = ArrayList<List<Webhook.Field>>()
+    var run = ArrayList<Webhook.Field>()
     for (f in fields) {
         if (!f.inline) {
             if (run.isNotEmpty()) { out += run; run = ArrayList() }
@@ -162,7 +164,7 @@ private fun fieldRows(fields: List<fish.nexa.data.HookEmbedField>, thumbnail: Bo
 }
 
 @Composable
-private fun RichEmbeds(hook: HookContent, from: String) {
+private fun RichEmbeds(hook: Webhook.Content, from: String) {
     val shown = remember(hook) { mergeGalleries(hook.embeds) }
     if (shown.isEmpty()) return
     Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -172,7 +174,7 @@ private fun RichEmbeds(hook: HookContent, from: String) {
 
 /** RichEmbed: a lit card with the embed's colour down its start: author, title, words, fields, pictures, footer. */
 @Composable
-private fun RichEmbed(hook: HookContent, embed: HookEmbed, all: List<HookMedia>, from: String) {
+private fun RichEmbed(hook: Webhook.Content, embed: Webhook.Embed, all: List<Webhook.Media>, from: String) {
     val c = Nx.colors
     val doc by Nexa.settings.doc.collectAsState()
     val remoteOk = remember(doc) { Nexa.settings.imagePreviews }
@@ -190,7 +192,7 @@ private fun RichEmbed(hook: HookContent, embed: HookEmbed, all: List<HookMedia>,
             .background(c.embedBg)
             .background(sheen(c))
             .topEdge(shape, c.edgeLight)
-            .startBar(embed.color?.let { rgbColor(it) } ?: c.borderStrong),
+            .startBar(embed.color?.let { rgbColor(it.toLong()) } ?: c.borderStrong),
     ) {
         // as wide as its widest part (up to the card's limit), like the web's shrink-to-fit grid
         Column(Modifier.width(IntrinsicSize.Max).padding(start = 12.dp, end = 16.dp, top = 2.dp, bottom = 16.dp)) {
@@ -232,7 +234,7 @@ private fun RichEmbed(hook: HookContent, embed: HookEmbed, all: List<HookMedia>,
                 Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val icon = hookSrc(hook, embed.footer?.iconBlobId, embed.footer?.proxyIconUrl)
                     if (icon != null && icon != "") AsyncImage(icon, null, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.size(20.dp).clip(CircleShape))
-                    val parts = listOfNotNull(embed.footer?.text, embed.timestamp?.let { Time.timestamp(it) })
+                    val parts = listOfNotNull(embed.footer?.text, embed.timestamp?.let { Time.timestamp(it.toLong()) })
                     Txt(parts.joinToString(" • "), style = Nx.type.hint.copy(lineHeight = Nx.type.sp(16f), fontWeight = FontWeight(500)), color = c.textMuted)
                 }
             }
@@ -241,7 +243,7 @@ private fun RichEmbed(hook: HookContent, embed: HookEmbed, all: List<HookMedia>,
 }
 
 @Composable
-private fun EmbedImage(hook: HookContent, m: HookMedia, thumb: Boolean, onOpen: () -> Unit) {
+private fun EmbedImage(hook: Webhook.Content, m: Webhook.Media, thumb: Boolean, onOpen: () -> Unit) {
     val c = Nx.colors
     val src = hookSrc(hook, m.blobId, m.proxyUrl) ?: return
     // a thumbnail is held within 64 dp on a phone (80 on the web), a picture within 400 by 300, both kept whole
@@ -262,7 +264,7 @@ private fun EmbedImage(hook: HookContent, m: HookMedia, thumb: Boolean, onOpen: 
 
 /** Up to four pictures of embeds sharing a URL: two columns of squares, the first spanning two rows when there are three. */
 @Composable
-private fun EmbedGallery(hook: HookContent, images: List<HookMedia>, onOpen: (Int) -> Unit) {
+private fun EmbedGallery(hook: Webhook.Content, images: List<Webhook.Media>, onOpen: (Int) -> Unit) {
     val c = Nx.colors
     @Composable
     fun cell(i: Int, modifier: Modifier) {
@@ -287,35 +289,40 @@ private fun EmbedGallery(hook: HookContent, images: List<HookMedia>, onOpen: (In
 
 /** HookComponents: one component of a webhook's message, as its type says. */
 @Composable
-private fun HookPart(c: HookComponent, hook: HookContent, from: String) {
-    when (c.type) {
-        Hooks.C_ACTION_ROW -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (b in c.components) if (b.type == Hooks.C_BUTTON) LinkButton(b)
-        }
-        Hooks.C_BUTTON -> LinkButton(c)
-        Hooks.C_TEXT -> c.content?.let { fish.nexa.ui.markdown.MarkdownView(it, fish.nexa.ui.markdown.RenderCtx(color = Nx.colors.text, bodyPx = 14f, bodyLine = 18f)) }
-        Hooks.C_SECTION -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { for (x in c.components) HookPart(x, hook, from) }
-            c.accessory?.let { acc ->
-                if (acc.type == Hooks.C_THUMBNAIL && acc.media != null) Thumbnail(hook, acc)
-                else if (acc.type == Hooks.C_BUTTON) LinkButton(acc)
+private fun HookPart(c: Webhook.Component, hook: Webhook.Content, from: String) {
+    when {
+        c.isType(Webhook.C_ACTION_ROW) -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (b in c.components) {
+                if (b.isType(Webhook.C_BUTTON)) ButtonView(b)
+                // a select menu takes a row of its own
+                else if (Webhook.isSelect(b.type)) SelectView(b, Modifier.fillMaxWidth())
             }
         }
-        Hooks.C_THUMBNAIL -> if (c.media != null) Thumbnail(hook, c)
-        Hooks.C_GALLERY -> if (c.items.isNotEmpty()) Gallery(hook, c, from)
-        Hooks.C_FILE -> c.file?.let { f -> Hooks.mediaAttachment(hook, f) }?.let { att ->
+        c.isType(Webhook.C_BUTTON) -> ButtonView(c)
+        c.isType(Webhook.C_TEXT) -> c.content?.let { fish.nexa.ui.markdown.MarkdownView(it, fish.nexa.ui.markdown.RenderCtx(color = Nx.colors.text, bodyPx = 14f, bodyLine = 18f)) }
+        c.isType(Webhook.C_SECTION) -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { for (x in c.components) HookPart(x, hook, from) }
+            c.accessory?.let { acc ->
+                if (acc.isType(Webhook.C_THUMBNAIL) && acc.media != null) Thumbnail(hook, acc)
+                else if (acc.isType(Webhook.C_BUTTON)) ButtonView(acc)
+            }
+        }
+        c.isType(Webhook.C_THUMBNAIL) -> if (c.media != null) Thumbnail(hook, c)
+        c.isType(Webhook.C_GALLERY) -> if (c.items.isNotEmpty()) Gallery(hook, c, from)
+        c.isType(Webhook.C_FILE) -> c.file?.let { f -> Webhook.mediaAttachment(hook, f) }?.let { att ->
             Attachments(listOf(if (c.spoiler) att.copy(spoiler = true) else att), null, null)
         }
-        Hooks.C_SEPARATOR -> {
-            val space = if (c.spacing == 2) 12.dp else 4.dp
+        c.isType(Webhook.C_SEPARATOR) -> {
+            val space = if (c.spacing == 2.0) 12.dp else 4.dp
             Box(Modifier.fillMaxWidth().padding(vertical = space).height(1.dp).background(if (c.divider != false) Nx.colors.border else Color.Transparent))
         }
-        Hooks.C_CONTAINER -> Container(c, hook, from)
+        c.isType(Webhook.C_CONTAINER) -> Container(c, hook, from)
+        Webhook.isSelect(c.type) -> SelectView(c, Modifier.fillMaxWidth())
     }
 }
 
 @Composable
-private fun Container(c: HookComponent, hook: HookContent, from: String) {
+private fun Container(c: Webhook.Component, hook: Webhook.Content, from: String) {
     val colors = Nx.colors
     var revealed by remember(c) { mutableStateOf(false) }
     val hidden = c.spoiler && !revealed
@@ -325,7 +332,7 @@ private fun Container(c: HookComponent, hook: HookContent, from: String) {
             .border(1.dp, colors.borderSubtle, Radii.Sm)
             .clip(Radii.Sm)
             .background(colors.embedBg)
-            .then(c.accentColor?.let { Modifier.startBar(rgbColor(it)) } ?: Modifier),
+            .then(c.accentColor?.let { Modifier.startBar(rgbColor(it.toLong())) } ?: Modifier),
     ) {
         Column(
             Modifier.fillMaxWidth().padding(16.dp).then(if (hidden && canBlur) Modifier.blur(24.dp) else Modifier),
@@ -339,17 +346,30 @@ private fun Container(c: HookComponent, hook: HookContent, from: String) {
 }
 
 @Composable
-private fun HookEmojiGlyph(e: HookEmoji, size: Int) {
+fun HookEmojiGlyph(e: Webhook.Emoji, size: Int) {
     val density = LocalDensity.current.density
     if (e.id != null) AsyncImage(Media.emojiUrl(e.id, size, density), e.name?.let { ":$it:" }, imageLoader = Media.loader, modifier = Modifier.size(size.dp))
     else if (e.name != null) TwemojiImage(e.name, size.dp)
 }
 
+/** A button: a link anywhere, any other kind on an app's message only (a webhook has nobody behind it to answer one). */
+@Composable
+private fun ButtonView(b: Webhook.Component) {
+    if (b.style == Webhook.BUTTON_LINK.toDouble()) LinkButton(b)
+    else if (fish.nexa.ui.apps.LocalAppMsg.current != null) fish.nexa.ui.apps.AppButton(b)
+}
+
+/** A select menu, on an app's message only. */
+@Composable
+private fun SelectView(c: Webhook.Component, modifier: Modifier) {
+    if (fish.nexa.ui.apps.LocalAppMsg.current != null) Box(modifier) { fish.nexa.ui.apps.AppSelect(c) }
+}
+
 /** A webhook's link button: its emoji and label and the open-elsewhere mark; it opens the address in the browser. */
 @Composable
-private fun LinkButton(b: HookComponent) {
+private fun LinkButton(b: Webhook.Component) {
     val c = Nx.colors
-    if (b.style != Hooks.BUTTON_LINK || b.url == null) return
+    if (b.style != Webhook.BUTTON_LINK.toDouble() || b.url == null) return
     val host = runCatching { URI(b.url).host }.getOrNull() ?: b.url
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -373,7 +393,7 @@ private fun LinkButton(b: HookComponent) {
 
 /** A section's or a message's single picture: 85 dp square, covered when a spoiler. */
 @Composable
-private fun Thumbnail(hook: HookContent, c: HookComponent) {
+private fun Thumbnail(hook: Webhook.Content, c: Webhook.Component) {
     val colors = Nx.colors
     val media = c.media ?: return
     val doc by Nexa.settings.doc.collectAsState()
@@ -405,14 +425,14 @@ private fun HookSpoilerLabel(modifier: Modifier) {
 
 /** A media gallery: one contained up to 350 dp, two or four in two columns, three as two and one, more in threes; videos play in place. */
 @Composable
-private fun Gallery(hook: HookContent, all: HookComponent, from: String) {
+private fun Gallery(hook: Webhook.Content, all: Webhook.Component, from: String) {
     val colors = Nx.colors
     val doc by Nexa.settings.doc.collectAsState()
     val remoteOk = remember(doc) { Nexa.settings.imagePreviews }
     val items = if (remoteOk) all.items else all.items.filter { it.media.blobId != null }
     val revealed = remember(all) { mutableStateMapOf<Int, Boolean>() }
     if (items.isEmpty()) return
-    fun isVideo(m: HookMedia) = (m.contentType ?: "").startsWith("video/")
+    fun isVideo(m: Webhook.Media) = (m.contentType ?: "").startsWith("video/")
     val pictures = items.withIndex().filter { (i, it) -> !isVideo(it.media) && (!it.spoiler || revealed[i] == true) }
     val viewer = pictures.map { (_, it) -> lightboxItem(hook, it.media).copy(from = from) }
     @Composable
@@ -422,7 +442,7 @@ private fun Gallery(hook: HookContent, all: HookComponent, from: String) {
         val src = hookSrc(hook, it.media.blobId, it.media.proxyUrl) ?: return
         if (isVideo(it.media) && src != "" && !spoiler) {
             Box(modifier) {
-                val att = Hooks.mediaAttachment(hook, it.media)
+                val att = Webhook.mediaAttachment(hook, it.media)
                 if (att != null) VideoPlayer(VideoSource.Attachment(att), att.name, att.w, att.h, eager = false)
                 else if (src is String) VideoPlayer(VideoSource.Url(src), nameOf(it.media.url), it.media.width, it.media.height, eager = false)
             }

@@ -121,6 +121,23 @@ type Server struct {
 	limThread *ratelimit.Limiter
 	// limDiscover paces Discovery searches, each a query over every listed server
 	limDiscover *ratelimit.Limiter
+	// limApps paces making, changing and deleting applications in the
+	// developer portal, per account
+	limApps *ratelimit.Limiter
+	// botLim is the bot API's rate limits: one per bucket and a global one
+	// (bot_auth.go)
+	botLim *botLimiters
+	// botKeys holds what has been opened for bots: their identities and the
+	// roots granted to them (bot_crypto.go)
+	botKeys *botKeys
+	// bots runs the bot gateway's sessions and the interactions waiting on
+	// an answer (bot_gateway.go, bot_interactions.go)
+	bots *botRuntime
+	// limInteract paces someone using applications: commands, buttons, forms
+	limInteract *ratelimit.Limiter
+	// botHTTP, when set, is the client interactions go to applications'
+	// endpoints with (tests); otherwise endpointClient builds a guarded one
+	botHTTP *http.Client
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
@@ -304,6 +321,14 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limThread: ratelimit.New(ratelimit.Every(30, 10*time.Minute), 15, time.Hour),
 		// Discovery searches, per account: a few for each word typed
 		limDiscover: ratelimit.New(ratelimit.Every(120, time.Minute), 60, 10*time.Minute),
+		// applications in the developer portal, per account: making one, its
+		// settings, a new token
+		limApps: ratelimit.New(ratelimit.Every(30, time.Minute), 20, 10*time.Minute),
+		botLim:  newBotLimiters(),
+		botKeys: newBotKeys(),
+		bots:    newBotRuntime(),
+		// using applications, per account: a command, a click, a form
+		limInteract: ratelimit.New(ratelimit.Every(60, time.Minute), 20, 10*time.Minute),
 	}
 }
 
@@ -311,7 +336,7 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 // limiters names every rate limit, for sweeping and sharing them. One missing
 // here is neither swept (every key it ever saw stays in memory) nor shared.
 func (s *Server) limiters() map[string]*ratelimit.Limiter {
-	return map[string]*ratelimit.Limiter{
+	out := map[string]*ratelimit.Limiter{
 		"generic": s.limGeneric, "auth-ip": s.limAuthIP, "auth-user": s.limAuthUsr, "register": s.limReg, "message": s.limMsg,
 		"upload": s.limUpload, "unfurl": s.limUnfurl, "proxy": s.limProxy, "youtube": s.limYouTube, "refresh": s.limRefresh, "voice": s.limVoice,
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
@@ -319,7 +344,12 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord, "server-tag": s.limTag, "music-search": s.limMusic, "music-preview": s.limPreview,
 		"automod": s.limAutomod, "publish": s.limPublish, "thread": s.limThread, "discover": s.limDiscover,
 		"note": s.limNote, "note-save": s.limNoteSave, "note-update": s.limNoteUpdate, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,
+		"apps": s.limApps, "interact": s.limInteract,
 	}
+	for name, l := range s.botLim.all() {
+		out[name] = l
+	}
+	return out
 }
 
 // StartLimiters runs the rate limiters' idle-key sweepers until ctx is done.

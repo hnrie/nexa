@@ -58,7 +58,7 @@ func TestMigrationMovesTheOldDMDefault(t *testing.T) {
 	ALTER TABLE servers DROP COLUMN tag_roles;
 	ALTER TABLE servers DROP COLUMN tag_invite;
 	ALTER TABLE users DROP COLUMN widgets;
-	` + undoCommunities + `
+	` + undoBots + undoCommunities + `
 	PRAGMA user_version = 17;`)
 	if err != nil {
 		t.Fatal(err)

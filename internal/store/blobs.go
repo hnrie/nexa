@@ -162,3 +162,26 @@ func (s *Store) CountBlobsByContent(ctx context.Context, sha string) (int, error
 	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM blobs WHERE sha256 = ? OR sha256 LIKE ? ESCAPE '\'`, sha, escapeLike(sha)+"-%").Scan(&n)
 	return n, err
 }
+
+// BlobsAnimated says, for each of the listed blobs that exists, whether it
+// moves: what the bot API's picture hashes mark with "a_".
+func (s *Store) BlobsAnimated(ctx context.Context, list []ids.ID) (map[ids.ID]bool, error) {
+	out := map[ids.ID]bool{}
+	err := chunked(list, func(part []ids.ID) error {
+		rows, err := s.db.R.QueryContext(ctx, `SELECT id, animated FROM blobs WHERE id IN (`+placeholders(len(part))+`)`, idArgs(part)...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id ids.ID
+			var animated int64
+			if err := rows.Scan(&id, &animated); err != nil {
+				return err
+			}
+			out[id] = animated == 1
+		}
+		return rows.Err()
+	})
+	return out, err
+}

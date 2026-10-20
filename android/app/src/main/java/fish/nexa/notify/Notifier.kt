@@ -142,7 +142,8 @@ object Notifier {
             mentioned -> CH_MENTIONS
             else -> CH_SERVERS
         }
-        val hookName = fish.nexa.data.Webhooks.content(dec.hook)?.name
+        // a webhook's message goes by the name and picture it was sent with; an app's, by its bot's
+        val hookName = if (m.webhookId != null) fish.nexa.data.Webhooks.content(dec.hook)?.name else null
         val author = hookName ?: Names.display(Nexa.users.get(m.authorId))
         val line = Line(m.authorId, author, if (hookName != null) null else Nexa.users.get(m.authorId)?.avatarId, previewOf(dec), m.createdAt)
         synchronized(history) {

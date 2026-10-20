@@ -119,7 +119,12 @@ fun IntegrationsPage(serverId: String, channelId: String?) {
         (tree.loose + tree.categories.flatMap { it.children }).filter { it.isText && Nexa.servers.canI(st, P.MANAGE_WEBHOOKS, it.id) }
     }
 
+    // the server's apps are its managers'; webhooks are for whoever may manage them in some channel
+    val manageApps = channelId == null && Nexa.servers.canI(st, P.MANAGE_SERVER)
+    val manageHooks = channelId != null || Nexa.servers.canI(st, P.MANAGE_WEBHOOKS) || targets.isNotEmpty()
+
     suspend fun load() {
+        if (!manageHooks) return
         try {
             val path = if (channelId != null) "/channels/$channelId/webhooks" else "/servers/$serverId/webhooks"
             list = Nexa.api.get(path, ListSerializer(Webhook.serializer()))
@@ -214,7 +219,10 @@ fun IntegrationsPage(serverId: String, channelId: String?) {
     val canCreate = if (channelId != null) targets.any { it.id == channelId } else targets.isNotEmpty()
     SettingsPage(SaveState(dirtyIds.isNotEmpty(), busy, { drafts.clear() }, ::save)) {
         PageTitle(t("integrations.title"), Modifier.padding(bottom = 0.dp))
-        Hint(t("integrations.intro"))
+        if (manageApps) AppsSection(serverId)
+        if (!manageHooks) return@SettingsPage
+        H5(t("integrations.webhooks"), top = if (manageApps) 28.dp else 0.dp)
+        Hint(t("integrations.intro"), top = 0.dp)
         Row(
             Modifier.fillMaxWidth().padding(top = 12.dp).background(c.bgSurface, Radii.Sm).padding(horizontal = 12.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -222,8 +230,7 @@ fun IntegrationsPage(serverId: String, channelId: String?) {
             Icon("LockOpen", c.textMuted, size = 16.dp, modifier = Modifier.padding(top = 1.dp))
             Txt(t("integrations.notEncrypted"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(18f)), color = c.textSubtle, modifier = Modifier.weight(1f))
         }
-        H5(t("integrations.webhooks"))
-        Box(Modifier.padding(top = 4.dp, bottom = 12.dp)) {
+        Box(Modifier.padding(top = 16.dp, bottom = 12.dp)) {
             NxButton(t("integrations.newWebhook"), { create() }, size = ButtonSize.SM, icon = "Plus", loading = creating, enabled = canCreate)
         }
         when {

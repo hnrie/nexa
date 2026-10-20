@@ -1,0 +1,30 @@
+/* A form an app opened: who asks at the top, its fields, and what happens to what is sent. */
+.head { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.who { display: flex; align-items: center; gap: 6px; min-width: 0; font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 0; }
+.whoName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; color: var(--text-strong); overflow-wrap: anywhere; }
+.form { display: flex; flex-direction: column; gap: 18px; }
+.text { font-size: 15px; line-height: 21px; color: var(--text-subtle); overflow-wrap: anywhere; }
+.text :global(.md-paragraph) { white-space: pre-wrap; }
+.check { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; color: var(--text); cursor: pointer; }
+.check input { flex: none; margin: 2px 0 0; width: 18px; height: 18px; accent-color: var(--brand); }
+.checkText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.checkHint { font-size: 13px; color: var(--text-muted); }
+.choices { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.choice { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); cursor: pointer; transition: box-shadow var(--transition), background var(--transition); }
+.choice:hover { box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border); }
+.choice[data-on] { background: var(--sheen), color-mix(in srgb, var(--brand) 10%, var(--bg-surface)); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 2px color-mix(in srgb, var(--brand) 75%, transparent); }
+.choice input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--brand); }
+.choice:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.choiceText { display: flex; flex-direction: column; min-width: 0; }
+.choiceLabel { font-size: 15px; color: var(--text); overflow-wrap: anywhere; }
+.choiceDesc { font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
+.files { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 2px; }
+.file { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; padding: 8px 8px 8px 12px; border-radius: var(--radius-sm); background: var(--bg-input); box-shadow: inset 0 0 0 1px var(--border-subtle); color: var(--text-muted); }
+.fileName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 14px; }
+.fileSize { flex: none; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.fileRemove { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-xs); color: var(--icon); }
+.fileRemove:hover { background: var(--bg-hover); color: var(--text-danger); }
+.fileError, .error { font-size: 13.5px; color: var(--text-danger); margin: 0; }
+.note { display: flex; align-items: flex-start; gap: 8px; margin: 2px 0 0; font-size: 13px; line-height: 17px; color: var(--text-muted); }
+.note svg { flex: none; margin-top: 1px; }

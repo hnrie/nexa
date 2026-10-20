@@ -337,9 +337,9 @@ function serverChannel(channelId: string): Channel | null {
   return ch?.server_id ? ch : null;
 }
 
-/** Messages AutoMod reads: what members wrote, not notes, webhooks or calls. */
+/** Messages AutoMod reads: what members wrote, not notes, webhooks, apps or calls. */
 function readsMessage(m: DecryptedMessage): boolean {
-  return !m.type.startsWith("system_") && !m.webhook_id && !!m.payload;
+  return !m.type.startsWith("system_") && !m.webhook_id && !m.hook && !!m.payload;
 }
 
 /**

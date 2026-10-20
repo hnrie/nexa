@@ -65,7 +65,8 @@ function StarterCard({ serverId, parentId, messageId }: { serverId: string | nul
   }, [inList, kept, parentId, messageId]);
   const words = useReplyWords(target);
   const ctx = useRowRenderCtx();
-  const shown = useShownName(parentId, target?.hook ? undefined : target?.author_id);
+  const byHook = !!target?.hook && !!target.webhook_id;
+  const shown = useShownName(parentId, byHook ? undefined : target?.author_id);
   const avatarId = useUsers((u) => (target ? (u.byId[target.author_id]?.avatar_id ?? null) : null));
   const blocked = useRelationships((r) => (target ? r.byUser[target.author_id]?.type === "blocked" : false));
   if (!target) {
@@ -83,7 +84,7 @@ function StarterCard({ serverId, parentId, messageId }: { serverId: string | nul
       </div>
     );
   }
-  const name = target.hook ? target.hook.name : shown;
+  const name = byHook ? target.hook!.name : shown;
   const open = () => {
     nav(serverId ? `/channels/${serverId}/${parentId}/${messageId}` : `/channels/@me/${parentId}/${messageId}`);
     useUI.getState().setJumpTo({ channelId: parentId, messageId });

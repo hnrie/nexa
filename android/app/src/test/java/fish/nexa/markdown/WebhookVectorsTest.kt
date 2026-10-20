@@ -137,6 +137,32 @@ class WebhookVectorsTest {
         opt("spacing", c.spacing)
         opt("accent_color", c.accentColor)
         opt("placeholder", c.placeholder)
+        opt("custom_id", c.customId)
+        put("options", buildJsonArray {
+            for (o in c.options) add(buildJsonObject {
+                put("label", o.label)
+                put("value", o.value)
+                opt("description", o.description)
+                emoji(o.emoji)?.let { put("emoji", it) }
+                flag("default", o.default)
+            })
+        })
+        opt("min_values", c.minValues)
+        opt("max_values", c.maxValues)
+        put("default_values", buildJsonArray { for (d in c.defaultValues) add(buildJsonObject { put("id", d.id); put("type", d.type) }) })
+        c.channelTypes?.let { list -> put("channel_types", buildJsonArray { for (n in list) add(JsonPrimitive(n)) }) }
+    }
+
+    private fun interaction(i: Webhook.Interaction): JsonObject = buildJsonObject {
+        put("id", i.id)
+        put("type", i.type)
+        put("user_id", i.userId)
+        opt("name", i.name)
+        opt("command_type", i.commandType)
+        opt("target_user_id", i.targetUserId)
+        opt("target_message_id", i.targetMessageId)
+        opt("original_response_message_id", i.originalResponseMessageId)
+        i.trigger?.let { put("trigger", interaction(it)) }
     }
 
     private fun content(h: Webhook.Content): JsonObject = buildJsonObject {
@@ -180,6 +206,11 @@ class WebhookVectorsTest {
             })
         }
         opt("source", h.source)
+        opt("application_id", h.applicationId)
+        h.interaction?.let { put("interaction", interaction(it)) }
+        put("stickers", buildJsonArray {
+            for (st in h.stickers) add(buildJsonObject { put("id", st.id); put("name", st.name); put("blob_id", st.blobId); opt("format", st.format) })
+        })
     }
 
     private fun meta(m: AttachmentMeta): JsonObject = buildJsonObject {
@@ -193,6 +224,7 @@ class WebhookVectorsTest {
     @Test
     fun sanitize() {
         val base = Webhook.sanitize(cases[0]["raw"])
+        val app = Webhook.sanitize(cases.first { (it["raw"] as? JsonObject)?.get("application_id") != null && (it["raw"] as JsonObject)["name"]?.jsonPrimitive?.contentOrNull == "Lab Bot" }["raw"])
         Vectors.expectAll("sanitizeHook / hookText / listedAttachments / mediaAttachment / sameHookSender", cases) { c ->
             val got = Webhook.sanitize(c["raw"])
             val want = c["out"]!!
@@ -209,6 +241,7 @@ class WebhookVectorsTest {
             val media: JsonElement = thumb?.let { Webhook.mediaAttachment(got, it) }?.let(::meta) ?: JsonNull
             if (!Vectors.same(media, comparable(c["media"]))) problems += "media web ${c["media"]} kotlin $media"
             if (Webhook.sameSender(got, base) != c["same"]!!.jsonPrimitive.contentOrNull?.toBoolean()) problems += "same"
+            if (Webhook.sameSender(got, app) != c["sameApp"]!!.jsonPrimitive.contentOrNull?.toBoolean()) problems += "sameApp"
             if (problems.isEmpty()) null else "raw ${c["raw"].toString().take(800)}\n" + problems.joinToString("\n")
         }
     }

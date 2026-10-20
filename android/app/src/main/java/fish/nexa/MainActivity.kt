@@ -20,6 +20,8 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         lifecycleScope.launch { Nexa.auth.bootstrap() }
+        // the forms apps open, from wherever an interaction brings one
+        fish.nexa.ui.apps.installAppForms()
         setContent { App() }
         if (!open(intent)) lifecycleScope.launch {
             Nexa.auth.state.first { it is fish.nexa.data.AuthState.Ready }
@@ -62,9 +64,12 @@ class MainActivity : ComponentActivity() {
             }
             return true
         }
-        // a shared note's key is the part after the #, which never leaves the device: it comes along
+        // a shared note's key is the part after the #, which never leaves the device: it comes along, and
+        // a link that adds an app says which and how in its query
         val path = intent?.getStringExtra(fish.nexa.notify.Notifier.EXTRA_PATH)
-            ?: intent?.data?.takeIf { it.scheme == "https" }?.let { uri -> uri.path?.let { p -> uri.encodedFragment?.let { "$p#$it" } ?: p } }
+            ?: intent?.data?.takeIf { it.scheme == "https" }?.let { uri ->
+                uri.path?.let { p -> p + (uri.encodedQuery?.let { "?$it" } ?: "") + (uri.encodedFragment?.let { "#$it" } ?: "") }
+            }
             ?: return false
         lifecycleScope.launch {
             Nexa.auth.state.first { it is fish.nexa.data.AuthState.Ready }

@@ -9,9 +9,7 @@ import { QrCode } from "@/components/common/QrCode";
 import { Select } from "@/components/common/Select";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
-import { b64 } from "@/crypto/bytes";
-import { deriveAuthKey, deriveMaster } from "@/crypto/kdf";
-import { acceptServerKdf } from "@/lib/serverKdf";
+import { authKeyFor } from "@/lib/passwordProof";
 import { users as usersApi } from "@/api/users";
 import { autoLockChoices, blurDelayChoices, DEFAULT_LOCK, loadLock, passcodeProblem, patchLock, type LockConfig } from "@/lib/appLock";
 import { EncryptionSection } from "./EncryptionSection";
@@ -25,15 +23,6 @@ import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
-/** Turns the account password into the proof the server expects. */
-async function authKeyFor(password: string): Promise<string> {
-  const bundle = await usersApi.myKeys();
-  // The stretch parameters are the server's answer, and the proof below goes
-  // straight back to it, so they are checked against the floor first.
-  const master = await deriveMaster(password, b64.dec(bundle.kdf_salt), acceptServerKdf(bundle.kdf_params));
-  return b64.enc(deriveAuthKey(master));
-}
-
 type Dialog = null | "enable" | "disable" | "codes" | "passcode" | "removePasscode";
 
 export default function SecurityPage() {

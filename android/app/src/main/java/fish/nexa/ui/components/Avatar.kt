@@ -270,6 +270,9 @@ fun PresenceDot(status: String, size: Dp, modifier: Modifier = Modifier) {
     }
 }
 
+/** An avatar drawn square, as the web's `.square` avatar (Avatar.module.css): a corner of 30%. Apps' icons, and servers' on the consent sheet. */
+val SQUARE_AVATAR = RoundedCornerShape(percent = 30)
+
 /** A server's or group's icon: its picture, or its initial on the surface. Square-ish tiles round to 16. */
 @Composable
 fun ServerIcon(id: String, name: String, iconId: String?, size: Dp, modifier: Modifier = Modifier, radius: Dp = 16.dp) {

@@ -654,6 +654,8 @@ private fun ConversationRow(ch: Channel, selected: Boolean, parentSelected: Bool
                     )
                     if (other != null) {
                         OwnerMarks(other)
+                        // a conversation with an app's bot is marked as one
+                        if (Nexa.users.get(other)?.isBot == true) fish.nexa.ui.media.AppTag()
                         Nexa.users.get(other)?.serverTag?.takeIf { it.text.isNotEmpty() }?.let { fish.nexa.ui.chat.ServerTagChip(it, small = true) }
                     }
                 }

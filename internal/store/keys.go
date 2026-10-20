@@ -205,7 +205,10 @@ func Lacking(entitled, holders []ids.ID) []ids.ID {
 }
 
 // Entitled lists the users who should hold a conversation's keys: DM and
-// group participants, a server's members, or a server channel's viewers.
+// group participants, a server's members, or a server channel's viewers. A
+// bot is among them only in a server, and only when its application has the
+// Message Content intent (keyEligible); every other bot reads just the
+// copies people's apps seal to it.
 func (s *Store) Entitled(ctx context.Context, conv ids.ID) ([]ids.ID, error) {
 	var typ string
 	var serverID sql.NullInt64
@@ -213,7 +216,7 @@ func (s *Store) Entitled(ctx context.Context, conv ids.ID) ([]ids.ID, error) {
 	if errors.Is(err, sql.ErrNoRows) {
 		// a server's own conversation belongs to its members
 		if members, err := s.serverMemberIDs(ctx, conv); err == nil {
-			return members, nil
+			return s.keyFilter(ctx, conv, members)
 		} else if !errors.Is(err, ErrNotFound) {
 			return nil, err
 		}
@@ -226,10 +229,14 @@ func (s *Store) Entitled(ctx context.Context, conv ids.ID) ([]ids.ID, error) {
 		return nil, err
 	}
 	if IsDMLike(typ) {
-		return s.Participants(ctx, conv)
+		return s.keyParticipants(ctx, conv)
 	}
 	if serverID.Valid {
-		return s.channelViewers(ctx, ids.ID(serverID.Int64), conv)
+		viewers, err := s.channelViewers(ctx, ids.ID(serverID.Int64), conv)
+		if err != nil {
+			return nil, err
+		}
+		return s.keyFilter(ctx, ids.ID(serverID.Int64), viewers)
 	}
 	if s.EntitledHook != nil {
 		return s.EntitledHook(ctx, conv)
@@ -341,6 +348,9 @@ func (s *Store) Needs(ctx context.Context, uid ids.ID) ([]KeyNeed, error) {
 				entitled = participants[e.ConvID]
 			case isChannel && !k.server.IsZero():
 				entitled, err = s.channelViewers(ctx, k.server, e.ConvID)
+				if err == nil {
+					entitled, err = s.keyFilter(ctx, k.server, entitled)
+				}
 			default:
 				// a server's own conversation, or one the hook knows about
 				entitled, err = s.Entitled(ctx, e.ConvID)
@@ -411,11 +421,14 @@ func (s *Store) convKinds(ctx context.Context, convs []ids.ID) (map[ids.ID]convK
 	return out, err
 }
 
-// participantsOf lists the participants of each conversation, in join order.
+// participantsOf lists the participants of each conversation who hold its
+// keys (all but bots), in join order.
 func (s *Store) participantsOf(ctx context.Context, convs []ids.ID) (map[ids.ID][]ids.ID, error) {
 	out := map[ids.ID][]ids.ID{}
 	err := chunked(convs, func(part []ids.ID) error {
-		rows, err := s.db.R.QueryContext(ctx, `SELECT channel_id, user_id FROM dm_participants WHERE channel_id IN (`+placeholders(len(part))+`) ORDER BY added_at, user_id`, idArgs(part)...)
+		// bots read the copies sealed to them, never a conversation's keys
+		args := append(idArgs(part), FlagBot)
+		rows, err := s.db.R.QueryContext(ctx, `SELECT p.channel_id, p.user_id FROM dm_participants p JOIN users u ON u.id = p.user_id WHERE p.channel_id IN (`+placeholders(len(part))+`) AND u.flags & ? = 0 ORDER BY p.added_at, p.user_id`, args...)
 		if err != nil {
 			return err
 		}
@@ -518,4 +531,12 @@ func (s *Store) Epoch(ctx context.Context, conv ids.ID, epoch int) (*KeyEpoch, e
 		return nil, err
 	}
 	return &e, nil
+}
+
+// DeleteUserGrants takes away every key an account was given: a bot whose
+// application no longer reads every message gives its keys back.
+func (s *Store) DeleteUserGrants(ctx context.Context, uid ids.ID) error {
+	defer s.everythingChanged()
+	_, err := s.db.W.ExecContext(ctx, `DELETE FROM key_grants WHERE user_id = ?`, int64(uid))
+	return err
 }

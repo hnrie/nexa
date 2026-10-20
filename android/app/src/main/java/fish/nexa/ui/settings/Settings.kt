@@ -133,6 +133,7 @@ object Settings {
                 listOf(
                     SettingsPageInfo("privacy", t("settings.privacy.title"), "ShieldCheck"),
                     SettingsPageInfo("blocked", t("people.blockedPage.title"), "Ban"),
+                    SettingsPageInfo("authorizedApps", t("apps.authorized.title"), "AppWindow"),
                     SettingsPageInfo("data", t("settings.privacy.yourData"), "DatabaseZap"),
                 ),
             ),
@@ -160,6 +161,7 @@ object Settings {
                     SettingsPageInfo("keybinds", t("keybinds.title"), "Keyboard"),
                     SettingsPageInfo("activity", t("settings.activity.title"), "Gamepad2"),
                     SettingsPageInfo("advanced", t("settings.privacy.advanced"), "Wrench"),
+                    SettingsPageInfo("developers", t("apps.portal.title"), "Bot"),
                 ),
             ),
             SettingsGroup(
@@ -611,6 +613,8 @@ private fun SettingsPageContent(id: String, anchor: String?, openPage: (String, 
         "keybinds" -> KeybindsPage(openPage)
         "activity" -> ActivityPage()
         "advanced" -> AdvancedPage()
+        "developers" -> DeveloperPortalPage()
+        "authorizedApps" -> AuthorizedAppsPage()
         "about" -> AboutPage()
         "licenses" -> LicensesPage()
         "admin" -> AdminPage()
@@ -625,6 +629,7 @@ private fun androidx.compose.foundation.layout.BoxScope.PageOverlay(id: String) 
         "profiles" -> ProfilesSaveBar()
         "appearance" -> ThemeBuilderSaveBar()
         "stickers" -> PackSaveBar()
+        "developers" -> PortalSaveBar()
     }
 }
 
@@ -715,6 +720,14 @@ private fun settingsIndex(groups: List<SettingsGroup>): List<SettingResult> {
         Triple("about", "version", "settings.about.version"),
     )
     for ((page, anchor, key) in anchored) if (page in shown) entries += SettingResult(page, anchor, t(key))
+    // what a page is for, found by more than its name
+    val within = listOf(
+        "developers" to "apps.portal.newApp",
+        "developers" to "apps.portal.token",
+        "developers" to "apps.portal.connect",
+        "authorizedApps" to "apps.menu.apps",
+    )
+    for ((page, key) in within) if (page in shown) entries += SettingResult(page, null, t(key))
     return entries
 }
 

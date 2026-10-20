@@ -131,9 +131,10 @@ private fun sameDay(a: Long, b: Long): Boolean {
 
 private data class Prev(val authorId: String, val at: Long, val system: Boolean, val hook: String?)
 
-/** Webhook messages group only when the webhook and the name and picture it sent match. */
+/** Webhook messages group only when the webhook and the name and picture it sent match; an app's group by the app, as its bot's. */
 private fun hookKey(cm: ChatMessage?): String? {
     val h = fish.nexa.data.Webhooks.content(cm?.hook) ?: return null
+    h.applicationId?.let { return "app:$it" }
     return "${cm!!.m.webhookId}|${h.name}|${h.avatarId ?: h.avatarUrl ?: ""}"
 }
 
@@ -420,7 +421,7 @@ fun MessageList(channel: Channel, modifier: Modifier = Modifier) {
                     is ListRow.Msg -> {
                         val cm = row.item.cm
                         if (cm?.m?.type == "system_call") CallRecordRow(cm, ctx)
-                        else MessageRow(row.item, ctx, cm?.let { flashes[it.id] }, picked = cm != null && cm.id in ChatUi.picked, canPick = cm != null && canDelete(cm.m))
+                        else MessageRow(row.item, ctx, cm?.let { flashes[it.id] }, picked = cm != null && cm.id in ChatUi.picked, canPick = cm != null && !cm.m.ephemeral && canDelete(cm.m))
                     }
                     is ListRow.System -> if (row.cm.m.type == "system_automod") fish.nexa.ui.automod.AutomodAlertRow(row.cm, ctx) else SystemRow(row.cm, ctx)
                     is ListRow.Blocked -> BlockedRun(row, ctx) { blockedShown[row.key] = !row.shown }
@@ -616,7 +617,10 @@ private fun ConversationStart(channel: Channel) {
                 StartTitle(t("chat.messageList.welcomeToChannel", "name" to channel.name))
                 Spacer(Modifier.height(8.dp))
                 val topic = channel.topic.takeIf { it.isNotBlank() }?.let { fish.nexa.ui.markdown.Markdown.plainText(fish.nexa.ui.markdown.Markdown.parse(it), AppNames).replace(Regex("\\s+"), " ").trim() }
-                StartText(boldIn("chat.messageList.channelStart", "name", "#${channel.name}", listOfNotNull(topic, endToEnd).joinToString(" ", prefix = " ")))
+                // apps that read every message here: the start of the channel names them with the encryption line
+                val readers = fish.nexa.ui.apps.readingApps(channel.serverId, channel.id)
+                val encryption = if (readers.isEmpty()) endToEnd else t("apps.reading.endToEndExcept", "apps" to Names.list(readers.map { Names.shown(it) }))
+                StartText(boldIn("chat.messageList.channelStart", "name", "#${channel.name}", listOfNotNull(topic, encryption).joinToString(" ", prefix = " ")))
             }
         }
     }

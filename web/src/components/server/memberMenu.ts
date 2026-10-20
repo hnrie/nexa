@@ -7,6 +7,9 @@ import { useUsers } from "@/stores/users";
 import { relationshipButtons } from "@/lib/friendship";
 import { profileLinkItem } from "@/lib/profileLinks";
 import { about, button, defineMenu, type MenuButton } from "@/lib/contextMenus/registry";
+import { userAppsItem } from "@/components/chat/apps/appMenus";
+import { useChannels } from "@/stores/channels";
+import { useUI } from "@/stores/ui";
 import { usePick, type PickList } from "@/stores/pick";
 
 import { t } from "@/i18n";
@@ -123,6 +126,11 @@ export const memberMenu = defineMenu<MemberMenuCtx>("member", [
   relationshipButtons<MemberMenuCtx>({ friend: "memberFriendship", block: "blockMember" }, ({ serverId, userId }) => (where(serverId) ? userId : null)),
   memberManageButtons<MemberMenuCtx>({ nickname: "editMemberNickname", roles: "editMemberRoles" }, (c) => c),
   memberModerationButtons<MemberMenuCtx>({ timeout: "timeoutMember", kick: "kickMember", ban: "banMember" }, (c) => c),
+  // what apps can do with someone, used in the conversation open in this server
+  [button("memberApps", ({ serverId, userId }) => {
+    const here = useUI.getState().activeChannelId;
+    return !!where(serverId) && useChannels.getState().byId[here ?? ""]?.server_id === serverId ? userAppsItem(here, userId) : null;
+  })],
   [button("copyMemberId", ({ serverId, userId }) => !!where(serverId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => copyAndSay(userId) })],
   [button("selectMembers", ({ serverId, userId, select }) => !!select && !!where(serverId) && { id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start(select, userId) })],
 ]);

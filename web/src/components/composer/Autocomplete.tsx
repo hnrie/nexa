@@ -1,11 +1,14 @@
 import { AtSign, Hash } from "lucide-react";
 import type { Channel, Emoji, PublicUser, Role } from "@/api/types";
+import type { CommandApp } from "@/api/apps";
+import type { CommandLeaf } from "@/lib/apps";
 import { emojiUrl } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
 import { Twemoji } from "@/components/common/Twemoji";
 import type { EmojiEntry } from "@/components/pickers/emojiIndex";
 import { withTone } from "@/components/pickers/emojiIndex";
 import { pointerMoved } from "@/lib/pointerMoved";
+import { optionName } from "@/lib/apps";
 import { Fragment, useEffect, useRef, type CSSProperties } from "react";
 import s from "./Composer.module.css";
 import { t } from "@/i18n";
@@ -17,7 +20,11 @@ export type AcItem =
   /** `name` is the code that matched what was typed, where it is not the emoji's first. */
   | { kind: "emoji"; entry: EmojiEntry; name?: string }
   | { kind: "customEmoji"; emoji: Emoji }
-  | { kind: "command"; name: string; desc: string };
+  | { kind: "command"; name: string; desc: string }
+  /** An app's slash command (or one of its subcommands), under its app. */
+  | { kind: "appCommand"; app: CommandApp; leaf: CommandLeaf }
+  /** One of the values an option of an app's command can take. */
+  | { kind: "choice"; name: string; value: string | number | boolean };
 
 /** The suggestion list's ids, so the message box can say which one is chosen. */
 export const AC_LIST_ID = "composer-suggestions";
@@ -27,6 +34,8 @@ export function acOptionId(i: number): string {
 
 /** What a row is filed under, for the headings between the groups. */
 function groupOf(it: AcItem, kind: string): string {
+  if (it.kind === "appCommand") return it.app.name;
+  if (it.kind === "choice") return t("apps.command.choices");
   if (it.kind === "role") return t("server.members.roles");
   if (it.kind === "user" || (it.kind === "command" && kind === "user")) return t("server.serverSettings.members");
   if (it.kind === "channel") return t("servers.defaults.textChannels");
@@ -46,6 +55,10 @@ function keyOf(it: AcItem): string {
       return "e" + it.entry.hexcode;
     case "customEmoji":
       return "x" + it.emoji.id;
+    case "appCommand":
+      return "a" + it.leaf.command.id + ":" + it.leaf.path.join(" ");
+    case "choice":
+      return "v" + String(it.value);
     default:
       return "m" + it.name;
   }
@@ -117,6 +130,19 @@ export function Autocomplete({ kind, items, index, onHover, onPick, tone, headin
                   <img className={s.acEmojiImg} src={emojiUrl(it.emoji.blob_id, it.emoji.animated, 24)} alt="" />
                   <span className={s.acName}>:{it.emoji.name}:</span>
                 </>
+              ) : it.kind === "appCommand" ? (
+                <>
+                  <Avatar id={it.app.id} avatarId={it.app.bot.avatar_id} name={it.app.name} size={24} />
+                  <span className={s.acName}>
+                    /{it.leaf.label}
+                    {it.leaf.options.filter((o) => o.required).map((o) => (
+                      <span key={o.name} className={s.acOption}>{optionName(o)}</span>
+                    ))}
+                  </span>
+                  <span className={s.acSub}>{it.leaf.description}</span>
+                </>
+              ) : it.kind === "choice" ? (
+                <span className={s.acName}>{it.name}</span>
               ) : kind === "user" ? (
                 <>
                   <span className={s.acIcon} aria-hidden="true"><AtSign size={18} /></span>

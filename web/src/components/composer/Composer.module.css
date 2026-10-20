@@ -125,3 +125,36 @@
   .btns { gap: 4px; padding-inline-end: 2px; }
   .noticeMain, .noticeAlt { min-height: 40px; }
 }
+
+/* --- an app's command being filled in (CommandMode) ---------------------------------------- */
+/* the box holds the command and a slot per option, wrapping onto more lines as they fill */
+.cmdBox { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-block: 8px; padding-inline: 0 8px; min-height: 48px; box-sizing: border-box; }
+.cmdHead { display: inline-flex; align-items: center; gap: 6px; padding-inline-end: 2px; min-width: 0; }
+.cmdName { font-size: 15.5px; font-weight: 650; color: var(--text-brand); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; max-width: 100%; padding-block: 0; padding-inline: 10px 4px; box-sizing: border-box; border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text); font-size: 15px; box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 40%, transparent), inset 0 0 0 1px var(--border-subtle); transition: box-shadow var(--transition); }
+.slot[data-focused] { box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 40%, transparent), 0 0 0 2px color-mix(in srgb, var(--focus-ring) 70%, transparent); }
+.slot[data-invalid] { box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 40%, transparent), inset 0 0 0 1px var(--text-danger); }
+.slotName { flex: none; font-size: 12.5px; font-weight: 650; color: var(--text-muted); white-space: nowrap; }
+/* the box grows with what is typed in it: an unseen copy of the words beside the input sets its width */
+.slotGrow { display: inline-grid; min-width: 4ch; max-width: min(360px, 56vw); padding-inline-end: 6px; }
+.slotGrow::after { content: attr(data-value) " "; visibility: hidden; white-space: pre; grid-area: 1 / 1; font: inherit; overflow: hidden; }
+.slotGrow input { grid-area: 1 / 1; width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; outline: none; unicode-bidi: plaintext; }
+.slotValue { display: inline-flex; align-items: center; min-width: 0; height: 24px; padding: 0 6px; border-radius: 6px; background: var(--mention-bg); color: var(--mention-fg); font-weight: 600; white-space: nowrap; }
+.slotValue span { overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
+.slotGhost { width: 3px; min-width: 3px; padding: 0; border: 0; background: transparent; color: transparent; caret-color: var(--text); outline: none; }
+.slotFile { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding-inline: 0 6px; color: var(--link); font-size: 14px; font-weight: 550; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slotFile:hover { text-decoration: underline; }
+.slotRemove { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: var(--icon); }
+.slotRemove:hover { background: var(--bg-hover); color: var(--text-strong); }
+.cmdAdd { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--border); transition: background var(--transition), color var(--transition); }
+.cmdAdd:hover { background: var(--bg-hover); color: var(--text-strong); }
+.cmdAdd:focus-visible, .slotRemove:focus-visible, .slotFile:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* above the box, what the option being filled in asks for, and that the app reads it as it is */
+.cmdBar { position: absolute; inset-inline: 16px; bottom: 100%; margin-bottom: 10px; z-index: 40; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; padding: 10px 14px; background: var(--bg-floating); border-radius: var(--radius-md); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); font-size: 13.5px; line-height: 18px; color: var(--text-muted); animation: acIn 160ms var(--ease-out); }
+.cmdHint { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.cmdHint b { color: var(--text-strong); font-weight: 650; }
+.cmdBar[data-invalid] .cmdHint span { color: var(--text-danger); }
+.cmdPlain { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; }
+.acOption { display: inline-block; margin-inline-start: 8px; padding: 1px 6px; border-radius: 5px; background: var(--bg-hover); font-size: 12.5px; font-weight: 550; color: var(--text-muted); vertical-align: 1px; }
+/* the caret's place after the command and its slots: a command that takes nothing sends from here */
+.cmdTail { flex: 1 1 4px; min-width: 4px; height: 28px; padding: 0; border: 0; background: transparent; color: transparent; caret-color: var(--text); outline: none; }

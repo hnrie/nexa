@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
@@ -175,23 +176,28 @@ type WebhookMessageEdit struct {
 	MentionEveryone bool
 	Keep            []ids.ID
 	Add             []Attachment
-	EditedAt        int64
+	// EditedAt is when it was edited; 0 leaves the message's edited time as
+	// it was (an app filling in an answer it said it was still thinking about)
+	EditedAt int64
 }
 
-// EditWebhookMessage rewrites a webhook message in one write: its content,
+// EditWebhookMessage rewrites a webhook's or a bot's message in one write: its content,
 // mentions and flags (the pinned bit is kept), and its files, taking the ones
 // dropped out (with their blob references) and adding new ones.
 func (s *Store) EditWebhookMessage(ctx context.Context, id ids.ID, e WebhookMessageEdit) error {
 	return s.Tx(ctx, func(tx *db.Tx) error {
 		var chID, author int64
 		var webhook sql.NullInt64
-		if err := tx.QueryRowContext(ctx, `SELECT channel_id, author_id, webhook_id FROM messages WHERE id = ?`, int64(id)).Scan(&chID, &author, &webhook); err != nil {
+		var plain, ct sql.NullString
+		var typ string
+		if err := tx.QueryRowContext(ctx, `SELECT channel_id, author_id, webhook_id, plain, ciphertext, type FROM messages WHERE id = ?`, int64(id)).Scan(&chID, &author, &webhook, &plain, &ct, &typ); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrNotFound
 			}
 			return err
 		}
-		if !webhook.Valid {
+		// a webhook's message, or a bot's: words kept in the clear
+		if !webhook.Valid && !(plain.Valid && !ct.Valid && (typ == "default" || typ == "reply")) {
 			return ErrNotFound
 		}
 		if e.Keep != nil {
@@ -233,7 +239,7 @@ func (s *Store) EditWebhookMessage(ctx context.Context, id ids.ID, e WebhookMess
 				a.ID = ids.New()
 			}
 			if _, err := tx.ExecContext(ctx, `INSERT INTO attachments (id, message_id, channel_id, uploader_id, blob_id, size, created_at) VALUES (?,?,?,?,?,?,?)`,
-				int64(a.ID), int64(id), chID, author, int64(a.BlobID), a.Size, e.EditedAt); err != nil {
+				int64(a.ID), int64(id), chID, author, int64(a.BlobID), a.Size, time.Now().UnixMilli()); err != nil {
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = ref_count + 1 WHERE id = ?`, int64(a.BlobID)); err != nil {
@@ -244,16 +250,20 @@ func (s *Store) EditWebhookMessage(ctx context.Context, id ids.ID, e WebhookMess
 		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM attachments WHERE message_id = ?`, int64(id)).Scan(&left); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `UPDATE messages SET plain = ?, flags = (flags & ?) | ?, mentions = ?, mention_roles = ?, mention_everyone = ?, has_attachments = ?, edited_at = ? WHERE id = ?`,
-			string(e.Plain), MsgFlagPinned, e.Flags&^MsgFlagPinned, idsJSON(e.Mentions), idsJSON(e.MentionRoles), boolInt(e.MentionEveryone), boolInt(left > 0), e.EditedAt, int64(id))
+		var edited any
+		if e.EditedAt != 0 {
+			edited = e.EditedAt
+		}
+		_, err := tx.ExecContext(ctx, `UPDATE messages SET plain = ?, flags = (flags & ?) | ?, mentions = ?, mention_roles = ?, mention_everyone = ?, has_attachments = ?, edited_at = COALESCE(?, edited_at) WHERE id = ?`,
+			string(e.Plain), MsgFlagPinned, e.Flags&^MsgFlagPinned, idsJSON(e.Mentions), idsJSON(e.MentionRoles), boolInt(e.MentionEveryone), boolInt(left > 0), edited, int64(id))
 		return err
 	})
 }
 
-// SetWebhookPlain replaces what a webhook message holds without calling it an
-// edit: the link previews the server fetched for it afterwards.
+// SetWebhookPlain replaces what a webhook's or a bot's message holds without
+// calling it an edit: the link previews the server fetched for it afterwards.
 func (s *Store) SetWebhookPlain(ctx context.Context, id ids.ID, plain json.RawMessage) error {
-	res, err := s.db.W.ExecContext(ctx, `UPDATE messages SET plain = ? WHERE id = ? AND webhook_id IS NOT NULL`, string(plain), int64(id))
+	res, err := s.db.W.ExecContext(ctx, `UPDATE messages SET plain = ? WHERE id = ? AND (webhook_id IS NOT NULL OR (plain IS NOT NULL AND ciphertext IS NULL AND type IN ('default', 'reply')))`, string(plain), int64(id))
 	if err != nil {
 		return err
 	}

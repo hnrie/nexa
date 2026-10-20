@@ -56,7 +56,6 @@ import coil3.compose.AsyncImage
 import fish.nexa.Nexa
 import fish.nexa.crypto.AttachmentMeta
 import fish.nexa.data.ChatMessage
-import fish.nexa.data.Hooks
 import fish.nexa.media.AUTO_LOAD_MAX
 import fish.nexa.media.AttachmentLoad
 import fish.nexa.media.Downloads
@@ -86,7 +85,7 @@ import fish.nexa.ui.theme.topEdge
 /** Who sent a message, as the viewer names it under a picture. */
 fun senderName(cm: ChatMessage?, ctx: ListCtx?): String {
     if (cm == null) return ""
-    Hooks.of(cm.hook)?.let { return it.name }
+    fish.nexa.ui.markdown.Webhook.of(cm.hook)?.let { return it.name }
     return Names.member(ctx?.server?.server?.id, cm.authorId)
 }
 

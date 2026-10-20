@@ -28,6 +28,8 @@ import { ApiError } from "@/api/client";
 import { expressions as expressionsApi } from "@/api/expressions";
 import { ring } from "@/lib/keyring";
 import type { Member, Message, NoteInviteRow, PublicUser, Relationship, ServerView } from "@/api/types";
+import { MSG_FLAG_EPHEMERAL } from "@/api/types";
+import { useAppCommands } from "@/stores/appCommands";
 import { nexa as nexaApi, type Announcement, type MemberCase, type NexaState } from "@/api/moderation";
 import { useNexa } from "@/stores/nexa";
 import { useDiscord } from "@/stores/discord";
@@ -336,6 +338,13 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const decrypted = await decryptForStore(m);
       if (gone()) return;
       const messages = useMessages.getState();
+      // An app's answer only this person sees: it shows where it was asked
+      // for, and is no part of the conversation (nothing unread, nothing newest).
+      if (m.flags & MSG_FLAG_EPHEMERAL) {
+        messages.insert(m.channel_id, [decrypted]);
+        ensureUser(m.author_id);
+        return;
+      }
       if (m.nonce && meId === m.author_id) messages.settle(m.channel_id, [decrypted], { nonce: m.nonce });
       else messages.insert(m.channel_id, [decrypted]);
       // AutoMod reads what arrives (a moderator's app clears away what a rule stops)
@@ -399,6 +408,10 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     }
     case "message_delete": {
+      if (e.d.ephemeral) {
+        useMessages.getState().remove(e.d.channel_id, e.d.id);
+        return;
+      }
       // Read before it goes: only the message itself says whether it was
       // counted as a mention, and a mention taken back as unread but not as a
       // mention leaves a red pill on a channel with nothing left to read.
@@ -431,6 +444,17 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       each(dispatchHooks.onMessageChange, (h) => h({ kind: "delete", channelId: e.d.channel_id, ids: e.d.ids }));
       return;
     }
+    case "reaction_remove_all":
+    case "reaction_remove_emoji":
+      useMessages.getState().clearReactions(e.d.channel_id, e.d.message_id, e.t === "reaction_remove_emoji" ? e.d.emoji : undefined);
+      return;
+    case "application_commands_update":
+    case "integrations_update":
+      // the commands kept for each channel are read again when next needed
+      useAppCommands.getState().forget();
+      // and a page listing a server's apps reads them again
+      each(dispatchHooks.onUnhandled, (h) => h(e));
+      return;
     case "reaction_add":
     case "reaction_remove":
       useMessages.getState().setReaction(e.d.channel_id, e.d.message_id, e.d.emoji, e.d.user_id, e.t === "reaction_add", e.d.user_id === meId);

@@ -164,13 +164,22 @@ class Session(private val nx: Nexa) {
             "message_delete" -> {
                 val ch = d.str("channel_id") ?: return
                 val id = d.str("id") ?: return
-                onDeleted(ch, listOf(id), d, single = true)
+                // an app's answer only this person saw: it goes, and was never part of the conversation
+                if (d.bool("ephemeral")) nx.messages.removeMany(ch, listOf(id))
+                else onDeleted(ch, listOf(id), d, single = true)
             }
             "message_delete_bulk" -> {
                 val ch = d.str("channel_id") ?: return
                 val ids = ((d as? JsonObject)?.get("ids") as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: return
                 onDeleted(ch, ids, d, single = false)
             }
+            "reaction_remove_all", "reaction_remove_emoji" -> {
+                val ch = d.str("channel_id") ?: return
+                val mid = d.str("message_id") ?: return
+                nx.messages.clearReactions(ch, mid, if (e.t == "reaction_remove_emoji") d.str("emoji") ?: return else null)
+            }
+            // the commands kept for each channel are read again when next needed (a page listing a server's apps follows the event itself)
+            "application_commands_update", "integrations_update" -> AppCommands.forget()
             "reaction_add", "reaction_remove" -> {
                 val ch = d.str("channel_id") ?: return
                 val mid = d.str("message_id") ?: return
@@ -429,6 +438,13 @@ class Session(private val nx: Nexa) {
 
     private suspend fun onMessageCreate(m: Message, meId: String?) {
         val dec = nx.messages.decrypt(m)
+        // An app's answer only this person sees: it shows where it was asked
+        // for, and is no part of the conversation (nothing unread, nothing newest).
+        if (m.ephemeral) {
+            nx.messages.insert(m.channelId, listOf(dec))
+            ensureUsers(listOf(m.authorId))
+            return
+        }
         if (m.nonce != null && meId == m.authorId) nx.messages.settle(m.channelId, listOf(dec), nonce = m.nonce)
         else nx.messages.insert(m.channelId, listOf(dec))
         val lastBefore = nx.channels.get(m.channelId)?.lastMessageId

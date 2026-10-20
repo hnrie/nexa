@@ -24,6 +24,7 @@ import { ShareScreenModal } from "@/components/voice/ShareScreenModal";
 import { ScreenPermission } from "@/components/desktop/DisplayPicker";
 import { GuestLinkModal } from "@/components/voice/GuestLinkModal";
 import type { StickerInfo } from "@/api/types";
+import type { AppForm } from "@/api/apps";
 import { StickerPackModal } from "./StickerPackModal";
 import { BlockDialog } from "@/components/profile/BlockDialog";
 import type { ProfileTab } from "@/components/profile/ProfileCard";
@@ -47,6 +48,7 @@ const VerifyKeyModal = lazyPage(() => import("./VerifyKeyModal"));
 const KeyChangeModal = lazyPage(() => import("./KeyChangeModal"));
 const ReportBugModal = lazyPage(() => import("@/components/bugs/ReportBugModal"));
 const ShareNoteModal = lazyPage(() => import("@/components/notes/ShareNoteModal").then((m) => ({ default: m.ShareNoteModal })));
+const AppFormModal = lazyPage(() => import("@/components/apps/AppFormModal").then((m) => ({ default: m.AppFormModal })));
 
 /** Stands in for a dialog whose code is still on its way. */
 function Loading({ onClose }: { onClose: () => void }) {
@@ -143,6 +145,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
         {modal?.kind === "keyChange" ? <KeyChangeModal onClose={close} /> : null}
         {modal?.kind === "reportBug" ? <ReportBugModal onClose={close} from={modal.props?.["from"] as BugFrom | undefined} /> : null}
         {modal?.kind === "shareNote" ? <ShareNoteModal onClose={close} noteId={String(modal.props?.["noteId"])} /> : null}
+        {modal?.kind === "appForm" ? <AppFormModal onClose={close} form={modal.props?.["form"] as AppForm} appId={String(modal.props?.["appId"])} channelId={String(modal.props?.["channelId"])} interactionId={String(modal.props?.["interactionId"])} /> : null}
       </Suspense>
     </>
   );

@@ -187,7 +187,8 @@ function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): voi
     void showNotification("Nexa", { body: t("notify.newMessage"), tag: `ec-${m.channel_id}`, icon: "/icons/icon-192.png", silent: true }, path);
     return;
   }
-  const hook = decrypted?.hook;
+  // a webhook's message goes by the name and picture it was sent with; an app's, by its bot's
+  const hook = decrypted?.hook && m.webhook_id ? decrypted.hook : undefined;
   const author = hook?.name ?? displayName(users[m.author_id]);
   const title = ch && ch.type === "group_dm" ? `${author} (${channelDisplayName(ch, users, me.id)})` : ch && ch.server_id ? `${author} (${channelLabel(ch)})` : author;
   const body = preview === "full" ? previewOf(m, decrypted) : t("notify.newMessage");

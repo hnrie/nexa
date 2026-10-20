@@ -32,6 +32,10 @@ import { learnEmojiHistory, noteEmojiUse, suggestEmoji, type EmojiCandidate } fr
 import { emojiKeysIn } from "@/lib/emojiUsage";
 import { channelDisplayName } from "@/lib/names";
 import { Autocomplete, type AcItem, AC_LIST_ID, acOptionId } from "./Autocomplete";
+import { useCommandMode } from "./CommandMode";
+import { CMD_SLASH, channelCommands, commandsOfType, useAppCommands } from "@/stores/appCommands";
+import { commandLeaves } from "@/lib/apps";
+import type { ChannelCommands } from "@/api/apps";
 import { commands, runCommand } from "./commands";
 import { rankPeople, recentSpeakers } from "./rankPeople";
 import { servers as serversApi } from "@/api/servers";
@@ -100,6 +104,9 @@ type Notice = { kind: "long"; text: string; start: number; end: number } | { kin
  */
 export function acToken(text: string, caret: number, channels: boolean, smartEmoji = false): { kind: AcKind; query: string; start: number } | null {
   const before = text.slice(0, caret);
+  // a command at the very start, an app's subcommands too ("/config set")
+  const command = /^\/([\p{L}\p{N}_-]*(?: [\p{L}\p{N}_-]*){0,2})$/u.exec(before);
+  if (command) return { kind: "command", query: command[1]!.toLowerCase(), start: 0 };
   if (smartEmoji && /(?:^|\s):$/.test(before)) return { kind: "emoji", query: "", start: caret - 1 };
   // names in any script: someone called Émile or سارة is found by typing their name
   const m = /(?:^|\s)(@[\p{L}\p{N}_.-]*|#[\p{L}\p{N}_-]*|:[\w+-]{2,}|^\/\w*)$/iu.exec(before);
@@ -119,6 +126,24 @@ function unicodeEmojiCandidates(): EmojiCandidate[] {
   const all = allEmoji();
   if (unicodeCandidates?.from !== all) unicodeCandidates = { from: all, list: all.map((entry) => ({ kind: "emoji", entry })) };
   return unicodeCandidates.list;
+}
+
+/**
+ * The slash commands of apps that match what was typed after the slash, a row
+ * per command or subcommand, by app; the words of a subcommand's name are
+ * matched one by one, so "/conf s" finds "config set".
+ */
+export function appCommandItems(list: ChannelCommands | null, query: string): AcItem[] {
+  const words = query.trim().split(/\s+/).filter(Boolean);
+  const out: AcItem[] = [];
+  for (const { app, command } of commandsOfType(list, CMD_SLASH)) {
+    for (const leaf of commandLeaves(command)) {
+      const parts = leaf.label.toLowerCase().split(" ");
+      const fits = words.every((w, i) => (i < words.length - 1 || query.endsWith(" ") ? parts[i] === w : parts[i]?.startsWith(w))) && (!query.endsWith(" ") || parts.length > words.length);
+      if (fits) out.push({ kind: "appCommand", app, leaf });
+    }
+  }
+  return out.slice(0, 50);
 }
 
 /** Matches that start with what was typed come before ones that only contain it. */
@@ -233,6 +258,39 @@ export function Composer({ channel }: { channel: Channel }) {
   const [preview, setPreview] = useState(false);
   /** Something the box has to say: a paste too long for a message, files that did not fit. */
   const [notice, setNotice] = useState<Notice | null>(null);
+  /** Apps' commands are offered where this account may use them. */
+  const canUseApps = !isServer || canI(serverState, P.USE_APPLICATION_COMMANDS, channel.id);
+  const cmd = useCommandMode(channel, {
+    tone,
+    onLeave: (value) => {
+      touched.current = true;
+      setText(value);
+      persistDraftRef.current?.(value);
+      caretOnceShown(value, value.length, true);
+    },
+  });
+  // what apps offer here is ready by the time a slash is typed
+  useEffect(() => {
+    if (canUseApps) void useAppCommands.getState().load(channel.id);
+  }, [channel.id, canUseApps]);
+  // a command clicked where someone used it starts here, in its conversation
+  const startCmd = useAppCommands((a) => a.start);
+  useEffect(() => {
+    if (!startCmd || startCmd.channelId !== channel.id) return;
+    useAppCommands.getState().startCommand(null);
+    void useAppCommands.getState().load(channel.id).then((list) => {
+      const found = commandsOfType(list, CMD_SLASH).find(({ app }) => app.id === startCmd.applicationId);
+      if (!found) return;
+      for (const { app, command } of commandsOfType(list, CMD_SLASH).filter((x) => x.app.id === startCmd.applicationId)) {
+        const leaf = commandLeaves(command).find((l) => l.command.name === startCmd.name.split(" ")[0] && [command.name, ...l.path].join(" ") === startCmd.name);
+        if (leaf) {
+          setText("");
+          cmd.start(app, leaf);
+          return;
+        }
+      }
+    });
+  }, [startCmd, channel.id, cmd]);
 
   /**
    * Puts the caret at `pos` on the next frame, once the box shows `value`,
@@ -446,13 +504,26 @@ export function Composer({ channel }: { channel: Channel }) {
       items = [...all, ...searchEmoji(tok.query, Math.max(2, 8 - all.length)).map((e) => ({ kind: "emoji" as const, entry: e }))];
     } else {
       items = commands().filter((c) => c.name.startsWith(tok.query)).map((c) => ({ kind: "command", name: c.name, desc: c.desc }));
+      if (canUseApps) {
+        const list = channelCommands(channel.id);
+        // the apps' commands lead: they are what a slash is mostly typed for where there are any
+        items = [...appCommandItems(list, tok.query), ...items];
+        // not loaded yet: the list follows once it is, if a command is still being typed
+        if (!list) {
+          const forChannel = channel.id;
+          void useAppCommands.getState().load(forChannel).then((loaded) => {
+            const ta = taRef.current;
+            if (loaded && ta && channelRef.current === forChannel && ta.value.startsWith("/")) refreshAcRef.current(ta.value, ta.selectionStart ?? ta.value.length);
+          });
+        }
+      }
     }
     setAc(items.length ? { items, index: 0, start: tok.start, kind: tok.kind } : null);
     // serverState, canEveryone and isServer are read above and change on their
     // own: without them a role that just granted @everyone, or members that
     // arrived after this was built, never showed up in the list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [users, rels, channel.id, channel.recipient_ids, channel.server_id, serverState, canEveryone, isServer, me?.id]);
+  }, [users, rels, channel.id, channel.recipient_ids, channel.server_id, serverState, canEveryone, isServer, me?.id, canUseApps]);
 
   /** Asks the server for members by name, once per name, a moment after the typing stops. */
   const asked = useRef(new Set<string>());
@@ -553,7 +624,14 @@ export function Composer({ channel }: { channel: Channel }) {
     else if (it.kind === "command" && ac.kind === "user") insertAt(ac.start, caret, `@${it.name} `);
     else if (it.kind === "emoji") insertAt(ac.start, caret, `${withTone(it.entry, tone)} `);
     else if (it.kind === "customEmoji") insertAt(ac.start, caret, `${emojiText(emojiToken(it.emoji), it.emoji.name)} `);
-    else insertAt(ac.start, caret, `/${it.name} `);
+    else if (it.kind === "appCommand") {
+      // the box becomes the command, with a slot for each option it needs
+      setAc(null);
+      touched.current = true;
+      setText("");
+      persistDraft("");
+      cmd.start(it.app, it.leaf);
+    } else if (it.kind === "command") insertAt(ac.start, caret, `/${it.name} `);
   };
 
   const addFiles = (list: FileList | File[]) => {
@@ -751,9 +829,10 @@ export function Composer({ channel }: { channel: Channel }) {
 
   const selecting = useSelection((x) => x.channelId) !== null;
   const replyTarget = useMemo(() => (replyTo && replyTo.channelId === channel.id ? msgs?.byId[replyTo.messageId] : undefined), [replyTo, msgs, channel.id]);
-  const replyShown = useShownName(channel.id, replyTarget?.hook ? undefined : replyTarget?.author_id);
-  // a webhook's message is answered by the name it was sent with
-  const replyName = replyTarget?.hook ? replyTarget.hook.name : replyShown;
+  // a webhook's message is answered by the name it was sent with; an app's, by its bot's
+  const replyByHook = !!replyTarget?.hook && !!replyTarget.webhook_id;
+  const replyShown = useShownName(channel.id, replyByHook ? undefined : replyTarget?.author_id);
+  const replyName = replyByHook ? replyTarget!.hook!.name : replyShown;
   const replyWords = useReplyWords(replyTarget);
   const replyCtx = useRenderCtx();
 
@@ -822,7 +901,7 @@ export function Composer({ channel }: { channel: Channel }) {
   return (
     <div className={s.wrap}>
       <DropOverlay name={name} hash={!!channel.server_id} onFiles={(list) => takeFiles.current?.(list)} disabled={!canSend || selecting} />
-      {ac ? <Autocomplete kind={ac.kind} items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} heading={ac.frequent ? tr_("composer.autocomplete.frequentlyUsed") : undefined} /> : null}
+      {cmd.active ? cmd.list : ac ? <Autocomplete kind={ac.kind} items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} heading={ac.frequent ? tr_("composer.autocomplete.frequentlyUsed") : undefined} /> : null}
       {formatting ? (
         <Suspense fallback={null}>
           <FormatEditor
@@ -962,58 +1041,62 @@ export function Composer({ channel }: { channel: Channel }) {
             <CirclePlus size={24} />
           </button>
         )}
-        <textarea
-          data-composer=""
-          // a screen reader hears the suggestions and which one Enter takes
-          aria-autocomplete="list"
-          aria-expanded={!!ac}
-          aria-controls={ac ? AC_LIST_ID : undefined}
-          aria-activedescendant={ac ? acOptionId(ac.index) : undefined}
-          ref={taRef}
-          className={s.ta}
-          value={text}
-          onChange={onChange}
-          onKeyDown={onKeyDown}
-          onSelect={onSelect}
-          onBlur={() => {
-            setAc(null);
-            setQuiet(false);
-          }}
-          onCompositionStart={() => setQuiet(false)}
-          onPaste={(e) => {
-            const cd = e.clipboardData;
-            const pasted = cd.getData("text/plain");
-            // Cells from a spreadsheet or lines from a document come with a
-            // picture of themselves; the words are what was meant. A picture
-            // copied from a page comes with markup that is only the picture.
-            const html = cd.getData("text/html");
-            const wordsToo = !!pasted.trim() && !!html && html.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]*>/g, "").trim() !== "";
-            if (cd.files.length && !wordsToo) {
-              // without permission any text on the clipboard still pastes
-              if (canAttach) e.preventDefault();
-              addFiles(cd.files);
-              return;
-            }
-            // Past the limit a paste is not cut short (the box has no maxLength,
-            // which used to throw the rest away): it waits, offered as a file.
-            const el = e.currentTarget;
-            const start = el.selectionStart ?? el.value.length;
-            const end = el.selectionEnd ?? start;
-            if (pasteOverflows(el.value, start, end, pasted)) {
-              e.preventDefault();
-              setNotice({ kind: "long", text: pasted, start, end });
-            }
-          }}
-          placeholder={placeholder}
-          rows={1}
-          spellCheck={spellcheck && !ownSpelling}
-          data-spell={ownSpelling ? "" : undefined}
-          data-markdown=""
-          aria-label={placeholder}
-        />
-        <SpellLines target={taRef} text={text} />
+        {cmd.active ? cmd.box : (
+          <>
+          <textarea
+            data-composer=""
+            // a screen reader hears the suggestions and which one Enter takes
+            aria-autocomplete="list"
+            aria-expanded={!!ac}
+            aria-controls={ac ? AC_LIST_ID : undefined}
+            aria-activedescendant={ac ? acOptionId(ac.index) : undefined}
+            ref={taRef}
+            className={s.ta}
+            value={text}
+            onChange={onChange}
+            onKeyDown={onKeyDown}
+            onSelect={onSelect}
+            onBlur={() => {
+              setAc(null);
+              setQuiet(false);
+            }}
+            onCompositionStart={() => setQuiet(false)}
+            onPaste={(e) => {
+              const cd = e.clipboardData;
+              const pasted = cd.getData("text/plain");
+              // Cells from a spreadsheet or lines from a document come with a
+              // picture of themselves; the words are what was meant. A picture
+              // copied from a page comes with markup that is only the picture.
+              const html = cd.getData("text/html");
+              const wordsToo = !!pasted.trim() && !!html && html.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]*>/g, "").trim() !== "";
+              if (cd.files.length && !wordsToo) {
+                // without permission any text on the clipboard still pastes
+                if (canAttach) e.preventDefault();
+                addFiles(cd.files);
+                return;
+              }
+              // Past the limit a paste is not cut short (the box has no maxLength,
+              // which used to throw the rest away): it waits, offered as a file.
+              const el = e.currentTarget;
+              const start = el.selectionStart ?? el.value.length;
+              const end = el.selectionEnd ?? start;
+              if (pasteOverflows(el.value, start, end, pasted)) {
+                e.preventDefault();
+                setNotice({ kind: "long", text: pasted, start, end });
+              }
+            }}
+            placeholder={placeholder}
+            rows={1}
+            spellCheck={spellcheck && !ownSpelling}
+            data-spell={ownSpelling ? "" : undefined}
+            data-markdown=""
+            aria-label={placeholder}
+          />
+            <SpellLines target={taRef} text={text} />
+          </>
+        )}
         <div className={s.btns}>
-          {mobile ? (
+          {cmd.active ? null : mobile ? (
             <button
               type="button"
               className={s.iconBtn}
@@ -1048,13 +1131,17 @@ export function Composer({ channel }: { channel: Channel }) {
               typingAtPress.current = document.activeElement === taRef.current;
             }}
             onClick={() => {
+              if (cmd.active) {
+                cmd.submit();
+                return;
+              }
               void send();
               // still inside the tap, where a phone lets a box take the keyboard back
               const ta = taRef.current;
               if (typingAtPress.current && ta && document.activeElement !== ta) ta.focus({ preventScroll: true });
               typingAtPress.current = false;
             }}
-            disabled={remaining > 0 || (!text.trim() && files.length === 0)}
+            disabled={!cmd.active && (remaining > 0 || (!text.trim() && files.length === 0))}
             data-testid="send-button"
           >
             <SendHorizontal size={22} />

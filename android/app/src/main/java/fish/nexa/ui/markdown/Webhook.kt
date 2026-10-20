@@ -22,6 +22,11 @@ import java.time.format.DateTimeFormatter
  * one kind that is not end-to-end encrypted, and the app says so wherever it
  * is shown. Everything is read defensively: a wrong type must not crash the
  * client.
+ *
+ * An app's messages come the same way and in the same shape, with
+ * `application_id` naming the app and, on an answer to something someone
+ * used, `interaction` saying who used what. Their buttons and select menus do
+ * something: the app answers them (data/Interactions).
  */
 object Webhook {
     data class Media(
@@ -84,7 +89,47 @@ object Webhook {
         val spacing: Double? = null,
         val accentColor: Double? = null,
         val placeholder: String? = null,
+        /** What the app is told was used: buttons other than links, and select menus. */
+        val customId: String? = null,
+        /** A string select menu's choices. */
+        val options: List<SelectOption> = emptyList(),
+        val minValues: Double? = null,
+        val maxValues: Double? = null,
+        /** What a person, role, mentionable or channel select menu starts with picked. */
+        val defaultValues: List<DefaultValue> = emptyList(),
+        /** The kinds of channel a channel select menu offers (the protocol's numbers). */
+        val channelTypes: List<Double>? = null,
+    ) {
+        /** Whether it is a component of this type (one of the C_ constants). */
+        fun isType(n: Int): Boolean = type == n.toDouble()
+    }
+
+    /** One choice of a select menu. */
+    data class SelectOption(val label: String, val value: String, val description: String? = null, val emoji: Emoji? = null, val default: Boolean = false)
+
+    /** Something a select menu starts with picked: `type` is user, role or channel. */
+    data class DefaultValue(val id: String, val type: String)
+
+    /** What someone used that an app's message answers. */
+    data class Interaction(
+        val id: String,
+        /** 2 a command, 3 a button or select menu, 5 a form. */
+        val type: Double,
+        val userId: String,
+        /** The command's name, with its subcommands ("config set"). */
+        val name: String? = null,
+        /** 1 typed, 2 from a person's menu, 3 from a message's menu. */
+        val commandType: Double? = null,
+        val targetUserId: String? = null,
+        val targetMessageId: String? = null,
+        /** For a followup, the message the first answer made. */
+        val originalResponseMessageId: String? = null,
+        /** For a form's answer, what opened the form. */
+        val trigger: Interaction? = null,
     )
+
+    /** A sticker an app sent; `format` is the file's kind as Nexa keeps it (png, apng, gif, webp, tgs, webm). */
+    data class Sticker(val id: String, val name: String, val blobId: String, val format: String? = null)
 
     data class PollAnswer(val answerId: Double, val text: String, val emoji: Emoji? = null)
 
@@ -124,6 +169,11 @@ object Webhook {
         val avatarUrl: String? = null,
         val poll: Poll? = null,
         val source: String? = null,
+        /** The app that wrote it, for an app's message (its bot is the message's author). */
+        val applicationId: String? = null,
+        /** What someone used that this answers. */
+        val interaction: Interaction? = null,
+        val stickers: List<Sticker> = emptyList(),
     )
 
     // Component types and button styles, at Discord's numbers.
@@ -136,7 +186,20 @@ object Webhook {
     const val C_FILE = 13
     const val C_SEPARATOR = 14
     const val C_CONTAINER = 17
+    const val C_STRING_SELECT = 3
+    const val C_USER_SELECT = 5
+    const val C_ROLE_SELECT = 6
+    const val C_MENTIONABLE_SELECT = 7
+    const val C_CHANNEL_SELECT = 8
+    const val BUTTON_PRIMARY = 1
+    const val BUTTON_SECONDARY = 2
+    const val BUTTON_SUCCESS = 3
+    const val BUTTON_DANGER = 4
     const val BUTTON_LINK = 5
+    const val BUTTON_PREMIUM = 6
+
+    /** Whether a component's type is a select menu of any kind. */
+    fun isSelect(type: Double): Boolean = type == C_STRING_SELECT.toDouble() || (type >= C_USER_SELECT && type <= C_CHANNEL_SELECT)
 
     private fun obj(x: JsonElement?): JsonObject? = x as? JsonObject
     private fun str(x: JsonElement?): String? = (x as? JsonPrimitive)?.takeIf { it.isString }?.content
@@ -238,8 +301,50 @@ object Webhook {
             divider = bool(o["divider"]),
             spacing = num(o["spacing"]),
             accentColor = num(o["accent_color"])?.takeIf { it >= 0 && it <= 0xffffff },
-            placeholder = str(o["placeholder"])?.takeIf { it.isNotEmpty() },
+            placeholder = str(o["placeholder"])?.takeIf { it.isNotEmpty() }?.let { slice(it, 150) },
+            customId = str(o["custom_id"])?.takeIf { it.isNotEmpty() }?.let { slice(it, 100) },
+            options = arr(o["options"])?.take(25)?.mapNotNull { ov ->
+                val oo = obj(ov) ?: return@mapNotNull null
+                val label = str(oo["label"]) ?: return@mapNotNull null
+                val value = str(oo["value"]) ?: return@mapNotNull null
+                SelectOption(slice(label, 100), slice(value, 100), str(oo["description"])?.takeIf { it.isNotEmpty() }?.let { slice(it, 100) }, emoji(oo["emoji"]), bool(oo["default"]) == true)
+            } ?: emptyList(),
+            minValues = num(o["min_values"])?.takeIf { it >= 0 && it <= 25 }?.let { Math.floor(it) },
+            maxValues = num(o["max_values"])?.takeIf { it >= 1 && it <= 25 }?.let { Math.floor(it) },
+            defaultValues = arr(o["default_values"])?.take(25)?.mapNotNull { dv ->
+                val d = obj(dv) ?: return@mapNotNull null
+                val did = id(d["id"]) ?: return@mapNotNull null
+                val dt = str(d["type"])?.takeIf { it == "user" || it == "role" || it == "channel" } ?: return@mapNotNull null
+                DefaultValue(did, dt)
+            } ?: emptyList(),
+            channelTypes = arr(o["channel_types"])?.mapNotNull { num(it) }?.take(20),
         )
+    }
+
+    private fun interaction(x: JsonElement?, depth: Int = 0): Interaction? {
+        val o = obj(x) ?: return null
+        if (depth > 1) return null
+        val iid = id(o["id"]) ?: return null
+        val uid = id(o["user_id"]) ?: return null
+        val type = num(o["type"]) ?: return null
+        return Interaction(
+            id = iid, type = type, userId = uid,
+            name = str(o["name"])?.takeIf { it.isNotEmpty() }?.let { slice(it, 100) },
+            commandType = num(o["command_type"]),
+            targetUserId = id(o["target_user_id"]),
+            targetMessageId = id(o["target_message_id"]),
+            originalResponseMessageId = id(o["original_response_message_id"]),
+            trigger = interaction(o["trigger"], depth + 1),
+        )
+    }
+
+    private val STICKER_FORMAT = Regex("^(png|apng|gif|webp|tgs|webm)$")
+
+    private fun sticker(x: JsonElement?): Sticker? {
+        val o = obj(x) ?: return null
+        val sid = id(o["id"]) ?: return null
+        val blob = id(o["blob_id"]) ?: return null
+        return Sticker(sid, slice(str(o["name"]) ?: "", 30), blob, str(o["format"])?.takeIf { STICKER_FORMAT.matches(it) })
     }
 
     private fun poll(x: JsonElement?): Poll? {
@@ -300,7 +405,21 @@ object Webhook {
             avatarUrl = href(o["avatar_url"]),
             poll = poll(o["poll"]),
             source = str(o["source"])?.takeIf { it.isNotEmpty() },
+            applicationId = id(o["application_id"]),
+            interaction = interaction(o["interaction"]),
+            stickers = arr(o["stickers"])?.take(3)?.mapNotNull(::sticker) ?: emptyList(),
         )
+    }
+
+    private val parsed = java.util.Collections.synchronizedMap(java.util.WeakHashMap<JsonObject, Content>())
+
+    /** The content of a message's webhook object, read once per object. */
+    fun of(hook: JsonElement?): Content? {
+        val o = hook as? JsonObject ?: return null
+        parsed[o]?.let { return it }
+        val out = sanitize(o) ?: return null
+        parsed[o] = out
+        return out
     }
 
     /** A webhook's file as the attachment views take one: downloaded as it is, never decrypted. */
@@ -349,8 +468,17 @@ object Webhook {
     /** Whether two webhook messages look like they came from the same sender, for grouping them. */
     fun sameSender(a: Content?, b: Content?): Boolean {
         if (a == null || b == null) return a == null && b == null
+        // an app's messages are its bot's, which the rows group by author
+        if (a.applicationId != null || b.applicationId != null) return a.applicationId == b.applicationId
         return a.name == b.name && a.avatarId == b.avatarId && a.avatarUrl == b.avatarUrl
     }
+
+    /**
+     * Whether a message goes by the name and picture it was sent with: a
+     * webhook's. An app's messages are its bot's, and go by the bot's name,
+     * like anyone's, though their content is read here.
+     */
+    fun namedByHook(webhookId: String?, hook: JsonElement?): Boolean = webhookId != null && hook is JsonObject
 
     /**
      * `Date.parse` for the ISO 8601 forms webhooks send: a date alone is UTC,

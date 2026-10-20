@@ -89,6 +89,61 @@ const base = {
   source: "github",
 };
 
+// an app's message: what someone used, buttons that do something, select menus, stickers
+const app = {
+  name: "Lab Bot",
+  application_id: "223456789012345678",
+  content: "Pick one",
+  interaction: {
+    id: "323456789012345678",
+    type: 2,
+    user_id: "123",
+    name: "config set",
+    command_type: 1,
+    target_user_id: "5",
+    target_message_id: "x",
+    original_response_message_id: "8",
+    trigger: { id: "4", type: 3, user_id: "123", trigger: { id: "6", type: 2, user_id: "7" } },
+  },
+  stickers: [
+    { id: "11", name: "wave".repeat(10), blob_id: "12", format: "png" },
+    { id: "13", blob_id: "14", format: "svg" },
+    { id: "x", blob_id: "15" },
+    { id: "16", blob_id: "17", format: "webm" },
+  ],
+  components: [
+    {
+      type: 1,
+      components: [
+        { type: 2, style: 1, label: "Press", custom_id: "press" },
+        { type: 2, style: 3, label: "Yes", custom_id: "y".repeat(120), emoji: { name: "✅" } },
+        { type: 2, style: 4, label: "No", custom_id: "no", disabled: true },
+        { type: 2, style: 2, label: "Empty id", custom_id: "" },
+      ],
+    },
+    {
+      type: 1,
+      components: [
+        {
+          type: 3,
+          custom_id: "pick",
+          placeholder: "Choose".repeat(30),
+          min_values: 1,
+          max_values: 2.7,
+          options: [
+            { label: "A", value: "a", description: "first", emoji: { name: "🅰" }, default: true },
+            { label: "B".repeat(120), value: "b", description: "", default: "yes" },
+            { label: 5, value: "bad" },
+            { label: "", value: "" },
+          ],
+        },
+      ],
+    },
+    { type: 1, components: [{ type: 5, custom_id: "who", default_values: [{ id: "123", type: "user" }, { id: "9", type: "guild" }, { id: "x", type: "role" }], min_values: 0, max_values: 25 }] },
+    { type: 1, components: [{ type: 8, custom_id: "where", channel_types: [0, 2, "5", 1e400, 15], min_values: 26, max_values: 0 }] },
+  ],
+};
+
 const WRONG: unknown[] = [null, true, false, 0, -1, 1e400, "", "x", "12345678901234567890123", "-5", [], [1, 2], {}, { a: 1 }, "javascript:alert(1)", "//evil.example/x", "https://a b.example", "/media/proxy/x\ty", "2026-10-03", "2026-10-03T12:00:00", "Sat, 03 Oct 2026 12:00:00 GMT", "2026-13-40T99:00:00Z", "+002026-10-03T00:00:00Z", 16777216, 16777215.7, 3.5];
 
 function clone<T>(x: T): T {
@@ -130,6 +185,12 @@ for (let k = 0; k < 600; k++) {
   for (let n = 1 + int(4); n > 0; n--) r = mangle(r);
   raws.push(r);
 }
+raws.push(app);
+for (let k = 0; k < 400; k++) {
+  let r: unknown = clone(app);
+  for (let n = 1 + int(4); n > 0; n--) r = mangle(r);
+  raws.push(r);
+}
 
 const cases = raws.map((raw) => {
   const out = sanitizeHook(raw);
@@ -140,6 +201,7 @@ const cases = raws.map((raw) => {
     listed: out ? listedAttachments(out) : null,
     media: out && out.embeds[0]?.thumbnail ? mediaAttachment(out, out.embeds[0].thumbnail) : null,
     same: out ? sameHookSender(out, sanitizeHook(base)!) : null,
+    sameApp: out ? sameHookSender(out, sanitizeHook(app)!) : null,
   };
 });
 

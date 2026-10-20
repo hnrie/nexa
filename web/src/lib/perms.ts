@@ -34,6 +34,7 @@ export const P = {
   MANAGE_ROLES: 1n << 28n,
   MANAGE_WEBHOOKS: 1n << 29n,
   MANAGE_EMOJIS: 1n << 30n,
+  USE_APPLICATION_COMMANDS: 1n << 31n,
   USE_EXTERNAL_EMOJIS: 1n << 18n,
   MANAGE_THREADS: 1n << 34n,
   CREATE_PUBLIC_THREADS: 1n << 35n,
@@ -44,6 +45,7 @@ export const P = {
   USE_SOUNDBOARD: 1n << 42n,
   CREATE_EXPRESSIONS: 1n << 43n,
   CREATE_POLLS: 1n << 49n,
+  USE_EXTERNAL_APPS: 1n << 50n,
   PIN_MESSAGES: 1n << 51n,
   BYPASS_SLOWMODE: 1n << 52n,
 } as const;
@@ -53,7 +55,7 @@ export type PermName = keyof typeof P;
 export const ALL: bigint = Object.values(P).reduce((a, b) => a | b, 0n);
 export const DEFAULT_EVERYONE: bigint =
   P.CREATE_INSTANT_INVITE | P.ADD_REACTIONS | P.STREAM | P.VIEW_CHANNEL | P.SEND_MESSAGES | P.EMBED_LINKS | P.ATTACH_FILES | P.READ_MESSAGE_HISTORY | P.USE_EXTERNAL_EMOJIS | P.CONNECT | P.SPEAK | P.USE_VAD | P.CHANGE_NICKNAME | P.USE_SOUNDBOARD | P.CREATE_POLLS |
-  P.CREATE_PUBLIC_THREADS | P.CREATE_PRIVATE_THREADS | P.USE_EXTERNAL_STICKERS | P.SEND_MESSAGES_IN_THREADS;
+  P.CREATE_PUBLIC_THREADS | P.CREATE_PRIVATE_THREADS | P.USE_EXTERNAL_STICKERS | P.SEND_MESSAGES_IN_THREADS | P.USE_APPLICATION_COMMANDS | P.USE_EXTERNAL_APPS;
 export const TIMED_OUT_KEEP: bigint = P.VIEW_CHANNEL | P.READ_MESSAGE_HISTORY;
 
 /** The kinds of channel a permission matters in, for the channel permission editor. */
@@ -119,6 +121,13 @@ export function permGroups(): { group: string; items: { name: PermName; label: s
       { name: "MUTE_MEMBERS", label: t("perms.muteMembers"), description: t("perms.allowsMembersToMuteOtherMembers"), channel: ["voice"] },
       { name: "DEAFEN_MEMBERS", label: t("perms.deafenMembers"), description: t("perms.allowsMembersToDeafenOtherMembers"), channel: ["voice"] },
       { name: "MOVE_MEMBERS", label: t("perms.moveMembers"), description: t("perms.allowsMembersToMoveOtherMembers"), channel: ["voice"] },
+    ],
+  },
+  {
+    group: t("perms.appPermissions"),
+    items: [
+      { name: "USE_APPLICATION_COMMANDS", label: t("perms.useApplicationCommands"), description: t("perms.useApplicationCommandsDescription"), channel: ["text", "voice", "forum"] },
+      { name: "USE_EXTERNAL_APPS", label: t("perms.useExternalApps"), description: t("perms.useExternalAppsDescription"), channel: ["text", "voice", "forum"] },
     ],
   },
   {

@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"evilion.xyz/chat/internal/botproto"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/perms"
 	"evilion.xyz/chat/internal/ratelimit"
@@ -211,7 +212,7 @@ func TestWebhookExecute(t *testing.T) {
 	}
 	msg := decode(t, raw)
 	author := msg["author"].(map[string]any)
-	if author["username"] != "CI Bot" || author["bot"] != true || author["id"] != f.hookID || msg["webhook_id"] != f.hookID {
+	if author["username"] != "CI Bot" || author["bot"] != true || author["id"] != outID(f.hookID) || msg["webhook_id"] != outID(f.hookID) {
 		t.Fatalf("author: %v", msg)
 	}
 	embed := msg["embeds"].([]any)[0].(map[string]any)
@@ -364,7 +365,7 @@ func TestWebhookFiles(t *testing.T) {
 		t.Fatalf("spoiler file: %v", notes)
 	}
 	image := msg["embeds"].([]any)[0].(map[string]any)["image"].(map[string]any)
-	if !strings.Contains(image["url"].(string), "/media/attachments/") || image["width"].(float64) != 3 || image["content_type"] != "image/png" {
+	if !strings.Contains(image["url"].(string), "/cdn/attachments/") || image["width"].(float64) != 3 || image["content_type"] != "image/png" {
 		t.Fatalf("embed picture: %v", image)
 	}
 	// the embed shows the picture, which is then not listed again
@@ -428,10 +429,11 @@ func TestWebhookMessageEdit(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Fatalf("execute: %d %s", resp.StatusCode, raw)
 	}
-	id := decode(t, raw)["id"].(string)
+	// the id as Nexa writes it, which the webhook's routes take too
+	id := parseHookID(decode(t, raw)["id"].(string)).String()
 	g.next("message_create", 3*time.Second)
 	resp, raw = post(t, ts, "GET", f.hookURL+"/messages/"+id, "", nil)
-	if resp.StatusCode != 200 || decode(t, raw)["content"] != "first <@"+f.memberID+">" {
+	if resp.StatusCode != 200 || decode(t, raw)["content"] != "first <@"+outID(f.memberID)+">" {
 		t.Fatalf("get: %d %s", resp.StatusCode, raw)
 	}
 	resp, raw = post(t, ts, "PATCH", f.hookURL+"/messages/"+id, "application/json", []byte(`{"content":"second","embeds":null}`))
@@ -537,7 +539,7 @@ func TestWebhookPoll(t *testing.T) {
 		t.Fatalf("poll: %d %s", resp.StatusCode, raw)
 	}
 	msg := decode(t, raw)
-	id := msg["id"].(string)
+	id := parseHookID(msg["id"].(string)).String()
 	answers := msg["poll"].(map[string]any)["answers"].([]any)
 	if len(answers) != 2 || answers[1].(map[string]any)["answer_id"].(float64) != 2 {
 		t.Fatalf("poll answers: %v", answers)
@@ -636,10 +638,15 @@ func TestWebhookAccountIsNobody(t *testing.T) {
 	}
 }
 
+// parseHookID reads an id a webhook route answered with, in the form the
+// bot libraries expect, or Nexa's own.
 func parseHookID(s string) ids.ID {
-	id, err := ids.Parse(s)
+	id, err := botproto.ParseID(s)
 	if err != nil {
 		panic(err)
 	}
 	return id
 }
+
+// outID is a Nexa id as the webhook routes write it.
+func outID(s string) string { return botproto.OutString(parseHookID(s)) }

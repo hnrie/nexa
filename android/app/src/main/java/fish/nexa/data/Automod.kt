@@ -375,8 +375,8 @@ object Automod {
     /** What a moderator's app caught as messages arrived (repeats are only seen then). */
     private val arrived = ConcurrentHashMap<String, Catch>()
 
-    /** Messages AutoMod reads: what members wrote, not notes, webhooks or calls. */
-    private fun readsMessage(cm: ChatMessage) = !cm.m.type.startsWith("system_") && cm.m.webhookId == null && cm.payload != null
+    /** Messages AutoMod reads: what members wrote, not notes, webhooks, apps or calls. */
+    private fun readsMessage(cm: ChatMessage) = !cm.m.type.startsWith("system_") && cm.m.webhookId == null && cm.hook == null && cm.payload != null
 
     private fun serverChannel(channelId: String): Channel? = Nexa.channels.get(channelId)?.takeIf { it.serverId != null }
 

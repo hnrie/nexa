@@ -751,18 +751,18 @@ Message on someone else's message, for one).
 | `friend` | A person on the Friends page | `user` | `viewFriendProfile`, `messageFriend`, `callFriend`, `removeFriend`, `blockFriend`, `copyFriendProfileLink`, `copyFriendId`, `selectFriends` |
 | `friendsBulk` | Several people picked on the Friends page | none | `groupChatWithFriends`, `acceptFriendRequests`, `ignoreFriendRequests`, `cancelFriendRequests`, `unblockPeople`, `removeFriends`, `blockFriends` |
 | `gifResult` | A search result in the GIF picker | none | `sendGif`, `favoriteGif` |
-| `groupMember` | A person in a group conversation's member list | `user`, `channel` | `viewGroupMemberProfile`, `copyGroupMemberProfileLink`, `mentionGroupMember`, `messageGroupMember`, `groupMemberFriendship`, `blockGroupMember`, `transferGroupOwnership`, `removeGroupMember`, `leaveGroupFromMembers`, `copyGroupMemberId`, `selectGroupMembers` |
+| `groupMember` | A person in a group conversation's member list | `user`, `channel` | `viewGroupMemberProfile`, `copyGroupMemberProfileLink`, `mentionGroupMember`, `messageGroupMember`, `groupMemberFriendship`, `blockGroupMember`, `transferGroupOwnership`, `removeGroupMember`, `leaveGroupFromMembers`, `groupMemberApps`, `copyGroupMemberId`, `selectGroupMembers` |
 | `groupMemberBulk` | Several people picked in a group conversation's member list | none | `removeGroupMembers`, `blockGroupMembers` |
 | `image` | A picture opened full size | none | `copyImage`, `saveImage` |
 | `invitePause` | Pausing invites, in Server Settings | none | `pauseInvites` |
-| `member` | A person in a server's member list, or their name in a server | `user`, `server` | `viewMemberProfile`, `copyMemberProfileLink`, `mentionMember`, `memberFriendship`, `blockMember`, `editMemberNickname`, `editMemberRoles`, `timeoutMember`, `kickMember`, `banMember`, `copyMemberId`, `selectMembers` |
+| `member` | A person in a server's member list, or their name in a server | `user`, `server` | `viewMemberProfile`, `copyMemberProfileLink`, `mentionMember`, `memberFriendship`, `blockMember`, `editMemberNickname`, `editMemberRoles`, `timeoutMember`, `kickMember`, `banMember`, `memberApps`, `copyMemberId`, `selectMembers` |
 | `memberAgeFilter` | The account age filter of Server Settings, Members | none | `memberAgeFilter` |
 | `memberBulk` | Several people picked in a server's member list | none | `addRoleToMembers`, `removeRoleFromMembers`, `kickMembers`, `banMembers`, `blockMembers` |
 | `memberJoinFilter` | The join method filter of Server Settings, Members | none | `memberJoinMethodFilter`, `memberInviteFilter` |
 | `memberJoinedFilter` | The joined filter of Server Settings, Members | none | `memberJoinedFilter` |
 | `memberRoleFilter` | The roles filter of Server Settings, Members | none | `memberRoleFilter` |
 | `memberSort` | The sort order of Server Settings, Members | none | `memberSortOrder` |
-| `message` | A message | `message`, `user`, `channel`, `server` | `copyMessageImage`, `saveMessageImage`, `addReaction`, `editMessage`, `replyToMessage`, `createThreadFromMessage`, `publishMessage`, `copyMessageText`, `pinMessage`, `markUnread`, `toggleEmbeds`, `copyMessageLink`, `copyMessageId`, `selectMessages`, `deleteMessage`, `messageTimes` |
+| `message` | A message | `message`, `user`, `channel`, `server` | `copyMessageImage`, `saveMessageImage`, `addReaction`, `editMessage`, `replyToMessage`, `createThreadFromMessage`, `publishMessage`, `copyMessageText`, `pinMessage`, `markUnread`, `toggleEmbeds`, `copyMessageLink`, `messageApps`, `copyMessageId`, `selectMessages`, `deleteMessage`, `messageTimes` |
 | `microphone` | The arrow beside the microphone button in a call | none | `microphoneDevices`, `speakerDevices`, `microphoneNoiseModes`, `voiceSettings` |
 | `moderation` | The staff panel's entry in the server rail or the direct messages list | none | `markModerationRead` |
 | `nexa` | Nexa's own conversation in the direct messages list | none | `markNexaRead`, `selectNexa`, `pinNexa`, `addNexaToGroup`, `removeNexaFromGroup`, `moveNexa`, `closeNexa` |

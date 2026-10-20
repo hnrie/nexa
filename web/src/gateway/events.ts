@@ -43,9 +43,17 @@ export type GatewayEvent =
   | { t: "ready"; d: ReadyPayload }
   | { t: "message_create"; d: Message }
   | { t: "message_update"; d: Message & { was?: Pick<Message, "mentions" | "mention_roles" | "mention_everyone"> } }
-  | { t: "message_delete"; d: { id: Snowflake; channel_id: Snowflake; last_message_id?: Snowflake | null } & Partial<MentionMeta> }
+  | { t: "message_delete"; d: { id: Snowflake; channel_id: Snowflake; last_message_id?: Snowflake | null; ephemeral?: boolean } & Partial<MentionMeta> }
   | { t: "message_delete_bulk"; d: { ids: Snowflake[]; channel_id: Snowflake; mentions?: MentionMeta[]; last_message_id?: Snowflake | null } }
   | { t: "reaction_add" | "reaction_remove"; d: { channel_id: Snowflake; message_id: Snowflake; user_id: Snowflake; emoji: string } }
+  /** Every reaction taken off a message at once (an app or a moderator through the bot API). */
+  | { t: "reaction_remove_all"; d: { channel_id: Snowflake; message_id: Snowflake } }
+  /** Every reaction of one emoji taken off a message. */
+  | { t: "reaction_remove_emoji"; d: { channel_id: Snowflake; message_id: Snowflake; emoji: string } }
+  /** An app's commands changed (made, changed, deleted, or who may use them): lists of them are read again. */
+  | { t: "application_commands_update"; d: { application_id: Snowflake; guild_id?: Snowflake | null } }
+  /** A server's apps changed: one was added or taken away. */
+  | { t: "integrations_update"; d: { server_id: Snowflake } }
   | { t: "typing"; d: { channel_id: Snowflake; user_id: Snowflake; ts: number; stop?: boolean } }
   | { t: "channel_create" | "channel_update"; d: Channel }
   | { t: "channel_delete"; d: { id: Snowflake; server_id?: Snowflake | null } }

@@ -54,8 +54,10 @@ function usePinSignal(channelId: string): string {
 function PinnedMessage({ msg, collapsed, unpinning, onJump, onUnpin }: { msg: DecryptedMessage; collapsed: boolean; unpinning: boolean; onJump: () => void; onUnpin: (() => void) | null }) {
   const hook = msg.hook;
   const avatarId = useUsers((u) => u.byId[msg.author_id]?.avatar_id ?? null);
-  const shownName = useShownName(msg.channel_id, hook ? undefined : msg.author_id);
-  const name = hook ? hook.name : shownName;
+  // a webhook's message goes by the name it was sent with; an app's, by its bot's
+  const byHook = !!hook && !!msg.webhook_id;
+  const shownName = useShownName(msg.channel_id, byHook ? undefined : msg.author_id);
+  const name = byHook ? hook!.name : shownName;
   const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
   const look = useMemberLook(serverId, msg.webhook_id ? undefined : msg.author_id);
   const whoId = useId();
@@ -66,14 +68,14 @@ function PinnedMessage({ msg, collapsed, unpinning, onJump, onUnpin }: { msg: De
       </span>
       <div className={s.pinMain}>
         <div className={s.headerRow} id={whoId}>
-          {hook ? (
+          {byHook ? (
             <span className={s.pinName} dir="auto">{name}</span>
           ) : (
             <button type="button" className={[s.author, nameClass(look)].join(" ")} style={nameStyle(look)} onClick={(e) => openProfilePopout(msg.author_id, e.currentTarget, serverId ?? undefined)} dir="auto">
               {name}
             </button>
           )}
-          {hook ? <HookTags /> : null}
+          {hook ? <HookTags app={!!hook.application_id} /> : null}
           <time className={s.time} dateTime={new Date(msg.created_at).toISOString()} title={formatFull(msg.created_at)}>
             {formatTimestamp(msg.created_at)}
           </time>

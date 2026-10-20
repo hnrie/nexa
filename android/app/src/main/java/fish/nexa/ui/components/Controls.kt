@@ -96,6 +96,16 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.unit.DpOffset
 
+/**
+ * Lays a panel out just above the top of where it is put, [gap] clear of it,
+ * taking no room there: what it floats over (the message box, under its
+ * suggestions or a command's options) keeps its place and size.
+ */
+fun Modifier.floatAbove(gap: Dp): Modifier = this.layout { measurable, constraints ->
+    val p = measurable.measure(constraints.copy(minHeight = 0, maxHeight = androidx.compose.ui.unit.Constraints.Infinity))
+    layout(p.width, 0) { p.place(0, -p.height - gap.roundToPx()) }
+}
+
 /** Plain text in the theme's colour and the body style unless told otherwise. */
 @Composable
 fun Txt(
@@ -446,17 +456,23 @@ fun NxCheckbox(checked: Boolean, onChange: (Boolean) -> Unit, label: String, mod
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        val shape = RoundedCornerShape(5.dp)
-        Box(
-            Modifier
-                .padding(top = 2.dp)
-                .size(20.dp)
-                .then(if (checked) Modifier.background(brandGradient(c), shape) else Modifier.sunken(shape, c).border(1.5.dp, c.border, shape)),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (checked) Icon("Check", c.onBrand, size = 14.dp, stroke = 3f)
-        }
+        TickBox(checked, Modifier.padding(top = 2.dp))
         Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text, modifier = Modifier.weight(1f))
+    }
+}
+
+/** A checkbox's box: 20 dp, filled with the accent and ticked when checked. */
+@Composable
+fun TickBox(checked: Boolean, modifier: Modifier = Modifier) {
+    val c = Nx.colors
+    val shape = RoundedCornerShape(5.dp)
+    Box(
+        modifier
+            .size(20.dp)
+            .then(if (checked) Modifier.background(brandGradient(c), shape) else Modifier.sunken(shape, c).border(1.5.dp, c.border, shape)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (checked) Icon("Check", c.onBrand, size = 14.dp, stroke = 3f)
     }
 }
 

@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import coil3.compose.AsyncImage
-import fish.nexa.data.HookContent
+import fish.nexa.ui.markdown.Webhook
 import fish.nexa.media.Media
 import fish.nexa.media.mediaSrc
 import fish.nexa.ui.Icon
@@ -44,7 +44,7 @@ import fish.nexa.ui.theme.Nx
  * anyone without a picture gets.
  */
 @Composable
-fun HookAvatar(hook: HookContent, webhookId: String, size: Dp, modifier: Modifier = Modifier) {
+fun HookAvatar(hook: Webhook.Content, webhookId: String, size: Dp, modifier: Modifier = Modifier) {
     var broken by remember(hook.avatarProxyUrl) { mutableStateOf(false) }
     val proxy = hook.avatarProxyUrl?.takeIf { !broken }
     val src = mediaSrc(proxy)
@@ -71,13 +71,17 @@ fun AppTag() {
     }
 }
 
-/** HookTags: the APP tag and the mark that says webhook messages are not end-to-end encrypted; the mark opens the card. */
+/**
+ * HookTags: the APP tag beside a webhook's or an app's name, and the mark that
+ * says its messages are not end-to-end encrypted; the mark opens the card (an
+ * app's: its bot's profile).
+ */
 @Composable
-fun HookTags(onOpen: () -> Unit) {
+fun HookTags(onOpen: (() -> Unit)?, app: Boolean = false) {
     AppTag()
     Icon(
-        "LockOpen", Nx.colors.textMuted, size = 14.dp, label = t("webhook.notEncryptedHint"),
-        modifier = Modifier.pressable(remember { MutableInteractionSource() }, onClick = onOpen),
+        "LockOpen", Nx.colors.textMuted, size = 14.dp, label = if (app) t("apps.notEncryptedHint") else t("webhook.notEncryptedHint"),
+        modifier = if (onOpen != null) Modifier.pressable(remember { MutableInteractionSource() }, onClick = onOpen) else Modifier,
     )
 }
 
@@ -86,7 +90,7 @@ fun HookTags(onOpen: () -> Unit) {
  * person to show a profile of, so the card says what the sender is, and that
  * what it posts is not end-to-end encrypted.
  */
-fun openHookCard(hook: HookContent, webhookId: String) {
+fun openHookCard(hook: Webhook.Content, webhookId: String) {
     openSheet("hook-card", closeButton = false) {
         val c = Nx.colors
         Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

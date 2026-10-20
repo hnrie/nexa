@@ -1,6 +1,9 @@
 import { NexaProfile } from "@/components/nexa/NexaProfile";
 import { isSystemAccount } from "@/lib/moderation";
-import { Link2, LoaderCircle, Maximize2, MessageCircle, MoreHorizontal, NotebookPen, Pencil, Plus, SendHorizontal, UserPlus, X } from "lucide-react";
+import { CirclePlus, Link2, LoaderCircle, Maximize2, MessageCircle, MoreHorizontal, NotebookPen, Pencil, Plus, SendHorizontal, UserPlus, X } from "lucide-react";
+import { apps as appsApi, type AppSummary } from "@/api/apps";
+import { HookTags } from "@/components/chat/webhook/HookHeader";
+import { isBot } from "@/lib/botCopies";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -473,8 +476,23 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
     };
   }, [userId, upsertUser, preview, visitor, inServer]);
 
+  // an app's bot: what the app says about itself, and whether it can be added from here
+  const bot = isBot(base);
+  const [app, setApp] = useState<AppSummary | null>(null);
+  useEffect(() => {
+    if (!bot || preview || visitor) return;
+    let alive = true;
+    appsApi
+      .about(userId)
+      .then((a) => alive && setApp(a))
+      .catch(() => alive && setApp(null));
+    return () => {
+      alive = false;
+    };
+  }, [bot, userId, preview, visitor]);
+
   // the preview shows the start of a long bio and offers the rest
-  const about = user?.about_me ?? "";
+  const about = user?.about_me || (bot ? (app?.description ?? "") : "");
   useLayoutEffect(() => {
     const el = bioRef.current;
     if (!compact || !el) return;
@@ -526,6 +544,12 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
     }
   };
   const addFriend = () => void sendFriendRequest(user);
+  // the app's own consent page, with its install settings
+  const canAddApp = bot && !!app && (app.bot_public !== false || app.owner_id === useAuth.getState().me?.id);
+  const addApp = () => {
+    onClose?.();
+    nav(`/oauth2/authorize?client_id=${userId}`);
+  };
   const editNickname = async () => {
     if (!rel || rel.type !== "friend") return;
     const values = await promptFields({ title: t("profile.profileCard.friendNickname"), fields: [{ key: "nickname", label: t("modals.serverProfile.nickname"), initial: rel.nickname, placeholder: user.display_name, maxLength: 32, hint: t("profile.profileCard.onlyYouSeeIt") }], confirmLabel: t("chat.editMessage.save"), allowEmpty: true });
@@ -598,6 +622,12 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   // (a request either way, or a block, is said by the bar under the names, with its own buttons)
   const primary = !buttons ? null : isMe ? (
     <button className={s.primary} onClick={() => { onClose?.(); openModal("settings", { page: "profiles" }); }}><Pencil size={16} /> {t("profile.profileCard.editProfile")}</button>
+  ) : bot ? (
+    canAddApp ? (
+      <button className={s.primary} onClick={addApp} data-testid="profile-add-app"><CirclePlus size={16} aria-hidden="true" /> {t("apps.profile.addApp")}</button>
+    ) : (
+      <button className={s.primary} onClick={() => void message()}><MessageCircle size={16} /> {t("profile.profileCard.message")}</button>
+    )
   ) : rel?.type === "blocked" ? null : rel ? (
     <button className={s.primary} onClick={() => void message()}><MessageCircle size={16} /> {t("profile.profileCard.message")}</button>
   ) : (
@@ -615,6 +645,8 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
           <>
             {isMe ? (
               <BannerButton label={t("profile.profileCard.editProfile")} onClick={() => { onClose?.(); openModal("settings", { page: "profiles" }); }}><Pencil size={16} /></BannerButton>
+            ) : bot ? (
+              canAddApp ? <BannerButton label={t("apps.profile.addApp")} onClick={addApp} testId="profile-add-app"><CirclePlus size={18} /></BannerButton> : null
             ) : !rel ? (
               <BannerButton label={busy ? t("people.request.sending") : t("profile.profileCard.addFriend")} onClick={addFriend} busy={busy} testId="profile-add-friend">
                 {busy ? <LoaderCircle size={18} className={s.spin} /> : <UserPlus size={18} />}
@@ -631,7 +663,9 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
             </>
           ) : (
             <>
-              {!rel ? (
+              {bot ? (
+                canAddApp ? <BannerButton label={t("apps.profile.addApp")} onClick={addApp} testId="profile-add-app"><CirclePlus size={18} /></BannerButton> : null
+              ) : !rel ? (
                 <BannerButton label={busy ? t("people.request.sending") : t("profile.profileCard.addFriend")} onClick={addFriend} busy={busy} testId="profile-add-friend">
                   {busy ? <LoaderCircle size={18} className={s.spin} /> : <UserPlus size={18} />}
                 </BannerButton>
@@ -691,6 +725,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
               <Plus size={12} aria-hidden="true" /> {t("designer.ghost.tag")}
             </button>
           ) : null}
+          {bot ? <HookTags app /> : null}
           {interactive && !isMe ? (
             <Tooltip text={note ? t("profile.profileCard.editNote") : t("profile.profileCard.addNote")} side="top">
               <button className={s.noteBtn} aria-label={note ? t("profile.profileCard.editNote2") : t("profile.profileCard.addNote2")} onClick={() => setNoteOpen((v) => !v)} data-testid="profile-note-toggle">
@@ -739,7 +774,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
         </div>
       </div>
 
-      {interactive && !isMe ? <RelationshipBar user={user} rel={rel} /> : null}
+      {interactive && !isMe && !bot ? <RelationshipBar user={user} rel={rel} /> : null}
       {/* read out when it changes: the button pressed has gone, and this is what took its place */}
       {interactive && !isMe ? <span className="visually-hidden" aria-live="polite">{relationshipLine(rel)}</span> : null}
 
@@ -807,12 +842,12 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
       <span className={s.ghostTitle}>{t("settings.profile.aboutMe")}</span>
       <span className={s.ghostText}>{t("designer.ghost.about")}</span>
     </button>
-  ) : user.about_me ? (
+  ) : about ? (
     <div className={[s.section, design ? s.spotWrap : ""].join(" ")} data-about="">
       {design ? <Spot design={design} part="about" label={t("designer.spot.about")} /> : null}
-      <h3>{t("settings.profile.aboutMe")}</h3>
+      <h3>{bot && !user.about_me ? t("apps.profile.about") : t("settings.profile.aboutMe")}</h3>
       <div ref={bioRef} className={s.about} data-clamp={compact || undefined} data-overflow={(compact && bioClamped) || undefined}>
-        <Markdown source={user.about_me} ctx={ctx} />
+        <Markdown source={about} ctx={ctx} />
       </div>
       {compact && bioClamped && interactive ? (
         <button className={s.moreLink} onClick={() => viewFull()} data-testid="view-full-bio">{t("profile.profileCard.viewFullBio")}</button>

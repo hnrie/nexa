@@ -1,7 +1,7 @@
 NEXA - PRIVACY POLICY
 Site: nexa.fish (also at mathtest.lol, and formerly chat.evilion.xyz)
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-10-04
+Effective: 2026-10-19
 
 This policy lists exactly what Nexa holds. It is written against the
 actual database, so if something is not listed here, there is no place
@@ -13,8 +13,10 @@ under data protection law, including the GDPR (sections 9 to 11).
 
 - Your messages, files, notes, and calls are encrypted end to end.
   Nobody who runs Nexa can read them, and nobody monitors what you do
-  in a chat. The one exception is messages that programs post through
-  a server's webhooks, which the app marks.
+  in a chat. The exceptions are messages that programs post through a
+  server's webhooks, and apps: what an app posts, and what reaches an
+  app that you or a server's manager added (section 3j). The app marks
+  both.
 - What the owner and staff can see is your public profile, what
   servers show everyone, public images, the delivery details the
   server needs (who sent what, where, and when), bug reports you send,
@@ -34,12 +36,15 @@ under data protection law, including the GDPR (sections 9 to 11).
 
 2. WHAT IS ENCRYPTED (NOBODY WHO RUNS NEXA CAN READ IT)
 
-- Message text and edits. Stored only as ciphertext. The one
-  exception is a message a program posts through a server's webhook:
-  it reaches the server readable and is stored as it came (section
-  3d), and the app marks it as not end-to-end encrypted.
+- Message text and edits. Stored only as ciphertext. The exceptions
+  are a message a program posts through a server's webhook, or an app
+  posts: it reaches the server readable and is stored as it came
+  (sections 3d and 3j), and the app marks it as not end-to-end
+  encrypted. A message meant for an app, and in some channels every
+  message, is also opened for the app (section 3j).
 - File contents, file names, file types, dimensions, and per file
-  keys (the key travels inside the encrypted message).
+  keys (the key travels inside the encrypted message). The files of a
+  message opened for an app are opened for it too.
 - Call audio and video. Calls are not recorded and are never written
   to disk.
 - Notes, with their earlier versions and their files, and the note
@@ -56,11 +61,13 @@ under data protection law, including the GDPR (sections 9 to 11).
   key sits on the server only wrapped by your password or recovery
   key. Conversation keys sit on the server only sealed separately to
   each member. Nobody who runs Nexa holds a key that can open any of
-  this. There is no spare key, no master key, and no escrow.
+  this, except the keys of apps (section 3j). There is no spare key,
+  no master key, and no escrow.
 
-There is no setting or admin action that decrypts content already
-sent, and nothing in the software that hands over future content in
-readable form.
+Apart from the apps people choose to add (section 3j), there is no
+setting or admin action that decrypts content already sent, and
+nothing in the software that hands over future content in readable
+form.
 
 3. WHAT THE OWNER AND STAFF CAN SEE
 
@@ -184,6 +191,37 @@ i) Activity and a linked Discord account (optional): what the
    the bot can add it back to that server. Unlinking deletes all of it
    at once.
 
+j) Apps (not end-to-end encrypted, added only by people who choose
+   to): an app is a program someone made in Settings, Developer
+   Portal, with a bot account its maker runs. People add apps to their
+   own account or to a server they manage. For each app Nexa keeps its
+   name, description, pictures, tags, and links, the addresses it is
+   sent interactions and events at, its settings, its commands, hashes
+   of the token its bot signs in with and of its secret, its bot's own
+   key (sealed with a key only the server has), where it was added (by
+   whom, and when), who may use its commands in each server, and
+   hashes of the sign in tokens it holds for accounts that let it in.
+   What reaches an app is readable to it, and to the server on the way:
+   - Messages an app posts are stored readable, as they came, as a
+     webhook's are.
+   - A message meant for an app (a direct message to its bot, a
+     mention of it, a reply to it, or a message someone uses one of its
+     commands on) carries a copy that the sender's app seals for the
+     app's bot. The copy is kept with the message, and the server opens
+     it, with the message's files, to hand them to the app.
+   - An app its maker set to read every message holds the keys of the
+     servers it is in, as a member does, and the server opens every
+     message in the channels it can see, earlier ones included, to hand
+     them to it. The app says so before anyone adds it, and the start
+     of each of those channels names it.
+   - What you send an app with its commands, buttons, menus, and forms,
+     files included, reaches it readable, and is kept with who sent it,
+     where, and when, for 15 minutes (files for a day), as are the
+     replies only you see.
+   - Like a member, an app's bot sees the delivery details (3c) and the
+     members (3d) of the servers and channels it is in, and, if its
+     maker turned it on, who is online and what they are doing.
+
 4. WHAT IS NEVER COLLECTED
 
 No email address. No phone number. No legal name, birth date, age, or
@@ -206,7 +244,7 @@ unsent copies: drafts live only inside your encrypted settings.
 - Other people see your public profile, your messages once their app
   decrypts them, and the communities and channels you share with
   them.
-- The owner and the staff they appoint see sections 3a to 3i. Staff
+- The owner and the staff they appoint see sections 3a to 3j. Staff
   use a moderation panel that shows public profiles, what servers
   show everyone, when accounts were last active, moderation cases and
   their threads, the log, announcements, and bug reports. It shows
@@ -225,6 +263,13 @@ unsent copies: drafts live only inside your encrypted settings.
   the same link is not fetched twice. In a chat, a link is only
   previewed when you send it, and you can turn previews off in
   Settings → Chat.
+- An app is run by whoever made it, not by Nexa. What reaches an app
+  (section 3j) goes to its maker's program, and from there the app's
+  own terms apply. An app with an address of its own is sent its
+  interactions and events there by the server, through Cloudflare's
+  WARP network. Nexa does not check apps, so add only ones you trust,
+  and take one back at any time in Settings, Authorized Apps, or in a
+  server's Integrations.
 - A theme, plugin, or stylesheet you add from a link, and any fonts or
   stylesheets your own custom CSS loads, come straight from the site
   that hosts them: your device fetches them when you add them and
@@ -235,7 +280,8 @@ unsent copies: drafts live only inside your encrypted settings.
   section 6, and each gets only what its job needs. Beyond them,
   nothing is handed over except as forced by a valid legal order (see
   Terms section 5), and even then only what exists above. Encrypted
-  content still cannot be handed over.
+  content still cannot be handed over, apart from what was opened for
+  an app (section 3j).
 
 6. SERVICE PROVIDERS
 
@@ -315,6 +361,11 @@ calls.
 - Bug reports and their threads: until your account is deleted.
 - A linked Discord account: until you unlink it or delete your
   account.
+- Apps: until their maker deletes them or the maker's account. What
+  you send an app, and its replies only you see: 15 minutes (files
+  sent to an app: a day). The codes an app trades for sign in tokens:
+  10 minutes. An app's sign in tokens: until you take the app back,
+  or after 90 days without use.
 - Moderation cases, case threads, held usernames, fingerprints of
   removed pictures, and the moderation log: kept as the moderation
   record, including after an account is deleted.
@@ -334,20 +385,21 @@ calls.
   everywhere, the files you uploaded, your reactions, votes, and
   packs, the notes you own, your bug reports and sound recordings, the
   invite and guest links you made, the servers and group chats you own
-  (for everyone in them), and your direct message conversations, for
-  both people in them. Its profile is overwritten, and its sessions,
-  relationships, settings, keys, second factor, linked Discord
-  account, and crash reports are deleted. What is left is a stand-in
-  named Deleted User, with the account ID, when it was made, its
-  public key, and its color and privacy choices, which nobody can
-  sign in as.
+  (for everyone in them), the apps you made with their bots, and your
+  direct message conversations, for both people in them. Its profile
+  is overwritten, and its sessions, relationships, settings, keys,
+  second factor, linked Discord account, and crash reports are
+  deleted. What is left is a stand-in named Deleted User, with the
+  account ID, when it was made, its public key, and its color and
+  privacy choices, which nobody can sign in as.
 - When someone you have a direct message conversation with deletes
   their own account, that conversation is deleted for you too.
 - When staff delete an account, everything it posted and uploaded is
-  removed with it, everywhere, and servers and group chats it owns
-  are deleted for everyone in them. Its direct message conversations
-  stay for the people on the other side, without its messages. The
-  moderation case, its thread, and the log entry stay.
+  removed with it, everywhere, servers and group chats it owns are
+  deleted for everyone in them, and so are the apps it made, with
+  their bots. Its direct message conversations stay for the people on
+  the other side, without its messages. The moderation case, its
+  thread, and the log entry stay.
 
 9. WHO IS RESPONSIBLE, AND WHERE YOUR DATA IS
 
@@ -377,7 +429,8 @@ of your data. These are Nexa's:
   your account and profile, delivering messages, files, notes, and
   calls, servers and group chats, link previews, GIF, game, and music
   search, the features you choose to use, such as a linked Discord
-  account or a sticker import, and answering your bug reports.
+  account, a sticker import, or the apps you add, and answering your
+  bug reports.
 - To keep Nexa secure and working (legitimate interests, Nexa's and
   every member's): the captcha, rate limits, the IP addresses in
   section 3e, crash reports, and backups.

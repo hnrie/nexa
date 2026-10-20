@@ -42,6 +42,15 @@ type permMember struct {
 	roleIDs      []ids.ID
 	timeoutUntil *int64
 	flags        int64
+	// userFlags are the account's own flags, for whether it is a bot that
+	// may hold the server's keys (keyEligible)
+	userFlags int64
+}
+
+// keyEligible reports whether an account may hold a conversation's keys:
+// everyone but a bot whose application lacks the Message Content intent.
+func keyEligible(userFlags int64) bool {
+	return userFlags&FlagBot == 0 || userFlags&FlagBotReadsAll != 0
 }
 
 // serverSnapshot is one server's permission inputs, as of one version. Nothing
@@ -254,19 +263,19 @@ func (s *Store) loadSnapshot(ctx context.Context, serverID ids.ID, version uint6
 	}
 	snap.roles = toPermRoles(roles)
 
-	rows, err := s.db.R.QueryContext(ctx, `SELECT user_id, timeout_until, flags FROM server_members WHERE server_id = ? ORDER BY user_id`, int64(serverID))
+	rows, err := s.db.R.QueryContext(ctx, `SELECT m.user_id, m.timeout_until, m.flags, coalesce(u.flags, 0) FROM server_members m LEFT JOIN users u ON u.id = m.user_id WHERE m.server_id = ? ORDER BY m.user_id`, int64(serverID))
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		var uid ids.ID
 		var timeout sql.NullInt64
-		var flags int64
-		if err := rows.Scan(&uid, &timeout, &flags); err != nil {
+		var flags, userFlags int64
+		if err := rows.Scan(&uid, &timeout, &flags, &userFlags); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		snap.members[uid] = &permMember{roleIDs: []ids.ID{}, timeoutUntil: int64Ptr(timeout), flags: flags}
+		snap.members[uid] = &permMember{roleIDs: []ids.ID{}, timeoutUntil: int64Ptr(timeout), flags: flags, userFlags: userFlags}
 		snap.memberOrder = append(snap.memberOrder, uid)
 	}
 	rows.Close()

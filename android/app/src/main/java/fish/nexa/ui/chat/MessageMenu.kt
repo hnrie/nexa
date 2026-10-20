@@ -214,7 +214,10 @@ fun openMessageMenu(cm: ChatMessage, ctx: ListCtx, image: ImageTarget? = null) {
     }
     val dev = Nexa.settings.developerMode
     val deletable = canDelete(cm.m)
-    items += MenuItem.Action(t("chat.messageItem.copyMessageLink"), separatorAfter = dev || deletable) { copy(messageLink(cm.m), t("chat.messageMenu.linkCopied")) }
+    // what apps can do with a message, their message commands
+    val apps = fish.nexa.ui.apps.messageAppsItem(cm)
+    items += MenuItem.Action(t("chat.messageItem.copyMessageLink"), separatorAfter = apps != null || dev || deletable) { copy(messageLink(cm.m), t("chat.messageMenu.linkCopied")) }
+    if (apps != null) items += apps.copy(separatorAfter = dev || deletable)
     if (dev) items += MenuItem.Action(t("chat.messageItem.copyMessageId"), separatorAfter = deletable) { copy(cm.id, t("clipboard.idCopied")) }
     if (deletable) {
         items += MenuItem.Action(t("chat.messageMenu.selectMessages")) { ChatUi.startSelecting(cm.channelId, cm.id) }
@@ -225,6 +228,7 @@ fun openMessageMenu(cm: ChatMessage, ctx: ListCtx, image: ImageTarget? = null) {
         val last = items.removeAt(items.lastIndex)
         items += when (last) {
             is MenuItem.Action -> last.copy(separatorAfter = true)
+            is MenuItem.Submenu -> last.copy(separatorAfter = true)
             else -> last
         }
         for (line in times) items += MenuItem.Note(line)

@@ -24,6 +24,7 @@ import st from "@/components/settings/Settings.module.css";
 import { isolate } from "../bidi";
 import { SaveBar } from "../SettingsLayer";
 import s from "./Integrations.module.css";
+import { AppsSection } from "./AppsSection";
 
 import { t } from "@/i18n";
 
@@ -84,6 +85,10 @@ export default function IntegrationsPage({ serverId, channelId }: { serverId: st
     [channels, serverId, server],
   );
 
+  // the server's apps are its managers'; webhooks are for whoever may manage them in some channel
+  const manageApps = !channelId && canI(server, P.MANAGE_SERVER);
+  const manageHooks = !!channelId || canI(server, P.MANAGE_WEBHOOKS) || targets.length > 0;
+
   const load = useCallback(async () => {
     try {
       const got = channelId ? await webhooksApi.forChannel(channelId) : await webhooksApi.forServer(serverId);
@@ -96,6 +101,7 @@ export default function IntegrationsPage({ serverId, channelId }: { serverId: st
   }, [serverId, channelId]);
 
   useEffect(() => {
+    if (!manageHooks) return;
     void load();
     const hook = (e: GatewayEvent) => {
       if (e.t === "webhooks_update" && e.d.server_id === serverId) void load();
@@ -104,7 +110,7 @@ export default function IntegrationsPage({ serverId, channelId }: { serverId: st
     return () => {
       dispatchHooks.onUnhandled.splice(dispatchHooks.onUnhandled.indexOf(hook), 1);
     };
-  }, [load, serverId, attempt]);
+  }, [load, serverId, attempt, manageHooks]);
 
   const create = async () => {
     const target = channelId ?? targets[0]?.id;
@@ -180,122 +186,127 @@ export default function IntegrationsPage({ serverId, channelId }: { serverId: st
   return (
     <>
       <h2 className={st.title}>{t("integrations.title")}</h2>
-      <p className={st.hint}>{t("integrations.intro")}</p>
-      <div className={s.notice}>
-        <LockOpen size={16} aria-hidden="true" />
-        <span>{t("integrations.notEncrypted")}</span>
-      </div>
-      <h3 className={st.h5}>{t("integrations.webhooks")}</h3>
-      <div className={s.bar}>
-        <Button size="sm" onClick={() => void create()} loading={creating} disabled={!canCreate} data-testid="webhook-new">
-          <Plus size={16} /> {t("integrations.newWebhook")}
-        </Button>
-      </div>
-      {list === null && !failed ? <Spinner label={t("integrations.loading")} /> : null}
-      {failed ? <LoadError message={t("integrations.couldNotLoad")} onRetry={() => setAttempt((n) => n + 1)} /> : null}
-      {list && list.length === 0 ? (
-        <div className={s.empty}>
-          <WebhookIcon size={28} aria-hidden="true" />
-          <span>{t("integrations.none")}</span>
-        </div>
-      ) : null}
-      <div className={s.list}>
-        {list?.map((w) => {
-          const d = drafts[w.id] ?? {};
-          const expanded = open === w.id;
-          const name = d.name ?? w.name;
-          const channel = d.channel ?? w.channel_id;
-          const creator = w.user ? (users[w.user.id] ? displayName(users[w.user.id]) : w.user.display_name || w.user.username) : null;
-          const avatarPreview = d.avatar === undefined ? null : d.avatar;
-          return (
-            <div key={w.id} className={s.card} data-open={expanded} data-testid="webhook-card">
-              <button type="button" className={s.head} onClick={() => setOpen(expanded ? null : w.id)} aria-expanded={expanded}>
-                {avatarPreview ? <img className={s.avatar} src={avatarPreview} alt="" /> : d.avatar === null ? <Avatar id={w.id} avatarId={null} name={name} size={40} /> : <Avatar id={w.id} avatarId={w.avatar} name={name} size={40} />}
-                <span className={s.headText}>
-                  <span className={s.name} dir="auto">{name}</span>
-                  <span className={s.meta}>
-                    {channels[w.channel_id] ? <bdi>#{channels[w.channel_id]!.name}</bdi> : null}
-                    {creator ? <> · {t("integrations.createdBy", { date: formatShortDate(w.created_at), name: creator })}</> : <> · {t("integrations.createdOn", { date: formatShortDate(w.created_at) })}</>}
-                  </span>
-                </span>
-                {expanded ? <ChevronDown size={18} aria-hidden="true" /> : <ChevronRight size={18} aria-hidden="true" />}
-              </button>
-              {expanded ? (
-                <div className={s.body}>
-                  <div className={s.avatarCol}>
-                    {avatarPreview ? <img className={s.bigAvatar} src={avatarPreview} alt="" /> : <Avatar id={w.id} avatarId={d.avatar === null ? null : w.avatar} name={name} size={80} />}
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        pickFor.current = w.id;
-                        fileRef.current?.click();
-                      }}
-                    >
-                      {t("integrations.uploadImage")}
-                    </Button>
-                    {(w.avatar && d.avatar !== null) || avatarPreview ? (
-                      <Button size="sm" variant="ghost" onClick={() => edit(w.id, { avatar: w.avatar ? null : undefined })}>{t("integrations.removeImage")}</Button>
-                    ) : null}
-                  </div>
-                  <div className={s.fields}>
-                    <Field label={t("integrations.name")} required>
-                      <TextInput value={name} maxLength={80} onChange={(e) => edit(w.id, { name: e.target.value })} data-testid="webhook-name" />
-                    </Field>
-                    {channelId ? null : (
-                      <Field label={t("integrations.channel")}>
-                        <Select value={channel} onChange={(e) => edit(w.id, { channel: e.target.value })} data-testid="webhook-channel">
-                          {!targets.some((c) => c.id === channel) && channels[channel] ? <option value={channel}>{isolate(`#${channels[channel]!.name}`)}</option> : null}
-                          {targets.map((c) => (
-                            <option key={c.id} value={c.id}>{isolate(`#${c.name}`)}</option>
-                          ))}
-                        </Select>
-                      </Field>
-                    )}
-                    <div className={s.actions}>
-                      <Button size="sm" variant="secondary" disabled={!w.url} onClick={() => w.url && copyAndSay(w.url, t("integrations.urlCopied"))} data-testid="webhook-copy">
-                        <Copy size={15} /> {t("integrations.copyUrl")}
-                      </Button>
-                      <Button size="sm" variant="danger" onClick={() => remove(w)} data-testid="webhook-delete">
-                        <Trash2 size={15} /> {t("integrations.deleteWebhook")}
-                      </Button>
-                    </div>
-                    <p className={s.tip}>{t("integrations.formatsTip")}</p>
-                  </div>
-                </div>
-              ) : null}
+      {manageApps ? <AppsSection serverId={serverId} /> : null}
+      {manageHooks ? (
+        <>
+          <h3 className={st.h5}>{t("integrations.webhooks")}</h3>
+          <p className={st.hint} style={{ marginTop: -6 }}>{t("integrations.intro")}</p>
+          <div className={s.notice}>
+            <LockOpen size={16} aria-hidden="true" />
+            <span>{t("integrations.notEncrypted")}</span>
+          </div>
+          <div className={s.bar}>
+            <Button size="sm" onClick={() => void create()} loading={creating} disabled={!canCreate} data-testid="webhook-new">
+              <Plus size={16} /> {t("integrations.newWebhook")}
+            </Button>
+          </div>
+          {list === null && !failed ? <Spinner label={t("integrations.loading")} /> : null}
+          {failed ? <LoadError message={t("integrations.couldNotLoad")} onRetry={() => setAttempt((n) => n + 1)} /> : null}
+          {list && list.length === 0 ? (
+            <div className={s.empty}>
+              <WebhookIcon size={28} aria-hidden="true" />
+              <span>{t("integrations.none")}</span>
             </div>
-          );
-        })}
-      </div>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/png,image/jpeg,image/gif,image/webp"
-        hidden
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          const id = pickFor.current;
-          if (f && id) setCrop({ id, file: f });
-          e.target.value = "";
-        }}
-      />
-      {crop ? (
-        <ImageCropModal
-          file={crop.file}
-          aspect={1}
-          round
-          maxSize={512}
-          title={t("integrations.cropImage")}
-          onClose={() => setCrop(null)}
-          onDone={({ blob }) => {
-            const id = crop.id;
-            setCrop(null);
-            void blobToDataURL(blob).then((data) => edit(id, { avatar: data }));
-          }}
-        />
+          ) : null}
+          <div className={s.list}>
+            {list?.map((w) => {
+              const d = drafts[w.id] ?? {};
+              const expanded = open === w.id;
+              const name = d.name ?? w.name;
+              const channel = d.channel ?? w.channel_id;
+              const creator = w.user ? (users[w.user.id] ? displayName(users[w.user.id]) : w.user.display_name || w.user.username) : null;
+              const avatarPreview = d.avatar === undefined ? null : d.avatar;
+              return (
+                <div key={w.id} className={s.card} data-open={expanded} data-testid="webhook-card">
+                  <button type="button" className={s.head} onClick={() => setOpen(expanded ? null : w.id)} aria-expanded={expanded}>
+                    {avatarPreview ? <img className={s.avatar} src={avatarPreview} alt="" /> : d.avatar === null ? <Avatar id={w.id} avatarId={null} name={name} size={40} /> : <Avatar id={w.id} avatarId={w.avatar} name={name} size={40} />}
+                    <span className={s.headText}>
+                      <span className={s.name} dir="auto">{name}</span>
+                      <span className={s.meta}>
+                        {channels[w.channel_id] ? <bdi>#{channels[w.channel_id]!.name}</bdi> : null}
+                        {creator ? <> · {t("integrations.createdBy", { date: formatShortDate(w.created_at), name: creator })}</> : <> · {t("integrations.createdOn", { date: formatShortDate(w.created_at) })}</>}
+                      </span>
+                    </span>
+                    {expanded ? <ChevronDown size={18} aria-hidden="true" /> : <ChevronRight size={18} aria-hidden="true" />}
+                  </button>
+                  {expanded ? (
+                    <div className={s.body}>
+                      <div className={s.avatarCol}>
+                        {avatarPreview ? <img className={s.bigAvatar} src={avatarPreview} alt="" /> : <Avatar id={w.id} avatarId={d.avatar === null ? null : w.avatar} name={name} size={80} />}
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            pickFor.current = w.id;
+                            fileRef.current?.click();
+                          }}
+                        >
+                          {t("integrations.uploadImage")}
+                        </Button>
+                        {(w.avatar && d.avatar !== null) || avatarPreview ? (
+                          <Button size="sm" variant="ghost" onClick={() => edit(w.id, { avatar: w.avatar ? null : undefined })}>{t("integrations.removeImage")}</Button>
+                        ) : null}
+                      </div>
+                      <div className={s.fields}>
+                        <Field label={t("integrations.name")} required>
+                          <TextInput value={name} maxLength={80} onChange={(e) => edit(w.id, { name: e.target.value })} data-testid="webhook-name" />
+                        </Field>
+                        {channelId ? null : (
+                          <Field label={t("integrations.channel")}>
+                            <Select value={channel} onChange={(e) => edit(w.id, { channel: e.target.value })} data-testid="webhook-channel">
+                              {!targets.some((c) => c.id === channel) && channels[channel] ? <option value={channel}>{isolate(`#${channels[channel]!.name}`)}</option> : null}
+                              {targets.map((c) => (
+                                <option key={c.id} value={c.id}>{isolate(`#${c.name}`)}</option>
+                              ))}
+                            </Select>
+                          </Field>
+                        )}
+                        <div className={s.actions}>
+                          <Button size="sm" variant="secondary" disabled={!w.url} onClick={() => w.url && copyAndSay(w.url, t("integrations.urlCopied"))} data-testid="webhook-copy">
+                            <Copy size={15} /> {t("integrations.copyUrl")}
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={() => remove(w)} data-testid="webhook-delete">
+                            <Trash2 size={15} /> {t("integrations.deleteWebhook")}
+                          </Button>
+                        </div>
+                        <p className={s.tip}>{t("integrations.formatsTip")}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              const id = pickFor.current;
+              if (f && id) setCrop({ id, file: f });
+              e.target.value = "";
+            }}
+          />
+          {crop ? (
+            <ImageCropModal
+              file={crop.file}
+              aspect={1}
+              round
+              maxSize={512}
+              title={t("integrations.cropImage")}
+              onClose={() => setCrop(null)}
+              onDone={({ blob }) => {
+                const id = crop.id;
+                setCrop(null);
+                void blobToDataURL(blob).then((data) => edit(id, { avatar: data }));
+              }}
+            />
+          ) : null}
+          <FollowedChannels serverId={serverId} channelId={channelId} />
+        </>
       ) : null}
-      <FollowedChannels serverId={serverId} channelId={channelId} />
       <SaveBar
         dirty={dirtyIds.length > 0}
         busy={busy}

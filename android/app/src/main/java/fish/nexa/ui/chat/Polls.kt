@@ -49,7 +49,6 @@ import coil3.compose.AsyncImage
 import fish.nexa.Nexa
 import fish.nexa.crypto.PollPayload
 import fish.nexa.data.ChatMessage
-import fish.nexa.data.HookPoll
 import fish.nexa.data.Send
 import fish.nexa.media.Media
 import fish.nexa.media.TwemojiImage
@@ -85,7 +84,7 @@ data class PollShape(val question: String, val answers: List<Answer>, val expiry
             p.multiselect,
         )
 
-        fun of(h: HookPoll) = PollShape(h.question, h.answers.map { Answer(it.answerId, it.text, it.emoji?.id, it.emoji?.name, it.emoji?.animated == true) }, h.expiry, h.allowMultiselect)
+        fun of(h: fish.nexa.ui.markdown.Webhook.Poll) = PollShape(h.question, h.answers.map { Answer(it.answerId.toInt(), it.text, it.emoji?.id, it.emoji?.name, it.emoji?.animated == true) }, h.expiry.toLong(), h.allowMultiselect)
     }
 }
 

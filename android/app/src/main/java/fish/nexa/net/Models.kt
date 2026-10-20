@@ -54,7 +54,16 @@ data class PublicUser(
     val isSystem get() = flags and 16L != 0L
     val isWebhook get() = flags and 32L != 0L
     val isGuest get() = flags and 8L != 0L
+    /** An app's bot account. */
+    val isBot get() = flags and BOT_FLAG != 0L
+    /** A bot whose app reads every message where it is (its app has Message Content). */
+    val readsAll get() = flags and BOT_READS_ALL_FLAG != 0L
     val name get() = displayName.ifBlank { username }
+
+    companion object {
+        const val BOT_FLAG = 64L
+        const val BOT_READS_ALL_FLAG = 128L
+    }
 }
 
 @Serializable
@@ -627,9 +636,15 @@ data class Message(
     val pinned get() = flags and MSG_FLAG_PINNED != 0L
     val suppressEmbeds get() = flags and MSG_FLAG_SUPPRESS_EMBEDS != 0L
     val silent get() = flags and MSG_FLAG_SUPPRESS_NOTIFICATIONS != 0L
+    /** An app's answer only this person sees. */
+    val ephemeral get() = flags and MSG_FLAG_EPHEMERAL != 0L
+    /** An app's answer still thinking. */
+    val loading get() = flags and MSG_FLAG_LOADING != 0L
 
     companion object {
         const val MSG_FLAG_PINNED = 1L
+        const val MSG_FLAG_EPHEMERAL = 1L shl 6
+        const val MSG_FLAG_LOADING = 1L shl 7
         const val MSG_FLAG_SUPPRESS_EMBEDS = 4L
         const val MSG_FLAG_SUPPRESS_NOTIFICATIONS = 1L shl 12
         const val MSG_FLAG_COMPONENTS_V2 = 1L shl 15

@@ -27,13 +27,17 @@ export function HookAvatar({ hook, webhookId, size = 40 }: { hook: HookContent; 
   return <Avatar id={webhookId} avatarId={hook.avatar_id ?? null} name={hook.name} size={size} />;
 }
 
-/** The tag beside a webhook's name, and the mark that says its messages are not end-to-end encrypted. */
-export function HookTags() {
+/**
+ * The tag beside a webhook's or an app's name, and the mark that says its
+ * messages are not end-to-end encrypted.
+ */
+export function HookTags({ app = false }: { app?: boolean }) {
+  const hint = app ? t("apps.notEncryptedHint") : t("webhook.notEncryptedHint");
   return (
     <>
-      <span className={s.appTag} data-testid="webhook-tag">{t("webhook.appTag")}</span>
-      <Tooltip text={t("webhook.notEncryptedHint")} side="top">
-        <span className={s.plainIcon} tabIndex={0} role="img" aria-label={t("webhook.notEncryptedHint")} data-testid="webhook-plain">
+      <span className={s.appTag} data-testid={app ? "app-tag" : "webhook-tag"}>{t("webhook.appTag")}</span>
+      <Tooltip text={hint} side="top">
+        <span className={s.plainIcon} tabIndex={0} role="img" aria-label={hint} data-testid="webhook-plain">
           <LockOpen size={14} />
         </span>
       </Tooltip>

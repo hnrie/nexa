@@ -106,7 +106,12 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
     val cm = item.cm
     val p = item.pending
     val reply = item.replyToId
-    val start = item.groupStart || reply != null
+    // an app's answer to a command says who used it, on the line a reply's quote takes
+    val appHook = fish.nexa.ui.markdown.Webhook.of(cm?.hook)?.takeIf { it.applicationId != null }
+    val command = fish.nexa.ui.apps.usedCommand(appHook?.interaction)
+    // an answer only you see is nobody else's to react to or reply to: it has no menu
+    val ephemeral = cm?.m?.ephemeral == true
+    val start = item.groupStart || reply != null || command != null
     val showHead = start && !ctx.compact || (ctx.compact && start)
     val failed = p?.status == "failed"
     val uploading = p?.upload != null && p.upload.done.not()
@@ -131,6 +136,8 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
         picked -> c.bgSelected
         menuOpen -> c.bgMessageHover
         item.mentionsMe -> c.brand.copy(alpha = 0.09f)
+        // an answer only you see: a pane of its own, lit faintly in the accent, unlike a mention's bar
+        ephemeral -> c.textBrand.copy(alpha = 0.05f)
         else -> Color.Transparent
     }
     val flashColor = if (reduced) c.mentionBg else c.brand.copy(alpha = 0.40f)
@@ -148,13 +155,14 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
         Modifier
             .fillMaxWidth()
             .padding(top = if (start && !ctx.compact) 17.dp else 0.dp)
+            .then(if (ephemeral) Modifier.padding(vertical = 2.dp).border(1.dp, c.textBrand.copy(alpha = 0.15f)) else Modifier)
             .background(tint)
             .then(if (flash.value > 0f) Modifier.background(flashColor.copy(alpha = flashColor.alpha * flash.value)) else Modifier)
             .then(if (label != null) Modifier.semantics { contentDescription = label } else Modifier)
             .then(
                 if (ctx.selecting && canPick) Modifier.pressable(remember { MutableInteractionSource() }) { ChatUi.togglePick(cm!!.id) }
                 else Modifier.rowTouch(
-                    enabled = cm != null && !ctx.selecting,
+                    enabled = cm != null && !ctx.selecting && !ephemeral,
                     canReply = cm != null && canSend(ctx),
                     swipe = swipe,
                     onLongPress = { cm?.let { openMessageMenu(it, ctx, PressedImage.take()) } },
@@ -179,10 +187,10 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
             )
         }
         Box(Modifier.graphicsLayer { translationX = swipe.offset.value }) {
-            if (ctx.selecting) PickCircle(picked, canPick, top = if (reply != null) 35.dp else if (start) 11.dp else 3.dp)
+            if (ctx.selecting) PickCircle(picked, canPick, top = if (reply != null || command != null) 35.dp else if (start) 11.dp else 3.dp)
             if (start && !ctx.compact) {
                 // a webhook's message goes by the name and picture it was sent with, and a tap says what the sender is
-                val hook = fish.nexa.data.Hooks.of(item.cm?.hook)
+                val hook = fish.nexa.ui.markdown.Webhook.of(item.cm?.hook)
                 val hookId = item.cm?.m?.webhookId
                 val authorName = Names.member(ctx.server?.server?.id, item.authorId)
                 val user = if (item.authorId == ctx.meId) Nexa.users.me.value?.let { fish.nexa.net.PublicUser(it.id, it.username, it.displayName, it.avatarId) } else Nexa.users.get(item.authorId)
@@ -190,7 +198,7 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                 val pressed by interaction.collectIsPressedAsState()
                 Box(
                     Modifier
-                        .padding(start = avatarStart, top = if (reply != null) 26.dp else 2.dp)
+                        .padding(start = avatarStart, top = if (reply != null || command != null) 26.dp else 2.dp)
                         .graphicsLayer { val s = if (pressed) 0.95f else 1f; scaleX = s; scaleY = s }
                         .pressable(interaction) { if (hook != null && hookId != null) fish.nexa.ui.media.openHookCard(hook, hookId) else openProfile(item.authorId) },
                 ) {
@@ -213,14 +221,16 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                     .heightIn(min = 22.dp)
                     .alpha(if (p != null && !failed) (if (uploading) 0.8f else 0.55f) else 1f),
             ) {
-                if (reply != null) ReplyLine(ctx, reply, cm?.m)
+                if (command != null && cm != null) fish.nexa.ui.apps.InteractionLine(cm, command, ctx)
+                else if (reply != null) ReplyLine(ctx, reply, cm?.m)
                 if (showHead) MessageHeader(item, ctx)
                 MessageBody(item, ctx, failed)
                 if (failed && p != null) FailedRow(ctx.channel.id, p.tmpId)
                 val sid = ctx.server?.server?.id
                 // an announcement not yet sent on to the channels following this one
                 if (cm != null && canPublish(cm)) PublishButton { publish(cm) }
-                if (cm != null) ReactionsRow(cm, ctx)
+                if (cm != null && !ephemeral) ReactionsRow(cm, ctx)
+                if (cm != null && ephemeral) fish.nexa.ui.apps.OnlyYou(cm)
                 // the thread it started, under everything else, its line from the avatar (or the row's top)
                 cm?.m?.thread?.let { th ->
                     if (sid != null) fish.nexa.ui.threads.ThreadChip(sid, th, spineFrom = when {
@@ -298,13 +308,13 @@ private fun HeaderTime(ms: Long) {
 private fun MessageHeader(item: MsgItem, ctx: ListCtx) {
     val c = Nx.colors
     val sid = ctx.server?.server?.id
-    val hook = fish.nexa.data.Hooks.of(item.cm?.hook)
+    val hook = fish.nexa.ui.markdown.Webhook.of(item.cm?.hook)
     val hookId = item.cm?.m?.webhookId?.takeIf { hook != null }
     // a published post's copy speaks for a channel elsewhere, not for a person
     val copy = item.cm?.m?.crosspost?.takeIf { item.cm.m.type == "crosspost" }
     val name = when {
         copy != null -> "${copy.serverName} #${copy.channelName}"
-        hook != null -> hook.name
+        hook != null && hookId != null -> hook.name
         else -> Names.member(sid, item.authorId)
     }
     // a webhook and a copy have no roles, so no role colours or icon
@@ -332,7 +342,7 @@ private fun MessageHeader(item: MsgItem, ctx: ListCtx) {
         look?.icon?.let { RoleIcon(it, 18.dp) }
         when {
             copy != null -> CopyTag()
-            hookId != null -> fish.nexa.ui.media.HookTags(open)
+            hook != null -> fish.nexa.ui.media.HookTags(open, app = hook.applicationId != null)
             else -> user?.serverTag?.takeIf { it.text.isNotEmpty() }?.let { ServerTagChip(it, small = false, open = true) }
         }
         HeaderTime(item.createdAt)
@@ -386,7 +396,6 @@ private fun CopyTag() {
 @Composable
 private fun ReplyLine(ctx: ListCtx, replyId: String, msg: fish.nexa.net.Message?) {
     val c = Nx.colors
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val inList = Nexa.messages.get(ctx.channel.id).byId[replyId]
     val targets by fish.nexa.data.ReplyTargets.byId.collectAsState()
     val kept = if (inList == null) targets[replyId] else null
@@ -406,6 +415,59 @@ private fun ReplyLine(ctx: ListCtx, replyId: String, msg: fish.nexa.net.Message?
         if (referenced != fish.nexa.net.Message.NOT_SAID && msg != null) fish.nexa.data.ReplyTargets.ingest(listOf(msg))
         else fish.nexa.data.ReplyTargets.request(ctx.channel.id, replyId)
     }
+    ReplyFrame(
+        when {
+            // gone is gone: there is nothing to go to
+            deleted -> Modifier
+            failed -> Modifier.pressable(remember { MutableInteractionSource() }) { fish.nexa.data.ReplyTargets.retry(ctx.channel.id, replyId) }
+                .semantics { contentDescription = t("chat.messageList.tryAgain") }
+            else -> Modifier.pressable(remember { MutableInteractionSource() }) { ChatUi.jumpTo(ctx.channel.id, replyId) }
+                .semantics { contentDescription = if (original == null) t("chat.messageItem.originalLoading") else t("chat.messageItem.goToOriginal") }
+        },
+    ) {
+        if (deleted) {
+            Txt(t("chat.messageItem.originalDeleted"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = c.textMuted, maxLines = 1)
+        } else if (failed) {
+            Icon("RotateCw", c.textMuted, size = 13.dp)
+            Txt(t("chat.messageItem.originalFailed"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
+        } else if (original == null) {
+            // waiting for it: a quiet bar where the quote goes
+            Box(Modifier.size(16.dp).background(c.bgActive, CircleShape))
+            Box(Modifier.size(width = 64.dp, height = 10.dp).background(c.bgActive, RoundedCornerShape(5.dp)))
+            Box(Modifier.size(width = 140.dp, height = 10.dp).background(c.bgHover, RoundedCornerShape(5.dp)))
+        } else {
+            val blocked = Nexa.relationships.isBlocked(original.authorId)
+            if (blocked) {
+                Txt(t("people.blocked.replyPreview"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
+            } else {
+                // a webhook's message goes by the name it was sent with; an app's, by its bot's
+                val hook = fish.nexa.ui.markdown.Webhook.of(original.hook)
+                val hookId = original.m.webhookId?.takeIf { hook != null }
+                val who = if (hook != null && hookId != null) hook.name else Names.member(ctx.server?.server?.id, original.authorId)
+                if (hook != null && hookId != null) fish.nexa.ui.media.HookAvatar(hook, hookId, 16.dp)
+                else Avatar(original.authorId, who, Nexa.users.get(original.authorId)?.avatarId, 16.dp)
+                Txt(
+                    who, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)), color = c.text, maxLines = 1,
+                    // a webhook has no profile; its message is where to go
+                    modifier = Modifier.widthIn(max = 160.dp).pressable(remember { MutableInteractionSource() }) {
+                        if (hookId != null) ChatUi.jumpTo(ctx.channel.id, replyId) else openProfile(original.authorId)
+                    },
+                )
+                ReplyExcerpt(original, ctx.server?.server?.id, Modifier.weight(1f, fill = false))
+            }
+        }
+    }
+}
+
+/**
+ * The frame of the line over a message that points elsewhere (a reply's
+ * quote, or who used an app's command): the curved line from the avatar
+ * column up into it, then what it says, in a row of its own.
+ */
+@Composable
+internal fun ReplyFrame(rowModifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    val c = Nx.colors
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val stroke = c.borderStrong
     Box(Modifier.fillMaxWidth().height(24.dp)) {
         // ::before: 32 wide, 15 tall, from 38 dp before the content, a 2 dp border on its start and top, 6 dp corner
@@ -428,53 +490,11 @@ private fun ReplyLine(ctx: ListCtx, replyId: String, msg: fish.nexa.net.Message?
             drawPath(path, stroke, style = Stroke(width = w))
         }
         Row(
-            Modifier
-                .fillMaxWidth()
-                .height(22.dp)
-                .then(
-                    when {
-                        // gone is gone: there is nothing to go to
-                        deleted -> Modifier
-                        failed -> Modifier.pressable(remember { MutableInteractionSource() }) { fish.nexa.data.ReplyTargets.retry(ctx.channel.id, replyId) }
-                            .semantics { contentDescription = t("chat.messageList.tryAgain") }
-                        else -> Modifier.pressable(remember { MutableInteractionSource() }) { ChatUi.jumpTo(ctx.channel.id, replyId) }
-                            .semantics { contentDescription = if (original == null) t("chat.messageItem.originalLoading") else t("chat.messageItem.goToOriginal") }
-                    },
-                ),
+            Modifier.fillMaxWidth().height(22.dp).then(rowModifier),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (deleted) {
-                Txt(t("chat.messageItem.originalDeleted"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = c.textMuted, maxLines = 1)
-            } else if (failed) {
-                Icon("RotateCw", c.textMuted, size = 13.dp)
-                Txt(t("chat.messageItem.originalFailed"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
-            } else if (original == null) {
-                // waiting for it: a quiet bar where the quote goes
-                Box(Modifier.size(16.dp).background(c.bgActive, CircleShape))
-                Box(Modifier.size(width = 64.dp, height = 10.dp).background(c.bgActive, RoundedCornerShape(5.dp)))
-                Box(Modifier.size(width = 140.dp, height = 10.dp).background(c.bgHover, RoundedCornerShape(5.dp)))
-            } else {
-                val blocked = Nexa.relationships.isBlocked(original.authorId)
-                if (blocked) {
-                    Txt(t("people.blocked.replyPreview"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
-                } else {
-                    val hook = fish.nexa.data.Hooks.of(original.hook)
-                    val hookId = original.m.webhookId?.takeIf { hook != null }
-                    val who = hook?.name ?: Names.member(ctx.server?.server?.id, original.authorId)
-                    if (hook != null && hookId != null) fish.nexa.ui.media.HookAvatar(hook, hookId, 16.dp)
-                    else Avatar(original.authorId, who, Nexa.users.get(original.authorId)?.avatarId, 16.dp)
-                    Txt(
-                        who, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)), color = c.text, maxLines = 1,
-                        // a webhook has no profile; its message is where to go
-                        modifier = Modifier.widthIn(max = 160.dp).pressable(remember { MutableInteractionSource() }) {
-                            if (hookId != null) ChatUi.jumpTo(ctx.channel.id, replyId) else openProfile(original.authorId)
-                        },
-                    )
-                    ReplyExcerpt(original, ctx.server?.server?.id, Modifier.weight(1f, fill = false))
-                }
-            }
-        }
+            content = content,
+        )
     }
 }
 
@@ -532,6 +552,11 @@ internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
         Txt(t("follows.originalDeleted"), style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = c.textMuted)
         return
     }
+    // an app said it would answer, and has not yet
+    if (cm != null && cm.m.loading && fish.nexa.ui.markdown.Webhook.of(cm.hook)?.applicationId != null) {
+        fish.nexa.ui.apps.Thinking(cm)
+        return
+    }
     val payload = cm?.payload ?: item.pending?.payload
     if (cm != null && cm.error != null && cm.call == null) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -567,7 +592,7 @@ internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     // cards for the Nexa invites, profiles, notes and packs the message links to (none once its embeds were removed)
     if (cm != null && !cm.m.suppressEmbeds) {
         val sealed = remember(embeds, cm.hook) {
-            (embeds ?: fish.nexa.data.Hooks.of(cm.hook)?.linkEmbeds?.takeIf { it.isNotEmpty() })?.mapNotNull { Unfurl.of(it) } ?: emptyList()
+            (embeds ?: fish.nexa.ui.markdown.Webhook.of(cm.hook)?.linkEmbeds?.takeIf { it.isNotEmpty() })?.mapNotNull { Unfurl.of(it) } ?: emptyList()
         }
         InviteCards(payload?.t, sealed)
         ProfileCards(payload?.t, sealed)

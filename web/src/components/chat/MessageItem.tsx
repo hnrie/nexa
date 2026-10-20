@@ -32,7 +32,7 @@ import { InviteCards } from "./InviteCards";
 import { PackCards } from "./PackCards";
 import { ProfileCards } from "./ProfileCards";
 import { NoteCards } from "@/components/notes/NoteCards";
-import { MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
+import { MSG_FLAG_EPHEMERAL, MSG_FLAG_LOADING, MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
 import { useAutomodHeld } from "@/lib/automod/useHeld";
 import { canI, P } from "@/stores/servers";
 import { ThreadChip } from "./ThreadChip";
@@ -55,6 +55,7 @@ import { useShownName } from "./useShownName";
 import { HookAvatar, HookPopout, HookTags } from "./webhook/HookHeader";
 import { UserTag } from "@/components/servertag/UserTag";
 import { HookBody } from "./webhook/HookBody";
+import { AppMsgProvider, InteractionLine, OnlyYou, Thinking, usedCommand } from "./apps/AppMessage";
 import { HookPoll } from "./webhook/HookPoll";
 import { hookText } from "@/lib/webhookMessage";
 import { hookPollOf, pollWords } from "@/lib/poll";
@@ -86,8 +87,10 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   const deleted = !target && (kept === "deleted" || (kept === undefined && msg.referenced_message === null));
   const failed = !target && kept === "failed";
   const avatarId = useUsers((u) => (target ? (u.byId[target.author_id]?.avatar_id ?? null) : null));
-  const shownName = useShownName(msg.channel_id, target?.hook ? undefined : target?.author_id);
-  const name = target?.hook ? target.hook.name : shownName;
+  // a webhook's message goes by the name it was sent with; an app's, by its bot's
+  const byHook = !!target?.hook && !!target.webhook_id;
+  const shownName = useShownName(msg.channel_id, byHook ? undefined : target?.author_id);
+  const name = byHook ? target!.hook!.name : shownName;
   const setJumpTo = useUI((u) => u.setJumpTo);
   const ctx = useRowRenderCtx();
   // what someone blocked wrote is not quoted back, even over a reply to it
@@ -149,7 +152,7 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
         onClick={(e) => {
           e.stopPropagation();
           // a webhook has no profile; its message is where to go
-          if (hook) jump();
+          if (byHook) jump();
           else openProfilePopout(target.author_id, e.currentTarget, useChannels.getState().byId[msg.channel_id]?.server_id ?? undefined);
         }}
       >
@@ -182,14 +185,19 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
     return sid ? (st.byId[sid]?.members[msg.author_id]?.avatar_id ?? null) : null;
   });
   const avatarId = serverAvatar ?? ownAvatar;
-  // A webhook's message goes by the name and picture it was sent with.
+  // A webhook's message goes by the name and picture it was sent with; an
+  // app's goes by its bot, like anyone's, but says it is an app's.
   const hook = msg.hook;
+  const webhookHook = hook && msg.webhook_id ? hook : undefined;
+  const fromApp = !!hook?.application_id;
+  const ephemeral = (msg.flags & MSG_FLAG_EPHEMERAL) !== 0;
+  const command = fromApp ? usedCommand(hook?.interaction) : null;
   // A nickname you gave a friend applies everywhere their name appears, not
   // just in the sidebar; a server nickname wins inside that server.
   // a post published from an announcement channel this one follows goes by where it came from
   const copy = msg.type === "crosspost" ? msg.crosspost : undefined;
-  const shownName = useShownName(msg.channel_id, hook || copy ? undefined : msg.author_id);
-  const name = copy ? `${copy.server_name} #${copy.channel_name}` : hook ? hook.name : shownName;
+  const shownName = useShownName(msg.channel_id, webhookHook || copy ? undefined : msg.author_id);
+  const name = copy ? `${copy.server_name} #${copy.channel_name}` : webhookHook ? webhookHook.name : shownName;
   const [hookCard, setHookCard] = useState<HTMLElement | null>(null);
   const closeHookCard = useCallback(() => setHookCard(null), []);
   const editing = useUI((u) => u.editing?.channelId === msg.channel_id && u.editing.messageId === msg.id);
@@ -254,7 +262,8 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
 
   if (msg.type.startsWith("system_")) return <SystemMessage msg={msg} />;
 
-  const isReply = !!msg.reply_to_id;
+  // an app's answer to a command says who used it, on the line a reply's quote takes
+  const isReply = !!msg.reply_to_id || !!command;
   const pinned = (msg.flags & MSG_FLAG_PINNED) !== 0;
 
   const showHeader = groupStart || isReply;
@@ -262,7 +271,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
     // a published copy speaks for a channel elsewhere, not for a person
     if (copy) return;
     // a webhook is not a person with a profile: its card says what it is
-    if (hook) {
+    if (webhookHook) {
       const el = e.currentTarget;
       setHookCard((cur) => (cur ? null : el));
       return;
@@ -285,6 +294,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       data-highlight={highlight}
       data-first={first}
       data-reply={isReply}
+      data-ephemeral={ephemeral || undefined}
       data-pending={pending === "sending"}
       data-failed={pending === "failed"}
       data-uploading={!!upload || undefined}
@@ -293,7 +303,8 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       data-picked={picked || undefined}
       onClickCapture={pickable ? pick : undefined}
       onContextMenu={(e) => {
-        if (pending) return;
+        // an answer only you see is nobody else's to react to or reply to: it has no menu
+        if (pending || ephemeral) return;
         // a right click in the edit box is for the text: spelling suggestions, cut, copy and paste
         if (e.target instanceof Element && e.target.closest("textarea, input, [contenteditable='true']")) return;
         e.preventDefault();
@@ -320,7 +331,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           {picked ? <Check size={14} strokeWidth={3} /> : null}
         </button>
       ) : null}
-      {isReply ? <ReplyPreview msg={msg} /> : null}
+      {command ? <InteractionLine msg={msg} it={command} /> : isReply ? <ReplyPreview msg={msg} /> : null}
       {showHeader ? (
         <>
           {/* the same way to the profile as the name beside it, for a pointer only: one stop for the keyboard is enough */}
@@ -328,17 +339,17 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
             {copy ? <Avatar id={copy.server_id} avatarId={copy.server_icon_id} name={copy.server_name} size={40} kind="icon" /> : hook && msg.webhook_id ? <HookAvatar hook={hook} webhookId={msg.webhook_id} /> : <Avatar id={msg.author_id} avatarId={avatarId} name={name} size={40} />}
           </button>
           <div className={s.headerRow} id={whoId}>
-            <button type="button" className={[s.author, copy ? "" : nameClass(look)].join(" ")} data-author={msg.author_id} data-webhook={msg.webhook_id} style={copy ? undefined : nameStyle(look)} onClick={profile} dir="auto" aria-haspopup={hook ? "dialog" : undefined}>{name}</button>
-            {look?.icon && !copy && !hook ? <RoleIcon icon={look.icon} size={18} /> : null}
+            <button type="button" className={[s.author, copy ? "" : nameClass(look)].join(" ")} data-author={msg.author_id} data-webhook={msg.webhook_id} style={copy ? undefined : nameStyle(look)} onClick={profile} dir="auto" aria-haspopup={webhookHook ? "dialog" : undefined}>{name}</button>
+            {look?.icon && !copy && !webhookHook ? <RoleIcon icon={look.icon} size={18} /> : null}
             {copy ? (
               <span className={s.followTag} title={t("follows.tagHint")}>
                 <Megaphone size={11} aria-hidden="true" />
                 {t("follows.tag")}
               </span>
-            ) : hook ? <HookTags /> : <UserTag userId={msg.author_id} open />}
+            ) : hook ? <HookTags app={fromApp} /> : <UserTag userId={msg.author_id} open />}
             <HeaderTime at={msg.created_at} />
           </div>
-          {hookCard && hook && msg.webhook_id ? <HookPopout hook={hook} webhookId={msg.webhook_id} anchor={hookCard} onClose={closeHookCard} /> : null}
+          {hookCard && webhookHook && msg.webhook_id ? <HookPopout hook={webhookHook} webhookId={msg.webhook_id} anchor={hookCard} onClose={closeHookCard} /> : null}
         </>
       ) : (
         <>
@@ -353,10 +364,11 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           {t("follows.publish")}
         </button>
       ) : null}
-      {!pending ? <Reactions msg={msg} pickerAnchor={picker} onOpenPicker={setPicker} onPickerClose={() => setPicker(null)} /> : null}
+      {!pending && !ephemeral ? <Reactions msg={msg} pickerAnchor={picker} onOpenPicker={setPicker} onPickerClose={() => setPicker(null)} /> : null}
       {/* the thread it started hangs under everything the message carries, its reactions too */}
       {msg.thread && serverId && !pending ? <ThreadChip serverId={serverId} summary={msg.thread} /> : null}
-      {!pending && !editing && !selecting && (active || menuOpen) ? <RowToolbar msg={msg} pinned={pinned} dev={dev} setPicker={setPicker} openMenu={openMenu} /> : null}
+      {ephemeral ? <OnlyYou msg={msg} /> : null}
+      {!pending && !ephemeral && !editing && !selecting && (active || menuOpen) ? <RowToolbar msg={msg} pinned={pinned} dev={dev} setPicker={setPicker} openMenu={openMenu} /> : null}
       {dev && !pending ? <span hidden data-dev-id={msg.id} /> : null}
     </div>
   );
@@ -410,6 +422,14 @@ function MessageContent({ msg, name, id, pending, upload }: { msg: DecryptedMess
   // A message of nothing but emoji draws them big, all at one size: shrinking
   // them as there were more made two messages side by side look mismatched.
   const jumbo = useMemo(() => nodes.length > 0 && isEmojiOnly(nodes), [nodes]);
+  // an app said it would answer, and has not yet
+  if (hook?.application_id && msg.flags & MSG_FLAG_LOADING) {
+    return (
+      <div id={id} className={s.content}>
+        <Thinking msg={msg} />
+      </div>
+    );
+  }
   return (
     <div id={id} className={[s.content, jumbo ? s.jumbo : ""].join(" ")}>
       {msg.decryptError === "no_key" ? (
@@ -426,7 +446,14 @@ function MessageContent({ msg, name, id, pending, upload }: { msg: DecryptedMess
       {msg.payload?.poll && !hook ? <PersonPoll msg={msg} poll={msg.payload.poll} pending={!!pending} /> : null}
       {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} from={name} /> : null}
       {embeds ? <Embeds list={embeds} onRemove={!pending && canRemoveEmbeds(msg) ? (ev) => confirmRemoveEmbeds(msg, ev.shiftKey) : undefined} /> : null}
-      {hook ? <HookBody msg={msg} from={name} /> : null}
+      {hook?.application_id ? (
+        // an app's buttons and menus do something, once it is really sent and known to the server
+        <AppMsgProvider msg={msg} interactive={!pending && !msg.local}>
+          <HookBody msg={msg} from={name} />
+        </AppMsgProvider>
+      ) : hook ? (
+        <HookBody msg={msg} from={name} />
+      ) : null}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <InviteCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <ProfileCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <NoteCards nodes={nodes} />}

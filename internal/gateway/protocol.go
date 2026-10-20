@@ -179,6 +179,16 @@ const (
 	EvThreadDelete = "thread_delete"
 	// EvThreadMembersUpdate is people joining or leaving a thread, with how many are in it now.
 	EvThreadMembersUpdate = "thread_members_update"
+	// EvReactionRemoveAll is every reaction taken off a message at once.
+	EvReactionRemoveAll = "reaction_remove_all"
+	// EvReactionRemoveEmoji is every reaction of one emoji taken off a message.
+	EvReactionRemoveEmoji = "reaction_remove_emoji"
+	// EvAppCommandsUpdate is an application's commands (or who may use them)
+	// changing, in one server or wherever it is: an app holding a list of
+	// them reads it again.
+	EvAppCommandsUpdate = "application_commands_update"
+	// EvIntegrationsUpdate is the applications installed in a server changing.
+	EvIntegrationsUpdate = "integrations_update"
 )
 
 // Presence is a user's visible status.

@@ -43,3 +43,21 @@ const undoCommunities = `
 	ALTER TABLE channels DROP COLUMN applied_tags;
 	ALTER TABLE channels DROP COLUMN forum;
 `
+
+// undoBots takes away what migration 0034 adds, for the same tests.
+const undoBots = `
+	DROP TABLE bot_copies;
+	DROP TABLE ephemeral_files;
+	DROP TABLE interaction_files;
+	DROP TABLE ephemeral_messages;
+	DROP TABLE interactions;
+	DROP TABLE oauth_tokens;
+	DROP TABLE oauth_codes;
+	DROP TABLE application_user_installs;
+	DROP TABLE application_guild_installs;
+	DROP TABLE application_command_permissions;
+	DROP TABLE application_commands;
+	DROP TABLE application_emojis;
+	DROP TABLE applications;
+	ALTER TABLE roles DROP COLUMN managed_by;
+`

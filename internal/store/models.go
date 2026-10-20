@@ -25,6 +25,14 @@ const (
 	// account; who a message really came from rides with the message itself.
 	// Nobody signs in as it, and nobody can message, befriend or block it.
 	FlagWebhook int64 = 32
+	// FlagBot marks an application's bot: an account a program runs through
+	// the bot API (internal/api/bot_*.go), signed in with its token alone.
+	FlagBot int64 = 64
+	// FlagBotReadsAll marks a bot whose application has the Message Content
+	// intent. Only such a bot is entitled to the keys of the servers it is in,
+	// so the server can decrypt what it sees to hand it over; everyone in
+	// those servers is told. Other bots read only what is addressed to them.
+	FlagBotReadsAll int64 = 128
 )
 
 // NotPeople are the flags of accounts no person holds: Nexa's and the
@@ -32,8 +40,9 @@ const (
 const NotPeople = FlagSystem | FlagWebhook
 
 // publicFlags are the bits other people may see: whether an account is staff,
-// and whether it is the system account rather than a person.
-const publicFlags = FlagAdmin | FlagSystem | FlagWebhook
+// whether it is the system account rather than a person, and whether it is a
+// bot and reads every message it can see.
+const publicFlags = FlagAdmin | FlagSystem | FlagWebhook | FlagBot | FlagBotReadsAll
 
 // Who may start a direct message with an account (users.dm_privacy): anyone,
 // friends and people who share a server with it, friends, or nobody. A new
@@ -454,6 +463,10 @@ type Role struct {
 	IconID      *ids.ID    `json:"icon_id"`
 	IconEmoji   string     `json:"icon_emoji"`
 	CreatedAt   int64      `json:"created_at"`
+	// ManagedBy is the bot a role came with (CreateManagedRole): it holds
+	// what the bot asked for when it was added, nobody else can be given it,
+	// and it goes when the bot leaves. Nil on every other role.
+	ManagedBy *ids.ID `json:"managed_by,omitempty"`
 }
 
 // RolePatch is an optional set of role changes.
@@ -556,6 +569,13 @@ const (
 	// MsgFlagPublished is a post of an announcement channel that has been
 	// published to the channels following it (Nexa's own bit).
 	MsgFlagPublished int64 = 1 << 20
+	// MsgFlagEphemeral is an application's answer only the person who used
+	// it sees; such a message is never stored with the rest
+	// (ephemeral_messages), and the apps are sent it with this bit set.
+	MsgFlagEphemeral int64 = 1 << 6
+	// MsgFlagLoading is an application's answer still on its way: the apps
+	// show it thinking until the application fills it in.
+	MsgFlagLoading int64 = 1 << 7
 )
 
 // Message is an encrypted message row plus its attachments and reactions.

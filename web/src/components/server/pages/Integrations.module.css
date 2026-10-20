@@ -25,3 +25,28 @@
   .avatarCol { width: auto; flex-direction: row; justify-content: flex-start; flex-wrap: wrap; }
   .actions > * { flex: 1 1 auto; }
 }
+
+/* --- apps (AppsSection) -------------------------------------------------------------------- */
+.readsAll { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 650; color: var(--text-warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }
+.appBody { display: flex; flex-direction: column; gap: 14px; padding: 16px; border-top: 1px solid var(--border-subtle); }
+.appDesc { margin: 0; font-size: 14.5px; line-height: 20px; color: var(--text-subtle); overflow-wrap: anywhere; }
+.perms { display: flex; flex-direction: column; gap: 10px; }
+.permsHead { margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-strong); }
+.permTargets { display: flex; flex-wrap: wrap; gap: 6px; }
+.permTarget { height: 30px; padding: 0 12px; border-radius: 999px; font-size: 13.5px; font-weight: 600; color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--border); }
+.permTarget:hover { color: var(--text); background: var(--bg-hover); }
+.permTarget[aria-selected="true"] { color: var(--on-brand); background: var(--grad-brand); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 12px -6px color-mix(in srgb, var(--brand) 85%, transparent); }
+.permGroup { display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: var(--radius-md); background: color-mix(in oklab, var(--bg-base) 45%, var(--bg-surface)); box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 30%, transparent), inset 0 0 0 1px var(--border-subtle); }
+.permGroupHead { font-size: 12.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 2px; }
+.permNone { font-size: 13.5px; color: var(--text-muted); padding: 4px 0; }
+.permRow { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.permName { flex: 1; min-width: 0; font-size: 14.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.permIcon { flex: none; color: var(--icon); margin-inline: 3px; }
+.permDot { flex: none; width: 14px; height: 14px; margin-inline: 5px; border-radius: 50%; background: var(--text-muted); }
+.permSwitch { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--radius-sm); background: var(--bg-input); flex: none; }
+.permSwitch button { height: 26px; padding: 0 10px; border-radius: 7px; font-size: 12.5px; font-weight: 650; color: var(--text-muted); }
+.permSwitch button[data-allow][aria-checked="true"] { color: var(--on-positive); background: var(--positive); }
+.permSwitch button[data-deny][aria-checked="true"] { color: var(--on-danger); background: var(--danger); }
+.permRemove { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-xs); color: var(--icon); }
+.permRemove:hover { color: var(--text-danger); background: var(--bg-hover); }
+.permAdd { margin-top: 4px; }

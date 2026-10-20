@@ -55,12 +55,13 @@ func (s *Server) webhookRoutes(mux *http.ServeMux) {
 		mux.Handle("GET "+base, s.hookRoute(s.handleWebhookTokenGet))
 		mux.Handle("PATCH "+base, s.hookRoute(s.handleWebhookTokenPatch))
 		mux.Handle("DELETE "+base, s.hookRoute(s.handleWebhookTokenDelete))
-		mux.Handle("POST "+base, s.hookRoute(s.handleWebhookExecute("")))
+		// an application's id with an interaction's token is a followup
+		mux.Handle("POST "+base, s.hookRoute(s.orFollowup(s.handleWebhookExecute(""), s.followupCreate)))
 		mux.Handle("POST "+base+"/slack", s.hookRoute(s.handleWebhookExecute("slack")))
 		mux.Handle("POST "+base+"/github", s.hookRoute(s.handleWebhookExecute("github")))
-		mux.Handle("GET "+base+"/messages/{mid}", s.hookRoute(s.handleWebhookMessageGet))
-		mux.Handle("PATCH "+base+"/messages/{mid}", s.hookRoute(s.handleWebhookMessageEdit))
-		mux.Handle("DELETE "+base+"/messages/{mid}", s.hookRoute(s.handleWebhookMessageDelete))
+		mux.Handle("GET "+base+"/messages/{mid}", s.hookRoute(s.orFollowup(s.handleWebhookMessageGet, s.followupGet)))
+		mux.Handle("PATCH "+base+"/messages/{mid}", s.hookRoute(s.orFollowup(s.handleWebhookMessageEdit, s.followupEdit)))
+		mux.Handle("DELETE "+base+"/messages/{mid}", s.hookRoute(s.orFollowup(s.handleWebhookMessageDelete, s.followupDelete)))
 		for _, p := range []string{base, base + "/slack", base + "/github", base + "/messages/{mid}"} {
 			mux.Handle("OPTIONS "+p, s.hookRoute(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) }))
 		}
@@ -556,7 +557,9 @@ func (s *Server) handleWebhookDelete(w http.ResponseWriter, r *http.Request) {
 // tokenWebhook loads the webhook a token route names and checks its token,
 // answering in Discord's shape when either is wrong.
 func (s *Server) tokenWebhook(w http.ResponseWriter, r *http.Request) *store.Webhook {
-	id, err := ids.Parse(r.PathValue("wid"))
+	// the id in either form: as Nexa writes it in the address it hands out,
+	// or as the bot API wrote it to a library
+	id, err := parseBotID(r.PathValue("wid"))
 	if err != nil || id.IsZero() {
 		writeDiscordError(w, dErrUnknownWebhook)
 		return nil
@@ -1104,7 +1107,7 @@ func (s *Server) handleWebhookExecute(source string) http.HandlerFunc {
 			_, _ = io.WriteString(w, "ok")
 			return
 		}
-		WriteJSON(w, http.StatusOK, s.discordMessage(full, *ch.ServerID))
+		WriteJSON(w, http.StatusOK, s.webhookMessageObj(r.Context(), full, ch))
 	}
 }
 
@@ -1114,7 +1117,7 @@ func (s *Server) webhookMessage(w http.ResponseWriter, r *http.Request, wh *stor
 		writeDiscordError(w, dErrUnknownChannel)
 		return nil
 	}
-	mid, err := ids.Parse(r.PathValue("mid"))
+	mid, err := parseBotID(r.PathValue("mid"))
 	if err != nil {
 		writeDiscordError(w, dErrUnknownMessage)
 		return nil
@@ -1136,7 +1139,7 @@ func (s *Server) handleWebhookMessageGet(w http.ResponseWriter, r *http.Request)
 	if m == nil {
 		return
 	}
-	WriteJSON(w, http.StatusOK, s.discordMessage(m, wh.ServerID))
+	WriteJSON(w, http.StatusOK, s.webhookMessageObj(r.Context(), m, nil))
 }
 
 func (s *Server) handleWebhookMessageEdit(w http.ResponseWriter, r *http.Request) {
@@ -1264,7 +1267,7 @@ func (s *Server) handleWebhookMessageEdit(w http.ResponseWriter, r *http.Request
 	if flags&store.MsgFlagSuppressEmbeds == 0 && !v2 && len(p.Embeds) == 0 {
 		s.unfurlWebhookMessage(m.ID, ch.ID, p.Content)
 	}
-	WriteJSON(w, http.StatusOK, s.discordMessage(updated, wh.ServerID))
+	WriteJSON(w, http.StatusOK, s.webhookMessageObj(ctx, updated, ch))
 }
 
 func (s *Server) handleWebhookMessageDelete(w http.ResponseWriter, r *http.Request) {

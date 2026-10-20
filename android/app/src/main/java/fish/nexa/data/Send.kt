@@ -365,6 +365,9 @@ object Send {
                         put("allow_multiselect", p.multiselect)
                     })
                 }
+                // the apps it is addressed to read their own copy, sealed to their bots
+                val copies = BotCopies.seal(BotCopies.addressed(channelId, mentions, author, meId), payload)
+                if (copies.isNotEmpty()) put("bot_copies", buildJsonObject { for ((k, v) in copies) put(k, v) })
             }
             val sent = wireJson.decodeFromJsonElement(Message.serializer(), Nexa.api.request("POST", "/channels/$channelId/messages", body))
             afterSend?.invoke(sent.id)
@@ -466,6 +469,9 @@ object Send {
             putJsonArray("mentions") { mentions.forEach { add(JsonPrimitive(it)) } }
             putJsonArray("mention_roles") { ex.roles.forEach { add(JsonPrimitive(it)) } }
             put("mention_everyone", ex.everyone)
+            // the apps it is addressed to get the edit too; an app no longer addressed loses its copy
+            val copies = BotCopies.seal(BotCopies.addressed(channelId, mentions, replied, me.id), payload)
+            put("bot_copies", buildJsonObject { for ((k, v) in copies) put(k, v) })
         }
         val updated = wireJson.decodeFromJsonElement(Message.serializer(), Nexa.api.request("PATCH", "/channels/$channelId/messages/$messageId", body))
         afterEdit?.invoke(messageId)

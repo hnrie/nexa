@@ -109,6 +109,35 @@ func (l *Limiter) Allow(key string) (bool, time.Duration) {
 	return false, delay
 }
 
+// Burst is how many events the limiter lets through at once.
+func (l *Limiter) Burst() int { return l.burst }
+
+// Rate is how many events a second the limiter allows over time.
+func (l *Limiter) Rate() rate.Limit { return l.r }
+
+// AllowRemaining is Allow that also says how many more events key may have
+// right away, for answers that report it (the bot API's rate limit headers).
+// Remaining is -1 when the allowance is shared and the count is not known.
+func (l *Limiter) AllowRemaining(key string) (ok bool, remaining int, retryAfter time.Duration) {
+	l.mu.Lock()
+	shared := l.shared
+	l.mu.Unlock()
+	if shared != nil {
+		ok, retry := l.Allow(key)
+		return ok, -1, retry
+	}
+	ok, retry := l.Allow(key)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if e := l.entries[key]; e != nil {
+		remaining = int(e.lim.TokensAt(l.now()))
+		if remaining < 0 {
+			remaining = 0
+		}
+	}
+	return ok, remaining, retry
+}
+
 // Reset forgets a key (used after a successful login to clear failures).
 //
 // It clears the shared counter as well as this process's own. Clearing only

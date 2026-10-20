@@ -37,7 +37,8 @@ object ServerSettings {
             Triple(NavPage("roles", t("server.members.roles"), "Tags"), s.canI(st, P.MANAGE_ROLES), 0),
             Triple(NavPage("emoji", t("modals.customStatus.emoji"), "Smile"), true, 0),
             Triple(NavPage("stickers", t("pickers.expressionPicker.stickers"), "Sticker"), true, 0),
-            Triple(NavPage("integrations", t("integrations.title"), "Webhook"), webhooks, 0),
+            // its apps for whoever manages the server, its webhooks for whoever manages them somewhere
+            Triple(NavPage("integrations", t("integrations.title"), "Webhook"), webhooks || s.canI(st, P.MANAGE_SERVER), 0),
             Triple(NavPage("encryption", t("server.encryption.encryption"), "Lock"), true, 0),
             Triple(NavPage("discovery", t("discovery.title"), "Compass"), s.canI(st, P.MANAGE_SERVER), 0),
             Triple(NavPage("members", t("server.serverSettings.members"), "Users"), true, 1),

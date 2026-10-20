@@ -1,0 +1,15 @@
+/* Permissions as ticks, grouped as the role editor groups them. */
+.picker { display: flex; flex-direction: column; gap: 14px; }
+.group { margin: 0; padding: 0; border: 0; min-width: 0; }
+.head { padding: 0; margin-bottom: 6px; font-size: 12.5px; font-weight: 700; letter-spacing: 0.01em; color: var(--text-muted); }
+.items { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
+.picker[data-columns="1"] .items { grid-template-columns: 1fr; }
+.item { position: relative; display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer; color: var(--text); font-size: 14.5px; }
+.item:hover { background: var(--bg-hover); }
+.item input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.box { flex: none; width: 20px; height: 20px; border-radius: 6px; box-sizing: border-box; border: 2px solid var(--text-muted); display: grid; place-items: center; color: var(--on-brand); transition: background var(--transition), border-color var(--transition); }
+.item[data-on] .box { background: var(--grad-brand); border-color: transparent; box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--brand) 80%, transparent); }
+.item[data-implied] { cursor: default; opacity: 0.7; }
+.item:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.label { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 767px) { .items { grid-template-columns: 1fr; } .item { min-height: 44px; } }

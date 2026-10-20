@@ -1,6 +1,6 @@
 import { channels as channelsApi } from "@/api/channels";
 import { BULK_DELETE_MAX, messages as messagesApi } from "@/api/messages";
-import { MSG_FLAG_PINNED, MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
+import { MSG_FLAG_EPHEMERAL, MSG_FLAG_PINNED, MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
 import { humanizeMentions, type HumanNames } from "@/components/composer/mentions";
 import { copyText } from "@/lib/clipboard";
 import { compareIds } from "@/lib/ids";
@@ -14,6 +14,7 @@ import { useSelection } from "@/stores/selection";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { about, button, defineMenu, type MenuButton } from "@/lib/contextMenus/registry";
+import { messageAppsItem } from "./apps/appMenus";
 import { canI, isInstanceAdmin, P, useServers } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
 import { mentionsMe } from "@/lib/mentionsMe";
@@ -169,6 +170,8 @@ export const messageMenu = defineMenu<MessageMenuCtx>("message", [
     }),
     button("copyMessageLink", ({ msg }) => ({ id: "link", label: t("chat.messageItem.copyMessageLink"), onSelect: () => copyMessageLink(msg) })),
   ],
+  // what apps can do with a message, their message commands
+  [button("messageApps", ({ msg }) => messageAppsItem(msg))],
   [button("copyMessageId", ({ msg }) => useSettings.getState().settings.developerMode && { id: "id", label: t("chat.messageItem.copyMessageId"), onSelect: () => void copyText(msg.id, t("clipboard.idCopied")) })],
   [
     button("selectMessages", ({ msg }) => canDelete(msg) && { id: "select", label: t("chat.messageMenu.selectMessages"), onSelect: () => startSelecting(msg) }),
@@ -268,7 +271,8 @@ export async function deleteMessageNow(msg: DecryptedMessage): Promise<void> {
 
 /** Whether a message can be ticked while picking messages to delete. */
 export function canPick(msg: DecryptedMessage): boolean {
-  return !msg.type.startsWith("system_") && canDelete(msg);
+  // an app's answer only you see is no part of the conversation, so nothing to delete from it
+  return !msg.type.startsWith("system_") && (msg.flags & MSG_FLAG_EPHEMERAL) === 0 && canDelete(msg);
 }
 
 /** Starts picking messages to delete in the message's channel, with that message ticked. */

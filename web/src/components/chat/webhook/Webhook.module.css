@@ -81,6 +81,8 @@ a.title:hover { text-decoration: underline; }
 .button[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 .buttonLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .buttonEmoji { width: 18px; height: 18px; object-fit: contain; flex: none; }
+/* a select menu takes a row of its own, as wide as it can be up to the components' width */
+.selectRow { flex: 1 1 100%; min-width: 0; display: flex; }
 .container {
   border-radius: var(--radius-sm); background: var(--embed-bg); padding: 16px; display: flex; flex-direction: column; gap: 8px;
   border: 1px solid var(--border-subtle); position: relative; overflow: hidden;

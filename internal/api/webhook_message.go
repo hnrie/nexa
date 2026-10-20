@@ -2,10 +2,8 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"regexp"
 	"strings"
-	"time"
 
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/store"
@@ -42,6 +40,46 @@ type wmPlain struct {
 	// Source is "slack" or "github" for a message converted from one of
 	// those formats, empty for one sent as it is.
 	Source string `json:"source,omitempty"`
+
+	// What a bot's messages carry besides (bot_messages.go): the
+	// application that wrote it, the interaction it answers, and the
+	// stickers it sent. Name and AvatarID are then the bot's own, which older
+	// apps show it under.
+	ApplicationID *ids.ID         `json:"application_id,omitempty"`
+	Interaction   *wmInteraction  `json:"interaction,omitempty"`
+	Stickers      []wmStickerItem `json:"stickers,omitempty"`
+}
+
+// wmInteraction is the interaction a bot's message answers: who used what.
+type wmInteraction struct {
+	ID          ids.ID `json:"id"`
+	Type        int    `json:"type"`
+	UserID      ids.ID `json:"user_id"`
+	Name        string `json:"name,omitempty"`
+	CommandType int    `json:"command_type,omitempty"`
+	// the message a component sat on, and the one an answer to a form's
+	// component went on from
+	InteractedMessageID *ids.ID `json:"interacted_message_id,omitempty"`
+	// what a user or message command was used on
+	TargetUserID    *ids.ID `json:"target_user_id,omitempty"`
+	TargetMessageID *ids.ID `json:"target_message_id,omitempty"`
+	// for a followup, the message the first answer made
+	OriginalResponseMessageID *ids.ID `json:"original_response_message_id,omitempty"`
+	// where the application was installed for it: "0" a server, "1" an account
+	Owners map[string]ids.ID `json:"authorizing_integration_owners,omitempty"`
+	// Trigger is, for a form's submission, the interaction that opened it
+	Trigger *wmInteraction `json:"trigger,omitempty"`
+}
+
+// wmStickerItem is a sticker a bot sent.
+type wmStickerItem struct {
+	ID         ids.ID `json:"id"`
+	Name       string `json:"name"`
+	FormatType int    `json:"format_type"`
+	BlobID     ids.ID `json:"blob_id"`
+	// Format is the sticker's file as Nexa keeps it (png, apng, gif, webp,
+	// tgs, webm), for the apps that draw it
+	Format string `json:"format,omitempty"`
 }
 
 // wmEmbed is a rich embed.
@@ -160,8 +198,33 @@ type wmComponent struct {
 	Spacing int   `json:"spacing,omitempty"`
 	// container
 	AccentColor *int `json:"accent_color,omitempty"`
-	// select menus: shown, never usable (there is no app to answer them)
-	Placeholder string `json:"placeholder,omitempty"`
+	// select menus: usable on a bot's message, which an application answers;
+	// on a webhook's only shown
+	Placeholder   string           `json:"placeholder,omitempty"`
+	Options       []wmSelectOption `json:"options,omitempty"`
+	MinValues     *int             `json:"min_values,omitempty"`
+	MaxValues     *int             `json:"max_values,omitempty"`
+	DefaultValues []wmDefaultValue `json:"default_values,omitempty"`
+	ChannelTypes  []int            `json:"channel_types,omitempty"`
+	Required      *bool            `json:"required,omitempty"`
+	// a premium button's SKU; nothing is for sale here, so it shows disabled
+	SKUID *ids.ID `json:"sku_id,omitempty"`
+}
+
+// wmSelectOption is one choice of a string select menu.
+type wmSelectOption struct {
+	Label       string   `json:"label"`
+	Value       string   `json:"value"`
+	Description string   `json:"description,omitempty"`
+	Emoji       *wmEmoji `json:"emoji,omitempty"`
+	Default     bool     `json:"default,omitempty"`
+}
+
+// wmDefaultValue is what a user, role, mentionable or channel select menu
+// starts with picked.
+type wmDefaultValue struct {
+	ID   ids.ID `json:"id"`
+	Type string `json:"type"` // user | role | channel
 }
 
 type wmGalleryItem struct {
@@ -232,6 +295,8 @@ type allowedMentions struct {
 	Parse []string `json:"parse"`
 	Users []ids.ID `json:"users"`
 	Roles []ids.ID `json:"roles"`
+	// RepliedUser says whether a reply pings who it replies to (nil: it does)
+	RepliedUser *bool `json:"replied_user,omitempty"`
 	// set is false when the request had none, which for a webhook means
 	// users are parsed and nothing else is.
 	set bool
@@ -347,143 +412,15 @@ func (p *wmPlain) texts() []string {
 
 // --- Discord's message object ---------------------------------------------------
 
-// discordMessage is a webhook message as Discord's API returns one, for the
-// programs that read back what they sent (wait=true, and the message routes).
-func (s *Server) discordMessage(m *store.Message, serverID ids.ID) map[string]any {
-	var p wmPlain
-	_ = json.Unmarshal(m.Webhook, &p)
-	var whID ids.ID
-	if m.WebhookID != nil {
-		whID = *m.WebhookID
+// webhookMessageObj is a webhook message as the protocol returns one, for the
+// programs that read back what they sent (wait=true, and the message
+// routes): built as the bot API builds every message, ids in the form the
+// libraries expect. ch may be nil, to be looked up.
+func (s *Server) webhookMessageObj(ctx context.Context, m *store.Message, ch *store.Channel) dMessage {
+	if ch == nil {
+		ch, _ = s.Store.ChannelByID(ctx, m.ChannelID)
 	}
-	var avatar any
-	if p.AvatarID != nil {
-		avatar = p.AvatarID.String()
-	}
-	author := map[string]any{"id": whID.String(), "username": p.Name, "avatar": avatar, "discriminator": "0000", "public_flags": 0, "flags": 0, "bot": true, "global_name": nil}
-	mentions := make([]map[string]any, 0, len(m.Mentions))
-	for _, id := range m.Mentions {
-		mentions = append(mentions, map[string]any{"id": id.String()})
-	}
-	if len(m.Mentions) > 0 {
-		if list, err := s.Store.UsersByIDs(context.Background(), m.Mentions); err == nil {
-			mentions = mentions[:0]
-			for _, u := range list {
-				mentions = append(mentions, map[string]any{"id": u.ID.String(), "username": u.Username, "global_name": u.DisplayName, "avatar": nil, "discriminator": "0", "public_flags": 0})
-			}
-		}
-	}
-	roles := make([]string, 0, len(m.MentionRoles))
-	for _, id := range m.MentionRoles {
-		roles = append(roles, id.String())
-	}
-	base := strings.TrimRight(s.Cfg.PublicURL, "/")
-	abs := func(u string) string {
-		if strings.HasPrefix(u, "/") {
-			return base + u
-		}
-		return u
-	}
-	attachments := make([]map[string]any, 0, len(p.Attachments))
-	for _, a := range p.Attachments {
-		// a file an embed or a component shows is part of that, not listed
-		if a.Inline {
-			continue
-		}
-		att := map[string]any{"id": a.ID.String(), "filename": a.Filename, "size": a.Size, "url": base + "/media/attachments/" + a.BlobID.String(), "proxy_url": base + "/media/attachments/" + a.BlobID.String()}
-		if a.ContentType != "" {
-			att["content_type"] = a.ContentType
-		}
-		if a.Description != "" {
-			att["description"] = a.Description
-		}
-		if a.Title != "" {
-			att["title"] = a.Title
-		}
-		if a.Width != nil && a.Height != nil {
-			att["width"], att["height"] = *a.Width, *a.Height
-		}
-		if a.Spoiler {
-			att["flags"] = 8
-		}
-		attachments = append(attachments, att)
-	}
-	embeds := make([]any, 0, len(p.Embeds)+len(p.LinkEmbeds))
-	for _, e := range p.Embeds {
-		e := e
-		for _, media := range []**wmMedia{&e.Image, &e.Thumbnail} {
-			if *media == nil {
-				continue
-			}
-			m := **media
-			if m.BlobID != nil {
-				// what attachment://name came to: the file's own address here
-				m.URL = base + "/media/attachments/" + m.BlobID.String()
-				m.ProxyURL = m.URL
-			} else if m.ProxyURL != "" {
-				m.ProxyURL = abs(m.ProxyURL)
-			}
-			*media = &m
-		}
-		if e.Footer != nil && e.Footer.ProxyIconURL != "" {
-			f := *e.Footer
-			f.ProxyIconURL = abs(f.ProxyIconURL)
-			e.Footer = &f
-		}
-		if e.Author != nil && e.Author.ProxyIconURL != "" {
-			a := *e.Author
-			a.ProxyIconURL = abs(a.ProxyIconURL)
-			e.Author = &a
-		}
-		embeds = append(embeds, e)
-	}
-	for _, l := range p.LinkEmbeds {
-		le := map[string]any{"type": map[string]string{"image": "image", "gif": "gifv", "video": "video", "youtube": "video"}[l.Type], "url": l.URL}
-		if le["type"] == "" {
-			le["type"] = "link"
-		}
-		if l.Title != "" {
-			le["title"] = l.Title
-		}
-		if l.Description != "" {
-			le["description"] = l.Description
-		}
-		if l.SiteName != "" {
-			le["provider"] = map[string]any{"name": l.SiteName}
-		}
-		if l.Image != "" {
-			le["thumbnail"] = map[string]any{"url": l.URL, "proxy_url": abs(l.Image), "width": l.ImageW, "height": l.ImageH}
-		}
-		embeds = append(embeds, le)
-	}
-	var edited any
-	if m.EditedAt != nil {
-		edited = time.UnixMilli(*m.EditedAt).UTC().Format("2006-01-02T15:04:05.000000+00:00")
-	}
-	out := map[string]any{
-		"id": m.ID.String(), "type": 0, "content": p.Content, "channel_id": m.ChannelID.String(), "author": author,
-		"attachments": attachments, "embeds": embeds, "mentions": mentions, "mention_roles": roles,
-		"pinned": m.Flags&store.MsgFlagPinned != 0, "mention_everyone": m.MentionEveryone, "tts": p.TTS,
-		"timestamp": time.UnixMilli(m.CreatedAt).UTC().Format("2006-01-02T15:04:05.000000+00:00"), "edited_timestamp": edited,
-		"flags": m.Flags &^ store.MsgFlagPinned, "components": nonNilComponents(p.Components), "webhook_id": whID.String(),
-	}
-	if p.Poll != nil {
-		poll := map[string]any{"question": p.Poll.Question, "answers": p.Poll.Answers, "expiry": p.Poll.Expiry, "allow_multiselect": p.Poll.AllowMultiselect, "layout_type": p.Poll.LayoutType}
-		if m.Poll != nil {
-			counts := make([]map[string]any, 0, len(m.Poll.Counts))
-			for _, c := range m.Poll.Counts {
-				if c.Count > 0 {
-					counts = append(counts, map[string]any{"id": c.ID, "count": c.Count, "me_voted": false})
-				}
-			}
-			poll["results"] = map[string]any{"is_finalized": m.Poll.Finalized, "answer_counts": counts}
-		}
-		out["poll"] = poll
-	}
-	if !serverID.IsZero() {
-		out["guild_id"] = serverID.String()
-	}
-	return out
+	return s.builder(ctx, nil, nil).messageObj(m, ch, msgOpts{content: true})
 }
 
 func nonNilComponents(list []wmComponent) []wmComponent {

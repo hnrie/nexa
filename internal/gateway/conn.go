@@ -170,6 +170,12 @@ type conn struct {
 	kicked  atomic.Pointer[kickInfo]
 	pendMu  sync.Mutex
 	pending []ServerFrame
+
+	// deliver and external are set on an external connection (external.go):
+	// its frames go to deliver rather than to a socket, and closing it tells
+	// its owner.
+	deliver  func(ServerFrame)
+	external *External
 }
 
 func (c *conn) lastBeat() time.Time { return time.UnixMilli(c.beat.Load()) }
@@ -178,6 +184,18 @@ func (c *conn) lastBeat() time.Time { return time.UnixMilli(c.beat.Load()) }
 func (c *conn) currentUser() *store.User { return c.user.Load() }
 
 func (c *conn) enqueue(f ServerFrame) {
+	if c.deliver != nil {
+		switch f.T {
+		case frameRevoked:
+			c.close(CloseSessionRevoked, "session revoked")
+		case frameKick:
+			k, _ := f.D.(kickInfo)
+			c.close(k.code, k.reason)
+		default:
+			c.deliver(f)
+		}
+		return
+	}
 	if !c.live.Load() {
 		c.pendMu.Lock()
 		if !c.live.Load() {
@@ -256,6 +274,10 @@ func (c *conn) goLive(ready ServerFrame) {
 func (c *conn) close(code websocket.StatusCode, reason string) {
 	c.once.Do(func() {
 		close(c.closed)
+		if c.external != nil {
+			c.closeExternal(code, reason)
+			return
+		}
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()

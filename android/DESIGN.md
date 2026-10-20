@@ -153,3 +153,5 @@ From the owner (CLAUDE.md and standing feedback):
 | Haptics on long-press, reactions and the push-to-talk key | Partly: long-press and swipe vibrate where the browser can |
 | The composer riding the keyboard's own animation | Not possible on the web (the browser moves the page) |
 | Long-press a member card on the Members page (Server Settings) to pick it | Done: ModMembers cards on phones |
+| An X on an app's command being filled in, to leave it in one tap | Done: CommandMode (Close Command) |
+| Tabs that do not fit on a phone (an app's five) slide sideways in their bar, not the whole page | Done: Designer.module.css `.scopeTabs` |

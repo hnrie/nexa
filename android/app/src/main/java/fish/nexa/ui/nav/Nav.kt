@@ -117,6 +117,11 @@ object Nav {
             fish.nexa.ui.profile.Profiles.openByUsername(parts[0].substring(1))
             return true
         }
+        // a link that adds an app: what it is, where it goes and what it may do, before saying yes
+        if (parts == listOf("oauth2", "authorize")) {
+            fish.nexa.ui.apps.openAuthorize(path.substringAfter('?', "").substringBefore('#'))
+            return true
+        }
         if (parts.firstOrNull() != "channels" || parts.size < 2) return false
         val id = Regex("^\\d{1,20}$")
         val next: Route = when (parts[1]) {

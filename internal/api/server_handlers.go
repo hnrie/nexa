@@ -104,6 +104,10 @@ func (s *Server) serverCtx(w http.ResponseWriter, r *http.Request, need perms.Pe
 }
 
 func (s *Server) audit(r *http.Request, serverID, actor ids.ID, action, targetType string, target *ids.ID, changes any, reason string) {
+	// a bot gives its reasons the way its libraries do, in a header
+	if reason == "" {
+		reason = auditReason(r)
+	}
 	s.auditAs(r.Context(), serverID, actor, action, targetType, target, changes, reason)
 }
 
@@ -565,6 +569,28 @@ func (s *Server) removeMember(r *http.Request, srv *store.Server, uid ids.ID, ev
 	}
 	s.emitServer(ctx, srv.ID, event, payload)
 	s.Bcast.EmitUsers([]ids.ID{uid}, "server_delete", map[string]any{"id": srv.ID})
+	// a bot leaves behind the role it brought and its application's install
+	if u, err := s.Store.UserByID(ctx, uid); err == nil && u.Flags&store.FlagBot != 0 {
+		s.botLeftServer(r, srv, uid)
+	}
+	return s.rotateFor(r, srv, visible)
+}
+
+// rotateAfter starts a new key in every conversation of a server that uid
+// could read and should read no more (a bot that stopped reading
+// everything): the server's root and its private channels and threads.
+func (s *Server) rotateAfter(r *http.Request, srv *store.Server, uid ids.ID) error {
+	visible, err := s.Store.ViewableServerChannels(r.Context(), srv.ID, uid)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
+	return s.rotateFor(r, srv, visible)
+}
+
+// rotateFor flags the server root, and the private channels and threads of
+// visible, as needing a new key, and asks their members' apps to make one.
+func (s *Server) rotateFor(r *http.Request, srv *store.Server, visible map[ids.ID]perms.Perm) error {
+	ctx := r.Context()
 	// rotate the server root and every private channel the user could read
 	convs := []ids.ID{srv.ID}
 	chans, err := s.Store.ServerChannels(ctx, srv.ID)

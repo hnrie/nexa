@@ -239,7 +239,12 @@ $ADB emu kill                                       # when finished
 ### Other end-to-end runs
 
 All start their own throwaway chatd: `tools/webhook_e2e.py` (every kind of webhook message, both
-sizes), `tools/discord_e2e.py` (Discord activity sync against the fake Discord in
+sizes), `tools/bot_e2e.py` (real bot libraries: the discord.py, discord.js and discordgo test bots
+in `tools/bots/`, pointed at Nexa as the portal says, used by a person in a headless browser;
+`BOT_E2E_PYTHON`, `BOT_E2E_NODE_MODULES` and `BOT_E2E_GOPATH` name where each library is),
+`tools/apps_ui.py` (every app screen as a person uses it, at both sizes, into
+`tools/out/apps-ui`; `--serve --port N` leaves the server and its discord.py bot running, for the
+Android emulator), `tools/discord_e2e.py` (Discord activity sync against the fake Discord in
 `internal/discordsync/fakediscord/cmd/fakediscord`), `tools/sfu_call.py` and `tools/sfu_guest.py`
 (real calls and a guest through Cloudflare Realtime, keys from `chatd.env`), `tools/call_quality.py`
 (calls over bad networks made by `tools/netsim`), `tools/share_quality.py` (a screen share of hard
@@ -262,7 +267,8 @@ downloads/android/  the published APKs and manifest.json (committed), served at 
 deploy/             systemd and launchd templates, install.sh, route-dns.sh, warp-proxy.sh
 tools/              test drivers, release scripts, i18n and asset generators (below)
 docs/               design spec and plans, STATUS.md, legal/ (the Terms and Privacy Policy the apps
-                    show word for word), plugins.md (the plugin API), design/reference captures
+                    show word for word), plugins.md (the plugin API), bots.md (making apps and
+                    pointing bot libraries at Nexa), design/reference captures
 audit/              two rounds of code audits: findings, triage and progress per area
 prompt.txt          the 2026-10-01 handoff to another machine, with the owner's messages word for word
 run.sh, backup.sh   what the service starts (bin/chatd -env chatd.env); the backup of data/
@@ -292,6 +298,7 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
 | `api` | REST handlers, middleware, rate limits, static pages; one file per area (below) |
 | `auth` | Argon2id of the client's auth key, bearer tokens (only SHA-256 hashes stored), the middleware that turns a token into a user or a guest, client IP behind the tunnel |
 | `automod` | AutoMod matching (text read past disguises, words with wildcards, patterns, presets); `testdata/vectors.json` binds every implementation |
+| `botproto` | what speaking the bot protocol of the libraries made for Discord needs: ids as they see them (Nexa's plus a fixed offset, so the time in them reads right), intents, the gateway's opcodes and close codes, JSON and ETF, zlib and zstd; it knows nothing of the store |
 | `cache` | optional Redis: shared rate limits, presence and events between processes |
 | `config` | settings from the environment with defaults and validation |
 | `db` | SQLite or Postgres pools (`W` single writer, `R` readers), `Tx`, the dialect helpers, embedded forward-only migrations |
@@ -352,6 +359,22 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   refusal names the action in `X-Captcha-Action`; the web's `api.captchaSolver` (`lib/captcha.ts`)
   and Android's `Api.captchaSolver` (set by `Auth.solveCaptcha`) solve it and send the request
   again, so a guarded call needs nothing of its own.
+- Apps and bots (`bot_*.go`, guide for bot makers in `docs/bots.md`): the Developer Portal
+  (`bot_portal`, `/api/v1/applications`), OAuth2 and installs (`bot_oauth`: the consent page's
+  `/api/v1/oauth2/authorize`, Authorized Apps, a server's integrations and who may use their
+  commands), people using apps (`bot_interactions`: `POST /api/v1/interactions`, files sent with
+  one, a channel's commands, dismissing an answer only one person sees), and the bot API itself:
+  the REST side of the bot libraries' protocol under `/api/v6` to `/api/v10` (`bot_auth` mounts it,
+  taking `Authorization: Bot <token>` or an OAuth2 `Bearer` token, with per-route buckets, a global
+  limit and the protocol's error shapes; `bot_rest_*`, `bot_message_routes`, `bot_commands`,
+  `bot_modals`, `bot_audit`), its gateway at `/bot-gateway` (`bot_gateway`; events translated and
+  filtered by intent in `bot_dispatch`), files and pictures at `/cdn/...` (`bot_cdn`), and the
+  objects it speaks (`bot_objects`, `bot_messages`). Where the app has a route for the same thing,
+  the bot route runs that route's code as the bot (`callNexa`), so a bot is held to a person's
+  rules and everyone sees the same events. A bot is a user with flag 64 (128 when its app reads
+  every message); an app's id is its bot's. Interactions and app events go to an app's own
+  address through the egress proxy, signed with the app's Ed25519 key. Server Settings,
+  Integrations lists apps for Manage Server and webhooks for Manage Webhooks.
 - Webhooks are used with their token at `/api/webhooks/{wid}/{token}` and at the versioned paths
   Discord's libraries build (`/api/v1`, `/api/v6` to `/api/v10`), with `/slack` and `/github`
   variants, taking Discord's JSON.
@@ -379,7 +402,13 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   positions, servers, members, roles, presence, users, relationships, read states, voice and calls,
   keys (`key_grant`, `keys_needed`, `key_rotation_needed`), emoji and stickers, pins, bans, invites,
   webhooks, polls, settings, threads, follows, AutoMod, the audit log, notes (`note_*`), Nexa and
-  moderation (`nexa_*`, `mod_*`), guests and sessions.
+  moderation (`nexa_*`, `mod_*`), apps (`application_commands_update`, `integrations_update`, and
+  `reaction_remove_all` and `reaction_remove_emoji` for what bots clear), guests and sessions. An
+  app's answer only one person sees is a `message_create` with flag 64 to that person alone, and
+  goes with a `message_delete` marked `ephemeral`.
+- A bot's gateway session is a connection of its account on the hub like any other
+  (`gateway.External`, `external.go`), whose frames go to a callback that `bot_dispatch` turns
+  into the protocol's events.
 - Handlers emit through the `Broadcaster` interface in `api/router.go` (`EmitUsers`, `EmitChannel`,
   ...); the hub sends an event only to members allowed to see it (`store/permcache.go` answers that)
   and encodes it once for all of them.
@@ -425,8 +454,12 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   `note_invites`, `note_links`, `note_files`, `note_versions`, `note_version_files`, `note_keys`,
   `note_updates`, `note_uploads`), Nexa and moderation (`mod_cases`, `mod_messages`,
   `mod_message_files`, `mod_restrictions`, `mod_announcements`, `mod_log`, `mod_reads`, `nexa_reads`,
-  `bug_reports`, `bug_attachments`, `bug_messages`, `bug_message_files`, `client_errors`), the
-  instance (`instance_settings`).
+  `bug_reports`, `bug_attachments`, `bug_messages`, `bug_message_files`, `client_errors`), apps
+  (`applications`, `application_emojis`, `application_commands`, `application_command_permissions`,
+  `application_guild_installs`, `application_user_installs`, `oauth_codes`, `oauth_tokens` (a row
+  goes when its refresh token does, 90 days unused), `interactions` and `ephemeral_messages` (15
+  minutes), `ephemeral_files`, `interaction_files` (a day), `bot_copies`, and `roles.managed_by` for
+  the role a bot brings), the instance (`instance_settings`).
 - Channel types: `dm`, `group_dm`, `subchat`, `text`, `voice`, `category`, `announcement`, `forum`,
   `thread`, `private_thread`. A channel's `key_conv_id` names the conversation whose keys encrypt
   it: itself for DMs and private channels, the server otherwise.
@@ -435,7 +468,9 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
 ### Permissions
 
 `internal/perms` is Discord's algorithm with Discord's bit values. `web/src/lib/perms.ts` mirrors it
-(BigInt, decimal strings on the wire), and so does Android's `fish.nexa.data.Perms`. Server channel
+(BigInt, decimal strings on the wire), and so does Android's `fish.nexa.data.Perms`. Use
+Application Commands (1 << 31) and Use External Apps (1 << 50) are for apps, and @everyone has
+both. Server channel
 access goes through the hooks `server_glue.go` installs, answered from `store/permcache.go`.
 
 ### Media and uploads (`internal/media`)
@@ -594,6 +629,8 @@ in `config.go`, `chatd.env.example` and this list.
   `register(t, ts, username)` (`auth_handlers_test.go`) returns a token and id;
   `do(t, ts, method, path, token, body)` makes a JSON request; `errCode` reads an error;
   `connectGWReady` / `connectGW` open a gateway socket and `gw.next(event, timeout)` waits for an event.
+  For apps (`bot_test.go`): `makeApp` makes one and returns its bot's token, `botDo` makes a
+  request as the bot, `addBot` adds it to a server as the consent page does.
 - `internal/store`: `newStore(t)`, `mkUser(t, s, name)`.
 - Tests against live services run only with their variables set (`UNFURL_LIVE`, `REALTIME_LIVE`,
   `TELEGRAM_LIVE_TOKEN`, `DISCORD_BOT_TOKEN`); the Discord tests otherwise use `fakediscord`.
@@ -630,9 +667,18 @@ deliver: author, channel, mentions, reactions, sizes.
   the device keeps neither the identity nor any roots in the clear. Identity keys are pinned the
   first time they are seen (`lib/keyPins.ts`) and safety numbers (`crypto/fingerprint.ts`) let two
   people compare them.
-- Not end-to-end encrypted: webhook messages (`messages.plain`; the app marks them), Nexa's case
-  threads, poll and AutoMod notices the server writes, and everything public (profiles, avatars,
-  server names, emoji and stickers).
+- Apps: a message meant for a bot (a DM to it, a mention of it, a reply to it, a message command's
+  target) carries `bot_copies`, its payload sealed by the sender's app to the bot's X25519 key (web
+  `lib/botCopies.ts`, Android `data/BotCopies`); the server keeps each bot's private key sealed
+  with the server secret and opens the copy to hand it to the bot (`bot_crypto.go`), files
+  included. An app with the Message Content intent gets the server's keys like a member, the
+  server decrypts for it, and the start of every channel it can see names it (web
+  `chat/apps/readingApps.ts`, Android `ui/apps/ReadingApps.kt`). The owner decided the channel's
+  header shows no mark for it: whoever added the app knew, and the topic keeps its room. The
+  reading glass in the portal and on the consent page shows people which of the two an app is.
+- Not end-to-end encrypted: webhook and app messages (`messages.plain`; the app marks them),
+  interactions, Nexa's case threads, poll and AutoMod notices the server writes, and everything
+  public (profiles, avatars, server names, emoji and stickers).
 
 ## Web app (`web/src`)
 
@@ -646,7 +692,8 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
 
 `/` (home), `/login`, `/register`, `/recover`, `/invite/:code`, `/note/:token`, `/download`,
 `/terms`, `/privacy`, `/about`, `/call/:code` (guest call), `/stickers/pack/:packId`,
-`/connected/discord`, and inside the signed-in shell `/channels/@me` (friends), `@me/nexa` (with
+`/connected/discord`, `/oauth2/authorize` (the consent page for adding an app), and inside the
+signed-in shell `/channels/@me` (friends), `@me/nexa` (with
 `cases/:caseId`, `bugs/:reportId`), `@me/notes[/:noteId]`, `@admin/*` (the staff panel),
 `@discover`, `@me/:channelId[/:messageId]` (DMs), `:serverId[/:channelId[/:messageId]]`, then
 `/:handle` (a profile link, `/@name`).
@@ -664,7 +711,8 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   `discord`, `desktop`, `ui` (modals), `tabs`, `selection`, `pick`, `uploads`, `unsaved`,
   `replyTargets`, `serverNav`, `slowmode`, `profilePopout`, `automodNotices`, `groupAddNotices`,
   `keyAlerts`, `threadLast` (each thread's newest message, for the card under the message it hangs
-  from), `voiceDrag` (someone being dragged to another voice channel). `typing` keeps who is typing
+  from), `voiceDrag` (someone being dragged to another voice channel), `appCommands` (the apps'
+  commands each channel offers, read again on `application_commands_update`). `typing` keeps who is typing
   where, for the status dot's typing pill (the dot stretched sideways, never taller) and the dots
   just after a server channel's name, both of which the account's settings can turn off
   (`typingAvatars`, `typingChannels`).
@@ -700,6 +748,20 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
   (Terms gate), `invite`, `discovery`, `follows`, `friends`, `stickers`,
   `servertag`, `activity`, `desktop`, `common` (shared controls: Modal, Popout, ContextMenu, Button,
   Toggle, Select, Avatar, Twemoji and more).
+- Apps (web): `api/apps.ts` is their REST client and `lib/apps.ts` their logic (commands, their
+  options, names in the reader's language); `lib/interactions.ts` sends what someone does with an
+  app and reads its answer, `lib/botCopies.ts` seals the copies for bots, `lib/pickables.ts` lists
+  people, roles and channels for an app's select menus, and `lib/passwordProof.ts` turns a password
+  into the proof the portal's resets ask for. `components/chat/apps` draws an app's messages (the
+  line saying who used which command, buttons, select menus, thinking, answers only you see) and
+  the Apps entries in the message, person and member menus;
+  `components/apps` holds what they share (`SelectBox`, `AppFormModal` for an app's forms,
+  `ReadingGlass`, `PermissionPicker`, `AppIcon`, `BotTag`). `composer/CommandMode.tsx` is the box
+  while an app's command is filled in, an option at a time. The Developer Portal is
+  `settings/portal` (`DeveloperPortalPage`, `AppDetail` with its General, Bot, Install, OAuth2 and
+  Commands tabs), Settings, Authorized Apps is `settings/AuthorizedAppsPage.tsx`, a server's apps
+  and who may use their commands are `server/pages/AppsSection.tsx` in Integrations, and the
+  consent page is `pages/AuthorizePage.tsx`.
 - Context menus: every menu the app opens is registered in `lib/contextMenus/registry.ts`, and none
   is built inline. A menu is `defineMenu<Ctx>(kind, groups)`, defined once at module level beside
   what it acts on (`chat/messageMenu.ts`, `sidebar/serverMenu.ts`, `sidebar/dmMenu.ts`, ...): groups
@@ -858,6 +920,19 @@ notes.
   (`ui/moderation`: `Panel` with its tabs, `Users`, `Person`, `Moderate` and the other takedown
   sheets, `Cases`, `Bugs`, `Servers`, `Expressions`, `Logs`, `Parts`, `Words`), at
   `Route.Admin(path)`, whose path is the web's below `/channels/@admin`.
+- Apps (`data/Apps`, `AppCommands`, `Interactions`, `BotCopies`, `Pickables`, `net/AppModels`) and
+  their screens in `ui/apps` (`CommandMode` with `CommandBox` and `CommandList` in the composer,
+  `AppMessage`, `AppForm`, `SelectBox`, `Authorize` for the consent sheet that `/oauth2/authorize`
+  links open, `ReadingApps` for the apps a channel's start names, `ReadingGlass`, `AppMenus`), the
+  portal in `ui/settings`
+  (`DeveloperPortal`, `AppDetail`, `PortalParts`, `AuthorizedApps`) and `ui/server/AppsSection`.
+  `ui/markdown/Webhook.kt` is the one parser of webhook and app messages (the web's
+  `lib/webhookMessage.ts`, checked by `web-hook-vectors.json.gz`).
+- Layers: `openSheet` takes `over` (a line over the title) and `heading` (drawn in place of the
+  title, `SheetTitle` drawing the words), and a footer with nothing in it takes no room.
+  `Modifier.floatAbove(gap)` (`components/Controls.kt`) hangs a list over what it sits on top of
+  (the composer's suggestions) without taking room from it. `SQUARE_AVATAR` is the web's square
+  avatar, `TickBox` a checkbox's box, and `RadioCard(tick = true)` the option card with one.
 - `data/ThreadLast` keeps each thread's newest message for the card under the message it hangs from
   (the web's `threadLast`), and `KeyManager` asks the holders again (`/keys/request`) while it waits.
 - There is no push service: `notify/ConnectionService` keeps the connection open in the background
@@ -893,7 +968,8 @@ notes.
 
 ## Tools (`tools/`)
 
-- Testing: `check.sh`, `e2e.py`, `screenshot.py`, `seed.py`, `webhook_e2e.py`, `discord_e2e.py`,
+- Testing: `check.sh`, `e2e.py`, `screenshot.py`, `seed.py`, `webhook_e2e.py`, `bot_e2e.py` with
+  `bots/`, `apps_ui.py`, `discord_e2e.py`,
   `sfu_call.py`, `sfu_guest.py`, `call_quality.py` and `share_quality.py` with `netsim/`, `ios_sim.py`
   with `ios/`, `app_size.py`.
 - i18n: `i18n_check.py`, `i18n_keys_used.py`, `i18n_apply.py` (write or merge a language's

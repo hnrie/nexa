@@ -172,6 +172,10 @@ fun Sheet(
     fill: Color? = null,
     /** Whether what is behind blurs as well as dims; a menu only dims, as on the web (ContextMenu.module.css). */
     blur: Boolean = true,
+    /** A line over the title: who asks, on an app's form. */
+    over: (@Composable () -> Unit)? = null,
+    /** Drawn in place of [title], for a title that changes or carries more than words ([SheetTitle] draws the words). */
+    heading: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = Nx.colors
@@ -275,14 +279,12 @@ fun Sheet(
                         Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.TopCenter) {
                             Box(Modifier.size(36.dp, 4.dp).background(c.borderStrong, RoundedCornerShape(2.dp)))
                         }
-                        if (title != null || closeButton) {
+                        if (title != null || heading != null || closeButton) {
                             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 10.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                if (title != null) Txt(
-                                    title,
-                                    style = Nx.type.heading.copy(fontSize = Nx.type.sp(21f), fontWeight = FontWeight(680), lineHeight = Nx.type.sp(25.2f)),
-                                    color = c.textStrong,
-                                    modifier = Modifier.weight(1f).semantics { heading() },
-                                ) else Spacer(Modifier.weight(1f))
+                                if (title != null || heading != null) Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    over?.invoke()
+                                    if (heading != null) heading() else if (title != null) SheetTitle(title)
+                                } else Spacer(Modifier.weight(1f))
                                 if (closeButton) {
                                     fish.nexa.ui.components.IconButton("X", t("chat.attachments.close"), { dismiss() }, tint = c.textMuted, iconSize = 20.dp)
                                 }
@@ -298,14 +300,20 @@ fun Sheet(
                         content = content,
                     )
                     if (footer != null) {
+                        // a footer with nothing in it (a step without buttons, as the made app's token) takes no room
+                        var filled by remember { mutableStateOf(true) }
                         Box(
                             Modifier
                                 .fillMaxWidth()
-                                .background(fish.nexa.ui.theme.mixOklab(c.bgBase, c.bgFloating, 0.45f))
-                                .topEdge(RoundedCornerShape(0.dp), c.borderSubtle)
-                                .navigationBarsPadding()
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                        ) { footer() }
+                                .then(
+                                    if (filled) Modifier
+                                        .background(fish.nexa.ui.theme.mixOklab(c.bgBase, c.bgFloating, 0.45f))
+                                        .topEdge(RoundedCornerShape(0.dp), c.borderSubtle)
+                                        .navigationBarsPadding()
+                                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                                    else Modifier.navigationBarsPadding(),
+                                ),
+                        ) { Box(Modifier.onSizeChanged { filled = it.height > 0 }) { footer() } }
                     }
                 }
                 // a bare sheet's content runs to its top edge (a banner), with the grip floating over it
@@ -326,13 +334,28 @@ fun openSheet(
     /** Without a title, a card that needs no close button of its own (it goes with a swipe or a tap outside). */
     closeButton: Boolean = true,
     footer: (@Composable (close: () -> Unit) -> Unit)? = null,
+    /** A line over the title: who asks, on an app's form. */
+    over: (@Composable () -> Unit)? = null,
+    /** Drawn in place of [title]: a title that changes, or carries a tag. */
+    heading: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.(close: () -> Unit) -> Unit,
 ) {
     lateinit var layer: Layer
     layer = Layer(key, replaces, canClose) { close ->
-        Sheet(layer, title = title, footer = footer?.let { f -> { f(close) } }, closeButton = closeButton) { content(close) }
+        Sheet(layer, title = title, footer = footer?.let { f -> { f(close) } }, closeButton = closeButton, over = over, heading = heading) { content(close) }
     }
     Layers.open(layer)
+}
+
+/** A sheet's title as [Sheet] draws it, for a [Sheet] heading of one's own. */
+@Composable
+fun SheetTitle(text: String, modifier: Modifier = Modifier) {
+    Txt(
+        text,
+        style = Nx.type.heading.copy(fontSize = Nx.type.sp(21f), fontWeight = FontWeight(680), lineHeight = Nx.type.sp(25.2f)),
+        color = Nx.colors.textStrong,
+        modifier = modifier.semantics { heading() },
+    )
 }
 
 // ---------------------------------------------------------------------------

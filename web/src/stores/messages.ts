@@ -127,6 +127,8 @@ interface MessagesState {
   remove: (channelId: string, id: string) => void;
   removeMany: (channelId: string, ids: string[]) => void;
   setReaction: (channelId: string, messageId: string, emoji: string, userId: string, add: boolean, isMe: boolean) => void;
+  /** Takes a message's reactions away: every one, or every one of one emoji. */
+  clearReactions: (channelId: string, messageId: string, emoji?: string) => void;
   setDecryption: (channelId: string, id: string, payload: MessagePayload | undefined, error: DecryptError | undefined) => void;
   /** A vote on a poll added or taken back, by anyone; `isMe` when it was this account's. */
   /** Counts one vote coming or going; `voters` is how many people have voted now, where the server says. */
@@ -312,9 +314,11 @@ export const useMessages = create<MessagesState>()((set, get) => ({
         if (!prev) return c;
         // The edited copy carries the editor's own "me" flags on its reactions,
         // so the reactions already here stay; their own events keep them current.
+        // So does the thread it started: an edited copy (a person's, an app's,
+        // an app's answer) comes without it, and thread events keep it current.
         // A poll's counts come from the copy, which was counted for nobody, so
         // which answers are this account's comes from the one already here.
-        const next: DecryptedMessage = { ...msg, reactions: prev.reactions };
+        const next: DecryptedMessage = { ...msg, reactions: prev.reactions, thread: msg.thread ?? prev.thread };
         if (msg.poll_results && prev.poll_results) {
           const mine = new Set(prev.poll_results.answer_counts.filter((a) => a.me_voted).map((a) => a.id));
           next.poll_results = { ...msg.poll_results, answer_counts: msg.poll_results.answer_counts.map((a) => ({ ...a, me_voted: mine.has(a.id) })) };
@@ -337,6 +341,15 @@ export const useMessages = create<MessagesState>()((set, get) => ({
       }),
     );
   },
+  clearReactions: (channelId, messageId, emoji) =>
+    set((s) =>
+      withChannel(s, channelId, (c) => {
+        const m = c.byId[messageId];
+        if (!m) return c;
+        const reactions = emoji === undefined ? [] : m.reactions.filter((r) => r.emoji !== emoji);
+        return { ...c, byId: { ...c.byId, [messageId]: { ...m, reactions } } };
+      }),
+    ),
   setReaction: (channelId, messageId, emoji, _userId, add, isMe) =>
     set((s) =>
       withChannel(s, channelId, (c) => {

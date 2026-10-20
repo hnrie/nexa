@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { AtSign, AudioLines, BadgeCheck, Compass, Gavel, KeyRound, Megaphone, MonitorUp, Pause, ScrollText, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, Feather, FolderPlus, Gamepad2, Globe, Headphones, House, IdCard, ImagePlay, ImagePlus, Images, Keyboard, LayoutGrid, Leaf, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessageSquareText, MessagesSquare, MousePointerClick, Move, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Snowflake, Sparkles, SpellCheck, Sticker, StickyNote, Tag, Timer, Trash2, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Volume2, Vote, Webhook, ZoomIn, type LucideIcon } from "lucide-react";
+import { AtSign, AudioLines, BadgeCheck, Bot, CodeXml, ScanEye, Compass, Gavel, KeyRound, Megaphone, MonitorUp, Pause, ScrollText, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, Feather, FolderPlus, Gamepad2, Globe, Headphones, House, IdCard, ImagePlay, ImagePlus, Images, Keyboard, LayoutGrid, Leaf, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessageSquareText, MessagesSquare, MousePointerClick, Move, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Snowflake, Sparkles, SpellCheck, Sticker, StickyNote, Tag, Timer, Trash2, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Volume2, Vote, Webhook, ZoomIn, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,14 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-10-19",
+    items: [
+      { icon: Bot, title: "whatsNew.r20261019.appsTitle", body: "whatsNew.r20261019.appsBody" },
+      { icon: CodeXml, title: "whatsNew.r20261019.portalTitle", body: "whatsNew.r20261019.portalBody" },
+      { icon: ScanEye, title: "whatsNew.r20261019.readingTitle", body: "whatsNew.r20261019.readingBody" },
+    ],
+  },
   {
     id: "2026-10-17",
     items: [

@@ -121,6 +121,10 @@ func (s *Server) actDelete(w http.ResponseWriter, r *http.Request, target *store
 // steps before left, so running it again after a failure finishes the job.
 func (s *Server) purgeAccount(r *http.Request, uid ids.ID, opt purgeOptions) error {
 	ctx := r.Context()
+	// the applications it made go with it, their bots out of every server
+	if err := s.deleteOwnedApplications(r, uid); err != nil {
+		return err
+	}
 	// Out of any call before anything else: its sockets are already closed,
 	// but that only detaches a call, which would otherwise go on carrying
 	// the account's voice for the grace period.

@@ -24,6 +24,7 @@ import { openProfilePopout } from "@/stores/profilePopout";
 import { nameOrder } from "./nameOrder";
 import s from "./MemberList.module.css";
 import { UserTag } from "@/components/servertag/UserTag";
+import { BotTag } from "@/components/apps/BotTag";
 
 import { t } from "@/i18n";
 
@@ -104,6 +105,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
                 <span className={s.nameText}>{row.name}</span>
                 {isOwner(row.id) ? <OwnerCrown /> : channel.owner_id === row.id ? <Crown size={14} className={s.crown} aria-label={t("chat.groupMemberList.groupOwner")} /> : null}
                 {!isOwner(row.id) && isInstanceAdmin(row.id) ? <AdminHammer /> : null}
+                <BotTag userId={row.id} />
                 <UserTag userId={row.id} size="sm" />
               </span>
               <StatusLine

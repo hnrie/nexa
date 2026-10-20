@@ -20,6 +20,7 @@ import { useReplyTargets, type ReplyTarget } from "@/stores/replyTargets";
 import { useChannels } from "@/stores/channels";
 import { MessageItem } from "./MessageItem";
 import { GroupAlone } from "./GroupAlone";
+import { useReadingApps } from "./apps/readingApps";
 import { ThreadIntro } from "@/components/threads/ThreadIntro";
 import { GroupAddNoticeRow } from "./GroupAddNoticeRow";
 import { noticeSpot } from "@/lib/groupAdd";
@@ -28,7 +29,7 @@ import { BlockedRun } from "./BlockedRun";
 import { isQuiet, messageFate, useBlockRules, type AuthorOf } from "@/lib/blocked";
 import s from "./Chat.module.css";
 
-import { t, Tr } from "@/i18n";
+import { formatList, t, Tr } from "@/i18n";
 import { cssValue } from "@/lib/cssEscape";
 import { RenderCtxProvider, useRenderCtx } from "@/lib/markdownCtx";
 import { sameHookSender } from "@/lib/webhookMessage";
@@ -472,7 +473,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     (m: DecryptedMessage) => {
       if (typeof document === "undefined" || document.visibilityState !== "visible") return;
       const st = channel.server_id ? useServers.getState().byId[channel.server_id] : undefined;
-      const name = m.hook?.name || st?.members[m.author_id]?.nickname || useRelationships.getState().byUser[m.author_id]?.nickname || displayName(users[m.author_id]);
+      const name = (m.webhook_id ? m.hook?.name : undefined) || st?.members[m.author_id]?.nickname || useRelationships.getState().byUser[m.author_id]?.nickname || displayName(users[m.author_id]);
       const body = m.payload?.t ? plainText(parse(m.payload.t), renderCtx).slice(0, 300) : m.payload?.poll ? pollWords(m.payload.poll).replace(/\n/g, ", ").slice(0, 300) : "";
       const text = body
         ? t("chat.messageList.announce", { name, text: body })
@@ -873,6 +874,9 @@ export function MessageList({ channel }: { channel: Channel }) {
     else toBottom(el);
   };
 
+  // apps that read every message here: the start of the channel names them with the encryption line
+  const readingIds = useReadingApps(channel.server_id ?? null, channel.id);
+  const readers = readingIds.length ? formatList(readingIds.map((id) => displayName(users[id]))) : "";
   const intro = useMemo(() => {
     const name = channelDisplayName(channel, users, me?.id);
     if (channel.type === "dm") {
@@ -908,11 +912,11 @@ export function MessageList({ channel }: { channel: Channel }) {
           {channel.server_id
             ? <Tr id="chat.messageList.channelStart" values={{ name: <b>#{name}</b> }} />
             : <Tr id="chat.messageList.groupStart" values={{ name: <b>{name}</b> }} />}
-          {channel.server_id && channel.topic ? ` ${plainText(parse(channel.topic)).replace(/\s+/g, " ").trim()}` : ""} {t("chat.messageList.endToEnd")}
+          {channel.server_id && channel.topic ? ` ${plainText(parse(channel.topic)).replace(/\s+/g, " ").trim()}` : ""} {readers ? t("apps.reading.endToEndExcept", { apps: readers }) : t("chat.messageList.endToEnd")}
         </p>}
       </div>
     );
-  }, [channel, users, me?.id, byIdChannels]);
+  }, [channel, users, me?.id, byIdChannels, readers]);
 
   useEffect(() => {
     if (loaded || loading) return;

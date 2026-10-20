@@ -2,6 +2,7 @@ import { ApiError } from "@/api/client";
 import { messages as messagesApi } from "@/api/messages";
 import type { SendMessageRequest } from "@/api/types";
 import { encryptMessage, type AttachmentMeta, type MessagePayload, type PollPayload } from "@/crypto/message";
+import { addressedBots, sealCopies } from "@/lib/botCopies";
 import { goesInOneRequest, sendInWorker, uploadStaged, type Staged } from "@/lib/attachments";
 import { encryptedSize } from "@/crypto/fileChunks";
 import { holdReload } from "@/lib/busy";
@@ -451,6 +452,9 @@ async function deliver(channelId: string, meId: string, w: Written, tmp: string,
     if (opts.attachments?.length) body.attachments = opts.attachments.flatMap((a) => [{ blob_id: a.blob_id, size: a.size }, ...(a.meta.preview ? [{ blob_id: a.meta.preview.blob_id, size: encryptedSize(a.meta.preview.size), preview: true }] : [])]);
     if (opts.flags) body.flags = opts.flags;
     if (payload.poll) body.poll = pollRequest(payload.poll);
+    // the apps it is addressed to read their own copy, sealed to their bots
+    const bots = addressedBots(channelId, body.mentions, body.reply_to_id ? replyAuthor(channelId, body.reply_to_id) : undefined, meId);
+    if (bots.length) body.bot_copies = await sealCopies(bots, payload);
     const sent = await messagesApi.send(channelId, body);
     afterSend?.(sent.id);
     const decrypted = await decryptForStore(sent);
@@ -566,7 +570,11 @@ export async function editMessage(channelId: string, messageId: string, rawText:
   }
   if (!chanKey) throw new Error("waiting_for_key");
   const ciphertext = await encryptMessage(chanKey, { conv, epoch: useEpoch, channelId, authorId: me.id }, payload);
-  const updated = await messagesApi.edit(channelId, messageId, { ciphertext, key_conv_id: conv, key_epoch: useEpoch, mentions, mention_roles: roles, mention_everyone: everyone });
+  const edit: Partial<SendMessageRequest> = { ciphertext, key_conv_id: conv, key_epoch: useEpoch, mentions, mention_roles: roles, mention_everyone: everyone };
+  // the apps it is addressed to get the edit too; an app no longer addressed loses its copy
+  const bots = addressedBots(channelId, mentions, replied, me.id);
+  edit.bot_copies = bots.length ? await sealCopies(bots, payload) : {};
+  const updated = await messagesApi.edit(channelId, messageId, edit);
   afterEdit?.(messageId);
   const decrypted = await decryptForStore(updated);
   useMessages.getState().update(channelId, decrypted);

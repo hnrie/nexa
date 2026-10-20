@@ -313,6 +313,11 @@ func (s *Store) packsQuery(ctx context.Context, where string, args ...any) ([]*S
 	return out, nil
 }
 
+// ServerPacks lists the packs a server owns, its stickers and emoji packs.
+func (s *Store) ServerPacks(ctx context.Context, serverID ids.ID) ([]*StickerPack, error) {
+	return s.packsQuery(ctx, `WHERE p.server_id = ? ORDER BY p.id`, int64(serverID))
+}
+
 // PacksForUser lists the packs a user owns, installed, or shares a server with.
 func (s *Store) PacksForUser(ctx context.Context, uid ids.ID) ([]*StickerPack, error) {
 	packs, err := s.packsQuery(ctx, `WHERE p.owner_user_id = ? OR p.id IN (SELECT pack_id FROM sticker_installs WHERE user_id = ?) OR p.server_id IN (SELECT server_id FROM server_members WHERE user_id = ?) ORDER BY p.updated_at DESC`, int64(uid), int64(uid), int64(uid))

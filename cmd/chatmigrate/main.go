@@ -244,6 +244,15 @@ var keyColumns = []struct{ table, cols string }{
 	{"note_invites", "id, note_id, to_id, key_sealed"},
 	{"note_links", "id, note_id, token_hash, key_wrapped, link_sealed"},
 	{"note_keys", "note_id, epoch, wrapped"},
+	// an app's token, secret and keys: one that came across wrong is a bot
+	// that can no longer sign in, sign its answers or open what it is sent
+	{"applications", "id, token_hash, secret_hash, sign_key_sealed, bot_key_sealed"},
+	{"bot_copies", "message_id, bot_id, sealed"},
+	// what apps and the people who added them hold: an interaction's token,
+	// and the codes and tokens the apps signed people in with
+	{"interactions", "id, token_hash"},
+	{"oauth_codes", "code_hash, application_id, user_id"},
+	{"oauth_tokens", "id, access_hash, refresh_hash"},
 }
 
 // sameBytes checks that the values that matter are identical on both sides.

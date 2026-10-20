@@ -9,6 +9,7 @@ import { useRelationships } from "@/stores/relationships";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { about as menuAbout, button, defineMenu } from "@/lib/contextMenus/registry";
+import { userAppsItem } from "./apps/appMenus";
 import { usePick, type PickList } from "@/stores/pick";
 import { displayName, useUsers } from "@/stores/users";
 import { relationshipButtons } from "@/lib/friendship";
@@ -136,6 +137,8 @@ export const groupMemberMenu = defineMenu<GroupMemberMenuRowCtx>("groupMember", 
       };
     }),
   ],
+  // what apps can do with someone, used in this group
+  [button("groupMemberApps", ({ channelId, userId }) => !!about(channelId, userId) && userAppsItem(channelId, userId))],
   [button("copyGroupMemberId", ({ channelId, userId }) => !!about(channelId, userId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void copyText(userId, t("clipboard.idCopied")) })],
   [button("selectGroupMembers", ({ channelId, userId, select }) => !!select && !!about(channelId, userId) && { id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start(select, userId) })],
 ]);

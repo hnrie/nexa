@@ -96,8 +96,9 @@ func scanMessage(r rowScanner) (*Message, error) {
 			m.Crosspost = json.RawMessage(plain.String)
 		} else if m.Type == "system_automod" {
 			m.Automod = json.RawMessage(plain.String)
-		} else if m.WebhookID == nil && m.Type == "system_poll_result" {
-			// the line closing a person's poll: numbers the server wrote itself
+		} else if m.WebhookID == nil && m.Type == "system_poll_result" && !strings.Contains(plain.String, `"embeds"`) {
+			// the line closing a person's poll: numbers the server wrote
+			// itself (a bot's poll's line says it in words, as a webhook's does)
 			var out PollOutcome
 			if json.Unmarshal([]byte(plain.String), &out) == nil {
 				m.PollResult = &out
@@ -614,6 +615,36 @@ func (s *Store) Reactors(ctx context.Context, msgID ids.ID, emoji string, limit 
 	return out, rows.Err()
 }
 
+// ReactorsAfter lists who reacted with emoji, by account id, after one id,
+// at most limit: the bot API's paging, which goes by id.
+func (s *Store) ReactorsAfter(ctx context.Context, msgID ids.ID, emoji string, after ids.ID, limit int) ([]ids.ID, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 25
+	}
+	return s.idList(ctx, `SELECT user_id FROM reactions WHERE message_id = ? AND emoji = ? AND user_id > ? ORDER BY user_id LIMIT ?`, int64(msgID), emoji, int64(after), limit)
+}
+
+// RemoveAllReactions takes every reaction off a message, and says whether
+// there were any.
+func (s *Store) RemoveAllReactions(ctx context.Context, msgID ids.ID) (bool, error) {
+	res, err := s.db.W.ExecContext(ctx, `DELETE FROM reactions WHERE message_id = ?`, int64(msgID))
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// RemoveEmojiReactions takes one emoji's reactions off a message, everyone's.
+func (s *Store) RemoveEmojiReactions(ctx context.Context, msgID ids.ID, emoji string) (bool, error) {
+	res, err := s.db.W.ExecContext(ctx, `DELETE FROM reactions WHERE message_id = ? AND emoji = ?`, int64(msgID), emoji)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 // MaxPins is how many messages one channel can have pinned. Pins lists them
 // all at once, so past this a list would have had to stop partway, silently.
 const MaxPins = 500
@@ -668,6 +699,64 @@ func (s *Store) UnpinMessage(ctx context.Context, chID, msgID ids.ID) error {
 // Pins lists pinned messages, most recently pinned first — all of them, as
 // PinMessage stops at MaxPins. Two pinned in the same millisecond come back
 // in the same order every time.
+// LastPinAt is when a message was last pinned in a channel, 0 for none.
+func (s *Store) LastPinAt(ctx context.Context, chID ids.ID) (int64, error) {
+	var at sql.NullInt64
+	err := s.db.R.QueryRowContext(ctx, `SELECT max(pinned_at) FROM pins WHERE channel_id = ?`, int64(chID)).Scan(&at)
+	return at.Int64, err
+}
+
+// PinsPage lists a channel's pins newest first, with when each was pinned,
+// pinned before a moment (0 for the newest), at most limit of them.
+func (s *Store) PinsPage(ctx context.Context, chID ids.ID, before int64, limit int, forUser ids.ID) ([]*Message, []int64, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 50
+	}
+	q := `SELECT m.id, p.pinned_at FROM messages m JOIN pins p ON p.message_id = m.id WHERE p.channel_id = ?`
+	args := []any{int64(chID)}
+	if before > 0 {
+		q += ` AND p.pinned_at < ?`
+		args = append(args, before)
+	}
+	rows, err := s.db.R.QueryContext(ctx, q+` ORDER BY p.pinned_at DESC, p.message_id DESC LIMIT ?`, append(args, limit)...)
+	if err != nil {
+		return nil, nil, err
+	}
+	var order []ids.ID
+	at := map[ids.ID]int64{}
+	for rows.Next() {
+		var id ids.ID
+		var when int64
+		if err := rows.Scan(&id, &when); err != nil {
+			rows.Close()
+			return nil, nil, err
+		}
+		order = append(order, id)
+		at[id] = when
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+	list, err := s.MessagesByIDs(ctx, chID, order, forUser)
+	if err != nil {
+		return nil, nil, err
+	}
+	byID := map[ids.ID]*Message{}
+	for _, m := range list {
+		byID[m.ID] = m
+	}
+	out := make([]*Message, 0, len(order))
+	times := make([]int64, 0, len(order))
+	for _, id := range order {
+		if m := byID[id]; m != nil {
+			out = append(out, m)
+			times = append(times, at[id])
+		}
+	}
+	return out, times, nil
+}
+
 func (s *Store) Pins(ctx context.Context, chID ids.ID, forUser ids.ID) ([]*Message, error) {
 	list, err := s.queryMessages(ctx, `SELECT `+messageColsM+` FROM messages m JOIN pins p ON p.message_id = m.id WHERE p.channel_id = ? ORDER BY p.pinned_at DESC, p.message_id DESC LIMIT ?`, int64(chID), MaxPins)
 	if err != nil {
@@ -687,6 +776,19 @@ func (s *Store) CountPins(ctx context.Context, chID ids.ID) (int, error) {
 	var n int
 	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM pins WHERE channel_id = ?`, int64(chID)).Scan(&n)
 	return n, err
+}
+
+// AttachmentByID loads one attachment row.
+func (s *Store) AttachmentByID(ctx context.Context, id ids.ID) (*Attachment, error) {
+	var a Attachment
+	err := s.db.R.QueryRowContext(ctx, `SELECT id, message_id, channel_id, uploader_id, blob_id, size, created_at FROM attachments WHERE id = ?`, int64(id)).Scan(&a.ID, &a.MessageID, &a.ChannelID, &a.UploaderID, &a.BlobID, &a.Size, &a.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
 }
 
 // AttachmentByBlob finds the attachment row that owns a blob, if any.

@@ -459,6 +459,8 @@ private fun Identity(user: PublicUser, rel: Relationship?, full: Boolean, theme:
             val tag = user.serverTag
             if (tag != null) Spotted(design, ProfilePart.TAG, t("designer.spot.tag"), kind = SpotKind.WORD) { fish.nexa.ui.chat.ServerTagChip(tag, small = false, open = design == null) }
             else if (design != null && ProfilePart.TAG !in design.fixed) GhostChip(design)
+            // an app's bot says so, and that what it sends is not end-to-end encrypted
+            if (user.isBot) fish.nexa.ui.media.HookTags(null, app = true)
             if (onNote != null) Box(
                 Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).pressable(remember { MutableInteractionSource() }, onClick = onNote).semantics { contentDescription = noteLabel },
                 contentAlignment = Alignment.Center,
@@ -689,13 +691,13 @@ private fun NoteSection(userId: String, focus: Boolean, onDone: () -> Unit) {
 
 /** Their about me; in the popout only its start, faded, with the way to the rest. */
 @Composable
-private fun AboutSection(about: String, clamp: Dp?, heading: Boolean, onMore: (() -> Unit)?) {
+private fun AboutSection(about: String, clamp: Dp?, heading: Boolean, title: String = t("settings.profile.aboutMe"), onMore: (() -> Unit)?) {
     val c = Nx.colors
     var full by remember { mutableIntStateOf(0) }
     var shown by remember { mutableIntStateOf(0) }
     val over = clamp != null && full > shown + 1
     Column {
-        if (heading) SectionTitle(t("settings.profile.aboutMe"))
+        if (heading) SectionTitle(title)
         val body = @Composable {
             fish.nexa.ui.markdown.MarkdownView(about, fish.nexa.ui.markdown.RenderCtx(color = c.text), Modifier.fillMaxWidth())
         }
@@ -999,6 +1001,21 @@ fun openProfileMenu(user: PublicUser, popout: Boolean, viewFull: () -> Unit) {
 // ---------------------------------------------------------------------------
 // The two cards
 
+/** What an app says about itself, for its bot's profile; null for a person, or while it loads. */
+@Composable
+private fun rememberBotApp(user: PublicUser, active: Boolean): fish.nexa.net.AppSummary? {
+    val app by androidx.compose.runtime.produceState<fish.nexa.net.AppSummary?>(null, user.id, user.isBot, active) {
+        value = if (user.isBot && active) runCatching { fish.nexa.data.Apps.about(user.id) }.getOrNull() else null
+    }
+    return app
+}
+
+/** Whether an app can be added from its bot's profile: anyone may add a public one, its owner any. */
+private fun canAddApp(app: fish.nexa.net.AppSummary?): Boolean = app != null && (app.botPublic || app.ownerId == Nexa.users.meId)
+
+/** The app's own consent page, with its install settings. */
+private fun addApp(appId: String) = fish.nexa.ui.apps.openAuthorize("client_id=$appId")
+
 /** Opens your own profile in Settings, where it is changed. */
 private fun editOwnProfile(anchor: String? = null) = fish.nexa.ui.settings.Settings.open("profiles", anchor)
 
@@ -1032,6 +1049,10 @@ fun ProfilePopoutCard(user: PublicUser, serverId: String?, close: () -> Unit, de
     val inServer = serverId?.takeIf { servers[it] != null }
     val mutualServers = extras.mutualServers.filter { servers[it] != null }
     fun viewFull(tab: ProfileTab? = null) = Profiles.openFull(user.id, tab)
+    // an app's bot: what the app says about itself, and whether it can be added from here
+    val bot = user.isBot
+    val app = rememberBotApp(user, design == null)
+    val about = user.aboutMe.ifBlank { if (bot) app?.description.orEmpty() else "" }
     ProfileColors(look) {
         Column(Modifier.fillMaxWidth().profileBackground(look)) {
             ProfileTop(
@@ -1042,6 +1063,7 @@ fun ProfilePopoutCard(user: PublicUser, serverId: String?, close: () -> Unit, de
             ) {
                 if (design == null) {
                     if (isMe) BannerButton("Pencil", t("profile.profileCard.editProfile"), iconSize = 16.dp) { close(); editOwnProfile() }
+                    else if (bot) { if (canAddApp(app)) BannerButton("CirclePlus", t("apps.profile.addApp")) { close(); addApp(user.id) } }
                     else if (rel == null) BannerButton("UserPlus", if (busy) t("people.request.sending") else t("profile.profileCard.addFriend"), busy = busy) { Nexa.scope.launch { People.sendRequest(user) } }
                     BannerButton("Maximize2", t("profile.profileCard.viewFullProfile"), iconSize = 16.dp) { viewFull() }
                     if (!isMe) BannerButton("MoreHorizontal", t("chat.chat.more")) { openProfileMenu(user, popout = true) { viewFull() } }
@@ -1055,14 +1077,14 @@ fun ProfilePopoutCard(user: PublicUser, serverId: String?, close: () -> Unit, de
                     noteLabel = if (note.isNotEmpty()) t("profile.profileCard.editNote2") else t("profile.profileCard.addNote2"),
                     design = design,
                 )
-                if (!isMe) RelationshipBar(user, rel)
+                if (!isMe && !bot) RelationshipBar(user, rel)
                 if (!isMe && extras.mutualFriends.size + mutualServers.size > 0) MutualRow(extras.mutualFriends, mutualServers.size) { viewFull(ProfileTab.MUTUALS) }
                 val noteShown = !isMe && (noteOpen || note.isNotEmpty())
-                if (noteShown || user.aboutMe.isNotBlank() || design != null || activities.isNotEmpty() || widgets.isNotEmpty() || inServer != null) {
+                if (noteShown || about.isNotBlank() || design != null || activities.isNotEmpty() || widgets.isNotEmpty() || inServer != null) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (noteShown) NoteSection(user.id, focus = noteOpen) { noteOpen = false }
                         if (design != null) DesignedAbout(user, design, clamp = 62.dp)
-                        else if (user.aboutMe.isNotBlank()) AboutSection(user.aboutMe, clamp = 62.dp, heading = false) { viewFull() }
+                        else if (about.isNotBlank()) AboutSection(about, clamp = 62.dp, heading = false) { viewFull() }
                         if (activities.isNotEmpty()) ActivityList(activities)
                         if (widgets.isNotEmpty()) WidgetPeek(widgets, if (design != null) null else ({ viewFull(ProfileTab.WIDGETS) }))
                         if (inServer != null && design == null) ServerRoles(inServer, user.id, popout = true)
@@ -1247,6 +1269,10 @@ fun FullProfileCard(
         if (!embedded && scroll.value > tabsTop) scope.launch { scroll.animateScrollTo(tabsTop) }
     }
     fun message() = openDmWith(user.id) { close() }
+    // an app's bot: what the app says about itself, and whether it can be added from here
+    val bot = user.isBot
+    val app = rememberBotApp(user, !preview)
+    val about = user.aboutMe.ifBlank { if (bot) app?.description.orEmpty() else "" }
     fun editWidgets() {
         close()
         editOwnProfile("widgets")
@@ -1273,17 +1299,18 @@ fun FullProfileCard(
                 noteLabel = if (note.isNotEmpty()) t("profile.profileCard.editNote2") else t("profile.profileCard.addNote2"),
                 design = design,
             )
-            if (!isMe) RelationshipBar(user, rel)
+            if (!isMe && !bot) RelationshipBar(user, rel)
             if (!preview) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                 when {
                     isMe -> PrimaryPill("Pencil", t("profile.profileCard.editProfile")) { close(); editOwnProfile() }
+                    bot -> if (canAddApp(app)) PrimaryPill("CirclePlus", t("apps.profile.addApp")) { close(); addApp(user.id) } else PrimaryPill("MessageCircle", t("profile.profileCard.message")) { message() }
                     rel?.type == "blocked" -> Unit
                     rel != null -> PrimaryPill("MessageCircle", t("profile.profileCard.message")) { message() }
                     else -> PrimaryPill("UserPlus", if (busy) t("people.request.sending") else t("profile.profileCard.addFriend"), busy = busy) {
                         Nexa.scope.launch { People.sendRequest(user) }
                     }
                 }
-                if (!isMe && rel == null) RoundAction("MessageCircle", t("profile.profileCard.message")) { message() }
+                if (!isMe && rel == null && !(bot && !canAddApp(app))) RoundAction("MessageCircle", t("profile.profileCard.message")) { message() }
                 RoundAction("Link2", t("profileLink.copy")) { ProfileLinks.copy(user.username) }
                 if (!isMe) RoundAction("MoreHorizontal", t("chat.chat.more")) { openProfileMenu(user, popout = false) {} }
             }
@@ -1304,7 +1331,7 @@ fun FullProfileCard(
                     ProfileTab.ABOUT -> {
                         if (!isMe && !preview && (noteOpen || note.isNotEmpty())) NoteSection(user.id, focus = noteOpen) { noteOpen = false }
                         if (design != null) DesignedAbout(user, design, clamp = null)
-                        else if (user.aboutMe.isNotBlank()) AboutSection(user.aboutMe, clamp = null, heading = true, onMore = null)
+                        else if (about.isNotBlank()) AboutSection(about, clamp = null, heading = true, onMore = null, title = if (bot && user.aboutMe.isBlank()) t("apps.profile.about") else t("settings.profile.aboutMe"))
                         Facts(user, rel, isMe, inServer, interactive = !preview)
                     }
                     ProfileTab.WIDGETS -> {

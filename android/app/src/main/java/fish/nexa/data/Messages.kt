@@ -35,6 +35,8 @@ data class ChatMessage(
     val call: JsonObject? = null,
     /** A webhook's message: its plain content, held to what can be drawn. */
     val hook: JsonObject? = null,
+    /** A line only this device knows (an app's notice that something failed): gone when dismissed or the conversation loads again. */
+    val local: Boolean = false,
 ) {
     val id get() = m.id
     val channelId get() = m.channelId
@@ -100,7 +102,8 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
 
     /** Opens a message with the keys this device holds. Never throws. */
     fun decrypt(msg: Message): ChatMessage {
-        if (msg.webhookId != null && msg.webhook != null) {
+        // a webhook's or an app's message comes readable, with nothing to decrypt
+        if (Webhooks.cameReadable(msg)) {
             val hook = Webhooks.sanitize(msg.webhook) ?: return ChatMessage(msg, error = DecryptFail.BAD)
             if (msg.type.startsWith("system_")) return ChatMessage(msg, hook = hook)
             return ChatMessage(msg, payload = Webhooks.payloadOf(hook), hook = hook)
@@ -211,7 +214,9 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
 
     private fun updateLoaded(ch: String, msg: ChatMessage) = with(ch) { c ->
         val prev = c.byId[msg.id] ?: return@with c
-        var m = msg.m.copy(reactions = prev.m.reactions)
+        // the reactions already here stay (their own events keep them current), and so does the thread it
+        // started: an edited copy (a person's, an app's, an app's answer) comes without it
+        var m = msg.m.copy(reactions = prev.m.reactions, thread = msg.m.thread ?: prev.m.thread)
         val pr = prev.m.pollResults
         val nr = msg.m.pollResults
         if (nr != null && pr != null) {
@@ -258,6 +263,13 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
             val n = r.count - 1
             if (n <= 0) reactions.removeAt(idx) else reactions[idx] = r.copy(count = n, me = if (isMe) false else r.me)
         } else return@with c
+        c.copy(byId = c.byId.put(messageId, cm.copy(m = cm.m.copy(reactions = reactions))))
+    }
+
+    /** Takes a message's reactions away: every one, or every one of one emoji. */
+    fun clearReactions(ch: String, messageId: String, emoji: String?) = with(ch) { c ->
+        val cm = c.byId[messageId] ?: return@with c
+        val reactions = if (emoji == null) emptyList() else cm.m.reactions.filter { it.emoji != emoji }
         c.copy(byId = c.byId.put(messageId, cm.copy(m = cm.m.copy(reactions = reactions))))
     }
 
@@ -515,21 +527,30 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
     }
 }
 
-/** A webhook's message, held to what can be drawn (web/src/lib/webhookMessage.ts); fleshed out with the renderer. */
 /**
  * Webhook messages: posted by programs, not encrypted, read as the web reads
  * them (lib/webhookMessage.ts, ported in ui/markdown/Webhook.kt). The raw
  * object is kept on the message; [content] is its checked form.
  */
 object Webhooks {
+    /** Whether a message's content came readable: a webhook's, or an app's (`application_id` in it). */
+    fun cameReadable(msg: Message): Boolean {
+        val w = msg.webhook ?: return false
+        if (w is kotlinx.serialization.json.JsonNull) return false
+        if (msg.webhookId != null) return true
+        return ((w as? JsonObject)?.get("application_id") as? kotlinx.serialization.json.JsonPrimitive)?.isString == true
+    }
+
     /** The message's webhook object when it is a well-formed one. */
     fun sanitize(el: JsonElement?): JsonObject? = if (fish.nexa.ui.markdown.Webhook.sanitize(el) != null) el as? JsonObject else null
 
-    fun content(hook: JsonObject?): fish.nexa.ui.markdown.Webhook.Content? = hook?.let { fish.nexa.ui.markdown.Webhook.sanitize(it) }
+    fun content(hook: JsonObject?): fish.nexa.ui.markdown.Webhook.Content? = fish.nexa.ui.markdown.Webhook.of(hook)
 
-    /** What the row draws as the message itself: the webhook's words and the files it lists (data/Webhook.kt). */
+    /** What the row draws as the message itself: the webhook's words and the files it lists. */
     fun payloadOf(hook: JsonObject): MessagePayload {
-        val h = Hooks.of(hook) ?: return MessagePayload()
-        return MessagePayload(t = h.content.takeIf { it.isNotEmpty() }, att = Hooks.listedAttachments(h).takeIf { it.isNotEmpty() })
+        val h = fish.nexa.ui.markdown.Webhook.of(hook) ?: return MessagePayload()
+        // an app's sticker stands where a person's would
+        val sticker = h.stickers.firstOrNull()?.let { fish.nexa.crypto.StickerRef(it.id, blob = it.blobId, name = it.name, format = it.format) }
+        return MessagePayload(t = h.content.takeIf { it.isNotEmpty() }, att = fish.nexa.ui.markdown.Webhook.listedAttachments(h).takeIf { it.isNotEmpty() }, sticker = sticker)
     }
 }

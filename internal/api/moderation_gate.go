@@ -69,6 +69,14 @@ var muteAllowed = map[string]bool{
 	"DELETE /api/v1/channels/{id}/recipients/{uid}":                     true, // leaving only
 	"DELETE /api/v1/uploads/{id}":                                       true,
 	"PUT /api/v1/voice/sfu/close":                                       true,
+	// putting away an app's message meant only for them, and taking back
+	// what they let apps do or tearing down their own
+	"DELETE /api/v1/ephemeral/{id}":                  true,
+	"DELETE /api/v1/oauth2/authorized/{id}":          true,
+	"POST /api/v1/applications/{id}/delete":          true,
+	"POST /api/v1/applications/{id}/bot/reset":       true,
+	"POST /api/v1/applications/{id}/secret/reset":    true,
+	"DELETE /api/v1/servers/{id}/integrations/{app}": true,
 }
 
 func init() {

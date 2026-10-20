@@ -165,39 +165,50 @@ func (s *Server) closePolls(ctx context.Context) {
 		return
 	}
 	for _, d := range due {
-		ended, err := s.Store.EndPoll(ctx, d.MessageID, now)
-		if err != nil || !ended {
-			continue
-		}
-		m, err := s.Store.MessageByID(ctx, d.MessageID, 0)
-		if err != nil {
-			continue
-		}
-		s.Bcast.EmitChannel(d.ChannelID, "message_update", messageUpdateEvent{m, mentionsBefore{m.Mentions, m.MentionRoles, m.MentionEveryone}})
-		mid := m.ID
-		line := &store.Message{ChannelID: d.ChannelID, Type: "system_poll_result", ReplyToID: &mid, Mentions: []ids.ID{}}
-		if m.WebhookID != nil {
-			author, err := s.webhookUser(ctx)
-			if err != nil {
-				continue
-			}
-			line.AuthorID, line.WebhookID, line.Webhook = author.ID, m.WebhookID, pollResult(m)
-		} else {
-			// A person's poll speaks for whoever asked it. What it asked is
-			// sealed in its message, so the line carries only the numbers,
-			// and readers put the two together.
-			line.AuthorID, line.PollResult = m.AuthorID, pollOutcome(m)
-		}
-		if err := s.Store.InsertMessage(ctx, line); err != nil {
-			s.Log.Warn("polls: result line", "err", err)
-			continue
-		}
-		if full, err := s.Store.MessageByID(ctx, line.ID, 0); err == nil {
-			// the line answers the poll, which readers may not have loaded
-			s.withRefs(ctx, 0, full)
-			s.Bcast.EmitChannel(d.ChannelID, "message_create", full)
-		}
+		s.endPoll(ctx, d.MessageID, d.ChannelID, now)
 	}
+}
+
+// endPoll closes one poll, now: its time ran out, or whoever asked it ended
+// it early (the bot API's Expire Poll). It reports whether it was still open.
+func (s *Server) endPoll(ctx context.Context, msgID, channelID ids.ID, now int64) bool {
+	ended, err := s.Store.EndPoll(ctx, msgID, now)
+	if err != nil || !ended {
+		return false
+	}
+	m, err := s.Store.MessageByID(ctx, msgID, 0)
+	if err != nil {
+		return true
+	}
+	s.Bcast.EmitChannel(channelID, "message_update", messageUpdateEvent{m, mentionsBefore{m.Mentions, m.MentionRoles, m.MentionEveryone}})
+	mid := m.ID
+	line := &store.Message{ChannelID: channelID, Type: "system_poll_result", ReplyToID: &mid, Mentions: []ids.ID{}}
+	switch {
+	case m.WebhookID != nil:
+		author, err := s.webhookUser(ctx)
+		if err != nil {
+			return true
+		}
+		line.AuthorID, line.WebhookID, line.Webhook = author.ID, m.WebhookID, pollResult(m)
+	case len(m.Webhook) > 0:
+		// a bot's poll is in the clear, as a webhook's is, and its line too
+		line.AuthorID, line.Webhook = m.AuthorID, pollResult(m)
+	default:
+		// A person's poll speaks for whoever asked it. What it asked is
+		// sealed in its message, so the line carries only the numbers, and
+		// readers put the two together.
+		line.AuthorID, line.PollResult = m.AuthorID, pollOutcome(m)
+	}
+	if err := s.Store.InsertMessage(ctx, line); err != nil {
+		s.Log.Warn("polls: result line", "err", err)
+		return true
+	}
+	if full, err := s.Store.MessageByID(ctx, line.ID, 0); err == nil {
+		// the line answers the poll, which readers may not have loaded
+		s.withRefs(ctx, 0, full)
+		s.Bcast.EmitChannel(channelID, "message_create", full)
+	}
+	return true
 }
 
 // pollResult is what a poll's closing line says, as Discord's poll result
