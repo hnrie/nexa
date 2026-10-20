@@ -203,6 +203,9 @@ fun GeneratedLink(link: String) {
 }
 
 /** The lines that point each bot library at this server. */
+/** The language each library's lines are written in, for their colours. */
+private val LIB_LANG = mapOf("py" to "python", "js" to "javascript", "go" to "go")
+
 private fun snippet(lib: String, base: String): String {
     val ws = base.replaceFirst(Regex("^http"), "ws")
     return when (lib) {
@@ -284,7 +287,11 @@ fun LibrarySnippets(base: String) {
         Box(Modifier.fillMaxWidth().clip(Radii.Md).background(c.codeBg, Radii.Md).border(1.dp, c.codeBorder, Radii.Md)) {
             Box(Modifier.horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 52.dp, top = 14.dp, bottom = 14.dp)) {
                 SelectionContainer {
-                    Txt(code, style = Nx.type.code.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(20f)), color = c.text, modifier = Modifier.widthIn(min = 200.dp))
+                    androidx.compose.foundation.text.BasicText(
+                        fish.nexa.ui.markdown.highlightedCode(code.replace("\t", "    "), LIB_LANG[lib]), // a tab four wide, as on the web
+                        style = Nx.type.code.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(20f), color = c.text),
+                        modifier = Modifier.widthIn(min = 200.dp),
+                    )
                 }
             }
             Box(Modifier.align(Alignment.TopEnd).padding(8.dp).clip(Radii.Xs).background(c.bgSurface).border(1.dp, c.borderSubtle, Radii.Xs)) {

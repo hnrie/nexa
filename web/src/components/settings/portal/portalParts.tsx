@@ -7,6 +7,7 @@ import { t } from "@/i18n";
 import { copyAndSay } from "@/lib/copyText";
 import { describeError } from "@/lib/errors";
 import { authKeyFor } from "@/lib/passwordProof";
+import { HighlightedCode } from "@/markdown/render";
 import s from "./Portal.module.css";
 
 /** A small button that copies something and says so. */
@@ -160,6 +161,9 @@ function snippet(lib: Lib, base: string): string {
  * How to point a bot library at this server: the few lines that change, for
  * the libraries people use most, and the addresses for any other.
  */
+/** The language each library's lines are written in, for their colours. */
+const LIB_LANG: Record<Lib, string | null> = { py: "python", js: "javascript", go: "go", other: null };
+
 export function LibrarySnippets({ base }: { base: string }) {
   const [lib, setLib] = useState<Lib>("py");
   const tabs: { id: Lib; label: string }[] = [
@@ -179,7 +183,9 @@ export function LibrarySnippets({ base }: { base: string }) {
         ))}
       </div>
       <pre className={s.code} dir="ltr">
-        <code>{code}</code>
+        <code className="hljs">
+          <HighlightedCode lang={LIB_LANG[lib]} text={code} />
+        </code>
         <CopyButton value={code} label={t("apps.portal.copyCode")} />
       </pre>
       <p className={s.libNote}>{lib === "other" ? t("apps.portal.otherNote") : lib === "js" ? t("apps.portal.jsNote") : t("apps.portal.libNote")}</p>

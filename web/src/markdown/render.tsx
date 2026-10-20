@@ -765,8 +765,16 @@ function renderHl(nodes: HlNode[]): ReactNode {
   );
 }
 
-function CodeBlock(props: { lang: string | null; text: string }): JSX.Element {
-  const { lang, text } = props;
+/**
+ * Code in a language, coloured by highlight.js once it has loaded (it loads on
+ * first use); plain until then, and for a language it does not know.
+ */
+export function HighlightedCode({ lang, text }: { lang: string | null; text: string }): JSX.Element {
+  const highlighted = useHighlighted(lang, text);
+  return <>{highlighted ? renderHl(highlighted) : text}</>;
+}
+
+function useHighlighted(lang: string | null, text: string): HlNode[] | null {
   const [highlighted, setHighlighted] = useState<HlNode[] | null>(null);
 
   useEffect(() => {
@@ -787,12 +795,16 @@ function CodeBlock(props: { lang: string | null; text: string }): JSX.Element {
       alive = false;
     };
   }, [lang, text]);
+  return highlighted;
+}
 
+function CodeBlock(props: { lang: string | null; text: string }): JSX.Element {
+  const { lang, text } = props;
   return (
     <div className="md-codeblock-wrap">
       <pre className="md-codeblock">
         <code className={lang === null ? "hljs" : "hljs language-" + lang}>
-          {highlighted ? renderHl(highlighted) : text}
+          <HighlightedCode lang={lang} text={text} />
         </code>
       </pre>
       {/* just the code, without the fences and whatever else the message said */}

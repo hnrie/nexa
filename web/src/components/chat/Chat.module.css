@@ -152,6 +152,10 @@
 .replyName:hover { text-decoration: underline; }
 .replyText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; unicode-bidi: plaintext; text-align: start; color: inherit; }
 .replyLine:hover .replyText { color: var(--text); }
+/* everything quoted stays on the one line: inline code otherwise keeps its own
+   pre-wrap and its box, and a long code block spilled over the rows around it */
+.replyText :global(.md-inline-code) { white-space: nowrap; padding: 0 0.3em; border-radius: 4px; }
+.replyText :global(*) { white-space: nowrap; }
 /* the original on its way: a bar where its words will be, quiet, and still while motion is reduced */
 .replySkeleton { width: min(220px, 50%); height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--bg-hover), color-mix(in srgb, var(--bg-hover) 40%, transparent), var(--bg-hover)); background-size: 200% 100%; animation: replyShimmer 1.4s ease-in-out infinite; }
 @keyframes replyShimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }

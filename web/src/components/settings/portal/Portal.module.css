@@ -87,7 +87,7 @@
 .libTab:hover { color: var(--text); }
 .libTab[aria-selected="true"] { color: var(--text-strong); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-low); }
 .libTab:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-.code { position: relative; margin: 0; padding: 14px 48px 14px 16px; border-radius: var(--radius-md); background: var(--code-bg); box-shadow: inset 0 0 0 1px var(--code-border); overflow-x: auto; }
+.code { position: relative; margin: 0; padding: 14px 48px 14px 16px; border-radius: var(--radius-md); background: var(--code-bg); box-shadow: inset 0 0 0 1px var(--code-border); overflow-x: auto; tab-size: 4; }
 .code code { font-family: var(--font-mono); font-size: 13px; line-height: 20px; color: var(--text); white-space: pre; }
 .code .copyBtn { position: absolute; top: 8px; inset-inline-end: 8px; background: var(--bg-surface); box-shadow: 0 0 0 1px var(--border-subtle); }
 .libNote { font-size: 13.5px; line-height: 19px; color: var(--text-muted); }

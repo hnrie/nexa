@@ -137,17 +137,52 @@ fun MarkdownView(source: String, ctx: RenderCtx, modifier: Modifier = Modifier) 
 @Composable
 fun MarkdownLine(source: String, color: Color, style: TextStyle, modifier: Modifier = Modifier, serverId: String? = null) {
     val ctx = RenderCtx(serverId = serverId, inert = true, color = color)
-    val nodes = remember(source) { flatten(Markdown.parse(source, inline = true)) }
+    val nodes = remember(source) { flattenInline(Markdown.parse(source)) }
     InlineText(nodes, ctx, style.copy(color = color), jumbo = false, modifier = modifier, maxLines = 1)
 }
 
-/** Line breaks become spaces in a one-line preview. */
-private fun flatten(nodes: List<Node>): List<Node> = nodes.map { n ->
-    when (n) {
-        Node.Br -> Node.Text(" ")
-        is Node.Container -> n.withChildren(flatten(n.children))
-        else -> n
+private val SPACE = Node.Text(" ")
+
+/** An inline node with any line break inside it turned into a space. */
+private fun oneLine(n: Node): Node = when (n) {
+    Node.Br -> SPACE
+    is Node.Container -> n.withChildren(n.children.map(::oneLine))
+    else -> n
+}
+
+/**
+ * A message's markdown laid flat into one line (web markdown/flatten.ts), for a
+ * preview of it such as the line over a reply. Formatting stays; blocks give up
+ * their shape and keep their words: a code block reads as inline code, and
+ * rules, footnotes and task boxes go.
+ */
+fun flattenInline(nodes: List<Node>): List<Node> {
+    val out = ArrayList<Node>()
+    fun gap() {
+        val last = out.lastOrNull()
+        if (last != null && !(last is Node.Text && last.text.lastOrNull()?.isWhitespace() == true)) out += SPACE
     }
+    fun walk(list: List<Node>) {
+        for (n in list) when (n) {
+            is Node.Paragraph, is Node.Heading, is Node.Subtext, is Node.Quote, is Node.Alert -> {
+                gap()
+                walk((n as Node.Container).children)
+            }
+            is Node.ListBlock -> for (item in n.items) { gap(); walk(item) }
+            is Node.Details -> { gap(); walk(n.summary); gap(); walk(n.children) }
+            is Node.Table -> for (row in listOf(n.head) + n.rows) for (cell in row) { gap(); walk(cell) }
+            is Node.CodeBlock -> {
+                val text = n.text.replace(Regex("\\s+"), " ").trim()
+                if (text.isNotEmpty()) { gap(); out += Node.Code(text) }
+            }
+            Node.Br -> gap()
+            Node.Hr, is Node.File, is Node.Footnotes, is Node.FootnoteRef, is Node.Task -> Unit
+            else -> out += oneLine(n)
+        }
+    }
+    walk(nodes)
+    while (out.firstOrNull() === SPACE) out.removeAt(0)
+    return out
 }
 
 private val BLOCK_TYPES = setOf("paragraph", "quote", "heading", "subtext", "list", "codeblock", "hr", "table", "alert", "details", "footnotes", "file")
@@ -592,13 +627,14 @@ private fun TaskBox(checked: Boolean) {
     ) { if (checked) Icon("Check", c.onBrand, size = 11.dp) }
 }
 
+/** Code in a language, coloured as the chat's code blocks are (plain for a language it does not know). */
 @Composable
-private fun CodeBlockView(b: Node.CodeBlock, ctx: RenderCtx) {
+fun highlightedCode(code: String, lang: String?): androidx.compose.ui.text.AnnotatedString {
     val c = Nx.colors
-    val text = remember(b.text, b.lang, c) {
+    return remember(code, lang, c) {
         buildAnnotatedString {
-            append(b.text)
-            for (s in Highlight.spans(b.text, b.lang)) {
+            append(code)
+            for (s in Highlight.spans(code, lang)) {
                 val color = when (s.kind) {
                     Highlight.Kind.KEYWORD -> c.codeKeyword
                     Highlight.Kind.STRING -> c.codeString
@@ -612,6 +648,12 @@ private fun CodeBlockView(b: Node.CodeBlock, ctx: RenderCtx) {
             }
         }
     }
+}
+
+@Composable
+private fun CodeBlockView(b: Node.CodeBlock, ctx: RenderCtx) {
+    val c = Nx.colors
+    val text = highlightedCode(b.text, b.lang)
     val shape = Radii.Sm
     Box(Modifier.padding(top = 6.dp).fillMaxWidth()) {
         Box(
