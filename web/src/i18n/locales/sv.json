@@ -6501,6 +6501,7 @@
   "apps.used": "{name} använde {command}",
   "bugs.context.appAndroid": "Android-appen",
   "bugs.staff.finishedLocked": "Rapporten är markerad som {status}, så ingen kan skriva i den. Öppna den igen för att svara.",
+  "captcha.finishTheOneOpen": "Slutför först captchan som redan är öppen.",
   "whatsNew.r202610028.swipeBody": "På en telefon, svep ett meddelande åt vänster och släpp när pilen lyser för att svara på det.",
   "whatsNew.r202610028.swipeTitle": "Svep för att svara",
   "whatsNew.r20261004.statusEmojiTitle": "Egna emoji i din status",

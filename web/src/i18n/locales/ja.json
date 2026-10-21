@@ -6267,6 +6267,7 @@
   "apps.used": "{name} が {command} を使用しました",
   "bugs.context.appAndroid": "Android アプリ",
   "bugs.staff.finishedLocked": "このレポートは「{status}」になっているため、誰も書き込めません。返信するには再び開いてください。",
+  "captcha.finishTheOneOpen": "先に表示中のキャプチャを完了してください。",
   "whatsNew.r202610028.swipeBody": "スマートフォンでメッセージを左にスワイプし、矢印が光ったら指を離すと返信できます。",
   "whatsNew.r202610028.swipeTitle": "スワイプで返信",
   "whatsNew.r20261004.statusEmojiTitle": "ステータスにカスタム絵文字",

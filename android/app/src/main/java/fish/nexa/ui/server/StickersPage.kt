@@ -218,11 +218,19 @@ private fun PackDetail(pack: StickerPack, manage: Boolean, onDeleted: () -> Unit
         }
     }
 
-    fun setPublic(v: Boolean) = scope.launch {
-        try {
-            Nexa.expressions.upsertPack(Nexa.api.request("PATCH", "/stickers/packs/${pack.id}", StickerPack.serializer(), buildJsonObject { put("public", v) }))
-        } catch (e: Exception) {
-            Nexa.ui.toast((e as? ApiError)?.message ?: t("server.packEditor.couldNotChangeVisibility"), "error")
+    // one change at a time: pressed again while one is on its way (or waits on a captcha), it waits
+    var publicBusy by remember(pack.id) { mutableStateOf(false) }
+    fun setPublic(v: Boolean) {
+        if (publicBusy) return
+        publicBusy = true
+        scope.launch {
+            try {
+                Nexa.expressions.upsertPack(Nexa.api.request("PATCH", "/stickers/packs/${pack.id}", StickerPack.serializer(), buildJsonObject { put("public", v) }))
+            } catch (e: Exception) {
+                Nexa.ui.toast((e as? ApiError)?.message ?: t("server.packEditor.couldNotChangeVisibility"), "error")
+            } finally {
+                publicBusy = false
+            }
         }
     }
 
@@ -378,7 +386,7 @@ private fun PackDetail(pack: StickerPack, manage: Boolean, onDeleted: () -> Unit
                 )
             }
             Box(Modifier.padding(top = 12.dp)) {
-                ToggleLine(t("server.packEditor.publicPack"), pack.public, { setPublic(it) }, description = t("server.packEditor.anyoneWithTheLinkCanInstall"))
+                ToggleLine(t("server.packEditor.publicPack"), pack.public, { setPublic(it) }, description = t("server.packEditor.anyoneWithTheLinkCanInstall"), enabled = !publicBusy)
             }
             if (pack.public) Wrap(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Txt(packUrl(pack.id), style = Nx.type.code.copy(fontSize = Nx.type.sp(13f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f).surfaceCard(c, Radii.Sm).padding(horizontal = 10.dp, vertical = 10.dp))

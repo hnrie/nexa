@@ -6613,6 +6613,7 @@
   "apps.used": "{name} usó {command}",
   "bugs.context.appAndroid": "App de Android",
   "bugs.staff.finishedLocked": "Este informe está marcado como «{status}», así que nadie puede escribir en él. Vuelve a abrirlo para responder.",
+  "captcha.finishTheOneOpen": "Primero completa el captcha que ya está abierto.",
   "whatsNew.r202610028.swipeBody": "En el móvil, desliza un mensaje hacia la izquierda y suéltalo cuando se ilumine la flecha para responderlo.",
   "whatsNew.r202610028.swipeTitle": "Desliza para responder",
   "whatsNew.r20261004.statusEmojiTitle": "Emojis personalizados en tu estado",

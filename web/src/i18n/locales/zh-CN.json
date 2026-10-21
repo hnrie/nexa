@@ -6267,6 +6267,7 @@
   "apps.used": "{name} 使用了 {command}",
   "bugs.context.appAndroid": "Android 应用",
   "bugs.staff.finishedLocked": "此报告已标记为“{status}”，因此没有人可以在其中发言。重新打开它即可回复。",
+  "captcha.finishTheOneOpen": "请先完成已打开的人机验证。",
   "whatsNew.r202610028.swipeBody": "在手机上将消息向左滑动，箭头亮起时松手即可回复。",
   "whatsNew.r202610028.swipeTitle": "滑动回复",
   "whatsNew.r20261004.statusEmojiTitle": "状态里的自定义表情",

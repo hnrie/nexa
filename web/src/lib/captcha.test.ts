@@ -66,9 +66,25 @@ describe("the captcha sheet", () => {
     await expect(token).rejects.toMatchObject({ code: "captcha_cancelled" });
   });
 
-  it("shows one at a time: a second waits for the first, and cancelling one cancels those waiting", async () => {
+  it("never stacks: the same action pressed again while its captcha is up gets none", async () => {
+    const first = captchaToken("sticker_pack_public");
+    const again = captchaToken("sticker_pack_public");
+    await expect(again).rejects.toMatchObject({ code: "captcha_pending" });
+    await rendering();
+    expect(document.querySelectorAll("[role=dialog]")).toHaveLength(1);
+    rendered!["callback"]!("tok");
+    await expect(first).resolves.toBe("tok");
+    // once it is done, the action can ask again
+    rendered = null;
+    const later = captchaToken("sticker_pack_public");
+    await rendering();
+    rendered!["callback"]!("tok2");
+    await expect(later).resolves.toBe("tok2");
+  });
+
+  it("shows one at a time: another action's waits for the first, and cancelling one cancels those waiting", async () => {
     const first = captchaToken("join_server");
-    const second = captchaToken("join_server");
+    const second = captchaToken("friend_request");
     await rendering();
     expect(document.querySelectorAll("[role=dialog]")).toHaveLength(1);
     const one = rendered!;
@@ -83,7 +99,7 @@ describe("the captcha sheet", () => {
 
     rendered = null;
     const third = captchaToken("join_server");
-    const fourth = captchaToken("join_server");
+    const fourth = captchaToken("friend_request");
     await rendering();
     rendered!["open-callback"]!();
     rendered!["close-callback"]!();

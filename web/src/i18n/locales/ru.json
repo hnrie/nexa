@@ -6942,6 +6942,7 @@
   "apps.used": "{name} использует {command}",
   "bugs.context.appAndroid": "Приложение для Android",
   "bugs.staff.finishedLocked": "Этот отчёт отмечен как «{status}», поэтому никто не может в нём писать. Откройте его снова, чтобы ответить.",
+  "captcha.finishTheOneOpen": "Сначала пройдите уже открытую капчу.",
   "whatsNew.r202610028.swipeBody": "На телефоне смахните сообщение влево и отпустите, когда загорится стрелка, чтобы ответить на него.",
   "whatsNew.r202610028.swipeTitle": "Ответ свайпом",
   "whatsNew.r20261004.statusEmojiTitle": "Свои эмодзи в статусе",

@@ -51,10 +51,11 @@ import org.json.JSONObject
  * the sheet only shows when hCaptcha puts up a challenge, and closing the
  * challenge cancels.
  *
- * One at a time, as on the web: a request made while a captcha is up waits
- * for it (a token is good for one request only), and cancelling one cancels
- * those waiting behind it. A second one used to take the sheet from the first,
- * whose request then waited for good.
+ * Never more than one at a time, as on the web. The same action asked for
+ * again while its captcha is up gets no second one (captcha_pending); another
+ * action's waits for it (a token is good for one request only), and
+ * cancelling one cancels those waiting behind it. A second one used to take
+ * the sheet from the first, whose request then waited for good.
  */
 object CaptchaHost : CaptchaProvider {
     private class Request(val siteKey: String, val action: String, val result: CompletableDeferred<String>)
@@ -67,9 +68,23 @@ object CaptchaHost : CaptchaProvider {
     /** Counts cancelled captchas: the ones waiting when one is cancelled go with it. */
     @Volatile private var cancels = 0
 
+    /** The actions with a captcha on screen or waiting for its turn. */
+    private val pending = mutableSetOf<String>()
+
     private fun cancelled() = ApiError(0, "captcha_cancelled", t("captcha.theCaptchaWasCancelled"))
 
     override suspend fun token(siteKey: String, action: String): String {
+        synchronized(pending) {
+            if (!pending.add(action)) throw ApiError(0, "captcha_pending", t("captcha.finishTheOneOpen"))
+        }
+        try {
+            return queued(siteKey, action)
+        } finally {
+            synchronized(pending) { pending.remove(action) }
+        }
+    }
+
+    private suspend fun queued(siteKey: String, action: String): String {
         val ticket = cancels
         return turn.withLock {
             if (cancels != ticket) throw cancelled()

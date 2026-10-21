@@ -6613,6 +6613,7 @@
   "apps.used": "{name} a utilisé {command}",
   "bugs.context.appAndroid": "Application Android",
   "bugs.staff.finishedLocked": "Ce signalement est marqué « {status} », personne ne peut donc y écrire. Rouvre-le pour répondre.",
+  "captcha.finishTheOneOpen": "Terminez d'abord le captcha déjà ouvert.",
   "whatsNew.r202610028.swipeBody": "Sur téléphone, faites glisser un message vers la gauche et relâchez quand la flèche s'allume pour y répondre.",
   "whatsNew.r202610028.swipeTitle": "Glisser pour répondre",
   "whatsNew.r20261004.statusEmojiTitle": "Emojis personnalisés dans ton statut",

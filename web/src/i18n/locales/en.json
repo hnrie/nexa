@@ -6501,6 +6501,7 @@
   "apps.used": "{name} used {command}",
   "bugs.context.appAndroid": "Android app",
   "bugs.staff.finishedLocked": "This report is marked {status}, so nobody can write in it. Reopen it to reply.",
+  "captcha.finishTheOneOpen": "Finish the captcha that's already open first.",
   "whatsNew.r202610028.swipeBody": "On a phone, swipe a message to the left and let go when the arrow lights up to reply to it.",
   "whatsNew.r202610028.swipeTitle": "Swipe to Reply",
   "whatsNew.r20261004.statusEmojiTitle": "Custom Emoji in Your Status",

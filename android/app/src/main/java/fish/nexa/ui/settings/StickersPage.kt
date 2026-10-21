@@ -277,15 +277,22 @@ private fun PackView(packId: String, onBack: () -> Unit) {
     PageTitle(pack.name)
     NxTextField(form.name, { form.name = it.take(100) }, label = t("server.packEditor.packName"), capitalize = true)
     NxTextField(form.description, { form.description = it.take(500) }, label = t("server.packEditor.description"), singleLine = false, minLines = 2, modifier = Modifier.padding(top = 12.dp), capitalize = true)
+    // one change at a time: pressed again while one is on its way (or waits on a captcha), it waits
+    var publicBusy by remember(pack.id) { mutableStateOf(false) }
     ToggleRow(t("server.packEditor.publicPack"), pack.public, { v ->
-        scope.launch {
-            try {
-                Nexa.expressions.upsertPack(Nexa.api.request("PATCH", "/stickers/packs/${pack.id}", StickerPack.serializer(), buildJsonObject { put("public", v) }))
-            } catch (e: Exception) {
-                Nexa.ui.toast((e as? ApiError)?.message ?: t("server.packEditor.couldNotChangeVisibility"), "error")
+        if (!publicBusy) {
+            publicBusy = true
+            scope.launch {
+                try {
+                    Nexa.expressions.upsertPack(Nexa.api.request("PATCH", "/stickers/packs/${pack.id}", StickerPack.serializer(), buildJsonObject { put("public", v) }))
+                } catch (e: Exception) {
+                    Nexa.ui.toast((e as? ApiError)?.message ?: t("server.packEditor.couldNotChangeVisibility"), "error")
+                } finally {
+                    publicBusy = false
+                }
             }
         }
-    }, t("server.packEditor.anyoneWithTheLinkCanInstall"))
+    }, t("server.packEditor.anyoneWithTheLinkCanInstall"), enabled = !publicBusy)
     if (pack.public) Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(Modifier.weight(1f).sunken(Radii.Sm, c).ring(Radii.Sm, c.borderSubtle).padding(horizontal = 12.dp, vertical = 10.dp)) {
             Txt(packUrl(pack.id), style = Nx.type.code.copy(fontSize = Nx.type.sp(13f)), color = c.text, maxLines = 1)

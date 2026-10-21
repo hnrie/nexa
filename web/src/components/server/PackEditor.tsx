@@ -130,11 +130,17 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
       setBusy(false);
     }
   };
+  // one change at a time: pressed again while one is on its way (or waits on a captcha), it waits
+  const [publicBusy, setPublicBusy] = useState(false);
   const setPublic = async (v: boolean) => {
+    if (publicBusy) return;
+    setPublicBusy(true);
     try {
       upsertPack(await expressionsApi.patchPack(pack.id, { public: v }));
     } catch (err) {
       toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotChangeVisibility"), "error");
+    } finally {
+      setPublicBusy(false);
     }
   };
   const stage = (files: FileList | File[]) => {
@@ -316,7 +322,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
             <TextArea value={description} onChange={(e) => setDescription(e.target.value.slice(0, 500))} maxLength={500} />
           </Field>
           <div style={{ height: 12 }} />
-          <Toggle checked={pack.public} onChange={(v) => void setPublic(v)} label={t("server.packEditor.publicPack")} description={t("server.packEditor.anyoneWithTheLinkCanInstall")} />
+          <Toggle checked={pack.public} disabled={publicBusy} onChange={(v) => void setPublic(v)} label={t("server.packEditor.publicPack")} description={t("server.packEditor.anyoneWithTheLinkCanInstall")} />
           {pack.public ? (
             <div className={s.linkRow}>
               <TextInput readOnly value={packUrl(pack.id)} onFocus={(e) => e.currentTarget.select()} />

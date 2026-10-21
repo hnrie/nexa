@@ -385,8 +385,10 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   refusal names the action in `X-Captcha-Action`; the web's `api.captchaSolver` (`lib/captcha.ts`)
   and Android's `Api.captchaSolver` (set by `Auth.solveCaptcha`) solve it and send the request
   again, so a guarded call needs nothing of its own. Only one captcha is on screen at a time (web
-`captchaToken`, Android `CaptchaHost.token`): one asked for while another is up waits for it (a
-token is good for one request), and cancelling one cancels those waiting behind it. hCaptcha binds no action to a token, so the
+`captchaToken`, Android `CaptchaHost.token`): the same action asked for again while its captcha is
+up gets none (`captcha_pending`, "finish the one already open"), another action's waits for it (a
+token is good for one request), and cancelling one cancels those waiting behind it. A control whose
+request may meet a captcha is disabled until that request ends (the Public Pack switches). hCaptcha binds no action to a token, so the
   server checks only that it passed and was solved on one of Nexa's own hostnames (the sitekey's
   allowed domains in the hCaptcha dashboard should list the same ones); with hCaptcha's published
   test secret the hostname is not checked. The web's sheet (`lib/captcha.ts`) dims the page while
