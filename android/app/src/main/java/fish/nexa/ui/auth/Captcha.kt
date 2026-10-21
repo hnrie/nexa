@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -33,10 +34,13 @@ import fish.nexa.ui.components.ButtonKind
 import fish.nexa.ui.components.NxButton
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.t
+import fish.nexa.ui.theme.NexaColors
 import fish.nexa.ui.theme.Nx
 import fish.nexa.ui.theme.Radii
 import fish.nexa.ui.theme.panel
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
 /**
@@ -46,6 +50,11 @@ import org.json.JSONObject
  * through a bridge and goes on the one request it was made for. Like the web,
  * the sheet only shows when hCaptcha puts up a challenge, and closing the
  * challenge cancels.
+ *
+ * One at a time, as on the web: a request made while a captcha is up waits
+ * for it (a token is good for one request only), and cancelling one cancels
+ * those waiting behind it. A second one used to take the sheet from the first,
+ * whose request then waited for good.
  */
 object CaptchaHost : CaptchaProvider {
     private class Request(val siteKey: String, val action: String, val result: CompletableDeferred<String>)
@@ -53,14 +62,28 @@ object CaptchaHost : CaptchaProvider {
     private var current by mutableStateOf<Request?>(null)
     private var shown by mutableStateOf(false)
 
+    private val turn = Mutex()
+
+    /** Counts cancelled captchas: the ones waiting when one is cancelled go with it. */
+    @Volatile private var cancels = 0
+
+    private fun cancelled() = ApiError(0, "captcha_cancelled", t("captcha.theCaptchaWasCancelled"))
+
     override suspend fun token(siteKey: String, action: String): String {
-        val r = Request(siteKey, action, CompletableDeferred())
-        current = r
-        shown = false
-        try {
-            return r.result.await()
-        } finally {
-            if (current === r) current = null
+        val ticket = cancels
+        return turn.withLock {
+            if (cancels != ticket) throw cancelled()
+            val r = Request(siteKey, action, CompletableDeferred())
+            current = r
+            shown = false
+            try {
+                r.result.await()
+            } catch (e: ApiError) {
+                if (e.code == "captcha_cancelled") cancels++
+                throw e
+            } finally {
+                if (current === r) current = null
+            }
         }
     }
 
@@ -85,11 +108,17 @@ setTimeout(function(){if(!started)fail("unavailable")},15000)
     }
 
     /** Drawn once at the root of the app; invisible until a request needs a click. */
-    @SuppressLint("SetJavaScriptEnabled")
     @Composable
     fun Sheet() {
         val r = current ?: return
         val c = Nx.colors
+        // a page of its own for each request: the next may follow without a frame between them
+        key(r) { Page(r, c) }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    @Composable
+    private fun Page(r: Request, c: NexaColors) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -131,7 +160,7 @@ setTimeout(function(){if(!started)fail("unavailable")},15000)
                                     (ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(windowToken, 0)
                                 }.let { }
                                 @JavascriptInterface fun onCancel() {
-                                    r.result.completeExceptionally(ApiError(0, "captcha_cancelled", t("captcha.theCaptchaWasCancelled")))
+                                    r.result.completeExceptionally(cancelled())
                                 }
                             }, "NexaCaptcha")
                             loadDataWithBaseURL(Nexa.api.baseUrl + "/", page(r.siteKey, !c.isLight, c.bgFloating.toArgb()), "text/html", "utf-8", null)
@@ -139,7 +168,7 @@ setTimeout(function(){if(!started)fail("unavailable")},15000)
                     },
                 )
                 if (shown) NxButton(t("chat.editMessage.cancel"), onClick = {
-                    r.result.completeExceptionally(ApiError(0, "captcha_cancelled", t("captcha.theCaptchaWasCancelled")))
+                    r.result.completeExceptionally(cancelled())
                 }, kind = ButtonKind.GHOST)
             }
         }

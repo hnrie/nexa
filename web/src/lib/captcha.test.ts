@@ -65,4 +65,36 @@ describe("the captcha sheet", () => {
     rendered!["close-callback"]!();
     await expect(token).rejects.toMatchObject({ code: "captcha_cancelled" });
   });
+
+  it("shows one at a time: a second waits for the first, and cancelling one cancels those waiting", async () => {
+    const first = captchaToken("join_server");
+    const second = captchaToken("join_server");
+    await rendering();
+    expect(document.querySelectorAll("[role=dialog]")).toHaveLength(1);
+    const one = rendered!;
+    rendered = null;
+    one["callback"]!("tok1");
+    await expect(first).resolves.toBe("tok1");
+    // the second gets a token of its own once the first is gone
+    await rendering();
+    expect(document.querySelectorAll("[role=dialog]")).toHaveLength(1);
+    rendered!["callback"]!("tok2");
+    await expect(second).resolves.toBe("tok2");
+
+    rendered = null;
+    const third = captchaToken("join_server");
+    const fourth = captchaToken("join_server");
+    await rendering();
+    rendered!["open-callback"]!();
+    rendered!["close-callback"]!();
+    await expect(third).rejects.toMatchObject({ code: "captcha_cancelled" });
+    await expect(fourth).rejects.toMatchObject({ code: "captcha_cancelled" });
+    expect(document.querySelector("[role=dialog]")).toBeNull();
+    // a captcha asked for after that shows as usual
+    rendered = null;
+    const fifth = captchaToken("join_server");
+    await rendering();
+    rendered!["callback"]!("tok5");
+    await expect(fifth).resolves.toBe("tok5");
+  });
 });

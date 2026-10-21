@@ -102,11 +102,31 @@ function loadHCaptcha(): Promise<HCaptcha> {
   return loading;
 }
 
+/** The captcha on screen, or the last one asked for: the next one waits for it. */
+let queue: Promise<unknown> = Promise.resolve();
+/** Counts cancelled captchas: the ones waiting when one is cancelled go with it. */
+let cancels = 0;
+
 /**
  * A fresh token for one guarded request, or null when captchas are off. If
  * hCaptcha puts up a challenge, a small sheet comes up behind it, with a way out.
+ *
+ * One at a time: a button pressed again while a captcha is up used to stack
+ * captchas on top of each other. Each one waits for the one before it (a
+ * token is good for one request only, so they cannot share), and cancelling
+ * one cancels those waiting behind it.
  */
-export async function captchaToken(action: string): Promise<string | null> {
+export function captchaToken(action: string): Promise<string | null> {
+  const ticket = cancels;
+  const run = queue.then(() => {
+    if (cancels !== ticket) throw captchaError("captcha_cancelled", t("captcha.theCaptchaWasCancelled"));
+    return showCaptcha();
+  });
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+async function showCaptcha(): Promise<string | null> {
   const key = await currentSiteKey();
   if (!key) return null;
   const hcaptcha = await loadHCaptcha();
@@ -156,7 +176,11 @@ export async function captchaToken(action: string): Promise<string | null> {
       if (hadFocus && before?.isConnected) before.focus();
       then();
     };
-    const cancelIt = (): void => finish(() => reject(captchaError("captcha_cancelled", t("captcha.theCaptchaWasCancelled"))));
+    const cancelIt = (): void =>
+      finish(() => {
+        cancels += 1;
+        reject(captchaError("captcha_cancelled", t("captcha.theCaptchaWasCancelled")));
+      });
     cancel.onclick = cancelIt;
     // Escape leaves it, as it leaves every other sheet in the app; caught
     // before the page's own handlers, which would close something underneath
