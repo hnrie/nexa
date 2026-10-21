@@ -312,7 +312,7 @@ function embed(x: unknown): HookEmbed | null {
   const title = str(x["title"]);
   if (title) out.title = title;
   const desc = str(x["description"]);
-  if (desc) out.description = desc;
+  if (desc) out.description = discordMarkdown(desc);
   const url = href(x["url"]);
   if (url) out.url = url;
   const ts = str(x["timestamp"]);
@@ -352,7 +352,7 @@ function embed(x: unknown): HookEmbed | null {
       const name = str(fv["name"]);
       const value = str(fv["value"]);
       if (name === undefined || value === undefined) continue;
-      out.fields.push({ name, value, inline: fv["inline"] === true });
+      out.fields.push({ name, value: discordMarkdown(value), inline: fv["inline"] === true });
     }
   }
   return out;
@@ -378,7 +378,7 @@ function component(x: unknown, depth: number): HookComponent | null {
   if (url) out.url = url;
   if (x["disabled"] === true) out.disabled = true;
   const content = str(x["content"]);
-  if (content) out.content = content;
+  if (content) out.content = discordMarkdown(content);
   const m = media(x["media"]);
   if (m) out.media = m;
   const file = media(x["file"]);
@@ -533,12 +533,104 @@ function attachment(x: unknown): HookAttachment | null {
   return out;
 }
 
+/** The paired markers a Discord message may stretch across lines. */
+const SPAN_MARKERS = ["**", "__", "~~", "||"] as const;
+
+/**
+ * Discord's markdown, rewritten into what Nexa's parser reads the same way.
+ * Discord opens and closes a fenced code block anywhere on a line and lets
+ * `**`, `__`, `~~` and `||` run across lines; Nexa wants a fence on its own
+ * line and keeps a span on one. So a fence gets the line breaks it lacks, and
+ * a span that crosses lines is closed at each line's end and opened again at
+ * the next word (`**Syntax:\n**` is `**Syntax:**`, the empty span dropped).
+ * Code is left alone, and a marker with no partner stays as written.
+ */
+export function discordMarkdown(src: string): string {
+  let out = "";
+  let text = "";
+  let i = 0;
+  while (i < src.length) {
+    const open = src.indexOf("```", i);
+    const close = open < 0 ? -1 : src.indexOf("```", open + 3);
+    if (close < 0) break;
+    const block = src.slice(open, close + 3);
+    if (!block.includes("\n")) {
+      // ```code``` on one line is inline code, part of the text around it
+      text += src.slice(i, close + 3);
+      i = close + 3;
+      continue;
+    }
+    out += joinSpans(text + src.slice(i, open));
+    text = "";
+    if (out && !out.endsWith("\n")) out += "\n";
+    out += block;
+    i = close + 3;
+    if (i < src.length && src[i] !== "\n") out += "\n";
+  }
+  return out + joinSpans(text + src.slice(i));
+}
+
+/** Keeps every paired span of `text` (which holds no code block) on one line. */
+function joinSpans(text: string): string {
+  for (const m of SPAN_MARKERS) text = joinSpan(text, m);
+  return text;
+}
+
+function joinSpan(text: string, m: string): string {
+  if (!text.includes("\n") || !text.includes(m)) return text;
+  let out = "";
+  let open = false;
+  // closed at a line's end, waiting for the next word to open it again
+  let reopen = false;
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i]!;
+    if (c === "`") {
+      // inline code is copied as is; a backtick with no partner on its line is just one
+      const end = text.indexOf("`", i + 1);
+      const nl = text.indexOf("\n", i + 1);
+      if (end > 0 && (nl < 0 || end < nl)) {
+        if (reopen) {
+          out += m;
+          reopen = false;
+        }
+        out += text.slice(i, end + 1);
+        i = end + 1;
+        continue;
+      }
+    }
+    if (text.startsWith(m, i)) {
+      if (open) {
+        if (!reopen) out += m;
+        open = reopen = false;
+      } else if (text.indexOf(m, i + m.length) >= 0) {
+        out += m;
+        open = true;
+      } else {
+        out += m;
+      }
+      i += m.length;
+      continue;
+    }
+    if (c === "\n" && open && !reopen) {
+      out += m;
+      reopen = true;
+    } else if (reopen && !/\s/.test(c)) {
+      out += m;
+      reopen = false;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
 /** Reads a webhook message's content, or null for anything that is not one. */
 export function sanitizeHook(raw: unknown): HookContent | null {
   if (!isObj(raw)) return null;
   const out: HookContent = {
     name: (str(raw["name"]) ?? "").slice(0, 80) || "Webhook",
-    content: str(raw["content"]) ?? "",
+    content: discordMarkdown(str(raw["content"]) ?? ""),
     tts: raw["tts"] === true,
     embeds: [],
     components: [],

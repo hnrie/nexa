@@ -210,6 +210,95 @@ object Webhook {
     /** Whether a component's type is a select menu of any kind. */
     fun isSelect(type: Double): Boolean = type == C_STRING_SELECT.toDouble() || (type >= C_USER_SELECT && type <= C_CHANNEL_SELECT)
 
+    /** The paired markers a Discord message may stretch across lines. */
+    private val SPAN_MARKERS = listOf("**", "__", "~~", "||")
+
+    /**
+     * Discord's markdown, rewritten into what Nexa's parser reads the same way
+     * (the web's `discordMarkdown`): a fence gets the line breaks it lacks, and
+     * a `**`, `__`, `~~` or `||` span that crosses lines is closed at each
+     * line's end and opened again at the next word. Code is left alone, and a
+     * marker with no partner stays as written.
+     */
+    fun discordMarkdown(src: String): String {
+        val out = StringBuilder()
+        var text = StringBuilder()
+        var i = 0
+        while (i < src.length) {
+            val open = src.indexOf("```", i)
+            val close = if (open < 0) -1 else src.indexOf("```", open + 3)
+            if (close < 0) break
+            val block = src.substring(open, close + 3)
+            if (!block.contains('\n')) {
+                // ```code``` on one line is inline code, part of the text around it
+                text.append(src, i, close + 3)
+                i = close + 3
+                continue
+            }
+            out.append(joinSpans(text.append(src, i, open).toString()))
+            text = StringBuilder()
+            if (out.isNotEmpty() && out.last() != '\n') out.append('\n')
+            out.append(block)
+            i = close + 3
+            if (i < src.length && src[i] != '\n') out.append('\n')
+        }
+        return out.append(joinSpans(text.append(src, i, src.length).toString())).toString()
+    }
+
+    private fun joinSpans(text: String): String = SPAN_MARKERS.fold(text) { t, m -> joinSpan(t, m) }
+
+    /** JavaScript's `\s`, which the web's version tests with. */
+    private fun isJsSpace(c: Char): Boolean =
+        c in "\t\n\u000B\u000C\r \u00A0\u1680\u2028\u2029\u202F\u205F\u3000\uFEFF" || c in '\u2000'..'\u200A'
+
+    private fun joinSpan(text: String, m: String): String {
+        if (!text.contains('\n') || !text.contains(m)) return text
+        val out = StringBuilder()
+        var open = false
+        // closed at a line's end, waiting for the next word to open it again
+        var reopen = false
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            if (c == '`') {
+                // inline code is copied as is; a backtick with no partner on its line is just one
+                val end = text.indexOf('`', i + 1)
+                val nl = text.indexOf('\n', i + 1)
+                if (end > 0 && (nl < 0 || end < nl)) {
+                    if (reopen) {
+                        out.append(m)
+                        reopen = false
+                    }
+                    out.append(text, i, end + 1)
+                    i = end + 1
+                    continue
+                }
+            }
+            if (text.startsWith(m, i)) {
+                if (open) {
+                    if (!reopen) out.append(m)
+                    open = false
+                    reopen = false
+                } else {
+                    out.append(m)
+                    if (text.indexOf(m, i + m.length) >= 0) open = true
+                }
+                i += m.length
+                continue
+            }
+            if (c == '\n' && open && !reopen) {
+                out.append(m)
+                reopen = true
+            } else if (reopen && !isJsSpace(c)) {
+                out.append(m)
+                reopen = false
+            }
+            out.append(c)
+            i++
+        }
+        return out.toString()
+    }
+
     private fun obj(x: JsonElement?): JsonObject? = x as? JsonObject
     private fun str(x: JsonElement?): String? = (x as? JsonPrimitive)?.takeIf { it.isString }?.content
     private fun num(x: JsonElement?): Double? = (x as? JsonPrimitive)?.takeIf { !it.isString && it !is JsonNull && it.booleanOrNull == null }?.doubleOrNull?.takeIf { it.isFinite() }
@@ -263,12 +352,12 @@ object Webhook {
             val fo = obj(fv) ?: return@forEach
             val name = str(fo["name"]) ?: return@forEach
             val value = str(fo["value"]) ?: return@forEach
-            fields += Field(name, value, isTrue(fo["inline"]))
+            fields += Field(name, discordMarkdown(value), isTrue(fo["inline"]))
         }
         return Embed(
             type = str(o["type"]) ?: "rich",
             title = str(o["title"])?.takeIf { it.isNotEmpty() },
-            description = str(o["description"])?.takeIf { it.isNotEmpty() },
+            description = str(o["description"])?.takeIf { it.isNotEmpty() }?.let(::discordMarkdown),
             url = href(o["url"]),
             timestamp = str(o["timestamp"])?.takeIf { it.isNotEmpty() }?.let(::parseDate),
             color = color,
@@ -299,7 +388,7 @@ object Webhook {
             emoji = emoji(o["emoji"]),
             url = href(o["url"]),
             disabled = isTrue(o["disabled"]),
-            content = str(o["content"])?.takeIf { it.isNotEmpty() },
+            content = str(o["content"])?.takeIf { it.isNotEmpty() }?.let(::discordMarkdown),
             media = media(o["media"]),
             file = media(o["file"]),
             description = str(o["description"])?.takeIf { it.isNotEmpty() },
@@ -437,7 +526,7 @@ object Webhook {
         val o = obj(raw) ?: return null
         return Content(
             name = slice(str(o["name"]) ?: "", 80).ifEmpty { "Webhook" },
-            content = str(o["content"]) ?: "",
+            content = discordMarkdown(str(o["content"]) ?: ""),
             tts = isTrue(o["tts"]),
             embeds = arr(o["embeds"])?.take(10)?.mapNotNull(::embed) ?: emptyList(),
             components = arr(o["components"])?.take(40)?.mapNotNull { component(it, 0) } ?: emptyList(),

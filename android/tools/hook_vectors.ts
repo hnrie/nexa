@@ -191,6 +191,11 @@ for (let k = 0; k < 400; k++) {
   for (let n = 1 + int(4); n > 0; n--) r = mangle(r);
   raws.push(r);
 }
+// Discord's markdown as bots write it (discordMarkdown): spans across lines, fences mid-line
+const flavored = ["**Syntax:\n**```\n!dm <user_id> <message>\n```", "**a\n  b**", "||s\np||", "t```py\nx=1```z", "`**` c\n**x**", "**open\nline"];
+const bits = ["**", "__", "~~", "||", "```", "`", "\n", "\n", " ", "a", "b", "\u3000", "py"];
+for (let k = 0; k < 300; k++) flavored.push(Array.from({ length: 2 + int(14) }, () => pick(bits)).join(""));
+for (const text of flavored) raws.push({ ...clone(app) as object, content: text, embeds: [{ description: text, fields: [{ name: "f", value: text }] }] });
 
 const cases = raws.map((raw) => {
   const out = sanitizeHook(raw);

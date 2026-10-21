@@ -1097,7 +1097,10 @@ notes.
   tap-to-show command invocation in `AppMessage.InteractionLine`, and the portal in `ui/settings`
   (`DeveloperPortal`, `AppDetail`, `PortalParts`, `AuthorizedApps`) and `ui/server/AppsSection`.
   `ui/markdown/Webhook.kt` is the one parser of webhook and app messages (the web's
-  `lib/webhookMessage.ts`, checked by `web-hook-vectors.json.gz`).
+  `lib/webhookMessage.ts`, checked by `web-hook-vectors.json.gz`). Both run the content, embed
+  descriptions, field values and text displays through `discordMarkdown`, which puts a fence opened
+  mid-line on its own line and splits a `**`, `__`, `~~` or `||` span that crosses lines into one per
+  line, since bots write Discord's markdown and Nexa's parser keeps spans on one line.
 - Layers: `openSheet` takes `over` (a line over the title) and `heading` (drawn in place of the
   title, `SheetTitle` drawing the words), and a footer with nothing in it takes no room.
   `Modifier.floatAbove(gap)` (`components/Controls.kt`) hangs a list over what it sits on top of

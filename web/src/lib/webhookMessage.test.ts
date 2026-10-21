@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  discordMarkdown,
   BUTTON_LINK,
   C_ACTION_ROW,
   C_BUTTON,
@@ -245,5 +246,28 @@ describe("sameHookSender", () => {
     expect(sameHookSender(a, d)).toBe(false);
     expect(sameHookSender(a, undefined)).toBe(false);
     expect(sameHookSender(undefined, undefined)).toBe(true);
+  });
+});
+
+describe("discordMarkdown", () => {
+  const cases: [string, string][] = [
+    // Red's help: bold closed after a line break, then a fence opened mid-line
+    ["**Syntax:\n**```\n!dm <user_id> <message>\n```", "**Syntax:**\n```\n!dm <user_id> <message>\n```"],
+    ["**a\nb**", "**a**\n**b**"],
+    ["**a\n  b**", "**a**\n  **b**"],
+    ["||spoil\ner||", "||spoil||\n||er||"],
+    ["text```py\nx=1```after", "text\n```py\nx=1```\nafter"],
+    ["inline ```x``` stays", "inline ```x``` stays"],
+    ["**unclosed\nline", "**unclosed\nline"],
+    ["`**` code\n**x**", "`**` code\n**x**"],
+    ["```\n**a\nb**\n```", "```\n**a\nb**\n```"],
+  ];
+  it.each(cases)("rewrites %j", (src, want) => expect(discordMarkdown(src)).toBe(want));
+
+  it("is applied to an app's content, descriptions and field values", () => {
+    const h = sanitizeHook({ content: "**a\nb**", embeds: [{ description: "**S:\n**```\nx\n```", fields: [{ name: "n", value: "__u\nv__" }] }] })!;
+    expect(h.content).toBe("**a**\n**b**");
+    expect(h.embeds[0]!.description).toBe("**S:**\n```\nx\n```");
+    expect(h.embeds[0]!.fields[0]!.value).toBe("__u__\n__v__");
   });
 });
