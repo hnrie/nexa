@@ -6502,6 +6502,8 @@
   "bugs.context.appAndroid": "Android app",
   "bugs.staff.finishedLocked": "This report is marked {status}, so nobody can write in it. Reopen it to reply.",
   "captcha.finishTheOneOpen": "Finish the captcha that's already open first.",
+  "copyId.forBots": "Copy ID for Bots",
+  "copyId.forBotsCopied": "ID for bots copied.",
   "whatsNew.r202610028.swipeBody": "On a phone, swipe a message to the left and let go when the arrow lights up to reply to it.",
   "whatsNew.r202610028.swipeTitle": "Swipe to Reply",
   "whatsNew.r20261004.statusEmojiTitle": "Custom Emoji in Your Status",
@@ -6825,5 +6827,9 @@
   "whatsNew.r202610202.priorityBody": "Roles with Priority Speaker can hold their Priority Speaker key in a voice channel to be heard over everyone else. Set the key in Settings, Voice & Video.",
   "whatsNew.r202610202.priorityTitle": "Priority Speaker",
   "whatsNew.r202610202.syncBody": "A channel made or moved into a category takes its permissions and follows every change to them. A channel's Permissions page says whether it is synced, with Sync Now to bring it back.",
-  "whatsNew.r202610202.syncTitle": "Categories Sync Their Permissions"
+  "whatsNew.r202610202.syncTitle": "Categories Sync Their Permissions",
+  "whatsNew.r202610203.botIdBody": "With Developer Mode on, Copy ID for Bots gives the ID an app's commands expect, so you can paste it straight in.",
+  "whatsNew.r202610203.botIdTitle": "IDs for Bots",
+  "whatsNew.r202610203.personMenuBody": "Right-click someone's picture or name in a chat to open their menu, the same one the member list shows.",
+  "whatsNew.r202610203.personMenuTitle": "Right-Click Anyone"
 }

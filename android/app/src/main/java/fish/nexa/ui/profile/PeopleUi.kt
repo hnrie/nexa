@@ -84,6 +84,20 @@ fun copyWithToast(text: String, toast: String) {
     if (android.os.Build.VERSION.SDK_INT < 33) Nexa.ui.toast(toast, "success")
 }
 
+/**
+ * What a bot's id adds to a Nexa id (internal/botproto, the web's lib/copyId):
+ * the time between the two epochs, in an id's millisecond bits. Bots see every
+ * id this way, so a person pasting one into a bot command needs it too.
+ */
+private const val BOT_ID_OFFSET: Long = (1767225600000L - 1420070400000L) shl 22
+
+/** The id a bot knows someone or something by. */
+fun botId(id: String): String = id.toLongOrNull()?.let { (it + BOT_ID_OFFSET).toString() } ?: id
+
+/** Copy ID for Bots, beside Copy User ID: the id an app's commands expect. */
+fun copyBotIdItem(userId: String, separatorAfter: Boolean = false): MenuItem.Action =
+    MenuItem.Action(t("copyId.forBots"), separatorAfter = separatorAfter) { copyWithToast(botId(userId), t("copyId.forBotsCopied")) }
+
 /** lib/errors.ts dmOpenError: why a conversation could not be opened, in the words for each refusal. */
 fun dmOpenError(e: Throwable, fallback: String): String = when ((e as? fish.nexa.net.ApiError)?.code) {
     "dm_friends_servers" -> t("errors.dmFriendsServers")

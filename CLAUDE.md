@@ -900,6 +900,15 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
   each recorded against the plugin and taken back by `dropChanges` when it stops); every menu
   module is listed in `lib/contextMenus/all.ts` so the plugin API can load them all before a plugin
   that may change menus starts, and a test fails when one is missing there.
+- People's menus: a right click on someone's picture or name in a message, or the name a reply
+  quotes, opens the menu the member list there opens (`chat/personMenu.ts`: `memberMenu` in a
+  server, `groupMemberMenu` in a group or a one-to-one conversation, where it leaves out the group's
+  choices); webhooks and published copies keep the message's menu. Next to every Copy User ID,
+  Copy ID for Bots (`lib/copyId.ts` `copyBotIdItem`, `botId`) copies the id bots see (`botproto`'s
+  offset), for pasting into an app's commands. Android does both the same way: a long press on the
+  picture or name claims the person (`PressedPerson` in `ui/chat/MessageRow.kt`, as `PressedImage`
+  does for pictures, since `rowTouch` sees the press first) and `openPersonMenu` in
+  `ui/chat/Members.kt` opens their menu; `copyBotIdItem` lives in `ui/profile/PeopleUi.kt`.
 - Plugins (`lib/look/plugins`): `runtime.ts` pins, loads, starts and stops them. A plugin without
   `apiVersion`, or with 1, gets the v1 API (`api.ts`, kept as it was); `apiVersion: 2` gets v2
   (`api2.ts` for its types, `runtimeV2.ts` for the API, `objects.ts` turning the app's objects into

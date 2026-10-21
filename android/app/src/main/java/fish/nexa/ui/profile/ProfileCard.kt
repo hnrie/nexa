@@ -995,6 +995,7 @@ fun openProfileMenu(user: PublicUser, popout: Boolean, viewFull: () -> Unit) {
     items += if (rel?.type == "blocked") MenuItem.Action(t("friends.unblock"), separatorAfter = true) { Nexa.scope.launch { People.unblock(user.id) } }
     else MenuItem.Action(t("profile.profileCard.block"), danger = true, separatorAfter = true) { openBlockDialog(user.id) }
     items += MenuItem.Action(t("chat.groupMemberMenu.copyUserId")) { copyWithToast(user.id, t("clipboard.idCopied")) }
+    items += copyBotIdItem(user.id)
     openMenu(items, title = Names.display(user))
 }
 

@@ -1,5 +1,6 @@
 package fish.nexa.ui.moderation
 
+import fish.nexa.ui.profile.copyBotIdItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -286,7 +287,8 @@ fun userMenu(u: ModUser, onChanged: () -> Unit) {
     val owner = Moderation.ownerId.value == u.id
     val items = ArrayList<MenuItem>()
     items += MenuItem.Action(t("moderation.menu.profile")) { openProfile(u.id) }
-    items += MenuItem.Action(t("moderation.menu.copyId"), separatorAfter = true) { copyText(u.id) }
+    items += MenuItem.Action(t("moderation.menu.copyId")) { copyText(u.id) }
+    items += copyBotIdItem(u.id, separatorAfter = true)
     if (u.blocked != "self" && !owner) {
         val admin = u.isStaff
         val disabled = u.isDisabled

@@ -1,5 +1,10 @@
 package fish.nexa.ui.chat
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -165,7 +170,13 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                     enabled = cm != null && !ctx.selecting && !ephemeral,
                     canReply = cm != null && canSend(ctx),
                     swipe = swipe,
-                    onLongPress = { cm?.let { openMessageMenu(it, ctx, PressedImage.take()) } },
+                    onLongPress = {
+                        cm?.let {
+                            // on someone's picture or name, the menu is theirs
+                            val who = PressedPerson.take()
+                            if (who == null || !openPersonMenu(ctx.channel.id, who)) openMessageMenu(it, ctx, PressedImage.take())
+                        }
+                    },
                     onReply = { cm?.let { ChatUi.reply[ctx.channel.id] = ChatUi.Reply(it.id, ping = it.authorId != ctx.meId) } },
                 ),
             ),
@@ -200,6 +211,7 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                     Modifier
                         .padding(start = avatarStart, top = if (reply != null || command != null) 26.dp else 2.dp)
                         .graphicsLayer { val s = if (pressed) 0.95f else 1f; scaleX = s; scaleY = s }
+                        .claimsPerson(personOf(item, ctx, hookId != null && hook != null))
                         .pressable(interaction) { if (hook != null && hookId != null) fish.nexa.ui.media.openHookCard(hook, hookId) else openProfile(item.authorId) },
                 ) {
                     val copy = item.cm?.m?.crosspost?.takeIf { item.cm.m.type == "crosspost" }
@@ -304,6 +316,38 @@ private fun HeaderTime(ms: Long) {
     )
 }
 
+/**
+ * Who a long press on a message's picture or name is about, so the row opens
+ * their menu, as the member list does (openPersonMenu); null, leaving the
+ * message's own menu, for anyone who is not a person here (a webhook, a
+ * published copy) and for a message not sent yet or one only you see.
+ */
+private fun personOf(item: MsgItem, ctx: ListCtx, byHook: Boolean): String? {
+    val cm = item.cm ?: return null
+    if (byHook || cm.m.ephemeral || cm.m.type == "crosspost") return null
+    return item.authorId
+}
+
+/**
+ * The person under the finger while it is down, for the row's long press
+ * (rowTouch, which sees the press first): PressedImage's way, for people.
+ * Cleared when the finger lifts, so a tap leaves nothing for a later press.
+ */
+object PressedPerson {
+    var userId: String? = null
+
+    fun take(): String? = userId.also { userId = null }
+}
+
+private fun Modifier.claimsPerson(userId: String?): Modifier = if (userId == null) this else pointerInput(userId) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        PressedPerson.userId = userId
+        waitForUpOrCancellation(PointerEventPass.Initial)
+        PressedPerson.userId = null
+    }
+}
+
 @Composable
 private fun MessageHeader(item: MsgItem, ctx: ListCtx) {
     val c = Nx.colors
@@ -337,7 +381,7 @@ private fun MessageHeader(item: MsgItem, ctx: ListCtx) {
             look,
             style = Nx.type.body.copy(fontWeight = FontWeight(650)),
             fallback = c.textStrong,
-            modifier = Modifier.weight(1f, fill = false).pressable(remember { MutableInteractionSource() }, onClick = open),
+            modifier = Modifier.weight(1f, fill = false).claimsPerson(personOf(item, ctx, hookId != null)).pressable(remember { MutableInteractionSource() }, onClick = open),
         )
         look?.icon?.let { RoleIcon(it, 18.dp) }
         when {
@@ -449,7 +493,8 @@ private fun ReplyLine(ctx: ListCtx, replyId: String, msg: fish.nexa.net.Message?
                 Txt(
                     who, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)), color = c.text, maxLines = 1,
                     // a webhook has no profile; its message is where to go
-                    modifier = Modifier.widthIn(max = 160.dp).pressable(remember { MutableInteractionSource() }) {
+                    // the person a reply quotes has the same menu as the one who wrote it
+                    modifier = Modifier.widthIn(max = 160.dp).claimsPerson(original.authorId.takeIf { hookId == null }).pressable(remember { MutableInteractionSource() }) {
                         if (hookId != null) ChatUi.jumpTo(ctx.channel.id, replyId) else openProfile(original.authorId)
                     },
                 )

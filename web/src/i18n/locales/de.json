@@ -6502,6 +6502,8 @@
   "bugs.context.appAndroid": "Android-App",
   "bugs.staff.finishedLocked": "Diese Meldung ist als „{status}“ markiert, deshalb kann niemand darin schreiben. Öffne sie wieder, um zu antworten.",
   "captcha.finishTheOneOpen": "Löse zuerst das Captcha, das schon offen ist.",
+  "copyId.forBots": "ID für Bots kopieren",
+  "copyId.forBotsCopied": "ID für Bots kopiert.",
   "whatsNew.r202610028.swipeBody": "Wische auf dem Handy eine Nachricht nach links und lass los, sobald der Pfeil aufleuchtet, um darauf zu antworten.",
   "whatsNew.r202610028.swipeTitle": "Zum Antworten wischen",
   "whatsNew.r20261004.statusEmojiTitle": "Eigene Emojis im Status",
@@ -6825,5 +6827,9 @@
   "whatsNew.r202610202.priorityBody": "Rollen mit Prioritätssprecher können in einem Sprachkanal ihre Taste gedrückt halten, um über allen anderen gehört zu werden. Lege die Taste unter Einstellungen, Sprache & Video fest.",
   "whatsNew.r202610202.priorityTitle": "Prioritätssprecher",
   "whatsNew.r202610202.syncBody": "Ein Kanal, der in einer Kategorie erstellt oder dorthin verschoben wird, übernimmt ihre Rechte und folgt jeder Änderung. Die Rechte-Seite eines Kanals zeigt, ob er synchronisiert ist, mit „Jetzt synchronisieren“.",
-  "whatsNew.r202610202.syncTitle": "Kategorien synchronisieren ihre Rechte"
+  "whatsNew.r202610202.syncTitle": "Kategorien synchronisieren ihre Rechte",
+  "whatsNew.r202610203.botIdBody": "Mit aktiviertem Entwicklermodus liefert „ID für Bots kopieren“ die ID, die die Befehle einer App erwarten, damit du sie direkt einfügen kannst.",
+  "whatsNew.r202610203.botIdTitle": "IDs für Bots",
+  "whatsNew.r202610203.personMenuBody": "Klicke im Chat mit der rechten Maustaste auf das Bild oder den Namen einer Person, um ihr Menü zu öffnen, dasselbe wie in der Mitgliederliste.",
+  "whatsNew.r202610203.personMenuTitle": "Rechtsklick auf jede Person"
 }

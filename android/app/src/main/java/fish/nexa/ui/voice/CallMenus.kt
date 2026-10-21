@@ -1,5 +1,6 @@
 package fish.nexa.ui.voice
 
+import fish.nexa.ui.profile.copyBotIdItem
 import android.content.ClipData
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -244,7 +245,7 @@ fun voicePersonMenu(userId: String, channelId: String): List<MenuItem> {
     if (serverId == null) {
         val items = ArrayList<MenuItem>(listOf(profile.copy(separatorAfter = true)))
         items += volumeItems(userId)
-        if (Nexa.settings.developerMode) appendSection(items, listOf(MenuItem.Action(t("chat.groupMemberMenu.copyUserId")) { copy(userId) }))
+        if (Nexa.settings.developerMode) appendSection(items, listOf(MenuItem.Action(t("chat.groupMemberMenu.copyUserId")) { copy(userId) }, copyBotIdItem(userId)))
         return items
     }
     // the member's own menu, with the call's choices after who they are (after Mention)
@@ -307,6 +308,7 @@ internal fun tileMenu(t: Tile, channelId: String, state: CallState) {
     if (!guestTile && Nexa.settings.developerMode) {
         sep()
         items += MenuItem.Action(fish.nexa.ui.t("chat.groupMemberMenu.copyUserId")) { copy(t.userId) }
+        items += copyBotIdItem(t.userId)
     }
     if (items.isNotEmpty()) openMenu(items, title = callName(t.userId, channelId))
 }

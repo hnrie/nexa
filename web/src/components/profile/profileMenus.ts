@@ -1,6 +1,7 @@
 import type { PublicUser, Role } from "@/api/types";
 import { about, button, defineMenu } from "@/lib/contextMenus/registry";
 import { copyText } from "@/lib/clipboard";
+import { copyBotIdItem } from "@/lib/copyId";
 import { confirmRemoveFriend, openBlockDialog, unblockUser } from "@/lib/friendship";
 import { useRelationships } from "@/stores/relationships";
 import { t } from "@/i18n";
@@ -34,7 +35,10 @@ export const profileMoreMenu = defineMenu<ProfileMoreCtx>("profileMore", [
         : { id: "block", label: t("profile.profileCard.block"), danger: true, onSelect: () => openBlockDialog(user.id) },
     ),
   ],
-  [button("copyProfileUserId", ({ user }) => ({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void copyText(user.id, t("clipboard.idCopied")) }))],
+  [
+    button("copyProfileUserId", ({ user }) => ({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void copyText(user.id, t("clipboard.idCopied")) })),
+    button("copyProfileBotId", ({ user }) => copyBotIdItem(user.id)),
+  ],
 ]);
 about(profileMoreMenu, ["user"], ({ user }) => ({ userId: user.id }));
 

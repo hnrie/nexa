@@ -1,5 +1,6 @@
 package fish.nexa.ui.shell
 
+import fish.nexa.ui.profile.copyBotIdItem
 import fish.nexa.data.NexaInbox
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -253,7 +254,10 @@ fun dmMenu(ch: Channel, moves: List<MenuItem.Action> = emptyList(), select: Bool
         val last = items.removeAt(items.lastIndex) as MenuItem.Action
         items += last.copy(separatorAfter = true)
         val other = if (group) null else ch.recipientIds.firstOrNull { it != me?.id }
-        if (other != null) items += MenuItem.Action(t("chat.groupMemberMenu.copyUserId")) { copyWithToast(other, t("chat.groupMemberMenu.copied")) }
+        if (other != null) {
+            items += MenuItem.Action(t("chat.groupMemberMenu.copyUserId")) { copyWithToast(other, t("chat.groupMemberMenu.copied")) }
+            items += copyBotIdItem(other)
+        }
         items += MenuItem.Action(t("sidebar.dmMenu.copyChannelId")) { copyWithToast(ch.id, t("chat.groupMemberMenu.copied")) }
     }
     return items

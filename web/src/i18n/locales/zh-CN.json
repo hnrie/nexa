@@ -6268,6 +6268,8 @@
   "bugs.context.appAndroid": "Android 应用",
   "bugs.staff.finishedLocked": "此报告已标记为“{status}”，因此没有人可以在其中发言。重新打开它即可回复。",
   "captcha.finishTheOneOpen": "请先完成已打开的人机验证。",
+  "copyId.forBots": "复制机器人用 ID",
+  "copyId.forBotsCopied": "已复制机器人用 ID。",
   "whatsNew.r202610028.swipeBody": "在手机上将消息向左滑动，箭头亮起时松手即可回复。",
   "whatsNew.r202610028.swipeTitle": "滑动回复",
   "whatsNew.r20261004.statusEmojiTitle": "状态里的自定义表情",
@@ -6588,5 +6590,9 @@
   "whatsNew.r202610202.priorityBody": "拥有优先发言人权限的身份组在语音频道中按住按键，即可盖过其他人被听到。在设置的语音与视频中设置按键。",
   "whatsNew.r202610202.priorityTitle": "优先发言人",
   "whatsNew.r202610202.syncBody": "在类别中创建或移入类别的频道会采用其权限并跟随每次更改。频道的权限页面会显示是否已同步，并可用“立即同步”恢复。",
-  "whatsNew.r202610202.syncTitle": "类别会同步权限"
+  "whatsNew.r202610202.syncTitle": "类别会同步权限",
+  "whatsNew.r202610203.botIdBody": "开启开发者模式后，“复制机器人用 ID”会给出应用命令需要的 ID，可直接粘贴。",
+  "whatsNew.r202610203.botIdTitle": "机器人用 ID",
+  "whatsNew.r202610203.personMenuBody": "在聊天中右键点击某人的头像或名字，即可打开与成员列表相同的菜单。",
+  "whatsNew.r202610203.personMenuTitle": "右键点击任何人"
 }

@@ -6502,6 +6502,8 @@
   "bugs.context.appAndroid": "Android-appen",
   "bugs.staff.finishedLocked": "Rapporten är markerad som {status}, så ingen kan skriva i den. Öppna den igen för att svara.",
   "captcha.finishTheOneOpen": "Slutför först captchan som redan är öppen.",
+  "copyId.forBots": "Kopiera ID för botar",
+  "copyId.forBotsCopied": "ID för botar kopierat.",
   "whatsNew.r202610028.swipeBody": "På en telefon, svep ett meddelande åt vänster och släpp när pilen lyser för att svara på det.",
   "whatsNew.r202610028.swipeTitle": "Svep för att svara",
   "whatsNew.r20261004.statusEmojiTitle": "Egna emoji i din status",
@@ -6825,5 +6827,9 @@
   "whatsNew.r202610202.priorityBody": "Roller med Prioriterad talare kan hålla in sin tangent i en röstkanal för att höras över alla andra. Välj tangenten i Inställningar, Röst och video.",
   "whatsNew.r202610202.priorityTitle": "Prioriterad talare",
   "whatsNew.r202610202.syncBody": "En kanal som skapas i eller flyttas till en kategori tar dess behörigheter och följer varje ändring. Kanalens sida Behörigheter visar om den är synkad, med Synka nu för att synka igen.",
-  "whatsNew.r202610202.syncTitle": "Kategorier synkar sina behörigheter"
+  "whatsNew.r202610202.syncTitle": "Kategorier synkar sina behörigheter",
+  "whatsNew.r202610203.botIdBody": "Med utvecklarläget på ger Kopiera ID för botar det ID som en apps kommandon väntar sig, så att du kan klistra in det direkt.",
+  "whatsNew.r202610203.botIdTitle": "ID för botar",
+  "whatsNew.r202610203.personMenuBody": "Högerklicka på någons bild eller namn i en chatt för att öppna personens meny, samma som medlemslistan visar.",
+  "whatsNew.r202610203.personMenuTitle": "Högerklicka på vem som helst"
 }

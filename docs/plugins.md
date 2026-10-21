@@ -733,29 +733,29 @@ Message on someone else's message, for one).
 | --- | --- | --- | --- |
 | `activity` | A right click on the activity button: sharing activity and where it comes from | none | `shareActivity`, `richPresence`, `richPresencePrograms`, `discordActivityKinds`, `activitySettings` |
 | `bugStatus` | A bug report's status, in the staff panel | none | `setBugStatus` |
-| `callParticipant` | A person in a call's list of who is in it | `user`, `channel`, `server` | `viewParticipantProfile`, `viewParticipantMemberProfile`, `copyParticipantProfileLink`, `mentionParticipant`, `participantVolume`, `muteParticipant`, `resetParticipantVolume`, `serverMuteParticipant`, `serverDeafenParticipant`, `moveParticipant`, `disconnectParticipant`, `participantFriendship`, `blockParticipant`, `editParticipantNickname`, `editParticipantRoles`, `timeoutParticipant`, `kickParticipant`, `banParticipant`, `removeGuestParticipant`, `copyParticipantId` |
-| `callTile` | A person's tile in a call | `user`, `channel`, `server` | `viewTileProfile`, `stopSharingFromTile`, `watchStream`, `focusTile`, `fullScreenTile`, `streamVolume`, `muteStream`, `resetStreamVolume`, `tileVolume`, `muteTile`, `resetTileVolume`, `serverMuteTile`, `serverDeafenTile`, `moveTile`, `disconnectTile`, `timeoutTile`, `kickTile`, `banTile`, `removeGuestFromTile`, `copyTileUserId` |
+| `callParticipant` | A person in a call's list of who is in it | `user`, `channel`, `server` | `viewParticipantProfile`, `viewParticipantMemberProfile`, `copyParticipantProfileLink`, `mentionParticipant`, `participantVolume`, `muteParticipant`, `resetParticipantVolume`, `serverMuteParticipant`, `serverDeafenParticipant`, `moveParticipant`, `disconnectParticipant`, `participantFriendship`, `blockParticipant`, `editParticipantNickname`, `editParticipantRoles`, `timeoutParticipant`, `kickParticipant`, `banParticipant`, `removeGuestParticipant`, `copyParticipantId`, `copyParticipantBotId` |
+| `callTile` | A person's tile in a call | `user`, `channel`, `server` | `viewTileProfile`, `stopSharingFromTile`, `watchStream`, `focusTile`, `fullScreenTile`, `streamVolume`, `muteStream`, `resetStreamVolume`, `tileVolume`, `muteTile`, `resetTileVolume`, `serverMuteTile`, `serverDeafenTile`, `moveTile`, `disconnectTile`, `timeoutTile`, `kickTile`, `banTile`, `removeGuestFromTile`, `copyTileUserId`, `copyTileBotId` |
 | `camera` | The arrow beside the camera button in a call | none | `cameraDevices`, `videoSettings` |
 | `category` | A category in a server's channel list | `channel`, `server` | `collapseCategory`, `moveCategory`, `createChannelInCategory`, `editCategory`, `deleteCategory`, `copyCategoryId` |
 | `channel` | A channel in a server's channel list | `channel`, `server` | `openChannelInTab`, `markChannelRead`, `inviteToChannel`, `inviteGuestsToCall`, `copyChannelLink`, `muteChannel`, `moveChannel`, `editChannel`, `deleteChannel`, `copyChannelId` |
 | `chatMore` | The More button at the top of a conversation | `channel`, `server` | `joinThreadFromMore`, `closeThreadFromMore`, `lockThreadFromMore`, `threadSettingsFromMore`, `deleteThreadFromMore`, `pinnedMessages`, `threadList`, `followChannel`, `subchatList`, `inviteFromMore`, `toggleMemberList`, `inviteGuestsFromMore`, `reportBugFromMore` |
 | `composerPlus` | The plus button in the message box, when it offers a choice | none | `uploadFile`, `createPoll` |
 | `composerTools` | The tools button of the message box on a phone (formatting, preview, emoji) | none | `formattingEditor`, `messagePreview`, `emojiPicker` |
-| `dm` | A conversation in the direct messages list | `channel`, `user` | `openDmInTab`, `markDmRead`, `selectConversations`, `pinConversation`, `addConversationToGroup`, `removeConversationFromGroup`, `moveConversation`, `editGroup`, `inviteToGroup`, `addFriendsToGroup`, `viewDmProfile`, `copyDmProfileLink`, `startDmCall`, `muteConversation`, `closeConversation`, `deleteConversation`, `copyDmUserId`, `copyDmChannelId` |
+| `dm` | A conversation in the direct messages list | `channel`, `user` | `openDmInTab`, `markDmRead`, `selectConversations`, `pinConversation`, `addConversationToGroup`, `removeConversationFromGroup`, `moveConversation`, `editGroup`, `inviteToGroup`, `addFriendsToGroup`, `viewDmProfile`, `copyDmProfileLink`, `startDmCall`, `muteConversation`, `closeConversation`, `deleteConversation`, `copyDmUserId`, `copyDmUserBotId`, `copyDmChannelId` |
 | `dmBulk` | Several conversations picked in the direct messages list | none | `markConversationsRead`, `pinConversations`, `addConversationsToGroup`, `muteConversations`, `groupChatWithPeople`, `removeFriendsOfConversations`, `blockPeopleOfConversations`, `closeConversations` |
 | `dmGroup` | A group of conversations in the direct messages list | none | `markDmGroupRead`, `collapseDmGroup`, `renameDmGroup`, `pinDmGroup`, `moveDmGroup`, `deleteDmGroup` |
 | `dmList` | The empty space of the direct messages list | none | `selectConversationsInList` |
 | `favoriteGif` | A favourite GIF in the GIF picker | none | `sendFavoriteGif`, `unfavoriteGif` |
 | `folder` | A folder of servers in the server rail | none | `markFolderRead`, `folderSettings`, `pinFolder`, `moveFolder`, `deleteFolder` |
 | `forumView` | A forum's view options | none | `sortForumByActivity`, `sortForumByCreated`, `forumListLayout`, `forumGalleryLayout` |
-| `friend` | A person on the Friends page | `user` | `viewFriendProfile`, `messageFriend`, `callFriend`, `removeFriend`, `blockFriend`, `copyFriendProfileLink`, `copyFriendId`, `selectFriends` |
+| `friend` | A person on the Friends page | `user` | `viewFriendProfile`, `messageFriend`, `callFriend`, `removeFriend`, `blockFriend`, `copyFriendProfileLink`, `copyFriendId`, `copyFriendBotId`, `selectFriends` |
 | `friendsBulk` | Several people picked on the Friends page | none | `groupChatWithFriends`, `acceptFriendRequests`, `ignoreFriendRequests`, `cancelFriendRequests`, `unblockPeople`, `removeFriends`, `blockFriends` |
 | `gifResult` | A search result in the GIF picker | none | `sendGif`, `favoriteGif` |
-| `groupMember` | A person in a group conversation's member list | `user`, `channel` | `viewGroupMemberProfile`, `copyGroupMemberProfileLink`, `mentionGroupMember`, `messageGroupMember`, `groupMemberFriendship`, `blockGroupMember`, `transferGroupOwnership`, `removeGroupMember`, `leaveGroupFromMembers`, `groupMemberApps`, `copyGroupMemberId`, `selectGroupMembers` |
+| `groupMember` | A person in a group conversation's member list | `user`, `channel` | `viewGroupMemberProfile`, `copyGroupMemberProfileLink`, `mentionGroupMember`, `messageGroupMember`, `groupMemberFriendship`, `blockGroupMember`, `transferGroupOwnership`, `removeGroupMember`, `leaveGroupFromMembers`, `groupMemberApps`, `copyGroupMemberId`, `copyGroupMemberBotId`, `selectGroupMembers` |
 | `groupMemberBulk` | Several people picked in a group conversation's member list | none | `removeGroupMembers`, `blockGroupMembers` |
 | `image` | A picture opened full size | none | `copyImage`, `saveImage` |
 | `invitePause` | Pausing invites, in Server Settings | none | `pauseInvites` |
-| `member` | A person in a server's member list, or their name in a server | `user`, `server` | `viewMemberProfile`, `copyMemberProfileLink`, `mentionMember`, `memberFriendship`, `blockMember`, `editMemberNickname`, `editMemberRoles`, `timeoutMember`, `kickMember`, `banMember`, `memberApps`, `copyMemberId`, `selectMembers` |
+| `member` | A person in a server's member list, or their name in a server | `user`, `server` | `viewMemberProfile`, `copyMemberProfileLink`, `mentionMember`, `memberFriendship`, `blockMember`, `editMemberNickname`, `editMemberRoles`, `timeoutMember`, `kickMember`, `banMember`, `memberApps`, `copyMemberId`, `copyMemberBotId`, `selectMembers` |
 | `memberAgeFilter` | The account age filter of Server Settings, Members | none | `memberAgeFilter` |
 | `memberBulk` | Several people picked in a server's member list | none | `addRoleToMembers`, `removeRoleFromMembers`, `kickMembers`, `banMembers`, `blockMembers` |
 | `memberJoinFilter` | The join method filter of Server Settings, Members | none | `memberJoinMethodFilter`, `memberInviteFilter` |
@@ -772,7 +772,7 @@ Message on someone else's message, for one).
 | `noteMemberRole` | What a person may do in a shared note | none | `noteMemberCanEdit`, `noteMemberCanView`, `removeNoteMember` |
 | `page` | Selected text or a link anywhere else in the app | none | `copySelection`, `openLink`, `copyLink` |
 | `profileAddRole` | The add role button on a person's profile in a server | none | `addProfileRole` |
-| `profileMore` | The More button on a person's profile | `user` | `viewFullProfile`, `copyProfileCardLink`, `editFriendNickname`, `removeFriendFromProfile`, `blockFromProfile`, `copyProfileUserId` |
+| `profileMore` | The More button on a person's profile | `user` | `viewFullProfile`, `copyProfileCardLink`, `editFriendNickname`, `removeFriendFromProfile`, `blockFromProfile`, `copyProfileUserId`, `copyProfileBotId` |
 | `roleOrder` | Moving a role, in Server Settings, Roles | none | `moveRole` |
 | `searchSort` | The sort order of search results | none | `searchSortOrder` |
 | `server` | A server in the server rail | `server` | `markServerRead`, `pinServer`, `addServerToFolder`, `removeServerFromFolder`, `moveServer`, `selectServers`, `inviteToServer`, `serverSettings`, `createChannel`, `createCategory`, `muteServer`, `serverNotifications`, `editServerProfile`, `wearServerTag`, `leaveServer`, `copyServerId` |
@@ -787,7 +787,7 @@ Message on someone else's message, for one).
 | `threadLine` | A line of a case thread or bug report | none | `copyThreadLine` |
 | `threadTools` | The tools button of a case thread's or bug report's box on a phone | none | `threadFormattingEditor`, `threadEmojiPicker` |
 | `typingSlot` | One of the pictures of your typing style, in Settings | none | `pickTypingEmoji`, `useTypingPicture`, `removeTypingItem` |
-| `userGrid` | A person in the staff panel's list of accounts | `user` | `viewModUserProfile`, `copyModUserId`, `toggleStaffAdmin`, `toggleAccountDisabled` |
+| `userGrid` | A person in the staff panel's list of accounts | `user` | `viewModUserProfile`, `copyModUserId`, `copyModUserBotId`, `toggleStaffAdmin`, `toggleAccountDisabled` |
 | `videoMore` | The More button of a video player | none | `playbackSpeed`, `pictureInPicture`, `downloadVideo` |
 
 <!-- menus:end -->

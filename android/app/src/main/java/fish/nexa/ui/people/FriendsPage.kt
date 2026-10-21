@@ -1,5 +1,6 @@
 package fish.nexa.ui.people
 
+import fish.nexa.ui.profile.copyBotIdItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -403,7 +404,8 @@ private fun FriendRow(rel: Relationship, picking: Boolean) {
         items += if (rel.type != "blocked") MenuItem.Action(t("profile.profileCard.block"), danger = true) { openBlockDialog(user.id) }
         else MenuItem.Action(t("friends.unblock")) { Nexa.scope.launch { People.unblock(user.id) } }
         items += MenuItem.Action(t("profileLink.copy")) { ProfileLinks.copy(user.username) }
-        items += MenuItem.Action(t("chat.groupMemberMenu.copyUserId"), separatorAfter = true) { copyWithToast(user.id, t("friends.userIdCopied")) }
+        items += MenuItem.Action(t("chat.groupMemberMenu.copyUserId")) { copyWithToast(user.id, t("friends.userIdCopied")) }
+        items += copyBotIdItem(user.id, separatorAfter = true)
         items += MenuItem.Action(t("pick.select")) { Pick.start("friends", user.id) }
         openMenu(items)
     }

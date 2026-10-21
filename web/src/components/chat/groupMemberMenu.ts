@@ -16,6 +16,7 @@ import { relationshipButtons } from "@/lib/friendship";
 
 import { t } from "@/i18n";
 import { profileLinkItem } from "@/lib/profileLinks";
+import { copyBotIdItem } from "@/lib/copyId";
 export interface GroupMemberMenuCtx {
   nav: (path: string) => void;
   openModal: (kind: string, props?: Record<string, unknown>) => void;
@@ -43,7 +44,8 @@ export interface GroupMemberMenuRowCtx extends GroupMemberMenuCtx {
 function about(channelId: string, userId: string) {
   const ch = useChannels.getState().byId[channelId];
   const me = useAuth.getState().me;
-  if (!ch || ch.type !== "group_dm" || !me) return null;
+  // a one-to-one conversation has the same person menu, without the group's choices
+  if (!ch || (ch.type !== "group_dm" && ch.type !== "dm") || !me) return null;
   const users = useUsers.getState().byId;
   const nicknames = friendNicknames(useRelationships.getState().byUser);
   const self = userId === me.id;
@@ -61,10 +63,11 @@ function about(channelId: string, userId: string) {
 }
 
 /**
- * Context menu for someone in a group's member list: profile, mention and
- * message for everyone, and for whoever manages the group (its owner or an
- * Nexa admin) handing ownership on and removing people. The owner
- * outranks a Nexa admin, so is never offered for removal.
+ * Context menu for someone in a group's member list, or shown in a group or
+ * one-to-one conversation (personMenu): profile, mention and message for
+ * everyone, and for whoever manages the group (its owner or an Nexa admin)
+ * handing ownership on and removing people. The owner outranks a Nexa
+ * admin, so is never offered for removal.
  */
 export const groupMemberMenu = defineMenu<GroupMemberMenuRowCtx>("groupMember", [
   [
@@ -121,7 +124,7 @@ export const groupMemberMenu = defineMenu<GroupMemberMenuRowCtx>("groupMember", 
     }),
     button("leaveGroupFromMembers", ({ channelId, userId, nav, openModal }) => {
       const a = about(channelId, userId);
-      if (!a?.self) return null;
+      if (!a?.self || a.ch.type !== "group_dm") return null;
       return {
         id: "leave",
         label: t("chat.groupMemberMenu.leaveGroup"),
@@ -139,7 +142,10 @@ export const groupMemberMenu = defineMenu<GroupMemberMenuRowCtx>("groupMember", 
   ],
   // what apps can do with someone, used in this group
   [button("groupMemberApps", ({ channelId, userId }) => !!about(channelId, userId) && userAppsItem(channelId, userId))],
-  [button("copyGroupMemberId", ({ channelId, userId }) => !!about(channelId, userId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void copyText(userId, t("clipboard.idCopied")) })],
+  [
+    button("copyGroupMemberId", ({ channelId, userId }) => !!about(channelId, userId) && useSettings.getState().settings.developerMode && { id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void copyText(userId, t("clipboard.idCopied")) }),
+    button("copyGroupMemberBotId", ({ channelId, userId }) => !!about(channelId, userId) && useSettings.getState().settings.developerMode && copyBotIdItem(userId)),
+  ],
   [button("selectGroupMembers", ({ channelId, userId, select }) => !!select && !!about(channelId, userId) && { id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start(select, userId) })],
 ]);
 menuAbout(groupMemberMenu, ["user", "channel"], ({ channelId, userId }) => ({ channelId, userId }));

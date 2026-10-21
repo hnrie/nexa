@@ -1,7 +1,7 @@
 import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import type { Channel } from "@/api/types";
-import { copyIdItem, developerMode } from "@/lib/copyId";
+import { copyBotIdItem, copyIdItem, developerMode } from "@/lib/copyId";
 import { about, button, defineMenu } from "@/lib/contextMenus/registry";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
@@ -195,6 +195,11 @@ export const dmMenu = defineMenu<DMMenuRowCtx>("dm", [
       const ch = dmOf(channelId);
       const other = ch && developerMode() && otherIn(ch);
       return other ? copyIdItem("copy-user", t("chat.groupMemberMenu.copyUserId"), other) : null;
+    }),
+    button("copyDmUserBotId", ({ channelId }) => {
+      const ch = dmOf(channelId);
+      const other = ch && developerMode() && otherIn(ch);
+      return other ? copyBotIdItem(other) : null;
     }),
     button("copyDmChannelId", ({ channelId }) => !!dmOf(channelId) && developerMode() && copyIdItem("copy", t("sidebar.dmMenu.copyChannelId"), channelId)),
   ],

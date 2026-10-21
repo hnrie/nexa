@@ -8,7 +8,7 @@ import { P } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
 import { canI, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
-import { copyIdItem, developerMode } from "@/lib/copyId";
+import { copyBotIdItem, copyIdItem, developerMode } from "@/lib/copyId";
 import { useVoice } from "@/stores/voice";
 import { setStreamLocalMute, setStreamVolume, setUserLocalMute, setUserVolume } from "@/voice/session";
 import { inAsGuest, voiceModerationButtons } from "./voiceModeration";
@@ -96,6 +96,10 @@ export const callParticipantMenu = defineMenu<CallParticipantCtx>("callParticipa
   [button("copyParticipantId", (c) => {
     const p = participant(c);
     return !p.self && !p.guest && developerMode() && copyIdItem("copy", t("chat.groupMemberMenu.copyUserId"), p.userId);
+  }),
+  button("copyParticipantBotId", (c) => {
+    const p = participant(c);
+    return !p.self && !p.guest && developerMode() && copyBotIdItem(p.userId);
   })],
 ]);
 about(callParticipantMenu, ["user", "channel", "server"], ({ serverId, channelId, vs }) => ({ serverId, channelId, userId: vs.user_id }));
@@ -156,7 +160,10 @@ export const callTileMenu = defineMenu<CallTileCtx>("callTile", [
   voiceModerationButtons<CallTileCtx>({ mute: "serverMuteTile", deafen: "serverDeafenTile", move: "moveTile", disconnect: "disconnectTile" }, (c) => (moderates(c) && c.serverId && c.voiceState ? { serverId: c.serverId, channelId: c.channelId, vs: c.voiceState } : null)),
   memberModerationButtons<CallTileCtx>({ timeout: "timeoutTile", kick: "kickTile", ban: "banTile" }, (c) => (moderates(c) && !c.guestTile && c.serverId ? { serverId: c.serverId, userId: c.userId, openModal: c.openModal } : null)),
   [button("removeGuestFromTile", (c) => inCall(c) && c.guestTile && c.canRemoveGuest && c.kind !== "screen" && { id: "remove-guest", label: t("voice.voiceParticipants.removeFromCall"), danger: true, onSelect: c.removeGuest })],
-  [button("copyTileUserId", (c) => inCall(c) && !c.viewerIsGuest && !c.guestTile && developerMode() && copyIdItem("copy-user", t("chat.groupMemberMenu.copyUserId"), c.userId))],
+  [
+    button("copyTileUserId", (c) => inCall(c) && !c.viewerIsGuest && !c.guestTile && developerMode() && copyIdItem("copy-user", t("chat.groupMemberMenu.copyUserId"), c.userId)),
+    button("copyTileBotId", (c) => inCall(c) && !c.viewerIsGuest && !c.guestTile && developerMode() && copyBotIdItem(c.userId)),
+  ],
 ]);
 about(callTileMenu, ["user", "channel", "server"], ({ serverId, channelId, userId }) => ({ serverId, channelId, userId }));
 

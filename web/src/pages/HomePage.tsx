@@ -41,10 +41,11 @@ import s from "./Home.module.css";
  * on this page cannot drift from the truth unnoticed, as "264 KB" had. (It
  * was 208 kB when this was first set at 300, and 500 had stopped saying much;
  * it was 321 kB when it became 330, about half of it the English strings,
- * 330.3 kB when it became 335, 337 kB when it became 340, and 342.4 kB when
- * it became 345, with apps' strings.)
+ * 330.3 kB when it became 335, 337 kB when it became 340, 342.4 kB when
+ * it became 345, with apps' strings, and 345.1 kB when it became 350, with
+ * the person menu in conversations.)
  */
-export const LOAD_KB_LIMIT = 345;
+export const LOAD_KB_LIMIT = 350;
 
 /** Whether this visitor has asked for less movement, by either route. */
 function useStillness(): boolean {

@@ -1,3 +1,4 @@
+import { copyBotIdItem } from "@/lib/copyId";
 import { Ban, CalendarDays, Check, Clock, Crown, Ellipsis, FolderOpen, Gavel, ListChecks, MessageSquareOff, Search, ShieldCheck, UserRoundCheck, UserRoundX, Users, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -33,6 +34,7 @@ const userGridMenu = defineMenu<UserGridMenuCtx>("userGrid", [
   [
     button("viewModUserProfile", ({ user, openModal }) => ({ id: "profile", label: t("moderation.menu.profile"), onSelect: () => openModal("profile", { userId: user.id }) })),
     button("copyModUserId", ({ user }) => ({ id: "copy", label: t("moderation.menu.copyId"), onSelect: () => copyAndSay(user.id, t("moderation.copied")) })),
+    button("copyModUserBotId", ({ user }) => copyBotIdItem(user.id)),
   ],
   [
     button("toggleStaffAdmin", ({ user: u, owner, openModal, setAccess }) => {

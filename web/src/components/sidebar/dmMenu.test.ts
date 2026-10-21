@@ -74,15 +74,17 @@ describe("the developer-mode items on a conversation", () => {
 
   it("offers the person first in a one-to-one conversation, then the conversation", () => {
     useSettings.setState((st) => ({ settings: { ...st.settings, developerMode: true } }));
-    expect(ids("10").slice(-2)).toEqual(["copy-user", "copy"]);
+    expect(ids("10").slice(-3)).toEqual(["copy-user", "copy-bot", "copy"]);
     // a group is a conversation, not a person
     expect(ids("30")).not.toContain("copy-user");
+    expect(ids("30")).not.toContain("copy-bot");
     expect(ids("30").at(-1)).toBe("copy");
   });
 
   it("offers no IDs with developer mode off", () => {
     useSettings.setState((st) => ({ settings: { ...st.settings, developerMode: false } }));
     expect(ids("10")).not.toContain("copy-user");
+    expect(ids("10")).not.toContain("copy-bot");
     expect(ids("10")).not.toContain("copy");
   });
 });

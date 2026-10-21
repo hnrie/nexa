@@ -95,3 +95,21 @@ describe("groupMemberMenuItems", () => {
     expect(api.removeRecipient).toHaveBeenCalledWith("g", "bob");
   });
 });
+
+describe("groupMemberMenu in a one-to-one conversation", () => {
+  const dm = { id: "d", type: "dm", parent_id: null, recipient_ids: ["me", "bob"] } as unknown as Channel;
+  const dmIds = (userId: string) => groupMemberMenu.items({ channelId: "d", userId, nav: vi.fn(), openModal: vi.fn() }).map((i) => i.id);
+
+  beforeEach(() => {
+    useChannels.setState({ byId: { d: dm } });
+    useRelationships.setState({ byUser: {} });
+    useUsers.setState({ byId: { bob: { id: "bob", username: "bob", display_name: "Bob", flags: 0 } as PublicUser } });
+  });
+
+  it("offers the person's choices and none of a group's", () => {
+    signIn(ADMIN);
+    expect(dmIds("bob")).toEqual(["profile", "copy-profile-link", "mention", "message", "add-friend", "block"]);
+    // there is no group to leave, hand on or remove anyone from
+    expect(dmIds("me")).toEqual(["profile", "mention"]);
+  });
+});

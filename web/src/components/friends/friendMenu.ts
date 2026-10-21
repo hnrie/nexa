@@ -1,3 +1,4 @@
+import { copyBotIdItem } from "@/lib/copyId";
 import type { Relationship } from "@/api/types";
 import { about, button, defineMenu } from "@/lib/contextMenus/registry";
 import { copyAndSay } from "@/lib/copyText";
@@ -30,6 +31,7 @@ export const friendMenu = defineMenu<FriendMenuCtx>("friend", [
     ),
     button("copyFriendProfileLink", ({ rel }) => ({ id: "copy-profile-link", label: t("profileLink.copy"), onSelect: () => copyProfileLink(rel.user.username) })),
     button("copyFriendId", ({ rel }) => ({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => copyAndSay(rel.user.id, t("friends.userIdCopied")) })),
+    button("copyFriendBotId", ({ rel }) => copyBotIdItem(rel.user.id)),
   ],
   // the way into picking on a touch screen, where there is no Ctrl to hold
   [button("selectFriends", ({ rel }) => ({ id: "select", label: t("pick.select"), onSelect: () => usePick.getState().start("friends", rel.user.id) }))],

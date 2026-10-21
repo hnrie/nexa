@@ -1,5 +1,6 @@
 package fish.nexa.ui.chat
 
+import fish.nexa.ui.profile.copyBotIdItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -386,6 +387,7 @@ fun memberMenuItems(serverId: String, userId: String): List<MenuItem.Action> {
     if (Nexa.settings.developerMode) {
         items[items.lastIndex] = items.last().copy(separatorAfter = true)
         items += MenuItem.Action(t("chat.groupMemberMenu.copyUserId")) { copyWithToast(userId, t("clipboard.idCopied")) }
+        items += copyBotIdItem(userId)
     }
     return items
 }
@@ -573,7 +575,8 @@ private fun messageUser(userId: String) {
 fun groupMemberMenuItems(channelId: String, userId: String): List<MenuItem.Action> {
     val ch = Nexa.channels.get(channelId) ?: return emptyList()
     val me = Nexa.users.me.value ?: return emptyList()
-    if (ch.type != "group_dm") return emptyList()
+    // a one-to-one conversation has the same person menu, without the group's choices
+    if (ch.type != "group_dm" && ch.type != "dm") return emptyList()
     fun nameOf(id: String) = Nexa.relationships.nickname(id) ?: Nexa.users.get(id)?.let { Names.display(it) }
     val self = userId == me.id
     val user = Nexa.users.get(userId)
@@ -618,7 +621,7 @@ fun groupMemberMenuItems(channelId: String, userId: String): List<MenuItem.Actio
             }
         }
     }
-    if (self) {
+    if (self && ch.type == "group_dm") {
         items += MenuItem.Action(t("chat.groupMemberMenu.leaveGroup"), danger = true) {
             confirm(
                 t("sidebar.dmMenu.leaveNamed", "name" to group),
@@ -630,8 +633,32 @@ fun groupMemberMenuItems(channelId: String, userId: String): List<MenuItem.Actio
     if (Nexa.settings.developerMode) {
         items[items.lastIndex] = items.last().copy(separatorAfter = true)
         items += MenuItem.Action(t("chat.groupMemberMenu.copyUserId")) { copyWithToast(userId, t("clipboard.idCopied")) }
+        items += copyBotIdItem(userId)
     }
     return items
+}
+
+/**
+ * components/chat/personMenu.ts: the menu for someone shown in a conversation
+ * (a long press on a message's picture or name, or the name a reply quotes),
+ * the one the member list there opens. False, and nothing opened, where there
+ * is none or it has nothing to offer.
+ */
+fun openPersonMenu(channelId: String, userId: String): Boolean {
+    val ch = Nexa.channels.get(channelId) ?: return false
+    val sid = ch.serverId
+    val items = ArrayList<MenuItem>(
+        when {
+            sid != null -> memberMenuItems(sid, userId)
+            ch.type == "group_dm" || ch.type == "dm" -> groupMemberMenuItems(channelId, userId)
+            else -> emptyList()
+        },
+    )
+    if (items.isEmpty()) return false
+    // what apps can do with someone, used in this conversation
+    fish.nexa.ui.apps.withApps(items, fish.nexa.ui.apps.userAppsItem(channelId, userId))
+    openMenu(items, Names.member(sid, userId))
+    return true
 }
 
 private fun openGroupMemberMenu(channelId: String, userId: String, name: String, list: String) {

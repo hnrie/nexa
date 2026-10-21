@@ -16,6 +16,8 @@ import { nameClass, nameStyle } from "@/lib/roleLook";
 import { RoleIcon } from "@/components/common/RoleIcon";
 import { useChannels } from "@/stores/channels";
 import { openProfilePopout } from "@/stores/profilePopout";
+import { useNavigate } from "react-router-dom";
+import { openPersonMenu } from "./personMenu";
 import { useRelationships } from "@/stores/relationships";
 import { ingestReferences, requestReplyTarget, retryReplyTarget, usedReplyTarget, useReplyTargets } from "@/stores/replyTargets";
 import { mentionsMe } from "@/lib/mentionsMe";
@@ -94,6 +96,8 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   const shownName = useShownName(msg.channel_id, byHook ? undefined : target?.author_id);
   const name = byHook ? target!.hook!.name : shownName;
   const setJumpTo = useUI((u) => u.setJumpTo);
+  const openModal = useUI((u) => u.openModal);
+  const nav = useNavigate();
   const ctx = useRowRenderCtx();
   // what someone blocked wrote is not quoted back, even over a reply to it
   const targetBlocked = useRelationships((r) => (target ? r.byUser[target.author_id]?.type === "blocked" : false));
@@ -157,6 +161,12 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
           if (byHook) jump();
           else openProfilePopout(target.author_id, e.currentTarget, useChannels.getState().byId[msg.channel_id]?.server_id ?? undefined);
         }}
+        onContextMenu={(e) => {
+          // the person a reply quotes has the same menu as the one who wrote it
+          if (byHook || !openPersonMenu(e, target.author_id, msg.channel_id, nav, openModal)) return;
+          e.preventDefault();
+          e.stopPropagation();
+        }}
       >
         {name}
       </button>
@@ -214,6 +224,8 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const active = useRowActive(msg.id);
   const uid = useId();
   const selecting = useSelection((x) => x.channelId === msg.channel_id);
+  const nav = useNavigate();
+  const openModal = useUI((u) => u.openModal);
   const picked = useSelection((x) => x.channelId === msg.channel_id && !!x.picked[msg.id]);
   const pickable = selecting && !pending && canPick(msg);
 
@@ -280,6 +292,15 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
     }
     openProfilePopout(msg.author_id, e.currentTarget, serverId ?? undefined);
   };
+  // A right click on the picture or the name is about the person, as in the
+  // member list; anything else on the row, and anyone who is not a person
+  // here (a webhook, a published copy), gets the message's menu.
+  const personMenu = (e: React.MouseEvent<HTMLElement>) => {
+    if (copy || webhookHook || pending || ephemeral || selecting) return;
+    if (!openPersonMenu(e, msg.author_id, msg.channel_id, nav, openModal)) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
   // A row reads as who, when and what, whether or not it shows the name: a
   // message grouped under the one before still says who wrote it.
   const whoId = `${uid}who`;
@@ -337,11 +358,11 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       {showHeader ? (
         <>
           {/* the same way to the profile as the name beside it, for a pointer only: one stop for the keyboard is enough */}
-          <button type="button" className={s.avatar} data-group-start={showHeader} data-avatar="" onClick={profile} tabIndex={-1} aria-hidden="true">
+          <button type="button" className={s.avatar} data-group-start={showHeader} data-avatar="" onClick={profile} onContextMenu={personMenu} tabIndex={-1} aria-hidden="true">
             {copy ? <Avatar id={copy.server_id} avatarId={copy.server_icon_id} name={copy.server_name} size={40} kind="icon" /> : hook && msg.webhook_id ? <HookAvatar hook={hook} webhookId={msg.webhook_id} /> : <Avatar id={msg.author_id} avatarId={avatarId} name={name} size={40} />}
           </button>
           <div className={s.headerRow} id={whoId}>
-            <button type="button" className={[s.author, copy ? "" : nameClass(look)].join(" ")} data-author={msg.author_id} data-webhook={msg.webhook_id} style={copy ? undefined : nameStyle(look)} onClick={profile} dir="auto" aria-haspopup={webhookHook ? "dialog" : undefined}>{name}</button>
+            <button type="button" className={[s.author, copy ? "" : nameClass(look)].join(" ")} data-author={msg.author_id} data-webhook={msg.webhook_id} style={copy ? undefined : nameStyle(look)} onClick={profile} onContextMenu={personMenu} dir="auto" aria-haspopup={webhookHook ? "dialog" : undefined}>{name}</button>
             {look?.icon && !copy && !webhookHook ? <RoleIcon icon={look.icon} size={18} /> : null}
             {copy ? (
               <span className={s.followTag} title={t("follows.tagHint")}>

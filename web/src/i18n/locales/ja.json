@@ -6268,6 +6268,8 @@
   "bugs.context.appAndroid": "Android アプリ",
   "bugs.staff.finishedLocked": "このレポートは「{status}」になっているため、誰も書き込めません。返信するには再び開いてください。",
   "captcha.finishTheOneOpen": "先に表示中のキャプチャを完了してください。",
+  "copyId.forBots": "ボット用IDをコピー",
+  "copyId.forBotsCopied": "ボット用IDをコピーしました。",
   "whatsNew.r202610028.swipeBody": "スマートフォンでメッセージを左にスワイプし、矢印が光ったら指を離すと返信できます。",
   "whatsNew.r202610028.swipeTitle": "スワイプで返信",
   "whatsNew.r20261004.statusEmojiTitle": "ステータスにカスタム絵文字",
@@ -6588,5 +6590,9 @@
   "whatsNew.r202610202.priorityBody": "優先スピーカー権限のあるロールは、ボイスチャンネルでキーを押している間ほかの人より聞こえやすくなります。キーは設定の音声・ビデオで選べます。",
   "whatsNew.r202610202.priorityTitle": "優先スピーカー",
   "whatsNew.r202610202.syncBody": "カテゴリー内に作成・移動したチャンネルはその権限を引き継ぎ、変更にも従います。チャンネルの権限ページで同期状態を確認でき、「今すぐ同期」で戻せます。",
-  "whatsNew.r202610202.syncTitle": "カテゴリーが権限を同期"
+  "whatsNew.r202610202.syncTitle": "カテゴリーが権限を同期",
+  "whatsNew.r202610203.botIdBody": "開発者モードがオンなら、「ボット用IDをコピー」でアプリのコマンドが求めるIDをそのまま貼り付けられます。",
+  "whatsNew.r202610203.botIdTitle": "ボット用ID",
+  "whatsNew.r202610203.personMenuBody": "チャットで相手の画像や名前を右クリックすると、メンバーリストと同じメニューが開きます。",
+  "whatsNew.r202610203.personMenuTitle": "誰でも右クリック"
 }

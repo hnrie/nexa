@@ -6614,6 +6614,8 @@
   "bugs.context.appAndroid": "Application Android",
   "bugs.staff.finishedLocked": "Ce signalement est marqué « {status} », personne ne peut donc y écrire. Rouvre-le pour répondre.",
   "captcha.finishTheOneOpen": "Terminez d'abord le captcha déjà ouvert.",
+  "copyId.forBots": "Copier l’ID pour les bots",
+  "copyId.forBotsCopied": "ID pour les bots copié.",
   "whatsNew.r202610028.swipeBody": "Sur téléphone, faites glisser un message vers la gauche et relâchez quand la flèche s'allume pour y répondre.",
   "whatsNew.r202610028.swipeTitle": "Glisser pour répondre",
   "whatsNew.r20261004.statusEmojiTitle": "Emojis personnalisés dans ton statut",
@@ -6938,5 +6940,9 @@
   "whatsNew.r202610202.priorityBody": "Les rôles avec Orateur prioritaire peuvent maintenir leur touche dans un salon vocal pour être entendus par-dessus les autres. Choisis la touche dans Paramètres, Voix et vidéo.",
   "whatsNew.r202610202.priorityTitle": "Orateur prioritaire",
   "whatsNew.r202610202.syncBody": "Un salon créé dans une catégorie ou déplacé dedans prend ses permissions et suit chaque changement. La page Permissions d'un salon indique s'il est synchronisé, avec Synchroniser pour le remettre en phase.",
-  "whatsNew.r202610202.syncTitle": "Les catégories synchronisent leurs permissions"
+  "whatsNew.r202610202.syncTitle": "Les catégories synchronisent leurs permissions",
+  "whatsNew.r202610203.botIdBody": "Avec le mode développeur activé, Copier l’ID pour les bots donne l’ID qu’attendent les commandes d’une app, à coller tel quel.",
+  "whatsNew.r202610203.botIdTitle": "ID pour les bots",
+  "whatsNew.r202610203.personMenuBody": "Faites un clic droit sur la photo ou le nom de quelqu’un dans une discussion pour ouvrir son menu, le même que dans la liste des membres.",
+  "whatsNew.r202610203.personMenuTitle": "Clic droit sur n’importe qui"
 }
