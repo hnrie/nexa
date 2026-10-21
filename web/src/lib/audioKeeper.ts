@@ -4,12 +4,21 @@
  * home-screen app until the phone restarts (Safari itself keeps working), and
  * an AudioContext keeps audio running even while it plays nothing. So there a
  * context is stopped whenever nothing needs it and started again for the next
- * sound. Everywhere else a context stays up once started, as it always has.
+ * sound. The desktop app does the same: a context left running with nothing
+ * to play kept its audio service waking near 200 times a second, minimised or
+ * not, and the app resumes one without waiting for a gesture. Everywhere else
+ * a context stays up once started, as it always has.
  */
+import { desktopBridge } from "./desktopBridge";
 
 /** Whether this page runs as an iPhone or iPad home-screen app. */
 export function isHomeScreenApp(): boolean {
   return typeof navigator !== "undefined" && (navigator as Navigator & { standalone?: boolean }).standalone === true;
+}
+
+/** Whether a context is stopped once nothing needs it: in a home-screen app and in the desktop app. */
+export function restsWhenIdle(): boolean {
+  return isHomeScreenApp() || desktopBridge() !== null;
 }
 
 /** Starts and stops one AudioContext as it is needed. */
@@ -70,9 +79,9 @@ export class AudioKeeper {
     if (this.ac.state !== "suspended") void this.stop();
   }
 
-  /** In a home-screen app, releases the context after `after` ms if `idle()` still says nothing needs it then. */
+  /** Where contexts rest when idle, releases the context after `after` ms if `idle()` still says nothing needs it then. */
   releaseLater(idle: () => boolean, after: number): void {
-    if (!isHomeScreenApp()) return;
+    if (!restsWhenIdle()) return;
     this.cancel();
     this.timer = setTimeout(() => {
       this.timer = null;

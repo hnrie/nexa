@@ -202,7 +202,8 @@ function gateOpen(): boolean {
   if (pushToTalkOn()) return true;
   // The gate is worked by a timer, which a hidden page has throttled or
   // frozen; it stays open there rather than cut the speaker off mid-sentence.
-  if (typeof document !== "undefined" && document.visibilityState === "hidden") return true;
+  // The desktop app keeps a call at full speed while it is hidden.
+  if (typeof document !== "undefined" && document.visibilityState === "hidden" && !desktopBridge()) return true;
   return s.vadOpen;
 }
 

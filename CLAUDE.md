@@ -255,7 +255,11 @@ its discord.py bot running, for the Android emulator), `tools/discord_e2e.py` (D
 (calls over bad networks made by `tools/netsim`), `tools/share_quality.py` (a screen share of hard
 motion through Cloudflare, timed frame by frame as the viewer sees it; the sharer is Chromium,
 Firefox or the desktop app's Electron in a hidden window, `--up-kbps`, `--loss` and `--down-loss`
-shape the links through netsim, results in `tools/out/share-quality`). Whatever a test starts must
+shape the links through netsim, results in `tools/out/share-quality`). `tools/desktop_idle.py` runs the desktop app's own build (its windows on screen, muted, no tray icon,
+no system-wide keys, Rich Presence off, its own profile) against its own throwaway chatd and checks
+that it sleeps when hidden, stays at full speed in a call, still notifies and sounds, and sleeps when
+launched into the tray; with it, two headless Chromium pages make a call (`--long 330` adds Chromium's
+deeper throttling after five minutes). Whatever a test starts must
 make no sound: Playwright's headless Chromium is muted, Electron and Firefox are muted by the
 scripts, and the emulator runs with `-no-audio`.
 
@@ -1005,6 +1009,25 @@ already have installed (anything new is optional and checked before use). `build
 esbuild, `electron-builder.yml` packs (`sign-mac.cjs` signs Mac builds ad hoc), and
 `tools/mac_package.py` and `tools/publish_desktop.py` finish a release.
 
+Out of sight the app costs next to nothing (measured with `tools/desktop_idle.py`). From 1.2.5 the
+window is made with background throttling on, as a browser tab is: minimised, in the tray or
+covered, the page stops drawing and its timers slow down (the gateway's heartbeat runs from a worker,
+so messages and notifications keep coming). A window made with it off is never hidden, whatever is set
+later, so it is on from the start. A call keeps the page at full speed (`applyThrottling` in
+`index.ts`, from the page's `setCallActive`), since its voice gate and share sizing run on timers;
+throttling turned back on while the window is out of sight would leave the page awake, so it waits
+for the window to be shown again, and a navigation resets the call (the new page says again). A
+launch into the tray (`--hidden` with Start Minimized) shows the window for a moment, transparent and
+without focus, until the page has been hidden once (`putToSleep` in `window.ts`; not on Linux, which
+cannot make a window transparent), since a page whose window was never shown counts as seen. The web
+does its part where the desktop app runs it: idle audio rests (`restsWhenIdle` in
+`lib/audioKeeper.ts`, an AudioContext left running kept the audio service waking about 200 times a
+second), a call's video is not pulled while the window is minimised or in the tray
+(`voice/videoShown.ts` reads the window state), the voice gate does not open just because the page
+is hidden (`gateOpen` in `voice/engine.ts`), and only a call listens for `devicechange`
+(`voice/session.ts`), which would start the browser's audio and camera services (near 90 MB).
+Apps before 1.2.5 keep every page at full speed.
+
 ## Android app (`android/`)
 
 Native Kotlin and Jetpack Compose (package `fish.nexa`, minSdk 26, targetSdk 36; debug builds are
@@ -1087,7 +1110,7 @@ notes.
 - Testing: `check.sh`, `e2e.py`, `screenshot.py`, `seed.py`, `webhook_e2e.py`, `bot_e2e.py` with
   `bots/`, `apps_ui.py`, `discord_e2e.py`,
   `sfu_call.py`, `sfu_guest.py`, `call_quality.py` and `share_quality.py` with `netsim/`, `ios_sim.py`
-  with `ios/`, `app_size.py`.
+  with `ios/`, `app_size.py`, `desktop_idle.py` with `desktop_idle/`.
 - i18n: `i18n_check.py`, `i18n_keys_used.py`, `i18n_apply.py` (write or merge a language's
   values), `i18n_extract.py` (pull hardcoded English into keys); `android/tools/add_strings.py`.
 - Releases: `android_release.py`, `mac_package.py`, `publish_desktop.py`, `licenses.py`.

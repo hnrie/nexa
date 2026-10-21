@@ -81,11 +81,13 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
       nodeIntegration: false,
       webSecurity: true,
       spellcheck: true,
-      // A chat app works while it is not looked at. Hidden (minimised, in the
-      // tray, or covered by another window), Chromium slows a page's timers
-      // to once a minute; the connection's heartbeat fell behind, the server
-      // hung up, and messages sent meanwhile never raised a notification.
-      backgroundThrottling: false,
+      // Hidden (minimised, in the tray, or covered), the page stops drawing
+      // and its timers slow down, as a background tab's do: the web app is
+      // made for that (its heartbeat runs from a worker). Only a call keeps
+      // it at full speed (applyThrottling in index.ts). This must be on
+      // when the window is made: a window made without it is never hidden,
+      // whatever is set later.
+      backgroundThrottling: true,
       // the preload only offers the bridge to pages of this origin
       additionalArguments: [`--evilion-origin=${ORIGIN}`, `--evilion-version=${app.getVersion()}`, `--evilion-share-audio=${shareAudioMode()}`, `--evilion-window-audio=${shareAudioMode() === "own" && windowAudioSupported() ? "1" : "0"}`],
     },
@@ -94,6 +96,7 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
 
   win.once("ready-to-show", () => {
     if (!opts.hidden) win.show();
+    else void putToSleep(win);
   });
 
   const wc = win.webContents;
@@ -142,6 +145,34 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
   // The splash is a data URL, so it paints immediately; the site replaces it.
   void win.loadURL(splashPage()).then(() => win.loadURL(START_URL));
   return win;
+}
+
+/**
+ * A window that has never been shown counts as seen by its page, so a launch
+ * straight into the tray (at login) drew and ran at full speed until the
+ * window was first opened. Shown for a moment, fully transparent, without
+ * focus or a taskbar button, until the page has seen itself shown, and then
+ * hidden, it sleeps as any hidden window does. Linux cannot make a window
+ * transparent, so there it stays as it was.
+ */
+async function putToSleep(win: BrowserWindow): Promise<void> {
+  if (process.platform === "linux") return;
+  const asleep = () => win.webContents.executeJavaScript("document.visibilityState === 'hidden'").catch(() => false);
+  win.setOpacity(0);
+  win.setSkipTaskbar(true);
+  win.showInactive();
+  // a hide that comes before the system has finished showing the window is
+  // ignored, so it is asked again until the page says it is hidden
+  for (let i = 0; i < 40 && !win.isDestroyed(); i++) {
+    await new Promise((r) => setTimeout(r, 25));
+    // opened from the tray meanwhile: it stays open
+    if (win.isDestroyed() || win.isFocused()) break;
+    win.hide();
+    if (await asleep()) break;
+  }
+  if (win.isDestroyed()) return;
+  win.setOpacity(1);
+  win.setSkipTaskbar(false);
 }
 
 /** The small native menu for text: spelling suggestions, cut, copy and paste. Pages with their own menus never reach it. */

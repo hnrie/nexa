@@ -36,6 +36,8 @@ let trayActions: TrayActions | null = null;
 let identity: Identity | null = null;
 let rpc: RpcService | null = null;
 let updater: Updater | null = null;
+/** Whether the page is in a call, which keeps it at full speed while hidden (applyThrottling). */
+let inCall = false;
 const pasteGate = new PasteGate();
 
 // an older copy still running would hold the lock the two share (macOS; succession.ts)
@@ -83,9 +85,14 @@ async function start(): Promise<void> {
   // A page that goes away (a reload, the offline page) lets go of the keybinds
   // it held: the next one asks again for its own, and one that cannot answer
   // them must not keep the keys from every other program.
+  // The same goes for its call: a new page says so again when it joins one.
   win.webContents.on("did-start-navigation", (nav) => {
-    if (nav.isMainFrame && !nav.isSameDocument) globalShortcut.unregisterAll();
+    if (!nav.isMainFrame || nav.isSameDocument) return;
+    globalShortcut.unregisterAll();
+    inCall = false;
   });
+  // set once the new page is there: set as it starts loading, it reached only the page going away
+  win.webContents.on("did-navigate", applyThrottling);
   handleDisplayMedia(() => win, log);
   applicationMenu(() => win, () => void updater?.check());
   // a copy opened from the disk image or Downloads offers to move into Applications, once
@@ -106,6 +113,9 @@ async function start(): Promise<void> {
   });
   // the page decides whether to notify from this rather than document.hasFocus()
   for (const event of ["focus", "blur", "show", "hide", "minimize", "restore"] as const) win.on(event as "focus", () => toPage(IPC.windowState, windowState()));
+  // a call that ended while the window was out of sight lets it sleep once it is back
+  win.on("show", applyThrottling);
+  win.on("restore", applyThrottling);
 
   trayActions = {
     show: showWindow,
@@ -219,8 +229,10 @@ function registerIpc(): void {
   });
 
   on(IPC.setBadge, (count: number) => setBadge(Math.max(0, Math.floor(Number(count) || 0))));
-  // the window is never slowed down in the background any more (see createMainWindow), in a call or not
-  on(IPC.setCallActive, () => {});
+  on(IPC.setCallActive, (active: boolean) => {
+    inCall = !!active;
+    applyThrottling();
+  });
   // a notification clicked while the window sits in the tray or minimised brings it back
   on(IPC.focusWindow, () => showWindow());
   on(IPC.requestAttention, () => requestAttention());
@@ -265,6 +277,21 @@ function requestAttention(): void {
   w.once("focus", () => {
     if (!w.isDestroyed()) w.flashFrame(false);
   });
+}
+
+/**
+ * A call runs at full speed in a hidden window: its voice gate, share sizing
+ * and stall watch run on timers that a hidden page has slowed to once a
+ * second. Out of a call the page sleeps while hidden.
+ *
+ * Throttling turned back on while the window is out of sight leaves the page
+ * awake (Electron hides a page only as its window hides), so then it waits
+ * until the window is shown again.
+ */
+function applyThrottling(): void {
+  if (!win || win.isDestroyed()) return;
+  if (!inCall && (!win.isVisible() || win.isMinimized())) return;
+  win.webContents.setBackgroundThrottling(!inCall);
 }
 
 function windowState(): WindowState {

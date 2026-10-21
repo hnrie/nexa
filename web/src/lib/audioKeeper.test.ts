@@ -101,4 +101,21 @@ describe("AudioKeeper", () => {
     expect(ac.suspends).toBe(1);
     expect(k.released).toBe(true);
   });
+
+  it("releases when idle in the desktop app too", async () => {
+    vi.useFakeTimers();
+    useFakeAudio(false);
+    (window as Window & { evilionDesktop?: object }).evilionDesktop = {};
+    try {
+      const { k, ac } = keeper();
+      await k.want();
+      k.releaseLater(() => true, 2000);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(ac.suspends).toBe(1);
+      expect(await k.want()).toBe(true);
+      expect(ac.state).toBe("running");
+    } finally {
+      delete (window as Window & { evilionDesktop?: object }).evilionDesktop;
+    }
+  });
 });

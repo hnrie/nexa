@@ -711,7 +711,19 @@ export function installVoice(): void {
   window.addEventListener("online", () => engine?.nudge());
   // The device in use going away is not a settings change, and the only other
   // devicechange listener in the app is on a settings page no call mounts.
-  navigator.mediaDevices?.addEventListener?.("devicechange", () => engine?.devicesChanged());
+  // Only a call listens: listening starts the browser's audio and camera
+  // services (near 90 MB in the desktop app), which stay up once started.
+  const onDevices = () => engine?.devicesChanged();
+  let listening = false;
+  const listen = ({ mine, joining }: { mine: unknown; joining: unknown }) => {
+    const want = !!(mine || joining);
+    if (want === listening) return;
+    listening = want;
+    if (want) navigator.mediaDevices?.addEventListener?.("devicechange", onDevices);
+    else navigator.mediaDevices?.removeEventListener?.("devicechange", onDevices);
+  };
+  listen(useVoice.getState());
+  useVoice.subscribe(listen);
   // a channel that disappears takes its call with it
   useChannels.subscribe((st, prev) => {
     const ch = inVoice();

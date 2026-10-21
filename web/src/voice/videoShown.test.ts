@@ -70,4 +70,20 @@ describe("whether a call's pictures are on screen", () => {
     recheckVideoShown();
     expect(seen).toEqual([false, true]);
   });
+
+  it("is off while the desktop app's window is minimised or in the tray, which keeps a call's page visible", async () => {
+    const { callViewOpen, watchVideoShown } = await load();
+    const { useDesktop } = await import("@/stores/desktop");
+    const seen: boolean[] = [];
+    useDesktop.getState().setWindow({ focused: true, visible: true, minimized: false });
+    const stop = watchVideoShown(() => "call", (on) => seen.push(on));
+    callViewOpen("call");
+    useDesktop.getState().setWindow({ focused: false, visible: true, minimized: true });
+    useDesktop.getState().setWindow({ focused: false, visible: true, minimized: false });
+    useDesktop.getState().setWindow({ focused: false, visible: false, minimized: false });
+    useDesktop.getState().setWindow({ focused: true, visible: true, minimized: false });
+    stop();
+    useDesktop.getState().setWindow({ focused: false, visible: false, minimized: false });
+    expect(seen).toEqual([false, true, false, true, false, true]);
+  });
 });

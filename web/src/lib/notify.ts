@@ -110,7 +110,7 @@ export async function closeNotifications(tag: string): Promise<void> {
  * can regain focus without firing the event that flag listens for.
  */
 export function appOnScreen(): boolean {
-  // the desktop app says where its window is; inside it the page is never hidden, and its focus reading was seen to stay true
+  // the desktop app says where its window is: in a call its page counts as visible while hidden, and its focus reading was seen to stay true
   const w = useDesktop.getState().window;
   if (w) return w.focused && w.visible && !w.minimized;
   return typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus();

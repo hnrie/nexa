@@ -6,7 +6,12 @@
  * (sfu.ts setVideoShown): a share watched and then left behind in another
  * channel otherwise kept coming in at up to 10 Mbit/s and being decoded for
  * nobody. Voices, and a share's sound, keep coming either way.
+ *
+ * The desktop app keeps a call's page awake, and so counted as visible, while
+ * its window is minimised or in the tray; there the window's own state says.
  */
+import { useDesktop } from "@/stores/desktop";
+
 const mounted = new Map<string, number>();
 const listeners = new Set<() => void>();
 
@@ -41,7 +46,8 @@ function floating(): boolean {
 export function videoShown(channelId: string): boolean {
   if (floating()) return true;
   const visible = typeof document === "undefined" || document.visibilityState !== "hidden";
-  return visible && (mounted.get(channelId) ?? 0) > 0;
+  const w = useDesktop.getState().window;
+  return visible && (!w || (w.visible && !w.minimized)) && (mounted.get(channelId) ?? 0) > 0;
 }
 
 /** Looks again everywhere: the call moved to another channel. */
@@ -62,12 +68,16 @@ export function watchVideoShown(channel: () => string, cb: (shown: boolean) => v
     cb(now);
   };
   listeners.add(check);
+  const offWindow = useDesktop.subscribe((st, prev) => {
+    if (st.window !== prev.window) check();
+  });
   // picture in picture's events do not bubble, so they are caught on the way down
   const events = ["visibilitychange", "enterpictureinpicture", "leavepictureinpicture", "webkitpresentationmodechanged"];
   if (typeof document !== "undefined") for (const e of events) document.addEventListener(e, check, true);
   check();
   return () => {
     listeners.delete(check);
+    offWindow();
     if (typeof document !== "undefined") for (const e of events) document.removeEventListener(e, check, true);
   };
 }
