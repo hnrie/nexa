@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -575,5 +576,29 @@ func TestStaffListAppsApartFromPeople(t *testing.T) {
 	}
 	if res, _ := do(t, ts, "GET", "/api/v1/moderation/apps", tok, nil); res.StatusCode != 403 {
 		t.Fatalf("someone who is not staff: %d", res.StatusCode)
+	}
+}
+
+func TestBulkOverwriteCountsOnlyTheNewList(t *testing.T) {
+	_, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	app, botToken := makeApp(t, ts, tok, "Swap Bot")
+	appOut := botproto.OutString(snowID(t, app["id"].(string)))
+	path := "/api/v10/applications/" + appOut + "/commands"
+	list := func(prefix string, n int) []map[string]any {
+		out := make([]map[string]any, n)
+		for i := range out {
+			out[i] = map[string]any{"name": fmt.Sprintf("%s%d", prefix, i), "description": "A command"}
+		}
+		return out
+	}
+	if res, body := botDo(t, ts, "PUT", path, botToken, list("old", 90)); res.StatusCode != 200 {
+		t.Fatalf("first overwrite: %d %v", res.StatusCode, body)
+	}
+	if res, body := botDo(t, ts, "PUT", path, botToken, list("new", 90)); res.StatusCode != 200 {
+		t.Fatalf("second overwrite: %d %v", res.StatusCode, body)
+	}
+	if res, _ := botDo(t, ts, "PUT", path, botToken, list("big", 101)); res.StatusCode != 400 {
+		t.Fatalf("101 commands: %d, want 400", res.StatusCode)
 	}
 }

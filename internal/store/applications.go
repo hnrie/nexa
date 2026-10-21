@@ -687,24 +687,25 @@ func (s *Store) DeleteCommand(ctx context.Context, c *Command) error {
 
 // ReplaceCommands makes an application's commands in one place exactly list:
 // commands of a kind and name it had already keep their ids, the rest are
-// new, and those not in list go.
+// new, and those not in list go. Those go first, so the limits apply to list
+// alone, as the protocol's bulk overwrite does.
 func (s *Store) ReplaceCommands(ctx context.Context, app ids.ID, guild *ids.ID, list []*Command) error {
 	return s.Tx(ctx, func(tx *db.Tx) error {
 		if err := tx.Serialise(ctx, "commands", int64(app)); err != nil {
 			return err
 		}
-		keep := map[ids.ID]bool{}
-		for _, c := range list {
-			c.ApplicationID, c.GuildID = app, guild
-			if _, err := putCommandTx(ctx, tx, c); err != nil {
-				return err
-			}
-			keep[c.ID] = true
+		type key struct {
+			typ  int
+			name string
 		}
-		q := `SELECT id FROM application_commands WHERE application_id = ? AND guild_id IS NULL`
+		keep := map[key]bool{}
+		for _, c := range list {
+			keep[key{c.Type, c.Name}] = true
+		}
+		q := `SELECT id, type, name FROM application_commands WHERE application_id = ? AND guild_id IS NULL`
 		args := []any{int64(app)}
 		if guild != nil {
-			q = `SELECT id FROM application_commands WHERE application_id = ? AND guild_id = ?`
+			q = `SELECT id, type, name FROM application_commands WHERE application_id = ? AND guild_id = ?`
 			args = append(args, int64(*guild))
 		}
 		rows, err := tx.QueryContext(ctx, q, args...)
@@ -714,11 +715,12 @@ func (s *Store) ReplaceCommands(ctx context.Context, app ids.ID, guild *ids.ID, 
 		var gone []int64
 		for rows.Next() {
 			var id int64
-			if err := rows.Scan(&id); err != nil {
+			var k key
+			if err := rows.Scan(&id, &k.typ, &k.name); err != nil {
 				rows.Close()
 				return err
 			}
-			if !keep[ids.ID(id)] {
+			if !keep[k] {
 				gone = append(gone, id)
 			}
 		}
@@ -731,6 +733,12 @@ func (s *Store) ReplaceCommands(ctx context.Context, app ids.ID, guild *ids.ID, 
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `DELETE FROM application_command_permissions WHERE application_id = ? AND command_id = ?`, int64(app), id); err != nil {
+				return err
+			}
+		}
+		for _, c := range list {
+			c.ApplicationID, c.GuildID = app, guild
+			if _, err := putCommandTx(ctx, tx, c); err != nil {
 				return err
 			}
 		}
