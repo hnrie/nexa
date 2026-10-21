@@ -1097,6 +1097,10 @@ notes.
   `src/release/res/xml/` for that build only) and serve the newer folder with `ANDROID_DIR`.
 - Calls (`voice/`): `ShareAdapt` sizes a 60 fps share as the web's `shareAdapt.ts` does, and
   `ui/voice/VoiceModeration.kt` is the moderators' voice menu (see Calls).
+  `AudioRoute` puts the phone in call mode but never takes the audio focus, so music and videos in
+  other apps play on beside a call and its microphone keeps sending. Only a phone call (the phone
+  ringing or in a call, read from the audio mode once a second) makes the call quiet both ways
+  until it ends.
 - Compose redraws a composable only for state it collected: `Nexa.settings`' getters and the stores'
   `get(...)` are plain reads, and a row that reads them can keep an old answer when its own
   arguments did not change. Read what a composable shows through `collectAsState()` (or

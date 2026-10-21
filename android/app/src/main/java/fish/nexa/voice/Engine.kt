@@ -351,7 +351,7 @@ internal object Engine {
         Nexa.ui.toast(t("session.microphoneAccessWasDeniedYouCan"), "error")
     }
 
-    /** A phone call or an alarm took the audio: the call is quiet both ways until it comes back. */
+    /** A phone call took the audio: the call is quiet both ways until it ends. */
     private fun onFocus(has: Boolean) {
         val s = session ?: return
         Voice.update { it.copy(interrupted = !has) }

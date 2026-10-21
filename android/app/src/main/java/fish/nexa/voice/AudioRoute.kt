@@ -1,16 +1,13 @@
 package fish.nexa.voice
 
 import android.content.Context
-import android.media.AudioAttributes
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
-import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
-import android.os.SystemClock
 import android.util.Log
 import fish.nexa.Nexa
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,15 +15,16 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Where a call's sound goes on the phone: the speaker, the earpiece, a wired
- * headset or a Bluetooth one, with the phone in call mode and holding the
- * audio focus, so other apps pause and the volume keys set the call's volume.
+ * headset or a Bluetooth one, with the phone in call mode so the volume keys
+ * set the call's volume. It never takes the audio focus: music or a video in
+ * another app plays on beside the call, and the call keeps its microphone.
  * A headset put on mid-call takes the call; one taken off hands it back.
  */
 object AudioRoute {
     private const val TAG = "AudioRoute"
 
-    /** How long a refused ask waits before the next one. */
-    private const val RETRY_MS = 500L
+    /** How often a call checks whether the phone is ringing or in a phone call. */
+    private const val PHONE_CHECK_MS = 1_000L
 
     enum class Kind { SPEAKER, EARPIECE, WIRED, BLUETOOTH, USB, OTHER }
 
@@ -38,16 +36,14 @@ object AudioRoute {
     private val _current = MutableStateFlow<Device?>(null)
     val current: StateFlow<Device?> = _current
 
-    /** Told when another app (a phone call, an alarm) takes the audio away, and when it comes back. */
+    /** Told when a phone call takes the audio away (false), and when it gives it back (true). */
     @Volatile var onFocus: ((Boolean) -> Unit)? = null
 
     private val main = Handler(Looper.getMainLooper())
     private var inCall = false
     private var chosen: Device? = null
-    private var focusRequest: AudioFocusRequest? = null
-    @Volatile private var hasFocus = false
-    /** When an ask was last refused (a phone call holds the audio); not asked again for [RETRY_MS]. */
-    private var deniedAt = 0L
+    /** A phone call holds the audio: the call is quiet both ways until it ends. */
+    private var phoneBusy = false
     private var callback: AudioDeviceCallback? = null
     private var proximity: PowerManager.WakeLock? = null
     @Volatile private var videoShowing = false
@@ -66,8 +62,8 @@ object AudioRoute {
         if (!inCall) {
             inCall = true
             chosen = null
-            takeFocus(am)
             watch(am)
+            phoneCheck.run()
         }
         refresh()
     }
@@ -84,9 +80,8 @@ object AudioRoute {
             if (am.isBluetoothScoOn) am.stopBluetoothSco()
             am.isSpeakerphoneOn = false
         }
-        focusRequest?.let { runCatching { am.abandonAudioFocusRequest(it) } }
-        focusRequest = null
-        hasFocus = false
+        phoneBusy = false
+        main.removeCallbacks(phoneCheck)
         runCatching { am.mode = AudioManager.MODE_NORMAL }
         setProximity(false)
         _current.value = null
@@ -110,59 +105,31 @@ object AudioRoute {
     /** In call mode while the call holds the audio: routing and the volume keys are the call's. */
     private fun callMode(am: AudioManager) = runCatching { am.mode = AudioManager.MODE_IN_COMMUNICATION }
 
-    private fun takeFocus(am: AudioManager) {
-        val attributes = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-            .build()
-        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-            .setAudioAttributes(attributes)
-            .setOnAudioFocusChangeListener({ change ->
-                when (change) {
-                    AudioManager.AUDIOFOCUS_GAIN -> {
-                        // what took it away may have left the phone in media mode
-                        callMode(am)
-                        hasFocus = true
-                        onFocus?.invoke(true)
-                    }
-                    AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                        hasFocus = false
-                        onFocus?.invoke(false)
-                    }
-                    // a duck asks the call to play under a prompt, not to stop: it plays on at full volume
-                    AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> Unit
-                }
-            }, main)
-            .setAcceptsDelayedFocusGain(false)
-            .build()
-        focusRequest = request
-        // a phone that refuses the focus still makes the call
-        runCatching { am.requestAudioFocus(request) }
-            .onSuccess { hasFocus = it == AudioManager.AUDIOFOCUS_REQUEST_GRANTED }
-            .onFailure { Log.w(TAG, "no audio focus", it) }
+    /** The phone is ringing or in a phone call (the system's own modes for them). */
+    private fun phoneInCall(am: AudioManager): Boolean = when (am.mode) {
+        AudioManager.MODE_RINGTONE, AudioManager.MODE_IN_CALL -> true
+        else -> Build.VERSION.SDK_INT >= 30 && am.mode == AudioManager.MODE_CALL_SCREENING
     }
 
     /**
-     * Asks for the audio back when the person returns to the call. Once another
-     * app (a video, a game) has taken the focus, the system never hands it back
-     * by itself: the call would stay quiet both ways, looking dropped, until it
-     * was left and joined again.
+     * Looks every [PHONE_CHECK_MS] whether a phone call holds the phone. Not asking
+     * for the audio focus, the call is told nothing when one rings or starts.
      */
-    fun refocus() = main.post {
-        if (!inCall || hasFocus) return@post
-        val request = focusRequest ?: return@post
-        val now = SystemClock.uptimeMillis()
-        if (now - deniedAt < RETRY_MS) return@post
-        val result = runCatching { audio().requestAudioFocus(request) }
-            .getOrDefault(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
-        if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-            // whatever held the audio may have left the phone in another mode
-            callMode(audio())
-            hasFocus = true
-            onFocus?.invoke(true)
-        } else {
-            deniedAt = now
+    private val phoneCheck: Runnable = object : Runnable {
+        override fun run() {
+            main.removeCallbacks(this)
+            if (!inCall) return
+            setPhoneBusy(phoneInCall(audio()))
+            main.postDelayed(this, PHONE_CHECK_MS)
         }
+    }
+
+    private fun setPhoneBusy(busy: Boolean) {
+        if (busy == phoneBusy) return
+        phoneBusy = busy
+        // the phone call left the phone in its own mode
+        if (!busy) callMode(audio())
+        onFocus?.invoke(!busy)
     }
 
     private fun watch(am: AudioManager) {
