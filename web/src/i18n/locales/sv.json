@@ -6707,6 +6707,13 @@
   "settings.voice.priorityKey": "Tangent för prioriterad talare",
   "settings.voice.priorityKeyHint": "Håll in den för att tala som prioriterad talare i röstkanaler där din roll tillåter det. Alla andra sänks medan du pratar. Backsteg rensar den.",
   "settings.voice.priorityKeyNone": "Inte vald",
+  "shell.requiredUpdate.body": "Den här versionen av datorappen är för gammal för Nexa. Uppdatera den så fortsätter du där du slutade.",
+  "shell.requiredUpdate.checking": "Letar efter uppdateringen…",
+  "shell.requiredUpdate.download": "Ladda ned Nexa",
+  "shell.requiredUpdate.downloading": "Laddar ned uppdateringen, {percent}",
+  "shell.requiredUpdate.manual": "Om nedladdningen inte startar av sig själv, ladda ned den nya versionen, installera den och öppna Nexa igen.",
+  "shell.requiredUpdate.ready": "Uppdateringen är nedladdad. Nexa stängs och öppnas igen för att installera den.",
+  "shell.requiredUpdate.title": "Uppdatera Nexa för att fortsätta",
   "threads.card.count": {
     "one": "{count} meddelande",
     "other": "{count} meddelanden"

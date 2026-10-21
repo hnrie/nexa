@@ -7152,6 +7152,13 @@
   "settings.voice.priorityKey": "Клавиша приоритетного режима",
   "settings.voice.priorityKeyHint": "Удерживайте, чтобы говорить в приоритетном режиме в голосовых каналах, где это разрешает ваша роль. Пока вы говорите, остальных слышно тише. Backspace сбрасывает клавишу.",
   "settings.voice.priorityKeyNone": "Не задана",
+  "shell.requiredUpdate.body": "Эта версия приложения для компьютера слишком старая для Nexa. Обновите её, и вы продолжите с того же места.",
+  "shell.requiredUpdate.checking": "Поиск обновления…",
+  "shell.requiredUpdate.download": "Скачать Nexa",
+  "shell.requiredUpdate.downloading": "Загрузка обновления, {percent}",
+  "shell.requiredUpdate.manual": "Если загрузка не начнётся сама, скачайте новую версию, установите её и снова откройте Nexa.",
+  "shell.requiredUpdate.ready": "Обновление загружено. Nexa закроется и откроется снова, чтобы установить его.",
+  "shell.requiredUpdate.title": "Обновите Nexa, чтобы продолжить",
   "threads.card.count": {
     "one": "{count} сообщение",
     "few": "{count} сообщения",

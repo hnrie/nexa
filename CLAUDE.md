@@ -1053,6 +1053,14 @@ progress for three minutes is given up (the download cancelled) and tried again 
 backoff, where it used to leave the updater busy for good. A page holding unsaved edits
 (`beforeunload`) no longer cancels a quit (`will-prevent-unload` in `index.ts`).
 
+A desktop app older than `REQUIRED_DESKTOP` (`web/src/lib/requiredDesktop.ts`, now 1.2.6) shows
+nothing but `components/shell/RequiredUpdate.tsx` in place of the app: its version and the new
+one with the download filling the way between them, Restart to Update once the update is ready,
+and otherwise the installer for that computer and Check for Updates. It holds only once
+`/api/v1/desktop/latest` publishes that version or newer, so it is raised together with a release,
+and one found while the app is open waits for a call to end. App loads the check and the screen
+lazily, and only inside the desktop app.
+
 ## Android app (`android/`)
 
 Native Kotlin and Jetpack Compose (package `fish.nexa`, minSdk 26, targetSdk 36; debug builds are

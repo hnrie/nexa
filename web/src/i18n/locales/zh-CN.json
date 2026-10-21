@@ -6471,6 +6471,13 @@
   "settings.voice.priorityKey": "优先发言人按键",
   "settings.voice.priorityKeyHint": "在你的身份组允许的语音频道中按住它，即可作为优先发言人说话。你说话时其他人的音量会降低。按退格键清除。",
   "settings.voice.priorityKeyNone": "未设置",
+  "shell.requiredUpdate.body": "此版本的桌面应用太旧，无法使用 Nexa。更新后即可从上次离开的地方继续。",
+  "shell.requiredUpdate.checking": "正在查找更新…",
+  "shell.requiredUpdate.download": "下载 Nexa",
+  "shell.requiredUpdate.downloading": "正在下载更新，{percent}",
+  "shell.requiredUpdate.manual": "如果没有自动开始下载，请下载新版本，安装后重新打开 Nexa。",
+  "shell.requiredUpdate.ready": "更新已下载。Nexa 将关闭并重新打开以完成安装。",
+  "shell.requiredUpdate.title": "更新 Nexa 以继续使用",
   "threads.card.count": {
     "other": "{count} 条消息"
   },

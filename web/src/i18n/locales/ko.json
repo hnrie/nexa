@@ -6471,6 +6471,13 @@
   "settings.voice.priorityKey": "우선 발언자 키",
   "settings.voice.priorityKeyHint": "역할이 허용하는 음성 채널에서 누르고 있으면 우선 발언자로 말합니다. 말하는 동안 다른 사람의 소리가 줄어듭니다. Backspace로 지웁니다.",
   "settings.voice.priorityKeyNone": "설정 안 됨",
+  "shell.requiredUpdate.body": "이 버전의 데스크톱 앱은 너무 오래되어 Nexa에서 사용할 수 없습니다. 업데이트하면 하던 곳에서 이어갈 수 있습니다.",
+  "shell.requiredUpdate.checking": "업데이트를 찾는 중…",
+  "shell.requiredUpdate.download": "Nexa 다운로드",
+  "shell.requiredUpdate.downloading": "업데이트 다운로드 중, {percent}",
+  "shell.requiredUpdate.manual": "다운로드가 저절로 시작되지 않으면 새 버전을 다운로드해 설치한 뒤 Nexa를 다시 여세요.",
+  "shell.requiredUpdate.ready": "업데이트를 다운로드했습니다. 설치를 위해 Nexa가 닫혔다가 다시 열립니다.",
+  "shell.requiredUpdate.title": "계속하려면 Nexa를 업데이트하세요",
   "threads.card.count": {
     "other": "메시지 {count}개"
   },

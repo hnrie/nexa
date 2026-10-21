@@ -6821,6 +6821,13 @@
   "settings.voice.priorityKey": "Tecla de Orador Prioritário",
   "settings.voice.priorityKeyHint": "Segure para falar como orador prioritário nos canais de voz em que seu cargo permite. Todos os outros ficam mais baixos enquanto você fala. Backspace limpa a tecla.",
   "settings.voice.priorityKeyNone": "Não Definida",
+  "shell.requiredUpdate.body": "Esta versão do app para computador é antiga demais para o Nexa. Atualize e você volta de onde parou.",
+  "shell.requiredUpdate.checking": "Procurando a atualização…",
+  "shell.requiredUpdate.download": "Baixar o Nexa",
+  "shell.requiredUpdate.downloading": "Baixando a atualização, {percent}",
+  "shell.requiredUpdate.manual": "Se o download não começar sozinho, baixe a nova versão, instale e abra o Nexa de novo.",
+  "shell.requiredUpdate.ready": "A atualização foi baixada. O Nexa fecha e abre de novo para instalá-la.",
+  "shell.requiredUpdate.title": "Atualize o Nexa para continuar",
   "threads.card.count": {
     "one": "{count} mensagem",
     "other": "{count} mensagens"

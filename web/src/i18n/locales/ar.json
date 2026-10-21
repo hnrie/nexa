@@ -7561,6 +7561,13 @@
   "settings.voice.priorityKey": "مفتاح المتحدث ذي الأولوية",
   "settings.voice.priorityKeyHint": "اضغط عليه مطولًا للتحدث كمتحدث ذي أولوية في القنوات الصوتية التي يسمح فيها دورك بذلك. يُخفَّض صوت الجميع أثناء حديثك. يمسحه مفتاح Backspace.",
   "settings.voice.priorityKeyNone": "غير معيّن",
+  "shell.requiredUpdate.body": "هذا الإصدار من تطبيق سطح المكتب أقدم من أن يعمل مع Nexa. حدّثه وستعود إلى حيث توقفت.",
+  "shell.requiredUpdate.checking": "جارٍ البحث عن التحديث…",
+  "shell.requiredUpdate.download": "تنزيل Nexa",
+  "shell.requiredUpdate.downloading": "جارٍ تنزيل التحديث، {percent}",
+  "shell.requiredUpdate.manual": "إذا لم يبدأ التنزيل من تلقاء نفسه، نزّل الإصدار الجديد وثبّته ثم افتح Nexa مجددًا.",
+  "shell.requiredUpdate.ready": "تم تنزيل التحديث. سيُغلق Nexa ثم يفتح مجددًا لتثبيته.",
+  "shell.requiredUpdate.title": "حدّث Nexa لتتابع",
   "threads.card.count": {
     "zero": "لا رسائل",
     "one": "رسالة واحدة",

@@ -6707,6 +6707,13 @@
   "settings.voice.priorityKey": "Taste für Prioritätssprecher",
   "settings.voice.priorityKeyHint": "Halte sie gedrückt, um in Sprachkanälen, in denen deine Rolle es erlaubt, als Prioritätssprecher zu reden. Alle anderen werden leiser, während du sprichst. Rücktaste entfernt sie.",
   "settings.voice.priorityKeyNone": "Nicht festgelegt",
+  "shell.requiredUpdate.body": "Diese Version der Desktop-App ist zu alt für Nexa. Aktualisiere sie, und du machst dort weiter, wo du aufgehört hast.",
+  "shell.requiredUpdate.checking": "Update wird gesucht…",
+  "shell.requiredUpdate.download": "Nexa herunterladen",
+  "shell.requiredUpdate.downloading": "Update wird heruntergeladen, {percent}",
+  "shell.requiredUpdate.manual": "Wenn der Download nicht von selbst beginnt, lade die neue Version herunter, installiere sie und öffne Nexa erneut.",
+  "shell.requiredUpdate.ready": "Das Update ist heruntergeladen. Nexa schließt sich und öffnet sich wieder, um es zu installieren.",
+  "shell.requiredUpdate.title": "Aktualisiere Nexa, um weiterzumachen",
   "threads.card.count": {
     "one": "{count} Nachricht",
     "other": "{count} Nachrichten"

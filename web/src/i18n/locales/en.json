@@ -6707,6 +6707,13 @@
   "settings.voice.priorityKey": "Priority Speaker Key",
   "settings.voice.priorityKeyHint": "Hold it to talk as Priority Speaker in voice channels where your role allows it. Everyone else is turned down while you speak. Backspace clears it.",
   "settings.voice.priorityKeyNone": "Not Set",
+  "shell.requiredUpdate.body": "This version of the desktop app is too old for Nexa. Update it and you're back where you left off.",
+  "shell.requiredUpdate.checking": "Looking for the update…",
+  "shell.requiredUpdate.download": "Download Nexa",
+  "shell.requiredUpdate.downloading": "Downloading the update, {percent}",
+  "shell.requiredUpdate.manual": "If it doesn't start downloading on its own, download the new version, install it and open Nexa again.",
+  "shell.requiredUpdate.ready": "The update is downloaded. Nexa closes and opens again to install it.",
+  "shell.requiredUpdate.title": "Update Nexa to Keep Going",
   "threads.card.count": {
     "one": "{count} Message",
     "other": "{count} Messages"

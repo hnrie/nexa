@@ -1,0 +1,114 @@
+/* The screen a desktop app too old for Nexa shows instead of the app. */
+
+.wrap {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--bg-base);
+}
+
+.panel {
+  width: 100%;
+  max-width: 460px;
+  padding: 32px 30px 28px;
+  border-radius: var(--radius-md);
+  background: var(--sheen), var(--bg-raised);
+  box-shadow: inset 0 1px 0 var(--edge-light), var(--shadow-high);
+}
+
+.mark {
+  display: block;
+  margin-bottom: 20px;
+}
+
+.title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--text-strong);
+}
+
+.body {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* the way from this copy's version to the new one; it fills as the update downloads */
+.way {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 26px;
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.from,
+.to {
+  flex: none;
+  font-size: 15px;
+  font-weight: 700;
+}
+.from { color: var(--text-muted); }
+.to { color: var(--text-brand); }
+
+.track {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-active);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.25);
+  overflow: hidden;
+}
+.fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+  transition: width 400ms ease;
+}
+/* waiting for the download to start: a short glint runs along the way */
+.track[data-state="waiting"]::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 30%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--brand) 55%, transparent), transparent);
+  animation: glint 1.8s ease-in-out infinite;
+}
+@keyframes glint {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(340%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .track[data-state="waiting"]::after { animation: none; display: none; }
+  .fill { transition: none; }
+}
+
+.status {
+  margin: 10px 0 0;
+  min-height: 1.45em;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+}
+.actions:empty { display: none; }
+
+@media (max-width: 480px) {
+  .panel { padding: 26px 20px 22px; }
+  .actions > * { flex: 1 1 100%; }
+}

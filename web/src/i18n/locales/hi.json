@@ -6707,6 +6707,13 @@
   "settings.voice.priorityKey": "प्राथमिक वक्ता कुंजी",
   "settings.voice.priorityKeyHint": "जिन वॉइस चैनलों में आपकी भूमिका अनुमति देती है, वहाँ प्राथमिक वक्ता के रूप में बोलने के लिए इसे दबाए रखें। आपके बोलते समय बाकी सबकी आवाज़ कम हो जाती है। Backspace इसे हटाता है।",
   "settings.voice.priorityKeyNone": "सेट नहीं",
+  "shell.requiredUpdate.body": "डेस्कटॉप ऐप का यह संस्करण Nexa के लिए बहुत पुराना है। इसे अपडेट करें और आप वहीं से जारी रख सकेंगे जहाँ छोड़ा था।",
+  "shell.requiredUpdate.checking": "अपडेट खोजा जा रहा है…",
+  "shell.requiredUpdate.download": "Nexa डाउनलोड करें",
+  "shell.requiredUpdate.downloading": "अपडेट डाउनलोड हो रहा है, {percent}",
+  "shell.requiredUpdate.manual": "अगर डाउनलोड अपने आप शुरू न हो, तो नया संस्करण डाउनलोड करें, इंस्टॉल करें और Nexa फिर से खोलें।",
+  "shell.requiredUpdate.ready": "अपडेट डाउनलोड हो गया है। इसे इंस्टॉल करने के लिए Nexa बंद होकर फिर खुलेगा।",
+  "shell.requiredUpdate.title": "आगे बढ़ने के लिए Nexa अपडेट करें",
   "threads.card.count": {
     "one": "{count} संदेश",
     "other": "{count} संदेश"

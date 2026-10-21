@@ -6471,6 +6471,13 @@
   "settings.voice.priorityKey": "優先スピーカーキー",
   "settings.voice.priorityKeyHint": "ロールで許可されたボイスチャンネルで、押している間は優先スピーカーとして話せます。話している間はほかの人の音量が下がります。Backspaceで解除します。",
   "settings.voice.priorityKeyNone": "未設定",
+  "shell.requiredUpdate.body": "このバージョンのデスクトップアプリは古すぎて Nexa で使えません。アップデートすると、続きから使えます。",
+  "shell.requiredUpdate.checking": "アップデートを確認しています…",
+  "shell.requiredUpdate.download": "Nexa をダウンロード",
+  "shell.requiredUpdate.downloading": "アップデートをダウンロード中、{percent}",
+  "shell.requiredUpdate.manual": "自動でダウンロードが始まらない場合は、新しいバージョンをダウンロードしてインストールし、Nexa を開き直してください。",
+  "shell.requiredUpdate.ready": "アップデートのダウンロードが完了しました。インストールのため Nexa が閉じて再び開きます。",
+  "shell.requiredUpdate.title": "続けるには Nexa をアップデートしてください",
   "threads.card.count": {
     "other": "{count} 件のメッセージ"
   },

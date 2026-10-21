@@ -6820,6 +6820,13 @@
   "settings.voice.priorityKey": "Touche d'orateur prioritaire",
   "settings.voice.priorityKeyHint": "Maintiens-la pour parler en orateur prioritaire dans les salons vocaux où ton rôle le permet. Tous les autres sont baissés pendant que tu parles. Retour arrière l'efface.",
   "settings.voice.priorityKeyNone": "Non défini",
+  "shell.requiredUpdate.body": "Cette version de l'application de bureau est trop ancienne pour Nexa. Mettez-la à jour et vous reprendrez là où vous en étiez.",
+  "shell.requiredUpdate.checking": "Recherche de la mise à jour…",
+  "shell.requiredUpdate.download": "Télécharger Nexa",
+  "shell.requiredUpdate.downloading": "Téléchargement de la mise à jour, {percent}",
+  "shell.requiredUpdate.manual": "Si le téléchargement ne démarre pas tout seul, téléchargez la nouvelle version, installez-la et rouvrez Nexa.",
+  "shell.requiredUpdate.ready": "La mise à jour est téléchargée. Nexa se ferme puis se rouvre pour l'installer.",
+  "shell.requiredUpdate.title": "Mettez à jour Nexa pour continuer",
   "threads.card.count": {
     "one": "{count} message",
     "other": "{count} messages"
