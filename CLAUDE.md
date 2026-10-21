@@ -25,9 +25,10 @@ the change it describes.
 
 ### Building is deploying
 
-`web/dist`, `bin/chatd` and `downloads/android` are what the live instance serves, so
-`npm run build`, `make web`, `make server`, `make build`, `make publish-android` and
-`tools/android_release.py` without `--to` publish immediately. Never run them to check a change; use the
+`web/dist`, `bin/chatd`, `downloads/android` and the desktop releases in `DESKTOP_DIR` are what the
+live instance serves, so `npm run build`, `make web`, `make server`, `make build`,
+`make publish-android`, `make desktop-release`, `make publish-desktop`, `tools/desktop_release.py`
+and `tools/android_release.py` without `--to` publish immediately. Never run them to check a change; use the
 commands under Commands, which write nothing live. Never test against port 8090, `data/` or the
 repo's `chatd.env`. On this server, never start chatd from the repository root either (`make run`,
 `go run ./cmd/chatd`): it reads the live `chatd.env` and `./data`, and chatd migrates its database
@@ -1009,6 +1010,18 @@ already have installed (anything new is optional and checked before use). `build
 esbuild, `electron-builder.yml` packs (`sign-mac.cjs` signs Mac builds ad hoc), and
 `tools/mac_package.py` and `tools/publish_desktop.py` finish a release.
 
+Releases are built on the Linux server, never handed over from another machine: the owner wants
+every app that changed built and published by `make build` (2026-10-20). Its `desktop-release` step
+runs `tools/desktop_release.py --if-changed`, which builds a release only when
+`desktop/package.json` names a version newer than the one published in `DESKTOP_DIR` (`data/desktop`
+unless the environment says otherwise), so a change to the app bumps that version in the same
+commit. It cleans `desktop/dist`, builds Windows and Linux with electron-builder, the Mac apps with
+its dir target for x64 and arm64 (signed ad hoc by `sign-mac.cjs` with `rcodesign`), packs them with
+`tools/mac_package.py` (`mkfs.hfsplus`, sudo, libdmg-hfsplus's `dmg`) and publishes with
+`tools/publish_desktop.py`. `python3 tools/desktop_release.py` builds and publishes the current
+version regardless (`--republish` to replace one already out). `make desktop` is the Mac's own build
+into `desktop/dist`, which publishes nothing.
+
 Out of sight the app costs next to nothing (measured with `tools/desktop_idle.py`). From 1.2.5 the
 window is made with background throttling on, as a browser tab is: minimised, in the tray or
 covered, the page stops drawing and its timers slow down (the gateway's heartbeat runs from a worker,
@@ -1113,7 +1126,8 @@ notes.
   with `ios/`, `app_size.py`, `desktop_idle.py` with `desktop_idle/`.
 - i18n: `i18n_check.py`, `i18n_keys_used.py`, `i18n_apply.py` (write or merge a language's
   values), `i18n_extract.py` (pull hardcoded English into keys); `android/tools/add_strings.py`.
-- Releases: `android_release.py`, `mac_package.py`, `publish_desktop.py`, `licenses.py`.
+- Releases: `android_release.py`, `desktop_release.py`, `mac_package.py`, `publish_desktop.py`,
+  `licenses.py`.
 - Assets: `twemoji_font.py`, `twemoji_font_check.py`, `twemoji_sprites.py`, `trace_wordmark.py`,
   `home_shots.py` and `home_gifs.py` (the front page's pictures and loops), `trailer.py`.
 - Schema: `gen_pg_schema.sh`, `pg_schema.py`.
@@ -1124,8 +1138,10 @@ notes.
   once, with no restart.
 - A server change: `make server` (it keeps the binary it replaces as `bin/chatd.prev`), then
   `sudo systemctl restart xyz.evilion.chat` (the unit runs `run.sh`). `make build` builds both,
-  then the Android app when it changed (see Android, Releases). Say so when the deploy runs a
+  then the Android app and the desktop app when they changed (see Android, Releases, and Desktop
+  app). Say so when the deploy runs a
   database migration.
 - Back up first (`bash backup.sh`, which keeps only the newest set) only when the request asks for it.
 - To roll back: `cp bin/chatd.prev bin/chatd` and restart (not across a migration, see Database).
-- Desktop releases are published separately (see its section); Android goes out with `make build`.
+- Android and the desktop app go out with `make build` when they changed; nothing is built on
+  another machine and copied over.

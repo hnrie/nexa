@@ -3,16 +3,16 @@ NODE_BIN ?= /usr/local/lib/nodejs/current/bin
 VERSION ?= $(shell git describe --always --dirty 2>/dev/null || echo dev)
 export PATH := $(NODE_BIN):$(PATH)
 
-.PHONY: build web server android test test-go test-web test-desktop desktop publish-desktop publish-android licenses run clean clean-deploy
+.PHONY: build web server android desktop-release test test-go test-web test-desktop desktop publish-desktop publish-android licenses run clean clean-deploy
 
 # A build runs the typechecker (inside the web build) but not the test
 # suites unless asked with `make build TEST=1`. The suites are timing
 # sensitive under load and slow machines trip them; `make test` is still the
 # way to run the whole thing on purpose.
 ifeq ($(TEST),1)
-BUILD_DEPS := test-web test-go web server android
+BUILD_DEPS := test-web test-go web server android desktop-release
 else
-BUILD_DEPS := web server android
+BUILD_DEPS := web server android desktop-release
 endif
 build: $(BUILD_DEPS)
 
@@ -22,6 +22,13 @@ build: $(BUILD_DEPS)
 # with the key kept in android/signing.
 android:
 	python3 tools/android_release.py --if-changed
+
+# The desktop app for every platform, published into DESKTOP_DIR, which chatd
+# serves: the apps update themselves to it. Built only when
+# desktop/package.json names a version not published yet (every release bumps
+# it). `python3 tools/desktop_release.py` builds and publishes it regardless.
+desktop-release:
+	python3 tools/desktop_release.py --if-changed
 
 # `web/dist` is what chatd serves, so this target *is* the deploy. DEPLOY=1 is
 # how the build says it knows that; see web/scripts/deploy-guard.mjs.
@@ -61,7 +68,7 @@ test-web:
 test-desktop:
 	@if [ -d desktop/src ]; then cd desktop && npm run typecheck && npm test; else echo "  desktop/ is not here; skipping its tests"; fi
 
-# the desktop app's installers for every platform, into desktop/dist (runs on macOS)
+# the desktop app's installers for every platform, into desktop/dist, on a Mac (no publishing)
 desktop: test-desktop
 	cd desktop && npm ci --no-audit --no-fund && npm run build && npx electron-builder --mac --win --linux --publish never
 
