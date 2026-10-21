@@ -99,6 +99,12 @@ async function start(): Promise<void> {
   // the page has had a moment to send its words over
   win.webContents.once("did-finish-load", () => setTimeout(() => void offerMoveToApplications(settings, win, log), 3000));
 
+  // A page asking to keep unsaved edits (beforeunload) silently cancels a quit
+  // in Electron: Quit did nothing, and Update left the app running while its
+  // installer started, which then had to kill it. Quitting means quitting.
+  win.webContents.on("will-prevent-unload", (e) => {
+    if (quitting) e.preventDefault();
+  });
   win.on("close", (e) => {
     if (quitting || !settings.get("closeToTray")) return;
     e.preventDefault();

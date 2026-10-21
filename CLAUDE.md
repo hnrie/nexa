@@ -1041,6 +1041,18 @@ is hidden (`gateOpen` in `voice/engine.ts`), and only a call listens for `device
 (`voice/session.ts`), which would start the browser's audio and camera services (near 90 MB).
 Apps before 1.2.5 keep every page at full speed.
 
+Updates (`src/main/update/`, tested in `test/updater.test.ts`) are looked for 10 s after start and
+then every minute; Windows and the AppImage download through electron-updater, the Mac through
+`mac.ts`, and the page offers the result (web `components/shell/UpdateDialog.tsx`). From 1.2.6
+nothing installs when the app quits (`autoInstallOnAppQuit` off): on Windows the silent installer
+it ran after a quit or at shutdown closed a copy opened again meanwhile, so the app seemed to
+restart by itself. An update installs only from Update, once however often it is pressed, and a
+downloaded one stays cached for the next start. While one waits to be installed the minute's check
+reads the manifest and downloads a newer release in its place; a check or download that shows no
+progress for three minutes is given up (the download cancelled) and tried again with the usual
+backoff, where it used to leave the updater busy for good. A page holding unsaved edits
+(`beforeunload`) no longer cancels a quit (`will-prevent-unload` in `index.ts`).
+
 ## Android app (`android/`)
 
 Native Kotlin and Jetpack Compose (package `fish.nexa`, minSdk 26, targetSdk 36; debug builds are
