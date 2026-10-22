@@ -1233,7 +1233,11 @@ notes.
   `--cut` picks the trailer, a faster cut of it (`fast`) or a 1080x1920 short for phones (`short`),
   which uses takes filmed in Nexa's phone layout (`film --phones`, saved as `m-<shot>`), each shown
   as its screen at the frame's full width so the app's words read on a phone. Each shot
-  gives up after `SHOT_LIMIT` seconds rather than hanging the run.
+  gives up after `SHOT_LIMIT` seconds rather than hanging the run. The seed makes a lived-in world
+  (`seed_world`: a server with an icon, categories, channels and coloured roles, more servers in each
+  list), people staying test1 and test2. A take's marks can log where on screen they happened
+  (`tk.mark(label, focus)`), and the edit's cameras are keyframes (`Cut.cam`) that open on the whole
+  app and ease in to those places, close enough to read.
 - Schema: `gen_pg_schema.sh`, `pg_schema.py`.
 
 ## Deploying (only when the owner says "deploy")

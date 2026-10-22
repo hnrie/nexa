@@ -116,6 +116,14 @@ class Takes:
         info = self.info[take]
         return info["marks"][label] - info["views"][view]["offset"]
 
+    def at(self, take, label, default=(0.5, 0.5), dx=0.0, dy=0.0):
+        """The middle of what a logged moment happened to, as a fraction of the
+        picture (where the camera points), or `default` if none was logged."""
+        f = self.info.get(take, {}).get("focus", {}).get(label)
+        if not f:
+            return default
+        return (min(1.0, max(0.0, f[0] + f[2] / 2 + dx)), min(1.0, max(0.0, f[1] + f[3] / 2 + dy)))
+
     def has(self, take, label=None):
         return take in self.info and (label is None or label in self.info[take]["marks"])
 
@@ -297,7 +305,7 @@ class Cut:
         for t in self.texts:
             if t["t1"] == end:
                 t["t1"] = hold
-        return {"fps": FPS, "dur": hold, "rigs": self.rigs, "pieces": self.pieces, "texts": self.texts,
+        return {"fps": FPS, "dur": hold, "hits": [s["d1"], s["d2"]], "rigs": self.rigs, "pieces": self.pieces, "texts": self.texts,
                 "bg": self.bg, "fade": [hold - 1.3, hold - 0.2]}
 
     def build(self):
@@ -403,73 +411,98 @@ class Cut:
             self.title(title, s0, s1, place=place)
         return r
 
+    def cam(self, *keys, drift=0.02):
+        """A camera for a window: keys of [t, zoom, fx, fy, move time], each a
+        framing it eases into and arrives at on t, then holds."""
+        return {"keys": [list(k) for k in keys], "drift": drift}
+
     def build_fast(self):
         """The trailer cut twice as often: a new scene every two bars, quicker
-        glides, the same intro, breakdown and ending."""
+        glides, the same intro, breakdown and ending. Every scene opens on the
+        whole app, then the camera eases in to what is happening, close enough
+        to read, on the beat."""
         s, T, p = self.s, self.t, self.s["period"]
         d1, d2, outro = s["d1"], s["d2"], s["outro"]
         B = lambda n, base=d1: self.bars(n, base)  # noqa: E731
-        shot, have, sc = self.shot, T.has, self.scene
+        shot, have, sc, cam, at = self.shot, T.has, self.scene, self.cam, T.at
 
         rise = self._intro()
-        r = self.rig("single", rise, B(2), enter="rise", enterDur=d1 - rise, exitDur=0.34, cams=[[1.22, 0.42, 0.64, 1.3]])
-        self.piece(r, "hi", rise, B(2), anchors=[("hey", self.beat(2)), ("how", self.beat(5.8))], hold_until=d1)
-        # the basics everyone wants, fast; then what only Nexa has
+        # the whole app as someone opens it: their messages, then a server with
+        # something new in its channels, clicked on the drop
+        r = self.rig("single", rise, B(2), enter="rise", enterDur=d1 - rise, exitDur=0.34,
+                     cams=[cam([rise, 1.0, 0.5, 0.5], [d1 + 1.6 * p, 1.3, 0.28, 0.42, 0.9],
+                               [B(1) + 1.6 * p, 1.55, *at("tour", "channel", (0.55, 0.85)), 0.9])])
+        self.piece(r, "tour", rise, B(2), anchors=[("server", d1), ("channel", B(1) + 0.5 * p)])
         self.colours(d1, "#4c1d95", "#0f2a4a", 1.0)
-        self.title("Chat in Real Time", d1, B(2))
-        self.colours(B(2), "#6d1d5b", "#1b1650", 1.0)
-        r = sc("right", B(2), B(4), "Say It\nYour Way", place="left", cams=[[1.6, 0.52, 0.8, 1.66]], quick=True)
+        self.title("Everything You're Used To", d1 - p, B(2))
+        # then what everyone wants from it, fast; then what only Nexa has
+        self.colours(B(2), "#3b1f8a", "#0f2a4a", 1.0)
+        r = sc("single", B(2), B(4), "Chat in Real Time", quick=True,
+               cams=[cam([B(2), 1.3, *at("hi", "hey", (0.45, 0.8))], [B(2) + 3.6 * p, 1.6, *at("hi", "how", (0.45, 0.85)), 0.8])])
+        self.piece(r, "hi", B(2), B(4), anchors=[("hey", B(2) + p), ("how", B(2) + 4 * p), ("good", B(2) + 6.5 * p)])
+        self.colours(B(4), "#6d1d5b", "#1b1650", 1.0)
+        r = sc("right", B(4), B(6), "Say It\nYour Way", place="left", quick=True,
+               cams=[cam([B(4), 1.5, *at("formatting", "bold", (0.55, 0.8))], [B(4) + 4 * p, 1.65, *at("formatting", "code", (0.55, 0.8)), 0.8])])
         for k, label in enumerate(["bold", "colour", "spoiler", "spoiler-open", "code", "quote"]):
-            shot(r, "formatting", B(2), k, 1 if k < 5 else 3, label, land=0.5)
-        self.colours(B(4), "#5a1a6e", "#1b1e50", 1.0)
-        r = sc("left", B(4), B(6), "Or Build It\nVisually", place="right", cams=[[1.15, 0.4, 0.5, 1.2]], quick=True)
-        self.piece(r, "editor", B(4), B(6), anchors=[("callout", B(4) + 2 * p), ("sent", B(4) + 6.5 * p)])
-        self.colours(B(6), "#0c4a4a", "#13204d", 1.0)
-        r = sc("single", B(6), B(8), "Full-Quality Screen Share, Free", cams=[[1.04, 0.5, 0.5, 1.08]], quick=True)
-        shot(r, "voice", B(6), 0, 3, "joined", land=1)
-        shot(r, "share", B(6), 3, 5, "watch", land=1)
-        self.colours(B(8), "#5a2a0c", "#3a0f3f", 1.0)
-        r = sc("right", B(8), B(10), "Make It\nYours", place="left", cams=[[1.25, 0.62, 0.42, 1.28]], quick=True)
+            shot(r, "formatting", B(4), k, 1 if k < 5 else 3, label, land=0.5)
+        self.colours(B(6), "#5a1a6e", "#1b1e50", 1.0)
+        r = sc("left", B(6), B(8), "Or Build It\nVisually", place="right", quick=True,
+               cams=[cam([B(6), 1.3, *at("editor", "open", (0.5, 0.6))], [B(6) + 2 * p, 1.55, *at("editor", "callout", (0.5, 0.6)), 0.8],
+                         [B(6) + 6.6 * p, 1.5, *at("editor", "sent", (0.5, 0.8)), 0.6])])
+        self.piece(r, "editor", B(6), B(8), anchors=[("callout", B(6) + 2 * p), ("sent", B(6) + 6.5 * p)])
+        self.colours(B(8), "#0c4a4a", "#13204d", 1.0)
+        r = sc("single", B(8), B(10), "Full-Quality Screen Share, Free", quick=True,
+               cams=[cam([B(8), 1.0, 0.5, 0.5], [B(8) + 3 * p + 0.5, 1.12, *at("share", "watch", (0.55, 0.45)), 0.5])])
+        shot(r, "voice", B(8), 0, 3, "joined", land=1)
+        shot(r, "share", B(8), 3, 5, "watch", land=1)
+        self.colours(B(10), "#5a2a0c", "#3a0f3f", 1.0)
+        r = sc("right", B(10), B(12), "Make It\nYours", place="left", quick=True, cams=[cam([B(10), 1.04, 0.5, 0.5])])
         if have("themes"):
-            self.montage(r, "themes", [f"theme{k}" for k in range(12)], B(8), 6)
-        self.piece(r, "snow", B(8) + 6 * p, B(10), anchors=[("sent", B(8) + 6.5 * p)], cam=[1.1, 0.6, 0.5, 1.12])
-        self.colours(B(10), "#1f5a2a", "#13204d", 1.0)
-        r = sc("left", B(10), B(12), "Your Own\nStickers", place="right", cams=[[1.3, 0.42, 0.42, 1.34]], quick=True)
+            self.montage(r, "themes", [f"theme{k}" for k in range(12)], B(10), 6)
+        self.piece(r, "snow", B(10) + 6 * p, B(12), anchors=[("sent", B(10) + 6.5 * p)],
+                   cam=cam([B(10) + 6 * p, 1.12, 0.55, 0.55], [B(12), 1.3, *at("snow", "sent", (0.55, 0.8)), 0.8]))
+        self.colours(B(12), "#1f5a2a", "#13204d", 1.0)
+        r = sc("left", B(12), B(14), "Your Own\nStickers", place="right", quick=True,
+               cams=[cam([B(12), 1.45, *at("stickers", "installed", (0.5, 0.35))], [B(12) + 3 * p, 1.4, *at("stickers", "picker", (0.6, 0.6)), 0.01],
+                         [B(12) + 5.6 * p, 1.55, *at("stickers", "sent", (0.5, 0.8)), 0.7])])
         if have("stickers"):
-            shot(r, "stickers", B(10), 0, 3, "installed", land=1)
-            shot(r, "stickers", B(10), 3, 5, "sent", land=2)
-        self.colours(B(12), "#3b1f8a", "#122a52", 1.0)
-        r = sc("single", B(12), B(14), "Your Own Typing Indicator", cams=[[1.75, 0.36, 0.9, 1.82]], quick=True)
-        self.piece(r, "typing", B(12), B(14), anchors=[("sent", B(14) - 0.4)])
-        self.colours(B(14), "#1d1342", "#0f2a4a", 0.9)
-        r = sc("single", B(14), s["breakdown"], "Check Who You're Talking To", cams=[[1.25, 0.5, 0.5, 1.3]], quick=True, exit="recede", exitDur=0.6)
-        shot(r, "safety", B(14), 0, 8, "open", land=1)
+            shot(r, "stickers", B(12), 0, 3, "installed", land=1)
+            shot(r, "stickers", B(12), 3, 5, "sent", land=2)
+        self.colours(B(14), "#3b1f8a", "#122a52", 1.0)
+        r = sc("single", B(14), s["breakdown"], "Your Own Typing Indicator", quick=True, exit="recede", exitDur=0.6,
+               cams=[cam([B(14), 1.05, 0.5, 0.6], [B(14) + 2.2 * p, 1.9, *at("typing", "start", (0.4, 0.9), dy=-0.035), 1.0])])
+        self.piece(r, "typing", B(14), s["breakdown"], anchors=[("sent", s["breakdown"] - 0.4)])
 
         self._breakdown()
 
         self.colours(d2, "#4a1d7a", "#10234a", 1.0)
-        r = sc("single", d2, B(2, d2), "A Profile That's All You", cams=[[1.42, 0.52, 0.4, 1.48]], enter="focus", enterDur=0.6, exitDur=0.34)
+        r = sc("single", d2, B(2, d2), "A Profile That's All You", enter="focus", enterDur=0.6, exitDur=0.34,
+               cams=[cam([d2, 1.3, *at("showcase", "open")], [d2 + 3.2 * p, 1.5, *at("showcase", "play", (0.6, 0.45)), 0.9])])
         if have("showcase"):
             shot(r, "showcase", d2, 0, 3, "open", land=0.5)
             shot(r, "showcase", d2, 3, 5, "widgets", land=0.5)
         self.colours(B(2, d2), "#7a2e12", "#4a1060", 1.0)
-        r = sc("right", B(2, d2), B(4, d2), "Your Name,\nYour Style", place="left", cams=[[1.72, 0.5, 0.38, 1.76]], quick=True)
+        r = sc("right", B(2, d2), B(4, d2), "Your Name,\nYour Style", place="left", quick=True,
+               cams=[cam([B(2, d2), 1.7, *at("namestyle", "font0", (0.5, 0.38), dy=0.06)])])
         if have("namestyle"):
             self.montage(r, "namestyle", [f"font{k}" for k in range(4)] + [f"effect{k}" for k in range(4)], B(2, d2), 8)
         self.colours(B(4, d2), "#123e6b", "#2a1458", 1.0)
-        r = sc("pair", B(4, d2), B(6, d2), "Write Together, Live", cams=[[1.7, 0.62, 0.3, 1.76]] * 2, titles=["test1", "test2"], quick=True)
+        nk = cam([B(4, d2), 1.5, 0.62, 0.48], [B(4, d2) + 2 * p, 2.1, 0.6, 0.45, 0.8])
+        r = sc("pair", B(4, d2), B(6, d2), "Write Together, Live", cams=[nk, nk], titles=["test1", "test2"], quick=True)
         for slot, view in ((0, "a"), (1, "b")):
             self.piece(r, "notes", B(4, d2), B(6, d2), slot=slot, view=view, anchors=[("typing", B(4, d2) + p)])
         self.colours(B(6, d2), "#0f4a33", "#1a1c4d", 1.0)
-        r = sc("single", B(6, d2), B(8, d2), "Lock Any Chat with a Password", cams=[[1.42, 0.42, 0.8, 1.46]], quick=True)
-        shot(r, "subchat", B(6, d2), 0, 4, "made", land=1)
+        r = sc("single", B(6, d2), B(8, d2), "Lock Any Chat with a Password", quick=True,
+               cams=[cam([B(6, d2), 1.15, 0.5, 0.5], [B(6, d2) + 4 * p + 0.5, 1.5, *at("subchat", "sent", (0.5, 0.8)), 0.6])])
+        shot(r, "subchat", B(6, d2), 0, 4, "made", land=3)
         shot(r, "subchat", B(6, d2), 4, 4, "sent", land=2)
         self.colours(B(8, d2), "#1c3a5e", "#1a1c4d", 1.0)
-        r = sc("single", B(8, d2), B(10, d2), "Plugins and Custom CSS", cams=[[1.25, 0.5, 0.68, 1.3]], quick=True)
+        r = sc("single", B(8, d2), B(10, d2), "Plugins and Custom CSS", quick=True,
+               cams=[cam([B(8, d2), 1.45, *at("plugins", "waved", (0.5, 0.8))])])
         self.piece(r, "plugins", B(8, d2), B(9, d2), anchors=[("waved", B(8, d2) + 3 * p)])
-        self.piece(r, "css", B(9, d2), B(10, d2), anchors=[("closed", B(9, d2) + 2 * p)], cam=[1.0, 0.5, 0.5, 1.02])
+        self.piece(r, "css", B(9, d2), B(10, d2), anchors=[("closed", B(9, d2) + 2 * p)], cam=cam([B(9, d2), 1.0, 0.5, 0.5]))
         self.colours(B(10, d2), "#3b1a6e", "#0d2f4f", 1.0)
-        r = sc("duo", B(10, d2), B(12, d2), "On Every Screen", cams=[[1.12, 0.45, 0.6, 1.16]], quick=True)
+        r = sc("duo", B(10, d2), B(12, d2), "On Every Screen", cams=[cam([B(10, d2), 1.12, 0.5, 0.6])], quick=True)
         for slot, view in ((0, "a"), (1, "b")):
             self.piece(r, "phone", B(10, d2), B(12, d2), slot=slot, view=view, anchors=[("arrived", B(10, d2) + 2 * p), ("back", B(10, d2) + 6 * p)])
         self._wall(B(12, d2), outro + 3 * p)
@@ -490,75 +523,81 @@ class Cut:
 
     def build_short(self):
         """A 9:16 cut for phones, from two bars before the second drop to a
-        little after the outro begins: a scene a bar, a title for each, all
-        clear of the space apps put their own buttons and captions in."""
+        little after the outro begins: Nexa's own phone layout, filmed on a
+        phone (the m- takes), each screen the frame's full width. A scene
+        opens on the top of the screen (the header, the lists) and the camera
+        eases down and in to what is happening, close enough to read; titles
+        sit above, clear of the space apps put their own buttons in."""
         s, T, p = self.s, self.t, self.s["period"]
         d2, outro = s["d2"], s["outro"]
         B = lambda n: self.bars(n, d2)  # noqa: E731
-        have = T.has
+        have, cam, at = T.has, self.cam, T.at
         start, end = B(-2), outro + 10 * p
 
-        def sc(layout, k, n, title, cams, **o):
-            r = self.rig(layout, B(k), B(k + n), cams=cams, enterDur=0.4, exitDur=0.3, **o)
-            self.texts.append({"kind": "title", "t0": B(k) + 0.12, "t1": B(k + n) - 0.1, "text": title, "place": "top", "y": 205, "size": 68})
+        def sc(k, n, title, *keys, **o):
+            o.setdefault("enterDur", 0.45)
+            r = self.rig("phoneTall", B(k), B(k + n), cams=[{"keys": [list(x) for x in keys], "drift": 0.0}], exitDur=0.32, **o)
+            if title:
+                self.texts.append({"kind": "title", "t0": B(k) + 0.1, "t1": B(k + n) - 0.08, "text": title, "place": "top", "y": 196, "size": 70})
             return r
 
-        # the hook, on the riser: the line, word by word on the eighths
+        # the hook: the line, word by word on the eighths, in the middle of an
+        # empty frame; then it rises into the title's place as the app comes up
         self.colours(start, "#3a1a6e", "#14102a", 0.7)
         words = "Private Chat with All the Fun Left In".split()
-        self.texts.append({"kind": "headline", "t0": start, "t1": d2 - 0.05, "y": 640, "size": 120,
-                           "lines": ["Private Chat", "with All the", "Fun Left In"], "times": [start + 0.05 + k * p / 2 for k in range(len(words))]})
-        self.texts.append({"kind": "wordmark", "t0": start + 5 * p, "t1": d2 - 0.05, "size": 70, "y": 520})
-
-        # Nexa's own phone layout, filmed on a phone (the m- takes), shown as its
-        # screen nearly the frame's width so the app's words read on a phone; each
-        # scene shows the top of the screen (0) or the bottom (1), never a cut
-        # through the app's own bars
-        ph = lambda k, n, title, cam, **o: sc("phoneTall", k, n, title, [cam], **o)  # noqa: E731
+        self.texts.append({"kind": "headline", "t0": start, "t1": B(1) - 0.06, "y": 700, "size": 108,
+                           "lines": ["Private Chat with", "All the Fun Left In"], "times": [start + 0.05 + k * p / 2 for k in range(len(words))],
+                           "move": [B(-1) - 0.15, B(-1) + 0.65, -510, 0.62]})
+        # a screen is either shown at its full width, or pushed in from its left
+        # edge (where the words start) far enough that the crop reads as meant
+        r = sc(-1, 2, None, [B(-1), 1.0, 0.5, 0.0], [d2 + 3 * p, 1.0, 0.5, 1.0, 0.8], enter="rise", enterDur=0.8)
+        self.piece(r, "m-tour", B(-1), B(1), anchors=[("server", d2 - p), ("channel", d2 + 2 * p)])
         self.colours(d2, "#4c1d95", "#0f2a4a", 1.0)
-        r = ph(0, 1, "Chat in Real Time", [1.0, 0.5, 1, 1.0], enter="focus")
-        self.shot(r, "m-hi", d2, 0, 4, "hey", land=2)
+
         self.colours(B(1), "#6d1d5b", "#1b1650", 1.0)
-        r = ph(1, 1, "Say It Your Way", [1.0, 0.5, 1, 1.0])
+        r = sc(1, 1, "Say It Your Way", [B(1), 1.0, 0.5, 1.0])
         for k, label in enumerate(["bold", "colour", "spoiler-open", "code"]):
             self.shot(r, "m-formatting", B(1), k, 1, label, land=0.5)
         self.colours(B(2), "#1f5a2a", "#13204d", 1.0)
-        r = ph(2, 2, "Your Own Sticker Packs", [1.0, 0.5, 0, 1.0])
-        self.piece(r, "m-stickers", B(2), B(2) + 3 * p, anchors=[("installed", B(2) + p)], cam=[1.0, 0.5, 0, 1.0])
-        self.piece(r, "m-stickers", B(2) + 3 * p, B(4), anchors=[("sent", B(2) + 5 * p)], cam=[1.0, 0.5, 1, 1.0])
+        r = sc(2, 2, "Your Own Sticker Packs", [B(2), 1.0, 0.5, 0.0], [B(2) + 1.6 * p, 1.5, 0.0, at("m-stickers", "installed", (0.3, 0.3))[1], 0.7],
+               [B(2) + 3 * p, 1.0, 0.5, 1.0, 0.01], [B(2) + 5.6 * p, 1.32, 0.0, at("m-stickers", "sent", (0.3, 0.85))[1], 0.7])
+        self.piece(r, "m-stickers", B(2), B(2) + 3 * p, anchors=[("installed", B(2) + p)])
+        self.piece(r, "m-stickers", B(2) + 3 * p, B(4), anchors=[("sent", B(2) + 5 * p)])
         self.colours(B(4), "#3b1f8a", "#122a52", 1.0)
-        r = ph(4, 1, "Your Own Typing Indicator", [1.0, 0.5, 1, 1.0])
+        r = sc(4, 1, "Your Own Typing Indicator", [B(4), 1.0, 0.5, 1.0], [B(4) + 2 * p, 1.45, 0.0, 1.0, 0.7])
         self.piece(r, "m-typing", B(4), B(5), anchors=[("sent", B(5) - 0.15)])
         self.colours(B(5), "#5a2a0c", "#3a0f3f", 1.0)
-        r = ph(5, 1, "Make It Yours", [1.0, 0.5, 0, 1.0])
+        r = sc(5, 1, "Make It Yours", [B(5), 1.0, 0.5, 0.0])
         if have("m-themes"):
             self.montage(r, "m-themes", [f"theme{k}" for k in range(12)], B(5), 4)
         self.colours(B(6), "#4a1d7a", "#10234a", 1.0)
-        r = ph(6, 2, "A Profile That's All You", [1.0, 0.5, 1, 1.0])
+        r = sc(6, 2, "A Profile That's All You", [B(6), 1.0, 0.5, 0.0], [B(6) + 3.4 * p, 1.0, 0.5, 1.0, 0.9],
+               )
         if have("m-showcase"):
             self.shot(r, "m-showcase", B(6), 0, 3, "open", land=0.5)
             self.shot(r, "m-showcase", B(6), 3, 5, "widgets", land=0.5)
         self.colours(B(8), "#7a2e12", "#4a1060", 1.0)
-        r = ph(8, 1, "Your Name, Your Style", [1.0, 0.5, 1, 1.0])
+        r = sc(8, 1, "Your Name, Your Style", [B(8), 1.0, 0.5, 0.0])
         if have("m-namestyle"):
             self.montage(r, "m-namestyle", [f"font{k}" for k in (0, 2)] + [f"effect{k}" for k in (1, 3)], B(8), 4)
         self.colours(B(9), "#0c4a4a", "#13204d", 1.0)
-        r = ph(9, 1, "Full-Quality Screen Share", [1.0, 0.5, 1, 1.0])
+        r = sc(9, 1, "Full-Quality Screen Share", [B(9), 1.0, 0.5, at("m-share", "watch", (0.5, 0.47))[1]])
         self.shot(r, "m-share", B(9), 0, 4, "watch", land=1)
         self.colours(B(10), "#123e6b", "#2a1458", 1.0)
-        r = ph(10, 2, "Write Together, Live", [1.0, 0.5, 0, 1.0])
+        r = sc(10, 2, "Write Together, Live", [B(10), 1.0, 0.5, 0.0], [B(10) + 2.4 * p, 1.85, 0.0, 0.0, 0.8])
         self.piece(r, "m-notes", B(10), B(12), anchors=[("typing", B(10) + 2 * p)])
         self.colours(B(12), "#0f4a33", "#1a1c4d", 1.0)
-        r = ph(12, 1, "Lock Chats with a Password", [1.0, 0.5, 1, 1.0])
-        self.shot(r, "m-subchat", B(12), 0, 4, "inside", land=2)
+        # the password going in, then the locked chat it makes
+        r = sc(12, 1, "Lock Chats with a Password", [B(12), 1.0, 0.5, 1.0])
+        self.piece(r, "m-subchat", B(12), B(13), anchors=[("made", B(12) + 2.2 * p)])
         self.colours(B(13), "#1c3a5e", "#1a1c4d", 1.0)
-        r = ph(13, 1, "Add Your Own Plugins", [1.0, 0.5, 1, 1.0])
+        r = sc(13, 1, "Add Your Own Plugins", [B(13), 1.0, 0.5, 1.0], [B(13) + 3 * p, 1.4, 0.0, 1.0, 0.6])
         self.piece(r, "m-plugins", B(13), B(14), anchors=[("waved", B(13) + 3 * p)])
         self.colours(B(14), "#5a1a6e", "#1b1e50", 1.0)
-        r = ph(14, 1, "Build Messages Visually", [1.0, 0.5, 0, 1.0])
-        self.piece(r, "m-editor", B(14), B(15), anchors=[("callout", B(14) + p), ("sent", B(14) + 3.2 * p)])
+        r = sc(14, 1, "Build Messages Visually", [B(14), 1.65, 0.0, 0.0], [B(14) + 3.4 * p, 1.0, 0.5, 1.0, 0.6])
+        self.piece(r, "m-editor", B(14), B(15), anchors=[("callout", B(14) + 2 * p), ("sent", B(14) + 3.2 * p)])
         self.colours(B(15), "#3b1a6e", "#0d2f4f", 1.0)
-        r = ph(15, 1, "Restyle It with CSS", [1.0, 0.5, 1, 1.0])
+        r = sc(15, 1, "Restyle It with CSS", [B(15), 1.0, 0.5, 1.0])
         self.piece(r, "m-css", B(15), B(16), anchors=[("closed", B(15) + 2 * p)])
 
         # the end: the promise, then the name
@@ -573,7 +612,7 @@ class Cut:
             if t["t1"] == end:
                 t["t1"] = hold
         end = hold
-        return {"fps": FPS, "dur": end, "size": [1080, 1920], "span": [start, end], "rigs": self.rigs, "pieces": self.pieces,
+        return {"fps": FPS, "dur": end, "hits": [d2], "size": [1080, 1920], "span": [start, end], "rigs": self.rigs, "pieces": self.pieces,
                 "texts": self.texts, "bg": self.bg, "fade": [end - 1.4, end - 0.1]}
 
 

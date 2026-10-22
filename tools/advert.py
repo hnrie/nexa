@@ -54,10 +54,21 @@ class Take:
     def __init__(self, name, *views, lead=0.8, tail=1.2):
         name = PREFIX + name
         self.name, self.views, self.lead, self.tail = name, views, lead, tail
-        self.marks = {}
+        self.marks, self.focus = {}, {}
 
-    def mark(self, label):
+    def mark(self, label, focus=None):
+        """Logs a moment; focus names what it happened to (a selector, the
+        last match), whose place on screen the edit's camera then frames."""
         self.marks[label] = round(time.time() - self.t0, 3)
+        if focus:
+            actor = self.views[0][0]
+            try:
+                b = actor.page.locator(focus).last.bounding_box(timeout=1500)
+            except Exception:
+                b = None
+            if b:
+                vw, vh = trailer.PHONE if actor.phone else VIEW
+                self.focus[label] = [round(b["x"] / vw, 4), round(b["y"] / vh, 4), round(b["width"] / vw, 4), round(b["height"] / vh, 4)]
 
     def __enter__(self):
         for actor, _ in self.views:
@@ -75,7 +86,7 @@ class Take:
                     pass
             return False
         time.sleep(self.tail)
-        info = {"marks": self.marks, "views": {}}
+        info = {"marks": self.marks, "focus": self.focus, "views": {}}
         for actor, view in self.views:
             raw = actor.record_stop(f"{self.name}-{view}")
             dest = TAKES / f"{self.name}-{view}.mp4"
@@ -85,6 +96,10 @@ class Take:
             info["views"][view] = {"file": dest.name, "offset": round(actor.started - self.t0, 3), "phone": actor.phone}
         (TAKES / f"{self.name}.json").write_text(json.dumps(info, indent=1))
         print(f"    filmed {self.name}: {self.marks}")
+
+
+LAST = "[data-id]"  # the newest message, for a mark's focus
+DIALOG = "[role=dialog]"
 
 
 def typed(actor, text, delay=70):
@@ -173,7 +188,7 @@ def seed(w):
     p = t1.page
     p.goto(w.base + "/channels/@me", wait_until="networkidle")
     p.click("button[aria-label='Add a Server']")
-    p.fill("[data-testid=server-name]", "test server")
+    p.fill("[data-testid=server-name]", SERVER[0])
     p.click("[data-testid=create-server-submit]")
     p.wait_for_url("**/channels/*/*", timeout=30000)
     p.wait_for_selector("textarea[aria-label='Message #general']", timeout=20000)
@@ -182,11 +197,69 @@ def seed(w):
     t2.page.goto(link, wait_until="networkidle")
     t2.page.click("[data-testid=invite-join]")
     t2.page.wait_for_url(f"**/channels/{w.server_id}/*", timeout=30000)
+    seed_world(w)
+    w.go(t1, p.url)
     w.channels = trailer.channel_ids(p)
     for a in (t1, t2):
         w.go(a, w.channel_url("general"))
     say(t2, "hi")
     say(t1, "hey")
+    # the other channels have something new in them, as a lived-in server does
+    for name, text in (("announcements", "movie night friday 🍿"), ("music", "this song is so good")):
+        w.go(t1, w.channel_url(name))
+        say(t1, text)
+    w.go(t1, w.channel_url("general"))
+
+
+# the server everything happens in, and the ones each of them has besides,
+# with the pictures in their icons (Twemoji on a colour)
+SERVER = ("Night Owls", "1f989", "#4c1d95")
+OTHER_SERVERS = {"test1": [("Study Hall", "1f4da", "#0f766e"), ("Game Night", "1f3ae", "#be123c")],
+                 "test2": [("Movie Club", "1f37f", "#b45309"), ("Art Corner", "1f3a8", "#1d4ed8")]}
+
+
+def icon_png(browser, code, colour):
+    root = Path(__file__).resolve().parent.parent / "web/node_modules/@twemoji/svg"
+    page = browser.new_page(viewport={"width": 256, "height": 256})
+    svg = (root / f"{code}.svg").read_text().replace("<svg", '<svg width="150" height="150"', 1)
+    page.set_content(f"""<body style="margin:0"><div style="width:256px;height:256px;display:grid;place-items:center;
+        background:radial-gradient(circle at 30% 25%, rgba(255,255,255,.22), transparent 60%), {colour}">{svg}</div></body>""")
+    png = page.screenshot()
+    page.close()
+    return png
+
+
+def seed_world(w):
+    """A server that looks lived in: an icon, channels in categories, roles
+    with colours, and a few more servers in each person's list. People stay
+    test1 and test2."""
+    t1, t2 = w["test1"], w["test2"]
+    for a in (t1, t2):
+        a.auth = token_of(a)
+
+    def api(a, method, path, body=None, raw=None):
+        return a.page.evaluate(API_CALL, [method, path, a.auth, body, raw])
+    sid = w.server_id
+    api(t1, "PUT", f"/servers/{sid}/icon", None, list(icon_png(w.browser, SERVER[1], SERVER[2])))
+    chans = api(t1, "GET", f"/servers/{sid}/channels")
+    cat = {c["name"]: c["id"] for c in chans if c["type"] == "category"}
+    info = api(t1, "POST", f"/servers/{sid}/channels", {"type": "category", "name": "Info"})
+    order = [info["id"], cat["Text Channels"], cat["Voice Channels"]]
+    api(t1, "PATCH", f"/servers/{sid}/channels", [{"id": c, "position": k} for k, c in enumerate(order)])
+    for kind, name, parent in (("text", "welcome", info["id"]), ("announcement", "announcements", info["id"]),
+                               ("text", "clips", cat["Text Channels"]), ("text", "music", cat["Text Channels"]),
+                               ("text", "memes", cat["Text Channels"]), ("voice", "Lounge", cat["Voice Channels"]),
+                               ("voice", "Gaming", cat["Voice Channels"])):
+        api(t1, "POST", f"/servers/{sid}/channels", {"type": kind, "name": name, "parent_id": parent})
+    for who, (role, colour) in ((t1, ("Night Shift", 0xf472b6)), (t2, ("Owls", 0x2dd4bf))):
+        r = api(t1, "POST", f"/servers/{sid}/roles", {"name": role, "color": colour, "hoist": True})
+        uid = api(who, "GET", "/users/@me")["id"]
+        api(t1, "PUT", f"/servers/{sid}/members/{uid}/roles/{r['id']}")
+    for who in (t1, t2):
+        for name, code, colour in OTHER_SERVERS[who.name]:
+            srv = api(who, "POST", "/servers", {"name": name})
+            api(who, "PUT", f"/servers/{srv['id']}/icon", None, list(icon_png(w.browser, code, colour)))
+    print("    world: server, channels, roles, more servers", flush=True)
 
 
 def dm_url(w):
@@ -203,22 +276,52 @@ def hi(w):
     with Take("hi", (t1, "a")) as tk:
         typed(t2, "hi")
         wait_message(t1, "hi")
-        tk.mark("hi")
+        tk.mark("hi", LAST)
         t1.rest(0.7)
         t1.click("textarea[aria-label^='Message']")
         t1.type("hey!")
         tk.mark("hey-enter")
         send(t1, after=0.3)
-        tk.mark("hey")
+        tk.mark("hey", LAST)
         t1.rest(0.6)
         typed(t2, "how are you")
         wait_message(t1, "how are you")
-        tk.mark("how")
+        tk.mark("how", LAST)
         t1.rest(0.5)
         t1.type("good :)")
         send(t1, after=0.2)
-        tk.mark("good")
+        tk.mark("good", LAST)
         t1.rest(0.8)
+
+
+@shot
+def tour(w):
+    """test2 finds their way around: their messages, then the server, its
+    channels with something new in them, and a channel's conversation."""
+    t2 = w["test2"]
+    w.go(t2, dm_url(w))
+    start(t2, 0.5, 0.5)
+    with Take("tour", (t2, "a")) as tk:
+        if t2.phone:
+            t2.click("button[aria-label='Open Navigation']")
+            t2.rest(0.5)
+        tk.mark("home")
+        t2.rest(0.9)
+        t2.click(f"[data-server='{w.server_id}'] button")
+        t2.page.wait_for_selector(f"[data-channel='{w.channels['announcements']}']", timeout=10000)
+        tk.mark("server")
+        t2.rest(1.1)
+        t2.click(f"[data-channel='{w.channels['announcements']}']")
+        wait_message(t2, "movie night")
+        tk.mark("channel", LAST)
+        t2.rest(1.2)
+        if t2.phone:
+            t2.click("button[aria-label='Open Navigation']")
+            t2.rest(0.6)
+        t2.click(f"[data-channel='{w.channels['music']}']")
+        wait_message(t2, "this song")
+        tk.mark("music", LAST)
+        t2.rest(1.2)
 
 
 @shot
@@ -273,12 +376,12 @@ def formatting(w):
             tk.mark(f"{name}-start")
             t1.type(text, speed=1.6)
             send(t1, after=0.05)
-            tk.mark(name)
+            tk.mark(name, LAST)
             t1.rest(0.9)
             if name == "spoiler":
                 sp = t1.page.locator("[data-id]").last.get_by_role("button", name=__import__("re").compile("spoiler", 2)).first
                 t1.click(sp)
-                tk.mark("spoiler-open")
+                tk.mark("spoiler-open", LAST)
                 t1.rest(0.8)
                 t1.click("textarea[aria-label^='Message']")
         t1.rest(0.6)
@@ -300,7 +403,7 @@ def editor(w):
     with Take("editor", (t1, "a")) as tk:
         box_tool(t1, "[data-testid=format-open]", "Formatting")
         t1.page.wait_for_selector("[data-testid=format-editor]", timeout=10000)
-        tk.mark("open")
+        tk.mark("open", "[data-testid=format-editor]")
         t1.rest(0.3)
         t1.click("[data-testid=format-surface]")
         t1.type("hi everyone")
@@ -308,7 +411,7 @@ def editor(w):
         tool("Text Style")
         t1.rest(0.25)
         t1.click("[role=group][aria-label='Text Style'] button >> nth=1")
-        tk.mark("heading")
+        tk.mark("heading", "[data-testid=format-editor]")
         t1.rest(0.5)
         if t1.phone:
             # the heading is still selected: the arrow lets go of it at its end
@@ -322,11 +425,11 @@ def editor(w):
         tool("Quote or Callout")
         t1.rest(0.25)
         t1.click("[role=group][aria-label='Quote or Callout'] button[data-kind=tip]")
-        tk.mark("callout")
+        tk.mark("callout", "[data-testid=format-editor]")
         t1.rest(0.7)
         t1.click("[data-testid=format-send]")
         t1.page.wait_for_selector("[data-testid=format-editor]", state="detached", timeout=10000)
-        tk.mark("sent")
+        tk.mark("sent", LAST)
         t1.rest(1.2)
 
 
@@ -347,7 +450,7 @@ def typing(w):
     with Take("typing", (t1, "a")) as tk:
         box = t2.page.locator("textarea[aria-label^='Message']").first
         box.click()
-        tk.mark("start")
+        tk.mark("start", "textarea[aria-label^='Message']")
         for ch in "are you coming tonight":
             t2.page.keyboard.type(ch)
             time.sleep(random.uniform(0.09, 0.16))
@@ -357,7 +460,7 @@ def typing(w):
         else:
             t2.page.keyboard.press("Enter")
         wait_message(t1, "are you coming tonight")
-        tk.mark("sent")
+        tk.mark("sent", LAST)
         t1.rest(1.0)
 
 
@@ -410,7 +513,7 @@ def share(w):
             t1.page.wait_for_selector("[data-testid=watch-stream]", timeout=30000)
             t1.rest(0.6)
             t1.click("[data-testid=watch-stream]")
-            tk.mark("watch")
+            tk.mark("watch", "video")
             t1.rest(5.0)
     finally:
         sharer.close()
@@ -464,7 +567,7 @@ def snow(w):
         t1.click("textarea[aria-label^='Message']")
         t1.type("it's snowing")
         send(t1, after=0.2)
-        tk.mark("sent")
+        tk.mark("sent", LAST)
         t1.glide(VIEW[0] * 0.78, VIEW[1] * 0.3)
         t1.rest(3.0)
     t1.open_settings("appearance")
@@ -559,18 +662,18 @@ def showcase(w):
         # the header's name opens the full profile; a desk also has it in the side panel
         t2.click(t2.page.locator("[data-testid=dm-header-name]" if t2.phone else "[data-testid=profile-avatar]").first)
         t2.page.wait_for_selector("[role=tab][data-tab]", timeout=10000)
-        tk.mark("open")
+        tk.mark("open", DIALOG)
         t2.rest(1.4)
         tab = t2.page.locator("[role=tab][data-tab=widgets]")
         if tab.count():
             t2.click(tab.first)
         t2.page.wait_for_selector("[data-testid=widget-songs], [data-testid=widget-custom]", timeout=10000)
-        tk.mark("widgets")
+        tk.mark("widgets", DIALOG)
         t2.rest(1.0)
         song = t2.page.locator("[data-testid=widget-songs] ol button").first
         if song.count():
             t2.click(song)
-            tk.mark("play")
+            tk.mark("play", "[data-testid=widget-songs]")
         t2.rest(2.4)
         t2.key("Escape", after=0.5)
 
@@ -608,20 +711,20 @@ def stickers(w):
         t2.rest(0.5)
         t2.click("[data-nav=packs-discover]")
         t2.page.wait_for_selector("[data-pack]", timeout=15000)
-        tk.mark("discover")
+        tk.mark("discover", "[data-pack]")
         t2.rest(1.2)
         t2.click("[data-pack] button:has-text('Install')")
-        tk.mark("installed")
+        tk.mark("installed", "[data-pack]")
         t2.rest(0.9)
         leave_settings(t2)
         box_tool(t2, "button[aria-label='Select Emoji']", "Emoji Picker")
         t2.rest(0.3)
         t2.click("[role=tab]:has-text('Stickers')")
         t2.page.wait_for_selector("[data-sticker-state=ready]", timeout=15000)
-        tk.mark("picker")
+        tk.mark("picker", "[role=dialog][aria-label='Expression Picker']")
         t2.rest(0.8)
         t2.click(t2.page.locator("[data-sticker]").first)
-        tk.mark("sent")
+        tk.mark("sent", LAST)
         t2.rest(2.2)
 
 
@@ -655,15 +758,15 @@ def namestyle(w):
         t1.rest(0.7)
         t1.click("[data-testid=designer-part-nameStyle]")
         t1.page.wait_for_selector("[data-testid=name-style-preview]", timeout=10000)
-        tk.mark("open")
+        tk.mark("open", "[data-testid=name-style-preview]")
         t1.rest(0.5)
         for i, f in enumerate(NAME_FONTS):
             t1.click(f"[data-testid=name-font-{f}]", pause=0.05, after=0.0)
-            tk.mark(f"font{i}")
+            tk.mark(f"font{i}", "[data-testid=name-style-preview]")
             t1.rest(0.45)
         for i, e in enumerate(NAME_EFFECTS):
             t1.click(f"[data-testid=name-effect-{e}]", pause=0.05, after=0.0)
-            tk.mark(f"effect{i}")
+            tk.mark(f"effect{i}", "[data-testid=name-style-preview]")
             t1.rest(0.5)
         save = t1.page.locator("[role=dialog] button:has-text('Save Changes')").last
         if save.count():
@@ -734,7 +837,7 @@ def notes(w):
             click_point(t2, *end_of(t2, "two", surface))
             t2.rest(0.4)
             click_point(t1, *end_of(t1, "hi", surface))
-        tk.mark("typing")
+        tk.mark("typing", surface)
         t2.key("Enter", after=0.2)
         hers, his = " from test1", "three"
         for i in range(max(len(hers), len(his))):
@@ -743,7 +846,7 @@ def notes(w):
             if i < len(his):
                 t.keyboard.type(his[i])
             time.sleep(random.uniform(0.07, 0.13))
-        tk.mark("typed")
+        tk.mark("typed", surface)
         if not t1.phone:
             t1.glide(VIEW[0] * 0.82, VIEW[1] * 0.35)
             t2.glide(VIEW[0] * 0.8, VIEW[1] * 0.7)
@@ -780,11 +883,11 @@ def subchat(w):
         t1.rest(0.5)
         t1.click(t1.page.locator(":text('secret'):visible").first)
         t1.page.wait_for_selector("[data-testid=subchat-parent]", timeout=20000)
-        tk.mark("inside")
+        tk.mark("inside", LAST)
         t1.click("textarea[aria-label^='Message']")
         t1.type("hi")
         send(t1, after=0.2)
-        tk.mark("sent")
+        tk.mark("sent", LAST)
         t1.rest(0.8)
 
 
@@ -819,7 +922,7 @@ def plugins(w):
         t1.rest(0.3)
         t1.click("[data-testid=plugin-code]")
         t1.paste(PLUGIN, after=0.5)
-        tk.mark("pasted")
+        tk.mark("pasted", "[data-testid=plugin-code]")
         t1.click("[data-testid=plugin-continue]")
         t1.page.wait_for_selector("[data-testid=plugin-review]", timeout=10000)
         t1.rest(0.6)
@@ -828,7 +931,7 @@ def plugins(w):
             t1.rest(0.2)
         t1.click("[data-testid=plugin-add]")
         t1.page.wait_for_selector("[data-testid=plugin-item]", timeout=20000)
-        tk.mark("added")
+        tk.mark("added", "[data-testid=plugin-item]")
         t1.rest(1.0)
         leave_settings(t1)
         t1.click("textarea[aria-label^='Message']")
@@ -839,7 +942,7 @@ def plugins(w):
         if t1.page.locator("textarea[aria-label^='Message']").first.input_value().strip():
             send(t1, after=0.2)
         t1.page.wait_for_selector("[data-id]:has(img[alt='👋'])", timeout=15000)
-        tk.mark("waved")
+        tk.mark("waved", LAST)
         t1.rest(1.2)
 
 
@@ -866,9 +969,9 @@ def css(w):
             t1.click("[role=dialog] label:has(input[role=switch])")
             t1.rest(0.3)
         t1.click("[data-testid=css-snippet]")
-        tk.mark("typing")
+        tk.mark("typing", "[data-testid=css-snippet]")
         t1.type(CSS, speed=2.2)
-        tk.mark("typed")
+        tk.mark("typed", "[data-testid=css-snippet]")
         t1.click("[data-testid=save]")
         t1.rest(0.6)
         leave_settings(t1)
@@ -917,7 +1020,7 @@ def phone(w):
         ph.close()
 
 
-ORDER = ["hi", "react", "formatting", "editor", "typing", "stickers", "safety", "subchat", "phone", "themes", "snow", "namestyle", "showcase", "profile",
+ORDER = ["hi", "react", "tour", "formatting", "editor", "typing", "stickers", "safety", "subchat", "phone", "themes", "snow", "namestyle", "showcase", "profile",
          "voice", "share", "notes", "plugins", "css", "e2ee"]
 
 

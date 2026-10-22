@@ -29,6 +29,8 @@ html, body { margin: 0; background: #000; }
 .c { display: inline-block; will-change: transform, opacity, filter; }
 .headline { left: 0; right: 0; text-align: center; font-size: 118px; font-weight: 760; line-height: 1.04; letter-spacing: -.035em; }
 .headline .line { display: block; }
+.ln { display: block; overflow: hidden; padding: 0.06em 0.04em 0.16em; margin: -0.06em -0.04em -0.16em; }
+.ln .c { transform-origin: 0 100%; }
 .title { font-size: 52px; font-weight: 700; letter-spacing: -.025em; }
 .title.top { left: 0; right: 0; top: 64px; text-align: center; }
 .title.side { font-size: 92px; line-height: 1.02; letter-spacing: -.04em; width: 640px; white-space: nowrap; }
@@ -127,7 +129,7 @@ function makePhone(h) {
 // of the words: titles above y 150, side words left or right of x 640/1280.
 function layout(name, u) {
   switch (name) {
-    case "single": return [{ x: 960, y: 610, w: 1420, rx: 1.5, ry: lerp(-2.5, 2.5, u) }];
+    case "single": return [{ x: 960, y: 602, w: 1520, rx: 1.2, ry: lerp(-2, 2, u) }];
     case "right": return [{ x: 1270, y: 548, w: 1160, rx: 3, ry: lerp(-12, -9, u) }];
     case "left": return [{ x: 650, y: 548, w: 1160, rx: 3, ry: lerp(12, 9, u) }];
     case "pair": return [
@@ -141,7 +143,7 @@ function layout(name, u) {
     case "phoneBig": return [{ x: 540, y: 950, h: 1060, rx: 1.5, ry: lerp(-6, -2, u), phone: true }];
     // the short's phone: as big as the frame allows below the title, clear of the apps' own tabs and captions
     // a screen card: clear of the frame's sides by 80 px, facing straight on so neither edge swings out
-    case "phoneTall": return [{ x: 540, y: 1075, w: 920, vh: 1440, rx: 0.6, ry: 0, screen: true }];
+    case "phoneTall": return [{ x: 540, y: 1095, w: 984, vh: 1500, rx: 0, ry: 0, screen: true }];
     case "duo": return [
       { x: 720, y: 600, w: 1180, rx: 2, ry: lerp(9, 6, u) },
       { x: 1575, y: 600, h: 820, rx: 2, ry: lerp(-15, -11, u), phone: true, phase: 2.3 }];
@@ -215,10 +217,40 @@ function motion(r, t) {
   return o;
 }
 
+// A camera that moves the way an editor keyframes one: it holds a framing,
+// then eases to the next, arriving on its key's moment, zoom changing at an
+// even rate to the eye. Each key is [t, zoom, fx, fy, dur]: the point (fx, fy)
+// of the picture held in the middle of the window, as far as its edges allow.
+const easeMove = (u) => (u < 0.5 ? 16 * u ** 5 : 1 - Math.pow(-2 * u + 2, 5) / 2);
+function camAt(keys, t) {
+  let [_, z, fx, fy] = keys[0];
+  for (let i = 1; i < keys.length; i++) {
+    const [tk, z1, fx1, fy1, dur = 0.7] = keys[i];
+    const u = clamp((t - (tk - dur)) / dur);
+    if (u <= 0) break;
+    const e = easeMove(u);
+    z = Math.exp(lerp(Math.log(z), Math.log(z1), e)); fx = lerp(fx, fx1, e); fy = lerp(fy, fy1, e);
+  }
+  return [z, fx, fy];
+}
+function placeImg(slot, z, fx, fy) {
+  const img = slot.querySelector("img");
+  const w = +img.width, h = +img.height, vw = +slot.dataset.vw, vh = +slot.dataset.vh;
+  const tx = clamp(vw / 2 - z * fx * w, vw - z * w, 0);
+  const ty = clamp(vh / 2 - z * fy * h, vh - z * h, 0);
+  img.style.transform = `translate(${tx}px, ${ty}px) scale(${z})`;
+}
+
 // the camera inside a window: one framing a scene, a slow push across it
 function frameContent(slot, cam, t, s0, s1) {
   const img = slot.querySelector("img");
   if (!cam) { img.style.transform = ""; return; }
+  if (!Array.isArray(cam)) {
+    // a breath of push across the whole scene keeps a held framing alive
+    const [z, fx, fy] = camAt(cam.keys, t);
+    placeImg(slot, Math.max(1, z * (1 + (cam.drift ?? 0.025) * sineInOut(clamp((t - s0) / (s1 - s0))))), fx, fy);
+    return;
+  }
   const u = sineInOut(clamp((t - s0) / (s1 - s0)));
   const [z0, fx, fy, z1] = cam;
   const z = Math.max(1, lerp(z0, z1 ?? z0, u));
@@ -287,6 +319,10 @@ function show(slot, p, r, k, t) {
 // ---------------------------------------------------------------------------
 // words, each kind moving its own way
 
+// words in lines, each line a mask the words rise into
+function masked(text) {
+  return text.split("\n").map((l) => `<span class="ln">${l.split(" ").map((w) => `<span class="c">${w}</span>`).join(" ")}</span>`).join("");
+}
 function chars(text) { return [...text].map((c) => c === "\n" ? "<br>" : c === " " ? " " : `<span class="c">${c}</span>`).join(""); }
 function words(text) { return text.split(" ").map((w) => `<span class="c">${w}</span>`).join(" "); }
 
@@ -298,7 +334,7 @@ function buildText(it) {
     el.className = "text title " + (it.place === "top" ? "top" : "side");
     if (it.place === "left") Object.assign(el.style, { left: "110px", top: "548px", transform: "translateY(-50%)" });
     if (it.place === "right") Object.assign(el.style, { right: "110px", top: "548px", transform: "translateY(-50%)", textAlign: "right" });
-    el.innerHTML = chars(it.text);
+    el.innerHTML = masked(it.text);
   }
   else if (it.kind === "statement") { el.className = "text statement"; el.innerHTML = words(it.text); }
   else if (it.kind === "tagline") { el.className = "text tagline"; el.innerHTML = chars(it.text); }
@@ -333,19 +369,21 @@ function drawTexts(t) {
         c.style.letterSpacing = `${(1 - e) * 0.06}em`;
       });
       const x = sineInOut(exitOf(t, it.t1, 0.8));
-      el.style.opacity = 1 - x; el.style.filter = x ? `blur(${x * 12}px)` : ""; el.style.transform = `translateY(${-x * 60}px)`;
+      // a headline can move aside for what comes next: [from, to, how far down, how big]
+      const [ma, mb, dy, sc] = it.move || [0, 1, 0, 1];
+      const m = cubicInOut(clamp((t - ma) / (mb - ma)));
+      el.style.transformOrigin = "50% 0";
+      el.style.opacity = 1 - x; el.style.filter = x ? `blur(${x * 12}px)` : "";
+      el.style.transform = `translateY(${-x * 60 + dy * m}px) scale(${lerp(1, sc, m)})`;
     } else if (it.kind === "title") {
-      // letter by letter, quick and close together
+      // word by word up out of the line's mask, and up out of it again to leave,
+      // the words a touch apart on the way in, as type set by hand
+      const n = cs.length;
       cs.forEach((c, i) => {
-        const at = it.t0 + i * 0.018, e = expoOut(clamp((t - at) / 0.7));
-        c.style.opacity = clamp((t - at) / 0.25);
-        c.style.transform = `translateY(${(1 - e) * 0.42}em)`;
-        c.style.filter = e < 0.99 ? `blur(${(1 - e) * 5}px)` : "";
+        const at = it.t0 + i * 0.05, e = expoOut(clamp((t - at) / 0.8));
+        const out = quartIn(clamp((t - (it.t1 - 0.34 + (i - n) * 0.018)) / 0.3));
+        c.style.transform = `translateY(${(1 - e) * 108 - out * 108}%) rotate(${(1 - e) * 3}deg)`;
       });
-      const x = quartIn(exitOf(t, it.t1, 0.4));
-      el.style.opacity = 1 - x;
-      el.style.filter = x ? `blur(${x * 8}px)` : "";
-      el.style.marginTop = `${-x * 24}px`;
     } else if (it.kind === "statement") {
       // each word lands on its beat, from a little larger
       cs.forEach((c, i) => {
@@ -413,6 +451,10 @@ function draw(t) {
   loads.length = 0;
   const frame = Math.round(t * SPEC.fps);
   drawBg(t);
+  // the drops land as a small kick: the whole room pushes in a little and settles
+  let kick = 0;
+  for (const h of SPEC.hits || []) if (t >= h) kick += 0.022 * Math.exp(-(t - h) / 0.16) * Math.min(1, (t - h) / 0.03);
+  document.getElementById("world").style.transform = kick > 1e-4 ? `scale(${1 + kick})` : "";
   drawRigs(t);
   drawTexts(t);
   document.getElementById("grain").style.backgroundPosition = `${(frame * 137) % 384}px ${(frame * 263) % 384}px`;
