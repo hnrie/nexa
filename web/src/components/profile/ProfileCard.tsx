@@ -302,13 +302,10 @@ function Spot({ design, part, label, round }: { design: ProfileDesign; part: Pro
 export type ProfileTab = "about" | "widgets" | "activity" | "mutuals";
 
 /** Below this width the full profile is one column, with what it says about the person behind a tab of its own. */
-const TWO_COLUMNS = 700;
+const TWO_COLUMNS = 520;
+/** Below this width the two columns are tight: the left one is under 300px, so the avatar is drawn smaller. */
+const ROOMY = 680;
 
-/**
- * Whether the full profile is too narrow for its two columns, measured on the
- * card itself: a dialog on a desktop, a phone's sheet and the page a profile
- * link opens all hold it at different widths.
- */
 /**
  * A custom status in a thought bubble beside the avatar. A long one is cut to
  * a few lines there, and opens to every word on a hover, a press or a key.
@@ -374,18 +371,23 @@ function StatusBubble({ status, design }: { status: { text: string; emoji: strin
   );
 }
 
-function useNarrow(el: HTMLElement | null, on: boolean): boolean {
-  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < TWO_COLUMNS + 64);
+/**
+ * How wide the full profile is, measured on the card itself: a dialog on a
+ * desktop, a phone's sheet and the page a profile link opens all hold it at
+ * different widths, and that decides one column or two.
+ */
+function useCardWidth(el: HTMLElement | null, on: boolean): number {
+  const [width, setWidth] = useState(() => (typeof window !== "undefined" ? window.innerWidth - 64 : ROOMY));
   useLayoutEffect(() => {
     if (!on || !el) return;
-    const measure = () => setNarrow(el.clientWidth < TWO_COLUMNS);
+    const measure = () => setWidth(el.clientWidth);
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
   }, [el, on]);
-  return narrow;
+  return width;
 }
 
 /**
@@ -450,7 +452,8 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const compact = variant !== "modal";
   const panel = variant === "panel";
   const popout = variant === "popout";
-  const narrow = useNarrow(cardEl, !compact);
+  const cardWidth = useCardWidth(cardEl, !compact);
+  const narrow = cardWidth < TWO_COLUMNS;
   const visitorWidgets = visitor?.widgets;
   const shownWidgets = useMemo(() => previewWidgets ?? (visitor ? readWidgets(visitorWidgets) : widgets), [previewWidgets, visitor, visitorWidgets, widgets]);
 
@@ -528,7 +531,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   const banner = bannerUrl(user.banner_id, panel || (!compact && !narrow) ? 340 : 600);
   const friend = !visitor && rel?.type === "friend";
   const interactive = !preview && !visitor;
-  const avatarSize = panel || popout ? 80 : 120;
+  const avatarSize = panel || popout ? 80 : !narrow && cardWidth < ROOMY ? 92 : 120;
 
   const colours: Record<string, string> = theme ? { "--profile-top": theme.top, "--profile-bottom": theme.bottom } : tint ? { "--profile-tint": tint } : {};
   const cardStyle = { "--av": `${avatarSize}px`, ...colours } as CSSProperties;

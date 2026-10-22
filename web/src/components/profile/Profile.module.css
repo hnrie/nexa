@@ -239,7 +239,8 @@
 .card[data-layout="wide"] {
   --av-left: 20px;
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
+  /* the left column gives way first, so a desktop window of 1000px still has both */
+  grid-template-columns: clamp(250px, 44%, 340px) minmax(0, 1fr);
   gap: 16px;
   height: min(720px, var(--profile-max-h, calc(100dvh - 48px)));
   padding: 12px;
