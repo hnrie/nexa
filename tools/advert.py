@@ -117,6 +117,21 @@ def user_settings(actor):
     actor.click("button[aria-label='User Settings']")
 
 
+def leave_settings(actor):
+    """Closes User Settings: Escape at a desk; on a phone its close button, then
+    the navigation drawer it was opened from."""
+    if actor.phone:
+        close = actor.page.locator("button[aria-label='Close Settings']")
+        if close.count() and close.first.is_visible():
+            actor.click(close.first, after=0.5)
+        close_drawer(actor)
+        return
+    for _ in range(3):
+        if not actor.page.locator("[role=dialog][aria-label='User Settings']").count():
+            return
+        actor.key("Escape", after=0.4)
+
+
 def close_drawer(actor):
     """On a phone, the navigation drawer stays open after settings close; a tap
     beside it closes it."""
@@ -276,25 +291,35 @@ def editor(w):
     w.go(t1, w.channel_url("general"))
     start(t1, 0.7, 0.35)
     tray = "[data-testid=format-toolbar] button[aria-label='{}']"
+
+    def tool(name):
+        # a phone's toolbar scrolls sideways; bring the button into view first
+        btn = t1.page.locator(tray.format(name)).first
+        btn.scroll_into_view_if_needed()
+        t1.click(btn)
     with Take("editor", (t1, "a")) as tk:
-        t1.click("[data-testid=format-open]")
+        box_tool(t1, "[data-testid=format-open]", "Formatting")
         t1.page.wait_for_selector("[data-testid=format-editor]", timeout=10000)
         tk.mark("open")
         t1.rest(0.3)
         t1.click("[data-testid=format-surface]")
         t1.type("hi everyone")
-        t1.key("Meta+a", after=0.2)
-        t1.click(tray.format("Text Style"))
+        t1.key("Shift+Home" if t1.phone else "Meta+a", after=0.2)
+        tool("Text Style")
         t1.rest(0.25)
         t1.click("[role=group][aria-label='Text Style'] button >> nth=1")
         tk.mark("heading")
         t1.rest(0.5)
-        t1.click("[data-testid=format-surface]", fx=0.9, fy=0.2)
+        if t1.phone:
+            # the heading is still selected: the arrow lets go of it at its end
+            t1.key("ArrowRight", after=0.1)
+        else:
+            t1.click("[data-testid=format-surface]", fx=0.9, fy=0.2)
         t1.key("End", after=0.1)
         t1.key("Enter", after=0.1)
         t1.type("this was made in the editor")
         t1.key("Shift+Home", after=0.2)
-        t1.click(tray.format("Quote or Callout"))
+        tool("Quote or Callout")
         t1.rest(0.25)
         t1.click("[role=group][aria-label='Quote or Callout'] button[data-kind=tip]")
         tk.mark("callout")
@@ -367,7 +392,11 @@ def share(w):
     w.go(w["test2"], w.base + "/channels/@me")
     sharer.page.goto(url, wait_until="networkidle")
     trailer.join_voice(sharer, url)
-    if not t1.page.locator("[data-testid=voice-status]").count():
+    if t1.phone:
+        # a phone opens the voice channel's own page and joins from there
+        t1.page.goto(f"{w.base}/channels/{w.server_id}/{w.channels['General']}", wait_until="networkidle")
+        t1.page.tap("[data-testid=join-voice]")
+    elif not t1.page.locator("[data-testid=voice-status]").count():
         w.go(t1, url)
         trailer.join_voice(t1, url)
     t1.page.wait_for_function("() => document.querySelectorAll('[data-peer-state=connected][data-user]').length >= 2", timeout=60000)
@@ -584,11 +613,7 @@ def stickers(w):
         t2.click("[data-pack] button:has-text('Install')")
         tk.mark("installed")
         t2.rest(0.9)
-        if t2.phone:
-            t2.click("button[aria-label='Close Settings']", after=0.5)
-        while t2.page.locator("[data-nav=stickers]").count():
-            t2.key("Escape", after=0.5)
-        close_drawer(t2)
+        leave_settings(t2)
         box_tool(t2, "button[aria-label='Select Emoji']", "Emoji Picker")
         t2.rest(0.3)
         t2.click("[role=tab]:has-text('Stickers')")
@@ -674,7 +699,8 @@ def notes(w):
     m.wait_for_selector("[data-testid=note-title]")
     m.fill("[data-testid=note-title]", "test")
     m.click(surface)
-    for i, line in enumerate(["hi", "", "- one", "- two"]):
+    # a list carries on by itself after Enter on a phone
+    for i, line in enumerate(["hi", "", "- one", "two" if t1.phone else "- two"]):
         if i:
             m.keyboard.press("Enter")
         m.keyboard.type(line, delay=3)
@@ -691,14 +717,23 @@ def notes(w):
     t.wait_for_timeout(800)
     t.goto(note, wait_until="networkidle")
     t.wait_for_selector(surface)
-    t1.mouse = (VIEW[0] * 0.8, VIEW[1] * 0.75)
-    t2.mouse = (VIEW[0] * 0.75, VIEW[1] * 0.8)
-    for a in (t1, t2):
-        a.page.mouse.move(*a.mouse)
+    if not t1.phone:
+        t1.mouse = (VIEW[0] * 0.8, VIEW[1] * 0.75)
+        t2.mouse = (VIEW[0] * 0.75, VIEW[1] * 0.8)
+        for a in (t1, t2):
+            a.page.mouse.move(*a.mouse)
     with Take("notes", (t1, "a"), (t2, "b")) as tk:
-        click_point(t2, *end_of(t2, "two", surface))
-        t2.rest(0.4)
-        click_point(t1, *end_of(t1, "hi", surface))
+        if t2.phone:
+            # a tap in the note, then the keys, put each caret where it belongs
+            t2.click(t.locator(surface).get_by_text("two", exact=True).first, fx=0.95)
+            t2.key("End", after=0.1)
+            t2.rest(0.3)
+            t1.page.locator(surface).get_by_text("hi", exact=True).first.tap()
+            t1.key("End", after=0.05)
+        else:
+            click_point(t2, *end_of(t2, "two", surface))
+            t2.rest(0.4)
+            click_point(t1, *end_of(t1, "hi", surface))
         tk.mark("typing")
         t2.key("Enter", after=0.2)
         hers, his = " from test1", "three"
@@ -709,8 +744,9 @@ def notes(w):
                 t.keyboard.type(his[i])
             time.sleep(random.uniform(0.07, 0.13))
         tk.mark("typed")
-        t1.glide(VIEW[0] * 0.82, VIEW[1] * 0.35)
-        t2.glide(VIEW[0] * 0.8, VIEW[1] * 0.7)
+        if not t1.phone:
+            t1.glide(VIEW[0] * 0.82, VIEW[1] * 0.35)
+            t2.glide(VIEW[0] * 0.8, VIEW[1] * 0.7)
         t1.rest(1.2)
 
 
@@ -721,7 +757,12 @@ def subchat(w):
     w.go(t1, dm_url(w))
     start(t1, 0.62, 0.55)
     with Take("subchat", (t1, "a")) as tk:
-        t1.click("[data-testid=subchats-button]")
+        if t1.phone:
+            t1.click("button[aria-label='More']")
+            t1.rest(0.35)
+            t1.click(t1.page.get_by_text("Subchats", exact=True).first)
+        else:
+            t1.click("[data-testid=subchats-button]")
         t1.rest(0.4)
         t1.click("[data-testid=subchat-with-password]")
         t1.rest(0.3)
@@ -789,15 +830,14 @@ def plugins(w):
         t1.page.wait_for_selector("[data-testid=plugin-item]", timeout=20000)
         tk.mark("added")
         t1.rest(1.0)
-        t1.key("Escape", after=0.4)
-        if t1.page.locator("[role=dialog][aria-label='User Settings']").count():
-            t1.key("Escape", after=0.4)
+        leave_settings(t1)
         t1.click("textarea[aria-label^='Message']")
         t1.type("/wave")
         t1.rest(0.5)
-        t1.key("Enter", after=0.3)
+        # Enter takes the command from the list, then sends; a phone's send button does both
+        send(t1, after=0.3)
         if t1.page.locator("textarea[aria-label^='Message']").first.input_value().strip():
-            t1.key("Enter", after=0.2)
+            send(t1, after=0.2)
         t1.page.wait_for_selector("[data-id]:has(img[alt='👋'])", timeout=15000)
         tk.mark("waved")
         t1.rest(1.2)
@@ -831,9 +871,11 @@ def css(w):
         tk.mark("typed")
         t1.click("[data-testid=save]")
         t1.rest(0.6)
-        t1.key("Escape", after=0.4)
+        leave_settings(t1)
         tk.mark("closed")
         t1.rest(1.6)
+    # the pink must not reach the shots filmed after this one
+    leave_settings(t1)
     t1.open_settings("customCss")
     if t1.page.locator("[role=dialog] input[role=switch]").first.is_checked():
         t1.page.locator("[role=dialog] label:has(input[role=switch])").first.click()
@@ -843,7 +885,7 @@ def css(w):
     except Exception:
         pass
     t1.page.wait_for_timeout(800)
-    t1.close_settings()
+    leave_settings(t1)
 
 
 @shot

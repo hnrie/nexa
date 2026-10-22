@@ -1231,7 +1231,8 @@ notes.
   song (`advert_edit.py`, needs librosa; `--bpm` when it hears the wrong tempo) and cuts the takes to
   its beats on a stage drawn frame by frame in headless Chrome (`advert_stage.html`), plus a thumbnail.
   `--cut` picks the trailer, a faster cut of it (`fast`) or a 1080x1920 short for phones (`short`),
-  which uses takes filmed in Nexa's phone layout (`film --phones`, saved as `m-<shot>`). Each shot
+  which uses takes filmed in Nexa's phone layout (`film --phones`, saved as `m-<shot>`), each shown
+  as its screen at the frame's full width so the app's words read on a phone. Each shot
   gives up after `SHOT_LIMIT` seconds rather than hanging the run.
 - Schema: `gen_pg_schema.sh`, `pg_schema.py`.
 

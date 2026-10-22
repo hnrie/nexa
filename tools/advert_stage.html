@@ -18,6 +18,8 @@ html, body { margin: 0; background: #000; }
 .bar i:nth-child(1) { background: #ff5f57; } .bar i:nth-child(2) { background: #febc2e; } .bar i:nth-child(3) { background: #28c840; }
 .bar span { position: absolute; left: 0; right: 0; text-align: center; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.5); }
 .view { position: relative; overflow: hidden; }
+.screen { border-radius: 46px; overflow: hidden; background: #17151d;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 30px 70px rgba(0,0,0,.4), 0 70px 160px rgba(0,0,0,.45); }
 .view img { display: block; transform-origin: 0 0; }
 .phone { padding: 13px; border-radius: 62px; background: #0b0b0e; box-shadow: 0 0 0 2px #3a3940, 0 0 0 3px #111, 0 28px 60px rgba(0,0,0,.35), 0 60px 140px rgba(0,0,0,.45); }
 .phone .view { border-radius: 49px; }
@@ -101,12 +103,22 @@ function makeWin(title, w, vh) {
   el.dataset.w = w; el.dataset.h = h + BAR; el.dataset.vw = w; el.dataset.vh = h;
   return el;
 }
+// A phone's screen w wide and vh tall, as a card: the phone take at the
+// frame's full width, cropped top and bottom, so its words read on a phone.
+function makeScreen(w, vh) {
+  const el = document.createElement("div");
+  el.className = "slot screen";
+  const ih = Math.round(w * 1170 / 540);
+  el.innerHTML = `<div class="view" style="width:${w}px;height:${vh}px"><img width="${w}" height="${ih}"></div>`;
+  el.dataset.w = w; el.dataset.h = vh; el.dataset.vw = w; el.dataset.vh = vh;
+  return el;
+}
 function makePhone(h) {
   const el = document.createElement("div");
   el.className = "slot phone";
   const w = Math.round(h * 540 / 1170);
   el.innerHTML = `<div class="view" style="width:${w}px;height:${h}px"><img width="${w}" height="${h}"></div><div class="island"></div>`;
-  el.dataset.w = w + 26; el.dataset.h = h + 26; el.dataset.phone = 1;
+  el.dataset.w = w + 26; el.dataset.h = h + 26; el.dataset.phone = 1; el.dataset.vw = w; el.dataset.vh = h;
   return el;
 }
 
@@ -127,7 +139,8 @@ function layout(name, u) {
       { x: 520, y: 700, w: 920, vh: 450, z: -160, rx: 2, ry: lerp(5, 3, u), dof: 1.2, phase: 1.7 },
       { x: 560, y: 1215, w: 920, vh: 450, rx: 2, ry: lerp(-4, -2, u) }];
     case "phoneBig": return [{ x: 540, y: 950, h: 1060, rx: 1.5, ry: lerp(-6, -2, u), phone: true }];
-    case "phoneTall": return [{ x: 540, y: 1010, h: 1300, rx: 1.2, ry: lerp(-4, -1.5, u), phone: true }];
+    // the short's phone: as big as the frame allows below the title, clear of the apps' own tabs and captions
+    case "phoneTall": return [{ x: 540, y: 1075, w: 1000, vh: 1480, rx: 1, ry: lerp(-3, -1, u), screen: true }];
     case "duo": return [
       { x: 720, y: 600, w: 1180, rx: 2, ry: lerp(9, 6, u) },
       { x: 1575, y: 600, h: 820, rx: 2, ry: lerp(-15, -11, u), phone: true, phase: 2.3 }];
@@ -164,7 +177,7 @@ function buildRig(r) {
     r.wallEl = wall;
   } else {
     for (const pl of layout(r.layout, 0)) {
-      const s = pl.phone ? makePhone(pl.h) : makeWin(r.titles?.[slots.length] || "Nexa", pl.w, pl.vh);
+      const s = pl.screen ? makeScreen(pl.w, pl.vh) : pl.phone ? makePhone(pl.h) : makeWin(r.titles?.[slots.length] || "Nexa", pl.w, pl.vh);
       el.appendChild(s);
       slots.push(s);
     }
@@ -200,7 +213,7 @@ function motion(r, t) {
 // the camera inside a window: one framing a scene, a slow push across it
 function frameContent(slot, cam, t, s0, s1) {
   const img = slot.querySelector("img");
-  if (slot.dataset.phone || !cam) { img.style.transform = ""; return; }
+  if (!cam) { img.style.transform = ""; return; }
   const u = sineInOut(clamp((t - s0) / (s1 - s0)));
   const [z0, fx, fy, z1] = cam;
   const z = Math.max(1, lerp(z0, z1 ?? z0, u));
