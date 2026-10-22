@@ -19,7 +19,7 @@ VITE_ALL_SEASONS=1 so the seasonal themes are there to film. edit needs
 numpy and librosa (in a venv of its own: ADVERT_PYTHON names its python).
 Takes and frames go to ADVERT_WORK (default /tmp/nexa-advert).
 """
-import argparse, json, os, random, shutil, subprocess, sys, time, traceback
+import argparse, json, os, random, shutil, signal, subprocess, sys, time, traceback
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -38,6 +38,8 @@ random.seed(11)
 # ---------------------------------------------------------------------------
 
 SHOTS = {}
+SHOT_LIMIT = 180  # seconds before a stuck shot is given up
+PREFIX = ""  # "m-" while filming the phone versions of the shots
 
 
 def shot(fn):
@@ -50,6 +52,7 @@ class Take:
     seconds from the start of the film, for the edit to cut on."""
 
     def __init__(self, name, *views, lead=0.8, tail=1.2):
+        name = PREFIX + name
         self.name, self.views, self.lead, self.tail = name, views, lead, tail
         self.marks = {}
 
@@ -91,7 +94,46 @@ def typed(actor, text, delay=70):
     for ch in text:
         actor.page.keyboard.type(ch)
         time.sleep(random.uniform(0.05, 0.12) * delay / 70)
-    actor.page.keyboard.press("Enter")
+    if actor.phone:
+        actor.page.click("button[aria-label='Send Message']")
+    else:
+        actor.page.keyboard.press("Enter")
+
+
+def send(actor, after=0.25):
+    """Sends what is in the box: Enter at a desk, the send button on a phone,
+    where Enter starts a new line."""
+    if actor.phone:
+        actor.click("button[aria-label='Send Message']", after=after)
+    else:
+        actor.key("Enter", after=after)
+
+
+def user_settings(actor):
+    """Opens User Settings; on a phone its button is in the navigation drawer."""
+    if actor.phone:
+        actor.click("button[aria-label='Open Navigation']")
+        actor.rest(0.45)
+    actor.click("button[aria-label='User Settings']")
+
+
+def close_drawer(actor):
+    """On a phone, the navigation drawer stays open after settings close; a tap
+    beside it closes it."""
+    if actor.phone and actor.page.locator("button[aria-label='User Settings']").first.is_visible():
+        actor.page.touchscreen.tap(trailer.PHONE[0] * 0.92, trailer.PHONE[1] * 0.45)
+        actor.rest(0.4)
+
+
+def box_tool(actor, sel, item):
+    """A button beside the message box; on a phone it is the row named `item`
+    in the Message Options sheet."""
+    if actor.phone and not actor.page.locator(sel).first.is_visible():
+        actor.click("button[aria-label='Message Options']")
+        actor.rest(0.4)
+        actor.click(actor.page.get_by_role("menuitem", name=item).or_(actor.page.get_by_text(item, exact=True)).first)
+        return
+    actor.click(sel)
 
 
 def wait_message(actor, text, timeout=15000):
@@ -151,7 +193,7 @@ def hi(w):
         t1.click("textarea[aria-label^='Message']")
         t1.type("hey!")
         tk.mark("hey-enter")
-        t1.key("Enter", after=0.3)
+        send(t1, after=0.3)
         tk.mark("hey")
         t1.rest(0.6)
         typed(t2, "how are you")
@@ -159,7 +201,7 @@ def hi(w):
         tk.mark("how")
         t1.rest(0.5)
         t1.type("good :)")
-        t1.key("Enter", after=0.2)
+        send(t1, after=0.2)
         tk.mark("good")
         t1.rest(0.8)
 
@@ -188,7 +230,7 @@ def react(w):
         t1.click(row.locator("button[aria-label='Reply']"))
         t1.rest(0.2)
         t1.type("all good here")
-        t1.key("Enter", after=0.2)
+        send(t1, after=0.2)
         tk.mark("replied")
         t1.rest(0.8)
 
@@ -208,12 +250,14 @@ def formatting(w):
     t1 = w["test1"]
     w.go(t1, w.channel_url("general"))
     start(t1, 0.62, 0.3)
-    t1.page.click("textarea[aria-label^='Message']")
+    (t1.page.tap if t1.phone else t1.page.click)("textarea[aria-label^='Message']")
     with Take("formatting", (t1, "a"), lead=0.4) as tk:
+        if t1.phone:  # starting the recording takes the focus from the box
+            t1.click("textarea[aria-label^='Message']", after=0.3)
         for name, text in FORMATS:
             tk.mark(f"{name}-start")
             t1.type(text, speed=1.6)
-            t1.key("Enter", after=0.05)
+            send(t1, after=0.05)
             tk.mark(name)
             t1.rest(0.9)
             if name == "spoiler":
@@ -283,7 +327,10 @@ def typing(w):
             t2.page.keyboard.type(ch)
             time.sleep(random.uniform(0.09, 0.16))
         time.sleep(1.2)
-        t2.page.keyboard.press("Enter")
+        if t2.phone:
+            t2.page.tap("button[aria-label='Send Message']")
+        else:
+            t2.page.keyboard.press("Enter")
         wait_message(t1, "are you coming tonight")
         tk.mark("sent")
         t1.rest(1.0)
@@ -356,7 +403,7 @@ def themes(w):
     w.go(t1, w.channel_url("general"))
     start(t1)
     with Take("themes", (t1, "a")) as tk:
-        t1.click("button[aria-label='User Settings']")
+        user_settings(t1)
         t1.rest(0.4)
         t1.click("[data-nav=appearance]")
         t1.rest(0.8)
@@ -387,7 +434,7 @@ def snow(w):
     with Take("snow", (t1, "a"), lead=1.5) as tk:
         t1.click("textarea[aria-label^='Message']")
         t1.type("it's snowing")
-        t1.key("Enter", after=0.2)
+        send(t1, after=0.2)
         tk.mark("sent")
         t1.glide(VIEW[0] * 0.78, VIEW[1] * 0.3)
         t1.rest(3.0)
@@ -407,6 +454,150 @@ def e2ee(w):
     shutil.move(str(take[1]), TAKES / "e2ee-a.mp4")
     (TAKES / "e2ee.json").write_text(json.dumps({"marks": {"cut": take[3]}, "views": {"a": {"file": "e2ee-a.mp4", "offset": 0, "phone": False}}}))
     print("    filmed e2ee", src.name)
+
+
+STICKER_EMOJI = ["1f438", "1f63a", "1f355", "1f44b", "1f389", "1f60e", "1f525", "1f49c"]
+
+
+def token_of(actor):
+    """The session token, read off the app's own next API request."""
+    with actor.page.expect_request(lambda r: "authorization" in r.headers and "/api/v1/" in r.url) as req:
+        actor.page.reload(wait_until="domcontentloaded")
+    return req.value.headers["authorization"]
+
+
+def sticker_pngs(browser):
+    """Twemoji drawn big with a white die-cut edge, the way stickers look."""
+    root = Path(__file__).resolve().parent.parent / "web/node_modules/@twemoji/svg"
+    page = browser.new_page(viewport={"width": 320, "height": 320})
+    out = []
+    for code in STICKER_EMOJI:
+        svg = (root / f"{code}.svg").read_text()
+        page.set_content(f"""<body style="margin:0;background:transparent"><div style="width:320px;height:320px;display:grid;place-items:center">
+            <div style="width:250px;height:250px;filter:drop-shadow(0 0 0 #fff) drop-shadow(5px 0 0 #fff) drop-shadow(-5px 0 0 #fff) drop-shadow(0 5px 0 #fff) drop-shadow(0 -5px 0 #fff) drop-shadow(0 4px 6px rgba(0,0,0,.25))">{svg.replace('<svg', '<svg width="250" height="250"', 1)}</div></div></body>""")
+        out.append(page.screenshot(omit_background=True))
+    page.close()
+    return out
+
+
+API_CALL = """async ([method, path, auth, body, raw]) => {
+    const r = await fetch('/api/v1' + path, { method, headers: { Authorization: auth, 'Content-Type': raw ? 'application/octet-stream' : 'application/json' },
+        body: method === 'GET' ? undefined : raw ? new Uint8Array(raw) : JSON.stringify(body) });
+    const text = await r.text();
+    if (!r.ok) throw new Error(path + ' ' + text);
+    return text ? JSON.parse(text) : null;
+}"""
+
+PROFILE_SONGS = ["Get Lucky Daft Punk", "Blinding Lights The Weeknd", "Levitating Dua Lipa", "As It Was Harry Styles"]
+PROFILE_ARTISTS = ["Daft Punk", "The Weeknd", "Dua Lipa", "Tame Impala"]
+
+
+def seed_profile(w):
+    """test1's profile as someone would make it: a styled name, an accent, a
+    short About Me, and the music they like (found on Deezer, as the app does)."""
+    if getattr(w, "profile_seeded", False):
+        return
+    w.profile_seeded = True
+    t1 = w["test1"]
+    auth = token_of(t1)
+    api = lambda *a: t1.page.evaluate(API_CALL, list(a) + [None] * (5 - len(a)))  # noqa: E731
+
+    def found(kind, q):
+        r = api("GET", f"/music/search?kind={kind}&q={q.replace(' ', '%20')}", auth)
+        return (r or {}).get("results", [])[:1]
+    songs = [x for q in PROFILE_SONGS for x in found("songs", q)]
+    artists = [x for q in PROFILE_ARTISTS for x in found("artists", q)]
+    print(f"    profile: {len(songs)} songs, {len(artists)} artists found", flush=True)
+    api("PATCH", "/users/@me", auth, {"about_me": "hi :)", "pronouns": "they/them", "accent_color": 0x7c3aed,
+                                      "name_style": {"font": "pacifico", "effect": "aurora", "colors": [0xa78bfa, 0x22d3ee, 0xf472b6]}})
+    widgets = []
+    if songs:
+        widgets.append({"id": "songs1", "type": "songs", "music": songs})
+    if artists:
+        widgets.append({"id": "artists1", "type": "artists", "music": artists})
+    widgets.append({"id": "card1", "type": "custom", "title": "Right Now", "text": "learning guitar, slowly"})
+    api("PUT", "/users/@me/widgets", auth, {"widgets": widgets})
+
+
+@shot
+def showcase(w):
+    """test2 opens test1's profile: the styled name, then their music, and a song plays."""
+    t2 = w["test2"]
+    seed_profile(w)
+    w.go(t2, dm_url(w))
+    start(t2, 0.55, 0.5)
+    with Take("showcase", (t2, "a")) as tk:
+        # the header's name opens the full profile; a desk also has it in the side panel
+        t2.click(t2.page.locator("[data-testid=dm-header-name]" if t2.phone else "[data-testid=profile-avatar]").first)
+        t2.page.wait_for_selector("[role=tab][data-tab]", timeout=10000)
+        tk.mark("open")
+        t2.rest(1.4)
+        tab = t2.page.locator("[role=tab][data-tab=widgets]")
+        if tab.count():
+            t2.click(tab.first)
+        t2.page.wait_for_selector("[data-testid=widget-songs], [data-testid=widget-custom]", timeout=10000)
+        tk.mark("widgets")
+        t2.rest(1.0)
+        song = t2.page.locator("[data-testid=widget-songs] ol button").first
+        if song.count():
+            t2.click(song)
+            tk.mark("play")
+        t2.rest(2.4)
+        t2.key("Escape", after=0.5)
+
+
+def seed_stickers(w):
+    """test1 makes a public sticker pack, as anyone can. The calls go through
+    the page, whose requests the browser sends to the throwaway server."""
+    if getattr(w, "stickers_seeded", False):
+        return
+    w.stickers_seeded = True
+    t1 = w["test1"]
+    print("    sticker pack: token", flush=True)
+    auth = token_of(t1)
+    print("    sticker pack: making it", flush=True)
+    call = API_CALL
+    pack = t1.page.evaluate(call, ["POST", "/stickers/packs", auth, {"name": "test1's stickers", "kind": "sticker"}, None])
+    print("    sticker pack: drawing stickers", flush=True)
+    names = ["frog", "cat", "pizza", "wave", "party", "cool", "fire", "heart"]
+    for name, png in zip(names, sticker_pngs(w.browser)):
+        t1.page.evaluate(call, ["POST", f"/stickers/packs/{pack['id']}/stickers?name={name}&tags={name}", auth, None, list(png)])
+    t1.page.evaluate(call, ["PATCH", f"/stickers/packs/{pack['id']}", auth, {"public": True}, None])
+
+
+@shot
+def stickers(w):
+    """test2 finds test1's pack in Discover, installs it, and sends one."""
+    t2 = w["test2"]
+    seed_stickers(w)
+    w.go(t2, dm_url(w))
+    start(t2, 0.6, 0.6)
+    with Take("stickers", (t2, "a")) as tk:
+        user_settings(t2)
+        t2.rest(0.35)
+        t2.click("[data-nav=stickers]")
+        t2.rest(0.5)
+        t2.click("[data-nav=packs-discover]")
+        t2.page.wait_for_selector("[data-pack]", timeout=15000)
+        tk.mark("discover")
+        t2.rest(1.2)
+        t2.click("[data-pack] button:has-text('Install')")
+        tk.mark("installed")
+        t2.rest(0.9)
+        if t2.phone:
+            t2.click("button[aria-label='Close Settings']", after=0.5)
+        while t2.page.locator("[data-nav=stickers]").count():
+            t2.key("Escape", after=0.5)
+        close_drawer(t2)
+        box_tool(t2, "button[aria-label='Select Emoji']", "Emoji Picker")
+        t2.rest(0.3)
+        t2.click("[role=tab]:has-text('Stickers')")
+        t2.page.wait_for_selector("[data-sticker-state=ready]", timeout=15000)
+        tk.mark("picker")
+        t2.rest(0.8)
+        t2.click(t2.page.locator("[data-sticker]").first)
+        tk.mark("sent")
+        t2.rest(2.2)
 
 
 @shot
@@ -433,7 +624,7 @@ def namestyle(w):
     w.go(t1, w.channel_url("general"))
     start(t1)
     with Take("namestyle", (t1, "a")) as tk:
-        t1.click("button[aria-label='User Settings']")
+        user_settings(t1)
         t1.rest(0.35)
         t1.click("[data-nav=profiles]")
         t1.rest(0.7)
@@ -551,7 +742,7 @@ def subchat(w):
         tk.mark("inside")
         t1.click("textarea[aria-label^='Message']")
         t1.type("hi")
-        t1.key("Enter", after=0.2)
+        send(t1, after=0.2)
         tk.mark("sent")
         t1.rest(0.8)
 
@@ -579,7 +770,7 @@ def plugins(w):
     w.go(t1, w.channel_url("general"))
     start(t1)
     with Take("plugins", (t1, "a")) as tk:
-        t1.click("button[aria-label='User Settings']")
+        user_settings(t1)
         t1.rest(0.4)
         t1.click("[data-nav=plugins]")
         t1.rest(0.6)
@@ -627,7 +818,7 @@ def css(w):
     w.go(t1, w.channel_url("general"))
     start(t1)
     with Take("css", (t1, "a")) as tk:
-        t1.click("button[aria-label='User Settings']")
+        user_settings(t1)
         t1.rest(0.4)
         t1.click("[data-nav=customCss]")
         t1.rest(0.6)
@@ -684,11 +875,23 @@ def phone(w):
         ph.close()
 
 
-ORDER = ["hi", "react", "formatting", "editor", "typing", "safety", "subchat", "phone", "themes", "snow", "namestyle", "profile",
+ORDER = ["hi", "react", "formatting", "editor", "typing", "stickers", "safety", "subchat", "phone", "themes", "snow", "namestyle", "showcase", "profile",
          "voice", "share", "notes", "plugins", "css", "e2ee"]
 
 
-def film(only):
+def as_phones(w):
+    """test1 and test2 swap their desks for phones, for the portrait cut."""
+    for name in ("test1", "test2"):
+        w.people[name].close()
+        ph = Actor(w.browser, w.base, name, name, phone=True)
+        ph.login()
+        ph.page.set_default_timeout(8000)
+        w.people[name] = ph
+
+
+def film(only, phones=False):
+    global PREFIX
+    PREFIX = "m-" if phones else ""
     chosen = only or ORDER
     for sub in ("raw", "assets"):
         shutil.rmtree(WORK / sub, ignore_errors=True)
@@ -710,11 +913,23 @@ def film(only):
             ])
             w = World(browser, srv, ADDRESS)
             seed(w)
+            if phones:
+                # made at the desk first: the in-page calls stall on the phone pages
+                if "stickers" in chosen:
+                    seed_stickers(w)
+                if "showcase" in chosen:
+                    seed_profile(w)
+                as_phones(w)
             for name in chosen:
-                print("shot:", name)
+                print("shot:", name, flush=True)
+                # a shot that stops making progress fails on its own instead of hanging the run
+                signal.signal(signal.SIGALRM, lambda *_: (_ for _ in ()).throw(TimeoutError(f"{name} took over {SHOT_LIMIT} s")))
+                signal.alarm(SHOT_LIMIT)
                 try:
                     SHOTS[name](w)
+                    signal.alarm(0)
                 except Exception:
+                    signal.alarm(0)
                     traceback.print_exc()
                     failed.append(name)
                     for a in w.people.values():
@@ -739,6 +954,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("what", choices=["film", "edit", "thumb"])
     ap.add_argument("--only", default="")
+    ap.add_argument("--phones", action="store_true", help="film the shots on phones, as m-<shot>, for the portrait cut")
     ap.add_argument("--song", default="")
     ap.add_argument("--out", default="")
     ap.add_argument("--from", dest="t_from", type=float, default=None)
@@ -747,9 +963,10 @@ def main():
     ap.add_argument("--cut", choices=["trailer", "fast", "short"], default="trailer",
                     help="edit: the trailer, a faster cut of it, or a 9:16 short for phones")
     ap.add_argument("--bpm", type=float, default=None, help="edit: the song's tempo, roughly, if the measured one is off")
-    ap.add_argument("--frame-key", default="namestyle-a", help="thumb: which take's frames to show")
-    ap.add_argument("--frame-index", type=int, default=1, help="thumb: which of its frames")
-    ap.add_argument("--line", default="Private Chat<br>with All the<br>Fun Left In", help="thumb: the headline (HTML)")
+    ap.add_argument("--frame-key", default="showcase-a", help="thumb: which take's frames to show")
+    ap.add_argument("--frame-index", type=int, default=269, help="thumb: which of its frames")
+    ap.add_argument("--line", default="The Best<br>Discord<br>Alternative", help="thumb: the headline (HTML)")
+    ap.add_argument("--pill", default="Free and End-to-End Encrypted", help="thumb: the line in the yellow pill")
     args = ap.parse_args()
     if args.what == "film":
         only = [n.strip() for n in args.only.split(",") if n.strip()]
@@ -757,7 +974,7 @@ def main():
         if bad:
             print("no such shot:", ", ".join(bad), "(have", ", ".join(SHOTS) + ")", file=sys.stderr)
             return 2
-        return film(only)
+        return film(only, args.phones)
     import advert_edit
     if args.what == "edit":
         return advert_edit.edit(args)

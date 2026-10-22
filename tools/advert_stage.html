@@ -29,10 +29,10 @@ html, body { margin: 0; background: #000; }
 .headline .line { display: block; }
 .title { font-size: 52px; font-weight: 700; letter-spacing: -.025em; }
 .title.top { left: 0; right: 0; top: 64px; text-align: center; }
-.title.side { font-size: 92px; line-height: 1.02; letter-spacing: -.04em; width: 560px; white-space: normal; }
+.title.side { font-size: 92px; line-height: 1.02; letter-spacing: -.04em; width: 640px; white-space: nowrap; }
 .statement { left: 0; right: 0; text-align: center; font-size: 132px; font-weight: 760; letter-spacing: -.04em; top: 455px; }
-.tagline { left: 0; right: 0; top: 612px; text-align: center; font-size: 56px; font-weight: 600; letter-spacing: -.02em; }
-.url { left: 0; right: 0; top: 708px; text-align: center; font-size: 30px; font-weight: 500; color: rgba(255,255,255,.62); letter-spacing: .01em; }
+.tagline { left: 0; right: 0; top: 602px; text-align: center; font-size: 46px; font-weight: 600; letter-spacing: -.02em; }
+.url { left: 0; right: 0; top: 672px; text-align: center; font-size: 96px; font-weight: 700; color: #fff; letter-spacing: -.02em; }
 .mark { position: absolute; left: 0; right: 0; display: flex; justify-content: center; }
 #grain { opacity: .045; mix-blend-mode: overlay; pointer-events: none; }
 #vignette { background: radial-gradient(ellipse 75% 70% at 50% 48%, transparent 55%, rgba(0,0,0,.5) 100%); pointer-events: none; }
@@ -127,6 +127,7 @@ function layout(name, u) {
       { x: 520, y: 700, w: 920, vh: 450, z: -160, rx: 2, ry: lerp(5, 3, u), dof: 1.2, phase: 1.7 },
       { x: 560, y: 1215, w: 920, vh: 450, rx: 2, ry: lerp(-4, -2, u) }];
     case "phoneBig": return [{ x: 540, y: 950, h: 1060, rx: 1.5, ry: lerp(-6, -2, u), phone: true }];
+    case "phoneTall": return [{ x: 540, y: 1010, h: 1300, rx: 1.2, ry: lerp(-4, -1.5, u), phone: true }];
     case "duo": return [
       { x: 720, y: 600, w: 1180, rx: 2, ry: lerp(9, 6, u) },
       { x: 1575, y: 600, h: 820, rx: 2, ry: lerp(-15, -11, u), phone: true, phase: 2.3 }];
@@ -403,28 +404,52 @@ function draw(t) {
 }
 
 // the thumbnail: the app turned on the right, the line big on the left
-window.drawThumb = async function (key, idx, line) {
+window.drawThumb = async function (key, idx, line, pill, phone) {
+  // A thumbnail is seen small, beside others, for a moment: a bright field,
+  // three words that read at a glance, and the real app big, on a computer
+  // and a phone.
   document.getElementById("words").style.display = "none";
+  document.getElementById("vignette").style.opacity = "0.55";
   const st = document.getElementById("stage");
   st.style.transform = "scale(0.6667)"; st.style.transformOrigin = "0 0";
+  st.style.background = "radial-gradient(120% 140% at 78% 30%, #7a2cff 0%, #4a12b8 32%, #1d0848 70%, #0d0322 100%)";
   const ga = document.getElementById("ga"), gb = document.getElementById("gb");
-  ga.style.cssText += ";left:1500px;top:300px;background:radial-gradient(closest-side, rgba(140,60,255,.95), rgba(140,60,255,0))";
-  gb.style.cssText += ";left:200px;top:1100px;background:radial-gradient(closest-side, rgba(255,70,150,.7), rgba(255,70,150,0))";
-  const win = makeWin("Nexa", 1120);
-  win.style.transform = "translate3d(870px, 215px, 0) rotateY(-16deg) rotateX(3deg)";
+  ga.style.cssText += ";left:1450px;top:380px;background:radial-gradient(closest-side, rgba(255,90,200,.75), rgba(255,90,200,0))";
+  gb.style.cssText += ";left:260px;top:980px;background:radial-gradient(closest-side, rgba(70,140,255,.6), rgba(70,140,255,0))";
+  const win = makeWin("Nexa", 1180);
+  win.style.transform = "translate3d(800px, 250px, 0) rotateY(-14deg) rotateX(4deg) rotateZ(1.5deg)";
+  win.style.boxShadow = "0 40px 120px rgba(10,0,40,.7), 0 0 0 2px rgba(255,255,255,.12)";
   document.getElementById("world").appendChild(win);
   const f = SPEC.frames[key];
   const img = win.querySelector("img");
   img.src = `${f.dir}/${String(idx).padStart(5, "0")}.jpg`;
   await img.decode();
+  // the same chat on a phone, in front of the window's corner
+  if (phone) {
+    const ph = makePhone(640);
+    ph.style.cssText += ";position:absolute;left:1600px;top:430px;transform:rotate(7deg);z-index:5;box-shadow:0 0 0 2px #3a3940, 0 30px 90px rgba(10,0,40,.7)";
+    st.appendChild(ph);
+    const pi = ph.querySelector("img");
+    pi.src = `${SPEC.frames[phone[0]].dir}/${String(phone[1]).padStart(5, "0")}.jpg`;
+    await pi.decode();
+  }
   const mark = document.createElement("div");
-  mark.className = "mark"; mark.style.cssText += ";top:70px;left:90px;right:auto;justify-content:flex-start";
-  mark.innerHTML = `<svg height="70" viewBox="0 0 229.45 100"><path d="${BRAND.letters}" fill="#fff" fill-rule="evenodd"/><path d="${BRAND.spark}" fill="#a160ff"/></svg>`;
+  mark.className = "mark"; mark.style.cssText += ";top:78px;left:96px;right:auto;justify-content:flex-start;z-index:6";
+  mark.innerHTML = `<svg height="76" viewBox="0 0 229.45 100"><path d="${BRAND.letters}" fill="#fff" fill-rule="evenodd"/><path d="${BRAND.spark}" fill="#c9a2ff"/></svg>`;
   st.appendChild(mark);
   const text = document.createElement("div");
-  text.style.cssText = "position:absolute;left:90px;top:270px;width:800px;font-size:128px;line-height:1;font-weight:800;letter-spacing:-.045em;text-shadow:0 8px 40px rgba(0,0,0,.5)";
+  text.style.cssText = "position:absolute;left:92px;top:250px;width:900px;z-index:6;font-size:150px;line-height:.94;font-weight:800;letter-spacing:-.05em;color:#fff;" +
+    "text-shadow:0 4px 0 rgba(30,0,70,.55), 0 14px 50px rgba(20,0,60,.65)";
   text.innerHTML = line;
   st.appendChild(text);
+  if (pill) {
+    const p = document.createElement("div");
+    p.style.cssText = "position:absolute;left:96px;top:800px;z-index:6;padding:18px 34px;border-radius:999px;color:#fff;" +
+      "background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 2px rgba(255,255,255,.28), 0 14px 40px rgba(20,0,60,.35);backdrop-filter:blur(18px);" +
+      "font-size:46px;font-weight:700;letter-spacing:-.02em";
+    p.textContent = pill;
+    st.appendChild(p);
+  }
   return true;
 };
 

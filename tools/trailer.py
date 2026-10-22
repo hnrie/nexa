@@ -374,6 +374,19 @@ class Actor(Session):
 
     # --- moving and clicking --------------------------------------------------
 
+    def open_settings(self, nav):
+        # on a phone User Settings lives in the navigation drawer
+        if self.phone and self.page.locator("[role=dialog][aria-label='User Settings']").count() == 0:
+            self.page.click("button[aria-label='Open Navigation']")
+            self.page.wait_for_timeout(500)
+        super().open_settings(nav)
+
+    def close_settings(self):
+        super().close_settings()
+        if self.phone and self.page.locator("button[aria-label='User Settings']").first.is_visible():
+            self.page.touchscreen.tap(PHONE[0] * 0.92, PHONE[1] * 0.45)
+            self.page.wait_for_timeout(400)
+
     def glide(self, x, y, dur=None, settle=True):
         """Moves the pointer as a hand on a mouse does: one quick, slightly
         curved throw that lands a little short or long of the target, then a
