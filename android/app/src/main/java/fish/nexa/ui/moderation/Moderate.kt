@@ -169,9 +169,9 @@ private val UNITS = listOf(MINUTE, HOUR, DAY, WEEK)
 private const val MAX_MUTE = 365 * DAY
 private const val MAX_BAN = 5 * 365 * DAY
 private val ACTIONS = listOf("avatar_remove", "field_reset", "mute", "ban", "delete")
-private val RESET_FIELDS = listOf("username", "display_name", "about_me", "pronouns", "status", "nicknames", "server_profiles", "typing_style", "widgets", "server_tag")
+private val RESET_FIELDS = listOf("username", "display_name", "about_me", "pronouns", "status", "nicknames", "server_profiles", "typing_style", "name_style", "widgets", "server_tag")
 /** The fields a reset empties rather than writing a stand-in in. */
-private val CLEARED = setOf("status", "nicknames", "server_profiles", "typing_style", "widgets", "server_tag")
+private val CLEARED = setOf("status", "nicknames", "server_profiles", "typing_style", "name_style", "widgets", "server_tag")
 
 private fun unitLabel(u: Long) = when (u) {
     MINUTE -> t("moderation.unit.minutes")
@@ -318,6 +318,7 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
         "nicknames" to (nicknamed?.joinToString(", ") { "${it.name}: ${it.nickname}" } ?: t("moderation.form.everyServer")),
         "server_profiles" to (profiled?.joinToString(", ") { it.name } ?: t("moderation.form.everyServer")),
         "typing_style" to TypingStyle.text(TypingStyle.read(u.typingStyle)),
+        "name_style" to fish.nexa.data.NameStyle.text(fish.nexa.data.NameStyle.read(u.nameStyle)),
         "widgets" to widgetsText(widgets).joinToString(" / ") { (title, text) -> "$title: $text" },
         "server_tag" to (u.serverTag?.text ?: ""),
     )

@@ -1,4 +1,5 @@
 import { ImagePlus, Trash2 } from "lucide-react";
+import { ColourInput } from "@/components/common/ColourInput";
 import { useRef, useState, type CSSProperties } from "react";
 import { servers as serversApi } from "@/api/servers";
 import { Avatar } from "@/components/common/Avatar";
@@ -167,7 +168,7 @@ export default function ServerTagPage({ serverId }: { serverId: string }) {
                 <button key={c} type="button" className={st.swatch} role="radio" aria-checked={draft.color === c} data-on={draft.color === c} style={{ background: tagColorCss(c) }} title={tagColorCss(c)} aria-label={t("server.roles.colourIndexOfCount", { index: i + 1, count: COLORS.length })} onClick={() => set({ color: c })} />
               ))}
               <label className={st.swatch} data-on={draft.color !== null && !COLORS.includes(draft.color)} style={{ background: draft.color !== null && !COLORS.includes(draft.color) ? tagColorCss(draft.color) : "var(--bg-surface)", border: "2px dashed var(--border-strong)" }} title={t("server.roles.customColour")}>
-                <input type="color" value={draft.color !== null ? tagColorCss(draft.color) : "#8000ff"} aria-label={t("server.roles.customColour")} onChange={(e) => set({ color: parseInt(e.target.value.slice(1), 16) })} />
+                <ColourInput value={draft.color !== null ? tagColorCss(draft.color) : "#8000ff"} label={t("server.roles.customColour")} onChange={(v) => set({ color: parseInt(v.slice(1, 7), 16) })} />
               </label>
             </div>
           </div>

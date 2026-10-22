@@ -1,0 +1,78 @@
+/*
+ * Nexa's own colour picker (ColourInput.tsx), the web's twin of Android's.
+ * The square is the thing to touch: large, its knob a white ring with a soft
+ * shadow so it reads on any colour. The strips under it are thick enough for
+ * a thumb, and the foot holds the colour as it is now beside its code.
+ */
+
+/* laid over a swatch that shows the colour already */
+.cover { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; border-radius: inherit; background: none; cursor: pointer; }
+.cover:disabled { cursor: not-allowed; }
+/* a swatch of its own, where nothing else shows the colour */
+.shown { width: 40px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-sm); background: var(--chosen); box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 16%, transparent), var(--shadow-low); cursor: pointer; }
+.shown:disabled { opacity: 0.45; cursor: not-allowed; }
+.cover:focus-visible, .shown:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.picker { display: flex; flex-direction: column; gap: 12px; width: 248px; padding: 12px; }
+
+.area {
+  position: relative;
+  height: 156px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent), var(--pure);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 18%, transparent);
+  cursor: crosshair;
+  touch-action: none;
+}
+:dir(rtl) .area { background: linear-gradient(to top, #000, transparent), linear-gradient(to left, #fff, transparent), var(--pure); }
+.knob {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  background: var(--solid);
+  box-shadow: 0 0 0 3px #fff, 0 1px 4px 3px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+
+.strip { position: relative; height: 14px; border-radius: var(--radius-pill); cursor: pointer; touch-action: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 18%, transparent); }
+.hue { background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+:dir(rtl) .hue { background: linear-gradient(to left, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+/* the colour fading out over light and dark squares */
+.alpha {
+  background:
+    linear-gradient(to right, transparent, var(--solid)),
+    repeating-conic-gradient(var(--bg-active) 0% 25%, var(--bg-surface) 0% 50%) 0 0 / 10px 10px;
+}
+:dir(rtl) .alpha { background: linear-gradient(to left, transparent, var(--solid)), repeating-conic-gradient(var(--bg-active) 0% 25%, var(--bg-surface) 0% 50%) 0 0 / 10px 10px; }
+.thumb { position: absolute; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / 0.4), inset 0 0 0 1px rgb(0 0 0 / 0.08); pointer-events: none; }
+.area:focus-visible, .strip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+
+.foot { display: flex; align-items: center; gap: 8px; }
+.now {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(var(--current), var(--current)), repeating-conic-gradient(var(--bg-active) 0% 25%, var(--bg-surface) 0% 50%) 0 0 / 10px 10px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 14%, transparent);
+}
+.hex {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  color: var(--text-strong);
+  font: 500 14px/1 var(--font-mono);
+  text-transform: lowercase;
+}
+.hex:focus { outline: none; box-shadow: inset 0 0 0 2px var(--brand); }
+.hex[aria-invalid="true"] { box-shadow: inset 0 0 0 2px var(--text-danger); }
+.drop { flex: none; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 0; border-radius: var(--radius-sm); background: var(--bg-raised); color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--border-subtle); cursor: pointer; }
+.drop:hover { background: var(--bg-hover); }
+.drop:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

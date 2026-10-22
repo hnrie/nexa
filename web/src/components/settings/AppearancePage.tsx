@@ -1,4 +1,5 @@
 import { Check, Pipette } from "lucide-react";
+import { ColourInput } from "@/components/common/ColourInput";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { useAuth } from "@/stores/auth";
@@ -108,7 +109,7 @@ export default function AppearancePage() {
         {ACCENTS.map((c, i) => <button key={c} className={s.swatch} data-on={accent === c} aria-pressed={accent === c} style={{ background: c }} title={c} aria-label={tr_("server.roles.colourIndexOfCount", { index: i + 1, count: ACCENTS.length })} onClick={() => patch({ accent: c })} />)}
         <label className={[s.swatch, look.swatchPick].join(" ")} data-on={!!accent && !ACCENTS.includes(accent)} title={tr_("settings.appearance.custom")} style={accent && !ACCENTS.includes(accent) ? { background: accent } : undefined}>
           {accent && !ACCENTS.includes(accent) ? null : <Pipette size={18} aria-hidden="true" />}
-          <input type="color" value={accent ?? themeAccent} aria-label={tr_("settings.appearance.custom")} onChange={(e) => patch({ accent: e.target.value })} />
+          <ColourInput value={accent ?? themeAccent} label={tr_("settings.appearance.custom")} onChange={(v) => patch({ accent: v })} />
         </label>
       </div>
       <h3 className={s.h5} data-setting="font">{tr_("settings.appearance.font")}</h3>

@@ -38,6 +38,8 @@ export interface PublicUser {
   created_at: number;
   /** How "is typing…" looks for them (lib/typingStyle), or null for the plain one. Read with readTypingStyle. */
   typing_style?: unknown;
+  /** How their display name is drawn (lib/nameStyle), or null for the plain name. Read with readNameStyle. */
+  name_style?: unknown;
   /** The server tag they wear beside their name, or null. */
   server_tag?: WornTag | null;
 }

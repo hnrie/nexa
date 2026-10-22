@@ -1,0 +1,34 @@
+/* The fonts a name can be set in (lib/nameStyle.ts NAME_FONTS), one cut each.
+   This sheet loads only once a name in one of them is drawn (loadNameFonts),
+   so the app's first load does not carry it; a face is then fetched only for
+   the subsets of the letters on screen. Letters a font lacks fall back to the
+   app's own. */
+@import "@fontsource/comic-neue/700.css";
+@import "@fontsource/fraunces/700.css";
+@import "@fontsource/playfair-display/700.css";
+@import "@fontsource/dm-serif-display/400.css";
+@import "@fontsource/young-serif/400.css";
+@import "@fontsource/syne/700.css";
+@import "@fontsource/bricolage-grotesque/700.css";
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource/outfit/600.css";
+@import "@fontsource/lexend/600.css";
+@import "@fontsource/sora/700.css";
+@import "@fontsource/rubik/700.css";
+@import "@fontsource/fredoka/600.css";
+@import "@fontsource/comfortaa/700.css";
+@import "@fontsource/baloo-2/700.css";
+@import "@fontsource/quicksand/700.css";
+@import "@fontsource/bungee/400.css";
+@import "@fontsource/righteous/400.css";
+@import "@fontsource/chewy/400.css";
+@import "@fontsource/shrikhand/400.css";
+@import "@fontsource/titan-one/400.css";
+@import "@fontsource/orbitron/700.css";
+@import "@fontsource/pacifico/400.css";
+@import "@fontsource/lobster/400.css";
+@import "@fontsource/kalam/700.css";
+@import "@fontsource/patrick-hand/400.css";
+@import "@fontsource/caveat/700.css";
+@import "@fontsource/pixelify-sans/600.css";
+@import "@fontsource/space-mono/700.css";

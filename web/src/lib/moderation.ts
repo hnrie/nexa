@@ -150,6 +150,8 @@ export function fieldLabel(f: ResetField | ServerField): string {
       return t("moderation.field.serverProfiles");
     case "typing_style":
       return t("moderation.field.typingStyle");
+    case "name_style":
+      return t("moderation.field.nameStyle");
     case "widgets":
       return t("moderation.field.widgets");
     case "server_tag":

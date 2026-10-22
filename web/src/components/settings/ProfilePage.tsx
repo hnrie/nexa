@@ -1,4 +1,4 @@
-import { AlignLeft, CircleUserRound, Image as ImageIcon, ImagePlus, LayoutGrid, LoaderCircle, MessageCircleMore, Palette, Pin, Plus, Smile, Tag, Type, UserRound, type LucideIcon } from "lucide-react";
+import { AlignLeft, CircleUserRound, Image as ImageIcon, ImagePlus, LayoutGrid, LoaderCircle, MessageCircleMore, Palette, Pin, Plus, Smile, Sparkles, Tag, Type, UserRound, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ApiError } from "@/api/client";
 import { avatarUrl, bannerUrl, users as usersApi } from "@/api/users";
@@ -22,13 +22,15 @@ import { ChatPreview, ColoursPicker, EditPop, hexOf, InlineAbout, InlineText } f
 import { ServerProfileDesigner } from "./ServerProfileDesigner";
 import { ServerTagList, wearServerTag } from "./ServerTagChooser";
 import { TypingStyleEditor } from "./TypingStyleEditor";
+import { NameStyleDialog } from "./NameStyleDialog";
+import { readNameStyle, sameNameStyle, type NameStyle } from "@/lib/nameStyle";
 import { AddWidgetDialog, CardDialog, GameWidgetDialog, MusicWidgetDialog } from "./WidgetsEditor";
 import st from "./Settings.module.css";
 import d from "./Designer.module.css";
 
 type View = "full" | "card" | "chat";
 /** What the strip of parts and the profile's own parts open. */
-type Part = ProfilePart | "colours" | "widgets" | "typing";
+type Part = ProfilePart | "colours" | "widgets" | "typing" | "nameStyle";
 type Pop = { part: "banner" | "avatar" | "colours" | "tag"; anchor: HTMLElement };
 
 /** Where the designer opens when Settings was asked for one of its parts (its search, a typing line's Make Your Own). */
@@ -83,6 +85,8 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
   const [accent, setAccent] = useState<string | null>(hexOf(me?.accent_color));
   const [accent2, setAccent2] = useState<string | null>(hexOf(me?.accent_color_2));
   const [typing, setTyping] = useState<TypingStyle | null>(() => readTypingStyle(me?.typing_style));
+  const [nameLook, setNameLook] = useState<NameStyle | null>(() => readNameStyle(me?.name_style));
+  const [styling, setStyling] = useState(false);
   const [crop, setCrop] = useState<{ file: File; kind: "avatar" | "banner" } | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<"avatar" | "banner" | null>(null);
@@ -137,6 +141,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     setAccent(hexOf(me.accent_color));
     setAccent2(hexOf(me.accent_color_2));
     setTyping(readTypingStyle(me.typing_style));
+    setNameLook(readNameStyle(me.name_style));
   }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const savedAbout = me?.about_me ?? "";
   const loadedAbout = useMemo(() => aboutToEdit(savedAbout), [savedAbout]);
@@ -151,7 +156,9 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
   const currentAccent2 = hexOf(me.accent_color_2);
   const savedTyping = readTypingStyle(me.typing_style);
   const typingChanged = !sameTypingStyle(typing, savedTyping);
-  const profileChanged = displayName !== me.display_name || pronouns !== me.pronouns || about !== loadedAbout || accent !== currentAccent || accent2 !== currentAccent2 || typingChanged;
+  const savedNameLook = readNameStyle(me.name_style);
+  const nameLookChanged = !sameNameStyle(nameLook, savedNameLook);
+  const profileChanged = displayName !== me.display_name || pronouns !== me.pronouns || about !== loadedAbout || accent !== currentAccent || accent2 !== currentAccent2 || typingChanged || nameLookChanged;
   const widgetsChanged = savedWidgets !== null && JSON.stringify(widgets) !== JSON.stringify(savedWidgets);
   const dirty = profileChanged || widgetsChanged;
   const shownName = displayName.trim() || me.display_name;
@@ -161,7 +168,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     setSaving(true);
     try {
       if (profileChanged) {
-        const u = await usersApi.patchMe({ display_name: displayName.trim(), pronouns: pronouns.trim(), about_me: aboutOut, accent_color: hex(accent), accent_color_2: hex(accent2), ...(typingChanged ? { typing_style: typing } : {}) });
+        const u = await usersApi.patchMe({ display_name: displayName.trim(), pronouns: pronouns.trim(), about_me: aboutOut, accent_color: hex(accent), accent_color_2: hex(accent2), ...(typingChanged ? { typing_style: typing } : {}), ...(nameLookChanged ? { name_style: nameLook } : {}) });
         setMe(u);
         // the server trims and cleans what it stores, so take its copy back or the form stays "unsaved"
         setDisplayName(u.display_name);
@@ -170,6 +177,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
         setAccent(hexOf(u.accent_color));
         setAccent2(hexOf(u.accent_color_2));
         setTyping(readTypingStyle(u.typing_style));
+        setNameLook(readNameStyle(u.name_style));
       }
       if (widgetsChanged) {
         const res = await usersApi.setWidgets(widgets);
@@ -191,6 +199,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     setAccent(currentAccent);
     setAccent2(currentAccent2);
     setTyping(savedTyping);
+    setNameLook(savedNameLook);
     if (savedWidgets) setWidgets(savedWidgets);
     setInline(null);
   };
@@ -237,6 +246,9 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
         return;
       case "typing":
         setView("chat");
+        return;
+      case "nameStyle":
+        setStyling(true);
         return;
       case "widgets":
         setView("full");
@@ -299,10 +311,11 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     if (editing.isNew && view === "full") showTab("widgets");
   };
 
-  const preview = { display_name: shownName, pronouns, about_me: aboutOut, accent_color: hex(accent), accent_color_2: hex(accent2), typing_style: typing };
+  const preview = { display_name: shownName, pronouns, about_me: aboutOut, accent_color: hex(accent), accent_color_2: hex(accent2), typing_style: typing, name_style: nameLook };
   // each with the anchor Settings' search knows it by
   const parts: { id: Part; icon: LucideIcon; label: string; setting?: string }[] = [
     { id: "name", icon: Type, label: t("settings.account.displayName") },
+    { id: "nameStyle", icon: Sparkles, label: t("nameStyle.title"), setting: "nameStyle" },
     { id: "pronouns", icon: UserRound, label: t("settings.profile.pronouns") },
     { id: "avatar", icon: CircleUserRound, label: t("settings.profile.avatar"), setting: "avatar" },
     { id: "banner", icon: ImageIcon, label: t("settings.profile.profileBanner"), setting: "banner" },
@@ -385,7 +398,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
           </div>
         ) : (
           <div className={d.chatView}>
-            <ChatPreview name={shownName} avatarId={me.avatar_id} userId={me.id} typing={typing} />
+            <ChatPreview name={shownName} avatarId={me.avatar_id} userId={me.id} typing={typing} look={nameLook ? { own: nameLook } : undefined} />
             <section className={d.typingPanel} aria-labelledby="designer-typing-title">
               <h3 className={d.panelTitle} id="designer-typing-title">{t("typing.editor.title")}</h3>
               <p className={d.panelHint}>{t("typing.editor.hint")}</p>
@@ -450,6 +463,14 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
         </EditPop>
       ) : null}
 
+      {styling ? (
+        <NameStyleDialog
+          initial={nameLook}
+          preview={{ ...me, ...preview, display_name: shownName }}
+          onApply={(st) => { setNameLook(st); setStyling(false); }}
+          onClose={() => setStyling(false)}
+        />
+      ) : null}
       {adding ? <AddWidgetDialog widgets={widgets} onPick={startWidget} onClose={() => setAdding(false)} /> : null}
       {editing && isGameWidget(editing.widget) ? <GameWidgetDialog initial={editing.widget} onDone={doneWidget} onClose={() => setEditing(null)} /> : null}
       {editing && isMusicWidget(editing.widget) ? <MusicWidgetDialog initial={editing.widget} onDone={doneWidget} onClose={() => setEditing(null)} /> : null}

@@ -82,6 +82,9 @@ type User struct {
 	// TypingStyle is how "is typing…" looks for this account to everyone
 	// else, as the JSON the server writes (api/typing_style.go), or "".
 	TypingStyle string `json:"-"`
+	// NameStyle is how the display name is drawn (font, effect, colours), as
+	// the JSON the server writes (api/name_style.go), or "".
+	NameStyle string `json:"-"`
 	// The server tag worn, copied from its server when it was put on and kept
 	// in step by the server (api/server_tags.go). TagServerID nil wears none.
 	TagServerID *ids.ID `json:"-"`
@@ -102,8 +105,8 @@ type User struct {
 // GroupLinkOnly says the account joins group chats only from an invite link
 // (users.group_link_only): friends picking people for a group see it as Link
 // Only. It is sent when false too, so a user_update that turns it off
-// replaces the old value instead of leaving it standing. TypingStyle and
-// ServerTag go out as null when there is none, for the same reason.
+// replaces the old value instead of leaving it standing. TypingStyle,
+// NameStyle and ServerTag go out as null when there is none, for the same reason.
 type PublicUser struct {
 	ID              ids.ID          `json:"id"`
 	Username        string          `json:"username"`
@@ -122,6 +125,7 @@ type PublicUser struct {
 	GroupLinkOnly   bool            `json:"group_link_only"`
 	CreatedAt       int64           `json:"created_at"`
 	TypingStyle     json.RawMessage `json:"typing_style"`
+	NameStyle       json.RawMessage `json:"name_style"`
 	ServerTag       *WornTag        `json:"server_tag"`
 }
 
@@ -140,6 +144,9 @@ func (u *User) Public() PublicUser {
 		StatusExpiresAt: u.StatusExpiresAt, PublicKey: u.PublicKey, Flags: u.Flags & publicFlags, GroupLinkOnly: u.GroupLinkOnly, CreatedAt: u.CreatedAt}
 	if u.TypingStyle != "" {
 		p.TypingStyle = json.RawMessage(u.TypingStyle)
+	}
+	if u.NameStyle != "" {
+		p.NameStyle = json.RawMessage(u.NameStyle)
 	}
 	p.ServerTag = u.WornTag()
 	return p
@@ -172,6 +179,8 @@ type ProfilePatch struct {
 	GroupLinkOnly   *bool
 	// TypingStyle replaces the style with this JSON; "" is the plain one.
 	TypingStyle *string
+	// NameStyle replaces the name's style with this JSON; "" is the plain one.
+	NameStyle *string
 }
 
 // Session is a login on one device.

@@ -657,6 +657,7 @@ private fun settingsIndex(groups: List<SettingsGroup>): List<SettingResult> {
         Triple("profiles", "profile", "settings.profile.pronouns"),
         Triple("profiles", "profile", "settings.profile.aboutMe"),
         Triple("profiles", "typingStyle", "typing.editor.title"),
+        Triple("profiles", "nameStyle", "nameStyle.title"),
         Triple("profiles", "widgets", "widgets.title"),
         Triple("profiles", "widgets", "widgets.group.music"),
         Triple("profiles", "widgets", "widgets.type.artists"),

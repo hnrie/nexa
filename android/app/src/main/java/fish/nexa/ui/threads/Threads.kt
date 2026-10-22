@@ -305,7 +305,7 @@ private fun LastLine(serverId: String, threadId: String, last: fish.nexa.data.Th
     val st = Nexa.servers.get(serverId)
     val name = fish.nexa.ui.shell.Names.member(serverId, last.authorId)
     val own = st?.members?.get(last.authorId)?.avatarId
-    val look = st?.let { fish.nexa.ui.chat.RoleLooks.of(it, last.authorId) }
+    val look = fish.nexa.ui.chat.RoleLooks.withOwn(st?.let { fish.nexa.ui.chat.RoleLooks.of(it, last.authorId) }, Nexa.users.get(last.authorId)?.nameStyle)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         fish.nexa.ui.components.Avatar(last.authorId, name, own ?: Nexa.users.get(last.authorId)?.avatarId, 16.dp)
         Box(Modifier.widthIn(max = 120.dp)) {

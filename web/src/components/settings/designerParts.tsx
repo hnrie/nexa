@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { ColourInput } from "@/components/common/ColourInput";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
@@ -161,7 +162,7 @@ export function ColoursPicker({ accent, accent2, setAccent, setAccent2 }: { acce
         {PRESETS.map((c, i) => <button key={c} className={st.swatch} data-on={accent === c} aria-pressed={accent === c} style={{ background: c }} title={c} aria-label={t("server.roles.colourIndexOfCount", { index: i + 1, count: PRESETS.length })} onClick={() => setAccent(c)} />)}
         <label className={st.swatch} data-on={!!accent && !PRESETS.includes(accent)} title={t("settings.appearance.custom")}>
           <CustomColorIcon color={accent && !PRESETS.includes(accent) ? accent : null} />
-          <input type="color" value={accent ?? "#8000ff"} aria-label={t("settings.appearance.custom")} onChange={(e) => setAccent(e.target.value)} />
+          <ColourInput value={accent ?? "#8000ff"} label={t("settings.appearance.custom")} onChange={setAccent} />
         </label>
         <HexInput value={accent} fallback="#8000ff" label={t("settings.profile.primaryColourHex")} testId="accent-hex" onChange={setAccent} />
       </div>
@@ -171,7 +172,7 @@ export function ColoursPicker({ accent, accent2, setAccent, setAccent2 }: { acce
         {PRESETS.map((c, i) => <button key={c} className={st.swatch} data-on={accent2 === c} aria-pressed={accent2 === c} style={{ background: c }} title={c} aria-label={t("server.roles.colourIndexOfCount", { index: i + 1, count: PRESETS.length })} onClick={() => setAccent2(c)} disabled={!accent} />)}
         <label className={st.swatch} data-on={!!accent2 && !PRESETS.includes(accent2)} style={{ opacity: accent ? 1 : 0.4 }} title={t("settings.appearance.custom")}>
           <CustomColorIcon color={accent2 && !PRESETS.includes(accent2) ? accent2 : null} />
-          <input type="color" value={accent2 ?? "#eb459e"} disabled={!accent} aria-label={t("settings.appearance.custom")} onChange={(e) => setAccent2(e.target.value)} />
+          <ColourInput value={accent2 ?? "#eb459e"} disabled={!accent} label={t("settings.appearance.custom")} onChange={setAccent2} />
         </label>
         <HexInput value={accent2} fallback="#eb459e" label={t("settings.profile.secondColourHex")} testId="accent2-hex" disabled={!accent} onChange={setAccent2} />
       </div>

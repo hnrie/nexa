@@ -2,6 +2,7 @@ import { api } from "./client";
 import type { PurgeCounts } from "./moderation";
 import type { KdfParamsJson, MeUser, PublicUser, SettingsBlob, Snowflake } from "./types";
 import type { TypingStyle } from "@/lib/typingStyle";
+import type { NameStyle } from "@/lib/nameStyle";
 import type { FoundMusic, MusicWidgetType } from "@/lib/widgets";
 
 export type MePatch = Partial<{
@@ -19,6 +20,8 @@ export type MePatch = Partial<{
   group_link_only: boolean;
   /** null for the plain "is typing…" (lib/typingStyle). */
   typing_style: TypingStyle | null;
+  /** null for the plain name (lib/nameStyle). */
+  name_style: NameStyle | null;
 }>;
 
 type Progress = (loaded: number, total: number) => void;

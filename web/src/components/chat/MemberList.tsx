@@ -25,6 +25,7 @@ import { openProfilePopout } from "@/stores/profilePopout";
 import { P, compute, has, toPermMember } from "@/lib/perms";
 import { nameOrder } from "./nameOrder";
 import { memberLook, nameClass, nameStyle, type RoleLook } from "@/lib/roleLook";
+import { withOwn } from "@/lib/useMemberLook";
 import { RoleIcon } from "@/components/common/RoleIcon";
 import s from "./MemberList.module.css";
 import { UserTag } from "@/components/servertag/UserTag";
@@ -188,7 +189,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
     const push = (key: string, label: string, list: Member[], off: boolean) => {
       if (list.length === 0) return;
       out.push({ kind: "head", key: "h:" + key, label, count: list.length });
-      for (const m of list) out.push({ kind: "member", key: m.user_id, member: m, user: users[m.user_id], look: memberLook(st, m.user_id), offline: off });
+      for (const m of list) out.push({ kind: "member", key: m.user_id, member: m, user: users[m.user_id], look: withOwn(memberLook(st, m.user_id), users[m.user_id]?.name_style), offline: off });
     };
     for (const [id, g] of groups) push(id, g.label, g.members, false);
     push("online", t("chat.memberList.online"), online, false);

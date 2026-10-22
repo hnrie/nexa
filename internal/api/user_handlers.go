@@ -229,6 +229,14 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 		}
 		p.TypingStyle = &style
 	}
+	if v, ok := raw["name_style"]; ok {
+		style, problem := cleanNameStyle(v)
+		if problem != "" {
+			bad("invalid_name_style", problem)
+			return
+		}
+		p.NameStyle = &style
+	}
 	if v, ok := raw["group_link_only"]; ok {
 		var b bool
 		if err := json.Unmarshal(v, &b); err != nil || string(v) == "null" {
@@ -242,7 +250,7 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 	// put anything new on it.
 	filled := func(v *string) bool { return v != nil && *v != "" }
 	public := p.Username != nil || p.DisplayName != nil || p.AccentColor != nil || p.AccentColor2 != nil ||
-		filled(p.AboutMe) || filled(p.Pronouns) || filled(p.StatusText) || filled(p.StatusEmoji) || filled(p.TypingStyle)
+		filled(p.AboutMe) || filled(p.Pronouns) || filled(p.StatusText) || filled(p.StatusEmoji) || filled(p.TypingStyle) || filled(p.NameStyle)
 	if public && mutedFor(w, r) {
 		return
 	}

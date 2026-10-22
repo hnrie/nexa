@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Role } from "@/api/types";
 import type { ServerState } from "@/stores/servers";
+import { nameStyleClass, nameStyleVars, type NameStyle } from "./nameStyle";
 
 /** A role's picture beside names: one of its own, an emoji, or one of the server's emoji. */
 export type RoleIconInfo = { kind: "image"; id: string; name: string } | { kind: "emoji"; text: string; name: string } | { kind: "custom"; id: string; name: string };
@@ -13,6 +14,8 @@ export interface RoleLook {
   /** Three colours shimmer across the name. */
   shimmer?: boolean;
   icon?: RoleIconInfo;
+  /** The person's own name style (lib/nameStyle.ts): its font always shows, its colours only without a role colour. */
+  own?: NameStyle;
 }
 
 export function hexOf(n: number): string {
@@ -73,16 +76,18 @@ export function memberLook(st: ServerState | undefined, userId: string): RoleLoo
   return look ?? undefined;
 }
 
-/** The style that draws a name in a look's colours (a gradient goes with the role-gradient class). */
+/** The style that draws a name in a look's colours (a gradient goes with the role-gradient class), and in the person's own style. */
 export function nameStyle(look: RoleLook | undefined): CSSProperties | undefined {
-  if (!look?.color) return undefined;
-  if (!look.colors) return { color: look.color };
+  const own = nameStyleVars(look?.own ?? null, !!look?.color);
+  if (!look?.color) return own;
+  if (!look.colors) return { ...own, color: look.color };
   const stops = look.shimmer ? [...look.colors, look.colors[0]!] : look.colors;
-  return { "--name-grad": `linear-gradient(90deg, ${stops.join(", ")})`, color: look.color } as CSSProperties;
+  return { ...own, "--name-grad": `linear-gradient(90deg, ${stops.join(", ")})`, color: look.color } as CSSProperties;
 }
 
-/** The class a gradient name takes, beside nameStyle. */
+/** The class a gradient name takes, beside nameStyle, and the person's own style's. */
 export function nameClass(look: RoleLook | undefined): string {
-  if (!look?.colors) return "";
-  return look.shimmer ? "role-gradient role-shimmer" : "role-gradient";
+  const own = nameStyleClass(look?.own ?? null, !!look?.color);
+  const role = !look?.colors ? "" : look.shimmer ? "role-gradient role-shimmer" : "role-gradient";
+  return [role, own].filter(Boolean).join(" ");
 }

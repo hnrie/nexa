@@ -362,8 +362,8 @@ private fun MessageHeader(item: MsgItem, ctx: ListCtx) {
         else -> Names.member(sid, item.authorId)
     }
     // a webhook and a copy have no roles, so no role colours or icon
-    val look = if (hookId != null || copy != null) null else ctx.server?.let { fish.nexa.ui.chat.RoleLooks.of(it, item.authorId) }
     val user = Nexa.users.get(item.authorId)
+    val look = if (hookId != null || copy != null) null else fish.nexa.ui.chat.RoleLooks.withOwn(ctx.server?.let { fish.nexa.ui.chat.RoleLooks.of(it, item.authorId) }, user?.nameStyle)
     val open = {
         when {
             copy != null -> Unit

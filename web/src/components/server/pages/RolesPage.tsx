@@ -1,4 +1,5 @@
 import { Plus, SmilePlus, Trash2 } from "lucide-react";
+import { ColourInput } from "@/components/common/ColourInput";
 import { useEffect, useId, useMemo, useRef, useState, type DragEvent } from "react";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
@@ -297,7 +298,7 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
           {SWATCHES.map((c, i) => (
             <label key={c} className={s.swatch} data-on={color === c} style={{ background: hex(c) }} title={hex(c)}><input type="radio" name={swatchName} checked={color === c} disabled={!editable} onChange={() => setColor(c)} aria-label={t("server.roles.colourIndexOfCount", { index: i + 1, count: SWATCHES.length })} /></label>
           ))}
-          <label className={s.swatch} style={{ background: color && !SWATCHES.includes(color) ? hex(color) : "var(--bg-surface)", border: "2px dashed var(--border-strong)" }} title={t("server.roles.customColour")}><input type="color" value={hex(color || 0x99aab5)} disabled={!editable} onChange={(e) => setColor(parseInt(e.target.value.slice(1), 16))} /></label>
+          <label className={s.swatch} style={{ background: color && !SWATCHES.includes(color) ? hex(color) : "var(--bg-surface)", border: "2px dashed var(--border-strong)" }} title={t("server.roles.customColour")}><ColourInput value={hex(color || 0x99aab5)} disabled={!editable} label={t("server.roles.customColour")} onChange={(v) => setColor(parseInt(v.slice(1, 7), 16))} /></label>
         </div>
       </Field>
       {!everyone ? (
@@ -314,12 +315,12 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
             <div className={s.styleColors}>
               <label className={s.styleColor}>
                 <span>{t("roles.style.second")}</span>
-                <input type="color" value={hex(color2 ?? 0x00b0f4)} disabled={!editable} onChange={(e) => setColor2(parseInt(e.target.value.slice(1), 16))} />
+                <ColourInput shown value={hex(color2 ?? 0x00b0f4)} disabled={!editable} label={t("roles.style.second")} onChange={(v) => setColor2(parseInt(v.slice(1, 7), 16))} />
               </label>
               {style === "shimmer" ? (
                 <label className={s.styleColor}>
                   <span>{t("roles.style.third")}</span>
-                  <input type="color" value={hex(color3 ?? 0xffd166)} disabled={!editable} onChange={(e) => setColor3(parseInt(e.target.value.slice(1), 16))} />
+                  <ColourInput shown value={hex(color3 ?? 0xffd166)} disabled={!editable} label={t("roles.style.third")} onChange={(v) => setColor3(parseInt(v.slice(1, 7), 16))} />
                 </label>
               ) : null}
             </div>

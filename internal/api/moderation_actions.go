@@ -25,7 +25,7 @@ type modActionReq struct {
 		Banner bool `json:"banner"`
 	} `json:"images"`
 	// field_reset: username, display_name, about_me, pronouns, status,
-	// nicknames, server_profiles, typing_style, widgets, server_tag
+	// nicknames, server_profiles, typing_style, name_style, widgets, server_tag
 	Fields []string `json:"fields"`
 	// mute and ban: how long; a ban can be permanent instead
 	DurationMS int64 `json:"duration_ms"`
@@ -53,9 +53,9 @@ const (
 // resetFields are the profile fields a field_reset can take back. Nicknames
 // are the names the account goes by in its servers, all of them at once, and
 // server profiles the bios, pronouns and widgets of its profiles there; those,
-// the typing style, the widgets and the server tag worn are cleared rather
+// the typing style, the name style, the widgets and the server tag worn are cleared rather
 // than overwritten, as a status is.
-var resetFields = []string{"username", "display_name", "about_me", "pronouns", "status", "nicknames", "server_profiles", "typing_style", "widgets", "server_tag"}
+var resetFields = []string{"username", "display_name", "about_me", "pronouns", "status", "nicknames", "server_profiles", "typing_style", "name_style", "widgets", "server_tag"}
 
 // readReason checks a moderator's reason, which the member reads.
 func readReason(w http.ResponseWriter, raw string) (string, bool) {
@@ -234,7 +234,7 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 		widgets = raw
 	}
 	empty := map[string]bool{"about_me": target.AboutMe == "", "pronouns": target.Pronouns == "", "status": target.StatusText == "" && target.StatusEmoji == "", "nicknames": len(nicknamed) == 0, "server_profiles": len(profiled) == 0,
-		"typing_style": target.TypingStyle == "", "widgets": widgets == "", "server_tag": target.WornTag() == nil}
+		"typing_style": target.TypingStyle == "", "name_style": target.NameStyle == "", "widgets": widgets == "", "server_tag": target.WornTag() == nil}
 	for _, f := range fields {
 		if empty[f] {
 			WriteError(w, E(http.StatusBadRequest, "field_empty", "That field is already empty, so there is nothing to reset."))
@@ -300,6 +300,9 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 			case "typing_style":
 				f.TypingStyle = true
 				oldVals[field], newVals[field] = typingStyleText(target.TypingStyle), ""
+			case "name_style":
+				f.NameStyle = true
+				oldVals[field], newVals[field] = nameStyleText(target.NameStyle), ""
 			case "widgets":
 				f.Widgets = true
 				oldVals[field], newVals[field] = clipRunes(widgetsText(widgets), maxKeptOldValue), ""

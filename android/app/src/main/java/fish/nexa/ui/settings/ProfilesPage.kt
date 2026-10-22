@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.em
 import coil3.compose.AsyncImage
 import fish.nexa.Nexa
 import fish.nexa.data.People
+import fish.nexa.data.NameStyle
 import fish.nexa.data.TypingStyle
 import fish.nexa.media.Media
 import fish.nexa.net.MeUser
@@ -143,6 +144,7 @@ object ProfileForm {
     var accent by mutableStateOf<Long?>(null)
     var accent2 by mutableStateOf<Long?>(null)
     var typing by mutableStateOf<TypingStyle?>(null)
+    var nameLook by mutableStateOf<NameStyle?>(null)
     var widgets by mutableStateOf<List<Widgets.Widget>>(emptyList())
     /** The widgets as saved; null until they have come with the whole profile. */
     var savedWidgets by mutableStateOf<List<Widgets.Widget>?>(null)
@@ -169,11 +171,13 @@ object ProfileForm {
         accent = me.accentColor
         accent2 = me.accentColor2
         typing = TypingStyle.read(me.typingStyle)
+        nameLook = NameStyle.read(me.nameStyle)
     }
 
     fun typingChanged(me: MeUser) = !TypingStyle.same(typing, TypingStyle.read(me.typingStyle))
+    fun nameLookChanged(me: MeUser) = nameLook != NameStyle.read(me.nameStyle)
     fun profileChanged(me: MeUser) = displayName != me.displayName || pronouns != me.pronouns || about != loadedAbout(me) ||
-        accent != me.accentColor || accent2 != me.accentColor2 || typingChanged(me)
+        accent != me.accentColor || accent2 != me.accentColor2 || typingChanged(me) || nameLookChanged(me)
     fun widgetsChanged() = savedWidgets.let { it != null && it != widgets }
     fun dirty(me: MeUser) = profileChanged(me) || widgetsChanged()
 
@@ -200,6 +204,7 @@ object ProfileForm {
         try {
             if (profileChanged(me)) {
                 val typingNow = typingChanged(me)
+                val nameNow = nameLookChanged(me)
                 val u = patchMe(buildJsonObject {
                     put("display_name", JsonPrimitive(displayName.trim()))
                     put("pronouns", JsonPrimitive(pronouns.trim()))
@@ -207,6 +212,7 @@ object ProfileForm {
                     put("accent_color", accent?.let { JsonPrimitive(it) } ?: JsonNull)
                     put("accent_color_2", accent2?.let { JsonPrimitive(it) } ?: JsonNull)
                     if (typingNow) put("typing_style", typing?.toJson() ?: JsonNull)
+                    if (nameNow) put("name_style", nameLook?.toJson() ?: JsonNull)
                 })
                 // the server trims and cleans what it stores, so its copy is taken back or the form stays "unsaved"
                 take(u)
@@ -379,6 +385,7 @@ private fun MainDesigner(anchor: String?) {
             }
             "status" -> fish.nexa.ui.dialogs.Dialogs.customStatus()
             "typing" -> view = "chat"
+            "nameStyle" -> openNameStyleSheet({ Nexa.users.me.value }, { f.displayName.trim().ifEmpty { me.displayName } }, f.nameLook) { f.nameLook = it }
             "widgets" -> {
                 view = "full"
                 showTab(ProfileTab.WIDGETS)
@@ -447,6 +454,7 @@ private fun MainDesigner(anchor: String?) {
         accentColor = f.accent,
         accentColor2 = f.accent2,
         typingStyle = f.typing?.toJson(),
+        nameStyle = f.nameLook?.toJson(),
     )
     // the stage glows in the profile's own colour, as the card does: its theme, or its banner's or picture's
     val theme = ProfileTheme.of(f.accent, f.accent2)
@@ -466,6 +474,7 @@ private fun MainDesigner(anchor: String?) {
     ) { view = it }
     val parts = listOf(
         PartChip("name", "Type", t("settings.account.displayName")),
+        PartChip("nameStyle", "Sparkles", t("nameStyle.title"), "nameStyle"),
         PartChip("pronouns", "UserRound", t("settings.profile.pronouns")),
         PartChip("avatar", "CircleUserRound", t("settings.profile.avatar"), "avatar"),
         PartChip("banner", "Image", t("settings.profile.profileBanner"), "banner"),
@@ -523,7 +532,7 @@ private fun MainDesigner(anchor: String?) {
                 CardAside(widgetTools)
             }
             else -> Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                ChatPreview(me, preview.displayName, f.typing)
+                ChatPreview(me, preview.displayName, f.typing, look = fish.nexa.ui.chat.RoleLooks.withOwn(null, f.nameLook?.toJson()))
                 Column(
                     Modifier
                         .fillMaxWidth()

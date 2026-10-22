@@ -42,6 +42,8 @@ import { servers as serversApi } from "@/api/servers";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
+import { nameClass, nameStyle } from "@/lib/roleLook";
+import { withOwn } from "@/lib/useMemberLook";
 import s from "./Profile.module.css";
 import { profileAddRoleMenu, profileMoreMenu } from "./profileMenus";
 
@@ -574,6 +576,8 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   };
 
   const shownName = friend && rel.nickname ? rel.nickname : user.display_name;
+  const ownLook = withOwn(undefined, user.name_style);
+  const styledName = ownLook ? <span className={nameClass(ownLook)} style={nameStyle(ownLook)} data-testid="profile-styled-name">{shownName}</span> : shownName;
   const mutualServers = mutual.servers.filter((id) => servers[id]);
   const mutualCount = mutual.friends.length + mutualServers.length;
   // the whole profile, which the popout makes way for
@@ -706,7 +710,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
       <div className={s.ident}>
         <div className={s.nameRow}>
           <h2 className={s.display}>
-            {design?.inline?.name ?? (compact && !design ? <button className={s.displayBtn} onClick={() => viewFull()} data-testid="profile-name">{shownName}</button> : shownName)}
+            {design?.inline?.name ?? (compact && !design ? <button className={s.displayBtn} onClick={() => viewFull()} data-testid="profile-name">{styledName}</button> : styledName)}
             {design && !design.inline?.name ? <Spot design={design} part="name" label={t("designer.spot.name")} /> : null}
           </h2>
           {/* the server tag they wear, which opens the server it is from (not for a visitor, who has no account to ask with) */}

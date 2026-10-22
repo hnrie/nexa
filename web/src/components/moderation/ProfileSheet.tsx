@@ -10,6 +10,7 @@ import { copyAndSay } from "@/lib/copyText";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { FLAG_ADMIN, FLAG_DELETED, FLAG_DISABLED, fieldLabel, fullDate, previewText } from "@/lib/moderation";
 import { readTypingStyle, typingStyleText } from "@/lib/typingStyle";
+import { nameStyleText, readNameStyle } from "@/lib/nameStyle";
 import { readWidgets, widgetsText } from "@/lib/widgets";
 import { widgetTitle } from "@/components/profile/Widgets";
 import { ServerTagChip } from "@/components/servertag/ServerTagChip";
@@ -69,6 +70,7 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
   const serverAvatars = servers.filter((s) => s.avatar_id).length;
   const serverBanners = servers.filter((s) => s.banner_id).length;
   const typing = typingStyleText(readTypingStyle(user.typing_style));
+  const nameLook = nameStyleText(readNameStyle(user.name_style));
   const widgets = widgetsText(readWidgets(user.widgets), widgetTitle);
   const owned = servers.filter((s) => s.owner);
 
@@ -174,6 +176,16 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
       icon: <Eraser size={15} aria-hidden="true" />,
       run: () => reset("typing_style"),
       testid: "sheet-typing_style",
+    },
+    {
+      part: null,
+      label: fieldLabel("name_style"),
+      value: nameLook ? <bdi>{nameLook}</bdi> : t("moderation.sheet.notSet"),
+      empty: !nameLook,
+      action: t("moderation.sheet.clear"),
+      icon: <Eraser size={15} aria-hidden="true" />,
+      run: () => reset("name_style"),
+      testid: "sheet-name_style",
     },
     {
       part: null,

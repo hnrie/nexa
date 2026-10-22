@@ -1,11 +1,12 @@
 import { AlertTriangle, RotateCcw } from "lucide-react";
+import { ColourInput } from "@/components/common/ColourInput";
 import { useEffect, useState, type ReactNode } from "react";
 import { t } from "@/i18n";
 import { parseColour, toHex, toThemeHex } from "@/lib/color";
 import s from "./Look.module.css";
 
 /**
- * One colour: a swatch that opens the system's colour picker, its hex code to
+ * One colour: a swatch that opens the colour picker, its hex code to
  * type or paste, and for a see-through colour how see-through it is. A code
  * typed in is only taken once it is a colour; until then the box says so and
  * the theme keeps the last good one.
@@ -59,7 +60,7 @@ export function ColourField({
     <div className={s.colour} data-testid={testId}>
       <label className={s.chip} title={t("settings.themeBuilder.pick", { name: label })}>
         <span style={{ background: value }} />
-        <input type="color" value={hex} aria-label={t("settings.themeBuilder.pick", { name: label })} onChange={(e) => onChange(toThemeHex(parseColour(e.target.value)!.rgb, alpha ? (parsed?.alpha ?? 1) : 1))} />
+        <ColourInput value={parsed ? toThemeHex(parsed.rgb, alpha ? parsed.alpha : 1) : hex} alpha={alpha} label={t("settings.themeBuilder.pick", { name: label })} onChange={onChange} />
       </label>
       <span className={s.colourText}>
         <span className={s.colourName}>

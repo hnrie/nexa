@@ -1,5 +1,6 @@
 package fish.nexa.ui.chat
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -24,7 +25,15 @@ import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+import fish.nexa.data.NameStyle
+import kotlinx.serialization.json.JsonElement
 import androidx.compose.ui.unit.Dp
 import coil3.compose.AsyncImage
 import fish.nexa.Nexa
@@ -53,6 +62,8 @@ data class RoleLook(
     /** Three colours shimmer across the name. */
     val shimmer: Boolean = false,
     val icon: RoleIconInfo? = null,
+    /** The person's own name style (data/NameStyle): its font always shows, its colours only without a role colour. */
+    val own: NameStyle? = null,
 )
 
 object RoleLooks {
@@ -73,6 +84,12 @@ object RoleLooks {
         if (c2 != null) out += rgbColor(c2)
         if (c2 != null && c3 != null) out += rgbColor(c3)
         return out
+    }
+
+    /** A look with the person's own name style added, from the name_style the server sent. */
+    fun withOwn(look: RoleLook?, nameStyle: JsonElement?): RoleLook? {
+        val own = NameStyle.read(nameStyle) ?: return look
+        return (look ?: RoleLook(color = null)).copy(own = own)
     }
 
     private val looks = WeakHashMap<ServerState, HashMap<String, RoleLook?>>()
@@ -108,13 +125,22 @@ object RoleLooks {
 /**
  * A name in its roles' colours (`.role-gradient`, `.role-shimmer`): one
  * colour, a gradient across the name, or three colours drifting along it,
- * still with Reduce Motion on.
+ * still with Reduce Motion on. The person's own name style sets its font, and
+ * draws its effect where no role colours the name (styles/nameStyle.css).
  */
 @Composable
 fun RoleName(text: String, look: RoleLook?, style: TextStyle, fallback: Color, modifier: Modifier = Modifier, maxLines: Int = 1) {
+    val own = look?.own
+    val family = own?.font?.takeIf { it.isNotEmpty() }?.let { NameFonts.family(it) }
+    val scale = own?.font?.let { f -> NameStyle.FONTS.firstOrNull { it.id == f }?.scale } ?: 1f
+    val styled = if (family != null) style.copy(fontFamily = family, fontSize = style.fontSize * scale, letterSpacing = 0.sp) else style
+    if (look?.color == null && own != null && own.colors.isNotEmpty()) {
+        OwnName(text, own, styled, modifier, maxLines)
+        return
+    }
     val colors = look?.colors
     if (colors == null) {
-        Txt(text, style = style, color = look?.color ?: fallback, maxLines = maxLines, modifier = modifier)
+        Txt(text, style = styled, color = look?.color ?: fallback, maxLines = maxLines, modifier = modifier)
         return
     }
     val phase = if (look.shimmer && !Nx.motion.reduced) {
@@ -133,14 +159,99 @@ fun RoleName(text: String, look: RoleLook?, style: TextStyle, fallback: Color, m
             }
         }
     }
-    // drawn here rather than with Txt, whose colour would take the brush's place
+    PlainName(text, styled.copy(brush = brush), modifier, maxLines)
+}
+
+/** Drawn here rather than with Txt, whose colour would take a brush's place. */
+@Composable
+private fun PlainName(text: String, style: TextStyle, modifier: Modifier, maxLines: Int) {
     androidx.compose.foundation.text.BasicText(
         text = text,
         modifier = modifier,
-        style = style.copy(brush = brush),
+        style = style,
         maxLines = maxLines,
-        overflow = if (maxLines == Int.MAX_VALUE) androidx.compose.ui.text.style.TextOverflow.Clip else androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis,
     )
+}
+
+/** A name in its own effect and colours (lib/nameStyle.ts, styles/nameStyle.css). */
+@Composable
+private fun OwnName(text: String, own: NameStyle, style: TextStyle, modifier: Modifier, maxLines: Int) {
+    val light = Nx.colors.isLight
+    val cs = own.colors.map { rgbColor(it) }
+    val c1 = cs.first()
+    val c2 = cs.getOrElse(1) { c1 }
+    val em = with(LocalDensity.current) { style.fontSize.toPx() }
+    when (own.effect) {
+        "gradient" -> PlainName(text, style.copy(brush = Brush.horizontalGradient(listOf(c1, c2))), modifier, maxLines)
+        "glow" -> PlainName(
+            text,
+            style.copy(
+                color = if (light) lerp(Color.Black, c1, 0.75f) else lerp(Color.White, c1, 0.35f),
+                shadow = Shadow(if (light) c1.copy(alpha = 0.7f) else c1, Offset.Zero, em * if (light) 0.35f else 0.4f),
+            ),
+            modifier, maxLines,
+        )
+        "ink" -> {
+            // the colour, a dark line round it and a shadow under it
+            val line = lerp(Color(0xFF12060C), c1, 0.35f)
+            Box(modifier) {
+                PlainName(text, style.copy(color = line, drawStyle = Stroke(width = em * 0.16f, join = StrokeJoin.Round), shadow = Shadow(line, Offset(em * 0.03f, em * 0.1f), 0f)), Modifier, maxLines)
+                PlainName(text, style.copy(color = c1), Modifier, maxLines)
+            }
+        }
+        "pop" -> PlainName(
+            text,
+            style.copy(color = if (light) Color.White else lerp(Color.White, c1, 0.1f), shadow = Shadow(c1, Offset(em * 0.05f, em * 0.09f), 0f)),
+            modifier, maxLines,
+        )
+        "candy" -> {
+            // hard stripes, leaning, like boiled sweets
+            val band = em * 0.42f
+            val brush = remember(cs, band) {
+                object : ShaderBrush() {
+                    override fun createShader(size: Size): Shader {
+                        val run = band * cs.size
+                        val colors = cs.flatMap { listOf(it, it) }
+                        val stops = cs.indices.flatMap { i -> listOf(i.toFloat() / cs.size, (i + 1f) / cs.size) }
+                        return LinearGradientShader(Offset.Zero, Offset(run * 0.985f, run * 0.174f), colors, stops, TileMode.Repeated)
+                    }
+                }
+            }
+            PlainName(text, style.copy(brush = brush), modifier, maxLines)
+        }
+        "aurora" -> {
+            // every colour flowing through the name and round again
+            val phase = if (!Nx.motion.reduced) {
+                val t = rememberInfiniteTransition(label = "aurora")
+                val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(6000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "aurora")
+                p
+            } else 0f
+            val stops = cs + cs.first()
+            val brush = remember(stops, phase) {
+                object : ShaderBrush() {
+                    override fun createShader(size: Size): Shader {
+                        val w = size.width * 3f
+                        val x0 = -phase * (w - size.width)
+                        return LinearGradientShader(Offset(x0, 0f), Offset(x0 + w, 0f), stops, tileMode = TileMode.Clamp)
+                    }
+                }
+            }
+            PlainName(text, style.copy(brush = brush), modifier, maxLines)
+        }
+        "chrome" -> {
+            // polished metal tinted by the colour: a bright sky, a hard horizon, a dark ground
+            val brush = Brush.verticalGradient(
+                0f to lerp(Color.White, c1, 0.2f),
+                0.46f to lerp(Color.White, c1, 0.55f),
+                0.52f to lerp(Color(0xFF10131A), c1, 0.6f),
+                0.78f to c1,
+                1f to lerp(Color.White, c1, 0.35f),
+            )
+            PlainName(text, style.copy(brush = brush), modifier, maxLines)
+        }
+        else -> PlainName(text, style.copy(color = c1), modifier, maxLines)
+    }
 }
 
 /** A role's picture beside a name, named for the role it stands for. */

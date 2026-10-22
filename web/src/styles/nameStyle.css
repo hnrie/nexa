@@ -1,0 +1,29 @@
+/* A name in someone's own style (lib/nameStyle.ts). The font scales so a
+   wide or small face sits on the same line as the text around it. */
+.ns-font { font-family: "Twemoji Text", var(--ns-family), var(--font-display); font-size: calc(1em * var(--ns-scale, 1)); font-weight: normal; letter-spacing: 0; }
+.ns { -webkit-text-fill-color: currentColor; }
+.ns-solid { color: var(--ns-c1) !important; }
+
+/* text cut out of a picture of colours */
+.ns-gradient, .ns-candy, .ns-aurora, .ns-chrome { -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent !important; }
+.ns-gradient { background-image: linear-gradient(90deg, var(--ns-c1), var(--ns-c2)); }
+/* hard stripes, leaning, like boiled sweets */
+.ns-candy { background-image: repeating-linear-gradient(100deg, var(--ns-stripes)); background-size: var(--ns-stripe-run) 100%; }
+/* every colour flowing through the name and round again */
+.ns-aurora { background-image: linear-gradient(90deg, var(--ns-stops)); background-size: 300% 100%; animation: ns-aurora 6s ease-in-out infinite alternate; }
+@keyframes ns-aurora { to { background-position: 100% 0; } }
+/* polished metal tinted by the colour: a bright sky, a hard horizon, a dark ground */
+.ns-chrome { background-image: linear-gradient(180deg, color-mix(in srgb, var(--ns-c1) 20%, #fff) 0%, color-mix(in srgb, var(--ns-c1) 55%, #fff) 46%, color-mix(in srgb, var(--ns-c1) 60%, #10131a) 52%, var(--ns-c1) 78%, color-mix(in srgb, var(--ns-c1) 35%, #fff) 100%); }
+
+/* a light core inside the colour's own light */
+.ns-glow { color: color-mix(in srgb, var(--ns-c1) 35%, #fff) !important; text-shadow: 0 0 0.12em var(--ns-c1), 0 0 0.4em var(--ns-c1), 0 0 0.9em color-mix(in srgb, var(--ns-c1) 60%, transparent); }
+/* a cartoon: the colour, a dark line round it and a shadow under it */
+.ns-ink { --ns-line: color-mix(in srgb, var(--ns-c1) 35%, #12060c); color: var(--ns-c1) !important; text-shadow: 0.04em 0 0 var(--ns-line), -0.04em 0 0 var(--ns-line), 0 0.04em 0 var(--ns-line), 0 -0.04em 0 var(--ns-line), 0.03em 0.1em 0 var(--ns-line); }
+/* pale letters lifted off a block of the colour */
+.ns-pop { color: color-mix(in srgb, var(--ns-c1) 10%, #fff) !important; text-shadow: 0.05em 0.09em 0 var(--ns-c1), 0.04em 0.06em 0 var(--ns-c1); }
+:root[data-scheme="light"] .ns-pop { color: #fff !important; text-shadow: 0.05em 0.09em 0 var(--ns-c1), 0 0 0.04em color-mix(in srgb, var(--ns-c1) 70%, #000); }
+:root[data-scheme="light"] .ns-glow { color: color-mix(in srgb, var(--ns-c1) 75%, #000) !important; text-shadow: 0 0 0.35em color-mix(in srgb, var(--ns-c1) 70%, transparent); }
+
+@media (prefers-reduced-motion: reduce) { .ns-aurora { animation: none; } }
+[data-reduced-motion="true"] .ns-aurora { animation: none; }
+@media (forced-colors: active) { .ns { -webkit-text-fill-color: currentColor; color: CanvasText !important; background: none; text-shadow: none; } }

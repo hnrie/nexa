@@ -291,7 +291,7 @@ fun MemberList(serverId: String, channelId: String?) {
             out += MemberRow.Head("h:$key", label, list.size)
             for ((m, name) in list) out += MemberRow.Person(
                 m.userId, m.userId, name, users[m.userId], m.avatarId ?: users[m.userId]?.avatarId,
-                RoleLooks.of(st, m.userId), isOff, crownOf(m.userId, st.server.ownerId),
+                RoleLooks.withOwn(RoleLooks.of(st, m.userId), users[m.userId]?.nameStyle), isOff, crownOf(m.userId, st.server.ownerId),
             )
         }
         for ((id, g) in groups) push(id, g.first, g.second, false)

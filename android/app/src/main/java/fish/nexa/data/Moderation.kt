@@ -152,6 +152,7 @@ data class ModUser(
     val flags: Long = 0,
     @SerialName("created_at") val createdAt: Long = 0,
     @SerialName("typing_style") val typingStyle: JsonElement? = null,
+    @SerialName("name_style") val nameStyle: JsonElement? = null,
     @SerialName("server_tag") val serverTag: WornTag? = null,
     @SerialName("admin_flags") val adminFlags: Long = 0,
     @SerialName("case_count") val caseCount: Int = 0,

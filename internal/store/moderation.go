@@ -669,6 +669,8 @@ type ModFieldReset struct {
 	ServerProfiles bool
 	// TypingStyle puts the account's typing line back to the plain one.
 	TypingStyle bool
+	// NameStyle draws the display name plainly again.
+	NameStyle bool
 	// Widgets takes every widget off the profile and lets their pictures go.
 	Widgets bool
 	// ServerTag takes off the server tag the account wears.
@@ -703,6 +705,9 @@ func (s *Store) ModResetFields(ctx context.Context, c *ModCase, f ModFieldReset,
 	}
 	if f.TypingStyle {
 		set("typing_style", "")
+	}
+	if f.NameStyle {
+		set("name_style", "")
 	}
 	if f.Widgets {
 		set("widgets", "")

@@ -36,6 +36,7 @@ export function settingsIndex(opts: { pageLabels: Record<string, string> }): Set
     e("profiles", t("settings.profile.pronouns"), "profile"),
     e("profiles", t("settings.profile.aboutMe"), "profile"),
     e("profiles", t("typing.editor.title"), "typingStyle"),
+    e("profiles", t("nameStyle.title"), "nameStyle"),
     e("profiles", t("widgets.title"), "widgets"),
     e("profiles", t("widgets.group.music"), "widgets"),
     e("profiles", t("widgets.type.artists"), "widgets"),

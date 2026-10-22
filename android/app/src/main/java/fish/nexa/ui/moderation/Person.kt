@@ -171,6 +171,7 @@ private fun ProfileSheet(user: ModUser, servers: List<ModMembership>, packs: Lis
     val serverAvatars = servers.count { it.avatarId != null }
     val serverBanners = servers.count { it.bannerId != null }
     val typing = TypingStyle.text(TypingStyle.read(user.typingStyle))
+    val nameLook = fish.nexa.data.NameStyle.text(fish.nexa.data.NameStyle.read(user.nameStyle))
     val widgets = widgetsText((user.widgets as? JsonArray)?.mapNotNull { it as? JsonObject }?.let { Widgets.read(it) } ?: emptyList())
     val owned = servers.filter { it.owner }
     val density = LocalDensity.current.density
@@ -213,6 +214,7 @@ private fun ProfileSheet(user: ModUser, servers: List<ModMembership>, packs: Lis
                     else NickList(profiled.map { s -> s.name to listOf(s.pronouns, if (s.bio.isNotEmpty()) previewText(s.bio) else "", if (s.widgets.isNotEmpty() && s.widgets != "[]") t("moderation.field.widgets") else "").filter { it.isNotEmpty() }.joinToString(" / ") })
                 }
                 row(fieldLabel("typing_style"), typing.isEmpty(), t("moderation.sheet.clear"), "Eraser", { reset("typing_style") }) { FieldValue(typing.ifEmpty { t("moderation.sheet.notSet") }, typing.isEmpty()) }
+                row(fieldLabel("name_style"), nameLook.isEmpty(), t("moderation.sheet.clear"), "Eraser", { reset("name_style") }) { FieldValue(nameLook.ifEmpty { t("moderation.sheet.notSet") }, nameLook.isEmpty()) }
                 row(fieldLabel("widgets"), widgets.isEmpty(), t("moderation.sheet.removeAll"), "Eraser", { reset("widgets") }) {
                     if (widgets.isEmpty()) FieldValue(t("moderation.sheet.none"), true) else NickList(widgets)
                 }

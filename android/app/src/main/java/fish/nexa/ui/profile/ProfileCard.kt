@@ -441,8 +441,10 @@ private fun Identity(user: PublicUser, rel: Relationship?, full: Boolean, theme:
             val nameEditor = design?.name
             if (nameEditor != null) Box(Modifier.weight(1f, fill = false)) { nameEditor() }
             else Spotted(design, ProfilePart.NAME, t("designer.spot.name"), Modifier.weight(1f, fill = false)) {
-                Txt(
+                // in their own name style, when they have one
+                fish.nexa.ui.chat.RoleName(
                     shownName,
+                    fish.nexa.ui.chat.RoleLooks.withOwn(null, user.nameStyle),
                     style = Nx.type.name.copy(
                         fontSize = Nx.type.sp(if (full) 28f else 20f),
                         lineHeight = Nx.type.sp(if (full) 30.8f else 23f),
@@ -450,7 +452,8 @@ private fun Identity(user: PublicUser, rel: Relationship?, full: Boolean, theme:
                         letterSpacing = (-0.01).em,
                         shadow = shadow,
                     ),
-                    color = c.textStrong,
+                    fallback = c.textStrong,
+                    maxLines = 2,
                     modifier = Modifier
                         .semantics { heading() }
                         .then(if (onName != null) Modifier.clip(Radii.Xs).pressable(remember { MutableInteractionSource() }, onClick = onName) else Modifier),

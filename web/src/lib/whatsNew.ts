@@ -26,6 +26,13 @@ export interface Release {
 /** Newest first. */
 export const RELEASES: Release[] = [
   {
+    id: "2026-10-21",
+    items: [
+      { icon: Type, title: "whatsNew.r20261021.nameStyleTitle", body: "whatsNew.r20261021.nameStyleBody" },
+      { icon: Palette, title: "whatsNew.r20261021.colourPickerTitle", body: "whatsNew.r20261021.colourPickerBody" },
+    ],
+  },
+  {
     id: "2026-10-20.3",
     items: [
       { icon: MousePointerClick, title: "whatsNew.r202610203.personMenuTitle", body: "whatsNew.r202610203.personMenuBody" },

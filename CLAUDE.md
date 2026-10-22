@@ -355,7 +355,7 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   emoji, sticker packs, recents, Telegram import, Klipy GIF search), `voice_glue` and `sfu_handlers`
   (ICE servers, voice states, ringing, the SFU), `guest_handlers` (guest links), `webhook_*`,
   `note_handlers`, `sound_handlers`, `widgets` (profile widgets, game and music search),
-  `typing_style`, `profile_links`, `discord_handlers`, `activity_glue`, `nexa` (a member's side of
+  `typing_style`, `name_style`, `profile_links`, `discord_handlers`, `activity_glue`, `nexa` (a member's side of
   Nexa) and `moderation*` (the staff's side), `bugs`, `crash_handlers` (client errors),
   `admin_handlers` (instance stats, users, runtime settings), `legal_handlers` (the admin's legal
   report), `desktop_handlers` and `android_handlers` (downloads and update manifests),
@@ -966,6 +966,23 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
   Android: `ui/notes/NoteFile.kt` (`FileMove`, TalkBack actions in place of the arrow keys),
   `FormatSurface` `Cmd.PlaceFile`, and `BlockPlaces` in `ui/format/FormatPage.kt`, where the
   page keeps each block's place on the screen and draws the landing.
+- Name styles (`lib/nameStyle.ts`, server `api/name_style.go`, column `users.name_style`): a
+  display name's font, effect and colours, public like the rest of a profile. The fonts are the
+  `NAME_FONTS` list (Comic Neue, serifs, sans, rounded, display, script, pixel and mono faces, all
+  picked to stay readable), served by Fontsource from `styles/nameStyle.css`, which also draws the
+  eight effects (Solid, Gradient, Glow, Ink, Pop, Candy, Aurora, Chrome) as `ns-*` classes. A new
+  font goes in `NAME_FONTS`, the CSS imports, `nameFonts` in the Go file, `FONTS` in
+  `android/tools/name_fonts.py` (then run it to write `res/font/name_<id>.ttf`) and Android's
+  `data/NameStyle.kt`. Names are drawn through `nameStyle`/`nameClass` in `lib/roleLook.ts`, whose
+  look carries the person's own style as `own` (`useMemberLook` adds it, `withOwn` for lists): in a
+  server a role's colour still colours the name and only the font stays. Settings, Profiles has
+  the Name Style dialog (`components/settings/NameStyleDialog.tsx`, saved with the profile); the
+  staff can reset it (field `name_style`). Android: `data/NameStyle`, `ui/chat/RoleLook.kt`
+  (`RoleName`, `OwnName`), `ui/chat/NameFonts.kt` and `ui/settings/NameStyleSheet.kt`.
+- Colours are picked with `components/common/ColourInput.tsx`, Nexa's own picker (a square of
+  shades, a hue strip, opacity when asked for, the hex code, the browser's eyedropper where it has
+  one), laid over whatever swatch shows the colour; never the browser's `<input type="color">`.
+  Android's is `openColourPicker` in `ui/settings/ColourPicker.kt`.
 - `pages/`: one per route. `styles/`: `tokens.css` (every theme token: colour, radius, shadow,
   motion), `base.css`, `markdown.css`, `fonts.css` (Wix Madefor) and `fonts-classic.css` (Onest,
   Mona Sans). `lib/theme.ts` applies a theme; `lib/look/` derives presets and custom themes.
@@ -1164,6 +1181,7 @@ notes.
   `bots/`, `apps_ui.py`, `discord_e2e.py`,
   `sfu_call.py`, `sfu_guest.py`, `call_quality.py` and `share_quality.py` with `netsim/`, `ios_sim.py`
   with `ios/`, `app_size.py`, `desktop_idle.py` with `desktop_idle/`.
+- Fonts: `android/tools/name_fonts.py` (the name style fonts for Android, from the web's Fontsource files).
 - i18n: `i18n_check.py`, `i18n_keys_used.py`, `i18n_apply.py` (write or merge a language's
   values), `i18n_extract.py` (pull hardcoded English into keys); `android/tools/add_strings.py`.
 - Releases: `android_release.py`, `desktop_release.py`, `mac_package.py`, `publish_desktop.py`,

@@ -48,6 +48,7 @@ data class PublicUser(
     @SerialName("group_link_only") val groupLinkOnly: Boolean = false,
     @SerialName("created_at") val createdAt: Long = 0,
     @SerialName("typing_style") val typingStyle: JsonElement? = null,
+    @SerialName("name_style") val nameStyle: JsonElement? = null,
     @SerialName("server_tag") val serverTag: WornTag? = null,
 ) {
     val isAdmin get() = flags and 1L != 0L
@@ -100,6 +101,7 @@ data class MeUser(
     @SerialName("group_link_only") val groupLinkOnly: Boolean = false,
     @SerialName("created_at") val createdAt: Long = 0,
     @SerialName("typing_style") val typingStyle: JsonElement? = null,
+    @SerialName("name_style") val nameStyle: JsonElement? = null,
     @SerialName("server_tag") val serverTag: WornTag? = null,
     @SerialName("presence_pref") val presencePref: String = "online",
     @SerialName("dm_privacy") val dmPrivacy: String = "friends_servers",
@@ -110,7 +112,7 @@ data class MeUser(
 ) {
     fun asPublic() = PublicUser(
         id, username, displayName, avatarId, bannerId, aboutMe, pronouns, accentColor, accentColor2, statusText, statusEmoji,
-        statusExpiresAt, publicKey, flags and (1L or 16L or 32L), groupLinkOnly, createdAt, typingStyle, serverTag,
+        statusExpiresAt, publicKey, flags and (1L or 16L or 32L), groupLinkOnly, createdAt, typingStyle, nameStyle, serverTag,
     )
     val isAdmin get() = flags and 1L != 0L
     val name get() = displayName.ifBlank { username }

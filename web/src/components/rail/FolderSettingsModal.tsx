@@ -1,4 +1,5 @@
 import { useId, useState, type CSSProperties } from "react";
+import { ColourInput } from "@/components/common/ColourInput";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Field, TextInput } from "@/components/common/TextInput";
@@ -76,7 +77,7 @@ export function FolderSettingsModal({ onClose, folderId, serverIds }: { onClose:
               ))}
               <label className={s.swatch} data-on={custom} title={t("server.roles.customColour")}>
                 <CustomColorIcon color={custom ? color : null} />
-                <input type="color" value={color ?? "#8000ff"} onChange={(e) => setColor(e.target.value)} aria-label={t("server.roles.customColour")} data-testid="folder-custom-colour" />
+                <ColourInput value={color ?? "#8000ff"} onChange={setColor} label={t("server.roles.customColour")} testId="folder-custom-colour" />
               </label>
             </div>
           </Field>

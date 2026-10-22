@@ -14,6 +14,7 @@ import { profileTheme } from "@/lib/avatarColor";
 import { describeError } from "@/lib/errors";
 import { actionIcon, fieldLabel, formatSpan, fullDate, relativeTo, severity, SPAN } from "@/lib/moderation";
 import { readTypingStyle, typingStyleText } from "@/lib/typingStyle";
+import { nameStyleText, readNameStyle } from "@/lib/nameStyle";
 import { readWidgets, widgetsText } from "@/lib/widgets";
 import { widgetTitle } from "@/components/profile/Widgets";
 import { formatBytes } from "@/lib/time";
@@ -32,7 +33,7 @@ const MAX_BAN = 5 * 365 * SPAN.DAY;
 
 const ACTIONS: ModAction[] = ["avatar_remove", "field_reset", "mute", "ban", "delete"];
 /** The fields a reset empties rather than writing MODERATOR_REMOVED_ in. */
-const CLEARED: ResetField[] = ["status", "nicknames", "server_profiles", "typing_style", "widgets", "server_tag"];
+const CLEARED: ResetField[] = ["status", "nicknames", "server_profiles", "typing_style", "name_style", "widgets", "server_tag"];
 
 function unitLabel(u: number): string {
   switch (u) {
@@ -201,6 +202,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers,
     nicknames: nicknamed ? nicknamed.map((x) => `${x.name}: ${x.nickname}`).join(", ") : t("moderation.form.everyServer"),
     server_profiles: profiled ? profiled.map((x) => x.name).join(", ") : t("moderation.form.everyServer"),
     typing_style: typingStyleText(readTypingStyle(user.typing_style)),
+    name_style: nameStyleText(readNameStyle(user.name_style)),
     widgets: widgetsText(readWidgets(user.widgets), widgetTitle).map((w) => `${w.title}: ${w.text}`).join(" / "),
     server_tag: user.server_tag?.text ?? "",
   };
@@ -400,7 +402,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers,
             <div className={m.section}>
               <span className={m.sectionLabel}>{t("moderation.form.whatToReset")}</span>
               <div className={m.choiceRow}>
-                {(["username", "display_name", "about_me", "pronouns", "status", "nicknames", "server_profiles", "typing_style", "widgets", "server_tag"] as ResetField[]).map((f) => {
+                {(["username", "display_name", "about_me", "pronouns", "status", "nicknames", "server_profiles", "typing_style", "name_style", "widgets", "server_tag"] as ResetField[]).map((f) => {
                   const empty = many ? false : f === "nicknames" ? !!nicknamed && nicknamed.length === 0 : f === "server_profiles" ? !!profiled && profiled.length === 0 : f !== "username" && f !== "display_name" && !values[f];
                   return (
                     <label key={f} className={m.pick} data-checked={fields.includes(f)} data-disabled={empty} data-testid={`field-${f}`}>

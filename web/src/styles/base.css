@@ -1,6 +1,7 @@
 @import "./fonts.css";
 @import "./tokens.css";
 @import "./markdown.css";
+@import "./nameStyle.css";
 
 *, *::before, *::after { box-sizing: border-box; }
 /* A double tap does not zoom (it would hold up every tap), but a pinch does: whoever needs the text bigger can have it. */

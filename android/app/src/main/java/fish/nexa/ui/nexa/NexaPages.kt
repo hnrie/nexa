@@ -299,6 +299,7 @@ internal fun fieldLabel(f: String): String = when (f) {
     "nicknames" -> t("moderation.field.nicknames")
     "server_profiles" -> t("moderation.field.serverProfiles")
     "typing_style" -> t("moderation.field.typingStyle")
+    "name_style" -> t("moderation.field.nameStyle")
     "widgets" -> t("moderation.field.widgets")
     "server_tag" -> t("moderation.field.serverTagWorn")
     "tag" -> t("moderation.field.serverTag")
