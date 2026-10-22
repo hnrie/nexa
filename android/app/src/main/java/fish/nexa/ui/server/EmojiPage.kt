@@ -139,7 +139,7 @@ fun EmojiPage(serverId: String) {
     SettingsPage {
         PageTitle(t("modals.customStatus.emoji"), Modifier.padding(bottom = 0.dp))
         Hint(t("server.emoji.addUpToAsManyEmoji"))
-        if (manage) DropZone(if (busy) t("server.emoji.uploading") else t("server.emoji.dropImagesHere")) { pick.launch(EMOJI_TYPES) }
+        if (manage) DropZone(if (busy) t("server.emoji.uploading") else t("server.emoji.tapToUpload")) { pick.launch(EMOJI_TYPES) }
         if (emojis.isEmpty()) Hint(t("server.emoji.noCustomEmojiYet"), top = 16.dp)
         else SearchBox(q, { q = it }, t("server.emoji.searchEmoji"), Modifier.padding(top = 16.dp, bottom = 4.dp))
         if (emojis.isNotEmpty() && found.isEmpty()) NoMatches(q, { q = "" })

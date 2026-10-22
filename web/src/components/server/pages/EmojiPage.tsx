@@ -1,3 +1,4 @@
+import { touchFirst } from "@/lib/touch";
 import { Pencil, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { TextInput } from "@/components/common/TextInput";
@@ -151,7 +152,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
             onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer.files.length) void upload(e.dataTransfer.files); }}
             data-drop-zone
           >
-            <Upload size={20} /> {busy ? t("server.emoji.uploading") : t("server.emoji.dropImagesHere")}
+            <Upload size={20} /> {busy ? t("server.emoji.uploading") : t(touchFirst() ? "server.emoji.tapToUpload" : "server.emoji.dropImagesHere")}
           </button>
           <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) void upload(e.target.files); e.target.value = ""; }} data-testid="emoji-file" />
         </>

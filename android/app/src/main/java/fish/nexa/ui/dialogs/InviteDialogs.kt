@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -106,6 +107,19 @@ internal fun LinkRow(link: String, busy: Boolean, copied: Boolean, onCopy: () ->
             icon = if (copied) "Check" else "Copy",
             enabled = link.isNotEmpty(),
             size = ButtonSize.MD,
+        )
+        // the phone's share sheet, to send the link straight to another app
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        NxButton(
+            "", {
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, link)
+                runCatching { ctx.startActivity(android.content.Intent.createChooser(send, t("invite.shareLink"))) }
+            },
+            kind = ButtonKind.SECONDARY,
+            icon = "Share2",
+            enabled = link.isNotEmpty(),
+            size = ButtonSize.MD,
+            modifier = Modifier.semantics { contentDescription = t("invite.shareLink") },
         )
     }
 }

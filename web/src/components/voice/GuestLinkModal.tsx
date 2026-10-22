@@ -1,3 +1,4 @@
+import { ShareLinkButton } from "@/components/common/ShareLinkButton";
 import { Check, Copy, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
@@ -114,6 +115,7 @@ export function GuestLinkModal({ onClose, channelId }: { onClose: () => void; ch
           <div className={s.linkRow}>
             <TextInput readOnly value={state?.url ?? ""} placeholder={busy ? t("voice.guestLink.makingALink") : ""} onFocus={(e) => e.currentTarget.select()} data-testid="guest-link" />
             <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!state} data-testid="guest-link-copy">{copied ? <><Check size={16} /> {t("modals.groupInvite.copied")}</> : <><Copy size={16} /> {t("modals.groupInvite.copy")}</>}</Button>
+            <ShareLinkButton link={state?.url ?? ""} title={t("voice.guestLink.inviteGuestsToThisCall")} />
           </div>
         </Field>
         {error ? <p className={s.hint} style={{ color: "var(--text-danger)" }}>{error}</p> : null}

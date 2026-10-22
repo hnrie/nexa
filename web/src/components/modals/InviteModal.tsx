@@ -1,3 +1,4 @@
+import { ShareLinkButton } from "@/components/common/ShareLinkButton";
 import { Check, Copy, KeyRound, Hash } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
@@ -133,6 +134,7 @@ export function InviteModal({ onClose, serverId, channelId }: { onClose: () => v
           <div className={s.linkRow}>
             <TextInput readOnly value={link} placeholder={busy ? t("modals.groupInvite.generating") : ""} onFocus={(e) => e.currentTarget.select()} data-testid="invite-link" />
             <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!link}>{copied ? <><Check size={16} /> {t("modals.groupInvite.copied")}</> : <><Copy size={16} /> {t("modals.groupInvite.copy")}</>}</Button>
+            <ShareLinkButton link={link} title={st?.server.name ?? ""} />
           </div>
         </Field>
         <div className={s.keyNote} data-warn={!key && !keyBusy}>

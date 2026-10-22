@@ -499,13 +499,10 @@ fun openShareScreen() {
                 ) { keep = it }
             }
         }
-        // a phone shares the picture; its sound cannot go into the call as a share's own
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f)) {
-                Txt(t("voice.shareScreen.shareAudio"), style = Nx.type.body.copy(fontWeight = FontWeight(550)), color = c.text)
-                Txt(t("android.call.shareNoSound"), style = Nx.type.hint, color = c.textMuted)
-            }
-            NxToggle(false, {}, enabled = false, label = t("voice.shareScreen.shareAudio"))
+        // a phone shares the picture; its sound cannot go into the call as a share's own, so it says so rather than offering a switch that never turns on
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon("VolumeOff", c.textMuted, size = 16.dp)
+            Txt(t("android.call.shareNoSound"), style = Nx.type.hint, color = c.textMuted)
         }
         Txt(
             (if (mode == "custom" && res == "source") t("voice.shareScreen.sharesAtYourScreenSOwn") else "") + t("android.call.shareUpload", "mbps" to mbpsOf(plan.bitrate)),

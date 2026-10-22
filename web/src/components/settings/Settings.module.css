@@ -9,8 +9,11 @@
 .navItem { display: flex; align-items: center; justify-content: flex-start; gap: 10px; min-height: 36px; padding: 4px 8px; border-radius: var(--radius-sm); font-size: 15px; font-weight: 550; line-height: 1.25; color: var(--text-channel); width: 100%; text-align: start; transition: background-color var(--transition), color var(--transition), box-shadow var(--transition); }
 .navLabel { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .navIcon { flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 8px; color: var(--icon); background: color-mix(in srgb, var(--text-strong) 5%, transparent); transition: background var(--transition), color var(--transition), box-shadow var(--transition); }
-.navItem:hover { background: var(--bg-hover); color: var(--text); }
-.navItem:hover .navIcon { color: var(--text-strong); }
+/* only under a pointer that hovers: a finger's last tap would leave a row lit */
+@media (hover: hover) {
+  .navItem:hover { background: var(--bg-hover); color: var(--text); }
+  .navItem:hover .navIcon { color: var(--text-strong); }
+}
 /* the page you are on: a tile lifted off the canvas, its picture lit in the accent */
 .navItem[data-selected="true"] { background: var(--sheen), var(--bg-selected); color: var(--text-strong); box-shadow: inset 0 1px 0 var(--edge-light), 0 1px 2px color-mix(in srgb, var(--shade) 35%, transparent); }
 .navItem[data-selected="true"] .navIcon { background: var(--grad-brand); color: var(--on-brand); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 10px -4px color-mix(in srgb, var(--brand) 80%, transparent); }
