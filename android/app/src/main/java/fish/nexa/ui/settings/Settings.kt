@@ -24,6 +24,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.semantics.selected
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.text.BasicTextField
@@ -243,8 +246,10 @@ private fun SettingsLayer(layer: Layer, startPage: String?, startAnchor: String?
         }
     }
     val isTop = Layers.stack.lastOrNull() === layer
+    // from 768 dp the list stays beside the page, as on the web, with My Account open first
+    val wide = fish.nexa.ui.nav.Nav.wide
     BackHandler(enabled = isTop) {
-        if (page != null) Unsaved.unlessUnsaved { page = null } else Unsaved.unlessUnsaved { close() }
+        if (page != null && !wide) Unsaved.unlessUnsaved { page = null } else Unsaved.unlessUnsaved { close() }
     }
     fun openPage(id: String, at: String?) {
         query = ""
@@ -268,7 +273,26 @@ private fun SettingsLayer(layer: Layer, startPage: String?, startAnchor: String?
             .imePadding(),
     ) {
         val current = page
-        if (current == null) SettingsList(query, { query = it }, onOpen = ::openPage, onClose = { Unsaved.unlessUnsaved { close() } })
+        if (wide) Row(Modifier.fillMaxSize()) {
+            val shown = current ?: "account"
+            Box(Modifier.width(300.dp).fillMaxHeight().background(c.bgBase)) {
+                SettingsList(query, { query = it }, onOpen = { id, at -> Unsaved.unlessUnsaved { openPage(id, at) } }, onClose = { Unsaved.unlessUnsaved { close() } }, selected = shown)
+            }
+            Box(Modifier.width(1.dp).fillMaxHeight().background(c.borderSubtle))
+            Box(Modifier.weight(1f).fillMaxHeight()) {
+                key(shown) {
+                    PageView(
+                        shown,
+                        anchor,
+                        isTop = isTop,
+                        onAnchorDone = { anchor = null },
+                        onBack = null,
+                        onClose = { Unsaved.unlessUnsaved { close() } },
+                        openPage = ::openPage,
+                    )
+                }
+            }
+        } else if (current == null) SettingsList(query, { query = it }, onOpen = ::openPage, onClose = { Unsaved.unlessUnsaved { close() } })
         else key(current) {
             PageView(
                 current,
@@ -285,7 +309,7 @@ private fun SettingsLayer(layer: Layer, startPage: String?, startAnchor: String?
 
 /** The top bar: the title on the list; back to User Settings on a page; the close button at the end. */
 @Composable
-private fun TopBar(onBack: (() -> Unit)?, onClose: () -> Unit) {
+private fun TopBar(onBack: (() -> Unit)?, onClose: (() -> Unit)?, title: Boolean = true) {
     val c = Nx.colors
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Row(
@@ -296,7 +320,8 @@ private fun TopBar(onBack: (() -> Unit)?, onClose: () -> Unit) {
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (onBack == null) {
+        if (onBack == null && !title) Spacer(Modifier.weight(1f))
+        else if (onBack == null) {
             Txt(
                 t("settings.settings.userSettings"),
                 style = Nx.type.title.copy(fontSize = Nx.type.sp(19f), lineHeight = Nx.type.sp(24f), fontWeight = FontWeight(690)),
@@ -312,7 +337,7 @@ private fun TopBar(onBack: (() -> Unit)?, onClose: () -> Unit) {
                     .height(44.dp)
                     .clip(Radii.Xs)
                     .background(if (pressed) c.bgHover else Color.Transparent)
-                    .pressable(interaction, onClick = onBack)
+                    .pressable(interaction, onClick = onBack!!)
                     .semantics { contentDescription = t("server.settingsLayer.backTo", "name" to t("settings.settings.userSettings")) }
                     .padding(start = 4.dp, end = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -323,11 +348,10 @@ private fun TopBar(onBack: (() -> Unit)?, onClose: () -> Unit) {
             }
             Spacer(Modifier.weight(1f))
         }
-        val interaction = remember { MutableInteractionSource() }
-        Box(
+        if (onClose != null) Box(
             Modifier
                 .size(44.dp)
-                .pressable(interaction, onClick = onClose)
+                .pressable(remember { MutableInteractionSource() }, onClick = onClose)
                 .semantics { contentDescription = t("server.settingsLayer.closeSettings") },
             contentAlignment = Alignment.Center,
         ) { Icon("X", c.textMuted, size = 22.dp) }
@@ -337,12 +361,12 @@ private fun TopBar(onBack: (() -> Unit)?, onClose: () -> Unit) {
 
 /** The list: a search box, then the groups as cards of rows, then Report a Bug and Log Out. */
 @Composable
-private fun SettingsList(query: String, setQuery: (String) -> Unit, onOpen: (String, String?) -> Unit, onClose: () -> Unit) {
+private fun SettingsList(query: String, setQuery: (String) -> Unit, onOpen: (String, String?) -> Unit, onClose: () -> Unit, selected: String? = null) {
     val c = Nx.colors
     val me by Nexa.users.me.collectAsState()
     val groups = remember(me?.flags, fish.nexa.ui.I18n.tag) { Settings.groups() }
     Column(Modifier.fillMaxSize()) {
-        TopBar(onBack = null, onClose = onClose)
+        TopBar(onBack = null, onClose = if (selected == null) onClose else null)
         Column(
             Modifier
                 .fillMaxSize()
@@ -374,7 +398,7 @@ private fun SettingsList(query: String, setQuery: (String) -> Unit, onOpen: (Str
                             modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 20.dp, bottom = 8.dp).semantics { heading() },
                         ) else Spacer(Modifier.height(20.dp))
                         NavCard {
-                            g.pages.forEachIndexed { i, p -> NavRow(p.icon, p.label, first = i == 0) { onOpen(p.id, null) } }
+                            g.pages.forEachIndexed { i, p -> NavRow(p.icon, p.label, first = i == 0, selected = p.id == selected, chevron = selected == null) { onOpen(p.id, null) } }
                         }
                     }
                     Spacer(Modifier.height(20.dp))
@@ -443,7 +467,7 @@ private fun NavCard(content: @Composable () -> Unit) {
 
 /** `.navItem` on a phone: a 30 dp icon tile, the label, a chevron; 52 dp tall, a hairline between rows. */
 @Composable
-private fun NavRow(icon: String, label: String, sub: String? = null, first: Boolean = false, danger: Boolean = false, chevron: Boolean = true, onClick: () -> Unit) {
+private fun NavRow(icon: String, label: String, sub: String? = null, first: Boolean = false, danger: Boolean = false, chevron: Boolean = true, selected: Boolean = false, onClick: () -> Unit) {
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -452,8 +476,9 @@ private fun NavRow(icon: String, label: String, sub: String? = null, first: Bool
     Row(
         Modifier
             .fillMaxWidth()
-            .background(if (pressed) c.bgHover else Color.Transparent)
+            .background(if (pressed) c.bgHover else if (selected) c.bgSelected else Color.Transparent)
             .pressable(interaction, onClick = onClick)
+            .semantics { this.selected = selected }
             .heightIn(min = 52.dp)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -465,9 +490,9 @@ private fun NavRow(icon: String, label: String, sub: String? = null, first: Bool
                 .size(30.dp)
                 .background(if (danger) c.danger.copy(alpha = 0.12f) else c.textStrong.copy(alpha = 0.05f), tile),
             contentAlignment = Alignment.Center,
-        ) { Icon(icon, if (danger) c.textDanger else c.icon, size = 18.dp) }
+        ) { Icon(icon, if (danger) c.textDanger else if (selected) c.textBrand else c.icon, size = 18.dp) }
         Column(Modifier.weight(1f)) {
-            Txt(label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(550), lineHeight = Nx.type.sp(18.75f)), color = if (danger) c.textDanger else c.text)
+            Txt(label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(550), lineHeight = Nx.type.sp(18.75f)), color = if (danger) c.textDanger else if (selected) c.textStrong else c.text)
             if (sub != null) Txt(sub, style = Nx.type.hint.copy(fontWeight = FontWeight(500)), color = c.textMuted)
         }
         if (chevron) Icon(if (rtl) "ChevronLeft" else "ChevronRight", c.textMuted, size = 18.dp)
@@ -485,7 +510,7 @@ private fun PageView(
     anchor: String?,
     isTop: Boolean,
     onAnchorDone: () -> Unit,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onClose: () -> Unit,
     openPage: (String, String?) -> Unit,
 ) {
@@ -498,7 +523,7 @@ private fun PageView(
     val drag = remember { Animatable(0f) }
     val scroll = rememberScrollState()
     val host = remember { AnchorHost(scroll) }
-    val back = { Unsaved.unlessUnsaved { host.inner?.invoke() ?: onBack() } }
+    val back = { Unsaved.unlessUnsaved { host.inner?.invoke() ?: onBack?.invoke() } }
     BackHandler(enabled = isTop && host.inner != null) { Unsaved.unlessUnsaved { host.inner?.invoke() } }
 
     // a search result or link: bring the setting into view (it may take a moment to appear) and light it
@@ -532,7 +557,8 @@ private fun PageView(
                     alpha = (if (drag.value != 0f) maxOf(0.4f, 1f - abs(drag.value) / (600f * density)) else 1f) * enter.value
                     translationY = (1f - enter.value) * 6f * density
                 }
-                .pointerInput(rtl, widthPx) {
+                .pointerInput(rtl, widthPx, onBack == null) {
+                    if (onBack == null) return@pointerInput
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         val t0 = System.currentTimeMillis()
@@ -562,7 +588,7 @@ private fun PageView(
                                 inner()
                             } else if (done && !Unsaved.blocking) {
                                 drag.animateTo(dir * widthPx, tween(if (reduced) 0 else 160, easing = ease))
-                                onBack()
+                                onBack?.invoke()
                             } else {
                                 if (done) Unsaved.unlessUnsaved {}
                                 drag.animateTo(0f, tween(if (reduced) 0 else 200, easing = ease))
@@ -571,7 +597,7 @@ private fun PageView(
                     }
                 },
         ) {
-            TopBar(onBack = back, onClose = onClose)
+            TopBar(onBack = if (onBack != null || host.inner != null) back else null, onClose = onClose, title = onBack != null)
             Box(Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { host.viewportHeight = it.size.height }) {
                 CompositionLocalProvider(LocalAnchors provides host) {
                     Column(
