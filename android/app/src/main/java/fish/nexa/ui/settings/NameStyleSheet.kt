@@ -53,24 +53,21 @@ import fish.nexa.ui.theme.shadowLow
 import fish.nexa.ui.theme.topEdge
 
 /**
- * Settings, Profiles, Name Style (the web's NameStyleDialog at phone width):
- * the name large on its plate and in a message, then the fonts, the effects
- * and the colours. Apply hands it to the profile, which saves it with the
- * rest; Surprise Me picks one at random and Reset goes back to the plain name.
+ * Settings, Profiles, Name Style (the web's NameStyleEditor in a phone's
+ * sheet): the name large on its plate, then Surprise Me and Reset, the fonts,
+ * the effects and the colours. Every choice goes straight to the profile
+ * being edited ([value] and [onChange]) and waits for Save Changes with the
+ * rest, as on the web.
  */
-internal fun openNameStyleSheet(me: () -> MeUser?, name: () -> String, initial: NameStyle?, onApply: (NameStyle?) -> Unit) {
-    val state = mutableStateOf(initial ?: NameStyle.PLAIN)
-    openSheet("designer-name-style", title = t("nameStyle.title"), footer = { close ->
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NxButton(t("nameStyle.reset"), { state.value = NameStyle.PLAIN }, kind = ButtonKind.GHOST, size = ButtonSize.SM)
-            Spacer(Modifier.weight(1f))
-            NxButton(t("nameStyle.surprise"), { state.value = NameStyle.surprise() }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "Dices")
-            NxButton(t("nameStyle.apply"), {
-                onApply(state.value.takeIf { !it.isPlain })
-                close()
-            }, size = ButtonSize.SM)
-        }
-    }) {
+internal fun openNameStyleSheet(me: () -> MeUser?, name: () -> String, value: () -> NameStyle?, onChange: (NameStyle?) -> Unit) {
+    val state = object : MutableState<NameStyle> {
+        override var value: NameStyle
+            get() = value() ?: NameStyle.PLAIN
+            set(v) = onChange(v.takeIf { !it.isPlain })
+        override fun component1() = this.value
+        override fun component2(): (NameStyle) -> Unit = { this.value = it }
+    }
+    openSheet("designer-name-style", title = t("nameStyle.title")) {
         val m = me() ?: return@openSheet
         NameStyleBody(m, name(), state)
     }
@@ -95,7 +92,10 @@ private fun NameStyleBody(me: MeUser, name: String, state: MutableState<NameStyl
         ) {
             RoleName(name, look, Nx.type.name.copy(fontSize = Nx.type.sp(26f), lineHeight = Nx.type.sp(32f), fontWeight = FontWeight(700), textAlign = TextAlign.Center), c.textStrong)
         }
-        ChatPreview(me, name, null, look = look)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NxButton(t("nameStyle.surprise"), { state.value = NameStyle.surprise() }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "Dices")
+            NxButton(t("nameStyle.reset"), { state.value = NameStyle.PLAIN }, kind = ButtonKind.GHOST, size = ButtonSize.SM, icon = "RotateCcw", enabled = !style.isPlain)
+        }
 
         Section(t("nameStyle.font")) {
             Grid(NameStyle.FONTS, 4) { f ->

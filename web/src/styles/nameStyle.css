@@ -1,6 +1,7 @@
-/* A name in someone's own style (lib/nameStyle.ts). The font scales so a
-   wide or small face sits on the same line as the text around it. */
-.ns-font { font-family: "Twemoji Text", var(--ns-family), var(--font-display); font-size: calc(1em * var(--ns-scale, 1)); font-weight: normal; letter-spacing: 0; }
+/* A name in someone's own style (lib/nameStyle.ts). font-size-adjust sizes
+   every face so its letters stand as tall as the app font's at the same size
+   (Wix Madefor's needs no adjusting), whatever size the name is set at. */
+.ns-font { font-family: "Twemoji Text", var(--ns-family), var(--font-display); font-size-adjust: var(--ns-adjust); font-weight: normal; letter-spacing: 0; }
 .ns { -webkit-text-fill-color: currentColor; }
 .ns-solid { color: var(--ns-c1) !important; }
 

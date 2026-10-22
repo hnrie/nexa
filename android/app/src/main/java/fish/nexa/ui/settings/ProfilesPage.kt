@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -385,7 +386,7 @@ private fun MainDesigner(anchor: String?) {
             }
             "status" -> fish.nexa.ui.dialogs.Dialogs.customStatus()
             "typing" -> view = "chat"
-            "nameStyle" -> openNameStyleSheet({ Nexa.users.me.value }, { f.displayName.trim().ifEmpty { me.displayName } }, f.nameLook) { f.nameLook = it }
+            "nameStyle" -> openNameStyleSheet({ Nexa.users.me.value }, { f.displayName.trim().ifEmpty { me.displayName } }, { f.nameLook }) { f.nameLook = it }
             "widgets" -> {
                 view = "full"
                 showTab(ProfileTab.WIDGETS)
@@ -468,35 +469,57 @@ private fun MainDesigner(anchor: String?) {
         color = c.textMuted,
         modifier = Modifier.padding(top = 0.dp, bottom = 18.dp).settingAnchor("profile"),
     )
+    // every part of the profile, grouped by what it changes, each showing what it holds now (the web's panel)
+    val shown = f.displayName.trim().ifEmpty { me.displayName }
+    val ownLook = f.nameLook?.let { fish.nexa.ui.chat.RoleLook(color = null, own = it) }
+    val status = listOf(me.statusEmoji, me.statusText).filter { it.isNotEmpty() }.joinToString(" ")
+    val typingWords = TypingStyle.text(f.typing)
+    val valueStyle = Nx.type.body.copy(fontSize = Nx.type.sp(14f))
+    val groups = listOf(
+        t("designer.group.name") to listOf(
+            PartRow("name", t("settings.account.displayName"), null) { Txt(shown, style = valueStyle, color = c.textMuted, maxLines = 1) },
+            PartRow("nameStyle", t("nameStyle.title"), "nameStyle") {
+                if (ownLook != null) fish.nexa.ui.chat.RoleName(shown, ownLook, valueStyle.copy(fontWeight = FontWeight(600)), c.textMuted)
+                else Txt(t("designer.value.plain"), style = valueStyle, color = c.textMuted, maxLines = 1)
+            },
+            PartRow("pronouns", t("settings.profile.pronouns"), null, empty = f.pronouns.isBlank()) { Txt(f.pronouns, style = valueStyle, color = c.textMuted, maxLines = 1) },
+        ),
+        t("designer.group.look") to listOf(
+            PartRow("avatar", t("settings.profile.avatar"), "avatar") { Avatar(me.id, me.displayName, me.avatarId, 28.dp) },
+            PartRow("banner", t("settings.profile.profileBanner"), "banner") {
+                val url = Media.bannerUrl(me.bannerId, 128, density)
+                Box(
+                    Modifier.size(56.dp, 24.dp).clip(RoundedCornerShape(6.dp)).background(
+                        when {
+                            url != null -> Brush.verticalGradient(listOf(c.bgSurface, c.bgSurface))
+                            theme != null -> Brush.verticalGradient(listOf(theme.top, theme.bottom))
+                            else -> Brush.verticalGradient(listOf(f.accent?.let { rgbColor(it) } ?: c.brand, f.accent?.let { rgbColor(it) } ?: c.brand))
+                        },
+                    ),
+                ) { if (url != null) AsyncImage(url, null, Media.loader, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+            },
+            PartRow("colours", t("settings.profile.profileTheme"), "profileTheme", empty = f.accent == null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    for (col in listOfNotNull(f.accent, f.accent2)) Box(Modifier.size(18.dp).clip(RoundedCornerShape(6.dp)).background(rgbColor(col)))
+                }
+            },
+        ),
+        t("designer.group.about") to listOf(
+            PartRow("about", t("settings.profile.aboutMe"), null, empty = f.about.isBlank()) { Txt(f.about.trim().lineSequence().first(), style = valueStyle, color = c.textMuted, maxLines = 1) },
+            PartRow("status", t("designer.part.status"), null, empty = status.isEmpty()) { Txt(status, style = valueStyle, color = c.textMuted, maxLines = 1) },
+            PartRow("widgets", t("widgets.title"), "widgets", empty = f.widgets.isEmpty()) { Txt(f.widgets.size.toString(), style = valueStyle, color = c.textMuted, maxLines = 1) },
+            PartRow("tag", t("serverTag.choose.title"), "serverTag", empty = me.serverTag == null) { Txt(me.serverTag?.text ?: "", style = valueStyle, color = c.textMuted, maxLines = 1) },
+            PartRow("typing", t("typing.editor.title"), "typingStyle", empty = typingWords.isEmpty()) { Txt(typingWords, style = valueStyle, color = c.textMuted, maxLines = 1) },
+        ),
+    )
+    Column(Modifier.padding(bottom = 16.dp).semantics { contentDescription = t("designer.parts") }, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        for ((title, rows) in groups) PartGroup(title, rows) { open(it) }
+    }
     TabStrip(
         listOf("full" to t("designer.view.full"), "card" to t("designer.view.card"), "chat" to t("designer.view.chat")),
         view, t("designer.view.label"), tabHeight = 32.dp,
     ) { view = it }
-    val parts = listOf(
-        PartChip("name", "Type", t("settings.account.displayName")),
-        PartChip("nameStyle", "Sparkles", t("nameStyle.title"), "nameStyle"),
-        PartChip("pronouns", "UserRound", t("settings.profile.pronouns")),
-        PartChip("avatar", "CircleUserRound", t("settings.profile.avatar"), "avatar"),
-        PartChip("banner", "Image", t("settings.profile.profileBanner"), "banner"),
-        PartChip("colours", "Palette", t("settings.profile.profileTheme"), "profileTheme"),
-        PartChip("about", "AlignLeft", t("settings.profile.aboutMe")),
-        PartChip("widgets", "LayoutGrid", t("widgets.title"), "widgets"),
-        PartChip("tag", "Tag", t("serverTag.choose.title"), "serverTag"),
-        PartChip("status", "Smile", t("designer.part.status")),
-        PartChip("typing", "MessageCircleMore", t("typing.editor.title"), "typingStyle"),
-    )
-    // the parts go sideways on a phone, under a thumb, rather than stacking down the page
-    Row(
-        Modifier
-            .padding(top = 12.dp, bottom = 14.dp)
-            .bleed(16.dp)
-            .sidewaysScroll()
-            .padding(horizontal = 16.dp, vertical = 2.dp)
-            .semantics { contentDescription = t("designer.parts") },
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        for (p in parts) PartButton(p, Modifier.settingAnchor(p.setting)) { open(p.part) }
-    }
+    Spacer(Modifier.height(14.dp))
 
     if (f.widgetsFailed) Row(
         Modifier
@@ -587,6 +610,49 @@ internal fun PartButton(p: PartChip, modifier: Modifier, onClick: () -> Unit) {
     ) {
         Icon(p.icon, if (pressed) c.textBrand else c.textMuted, size = 15.dp)
         Txt(p.label, style = Nx.type.body.copy(fontSize = Nx.type.sp(13.5f), fontWeight = FontWeight(600)), color = if (pressed) c.textStrong else c.textSubtle, maxLines = 1)
+    }
+}
+
+/** A part of the profile in the list: its name, what it holds now (or Add), and the way to change it. */
+internal class PartRow(val part: String, val label: String, val setting: String?, val empty: Boolean = false, val value: @Composable () -> Unit)
+
+/** One group of the list (the web's `.group`): a quiet heading over raised rows joined into one panel. */
+@Composable
+internal fun PartGroup(title: String, rows: List<PartRow>, onOpen: (String) -> Unit) {
+    val c = Nx.colors
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Txt(title, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(650)), color = c.textMuted, modifier = Modifier.padding(horizontal = 4.dp).semantics { heading() })
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .shadowLow(Radii.Md, c)
+                .background(c.bgSurface, Radii.Md)
+                .background(sheen(c), Radii.Md)
+                .ring(Radii.Md, c.borderSubtle)
+                .topEdge(Radii.Md, c.edgeLight)
+                .clip(Radii.Md),
+        ) {
+            rows.forEachIndexed { i, row ->
+                if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 50.dp)
+                        .settingAnchor(row.setting)
+                        .pressable(remember { MutableInteractionSource() }, role = Role.Button) { onOpen(row.part) }
+                        .padding(start = 14.dp, end = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Txt(row.label, style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(600)), color = c.textSubtle, maxLines = 1)
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                        if (row.empty) Txt(t("designer.value.add"), style = Nx.type.body.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textBrand, maxLines = 1)
+                        else row.value()
+                    }
+                    Icon("ChevronRight", c.textMuted, size = 16.dp)
+                }
+            }
+        }
     }
 }
 

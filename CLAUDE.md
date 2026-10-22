@@ -969,16 +969,28 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
 - Name styles (`lib/nameStyle.ts`, server `api/name_style.go`, column `users.name_style`): a
   display name's font, effect and colours, public like the rest of a profile. The fonts are the
   `NAME_FONTS` list (Comic Neue, serifs, sans, rounded, display, script, pixel and mono faces, all
-  picked to stay readable), served by Fontsource from `styles/nameStyle.css`, which also draws the
-  eight effects (Solid, Gradient, Glow, Ink, Pop, Candy, Aurora, Chrome) as `ns-*` classes. A new
+  picked to stay readable), served by Fontsource from `styles/nameFonts.css`, which loads only once a
+  styled name is drawn (`loadNameFonts`). Every font is sized to match the app's own:
+  `font-size-adjust` gives it Wix Madefor Display's lowercase height (Bungee, all capitals, its
+  capital height), and Android multiplies by the same measured `scale`. `styles/nameStyle.css` draws
+  the eight effects (Solid, Gradient, Glow, Ink, Pop, Candy, Aurora, Chrome) as `ns-*` classes. A new
   font goes in `NAME_FONTS`, the CSS imports, `nameFonts` in the Go file, `FONTS` in
   `android/tools/name_fonts.py` (then run it to write `res/font/name_<id>.ttf`) and Android's
   `data/NameStyle.kt`. Names are drawn through `nameStyle`/`nameClass` in `lib/roleLook.ts`, whose
   look carries the person's own style as `own` (`useMemberLook` adds it, `withOwn` for lists): in a
-  server a role's colour still colours the name and only the font stays. Settings, Profiles has
-  the Name Style dialog (`components/settings/NameStyleDialog.tsx`, saved with the profile); the
+  server a role's colour still colours the name and only the font stays. Settings, Profiles edits it
+  with `components/settings/NameStyleEditor.tsx`, saved with the profile; the
   staff can reset it (field `name_style`). Android: `data/NameStyle`, `ui/chat/RoleLook.kt`
   (`RoleName`, `OwnName`), `ui/chat/NameFonts.kt` and `ui/settings/NameStyleSheet.kt`.
+- The profile designer (Settings, Profiles, `components/settings/ProfilePage.tsx`): every part of the
+  profile is a row in a panel, grouped as Your Name, Pictures & Colours and About You, each row
+  showing what the part holds now. With room (`PANEL_BESIDE`, measured on the designer) the panel
+  stands beside the profile and Name Style, the avatar, banner, theme and server tag open as pages
+  in it; otherwise the list goes above the profile and those pages open as sheets. Display name,
+  pronouns and About Me are written in place on the profile (the name opening Name Style beside
+  it), Status opens its dialog, Widgets the profile's widgets tab, Typing Indicator the In Chat
+  view. Android's `ProfilesPage.kt` has the same rows (`PartGroup`, `PartRow`) above the profile,
+  opening sheets.
 - Colours are picked with `components/common/ColourInput.tsx`, Nexa's own picker (a square of
   shades, a hue strip, opacity when asked for, the hex code, the browser's eyedropper where it has
   one), laid over whatever swatch shows the colour; never the browser's `<input type="color">`.

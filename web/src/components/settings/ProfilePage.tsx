@@ -1,9 +1,10 @@
-import { AlignLeft, CircleUserRound, Image as ImageIcon, ImagePlus, LayoutGrid, LoaderCircle, MessageCircleMore, Palette, Pin, Plus, Smile, Sparkles, Tag, Type, UserRound, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { ArrowLeft, ChevronRight, ImagePlus, LoaderCircle, Palette, Pin, Plus } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { avatarUrl, bannerUrl, users as usersApi } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
+import { Modal } from "@/components/common/Modal";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
 import { ProfileCard, type ProfileDesign, type ProfilePart, type ProfileTab } from "@/components/profile/ProfileCard";
 import { widgetName, type WidgetDesign } from "@/components/profile/Widgets";
@@ -18,20 +19,26 @@ import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
 import { unlessUnsaved } from "@/stores/unsaved";
 import { aboutToEdit, aboutToSave } from "./AboutMeEditor";
-import { ChatPreview, ColoursPicker, EditPop, hexOf, InlineAbout, InlineText } from "./designerParts";
+import { ChatPreview, ColoursPicker, hexOf, InlineAbout, InlineText } from "./designerParts";
 import { ServerProfileDesigner } from "./ServerProfileDesigner";
 import { ServerTagList, wearServerTag } from "./ServerTagChooser";
 import { TypingStyleEditor } from "./TypingStyleEditor";
-import { NameStyleDialog } from "./NameStyleDialog";
+import { NameStyleEditor } from "./NameStyleEditor";
+import { nameClass, nameStyle } from "@/lib/roleLook";
+import { typingStyleText } from "@/lib/typingStyle";
 import { readNameStyle, sameNameStyle, type NameStyle } from "@/lib/nameStyle";
 import { AddWidgetDialog, CardDialog, GameWidgetDialog, MusicWidgetDialog } from "./WidgetsEditor";
 import st from "./Settings.module.css";
 import d from "./Designer.module.css";
 
 type View = "full" | "card" | "chat";
-/** What the strip of parts and the profile's own parts open. */
+/** What the panel's rows and the profile's own parts open. */
 type Part = ProfilePart | "colours" | "widgets" | "typing" | "nameStyle";
-type Pop = { part: "banner" | "avatar" | "colours" | "tag"; anchor: HTMLElement };
+/** The parts edited on a page of their own: in the panel beside the profile, or a sheet where there is no room for it. */
+type Page = "nameStyle" | "avatar" | "banner" | "colours" | "tag";
+const PAGES: Part[] = ["nameStyle", "avatar", "banner", "colours", "tag"];
+/** Narrower than this, the panel's list goes above the profile and its pages open as sheets. */
+const PANEL_BESIDE = 820;
 
 /** Where the designer opens when Settings was asked for one of its parts (its search, a typing line's Make Your Own). */
 function viewFor(anchor: string | null | undefined): View {
@@ -86,7 +93,6 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
   const [accent2, setAccent2] = useState<string | null>(hexOf(me?.accent_color_2));
   const [typing, setTyping] = useState<TypingStyle | null>(() => readTypingStyle(me?.typing_style));
   const [nameLook, setNameLook] = useState<NameStyle | null>(() => readNameStyle(me?.name_style));
-  const [styling, setStyling] = useState(false);
   const [crop, setCrop] = useState<{ file: File; kind: "avatar" | "banner" } | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<"avatar" | "banner" | null>(null);
@@ -99,7 +105,20 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
   // the designer: what is shown, what is written in place, what is open beside a part
   const [view, setView] = useState<View>(() => viewFor(anchor));
   const [inline, setInline] = useState<"name" | "pronouns" | "about" | null>(null);
-  const [pop, setPop] = useState<Pop | null>(null);
+  const [page, setPage] = useState<Page | null>(null);
+  // whether the panel stands beside the profile, measured on the designer itself
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const [beside, setBeside] = useState(true);
+  useLayoutEffect(() => {
+    const el = layoutRef.current;
+    if (!el) return;
+    const measure = () => setBeside(el.clientWidth >= PANEL_BESIDE);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [tab, setTab] = useState<{ tab: ProfileTab; n: number } | null>(null);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<{ widget: Widget; isNew: boolean } | null>(null);
@@ -202,6 +221,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     setNameLook(savedNameLook);
     if (savedWidgets) setWidgets(savedWidgets);
     setInline(null);
+    setPage(null);
   };
   const upload = async (kind: "avatar" | "banner", file: File, crop?: { x: number; y: number; w: number; h: number } | null) => {
     if (file.size > 10 * 1024 * 1024) return toast(t("settings.profile.imagesAreLimitedTo10Mb"), "error");
@@ -226,12 +246,14 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     }
   };
 
-  /** A part of the profile on the stage, once it is drawn, to open what changes it beside it. */
-  const partOnStage = (part: string): HTMLElement | null => stageRef.current?.querySelector<HTMLElement>(`[data-spot="${part}"]`) ?? null;
   const showTab = (next: ProfileTab) => setTab((cur) => ({ tab: next, n: (cur?.n ?? 0) + 1 }));
-  // what pressing a part does, on the stage or in the strip
-  const open = (part: Part, anchorEl: HTMLElement | null) => {
-    setPop(null);
+  // what pressing a part does, in the panel or on the profile
+  const open = (part: Part) => {
+    if ((PAGES as string[]).includes(part)) {
+      if (view === "chat" && part !== "colours" && part !== "tag" && part !== "nameStyle") setView("full");
+      setPage(part as Page);
+      return;
+    }
     switch (part) {
       case "name":
       case "pronouns":
@@ -240,6 +262,8 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
         // one column (a phone) keeps About Me behind its own tab
         if (part === "about" && stageRef.current?.querySelector('[data-layout="narrow"]')) showTab("about");
         setInline(part);
+        // the name and its style go together: the style opens beside the name being written
+        if (part === "name" && beside) setPage("nameStyle");
         return;
       case "status":
         openModal("customStatus");
@@ -247,20 +271,11 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
       case "typing":
         setView("chat");
         return;
-      case "nameStyle":
-        setStyling(true);
-        return;
       case "widgets":
         setView("full");
         showTab("widgets");
         requestAnimationFrame(() => stageRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
         return;
-      default: {
-        if (view === "chat" && part !== "colours" && part !== "tag") setView("full");
-        // beside the part on the stage when it is there, else beside what was pressed
-        const at = (part !== "colours" ? partOnStage(part) : null) ?? anchorEl;
-        if (at) setPop({ part, anchor: at });
-      }
     }
   };
   const widgetTools: WidgetDesign = {
@@ -287,7 +302,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     add: () => setAdding(true),
   };
   const design: ProfileDesign = {
-    edit: (part, anchorEl) => open(part, anchorEl),
+    edit: (part) => open(part),
     inline: {
       ...(inline === "name"
         ? { name: <InlineText className={d.nameInput} value={displayName} onChange={setDisplayName} onDone={() => setInline(null)} max={32} label={t("settings.account.displayName")} testId="designer-name" /> }
@@ -312,20 +327,116 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
   };
 
   const preview = { display_name: shownName, pronouns, about_me: aboutOut, accent_color: hex(accent), accent_color_2: hex(accent2), typing_style: typing, name_style: nameLook };
-  // each with the anchor Settings' search knows it by
-  const parts: { id: Part; icon: LucideIcon; label: string; setting?: string }[] = [
-    { id: "name", icon: Type, label: t("settings.account.displayName") },
-    { id: "nameStyle", icon: Sparkles, label: t("nameStyle.title"), setting: "nameStyle" },
-    { id: "pronouns", icon: UserRound, label: t("settings.profile.pronouns") },
-    { id: "avatar", icon: CircleUserRound, label: t("settings.profile.avatar"), setting: "avatar" },
-    { id: "banner", icon: ImageIcon, label: t("settings.profile.profileBanner"), setting: "banner" },
-    { id: "colours", icon: Palette, label: t("settings.profile.profileTheme"), setting: "profileTheme" },
-    { id: "about", icon: AlignLeft, label: t("settings.profile.aboutMe") },
-    { id: "widgets", icon: LayoutGrid, label: t("widgets.title"), setting: "widgets" },
-    { id: "tag", icon: Tag, label: t("serverTag.choose.title"), setting: "serverTag" },
-    { id: "status", icon: Smile, label: t("designer.part.status") },
-    { id: "typing", icon: MessageCircleMore, label: t("typing.editor.title"), setting: "typingStyle" },
+  const status = [me.status_emoji, me.status_text].filter(Boolean).join(" ");
+  const typingWords = typingStyleText(typing);
+  const nameLookShown = nameLook ? { own: nameLook } : undefined;
+  // every part of the profile, grouped by what it changes, each showing what it holds now; with the anchor Settings' search knows it by
+  const groups: { title: string; rows: { id: Part; label: string; value: ReactNode; setting?: string }[] }[] = [
+    {
+      title: t("designer.group.name"),
+      rows: [
+        { id: "name", label: t("settings.account.displayName"), value: shownName },
+        { id: "nameStyle", label: t("nameStyle.title"), value: nameLook ? <span className={nameClass(nameLookShown)} style={nameStyle(nameLookShown)}>{shownName}</span> : t("designer.value.plain"), setting: "nameStyle" },
+        { id: "pronouns", label: t("settings.profile.pronouns"), value: pronouns || null },
+      ],
+    },
+    {
+      title: t("designer.group.look"),
+      rows: [
+        { id: "avatar", label: t("settings.profile.avatar"), value: <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={28} />, setting: "avatar" },
+        { id: "banner", label: t("settings.profile.profileBanner"), value: <span className={d.rowBanner} style={me.banner_id ? { backgroundImage: `url(${bannerUrl(me.banner_id, 128)})` } : { background: theme ? `linear-gradient(180deg, ${theme.top}, ${theme.bottom})` : (accent ?? "var(--brand)") }} />, setting: "banner" },
+        { id: "colours", label: t("settings.profile.profileTheme"), value: accent ? <span className={d.rowSwatches}><i style={{ background: accent }} />{accent2 ? <i style={{ background: accent2 }} /> : null}</span> : null, setting: "profileTheme" },
+      ],
+    },
+    {
+      title: t("designer.group.about"),
+      rows: [
+        { id: "about", label: t("settings.profile.aboutMe"), value: about.trim() ? about.trim().split("\n")[0] : null },
+        { id: "status", label: t("designer.part.status"), value: status || null },
+        { id: "widgets", label: t("widgets.title"), value: widgets.length ? String(widgets.length) : null, setting: "widgets" },
+        { id: "tag", label: t("serverTag.choose.title"), value: me.server_tag?.text ?? null, setting: "serverTag" },
+        { id: "typing", label: t("typing.editor.title"), value: typingWords || null, setting: "typingStyle" },
+      ],
+    },
   ];
+  const pageTitle: Record<Page, string> = {
+    nameStyle: t("nameStyle.title"),
+    avatar: t("settings.profile.avatar"),
+    banner: t("settings.profile.profileBanner"),
+    colours: t("settings.profile.profileTheme"),
+    tag: t("serverTag.choose.title"),
+  };
+  const pageBody = (part: Page): ReactNode => {
+    switch (part) {
+      case "nameStyle":
+        return <NameStyleEditor value={nameLook} onChange={setNameLook} name={shownName} plate={!beside} />;
+      case "avatar":
+        return (
+          <>
+            <div className={d.popRow}>
+              <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={64} />
+              <div className={d.popBtns}>
+                <Button size="sm" loading={uploading === "avatar"} onClick={() => avatarRef.current?.click()} data-testid="designer-upload-avatar">
+                  <ImagePlus size={15} aria-hidden="true" /> {t("settings.profile.changeAvatar")}
+                </Button>
+                {me.avatar_id ? <Button size="sm" variant="ghost" onClick={() => void remove("avatar")}>{t("settings.profile.removeAvatar")}</Button> : null}
+              </div>
+            </div>
+            <p className={d.popHint}>{t("designer.imageHint")}</p>
+          </>
+        );
+      case "banner":
+        return (
+          <>
+            <div className={d.bannerThumb} style={me.banner_id ? { backgroundImage: `url(${bannerUrl(me.banner_id, 340)})` } : { background: theme ? `linear-gradient(180deg, ${theme.top}, ${theme.bottom})` : (accent ?? "var(--brand)") }} aria-hidden="true" />
+            <div className={d.popBtns}>
+              <Button size="sm" loading={uploading === "banner"} onClick={() => bannerRef.current?.click()} data-testid="designer-upload-banner">
+                <ImagePlus size={15} aria-hidden="true" /> {me.banner_id ? t("settings.profile.changeBanner") : t("designer.addBanner")}
+              </Button>
+              {me.banner_id ? <Button size="sm" variant="ghost" onClick={() => void remove("banner")}>{t("composer.composer.remove")}</Button> : null}
+            </div>
+            <p className={d.popHint}>{t("designer.imageHint")}</p>
+            {!me.banner_id ? (
+              <button type="button" className={d.popLink} onClick={() => setPage("colours")}>
+                <Palette size={14} aria-hidden="true" /> {t("designer.bannerColour")}
+              </button>
+            ) : null}
+          </>
+        );
+      case "colours":
+        return <ColoursPicker accent={accent} accent2={accent2} setAccent={setAccent} setAccent2={setAccent2} />;
+      case "tag":
+        return (
+          <>
+            <p className={d.popHint}>{t("serverTag.choose.hint")}</p>
+            <ServerTagList />
+            {me.server_tag ? (
+              <Button size="sm" variant="ghost" onClick={() => void wearServerTag(null)} data-testid="designer-tag-off">
+                {t("serverTag.takeOff")}
+              </Button>
+            ) : null}
+          </>
+        );
+    }
+  };
+  const partList = (
+    <nav className={d.partList} aria-label={t("designer.parts")} data-testid="designer-parts">
+      {groups.map((g) => (
+        <section key={g.title} className={d.group}>
+          <h3 className={d.groupTitle}>{g.title}</h3>
+          <div className={d.rows}>
+            {g.rows.map((row) => (
+              <button key={row.id} type="button" className={d.row} aria-current={(page === row.id || (row.id === "typing" && view === "chat")) || undefined} onClick={() => open(row.id)} data-setting={row.setting} data-testid={`designer-part-${row.id}`}>
+                <span className={d.rowLabel}>{row.label}</span>
+                <span className={d.rowValue} data-empty={row.value === null || undefined} dir="auto">{row.value ?? t("designer.value.add")}</span>
+                <ChevronRight size={16} className={d.rowChevron} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+    </nav>
+  );
   const views: { id: View; label: string }[] = [
     { id: "full", label: t("designer.view.full") },
     { id: "card", label: t("designer.view.card") },
@@ -337,77 +448,83 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     <>
       <p className={d.intro}>{t("designer.intro")}</p>
 
-      <div className={d.toolbar}>
-        <div className={d.views} role="tablist" aria-label={t("designer.view.label")}>
-          {views.map((v) => (
-            <button key={v.id} type="button" role="tab" aria-selected={view === v.id} className={d.viewBtn} data-selected={view === v.id} onClick={() => setView(v.id)} data-testid={`designer-view-${v.id}`}>
-              {v.label}
-            </button>
-          ))}
-        </div>
-        <div className={d.parts} role="toolbar" aria-label={t("designer.parts")}>
-          {parts.map((p) => {
-            const Icon = p.icon;
-            return (
-              <button key={p.id} type="button" className={d.part} onClick={(e) => open(p.id, e.currentTarget)} data-setting={p.setting} data-testid={`designer-part-${p.id}`}>
-                <Icon size={15} aria-hidden="true" /> {p.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {widgetsFailed ? (
-        <div className={d.notice} role="status">
-          <span>{t("widgets.couldNotLoad")}</span>
-          <Button size="sm" variant="secondary" onClick={loadWidgets}>{t("invite.tryAgain")}</Button>
-        </div>
-      ) : null}
-
-      <div ref={stageRef} className={d.stage} data-view={view} data-intro={intro || undefined} style={{ "--glow": glow } as CSSProperties} data-testid="designer-stage">
-        {view === "full" ? (
-          <div className={d.frame}>
-            <ProfileCard key={tab ? `${tab.tab}-${tab.n}` : "profile"} userId={me.id} variant="modal" preview={preview} previewWidgets={widgets} design={design} initialTab={tab?.tab} />
-          </div>
-        ) : view === "card" ? (
-          <div className={d.cardView}>
-            <div className={d.cardFrame}>
-              <ProfileCard userId={me.id} variant="popout" preview={preview} previewWidgets={widgets} design={design} />
+      <div ref={layoutRef} className={d.layout} data-beside={beside || undefined}>
+        <aside className={d.panel} data-testid="designer-panel">
+          {page && beside ? (
+            <div className={d.page} data-testid={`designer-page-${page}`}>
+              <div className={d.pageHead}>
+                <button type="button" className={d.back} onClick={() => setPage(null)} aria-label={t("designer.back")} data-testid="designer-page-back">
+                  <ArrowLeft size={18} aria-hidden="true" />
+                </button>
+                <h3 className={d.pageTitle}>{pageTitle[page]}</h3>
+              </div>
+              {pageBody(page)}
             </div>
-            <aside className={d.aside}>
-              <h3 className={d.asideTitle}><Pin size={15} aria-hidden="true" /> {t("designer.card.title")}</h3>
-              <p className={d.asideText}>{t("designer.card.hint")}</p>
-              {widgets.length ? (
-                <div className={d.choices} role="radiogroup" aria-label={t("designer.card.title")}>
-                  {widgets.map((w) => (
-                    <button key={w.id} type="button" role="radio" aria-checked={first?.id === w.id} className={d.choice} onClick={() => widgetTools.feature(w.id)} data-testid={`designer-card-${w.type}`}>
-                      <span className={d.choiceDot} aria-hidden="true" />
-                      <span className={d.choiceText} dir="auto">{widgetName(w)}</span>
-                    </button>
-                  ))}
+          ) : (
+            partList
+          )}
+        </aside>
+        <div className={d.main}>
+          <div className={d.views} role="tablist" aria-label={t("designer.view.label")}>
+            {views.map((v) => (
+              <button key={v.id} type="button" role="tab" aria-selected={view === v.id} className={d.viewBtn} data-selected={view === v.id} onClick={() => setView(v.id)} data-testid={`designer-view-${v.id}`}>
+                {v.label}
+              </button>
+            ))}
+          </div>
+          {widgetsFailed ? (
+            <div className={d.notice} role="status">
+              <span>{t("widgets.couldNotLoad")}</span>
+              <Button size="sm" variant="secondary" onClick={loadWidgets}>{t("invite.tryAgain")}</Button>
+            </div>
+          ) : null}
+
+          <div ref={stageRef} className={d.stage} data-view={view} data-intro={intro || undefined} style={{ "--glow": glow } as CSSProperties} data-testid="designer-stage">
+            {view === "full" ? (
+              <div className={d.frame}>
+                <ProfileCard key={tab ? `${tab.tab}-${tab.n}` : "profile"} userId={me.id} variant="modal" preview={preview} previewWidgets={widgets} design={design} initialTab={tab?.tab} />
+              </div>
+            ) : view === "card" ? (
+              <div className={d.cardView}>
+                <div className={d.cardFrame}>
+                  <ProfileCard userId={me.id} variant="popout" preview={preview} previewWidgets={widgets} design={design} />
                 </div>
-              ) : (
-                <>
-                  <p className={d.asideText}>{t("designer.card.none")}</p>
-                  <Button size="sm" onClick={() => setAdding(true)} disabled={savedWidgets === null}>
-                    <Plus size={15} aria-hidden="true" /> {t("widgets.addOne")}
-                  </Button>
-                </>
-              )}
-            </aside>
+                <aside className={d.aside}>
+                  <h3 className={d.asideTitle}><Pin size={15} aria-hidden="true" /> {t("designer.card.title")}</h3>
+                  <p className={d.asideText}>{t("designer.card.hint")}</p>
+                  {widgets.length ? (
+                    <div className={d.choices} role="radiogroup" aria-label={t("designer.card.title")}>
+                      {widgets.map((w) => (
+                        <button key={w.id} type="button" role="radio" aria-checked={first?.id === w.id} className={d.choice} onClick={() => widgetTools.feature(w.id)} data-testid={`designer-card-${w.type}`}>
+                          <span className={d.choiceDot} aria-hidden="true" />
+                          <span className={d.choiceText} dir="auto">{widgetName(w)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <p className={d.asideText}>{t("designer.card.none")}</p>
+                      <Button size="sm" onClick={() => setAdding(true)} disabled={savedWidgets === null}>
+                        <Plus size={15} aria-hidden="true" /> {t("widgets.addOne")}
+                      </Button>
+                    </>
+                  )}
+                </aside>
+              </div>
+            ) : (
+              <div className={d.chatView}>
+                <ChatPreview name={shownName} avatarId={me.avatar_id} userId={me.id} typing={typing} look={nameLook ? { own: nameLook } : undefined} />
+                <section className={d.typingPanel} aria-labelledby="designer-typing-title">
+                  <h3 className={d.panelTitle} id="designer-typing-title">{t("typing.editor.title")}</h3>
+                  <p className={d.panelHint}>{t("typing.editor.hint")}</p>
+                  <TypingStyleEditor value={typing} onChange={setTyping} name={shownName} preview={false} />
+                </section>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className={d.chatView}>
-            <ChatPreview name={shownName} avatarId={me.avatar_id} userId={me.id} typing={typing} look={nameLook ? { own: nameLook } : undefined} />
-            <section className={d.typingPanel} aria-labelledby="designer-typing-title">
-              <h3 className={d.panelTitle} id="designer-typing-title">{t("typing.editor.title")}</h3>
-              <p className={d.panelHint}>{t("typing.editor.hint")}</p>
-              <TypingStyleEditor value={typing} onChange={setTyping} name={shownName} preview={false} />
-            </section>
-          </div>
-        )}
+          <p className={d.caption}>{t(`designer.caption.${view}`)}</p>
+        </div>
       </div>
-      <p className={d.caption}>{t(`designer.caption.${view}`)}</p>
       {uploading ? (
         <p className={d.uploading} role="status"><LoaderCircle size={14} className={d.spin} aria-hidden="true" /> {t("common.working")}</p>
       ) : null}
@@ -415,61 +532,10 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
       <input ref={avatarRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop({ file: f, kind: "avatar" }); e.target.value = ""; }} />
       <input ref={bannerRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop({ file: f, kind: "banner" }); e.target.value = ""; }} />
 
-      {pop?.part === "avatar" ? (
-        <EditPop anchor={pop.anchor} title={t("settings.profile.avatar")} onClose={() => setPop(null)} testId="designer-pop-avatar">
-          <div className={d.popRow}>
-            <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={64} />
-            <div className={d.popBtns}>
-              <Button size="sm" loading={uploading === "avatar"} onClick={() => avatarRef.current?.click()} data-testid="designer-upload-avatar">
-                <ImagePlus size={15} aria-hidden="true" /> {t("settings.profile.changeAvatar")}
-              </Button>
-              {me.avatar_id ? <Button size="sm" variant="ghost" onClick={() => { setPop(null); void remove("avatar"); }}>{t("settings.profile.removeAvatar")}</Button> : null}
-            </div>
-          </div>
-          <p className={d.popHint}>{t("designer.imageHint")}</p>
-        </EditPop>
-      ) : null}
-      {pop?.part === "banner" ? (
-        <EditPop anchor={pop.anchor} title={t("settings.profile.profileBanner")} onClose={() => setPop(null)} testId="designer-pop-banner">
-          <div className={d.bannerThumb} style={me.banner_id ? { backgroundImage: `url(${bannerUrl(me.banner_id, 340)})` } : { background: theme ? `linear-gradient(180deg, ${theme.top}, ${theme.bottom})` : (accent ?? "var(--brand)") }} aria-hidden="true" />
-          <div className={d.popBtns}>
-            <Button size="sm" loading={uploading === "banner"} onClick={() => bannerRef.current?.click()} data-testid="designer-upload-banner">
-              <ImagePlus size={15} aria-hidden="true" /> {me.banner_id ? t("settings.profile.changeBanner") : t("designer.addBanner")}
-            </Button>
-            {me.banner_id ? <Button size="sm" variant="ghost" onClick={() => { setPop(null); void remove("banner"); }}>{t("composer.composer.remove")}</Button> : null}
-          </div>
-          <p className={d.popHint}>{t("designer.imageHint")}</p>
-          {!me.banner_id ? (
-            <button type="button" className={d.popLink} onClick={() => setPop({ part: "colours", anchor: pop.anchor })}>
-              <Palette size={14} aria-hidden="true" /> {t("designer.bannerColour")}
-            </button>
-          ) : null}
-        </EditPop>
-      ) : null}
-      {pop?.part === "colours" ? (
-        <EditPop anchor={pop.anchor} title={t("settings.profile.profileTheme")} onClose={() => setPop(null)} testId="designer-pop-colours">
-          <ColoursPicker accent={accent} accent2={accent2} setAccent={setAccent} setAccent2={setAccent2} />
-        </EditPop>
-      ) : null}
-      {pop?.part === "tag" ? (
-        <EditPop anchor={pop.anchor} title={t("serverTag.choose.title")} onClose={() => setPop(null)} testId="designer-pop-tag">
-          <p className={d.popHint}>{t("serverTag.choose.hint")}</p>
-          <ServerTagList onWorn={() => setPop(null)} />
-          {me.server_tag ? (
-            <Button size="sm" variant="ghost" onClick={() => { setPop(null); void wearServerTag(null); }} data-testid="designer-tag-off">
-              {t("serverTag.takeOff")}
-            </Button>
-          ) : null}
-        </EditPop>
-      ) : null}
-
-      {styling ? (
-        <NameStyleDialog
-          initial={nameLook}
-          preview={{ ...me, ...preview, display_name: shownName }}
-          onApply={(st) => { setNameLook(st); setStyling(false); }}
-          onClose={() => setStyling(false)}
-        />
+      {page && !beside ? (
+        <Modal open onClose={() => setPage(null)} title={pageTitle[page]} width={520}>
+          <div className={d.sheetPage} data-testid={`designer-page-${page}`}>{pageBody(page)}</div>
+        </Modal>
       ) : null}
       {adding ? <AddWidgetDialog widgets={widgets} onPick={startWidget} onClose={() => setAdding(false)} /> : null}
       {editing && isGameWidget(editing.widget) ? <GameWidgetDialog initial={editing.widget} onDone={doneWidget} onClose={() => setEditing(null)} /> : null}
@@ -488,7 +554,6 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
           onDone={({ blob, crop: area }) => {
             const kind = crop.kind;
             setCrop(null);
-            setPop(null);
             void upload(kind, new File([blob], kind + (blob.type === "image/png" ? ".png" : ""), { type: blob.type }), area ?? null);
           }}
         />

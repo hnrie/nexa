@@ -152,3 +152,48 @@
   .viewBtn { flex: 1; padding: 0 8px; }
   .stage { padding: 10px; border-radius: var(--radius-lg); }
 }
+
+/* The panel: every part of the profile, grouped by what it changes, beside the
+   profile (or above it where there is no room). It stays quiet so the lit
+   stage keeps the eye; each row says what the part holds now, so it reads as
+   the profile written out, and the part being edited is lit in the accent. */
+.layout { display: flex; flex-direction: column; gap: 18px; }
+.layout[data-beside] { flex-direction: row; align-items: flex-start; gap: 16px; }
+/* beside the panel the stage gives up some of its margin, so the full profile keeps its two columns */
+.layout[data-beside] .stage { padding: 12px; }
+.panel { flex: none; min-width: 0; }
+.layout[data-beside] .panel { position: sticky; top: 0; width: 248px; max-height: calc(100dvh - 96px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 2px; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.main > .views { margin-bottom: 0; }
+
+.partList { display: flex; flex-direction: column; gap: 16px; }
+.layout:not([data-beside]) .partList { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px 16px; }
+.group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.groupTitle { margin: 0 4px; font-size: 13px; font-weight: 650; color: var(--text-muted); }
+.rows { display: flex; flex-direction: column; border-radius: var(--radius-md); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-low); overflow: hidden; }
+.row { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 6px 10px 6px 14px; text-align: start; color: var(--text); transition: background-color var(--transition); }
+.row + .row { box-shadow: inset 0 1px 0 var(--border-subtle); }
+.row:hover { background: var(--bg-hover); }
+.row[aria-current] { background: color-mix(in srgb, var(--brand) 16%, transparent); }
+.row[aria-current] .rowLabel { color: var(--text-strong); }
+.row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: var(--radius-md); }
+.rowLabel { flex: none; font-size: 14.5px; font-weight: 600; color: var(--text-subtle); white-space: nowrap; }
+.rowValue { flex: 1; min-width: 0; display: flex; justify-content: flex-end; align-items: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: var(--text-muted); }
+.rowValue > span:not([class*="avatar"]) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rowValue[data-empty] { color: var(--text-brand); font-weight: 600; }
+.rowChevron { flex: none; color: var(--text-muted); }
+:dir(rtl) .rowChevron { transform: scaleX(-1); }
+.rowBanner { display: block; width: 56px; height: 24px; border-radius: 6px; background-size: cover; background-position: center; box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 12%, transparent); }
+.rowSwatches { display: inline-flex; gap: 4px; }
+.rowSwatches i { width: 18px; height: 18px; border-radius: 6px; box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 14%, transparent); }
+
+/* a part's own page, in place of the list */
+.page { display: flex; flex-direction: column; gap: 14px; padding: 12px; border-radius: var(--radius-lg); background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-low); }
+.pageHead { display: flex; align-items: center; gap: 8px; margin: -4px -4px 0; }
+.back { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-sm); color: var(--text-muted); }
+.back:hover { background: var(--bg-hover); color: var(--text-strong); }
+.back:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; }
+:dir(rtl) .back svg { transform: scaleX(-1); }
+.pageTitle { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--text-strong); }
+.sheetPage { display: flex; flex-direction: column; gap: 14px; }
+@media (pointer: coarse) { .row { min-height: 50px; } }

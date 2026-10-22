@@ -19,38 +19,43 @@ export interface NameStyle {
   colors: number[];
 }
 
-/** The fonts on offer: the family each is served as (styles/nameFonts.css) and how much it is scaled to sit with the app's text. */
-export const NAME_FONTS: { id: string; family: string; scale: number; label: string }[] = [
+/**
+ * The fonts on offer: the family each is served as (styles/nameFonts.css), and
+ * how much it is scaled so its lowercase letters (a capitals-only font's
+ * capitals) are as tall as the app's own font's, measured from the letters
+ * themselves. The web does that with font-size-adjust; Android with the scale.
+ */
+export const NAME_FONTS: { id: string; family: string; scale: number; label: string; caps?: boolean }[] = [
   { id: "", family: "", scale: 1, label: "" },
-  { id: "comic", family: "Comic Neue", scale: 1.04, label: "Comic" },
-  { id: "fraunces", family: "Fraunces", scale: 1.04, label: "Fraunces" },
-  { id: "playfair", family: "Playfair Display", scale: 1.02, label: "Playfair" },
-  { id: "dmserif", family: "DM Serif Display", scale: 1.06, label: "DM Serif" },
-  { id: "youngserif", family: "Young Serif", scale: 1, label: "Young Serif" },
-  { id: "syne", family: "Syne", scale: 1, label: "Syne" },
-  { id: "bricolage", family: "Bricolage Grotesque", scale: 1, label: "Bricolage" },
-  { id: "spacegrotesk", family: "Space Grotesk", scale: 1, label: "Space Grotesk" },
+  { id: "comic", family: "Comic Neue", scale: 1.0, label: "Comic" },
+  { id: "fraunces", family: "Fraunces", scale: 1.02, label: "Fraunces" },
+  { id: "playfair", family: "Playfair Display", scale: 0.95, label: "Playfair" },
+  { id: "dmserif", family: "DM Serif Display", scale: 1.02, label: "DM Serif" },
+  { id: "youngserif", family: "Young Serif", scale: 0.98, label: "Young Serif" },
+  { id: "syne", family: "Syne", scale: 0.99, label: "Syne" },
+  { id: "bricolage", family: "Bricolage Grotesque", scale: 0.94, label: "Bricolage" },
+  { id: "spacegrotesk", family: "Space Grotesk", scale: 0.99, label: "Space Grotesk" },
   { id: "outfit", family: "Outfit", scale: 1.02, label: "Outfit" },
-  { id: "lexend", family: "Lexend", scale: 1, label: "Lexend" },
-  { id: "sora", family: "Sora", scale: 0.98, label: "Sora" },
-  { id: "rubik", family: "Rubik", scale: 1.02, label: "Rubik" },
-  { id: "fredoka", family: "Fredoka", scale: 1.04, label: "Fredoka" },
-  { id: "comfortaa", family: "Comfortaa", scale: 0.96, label: "Comfortaa" },
-  { id: "baloo", family: "Baloo 2", scale: 1.06, label: "Baloo" },
-  { id: "quicksand", family: "Quicksand", scale: 1.02, label: "Quicksand" },
-  { id: "bungee", family: "Bungee", scale: 0.86, label: "Bungee" },
-  { id: "righteous", family: "Righteous", scale: 1, label: "Righteous" },
-  { id: "chewy", family: "Chewy", scale: 1.08, label: "Chewy" },
-  { id: "shrikhand", family: "Shrikhand", scale: 0.94, label: "Shrikhand" },
-  { id: "titan", family: "Titan One", scale: 0.96, label: "Titan" },
-  { id: "orbitron", family: "Orbitron", scale: 0.88, label: "Orbitron" },
-  { id: "pacifico", family: "Pacifico", scale: 0.94, label: "Pacifico" },
-  { id: "lobster", family: "Lobster", scale: 1.08, label: "Lobster" },
-  { id: "kalam", family: "Kalam", scale: 1.06, label: "Kalam" },
-  { id: "patrick", family: "Patrick Hand", scale: 1.12, label: "Patrick Hand" },
-  { id: "caveat", family: "Caveat", scale: 1.3, label: "Caveat" },
-  { id: "pixelify", family: "Pixelify Sans", scale: 1.04, label: "Pixelify" },
-  { id: "spacemono", family: "Space Mono", scale: 0.92, label: "Space Mono" },
+  { id: "lexend", family: "Lexend", scale: 0.93, label: "Lexend" },
+  { id: "sora", family: "Sora", scale: 0.9, label: "Sora" },
+  { id: "rubik", family: "Rubik", scale: 0.95, label: "Rubik" },
+  { id: "fredoka", family: "Fredoka", scale: 0.99, label: "Fredoka" },
+  { id: "comfortaa", family: "Comfortaa", scale: 0.9, label: "Comfortaa" },
+  { id: "baloo", family: "Baloo 2", scale: 1.01, label: "Baloo" },
+  { id: "quicksand", family: "Quicksand", scale: 0.92, label: "Quicksand" },
+  { id: "bungee", family: "Bungee", scale: 0.99, label: "Bungee", caps: true },
+  { id: "righteous", family: "Righteous", scale: 0.94, label: "Righteous" },
+  { id: "chewy", family: "Chewy", scale: 0.9, label: "Chewy" },
+  { id: "shrikhand", family: "Shrikhand", scale: 0.93, label: "Shrikhand" },
+  { id: "titan", family: "Titan One", scale: 0.85, label: "Titan" },
+  { id: "orbitron", family: "Orbitron", scale: 0.85, label: "Orbitron" },
+  { id: "pacifico", family: "Pacifico", scale: 1.05, label: "Pacifico" },
+  { id: "lobster", family: "Lobster", scale: 0.94, label: "Lobster" },
+  { id: "kalam", family: "Kalam", scale: 0.93, label: "Kalam" },
+  { id: "patrick", family: "Patrick Hand", scale: 1.05, label: "Patrick Hand" },
+  { id: "caveat", family: "Caveat", scale: 1.34, label: "Caveat" },
+  { id: "pixelify", family: "Pixelify Sans", scale: 1.07, label: "Pixelify" },
+  { id: "spacemono", family: "Space Mono", scale: 0.99, label: "Space Mono" },
 ];
 
 /** Each effect, how many colours it takes, and the colours it starts with when picked. */
@@ -111,6 +116,10 @@ export function surpriseStyle(rand: () => number = Math.random): NameStyle {
   return { font: pick(NAME_FONTS).id, effect, colors };
 }
 
+/** Wix Madefor Display's lowercase and capital heights, as fractions of its size: what every name font is matched to. */
+const X_HEIGHT = 0.492;
+const CAP_HEIGHT = 0.715;
+
 const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
 
 /** The class a styled name takes (styles/nameStyle.css); the colour part is left out when a role colours it. */
@@ -138,7 +147,7 @@ export function nameStyleVars(style: NameStyle | null, roleColoured: boolean): C
   if (font) {
     loadNameFonts();
     v["--ns-family"] = `"${font.family}"`;
-    v["--ns-scale"] = String(font.scale);
+    v["--ns-adjust"] = font.caps ? `cap-height ${CAP_HEIGHT}` : String(X_HEIGHT);
   }
   if (!roleColoured && style.colors.length) {
     const cs = style.colors.map(hex);

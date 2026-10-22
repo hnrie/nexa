@@ -27,7 +27,7 @@ data class NameStyle(val font: String, val effect: String, val colors: List<Long
 
     val isPlain get() = font.isEmpty() && effect == "solid" && colors.isEmpty()
 
-    /** A font on offer: how much it is scaled to sit with the app's text, and its name. */
+    /** A font on offer: how much it is scaled so its lowercase letters (Bungee's capitals) are as tall as the app font's, and its name. */
     data class Font(val id: String, val scale: Float, val label: String)
 
     /** An effect, how many colours it takes, and the colours it starts with when picked. */
@@ -38,35 +38,35 @@ data class NameStyle(val font: String, val effect: String, val colors: List<Long
 
         val FONTS = listOf(
             Font("", 1.0f, ""),
-            Font("comic", 1.04f, "Comic"),
-            Font("fraunces", 1.04f, "Fraunces"),
-            Font("playfair", 1.02f, "Playfair"),
-            Font("dmserif", 1.06f, "DM Serif"),
-            Font("youngserif", 1.0f, "Young Serif"),
-            Font("syne", 1.0f, "Syne"),
-            Font("bricolage", 1.0f, "Bricolage"),
-            Font("spacegrotesk", 1.0f, "Space Grotesk"),
+            Font("comic", 1.0f, "Comic"),
+            Font("fraunces", 1.02f, "Fraunces"),
+            Font("playfair", 0.95f, "Playfair"),
+            Font("dmserif", 1.02f, "DM Serif"),
+            Font("youngserif", 0.98f, "Young Serif"),
+            Font("syne", 0.99f, "Syne"),
+            Font("bricolage", 0.94f, "Bricolage"),
+            Font("spacegrotesk", 0.99f, "Space Grotesk"),
             Font("outfit", 1.02f, "Outfit"),
-            Font("lexend", 1.0f, "Lexend"),
-            Font("sora", 0.98f, "Sora"),
-            Font("rubik", 1.02f, "Rubik"),
-            Font("fredoka", 1.04f, "Fredoka"),
-            Font("comfortaa", 0.96f, "Comfortaa"),
-            Font("baloo", 1.06f, "Baloo"),
-            Font("quicksand", 1.02f, "Quicksand"),
-            Font("bungee", 0.86f, "Bungee"),
-            Font("righteous", 1.0f, "Righteous"),
-            Font("chewy", 1.08f, "Chewy"),
-            Font("shrikhand", 0.94f, "Shrikhand"),
-            Font("titan", 0.96f, "Titan"),
-            Font("orbitron", 0.88f, "Orbitron"),
-            Font("pacifico", 0.94f, "Pacifico"),
-            Font("lobster", 1.08f, "Lobster"),
-            Font("kalam", 1.06f, "Kalam"),
-            Font("patrick", 1.12f, "Patrick Hand"),
-            Font("caveat", 1.3f, "Caveat"),
-            Font("pixelify", 1.04f, "Pixelify"),
-            Font("spacemono", 0.92f, "Space Mono"),
+            Font("lexend", 0.93f, "Lexend"),
+            Font("sora", 0.9f, "Sora"),
+            Font("rubik", 0.95f, "Rubik"),
+            Font("fredoka", 0.99f, "Fredoka"),
+            Font("comfortaa", 0.9f, "Comfortaa"),
+            Font("baloo", 1.01f, "Baloo"),
+            Font("quicksand", 0.92f, "Quicksand"),
+            Font("bungee", 0.99f, "Bungee"),
+            Font("righteous", 0.94f, "Righteous"),
+            Font("chewy", 0.9f, "Chewy"),
+            Font("shrikhand", 0.93f, "Shrikhand"),
+            Font("titan", 0.85f, "Titan"),
+            Font("orbitron", 0.85f, "Orbitron"),
+            Font("pacifico", 1.05f, "Pacifico"),
+            Font("lobster", 0.94f, "Lobster"),
+            Font("kalam", 0.93f, "Kalam"),
+            Font("patrick", 1.05f, "Patrick Hand"),
+            Font("caveat", 1.34f, "Caveat"),
+            Font("pixelify", 1.07f, "Pixelify"),
+            Font("spacemono", 0.99f, "Space Mono"),
         )
 
         val EFFECTS = listOf(
