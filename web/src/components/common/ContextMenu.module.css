@@ -5,7 +5,9 @@
 .item { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 34px; padding: 6px 10px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 550; color: var(--text-subtle); text-align: start; transition: background-color 90ms ease, color 90ms ease; }
 /* lit in a tint of the accent, with the strongest text over it: it reads on
    any accent, where white on a yellow or green fill was 1.8–3:1 */
-.item:hover:not(:disabled), .item:focus-visible { background: color-mix(in srgb, var(--brand) 20%, transparent); color: var(--text-strong); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 26%, transparent); }
+/* lit under a hovering pointer, by the keyboard, and while a finger presses: a finger's last tap leaves nothing lit */
+.item:focus-visible, .item:active:not(:disabled) { background: color-mix(in srgb, var(--brand) 20%, transparent); color: var(--text-strong); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 26%, transparent); }
+@media (hover: hover) { .item:hover:not(:disabled) { background: color-mix(in srgb, var(--brand) 20%, transparent); color: var(--text-strong); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 26%, transparent); } }
 .item:focus-visible { outline-offset: -2px; }
 /* a line to read, such as when a message was sent */
 .note { padding: 6px 8px 4px; font-size: 12px; line-height: 1.35; color: var(--text-muted); overflow-wrap: anywhere; }
@@ -21,7 +23,8 @@
 
 /* the keys that do the same, quiet at the end */
 .keys { flex: none; margin-inline-start: auto; padding-inline-start: 24px; font-size: 12px; font-weight: 400; color: var(--text-muted); white-space: nowrap; }
-.item:hover:not(:disabled) .keys, .item:focus-visible .keys { color: var(--text-subtle); }
+.item:focus-visible .keys { color: var(--text-subtle); }
+@media (hover: hover) { .item:hover:not(:disabled) .keys { color: var(--text-subtle); } }
 /* in the keys' place: something stands in the item's way, which choosing it explains */
 .warn { flex: none; display: inline-flex; margin-inline-start: auto; padding-inline-start: 24px; color: var(--warning); }
 .strong { font-weight: 700; color: var(--text-strong); }
