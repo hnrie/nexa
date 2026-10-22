@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 
 /** Add Reaction: the emoji tab alone, closing on a pick, which toggles that reaction. */
 fun openReactionPicker(cm: ChatMessage, ctx: ListCtx) = fish.nexa.ui.pickers.Pickers.open(
-    fish.nexa.ui.pickers.Pickers.Opener(listOf(fish.nexa.ui.pickers.Pickers.Tab.EMOJI), ctx.server?.server?.id, draggable = false, closeOnEmoji = true, onEmoji = { p ->
+    fish.nexa.ui.pickers.Pickers.Opener(listOf(fish.nexa.ui.pickers.Pickers.Tab.EMOJI), ctx.server?.server?.id, title = fish.nexa.ui.t("chat.reactions.addReaction"), draggable = false, closeOnEmoji = true, onEmoji = { p ->
         val key = p.custom?.let { (if (it.animated) "a" else "") + ":" + it.name + ":" + it.blobId }
             ?: p.packEmoji?.let { (if (it.animated) "a" else "") + ":" + it.name + ":" + it.blobId } ?: p.text
         val mine = cm.m.reactions.any { it.emoji == key && it.me }

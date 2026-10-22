@@ -158,7 +158,7 @@ export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Pr
           onClose={closeShowing}
         />
       ) : null}
-      {pickerAnchor ? <ExpressionPicker anchor={pickerAnchor} serverId={reactServer} onlyServer={ownOnly} onClose={closePicker} onEmoji={(e) => { closePicker(); void toggleReaction(msg, reactionKeyOf(e)); }} /> : null}
+      {pickerAnchor ? <ExpressionPicker title={t("chat.reactions.addReaction")} anchor={pickerAnchor} serverId={reactServer} onlyServer={ownOnly} onClose={closePicker} onEmoji={(e) => { closePicker(); void toggleReaction(msg, reactionKeyOf(e)); }} /> : null}
     </div>
   );
 }

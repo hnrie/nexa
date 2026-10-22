@@ -44,7 +44,7 @@ import { canPublish, publish } from "./publish";
 import type { UnfurlResult } from "@/api/types";
 import { EditMessage } from "./EditMessage";
 import { isOnlyMediaLinks } from "./mediaLinks";
-import { Reactions } from "./Reactions";
+import { Reactions, toggleReaction } from "./Reactions";
 import { StickerPopout } from "./StickerPopout";
 import { ReplyWords, useReplyWords } from "./ReplyWords";
 import { SystemMessage } from "./SystemMessage";
@@ -53,7 +53,7 @@ import { menuAnchor } from "@/components/common/ContextMenu";
 import { copyText } from "@/lib/clipboard";
 import { MSG_FLAG_PINNED } from "@/api/types";
 import { discardPending, retryPending } from "@/components/composer/send";
-import { canDelete, canEdit, canRemoveEmbeds, confirmRemoveEmbeds, canPick, canPin, canReact, canThread, copyMessageLink, deleteMessageNow, markUnread, messageMenu, messageTimes, togglePin } from "./messageMenu";
+import { canDelete, canEdit, canRemoveEmbeds, confirmRemoveEmbeds, canPick, canPin, canReact, canThread, copyMessageLink, deleteMessageNow, markUnread, messageMenu, messageTimes, quickReactions, togglePin } from "./messageMenu";
 import { useRowActive } from "./activeRow";
 import { useShownName } from "./useShownName";
 import { HookAvatar, HookPopout, HookTags } from "./webhook/HookHeader";
@@ -239,7 +239,9 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const openMenu = useCallback((x: number, y: number, image?: ImageTarget | null, anchor?: ContextMenuState["anchor"]) => {
     setMenuOpen(true);
     // the menu is named by when the message was sent: its last lines say so to the eye
-    messageMenu.open({ msg, openReactionPicker: () => setPicker(new DOMRect(x, y, 0, 0)), image }, { x, y, ...(anchor ? { anchor } : {}), label: messageTimes(msg).join(", ") });
+    const more = () => setPicker(new DOMRect(x, y, 0, 0));
+    const reactions = canReact(msg) ? { emoji: quickReactions(), mine: msg.reactions.filter((r) => r.me).map((r) => r.emoji), pick: (e: string) => void toggleReaction(msg, e), more } : undefined;
+    messageMenu.open({ msg, openReactionPicker: more, image }, { x, y, ...(anchor ? { anchor } : {}), label: messageTimes(msg).join(", "), reactions });
     menuWatch.current?.();
     menuWatch.current = useUI.subscribe((state) => {
       if (!state.contextMenu) {

@@ -1,3 +1,4 @@
+import { rankedKeys, unicodeKey } from "@/lib/emojiUsage";
 import { channels as channelsApi } from "@/api/channels";
 import { BULK_DELETE_MAX, messages as messagesApi } from "@/api/messages";
 import { MSG_FLAG_EPHEMERAL, MSG_FLAG_PINNED, MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
@@ -124,6 +125,20 @@ export function imageButtons<C>(ids: [copy: string, save: string], image: (ctx: 
 
 /** The menu for a picture on its own, as the lightbox shows it. */
 export const imageMenu = defineMenu<ImageTarget>("image", [imageButtons(["copyImage", "saveImage"], (img) => img)]);
+
+/** The emoji a phone's sheet offers to react with: your most used, then the usual few (the Android app's quickReactionKeys). */
+export function quickReactions(): string[] {
+  const starter = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
+  const used = rankedKeys(useSettings.getState().settings.emojiUsage, Date.now()).filter((k) => !k.startsWith("c:"));
+  const out: string[] = [];
+  for (const k of [...used, ...starter]) {
+    // a counted key has no variation selector; react with the starter's own spelling when it is one of them
+    const e = starter.find((x) => unicodeKey(x) === k) ?? k;
+    if (!out.some((x) => unicodeKey(x) === unicodeKey(e))) out.push(e);
+    if (out.length === 6) break;
+  }
+  return out;
+}
 
 export interface MessageMenuCtx {
   msg: DecryptedMessage;

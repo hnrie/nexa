@@ -21,6 +21,8 @@ interface Props {
   serverId?: string | null | undefined;
   /** Offer that server's custom emoji only, and no packs (see EmojiPicker). */
   onlyServer?: boolean;
+  /** What the picker is for, shown as its title when it offers emoji alone ("Add Reaction"); "Emoji" otherwise. */
+  title?: string;
 }
 
 /** What Tab can reach inside the popover, for the trap. */
@@ -57,7 +59,7 @@ function openedOver(picker: HTMLElement, el: Element | null): boolean {
 }
 
 /** Tabbed popover above the composer (or anchored anywhere); closes on outside click or Escape. */
-export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, stickers, anchor = null, serverId, onlyServer }: Props) {
+export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, stickers, anchor = null, serverId, onlyServer, title }: Props) {
   // drawn in place over the message box, it tells the back gesture itself (a portalled one is seen anyway)
   useLayerPresence(!anchor);
   const [active, setActive] = useState<PickerTab>(tab === "gif" && !gifs ? "emoji" : tab === "sticker" && !stickers ? "emoji" : tab);
@@ -149,6 +151,13 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
           app, implying a feature that is not coming. Where the caller has no
           GIFs or stickers to offer, there is no tab. */}
       {mobile && !anchor ? <span className={s.grip} aria-hidden="true" data-sheet-handle="" /> : null}
+      {/* emoji alone: a title saying what the picker is for, not a bar with one tab in it */}
+      {!gifs && !stickers ? (
+        <div className={s.titleBar}>
+          <h2 className={s.title}>{title ?? t("modals.customStatus.emoji")}</h2>
+          <button className={s.close} aria-label={t("pickers.expressionPicker.closePicker")} onClick={onClose}><X size={18} /></button>
+        </div>
+      ) : (
       <div className={s.tabs}>
         {/* The close button is not a tab, so the tablist is only the tabs. */}
         <div style={{ display: "flex", gap: 4 }} role="tablist" aria-label={t("pickers.expressionPicker.expressionPicker")}>
@@ -158,6 +167,7 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
         </div>
         <button className={s.close} aria-label={t("pickers.expressionPicker.closePicker")} onClick={onClose}><X size={18} /></button>
       </div>
+      )}
       {active === "emoji" ? <EmojiPicker onPick={onEmoji} serverId={serverId} onlyServer={onlyServer} /> : active === "gif" ? gifs : stickers}
     </div>
   );

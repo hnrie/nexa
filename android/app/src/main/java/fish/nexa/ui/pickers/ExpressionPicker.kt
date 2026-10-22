@@ -103,6 +103,8 @@ object Pickers {
         val onEmoji: (Picked) -> Unit,
         val onSticker: ((Sticker) -> Unit)? = null,
         val onGif: ((Gif) -> Unit)? = null,
+        /** What the picker is for, its title when it offers emoji alone ("Add Reaction"). */
+        val title: String? = null,
     )
 
     data class Gif(val url: String, val w: Int?, val h: Int?)
@@ -195,7 +197,9 @@ private fun PickerSheet(layer: Layer, opener: Pickers.Opener, close: () -> Unit)
                 if (opener.draggable) Box(Modifier.padding(top = 6.dp).size(36.dp, 4.dp).background(c.borderStrong, RoundedCornerShape(2.dp)))
             }
             Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Tabs(opener.tabs, tab, Modifier.weight(1f)) { tab = it }
+                // emoji alone: a title saying what the picker is for, not a bar with one tab in it
+                if (opener.tabs.size == 1) Txt(opener.title ?: t("modals.customStatus.emoji"), style = Nx.type.headerTitle, color = c.textStrong, modifier = Modifier.weight(1f).padding(start = 4.dp, top = 12.dp))
+                else Tabs(opener.tabs, tab, Modifier.weight(1f)) { tab = it }
                 Box(
                     Modifier
                         .padding(start = 8.dp)

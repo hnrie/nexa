@@ -1,4 +1,5 @@
-import { Check, ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, SmilePlus, TriangleAlert } from "lucide-react";
+import { Twemoji } from "./Twemoji";
 import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
@@ -549,6 +550,18 @@ export function ContextMenuHost() {
         {sheet ? <span className={s.grip} aria-hidden="true" /> : null}
         {/* on a phone the menu says what it is for, far from the finger that opened it */}
         {sheet && menu.label && !drilled && !menu.items.some((it) => it.note && it.label === menu.label) ? <div className={s.sheetTitle} aria-hidden="true" dir="auto">{menu.label}</div> : null}
+        {sheet && menu.reactions && !drilled ? (
+          <div className={s.quick} role="none">
+            {menu.reactions.emoji.map((e) => (
+              <button key={e} role="menuitem" className={s.quickBtn} data-on={menu.reactions!.mine.includes(e) || undefined} aria-label={t("chat.reactions.reactWith", { emoji: e })} onClick={() => { const r = menu.reactions!; close(); r.pick(e); }}>
+                <Twemoji text={e} />
+              </button>
+            ))}
+            <button role="menuitem" className={s.quickBtn} aria-label={t("chat.reactions.addReaction")} onClick={() => { const r = menu.reactions!; close(); r.more(); }}>
+              <SmilePlus size={22} aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
         {drilled ? (
           <>
             <div role="none">

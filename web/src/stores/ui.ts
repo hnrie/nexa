@@ -51,6 +51,11 @@ export interface ContextMenuState {
   x: number;
   y: number;
   items: ContextMenuItem[];
+  /**
+   * A row of emoji to react with in one tap, over the items: shown only when
+   * the menu is a phone's sheet, where it saves opening the picker.
+   */
+  reactions?: { emoji: string[]; mine: string[]; pick: (emoji: string) => void; more: () => void };
   /** What the menu is called, for anyone who cannot see what it opened from. */
   label?: string;
   /** Opens upwards, its bottom edge at y: for a button along the bottom of the screen. */

@@ -46,7 +46,7 @@
   .menu { min-width: 220px; }
   .item { min-height: 44px; font-size: 16px; }
 }
-.grip, .sheetTitle { display: none; }
+.grip, .sheetTitle, .quick { display: none; }
 /* On a phone, a sheet across the bottom with a handle, over a dimmed page:
    swiped down it goes, pulled up a long one shows all of itself (lib/sheetDrag.ts). */
 @media (max-width: 767px) {
@@ -55,6 +55,12 @@
   .menu[data-sheet][data-expanded] { max-height: none; height: calc(var(--vvh, 100dvh) - env(safe-area-inset-top)); border-radius: 0; }
   .menu[data-sheet] .grip { display: block; position: absolute; top: 7px; left: 50%; translate: -50% 0; width: 36px; height: 4px; border-radius: 2px; background: var(--border-strong); }
   .menu[data-sheet] .sheetTitle { display: block; padding: 2px 12px 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* the quick reactions over a message's sheet, as the Android app has them */
+  .menu[data-sheet] .quick { display: flex; justify-content: space-between; padding: 2px 6px 8px; }
+  .quickBtn { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; border: 0; padding: 0; background: var(--bg-surface); color: var(--icon); font-size: 26px; cursor: pointer; transition: transform var(--motion-fast, 120ms) var(--ease-out); }
+  .quickBtn img { width: 26px; height: 26px; }
+  .quickBtn:active { transform: scale(0.9); }
+  .quickBtn[data-on] { background: color-mix(in srgb, var(--brand) 22%, transparent); }
   .menu[data-sheet] .item { min-height: 48px; padding-inline: 14px; border-radius: var(--radius-md); }
 }
 @keyframes sheetIn { from { transform: translateY(32px); opacity: 0.4; } }
