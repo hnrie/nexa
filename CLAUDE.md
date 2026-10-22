@@ -1141,7 +1141,8 @@ notes.
   from 768 dp (`Nav.wide`) the rail and sidebar stay beside the page and the menu button goes;
   from 1100 dp (`Nav.roomy`) the member list stays beside the chat too, shown or hidden by
   `Nav.toggleMembers` (`Nav.membersPinned`). From 768 dp User Settings keeps its list beside the
-  open page (My Account first), as the web's settings do (`SettingsLayer` in `ui/settings/Settings.kt`). A slow drag settles to the side it was dragged
+  open page (My Account first), as the web's settings do (`SettingsLayer` in `ui/settings/Settings.kt`),
+  and so do Server and Channel Settings (`SettingsFrame` in `ui/server/Frame.kt`). A slow drag settles to the side it was dragged
   to once it has gone 40% of the way, from open or closed, on both the web (`AppShell.tsx`) and
   Android.
 - Nexa and moderation: `data/NexaInbox` is a member's side (standing, the Nexa conversation, case

@@ -48,6 +48,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -191,8 +193,10 @@ fun SettingsFrame(
         }
     }
     val isTop = Layers.stack.lastOrNull() === layer
+    // from 768 dp the list stays beside the page, as on the web
+    val wide = fish.nexa.ui.nav.Nav.wide
     BackHandler(enabled = isTop) {
-        if (!atList) Holds.unlessUnsaved { atList = true } else Holds.unlessUnsaved { close() }
+        if (!atList && !wide) Holds.unlessUnsaved { atList = true } else Holds.unlessUnsaved { close() }
     }
     Box(
         Modifier
@@ -210,7 +214,15 @@ fun SettingsFrame(
             .navigationBarsPadding()
             .imePadding(),
     ) {
-        if (atList) {
+        if (wide) Row(Modifier.fillMaxSize()) {
+            Box(Modifier.width(300.dp).fillMaxHeight().background(c.bgBase)) {
+                NavList(title, sections, onOpen = { id -> Holds.unlessUnsaved { setPage(id) } }, onClose = { Holds.unlessUnsaved { close() } }, selected = page)
+            }
+            Box(Modifier.width(1.dp).fillMaxHeight().background(c.borderSubtle))
+            Box(Modifier.weight(1f).fillMaxHeight()) {
+                key(page) { PageView(title, onBack = null, onClose = { Holds.unlessUnsaved { close() } }) { content(page) } }
+            }
+        } else if (atList) {
             NavList(title, sections, onOpen = { id ->
                 Holds.unlessUnsaved {
                     setPage(id)
@@ -229,7 +241,7 @@ fun SettingsFrame(
 
 /** The top bar: the layer's title on the list; on a page, the way back to it. The close button at the end. */
 @Composable
-private fun TopBar(title: String, onBack: (() -> Unit)?, onClose: () -> Unit) {
+private fun TopBar(title: String, onBack: (() -> Unit)?, onClose: (() -> Unit)?, showTitle: Boolean = true) {
     val c = Nx.colors
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Row(
@@ -240,7 +252,8 @@ private fun TopBar(title: String, onBack: (() -> Unit)?, onClose: () -> Unit) {
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (onBack == null) {
+        if (onBack == null && !showTitle) Spacer(Modifier.weight(1f))
+        else if (onBack == null) {
             Txt(
                 title,
                 style = Nx.type.title.copy(fontSize = Nx.type.sp(19f), lineHeight = Nx.type.sp(24f), fontWeight = FontWeight(690), letterSpacing = TextUnit.Unspecified),
@@ -268,7 +281,7 @@ private fun TopBar(title: String, onBack: (() -> Unit)?, onClose: () -> Unit) {
             }
             Spacer(Modifier.weight(1f))
         }
-        Box(
+        if (onClose != null) Box(
             Modifier
                 .size(44.dp)
                 .clip(CircleShape)
@@ -281,10 +294,10 @@ private fun TopBar(title: String, onBack: (() -> Unit)?, onClose: () -> Unit) {
 }
 
 @Composable
-private fun NavList(title: String, sections: List<NavSection>, onOpen: (String) -> Unit, onClose: () -> Unit) {
+private fun NavList(title: String, sections: List<NavSection>, onOpen: (String) -> Unit, onClose: () -> Unit, selected: String? = null) {
     val c = Nx.colors
     Column(Modifier.fillMaxSize()) {
-        TopBar(title, onBack = null, onClose = onClose)
+        TopBar(title, onBack = null, onClose = if (selected == null) onClose else null)
         Column(
             Modifier
                 .fillMaxSize()
@@ -303,7 +316,7 @@ private fun NavList(title: String, sections: List<NavSection>, onOpen: (String) 
                         modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 20.dp, bottom = 8.dp).semantics { heading() },
                     ) else Spacer(Modifier.height(20.dp))
                     NavCard {
-                        s.pages.forEachIndexed { i, p -> NavRow(p, first = i == 0) { onOpen(p.id) } }
+                        s.pages.forEachIndexed { i, p -> NavRow(p, first = i == 0, selected = p.id == selected, chevron = selected == null) { onOpen(p.id) } }
                     }
                 }
             }
@@ -330,7 +343,7 @@ private fun NavCard(content: @Composable () -> Unit) {
 
 /** `.navItem` on a phone: a 30 dp icon tile, the label, a chevron; 52 dp tall, a hairline between rows. */
 @Composable
-private fun NavRow(p: NavPage, first: Boolean, onClick: () -> Unit) {
+private fun NavRow(p: NavPage, first: Boolean, selected: Boolean = false, chevron: Boolean = true, onClick: () -> Unit) {
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -339,8 +352,9 @@ private fun NavRow(p: NavPage, first: Boolean, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .background(if (pressed) c.bgHover else Color.Transparent)
+            .background(if (pressed) c.bgHover else if (selected) c.bgSelected else Color.Transparent)
             .pressable(interaction, onClick = onClick)
+            .semantics { this.selected = selected }
             .heightIn(min = 52.dp)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -350,20 +364,20 @@ private fun NavRow(p: NavPage, first: Boolean, onClick: () -> Unit) {
         Box(
             Modifier.size(30.dp).background(if (p.danger) c.danger.copy(alpha = 0.12f) else c.textStrong.copy(alpha = 0.05f), tile),
             contentAlignment = Alignment.Center,
-        ) { Icon(p.icon, if (p.danger) c.textDanger else c.icon, size = 18.dp) }
+        ) { Icon(p.icon, if (p.danger) c.textDanger else if (selected) c.textBrand else c.icon, size = 18.dp) }
         Txt(
             p.label,
             style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(550), lineHeight = Nx.type.sp(18.75f)),
-            color = if (p.danger) c.textDanger else c.text,
+            color = if (p.danger) c.textDanger else if (selected) c.textStrong else c.text,
             modifier = Modifier.weight(1f),
         )
-        Icon(if (rtl) "ChevronLeft" else "ChevronRight", c.textMuted, size = 18.dp)
+        if (chevron) Icon(if (rtl) "ChevronLeft" else "ChevronRight", c.textMuted, size = 18.dp)
     }
 }
 
 /** A page pushed over the list: it comes in from 6 dp below and goes back to the list with a drag toward the reading end. */
 @Composable
-private fun PageView(title: String, onBack: () -> Unit, onClose: () -> Unit, content: @Composable () -> Unit) {
+private fun PageView(title: String, onBack: (() -> Unit)?, onClose: () -> Unit, content: @Composable () -> Unit) {
     val scope = rememberCoroutineScope()
     val reduced = Nx.motion.reduced
     val ease = Nx.motion.easeOut
@@ -382,7 +396,8 @@ private fun PageView(title: String, onBack: () -> Unit, onClose: () -> Unit, con
                     alpha = (if (drag.value != 0f) maxOf(0.4f, 1f - abs(drag.value) / (600f * density)) else 1f) * enter.value
                     translationY = (1f - enter.value) * 6f * density
                 }
-                .pointerInput(rtl, widthPx) {
+                .pointerInput(rtl, widthPx, onBack == null) {
+                    if (onBack == null) return@pointerInput
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         val t0 = System.currentTimeMillis()
@@ -408,7 +423,7 @@ private fun PageView(title: String, onBack: () -> Unit, onClose: () -> Unit, con
                         scope.launch {
                             if (done && !Holds.blocking) {
                                 drag.animateTo(dir * widthPx, tween(if (reduced) 0 else 160, easing = ease))
-                                onBack()
+                                onBack?.invoke()
                             } else {
                                 if (done) Holds.unlessUnsaved {}
                                 drag.animateTo(0f, tween(if (reduced) 0 else 200, easing = ease))
@@ -417,7 +432,7 @@ private fun PageView(title: String, onBack: () -> Unit, onClose: () -> Unit, con
                     }
                 },
         ) {
-            TopBar(title, onBack = { Holds.unlessUnsaved(onBack) }, onClose = onClose)
+            TopBar(title, onBack = onBack?.let { b -> { Holds.unlessUnsaved(b) } }, onClose = onClose, showTitle = onBack != null)
             Box(Modifier.weight(1f).fillMaxWidth()) { content() }
         }
     }
