@@ -190,14 +190,18 @@ function buildRig(r) {
 // How a scene arrives and leaves. A glide: the window eases in from the side
 // it travels from, out of a soft focus, and leaves the same way it was going.
 // how much of a scene's way out comes before its last moment
-function lead(r) { return r.exit === "glide" ? 0.5 : 1; }
+// how much of the way out comes before the cut: a push is mostly under way when the next scene arrives
+const cubicIn = (x) => x * x * x;
+function lead(r) { return r.exit === "glide" ? 0.7 : 1; }
 
 function motion(r, t) {
   const o = { dx: 0, dy: 0, dz: 0, rx: 0, ry: 0, s: 1, op: 1, blur: 0 };
   const ein = r.enterDur || 0.75, eout = r.exitDur || 0.5;
   const u = clamp((t - r.s0) / ein);
   if (u < 1) {
-    if (r.enter === "glide") { const e = expoOut(u); o.dx += 220 * (1 - e); o.ry += 6 * (1 - e); o.op *= clamp(u * 2.2); o.blur += 10 * (1 - e); }
+    // a push: the scene sweeps in from the right and settles, beside the one leaving
+    // rather than on top of it, sharp as soon as it slows
+    if (r.enter === "glide") { const e = expoOut(u), m = 1 - e; o.dx += 640 * m; o.ry += 9 * m; o.op *= clamp(u * 4.5); o.blur += 7 * m * m; }
     else if (r.enter === "rise") { const e = cubicInOut(u); o.dy += 760 * (1 - e); o.rx += 24 * (1 - e); o.dz -= 260 * (1 - e); }
     else if (r.enter === "far") { const e = expoOut(u); o.dz -= 1100 * (1 - e); o.op *= clamp(u * 1.8); o.blur += 8 * (1 - e); }
     else if (r.enter === "focus") { const e = expoOut(u); o.s *= lerp(0.93, 1, e); o.op *= clamp(u * 3); o.blur += 14 * (1 - e); }
@@ -205,7 +209,7 @@ function motion(r, t) {
   // the way out straddles the cut, so the next scene is already arriving
   const v = clamp((t - (r.s1 - eout * lead(r))) / eout);
   if (v > 0) {
-    if (r.exit === "glide") { const e = quartIn(v); o.dx -= 220 * e; o.ry -= 6 * e; o.op *= 1 - clamp((v - 0.2) / 0.8); o.blur += 10 * e; }
+    if (r.exit === "glide") { const e = cubicIn(v); o.dx -= 640 * e; o.ry -= 9 * e; o.op *= 1 - clamp((v - 0.5) / 0.5); o.blur += 7 * e * e; }
     else if (r.exit === "recede") { const e = sineInOut(v); o.dz -= 900 * e; o.op *= 1 - e; o.blur += 8 * e; }
   }
   return o;
