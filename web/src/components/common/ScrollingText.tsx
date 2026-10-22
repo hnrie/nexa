@@ -18,12 +18,40 @@
  * Nothing moves when it fits, and nothing moves for anyone who asked for less
  * motion: they get the ellipsis, which is the honest fallback.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { useSettings } from "@/stores/settings";
-import { keyframesOf, loopLegs, resumeLegs, resumePlan, stateAt, totalMs, translateXOf, type Leg } from "./marquee";
+import { keyframesOf, loopLegs, resumeLegs, resumePlan, stateAt, totalMs, translateXOf, travelMs, type Leg } from "./marquee";
 import s from "./ScrollingText.module.css";
 
+/**
+ * Texts that scroll together. Everything inside a group shares one cycle, set
+ * by its longest text: they all start, turn and come home at the same moments,
+ * each at its own speed, and a loop is started on the page's clock so that
+ * texts that mounted at different times still line up. A group inside a group
+ * joins the outer one.
+ */
+interface Group {
+  report(id: string, over: number): void;
+  /** The widest overflow in the group: its longest trip sets the cycle. */
+  over: number;
+}
+const GroupContext = createContext<Group | null>(null);
+
+export function ScrollGroup({ children }: { children: ReactNode }) {
+  const outer = useContext(GroupContext);
+  const overs = useRef(new Map<string, number>());
+  const [over, setOver] = useState(0);
+  const report = useCallback((id: string, o: number) => {
+    if (o > 0) overs.current.set(id, o);
+    else overs.current.delete(id);
+    setOver(Math.max(0, ...overs.current.values()));
+  }, []);
+  if (outer) return <>{children}</>;
+  return <GroupContext.Provider value={{ report, over }}>{children}</GroupContext.Provider>;
+}
+
 interface Motion {
+  cycle: number | undefined;
   anim: Animation;
   legs: Leg[];
   loop: boolean;
@@ -57,15 +85,15 @@ function distanceNow(el: HTMLElement, sign: 1 | -1): number {
  * hands over to the loop when it ends, or, going home because the text fits
  * now, simply ends.
  */
-function play(el: HTMLElement, ref: MutableRefObject<Motion | null>, legs: Leg[], sign: 1 | -1, over: number, version: number, loop: boolean): Motion {
+function play(el: HTMLElement, ref: MutableRefObject<Motion | null>, legs: Leg[], sign: 1 | -1, over: number, version: number, loop: boolean, cycle?: number): Motion {
   const { frames, duration } = keyframesOf(legs, sign);
   const anim = el.animate(frames, { duration, iterations: loop ? Infinity : 1, fill: loop ? "none" : "forwards" });
-  const m: Motion = { anim, legs, loop, sign, over, version };
+  const m: Motion = { cycle, anim, legs, loop, sign, over, version };
   if (!loop) {
     anim.onfinish = () => {
       if (ref.current !== m) return;
       if (over > 0) {
-        ref.current = play(el, ref, loopLegs(over), sign, over, version, true);
+        ref.current = play(el, ref, loopLegs(over, cycle), sign, over, version, true, cycle);
         anim.cancel();
       } else {
         ref.current = null;
@@ -80,6 +108,8 @@ export function ScrollingText({ children, className }: { children: ReactNode; cl
   const box = useRef<HTMLSpanElement>(null);
   const inner = useRef<HTMLSpanElement>(null);
   const still = useStill();
+  const group = useContext(GroupContext);
+  const id = useId();
   const [over, setOver] = useState(0);
   const [rtl, setRtl] = useState(false);
   /** Bumped when the words change: new words start again from their beginning. */
@@ -126,6 +156,14 @@ export function ScrollingText({ children, className }: { children: ReactNode; cl
     if (!still) measure();
   });
 
+  // the group's cycle is its longest trip, kept only while this text moves too
+  useEffect(() => {
+    if (!group) return;
+    group.report(id, still ? 0 : over);
+    return () => group.report(id, 0);
+  }, [group, id, over, still]);
+  const cycle = group && over > 0 ? travelMs(Math.max(group.over, over)) : undefined;
+
   useLayoutEffect(() => {
     const el = inner.current;
     if (!el || typeof el.animate !== "function") return;
@@ -140,9 +178,13 @@ export function ScrollingText({ children, className }: { children: ReactNode; cl
       if (!still && at >= 1) motion.current = play(el, motion, resumeLegs({ kind: "back", at, restLeft: 0 }, 0), cur.sign, 0, version, false);
       return;
     }
-    if (!cur || cur.sign !== sign || cur.version !== version) {
+    if (!cur || cur.sign !== sign || cur.version !== version || cur.cycle !== cycle) {
       cur?.anim.cancel();
-      motion.current = play(el, motion, loopLegs(over), sign, over, version, true);
+      const legs = loopLegs(over, cycle);
+      const next = play(el, motion, legs, sign, over, version, true, cycle);
+      // in a group the loop runs on the page's clock, so every text is at the same point of the same cycle
+      if (cycle !== undefined) next.anim.currentTime = (document.timeline.currentTime as number) % totalMs(legs);
+      motion.current = next;
       return;
     }
     if (cur.over === over) return;
@@ -151,11 +193,11 @@ export function ScrollingText({ children, className }: { children: ReactNode; cl
     const total = totalMs(cur.legs);
     const state = stateAt(cur.legs, cur.loop && total > 0 ? time % total : time, distanceNow(el, sign));
     cur.anim.cancel();
-    const plan = resumePlan(state, over);
-    const next = play(el, motion, plan.legs, sign, over, version, plan.loop);
+    const plan = resumePlan(state, over, cycle);
+    const next = play(el, motion, plan.legs, sign, over, version, plan.loop, cycle);
     next.anim.currentTime = plan.startAt;
     motion.current = next;
-  }, [over, still, rtl, version]);
+  }, [over, still, rtl, version, cycle]);
 
   useEffect(
     () => () => {

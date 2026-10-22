@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import type { Activity } from "@/api/types";
 import { useNow } from "@/hooks/useNow";
 import { activityHeading, activityProgress, formatClock, isSpotify } from "@/lib/activity";
-import { ScrollingText } from "@/components/common/ScrollingText";
+import { ScrollGroup, ScrollingText } from "@/components/common/ScrollingText";
 import s from "./Activity.module.css";
 
 import { t } from "@/i18n";
@@ -50,6 +50,7 @@ export function ActivityCard({ activity: a }: { activity: Activity }) {
   // the art, blurred far out behind the card, tints it with whatever is playing
   const ambient = large ? ({ "--art": `url(${JSON.stringify(large)})` } as CSSProperties) : undefined;
   return (
+    <ScrollGroup>
     <div className={s.card} data-testid="activity-card" style={ambient}>
       {large ? <span className={s.ambient} aria-hidden="true" /> : null}
       <h4 className={s.heading}>
@@ -103,6 +104,7 @@ export function ActivityCard({ activity: a }: { activity: Activity }) {
         </div>
       ) : null}
     </div>
+    </ScrollGroup>
   );
 }
 
@@ -110,10 +112,12 @@ export function ActivityCard({ activity: a }: { activity: Activity }) {
 export function ActivityList({ activities }: { activities: Activity[] }) {
   if (activities.length === 0) return null;
   return (
-    <div className={s.list}>
-      {activities.map((a) => (
-        <ActivityCard key={`${a.application_id ?? ""}:${a.name}:${a.created_at}`} activity={a} />
-      ))}
-    </div>
+    <ScrollGroup>
+      <div className={s.list}>
+        {activities.map((a) => (
+          <ActivityCard key={`${a.application_id ?? ""}:${a.name}:${a.created_at}`} activity={a} />
+        ))}
+      </div>
+    </ScrollGroup>
   );
 }

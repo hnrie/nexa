@@ -146,3 +146,17 @@ describe("entering the loop where the text already is", () => {
     expect(positionAt(end.legs, 0)).toBe(260);
   });
 });
+
+describe("a loop shared with a longer text", () => {
+  it("keeps its own speed but sets off, turns and comes home with the longest", () => {
+    const long = loopLegs(520);
+    const short = loopLegs(100, travelMs(520));
+    expect(totalMs(short)).toBe(totalMs(long));
+    // it turns when the long one does, and starts back when the long one does
+    expect(short[1]!.ms + short[2]!.ms).toBe(long[1]!.ms + long[2]!.ms);
+    expect(short[1]!.ms).toBe(travelMs(100));
+  });
+  it("is the plain loop when it is the longest", () => {
+    expect(loopLegs(260, travelMs(260))).toEqual(loopLegs(260));
+  });
+});

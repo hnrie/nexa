@@ -45,15 +45,26 @@ export function travelMs(px: number): number {
   return Math.max(250, Math.round((Math.abs(px) / SPEED) * 1000));
 }
 
-/** One full cycle for text that overflows by `over` pixels, starting at rest at its start. */
-export function loopLegs(over: number): Leg[] {
+/**
+ * One full cycle for text that overflows by `over` pixels, starting at rest at its start.
+ *
+ * `cycleTravel` is the trip of the longest text in a group that moves
+ * together (`ScrollGroup`). A shorter text keeps its own speed, then waits so
+ * that every text in the group sets off, turns and comes home at the same
+ * moments: the rest at the end is stretched by the difference, and a rest
+ * after coming back makes the cycle as long as the longest one's.
+ */
+export function loopLegs(over: number, cycleTravel?: number): Leg[] {
   const travel = travelMs(over);
-  return [
+  const spare = Math.max(0, (cycleTravel ?? travel) - travel);
+  const legs: Leg[] = [
     { kind: "rest-start", from: 0, to: 0, ms: REST_START_MS, easing: "linear" },
     { kind: "out", from: 0, to: over, ms: travel, easing: EASE_IN_OUT },
-    { kind: "rest-end", from: over, to: over, ms: REST_END_MS, easing: "linear" },
+    { kind: "rest-end", from: over, to: over, ms: REST_END_MS + spare, easing: "linear" },
     { kind: "back", from: over, to: 0, ms: travel, easing: EASE_IN_OUT },
   ];
+  if (spare > 0) legs.push({ kind: "rest-start", from: 0, to: 0, ms: spare, easing: "linear" });
+  return legs;
 }
 
 export function totalMs(legs: Leg[]): number {
@@ -182,8 +193,8 @@ export function positionAt(legs: Leg[], t: number): number {
  * never there (the end moved while showing, or past where the text is), a
  * lead-in that takes it there first.
  */
-export function resumePlan(state: MarqueeState, over: number): { legs: Leg[]; loop: boolean; startAt: number } {
-  const loop = loopLegs(over);
+export function resumePlan(state: MarqueeState, over: number, cycleTravel?: number): { legs: Leg[]; loop: boolean; startAt: number } {
+  const loop = loopLegs(over, cycleTravel);
   const [rest, out, restEnd, back] = loop as [Leg, Leg, Leg, Leg];
   if (state.kind === "rest-start") return { legs: loop, loop: true, startAt: Math.max(0, rest.ms - state.restLeft) };
   if ((state.kind === "out" || state.kind === "back") && state.at <= over && over > 0) {

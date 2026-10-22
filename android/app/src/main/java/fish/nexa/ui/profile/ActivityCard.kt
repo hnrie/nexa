@@ -49,6 +49,7 @@ import fish.nexa.Nexa
 import fish.nexa.net.Activity
 import fish.nexa.ui.Icon
 import androidx.compose.ui.text.AnnotatedString
+import fish.nexa.ui.components.ScrollGroup
 import fish.nexa.ui.components.ScrollingText
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
@@ -78,7 +79,10 @@ private fun Modifier.linked(url: String?): Modifier = if (url.isNullOrEmpty()) t
  * a card lit by its own art, with how far along it is.
  */
 @Composable
-fun ActivityCard(a: Activity) {
+fun ActivityCard(a: Activity) = ScrollGroup { ActivityCardBody(a) }
+
+@Composable
+private fun ActivityCardBody(a: Activity) {
     val c = Nx.colors
     val timed = a.timestamps?.start != null || a.timestamps?.end != null
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -221,5 +225,5 @@ private fun ActivityBars(color: Color) {
 @Composable
 fun ActivityList(activities: List<Activity>) {
     if (activities.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { for (a in activities) ActivityCard(a) }
+    ScrollGroup { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { for (a in activities) ActivityCard(a) } }
 }
