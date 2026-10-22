@@ -11,7 +11,7 @@ that grid. The edit is an HTML page drawn frame by frame in headless Chrome
 titles), so every frame is exact, then joined with the song by ffmpeg.
 
   tools/.venv/bin/python tools/advert.py film   [--only shot,shot]
-  tools/.venv/bin/python tools/advert.py edit   --song music.mp3 [--bpm 140] [--out advert.mp4] [--from 0 --to 84]
+  tools/.venv/bin/python tools/advert.py edit   --song music.mp3 [--cut trailer|fast|short] [--bpm 140] [--out advert.mp4] [--from 0 --to 84]
   tools/.venv/bin/python tools/advert.py thumb  [--out thumbnail.png]
 
 film needs E2E_CHATD and E2E_WEB_DIST (see tools/e2e.py); build the web with
@@ -744,6 +744,8 @@ def main():
     ap.add_argument("--from", dest="t_from", type=float, default=None)
     ap.add_argument("--to", dest="t_to", type=float, default=None)
     ap.add_argument("--fps", type=int, default=60)
+    ap.add_argument("--cut", choices=["trailer", "fast", "short"], default="trailer",
+                    help="edit: the trailer, a faster cut of it, or a 9:16 short for phones")
     ap.add_argument("--bpm", type=float, default=None, help="edit: the song's tempo, roughly, if the measured one is off")
     ap.add_argument("--frame-key", default="namestyle-a", help="thumb: which take's frames to show")
     ap.add_argument("--frame-index", type=int, default=1, help="thumb: which of its frames")

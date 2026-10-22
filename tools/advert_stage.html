@@ -90,12 +90,15 @@ function setImg(img, url) {
   loads.push(img.decode().catch(() => {}));
 }
 
-function makeWin(title, w) {
+// A window w wide. Given a height vh of its own (a portrait frame's tall
+// window), it crops the 16:9 picture, which then covers it.
+function makeWin(title, w, vh) {
   const el = document.createElement("div");
   el.className = "slot win";
-  const h = Math.round(w * 9 / 16);
-  el.innerHTML = `<div class="bar"><i></i><i></i><i></i><span>${title}</span></div><div class="view" style="width:${w}px;height:${h}px"><img width="${w}" height="${h}"></div>`;
-  el.dataset.w = w; el.dataset.h = h + BAR;
+  const h = Math.round(vh || w * 9 / 16);
+  const iw = Math.round(Math.max(w, h * 16 / 9)), ih = Math.round(iw * 9 / 16);
+  el.innerHTML = `<div class="bar"><i></i><i></i><i></i><span>${title}</span></div><div class="view" style="width:${w}px;height:${h}px"><img width="${iw}" height="${ih}"></div>`;
+  el.dataset.w = w; el.dataset.h = h + BAR; el.dataset.vw = w; el.dataset.vh = h;
   return el;
 }
 function makePhone(h) {
@@ -118,6 +121,12 @@ function layout(name, u) {
     case "pair": return [
       { x: 660, y: 470, w: 1000, z: -300, rx: 2, ry: lerp(10, 7, u), dof: 1.6, phase: 1.7 },
       { x: 1280, y: 650, w: 1000, z: 0, rx: 2, ry: lerp(-8, -5, u) }];
+    // portrait: one tall window, two stacked, or a big phone, all below the title band
+    case "tall": return [{ x: 540, y: 950, w: 960, vh: 1000, rx: 1.5, ry: lerp(-3, 3, u) }];
+    case "stack": return [
+      { x: 520, y: 700, w: 920, vh: 450, z: -160, rx: 2, ry: lerp(5, 3, u), dof: 1.2, phase: 1.7 },
+      { x: 560, y: 1215, w: 920, vh: 450, rx: 2, ry: lerp(-4, -2, u) }];
+    case "phoneBig": return [{ x: 540, y: 950, h: 1060, rx: 1.5, ry: lerp(-6, -2, u), phone: true }];
     case "duo": return [
       { x: 720, y: 600, w: 1180, rx: 2, ry: lerp(9, 6, u) },
       { x: 1575, y: 600, h: 820, rx: 2, ry: lerp(-15, -11, u), phone: true, phase: 2.3 }];
@@ -154,7 +163,7 @@ function buildRig(r) {
     r.wallEl = wall;
   } else {
     for (const pl of layout(r.layout, 0)) {
-      const s = pl.phone ? makePhone(pl.h) : makeWin(r.titles?.[slots.length] || "Nexa", pl.w);
+      const s = pl.phone ? makePhone(pl.h) : makeWin(r.titles?.[slots.length] || "Nexa", pl.w, pl.vh);
       el.appendChild(s);
       slots.push(s);
     }
@@ -194,10 +203,12 @@ function frameContent(slot, cam, t, s0, s1) {
   const u = sineInOut(clamp((t - s0) / (s1 - s0)));
   const [z0, fx, fy, z1] = cam;
   const z = Math.max(1, lerp(z0, z1 ?? z0, u));
-  const w = +img.width, h = +img.height;
-  const k = clamp((z - 1) / 0.4);
-  const tx = clamp(lerp(fx * w, w / 2, k) - z * fx * w, w - z * w, 0);
-  const ty = clamp(lerp(fy * h, h / 2, k) - z * fy * h, h - z * h, 0);
+  const w = +img.width, h = +img.height, vw = +slot.dataset.vw, vh = +slot.dataset.vh;
+  // a window as wide as its picture eases its focus to the middle as it zooms;
+  // a cropped one always holds the focus in the middle (as far as the edges allow)
+  const k = vw === w && vh === h ? clamp((z - 1) / 0.4) : 1;
+  const tx = clamp(lerp(fx * w, vw / 2, k) - z * fx * w, vw - z * w, 0);
+  const ty = clamp(lerp(fy * h, vh / 2, k) - z * fy * h, vh - z * h, 0);
   img.style.transform = `translate(${tx}px, ${ty}px) scale(${z})`;
 }
 
@@ -279,6 +290,8 @@ function buildText(it) {
     const sparks = BRAND.spark.split("Z").filter((d) => d.trim()).map((d) => `<path class="sp" d="${d}Z" fill="#a160ff"/>`).join("");
     el.innerHTML = `<svg height="${it.size}" viewBox="0 0 229.45 100" style="overflow:visible"><path class="lt" d="${BRAND.letters}" fill="#fff" fill-rule="evenodd"/>${sparks}</svg>`;
   }
+  if (it.y != null && it.kind !== "headline" && it.kind !== "wordmark") el.style.top = it.y + "px";
+  if (it.size && it.kind !== "wordmark") el.style.fontSize = it.size + "px";
   el.style.display = "none";
   document.getElementById("words").appendChild(el);
   texts.push({ it, el, cs: [...el.querySelectorAll(".c")] });
@@ -417,6 +430,11 @@ window.drawThumb = async function (key, idx, line) {
 
 window.draw = draw;
 document.fonts.load("700 40px Madefor").then(() => {
+  // the frame's own size: 1920x1080, or 1080x1920 for a phone's
+  const [W, H] = SPEC.size || [1920, 1080];
+  const st = document.getElementById("stage");
+  st.style.width = W + "px"; st.style.height = H + "px";
+  document.getElementById("world").style.perspectiveOrigin = `${W / 2}px ${H * 0.52}px`;
   grain();
   (SPEC.rigs || []).forEach(buildRig);
   (SPEC.texts || []).forEach(buildText);
