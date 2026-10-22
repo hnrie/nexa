@@ -26,6 +26,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -95,14 +99,25 @@ fun AboutPage() {
     LaunchedEffect(Unit) { server = Nexa.auth.loadInstance()?.version }
 
     PageTitle(t("settings.about.title"))
-    Column(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.size(56.dp).shadowLow(Radii.Md, c).background(brandGradient(c), Radii.Md).topEdge(Radii.Md, c.edgeLight), contentAlignment = Alignment.Center) {
-                NexaMark(c.onBrand, size = 30.dp)
-            }
-            NexaWordmark(height = 26.dp)
+    // `.aboutHero`: the tile beside the wordmark and the lead, in a card lit by the brand at its corner
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .ring(Radii.Md, c.borderSubtle)
+            .background(c.bgRaised, Radii.Md)
+            .clip(Radii.Md)
+            .drawBehind { drawRect(Brush.radialGradient(listOf(c.brand.copy(alpha = 0.22f), Color.Transparent), center = Offset(size.width, 0f), radius = size.width)) }
+            .padding(18.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Box(Modifier.size(56.dp).shadowLow(Radii.Md, c).background(brandGradient(c), Radii.Md).topEdge(Radii.Md, c.edgeLight), contentAlignment = Alignment.Center) {
+            NexaMark(c.onBrand, size = 30.dp)
         }
-        Txt(t("legal.aboutLead"), style = Nx.type.body.copy(lineHeight = Nx.type.sp(23f)), color = c.textSubtle)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            NexaWordmark(height = 26.dp)
+            Txt(t("legal.aboutLead"), style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), lineHeight = Nx.type.sp(22f)), color = c.textSubtle)
+        }
     }
 
     SectionHeading(t("settings.about.glance"))

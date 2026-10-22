@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.draw.alpha
@@ -201,8 +202,8 @@ fun RadioDot(selected: Boolean) {
 
 /**
  * `.device`: a list row of sessions, packs and the like: a well with an
- * icon, the name over a muted line, and its buttons, which drop under the
- * words when the row is too narrow for both.
+ * icon, the name over a muted line, and its buttons beside the words, or
+ * under them when they would take too much of the row.
  */
 @Composable
 fun DeviceRow(
@@ -229,21 +230,44 @@ fun DeviceRow(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            if (icon != null) Box(Modifier.size(40.dp).sunken(Radii.Sm, c).ring(Radii.Sm, c.borderSubtle), contentAlignment = Alignment.Center) {
-                Icon(icon, if (current) c.textBrand else c.icon, size = 20.dp)
-            }
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Txt(title, style = Nx.type.body.copy(fontWeight = FontWeight(500)), color = c.text, modifier = Modifier.weight(1f, fill = false))
-                    if (badge != null) Box(
-                        Modifier.background(c.positive.copy(alpha = 0.18f), RoundedCornerShape(999.dp)).padding(horizontal = 8.dp, vertical = 1.dp),
-                    ) { Txt(badge, style = Nx.type.hint.copy(fontWeight = FontWeight(600)), color = c.text, maxLines = 1) }
+        val main: @Composable () -> Unit = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (icon != null) Box(Modifier.size(40.dp).sunken(Radii.Sm, c).ring(Radii.Sm, c.borderSubtle), contentAlignment = Alignment.Center) {
+                    Icon(icon, if (current) c.textBrand else c.icon, size = 20.dp)
                 }
-                if (subtitle != null) Txt(subtitle, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted)
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Txt(title, style = Nx.type.body.copy(fontWeight = FontWeight(500)), color = c.text, modifier = Modifier.weight(1f, fill = false))
+                        if (badge != null) Box(
+                            Modifier.background(c.positive.copy(alpha = 0.18f), RoundedCornerShape(999.dp)).padding(horizontal = 8.dp, vertical = 1.dp),
+                        ) { Txt(badge, style = Nx.type.hint.copy(fontWeight = FontWeight(600)), color = c.text, maxLines = 1) }
+                    }
+                    if (subtitle != null) Txt(subtitle, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted)
+                }
             }
         }
-        if (actions != null) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) { actions() }
+        if (actions == null) main() else {
+            val buttons: @Composable () -> Unit = { Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) { actions() } }
+            // Beside the words while the buttons take under 40% of the row, as the web's wrapping row does.
+            Layout(contents = listOf(main, buttons)) { (m, b), cons ->
+                val gap = 12.dp.roundToPx()
+                val bp = b.first().measure(cons.copy(minWidth = 0, minHeight = 0))
+                if (bp.width <= cons.maxWidth * 0.4f) {
+                    val mp = m.first().measure(cons.copy(minWidth = 0, maxWidth = (cons.maxWidth - bp.width - gap).coerceAtLeast(0)))
+                    val h = maxOf(mp.height, bp.height)
+                    layout(cons.maxWidth, h) {
+                        mp.place(0, (h - mp.height) / 2)
+                        bp.place(cons.maxWidth - bp.width, (h - bp.height) / 2)
+                    }
+                } else {
+                    val mp = m.first().measure(cons.copy(minWidth = 0))
+                    layout(cons.maxWidth, mp.height + gap + bp.height) {
+                        mp.place(0, 0)
+                        bp.place(cons.maxWidth - bp.width, mp.height + gap)
+                    }
+                }
+            }
+        }
     }
 }
 
