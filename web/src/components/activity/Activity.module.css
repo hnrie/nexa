@@ -11,6 +11,7 @@
 [data-theme="light"] .ambient { opacity: 0.3; }
 .heading { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; font-weight: 700; letter-spacing: 0.01em; color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* a game or a song is always marked in green, whichever app it comes from (--activity-green below) */
+.headingText { min-width: 0; flex: 0 1 auto; }
 .headingIcon { flex: none; color: var(--text-brand); }
 .headingIcon[data-kind="0"], .headingIcon[data-kind="2"] { color: var(--activity-green); }
 /* three bars rising and falling out of step, while a song plays */

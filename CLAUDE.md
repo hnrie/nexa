@@ -1001,6 +1001,7 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
   are the parts a server can change (nickname, pronouns, server picture and banner, theme, About Me,
   widgets), each saying what is set there. Android's `ProfilesPage.kt` and `ServerProfileDesigner.kt`
   have the same rows (`PartGroup`, `PartRow`) above the profile, opening sheets.
+- Activity cards (`components/activity/ActivityCard.tsx`, Android `ui/profile/ActivityCard.kt`) draw their heading, title and lines in `ScrollingText`, so a long song or game title scrolls as a status does.
 - Colours are picked with `components/common/ColourInput.tsx`, Nexa's own picker (a square of
   shades, a hue strip, opacity when asked for, the hex code, the browser's eyedropper where it has
   one), laid over whatever swatch shows the colour; never the browser's `<input type="color">`.

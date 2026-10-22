@@ -48,6 +48,8 @@ import fish.nexa.media.Media
 import fish.nexa.Nexa
 import fish.nexa.net.Activity
 import fish.nexa.ui.Icon
+import androidx.compose.ui.text.AnnotatedString
+import fish.nexa.ui.components.ScrollingText
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
 import fish.nexa.ui.t
@@ -123,7 +125,7 @@ fun ActivityCard(a: Activity) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (a.type == 2 && clock is Activities.Clock.Progress && clock.fraction < 1f) ActivityBars(green)
                 else Icon(Activities.icon(a.type), if (a.type == 0 || a.type == 2) green else c.textBrand, size = 13.dp)
-                Txt(Activities.heading(a), style = Nx.type.label.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(700)), color = c.textSubtle, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                ScrollingText(AnnotatedString(Activities.heading(a)), Nx.type.label.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(700), color = c.textSubtle), Modifier.weight(1f, fill = false))
                 if (a.source == "discord") Txt(
                     t("activity.activityCard.fromDiscord"),
                     style = Nx.type.hint.copy(fontSize = Nx.type.sp(10.5f), fontWeight = FontWeight(650)), color = c.textMuted,
@@ -149,8 +151,8 @@ fun ActivityCard(a: Activity) {
                     }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Txt(title, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(18f)), color = c.textStrong, maxLines = 1, modifier = Modifier.linked(if (media) a.detailsUrl else null))
-                    for (l in lines) Txt(l.text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(18f)), color = if (l.muted) c.textMuted else c.text, maxLines = 1, modifier = Modifier.linked(l.href))
+                    ScrollingText(AnnotatedString(title), Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(18f), color = c.textStrong), Modifier.linked(if (media) a.detailsUrl else null))
+                    for (l in lines) ScrollingText(AnnotatedString(l.text), Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(18f), color = if (l.muted) c.textMuted else c.text), Modifier.linked(l.href))
                     when (clock) {
                         is Activities.Clock.Remaining -> Txt(t("activity.activityCard.timeLeft", "time" to Activities.clock(clock.remaining)), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), fontFeatureSettings = "tnum"), color = c.textMuted)
                         is Activities.Clock.Elapsed -> Txt(t("activity.activityCard.timeElapsed", "time" to Activities.clock(clock.elapsed)), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), fontFeatureSettings = "tnum"), color = c.textMuted)

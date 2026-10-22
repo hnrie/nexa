@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import type { Activity } from "@/api/types";
 import { useNow } from "@/hooks/useNow";
 import { activityHeading, activityProgress, formatClock, isSpotify } from "@/lib/activity";
+import { ScrollingText } from "@/components/common/ScrollingText";
 import s from "./Activity.module.css";
 
 import { t } from "@/i18n";
@@ -58,7 +59,7 @@ export function ActivityCard({ activity: a }: { activity: Activity }) {
         ) : (
           <KindIcon size={13} className={s.headingIcon} data-kind={a.type} aria-hidden="true" />
         )}
-        {activityHeading(a)}
+        <ScrollingText className={s.headingText}>{activityHeading(a)}</ScrollingText>
         {a.source === "discord" ? <span className={s.source}>{t("activity.activityCard.fromDiscord")}</span> : null}
       </h4>
       <div className={s.row}>
@@ -77,9 +78,9 @@ export function ActivityCard({ activity: a }: { activity: Activity }) {
           ) : null}
         </div>
         <div className={s.text}>
-          <Linked href={media ? a.details_url : undefined} className={s.title} title={title}>{title}</Linked>
+          <Linked href={media ? a.details_url : undefined} className={s.title} title={title}><ScrollingText>{title}</ScrollingText></Linked>
           {lines.map((l, i) => (
-            <Linked key={i} href={l.href} className={[s.line, l.muted ? s.muted : ""].join(" ")} title={l.text}>{l.text}</Linked>
+            <Linked key={i} href={l.href} className={[s.line, l.muted ? s.muted : ""].join(" ")} title={l.text}><ScrollingText>{l.text}</ScrollingText></Linked>
           ))}
           {clock?.kind === "remaining" ? <span className={s.clock}>{t("activity.activityCard.timeLeft", { time: formatClock(clock.remaining) })}</span> : null}
           {clock?.kind === "elapsed" ? <span className={s.clock}>{t("activity.activityCard.timeElapsed", { time: formatClock(clock.elapsed) })}</span> : null}
