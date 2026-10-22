@@ -6623,6 +6623,8 @@
   "designer.group.about": "À Propos de Toi",
   "designer.group.look": "Images et Couleurs",
   "designer.group.name": "Ton Nom",
+  "designer.hidePanel": "Masquer le Panneau",
+  "designer.showPanel": "Afficher le Panneau",
   "designer.value.add": "Ajouter",
   "designer.value.plain": "Simple",
   "whatsNew.r202610028.swipeBody": "Sur téléphone, faites glisser un message vers la gauche et relâchez quand la flèche s'allume pour y répondre.",

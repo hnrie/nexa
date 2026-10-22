@@ -1,4 +1,5 @@
-import { ArrowLeft, ChevronRight, ImagePlus, LoaderCircle, Palette, Pin, Plus } from "lucide-react";
+import { ArrowLeft, ChevronRight, ChevronsLeft, ChevronsRight, ImagePlus, LoaderCircle, Palette, Pin, Plus } from "lucide-react";
+import { parse, plainText } from "@/markdown/parse";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { avatarUrl, bannerUrl, users as usersApi } from "@/api/users";
@@ -39,6 +40,15 @@ type Page = "nameStyle" | "avatar" | "banner" | "colours" | "tag";
 const PAGES: Part[] = ["nameStyle", "avatar", "banner", "colours", "tag"];
 /** Narrower than this, the panel's list goes above the profile and its pages open as sheets. */
 const PANEL_BESIDE = 820;
+/** Where this browser remembers the panel folded away, so the profile has the whole width. */
+const FOLDED_KEY = "nexa.profilePanelFolded";
+function readFolded(): boolean {
+  try {
+    return localStorage.getItem(FOLDED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 /** Where the designer opens when Settings was asked for one of its parts (its search, a typing line's Make Your Own). */
 function viewFor(anchor: string | null | undefined): View {
@@ -106,6 +116,19 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
   const [view, setView] = useState<View>(() => viewFor(anchor));
   const [inline, setInline] = useState<"name" | "pronouns" | "about" | null>(null);
   const [page, setPage] = useState<Page | null>(null);
+  // the panel beside the profile can be folded to a thin strip; a page it has to show opens it again
+  const [folded, setFoldedState] = useState(readFolded);
+  const setFolded = (v: boolean) => {
+    setFoldedState(v);
+    try {
+      localStorage.setItem(FOLDED_KEY, v ? "1" : "0");
+    } catch {
+      // only this browser's convenience
+    }
+  };
+  useEffect(() => {
+    if (page) setFoldedState(false);
+  }, [page]);
   // whether the panel stands beside the profile, measured on the designer itself
   const layoutRef = useRef<HTMLDivElement>(null);
   const [beside, setBeside] = useState(true);
@@ -335,9 +358,9 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     {
       title: t("designer.group.name"),
       rows: [
-        { id: "name", label: t("settings.account.displayName"), value: shownName },
+        { id: "name", label: t("settings.account.displayName"), value: <span>{shownName}</span> },
         { id: "nameStyle", label: t("nameStyle.title"), value: nameLook ? <span className={nameClass(nameLookShown)} style={nameStyle(nameLookShown)}>{shownName}</span> : t("designer.value.plain"), setting: "nameStyle" },
-        { id: "pronouns", label: t("settings.profile.pronouns"), value: pronouns || null },
+        { id: "pronouns", label: t("settings.profile.pronouns"), value: pronouns ? <span>{pronouns}</span> : null },
       ],
     },
     {
@@ -351,11 +374,11 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     {
       title: t("designer.group.about"),
       rows: [
-        { id: "about", label: t("settings.profile.aboutMe"), value: about.trim() ? about.trim().split("\n")[0] : null },
-        { id: "status", label: t("designer.part.status"), value: status || null },
+        { id: "about", label: t("settings.profile.aboutMe"), value: aboutOut.trim() ? <span>{plainText(parse(aboutOut)).replace(/\s+/g, " ").trim()}</span> : null },
+        { id: "status", label: t("designer.part.status"), value: status ? <span>{status}</span> : null },
         { id: "widgets", label: t("widgets.title"), value: widgets.length ? String(widgets.length) : null, setting: "widgets" },
-        { id: "tag", label: t("serverTag.choose.title"), value: me.server_tag?.text ?? null, setting: "serverTag" },
-        { id: "typing", label: t("typing.editor.title"), value: typingWords || null, setting: "typingStyle" },
+        { id: "tag", label: t("serverTag.choose.title"), value: me.server_tag ? <span>{me.server_tag.text}</span> : null, setting: "serverTag" },
+        { id: "typing", label: t("typing.editor.title"), value: typingWords ? <span>{typingWords}</span> : null, setting: "typingStyle" },
       ],
     },
   ];
@@ -448,9 +471,13 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     <>
       <p className={d.intro}>{t("designer.intro")}</p>
 
-      <div ref={layoutRef} className={d.layout} data-beside={beside || undefined}>
+      <div ref={layoutRef} className={d.layout} data-beside={beside || undefined} data-folded={(beside && folded) || undefined}>
         <aside className={d.panel} data-testid="designer-panel">
-          {page && beside ? (
+          {beside && folded ? (
+            <button type="button" className={d.fold} onClick={() => setFolded(false)} aria-label={t("designer.showPanel")} title={t("designer.showPanel")} aria-expanded={false} data-testid="designer-unfold">
+              <ChevronsRight size={18} aria-hidden="true" />
+            </button>
+          ) : page && beside ? (
             <div className={d.page} data-testid={`designer-page-${page}`}>
               <div className={d.pageHead}>
                 <button type="button" className={d.back} onClick={() => setPage(null)} aria-label={t("designer.back")} data-testid="designer-page-back">
@@ -461,7 +488,14 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
               {pageBody(page)}
             </div>
           ) : (
-            partList
+            <>
+              {beside ? (
+                <button type="button" className={[d.fold, d.foldOpen].join(" ")} onClick={() => setFolded(true)} aria-label={t("designer.hidePanel")} title={t("designer.hidePanel")} aria-expanded data-testid="designer-fold">
+                  <ChevronsLeft size={18} aria-hidden="true" />
+                </button>
+              ) : null}
+              {partList}
+            </>
           )}
         </aside>
         <div className={d.main}>

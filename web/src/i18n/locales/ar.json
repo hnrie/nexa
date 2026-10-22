@@ -7357,6 +7357,8 @@
   "designer.group.about": "عنك",
   "designer.group.look": "الصور والألوان",
   "designer.group.name": "اسمك",
+  "designer.hidePanel": "إخفاء اللوحة",
+  "designer.showPanel": "إظهار اللوحة",
   "designer.value.add": "إضافة",
   "designer.value.plain": "عادي",
   "whatsNew.r202610028.swipeBody": "على الهاتف، اسحب الرسالة إلى اليمين واتركها عندما يضيء السهم للرد عليها.",

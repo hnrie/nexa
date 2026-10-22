@@ -986,7 +986,9 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
   profile is a row in a panel, grouped as Your Name, Pictures & Colours and About You, each row
   showing what the part holds now. With room (`PANEL_BESIDE`, measured on the designer) the panel
   stands beside the profile and Name Style, the avatar, banner, theme and server tag open as pages
-  in it; otherwise the list goes above the profile and those pages open as sheets. Display name,
+  in it; otherwise the list goes above the profile and those pages open as sheets. Beside the profile the
+  panel folds to an arrow (remembered in this browser, `nexa.profilePanelFolded`) and opens again for
+  any page it has to show. Display name,
   pronouns and About Me are written in place on the profile (the name opening Name Style beside
   it), Status opens its dialog, Widgets the profile's widgets tab, Typing Indicator the In Chat
   view. Android's `ProfilesPage.kt` has the same rows (`PartGroup`, `PartRow`) above the profile,

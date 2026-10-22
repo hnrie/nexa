@@ -6624,6 +6624,8 @@
   "designer.group.about": "Sobre Você",
   "designer.group.look": "Imagens e Cores",
   "designer.group.name": "Seu Nome",
+  "designer.hidePanel": "Ocultar Painel",
+  "designer.showPanel": "Mostrar Painel",
   "designer.value.add": "Adicionar",
   "designer.value.plain": "Simples",
   "whatsNew.r202610028.swipeBody": "No celular, deslize uma mensagem para a esquerda e solte quando a seta acender para respondê-la.",

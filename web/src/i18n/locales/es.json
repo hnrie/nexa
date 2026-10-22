@@ -6623,6 +6623,8 @@
   "designer.group.about": "Sobre Ti",
   "designer.group.look": "Imágenes y Colores",
   "designer.group.name": "Tu Nombre",
+  "designer.hidePanel": "Ocultar Panel",
+  "designer.showPanel": "Mostrar Panel",
   "designer.value.add": "Añadir",
   "designer.value.plain": "Simple",
   "whatsNew.r202610028.swipeBody": "En el móvil, desliza un mensaje hacia la izquierda y suéltalo cuando se ilumine la flecha para responderlo.",

@@ -6511,6 +6511,8 @@
   "designer.group.about": "About You",
   "designer.group.look": "Pictures & Colours",
   "designer.group.name": "Your Name",
+  "designer.hidePanel": "Hide Panel",
+  "designer.showPanel": "Show Panel",
   "designer.value.add": "Add",
   "designer.value.plain": "Plain",
   "whatsNew.r202610028.swipeBody": "On a phone, swipe a message to the left and let go when the arrow lights up to reply to it.",

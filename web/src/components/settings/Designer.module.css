@@ -197,3 +197,12 @@
 .pageTitle { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--text-strong); }
 .sheetPage { display: flex; flex-direction: column; gap: 14px; }
 @media (pointer: coarse) { .row { min-height: 50px; } }
+
+/* folding the panel away: a thin strip with the way back, and the profile takes the width */
+.layout[data-folded] .panel { width: auto; }
+.fold { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-sm); background: var(--sheen), var(--bg-surface); color: var(--text-muted); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); transition: color var(--transition), background-color var(--transition); }
+.fold:hover { color: var(--text-strong); background: var(--bg-hover); }
+.fold:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+:dir(rtl) .fold svg { transform: scaleX(-1); }
+/* in the corner beside the first group's heading */
+.foldOpen { position: absolute; z-index: 1; top: -4px; inset-inline-end: 2px; width: 28px; height: 28px; }

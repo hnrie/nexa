@@ -6277,6 +6277,8 @@
   "designer.group.about": "あなたについて",
   "designer.group.look": "画像と色",
   "designer.group.name": "名前",
+  "designer.hidePanel": "パネルを隠す",
+  "designer.showPanel": "パネルを表示",
   "designer.value.add": "追加",
   "designer.value.plain": "なし",
   "whatsNew.r202610028.swipeBody": "スマートフォンでメッセージを左にスワイプし、矢印が光ったら指を離すと返信できます。",

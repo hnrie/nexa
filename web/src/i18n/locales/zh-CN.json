@@ -6277,6 +6277,8 @@
   "designer.group.about": "关于你",
   "designer.group.look": "图片和颜色",
   "designer.group.name": "你的名字",
+  "designer.hidePanel": "隐藏面板",
+  "designer.showPanel": "显示面板",
   "designer.value.add": "添加",
   "designer.value.plain": "普通",
   "whatsNew.r202610028.swipeBody": "在手机上将消息向左滑动，箭头亮起时松手即可回复。",
