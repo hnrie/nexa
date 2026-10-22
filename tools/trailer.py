@@ -63,6 +63,7 @@ FILM_JS = r"""
     beam: { x: 5.5, y: 8.5, svg: `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="17" viewBox="0 0 20 26"><g fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h1.4c1.2 0 2.1.6 2.6 1.5.5-.9 1.4-1.5 2.6-1.5H14M10 5v16M6 23h1.4c1.2 0 2.1-.6 2.6-1.5.5.9 1.4 1.5 2.6 1.5H14" stroke="#fff" stroke-width="4"/><path d="M6 3h1.4c1.2 0 2.1.6 2.6 1.5.5-.9 1.4-1.5 2.6-1.5H14M10 5v16M6 23h1.4c1.2 0 2.1-.6 2.6-1.5.5.9 1.4 1.5 2.6 1.5H14" stroke="${INK}" stroke-width="1.8"/></g></svg>` },
   };
   const CSS = `
+*{-webkit-tap-highlight-color:transparent!important}
 #__film-cursor{position:fixed;left:0;top:0;width:0;height:0;z-index:2147483647;pointer-events:none;opacity:0;transition:opacity 140ms ease;contain:layout style}
 #__film-cursor[data-on]{opacity:1}
 #__film-cursor .__film-shape{position:absolute;display:none;filter:drop-shadow(0 1px 1.2px rgba(0,0,0,.32));transition:transform 70ms ease}
