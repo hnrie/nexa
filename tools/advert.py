@@ -226,6 +226,70 @@ def formatting(w):
 
 
 @shot
+def editor(w):
+    """A message built in the formatting editor: a heading, then a callout."""
+    t1 = w["test1"]
+    w.go(t1, w.channel_url("general"))
+    start(t1, 0.7, 0.35)
+    tray = "[data-testid=format-toolbar] button[aria-label='{}']"
+    with Take("editor", (t1, "a")) as tk:
+        t1.click("[data-testid=format-open]")
+        t1.page.wait_for_selector("[data-testid=format-editor]", timeout=10000)
+        tk.mark("open")
+        t1.rest(0.3)
+        t1.click("[data-testid=format-surface]")
+        t1.type("hi everyone")
+        t1.key("Meta+a", after=0.2)
+        t1.click(tray.format("Text Style"))
+        t1.rest(0.25)
+        t1.click("[role=group][aria-label='Text Style'] button >> nth=1")
+        tk.mark("heading")
+        t1.rest(0.5)
+        t1.click("[data-testid=format-surface]", fx=0.9, fy=0.2)
+        t1.key("End", after=0.1)
+        t1.key("Enter", after=0.1)
+        t1.type("this was made in the editor")
+        t1.key("Shift+Home", after=0.2)
+        t1.click(tray.format("Quote or Callout"))
+        t1.rest(0.25)
+        t1.click("[role=group][aria-label='Quote or Callout'] button[data-kind=tip]")
+        tk.mark("callout")
+        t1.rest(0.7)
+        t1.click("[data-testid=format-send]")
+        t1.page.wait_for_selector("[data-testid=format-editor]", state="detached", timeout=10000)
+        tk.mark("sent")
+        t1.rest(1.2)
+
+
+@shot
+def typing(w):
+    """test2's own typing indicator, as test1 sees it."""
+    t1, t2 = w["test1"], w["test2"]
+    t2.open_settings("profiles")
+    t2.page.click("[data-testid=designer-part-typing]")
+    t2.page.click("[data-testid=typing-surprise]")
+    t2.page.wait_for_timeout(400)
+    t2.page.locator("[role=dialog] button:has-text('Save Changes')").last.click()
+    t2.page.wait_for_timeout(1200)
+    t2.close_settings()
+    w.go(t1, dm_url(w))
+    w.go(t2, dm_url(w))
+    start(t1, 0.8, 0.3)
+    with Take("typing", (t1, "a")) as tk:
+        box = t2.page.locator("textarea[aria-label^='Message']").first
+        box.click()
+        tk.mark("start")
+        for ch in "are you coming tonight":
+            t2.page.keyboard.type(ch)
+            time.sleep(random.uniform(0.09, 0.16))
+        time.sleep(1.2)
+        t2.page.keyboard.press("Enter")
+        wait_message(t1, "are you coming tonight")
+        tk.mark("sent")
+        t1.rest(1.0)
+
+
+@shot
 def voice(w):
     """Both join the voice channel; the speaking rings light up."""
     t1, t2 = w["test1"], w["test2"]
@@ -620,7 +684,7 @@ def phone(w):
         ph.close()
 
 
-ORDER = ["hi", "react", "formatting", "safety", "subchat", "phone", "themes", "snow", "namestyle", "profile",
+ORDER = ["hi", "react", "formatting", "editor", "typing", "safety", "subchat", "phone", "themes", "snow", "namestyle", "profile",
          "voice", "share", "notes", "plugins", "css", "e2ee"]
 
 
@@ -683,7 +747,7 @@ def main():
     ap.add_argument("--bpm", type=float, default=None, help="edit: the song's tempo, roughly, if the measured one is off")
     ap.add_argument("--frame-key", default="namestyle-a", help="thumb: which take's frames to show")
     ap.add_argument("--frame-index", type=int, default=1, help="thumb: which of its frames")
-    ap.add_argument("--line", default="Chat that's<br>actually <span style='color:#b98bff'>yours.</span>", help="thumb: the headline (HTML)")
+    ap.add_argument("--line", default="Private Chat<br>with All the<br>Fun Left In", help="thumb: the headline (HTML)")
     args = ap.parse_args()
     if args.what == "film":
         only = [n.strip() for n in args.only.split(",") if n.strip()]

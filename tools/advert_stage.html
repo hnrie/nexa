@@ -5,46 +5,62 @@
 <style>
 @font-face { font-family: "Madefor"; src: url("%FONT%") format("woff2"); font-weight: 400 900; }
 html, body { margin: 0; background: #000; }
-#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #07060c; font-family: "Madefor", system-ui, sans-serif; color: #fff; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #0e0b16; font-family: "Madefor", system-ui, sans-serif; color: #fff;
+  font-kerning: normal; -webkit-font-smoothing: antialiased; }
 .layer { position: absolute; inset: 0; }
-.glow { position: absolute; width: 1700px; height: 1700px; margin: -850px 0 0 -850px; border-radius: 50%; }
-.win { position: absolute; left: 0; top: 0; transform-origin: 0 0; border-radius: 14px; overflow: hidden; background: #17151d;
-  box-shadow: 0 0 0 1px rgba(255,255,255,.09), 0 2px 6px rgba(0,0,0,.25), 0 30px 90px rgba(0,0,0,.55); will-change: transform; }
+.glow { position: absolute; width: 1900px; height: 1900px; margin: -950px 0 0 -950px; border-radius: 50%; }
+#world { perspective: 2600px; perspective-origin: 960px 560px; }
+.slot { position: absolute; left: 0; top: 0; transform-origin: 50% 50%; backface-visibility: hidden; will-change: transform, filter, opacity; }
+.win { border-radius: 14px; overflow: hidden; background: #17151d;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 1px rgba(255,255,255,.07), 0 2px 6px rgba(0,0,0,.25), 0 28px 60px rgba(0,0,0,.35), 0 60px 140px rgba(0,0,0,.45); }
 .bar { position: relative; height: 30px; background: #1d1a24; display: flex; align-items: center; padding-left: 14px; gap: 8px; }
 .bar i { width: 12px; height: 12px; border-radius: 50%; display: block; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.25); }
 .bar i:nth-child(1) { background: #ff5f57; } .bar i:nth-child(2) { background: #febc2e; } .bar i:nth-child(3) { background: #28c840; }
-.bar span { position: absolute; left: 0; right: 0; text-align: center; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.55); letter-spacing: .01em; pointer-events: none; }
-.win .view { position: relative; overflow: hidden; }
-.win img { display: block; transform-origin: 0 0; will-change: transform; }
+.bar span { position: absolute; left: 0; right: 0; text-align: center; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.5); }
+.view { position: relative; overflow: hidden; }
+.view img { display: block; transform-origin: 0 0; }
+.phone { padding: 13px; border-radius: 62px; background: #0b0b0e; box-shadow: 0 0 0 2px #3a3940, 0 0 0 3px #111, 0 28px 60px rgba(0,0,0,.35), 0 60px 140px rgba(0,0,0,.45); }
+.phone .view { border-radius: 49px; }
+.phone .island { position: absolute; left: 50%; top: 26px; width: 118px; height: 34px; margin-left: -59px; border-radius: 20px; background: #000; z-index: 2; }
+.wall { position: absolute; left: 960px; top: 540px; width: 0; height: 0; transform-style: preserve-3d; }
+.text { position: absolute; white-space: nowrap; }
+.c { display: inline-block; will-change: transform, opacity, filter; }
+.headline { left: 0; right: 0; text-align: center; font-size: 118px; font-weight: 760; line-height: 1.04; letter-spacing: -.035em; }
+.headline .line { display: block; }
+.title { font-size: 52px; font-weight: 700; letter-spacing: -.025em; }
+.title.top { left: 0; right: 0; top: 64px; text-align: center; }
+.title.side { font-size: 92px; line-height: 1.02; letter-spacing: -.04em; width: 560px; white-space: normal; }
+.statement { left: 0; right: 0; text-align: center; font-size: 132px; font-weight: 760; letter-spacing: -.04em; top: 455px; }
+.tagline { left: 0; right: 0; top: 612px; text-align: center; font-size: 56px; font-weight: 600; letter-spacing: -.02em; }
+.url { left: 0; right: 0; top: 708px; text-align: center; font-size: 30px; font-weight: 500; color: rgba(255,255,255,.62); letter-spacing: .01em; }
 .mark { position: absolute; left: 0; right: 0; display: flex; justify-content: center; }
-.phone { position: absolute; left: 0; top: 0; transform-origin: 0 0; padding: 13px; border-radius: 62px; background: #0b0b0e;
-  box-shadow: 0 0 0 2px #3a3940, 0 0 0 3px #111, 0 30px 90px rgba(0,0,0,.55); }
-.phone img { display: block; border-radius: 49px; }
-.phone .island { position: absolute; left: 50%; top: 26px; width: 118px; height: 34px; margin-left: -59px; border-radius: 20px; background: #000; }
-.words { position: absolute; left: 0; right: 0; text-align: center; white-space: nowrap; }
-.words b { display: inline-block; font-weight: inherit; }
-.caption { top: 50px; font-size: 46px; font-weight: 650; letter-spacing: -.012em; }
-.type { font-size: 190px; font-weight: 700; letter-spacing: -.03em; }
-.caret { display: inline-block; width: 9px; height: .78em; margin-left: 12px; vertical-align: -.04em; background: #b78cff; border-radius: 3px; }
-#fade { background: #000; }
+#grain { opacity: .045; mix-blend-mode: overlay; pointer-events: none; }
+#vignette { background: radial-gradient(ellipse 75% 70% at 50% 48%, transparent 55%, rgba(0,0,0,.5) 100%); pointer-events: none; }
+#fade { background: #000; opacity: 0; }
 </style>
 </head>
 <body>
 <div id="stage">
   <div class="layer" id="bg"><div class="glow" id="ga"></div><div class="glow" id="gb"></div></div>
-  <div class="layer" id="items"></div>
-  <div class="layer" id="fade" style="opacity:0"></div>
+  <div class="layer" id="world"></div>
+  <div class="layer" id="words"></div>
+  <div class="layer" id="vignette"></div>
+  <div class="layer" id="grain"></div>
+  <div class="layer" id="fade"></div>
 </div>
 <script>
 const SPEC = /*SPEC*/null;
 const BRAND = /*BRAND*/null;
-const W = 1560, BAR = 30, CX = 960, CY = 598;
+const BAR = 30;
+const TAU = Math.PI * 2;
 
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const lerp = (a, b, u) => a + (b - a) * u;
 const expoOut = (u) => (u >= 1 ? 1 : 1 - Math.pow(2, -10 * u));
+const quartOut = (u) => 1 - Math.pow(1 - u, 4);
+const quartIn = (u) => u * u * u * u;
+const sineInOut = (u) => -(Math.cos(Math.PI * u) - 1) / 2;
 const cubicInOut = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
-const quintOut = (u) => 1 - Math.pow(1 - u, 5);
 
 function hex(c) { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 function mix(a, b, u) { const x = hex(a), y = hex(b); return x.map((v, i) => Math.round(lerp(v, y[i], u))); }
@@ -58,33 +74,13 @@ function along(map, t) {
   return map[map.length - 1][1];
 }
 
-function camAt(cam, t) {
-  if (t <= cam[0][0] || cam.length === 1) return cam[0].slice(1);
-  for (let i = 1; i < cam.length; i++) {
-    const a = cam[i - 1], b = cam[i];
-    if (t <= b[0]) { const u = cubicInOut((t - a[0]) / Math.max(1e-6, b[0] - a[0])); return [1, 2, 3].map((k) => lerp(a[k], b[k], u)); }
-  }
-  return cam[cam.length - 1].slice(1);
-}
+// ---------------------------------------------------------------------------
+// pictures
 
-// a word or a line arriving: up a little, out of a blur
-function arrive(el, t, at, dist = 0.45, dur = 0.7) {
-  const u = clamp((t - at) / dur), e = expoOut(u);
-  el.style.opacity = u <= 0 ? 0 : clamp(e * 1.4);
-  el.style.transform = `translateY(${(1 - e) * dist}em)`;
-  el.style.filter = `blur(${(1 - e) * 10}px)`;
-}
-function leave(el, t, t1, dur = 0.3) {
-  const u = clamp((t1 - t) / dur);
-  return u;
-}
-
-const items = [];
 const loads = [];
-function frameUrl(key, src, t) {
-  const f = SPEC.frames[key];
-  const s = along(src.map, t);
-  const i = clamp(Math.round((s - f.lo) * SPEC.fps), 0, f.n - 1);
+function frameUrl(src, t) {
+  const f = SPEC.frames[src.key];
+  const i = clamp(Math.round((along(src.map, t) - f.lo) * SPEC.fps), 0, f.n - 1);
   return `${f.dir}/${String(i + 1).padStart(5, "0")}.jpg`;
 }
 function setImg(img, url) {
@@ -96,167 +92,336 @@ function setImg(img, url) {
 
 function makeWin(title, w) {
   const el = document.createElement("div");
-  el.className = "win";
-  el.innerHTML = `<div class="bar"><i></i><i></i><i></i><span>${title}</span></div><div class="view" style="width:${w}px;height:${Math.round(w * 9 / 16)}px"><img width="${w}" height="${Math.round(w * 9 / 16)}"></div>`;
+  el.className = "slot win";
+  const h = Math.round(w * 9 / 16);
+  el.innerHTML = `<div class="bar"><i></i><i></i><i></i><span>${title}</span></div><div class="view" style="width:${w}px;height:${h}px"><img width="${w}" height="${h}"></div>`;
+  el.dataset.w = w; el.dataset.h = h + BAR;
   return el;
 }
 function makePhone(h) {
   const el = document.createElement("div");
-  el.className = "phone";
+  el.className = "slot phone";
   const w = Math.round(h * 540 / 1170);
-  el.innerHTML = `<img width="${w}" height="${h}"><div class="island"></div>`;
-  return el;
-}
-function words(cls, list, style) {
-  const el = document.createElement("div");
-  el.className = "words " + cls;
-  Object.assign(el.style, style || {});
-  el.innerHTML = list.map((w) => `<b>${w}</b>`).join(" ");
-  return el;
-}
-function wordmark(size) {
-  const el = document.createElement("div");
-  el.className = "mark";
-  el.innerHTML = `<svg height="${size}" viewBox="0 0 229.45 100" style="overflow:visible"><path d="${BRAND.letters}" fill="#fff" fill-rule="evenodd"/><path d="${BRAND.spark}" fill="#9d4dff" fill-rule="evenodd"/></svg>`;
+  el.innerHTML = `<div class="view" style="width:${w}px;height:${h}px"><img width="${w}" height="${h}"></div><div class="island"></div>`;
+  el.dataset.w = w + 26; el.dataset.h = h + 26; el.dataset.phone = 1;
   return el;
 }
 
-function build() {
-  const root = document.getElementById("items");
-  for (const it of SPEC.items) {
-    let el;
-    if (it.kind === "window") { el = makeWin("Nexa", W); }
-    else if (it.kind === "split") { el = document.createElement("div"); el.append(makeWin("test1", 1180), makeWin("test2", 1180)); }
-    else if (it.kind === "duo") { el = document.createElement("div"); el.append(makeWin("Nexa", 1240), makePhone(860)); }
-    else if (it.kind === "caption") el = words("caption", it.text.split(" "));
-    else if (it.kind === "card") el = words("", it.words, { fontSize: it.size + "px", fontWeight: it.weight, top: (it.y - it.size * 0.62) + "px", letterSpacing: "-.025em" });
-    else if (it.kind === "type") { el = words("type", []); el.style.top = "380px"; el.innerHTML = `${[...it.text].map((c) => `<b>${c}</b>`).join("")}<span class="caret"></span>`; }
-    else if (it.kind === "wordmark") { el = wordmark(it.size); el.style.top = (it.y - it.size / 2) + "px"; }
-    else if (it.kind === "url") { el = words("", [it.text], { top: "720px", fontSize: "34px", fontWeight: 500, color: "rgba(255,255,255,.72)" }); }
-    el.style.display = "none";
-    root.appendChild(el);
-    items.push({ it, el });
+// Where each layout puts its windows (centre, width, turn), drifting a few
+// degrees over the scene. Every window stays clear of the frame's edges and
+// of the words: titles above y 150, side words left or right of x 640/1280.
+function layout(name, u) {
+  switch (name) {
+    case "single": return [{ x: 960, y: 610, w: 1420, rx: 1.5, ry: lerp(-2.5, 2.5, u) }];
+    case "right": return [{ x: 1270, y: 548, w: 1160, rx: 3, ry: lerp(-12, -9, u) }];
+    case "left": return [{ x: 650, y: 548, w: 1160, rx: 3, ry: lerp(12, 9, u) }];
+    case "pair": return [
+      { x: 660, y: 470, w: 1000, z: -300, rx: 2, ry: lerp(10, 7, u), dof: 1.6, phase: 1.7 },
+      { x: 1280, y: 650, w: 1000, z: 0, rx: 2, ry: lerp(-8, -5, u) }];
+    case "duo": return [
+      { x: 720, y: 600, w: 1180, rx: 2, ry: lerp(9, 6, u) },
+      { x: 1575, y: 600, h: 820, rx: 2, ry: lerp(-15, -11, u), phone: true, phase: 2.3 }];
   }
+  return [];
 }
 
-// the window keeps its place and grows a little; the camera moves inside it,
-// closing in on (fx, fy) of the screen and bringing that point to the middle
-function placeWin(el, w, left, top, z, fx, fy, push = 1) {
-  const h = w * 9 / 16;
-  const cx = left + w / 2, cy = top + (h + BAR) / 2;
-  el.style.transform = `translate(${cx - push * w / 2}px, ${cy - push * (h + BAR) / 2}px) scale(${push})`;
+// a slow float on every window, from the song's own clock, so a cut never resets it
+function float(t, phase = 0) {
+  return {
+    y: Math.sin(TAU * t / 5.6 + phase) * 7,
+    rx: Math.cos(TAU * t / 6.4 + phase) * 0.6,
+    ry: Math.sin(TAU * t / 8.2 + phase * 0.7) * 0.9,
+  };
+}
+
+const rigs = [];
+function buildRig(r) {
+  const el = document.createElement("div");
+  el.style.display = "none";
+  const slots = [];
+  if (r.layout === "wall") {
+    const wall = document.createElement("div");
+    wall.className = "wall";
+    el.appendChild(wall);
+    const cols = 4, rows = 3, w = 540, gap = 44, h = w * 9 / 16 + BAR;
+    for (let k = 0; k < cols * rows; k++) {
+      const s = makeWin("Nexa", w);
+      s.dataset.gx = ((k % cols) - (cols - 1) / 2) * (w + gap);
+      s.dataset.gy = (Math.floor(k / cols) - (rows - 1) / 2) * (h + gap);
+      wall.appendChild(s);
+      slots.push(s);
+    }
+    r.wallEl = wall;
+  } else {
+    for (const pl of layout(r.layout, 0)) {
+      const s = pl.phone ? makePhone(pl.h) : makeWin(r.titles?.[slots.length] || "Nexa", pl.w);
+      el.appendChild(s);
+      slots.push(s);
+    }
+  }
+  document.getElementById("world").appendChild(el);
+  rigs.push({ r, el, slots, last: {} });
+}
+
+// How a scene arrives and leaves. A glide: the window eases in from the side
+// it travels from, out of a soft focus, and leaves the same way it was going.
+// how much of a scene's way out comes before its last moment
+function lead(r) { return r.exit === "glide" ? 0.5 : 1; }
+
+function motion(r, t) {
+  const o = { dx: 0, dy: 0, dz: 0, rx: 0, ry: 0, s: 1, op: 1, blur: 0 };
+  const ein = r.enterDur || 0.75, eout = r.exitDur || 0.5;
+  const u = clamp((t - r.s0) / ein);
+  if (u < 1) {
+    if (r.enter === "glide") { const e = expoOut(u); o.dx += 220 * (1 - e); o.ry += 6 * (1 - e); o.op *= clamp(u * 2.2); o.blur += 10 * (1 - e); }
+    else if (r.enter === "rise") { const e = cubicInOut(u); o.dy += 760 * (1 - e); o.rx += 24 * (1 - e); o.dz -= 260 * (1 - e); }
+    else if (r.enter === "far") { const e = expoOut(u); o.dz -= 1100 * (1 - e); o.op *= clamp(u * 1.8); o.blur += 8 * (1 - e); }
+    else if (r.enter === "focus") { const e = expoOut(u); o.s *= lerp(0.93, 1, e); o.op *= clamp(u * 3); o.blur += 14 * (1 - e); }
+  }
+  // the way out straddles the cut, so the next scene is already arriving
+  const v = clamp((t - (r.s1 - eout * lead(r))) / eout);
+  if (v > 0) {
+    if (r.exit === "glide") { const e = quartIn(v); o.dx -= 220 * e; o.ry -= 6 * e; o.op *= 1 - clamp((v - 0.2) / 0.8); o.blur += 10 * e; }
+    else if (r.exit === "recede") { const e = sineInOut(v); o.dz -= 900 * e; o.op *= 1 - e; o.blur += 8 * e; }
+  }
+  return o;
+}
+
+// the camera inside a window: one framing a scene, a slow push across it
+function frameContent(slot, cam, t, s0, s1) {
+  const img = slot.querySelector("img");
+  if (slot.dataset.phone || !cam) { img.style.transform = ""; return; }
+  const u = sineInOut(clamp((t - s0) / (s1 - s0)));
+  const [z0, fx, fy, z1] = cam;
+  const z = Math.max(1, lerp(z0, z1 ?? z0, u));
+  const w = +img.width, h = +img.height;
   const k = clamp((z - 1) / 0.4);
   const tx = clamp(lerp(fx * w, w / 2, k) - z * fx * w, w - z * w, 0);
   const ty = clamp(lerp(fy * h, h / 2, k) - z * fy * h, h - z * h, 0);
-  el.querySelector("img").style.transform = `translate(${tx}px, ${ty}px) scale(${z})`;
+  img.style.transform = `translate(${tx}px, ${ty}px) scale(${z})`;
 }
+
+function piecesAt(rigIndex, t) {
+  const out = {};
+  for (const p of SPEC.pieces) if (p.rig === rigIndex && t >= p.t0 && t < p.t1) out[p.slot] = p;
+  return out;
+}
+
+function drawRigs(t) {
+  rigs.forEach((g, i) => {
+    const r = g.r;
+    const on = t >= r.s0 && t < r.s1 + (r.exitDur || 0.4) * (1 - lead(r));
+    g.el.style.display = on ? "" : "none";
+    if (!on) return;
+    const u = clamp((t - r.s0) / (r.s1 - r.s0));
+    const o = motion(r, t);
+    const ps = piecesAt(i, t);
+    Object.assign(g.last, ps);
+    if (r.layout === "wall") {
+      // the screens arrive one after another and the wall drifts back into the dark
+      const e = sineInOut(u);
+      r.wallEl.style.transform = `translateZ(${lerp(-150, -760, e) + o.dz}px) rotateX(${lerp(22, 15, e)}deg) rotateY(${lerp(-20, -12, e)}deg) rotateZ(${lerp(5, 3, e)}deg) translateY(${lerp(50, -30, e)}px)`;
+      g.el.style.opacity = o.op;
+      g.el.style.filter = o.blur > 0.2 ? `blur(${o.blur}px)` : "";
+      g.slots.forEach((s, k) => {
+        const a = expoOut(clamp((t - r.s0 - (r.stagger || 0.06) * k) / 0.9));
+        const sw = +s.dataset.w, sh = +s.dataset.h;
+        s.style.transform = `translate3d(${+s.dataset.gx - sw / 2}px, ${+s.dataset.gy - sh / 2}px, ${lerp(-420, 0, a)}px)`;
+        s.style.opacity = clamp(a * 1.4);
+        const p = g.last[k];
+        if (p) show(s, p, r, k, t);
+      });
+      return;
+    }
+    const places = layout(r.layout, sineInOut(u));
+    g.slots.forEach((s, k) => {
+      const pl = places[k], fl = float(t, pl.phase || 0);
+      const w = +s.dataset.w, h = +s.dataset.h;
+      s.style.transform = `translate3d(${pl.x - w / 2 + o.dx}px, ${pl.y - h / 2 + o.dy + fl.y}px, ${(pl.z || 0) + o.dz}px) rotateX(${pl.rx + o.rx + fl.rx}deg) rotateY(${pl.ry + o.ry + fl.ry}deg) scale(${o.s})`;
+      s.style.opacity = o.op;
+      const blur = (pl.dof || 0) + o.blur;
+      s.style.filter = blur > 0.2 ? `blur(${blur}px)` : "";
+      const p = g.last[k];
+      if (p) show(s, p, r, k, t);
+    });
+  });
+}
+
+// a piece in its window: the scene's framing, or the piece's own when it has one
+function show(slot, p, r, k, t) {
+  setImg(slot.querySelector("img"), frameUrl(p.src, Math.min(t, p.t1 - 1e-3)));
+  if (p.cam) frameContent(slot, p.cam, t, p.t0, p.t1);
+  else frameContent(slot, r.cams?.[k], t, r.s0, r.s1);
+}
+
+// ---------------------------------------------------------------------------
+// words, each kind moving its own way
+
+function chars(text) { return [...text].map((c) => c === "\n" ? "<br>" : c === " " ? " " : `<span class="c">${c}</span>`).join(""); }
+function words(text) { return text.split(" ").map((w) => `<span class="c">${w}</span>`).join(" "); }
+
+const texts = [];
+function buildText(it) {
+  const el = document.createElement("div");
+  if (it.kind === "headline") { el.className = "text headline"; el.style.top = it.y + "px"; el.innerHTML = it.lines.map((l) => `<span class="line">${words(l)}</span>`).join(""); }
+  else if (it.kind === "title") {
+    el.className = "text title " + (it.place === "top" ? "top" : "side");
+    if (it.place === "left") Object.assign(el.style, { left: "110px", top: "548px", transform: "translateY(-50%)" });
+    if (it.place === "right") Object.assign(el.style, { right: "110px", top: "548px", transform: "translateY(-50%)", textAlign: "right" });
+    el.innerHTML = chars(it.text);
+  }
+  else if (it.kind === "statement") { el.className = "text statement"; el.innerHTML = words(it.text); }
+  else if (it.kind === "tagline") { el.className = "text tagline"; el.innerHTML = chars(it.text); }
+  else if (it.kind === "url") { el.className = "text url"; el.innerHTML = chars(it.text); }
+  else if (it.kind === "wordmark") {
+    el.className = "mark";
+    el.style.top = (it.y - it.size / 2) + "px";
+    const sparks = BRAND.spark.split("Z").filter((d) => d.trim()).map((d) => `<path class="sp" d="${d}Z" fill="#a160ff"/>`).join("");
+    el.innerHTML = `<svg height="${it.size}" viewBox="0 0 229.45 100" style="overflow:visible"><path class="lt" d="${BRAND.letters}" fill="#fff" fill-rule="evenodd"/>${sparks}</svg>`;
+  }
+  el.style.display = "none";
+  document.getElementById("words").appendChild(el);
+  texts.push({ it, el, cs: [...el.querySelectorAll(".c")] });
+}
+
+function exitOf(t, t1, dur) { return clamp((t - (t1 - dur)) / dur); }
+
+function drawTexts(t) {
+  for (const { it, el, cs } of texts) {
+    const on = t >= it.t0 && t < it.t1;
+    el.style.display = on ? "" : "none";
+    if (!on) continue;
+    if (it.kind === "headline") {
+      // word by word on the piano, out of a soft focus, the spacing closing up as it lands
+      cs.forEach((c, i) => {
+        const e = expoOut(clamp((t - it.times[i]) / 1.1));
+        c.style.opacity = clamp((t - it.times[i]) / 0.35);
+        c.style.filter = `blur(${(1 - e) * 10}px)`;
+        c.style.transform = `translateY(${(1 - e) * 0.16}em)`;
+        c.style.letterSpacing = `${(1 - e) * 0.06}em`;
+      });
+      const x = sineInOut(exitOf(t, it.t1, 0.8));
+      el.style.opacity = 1 - x; el.style.filter = x ? `blur(${x * 12}px)` : ""; el.style.transform = `translateY(${-x * 60}px)`;
+    } else if (it.kind === "title") {
+      // letter by letter, quick and close together
+      cs.forEach((c, i) => {
+        const at = it.t0 + i * 0.018, e = expoOut(clamp((t - at) / 0.7));
+        c.style.opacity = clamp((t - at) / 0.25);
+        c.style.transform = `translateY(${(1 - e) * 0.42}em)`;
+        c.style.filter = e < 0.99 ? `blur(${(1 - e) * 5}px)` : "";
+      });
+      const x = quartIn(exitOf(t, it.t1, 0.4));
+      el.style.opacity = 1 - x;
+      el.style.filter = x ? `blur(${x * 8}px)` : "";
+      el.style.marginTop = `${-x * 24}px`;
+    } else if (it.kind === "statement") {
+      // each word lands on its beat, from a little larger
+      cs.forEach((c, i) => {
+        const e = expoOut(clamp((t - it.times[i]) / 0.6));
+        c.style.opacity = clamp((t - it.times[i]) / 0.12);
+        c.style.transform = `scale(${lerp(1.22, 1, e)})`;
+        c.style.filter = `blur(${(1 - e) * 12}px)`;
+      });
+      const x = sineInOut(exitOf(t, it.t1, 0.35));
+      el.style.opacity = 1 - x; el.style.filter = x ? `blur(${x * 10}px)` : "";
+    } else if (it.kind === "tagline" || it.kind === "url") {
+      // the last words resolve slowly, letter by letter
+      cs.forEach((c, i) => {
+        const at = it.t0 + i * (it.kind === "url" ? 0.025 : 0.04), e = expoOut(clamp((t - at) / 1.2));
+        c.style.opacity = clamp((t - at) / 0.6);
+        c.style.filter = `blur(${(1 - e) * 6}px)`;
+      });
+    } else if (it.kind === "wordmark") {
+      // the letters come out of focus as they rise; the sparkles turn in after
+      const e = expoOut(clamp((t - it.t0) / 1.4));
+      const lt = el.querySelector(".lt");
+      lt.style.opacity = clamp((t - it.t0) / 0.5);
+      el.querySelectorAll(".sp").forEach((sp, k) => {
+        const a = expoOut(clamp((t - it.t0 - 0.35 - k * 0.14) / 1.2));
+        sp.style.transformBox = "fill-box"; sp.style.transformOrigin = "50% 50%";
+        sp.style.opacity = clamp((t - it.t0 - 0.35 - k * 0.14) / 0.3);
+        sp.style.transform = `rotate(${(1 - a) * -90}deg) scale(${lerp(0.3, 1, a)})`;
+      });
+      const x = sineInOut(exitOf(t, it.t1, 0.6));
+      el.style.opacity = 1 - x;
+      el.style.filter = `blur(${(1 - e) * 12 + x * 10}px)`;
+      el.style.transform = `translateY(${(1 - e) * 24 - x * 40}px)`;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// the room: light that follows the scene, grain, a vignette
 
 function drawBg(t) {
   const bg = SPEC.bg;
   let i = 0;
   while (i + 1 < bg.length && bg[i + 1][0] <= t) i++;
   const cur = bg[i], prev = bg[Math.max(0, i - 1)];
-  const u = i === 0 ? 1 : expoOut(clamp((t - cur[0]) / 0.9));
+  const u = i === 0 ? 1 : sineInOut(clamp((t - cur[0]) / 1.2));
   const a = mix(prev[1], cur[1], u), b = mix(prev[2], cur[2], u), g = lerp(prev[3], cur[3], u);
   const ga = document.getElementById("ga"), gb = document.getElementById("gb");
-  ga.style.left = (420 + Math.sin(t * 0.21) * 90) + "px"; ga.style.top = (190 + Math.cos(t * 0.17) * 60) + "px";
-  gb.style.left = (1560 + Math.cos(t * 0.19) * 90) + "px"; gb.style.top = (960 + Math.sin(t * 0.23) * 60) + "px";
-  ga.style.background = `radial-gradient(closest-side, rgba(${a},${0.95 * g}), rgba(${a},0))`;
-  gb.style.background = `radial-gradient(closest-side, rgba(${b},${0.85 * g}), rgba(${b},0))`;
+  ga.style.left = (440 + Math.sin(t * 0.21) * 110) + "px"; ga.style.top = (170 + Math.cos(t * 0.17) * 70) + "px";
+  gb.style.left = (1540 + Math.cos(t * 0.19) * 110) + "px"; gb.style.top = (990 + Math.sin(t * 0.23) * 70) + "px";
+  ga.style.background = `radial-gradient(closest-side, rgba(${a},${0.9 * g}), rgba(${a},0))`;
+  gb.style.background = `radial-gradient(closest-side, rgba(${b},${0.8 * g}), rgba(${b},0))`;
+}
+
+function grain() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 384;
+  const g = c.getContext("2d"), d = g.createImageData(384, 384);
+  let s = 1234567;
+  for (let i = 0; i < d.data.length; i += 4) { s = (s * 1103515245 + 12345) >>> 0; const v = s >>> 24; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; }
+  g.putImageData(d, 0, 0);
+  document.getElementById("grain").style.backgroundImage = `url(${c.toDataURL()})`;
 }
 
 function draw(t) {
   loads.length = 0;
+  const frame = Math.round(t * SPEC.fps);
   drawBg(t);
-  for (const { it, el } of items) {
-    const on = t >= it.t0 && t < it.t1;
-    el.style.display = on ? "" : "none";
-    if (!on) continue;
-    if (it.kind === "window") {
-      const [z, fx, fy] = camAt(it.cam, t);
-      let left = CX - W / 2, top = CY - (W * 9 / 16 + BAR) / 2;
-      if (it.enter === "rise") {
-        const u = quintOut(clamp((t - it.t0) / (it.riseDur || 0.8)));
-        top += (1 - u) * 760; el.style.opacity = clamp(u * 3);
-      } else el.style.opacity = 1;
-      const push = it.enter === "rise" ? lerp(0.94, 1, quintOut(clamp((t - it.t0) / (it.riseDur || 0.8)))) : 1 + 0.025 * clamp((t - it.t0) / (it.t1 - it.t0));
-      placeWin(el, W, left, top, Math.max(1, z), fx, fy, push);
-      setImg(el.querySelector("img"), frameUrl(it.src.key, it.src, t));
-    } else if (it.kind === "split") {
-      const [a, b] = el.children;
-      const u = (t - it.t0) / (it.t1 - it.t0), push = 1 + 0.03 * u;
-      const [z, fx, fy] = camAt(it.cam, t);
-      // two people's screens, overlapping, the second in front
-      placeWin(a, 1180, 60, 140, z, fx, fy, push);
-      placeWin(b, 1180, 680, 372, z, fx, fy, push);
-      setImg(a.querySelector("img"), frameUrl(it.srcs[0].key, it.srcs[0], t));
-      setImg(b.querySelector("img"), frameUrl(it.srcs[1].key, it.srcs[1], t));
-    } else if (it.kind === "duo") {
-      const [a, b] = el.children;
-      const u = (t - it.t0) / (it.t1 - it.t0), z = 1 + 0.03 * u;
-      placeWin(a, 1240, 95, CY - 363, 1, 0.5, 0.5, z);
-      b.style.transform = `translate(${1415}px, ${CY - 443 - u * 8}px) scale(${z})`;
-      setImg(a.querySelector("img"), frameUrl(it.srcs[0].key, it.srcs[0], t));
-      setImg(b.querySelector("img"), frameUrl(it.srcs[1].key, it.srcs[1], t));
-    } else if (it.kind === "caption") {
-      const out = leave(el, t, it.t1, 0.25);
-      [...el.children].forEach((w, i) => arrive(w, t, it.t0 + i * 0.07, 0.4, 0.75));
-      el.style.opacity = out;
-    } else if (it.kind === "card") {
-      [...el.children].forEach((w, i) => arrive(w, t, it.times[i], 0.35, 0.8));
-      const out = leave(el, t, it.t1, 0.3);
-      el.style.opacity = out; el.style.filter = `blur(${(1 - out) * 12}px)`;
-    } else if (it.kind === "type") {
-      const kids = [...el.children];
-      const letters = kids.slice(0, -1), caret = kids[kids.length - 1];
-      letters.forEach((l, i) => { const u = clamp((t - it.times[i]) / 0.14); l.style.opacity = u > 0 ? 1 : 0; l.style.transform = `scale(${lerp(0.86, 1, quintOut(u))})`; });
-      const last = it.times.filter((x) => x <= t).pop();
-      const typing = last !== undefined && t - last < 0.5;
-      caret.style.opacity = typing || ((t - (last ?? 0)) % 1.06) < 0.53 ? 1 : 0;
-      const out = leave(el, t, it.t1, 0.4);
-      el.style.opacity = out; el.style.filter = `blur(${(1 - out) * 14}px)`;
-      el.style.transform = `translateY(${-(1 - out) * 40}px)`;
-    } else if (it.kind === "wordmark") {
-      const u = expoOut(clamp((t - it.t0) / 1.1)), out = leave(el, t, it.t1, 0.4);
-      el.style.opacity = clamp(u * 1.3) * out;
-      el.style.filter = `blur(${(1 - u) * 16 + (1 - out) * 14}px)`;
-      el.style.transform = `scale(${lerp(0.9, 1, u) * lerp(1.04, 1, out)})`;
-    } else if (it.kind === "url") {
-      arrive(el.children[0], t, it.t0, 0.3, 0.8);
-    }
-  }
+  drawRigs(t);
+  drawTexts(t);
+  document.getElementById("grain").style.backgroundPosition = `${(frame * 137) % 384}px ${(frame * 263) % 384}px`;
   const [f0, f1] = SPEC.fade;
-  document.getElementById("fade").style.opacity = clamp((t - f0) / (f1 - f0));
+  document.getElementById("fade").style.opacity = sineInOut(clamp((t - f0) / (f1 - f0)));
   return Promise.all(loads);
 }
 
-// the thumbnail: the app tilted on the right, the line big on the left
-window.drawThumb = async function (key, idx, line, accent) {
-  document.getElementById("items").style.display = "none";
+// the thumbnail: the app turned on the right, the line big on the left
+window.drawThumb = async function (key, idx, line) {
+  document.getElementById("words").style.display = "none";
   const st = document.getElementById("stage");
   st.style.transform = "scale(0.6667)"; st.style.transformOrigin = "0 0";
-  const f = SPEC.frames[key];
   const ga = document.getElementById("ga"), gb = document.getElementById("gb");
   ga.style.cssText += ";left:1500px;top:300px;background:radial-gradient(closest-side, rgba(140,60,255,.95), rgba(140,60,255,0))";
   gb.style.cssText += ";left:200px;top:1100px;background:radial-gradient(closest-side, rgba(255,70,150,.7), rgba(255,70,150,0))";
-  const win = makeWin("Nexa", 1500);
-  win.style.transform = "translate(780px, 150px) perspective(2400px) rotateY(-16deg) rotateX(4deg) scale(1)";
-  win.style.transformOrigin = "0 50%";
-  st.appendChild(win);
+  const win = makeWin("Nexa", 1120);
+  win.style.transform = "translate3d(870px, 215px, 0) rotateY(-16deg) rotateX(3deg)";
+  document.getElementById("world").appendChild(win);
+  const f = SPEC.frames[key];
   const img = win.querySelector("img");
   img.src = `${f.dir}/${String(idx).padStart(5, "0")}.jpg`;
   await img.decode();
-  const mark = wordmark(70); mark.style.cssText += ";top:70px;left:90px;right:auto;justify-content:flex-start";
+  const mark = document.createElement("div");
+  mark.className = "mark"; mark.style.cssText += ";top:70px;left:90px;right:auto;justify-content:flex-start";
+  mark.innerHTML = `<svg height="70" viewBox="0 0 229.45 100"><path d="${BRAND.letters}" fill="#fff" fill-rule="evenodd"/><path d="${BRAND.spark}" fill="#a160ff"/></svg>`;
   st.appendChild(mark);
   const text = document.createElement("div");
-  text.style.cssText = "position:absolute;left:90px;top:250px;width:860px;font-size:150px;line-height:.98;font-weight:800;letter-spacing:-.045em;text-shadow:0 8px 40px rgba(0,0,0,.5)";
+  text.style.cssText = "position:absolute;left:90px;top:270px;width:800px;font-size:128px;line-height:1;font-weight:800;letter-spacing:-.045em;text-shadow:0 8px 40px rgba(0,0,0,.5)";
   text.innerHTML = line;
   st.appendChild(text);
   return true;
 };
 
 window.draw = draw;
-document.fonts.load("700 40px Madefor").then(() => { build(); window.ready = true; });
+document.fonts.load("700 40px Madefor").then(() => {
+  grain();
+  (SPEC.rigs || []).forEach(buildRig);
+  (SPEC.texts || []).forEach(buildText);
+  window.ready = true;
+});
 </script>
 </body>
 </html>

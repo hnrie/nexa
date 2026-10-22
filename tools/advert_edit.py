@@ -78,7 +78,18 @@ def analyse(song, bpm=None):
 
     def on_bar(x):
         return d1 + round((x - d1) / bar) * bar
+    # the piano's clearest notes before the first drop, for the intro to move on
+    harm, _ = librosa.effects.hpss(y, margin=3.0)
+    band = np.abs(librosa.stft(harm, hop_length=hop))
+    f = librosa.fft_frequencies(sr=sr)
+    penv = librosa.onset.onset_strength(S=librosa.amplitude_to_db(band[(f > 220) & (f < 2500)], ref=np.max), sr=sr, hop_length=hop)
+    pon = librosa.onset.onset_detect(onset_envelope=penv, sr=sr, hop_length=hop, units="time")
+    pst = penv[librosa.time_to_frames(pon, sr=sr, hop_length=hop)]
+    keep = (pon > 0.5) & (pon < d1 - 0.2)
+    pon, pst = pon[keep], pst[keep]
+    notes = sorted(float(t) for t in pon[np.argsort(-pst)[:14]])
     out = {
+        "notes": notes,
         "period": float(period), "bar": float(bar), "d1": d1,
         "breakdown": on_bar(grid[i_b]), "d2": on_bar(hit(i_d2)), "outro": on_bar(grid[i_o]),
         "end": len(y) / sr, "bpm": 60 / float(period),
@@ -145,12 +156,13 @@ class Takes:
 
 
 class Cut:
+    """The advert as the stage draws it. A rig is a window (or two, or a wall
+    of them) placed in 3D for a stretch of the song, with how it comes in and
+    goes out; a piece is what one window shows for a while; texts are words."""
+
     def __init__(self, song, takes):
         self.s, self.t = song, takes
-        self.items = []
-        self.bg = []
-
-    # --- time ----------------------------------------------------------------
+        self.rigs, self.pieces, self.texts, self.bg, self.flashes = [], [], [], [], []
 
     def beat(self, n, base=None):
         return (self.s["d1"] if base is None else base) + n * self.s["period"]
@@ -174,61 +186,56 @@ class Cut:
             if not 0.6 <= sp <= 1.7:
                 print(f"  note: {take} runs at {sp:.2f}x between {a:.2f} and {b:.2f}")
         first, last = pts[0], pts[-1]
-        start = (t0, first[1] - (first[0] - t0) * speed)
-        end = (t1, last[1] + (t1 - last[0]) * speed)
-        pts = [start] + [p for p in pts if t0 < p[0] < t1] + [end]
+        pts = [(t0, first[1] - (first[0] - t0) * speed)] + [q for q in pts if t0 < q[0] < t1] + [(t1, last[1] + (t1 - last[0]) * speed)]
         if hold_until:
-            # still on its first frame until then, as a picture waiting to play
+            # still on one frame until then, as a picture waiting to play
             held = float(np.interp(hold_until, [a for a, _ in pts], [b for _, b in pts]))
             pts = [(t0, held), (hold_until, held)] + [q for q in pts if q[0] > hold_until]
-        lo, hi = min(p[1] for p in pts), max(p[1] for p in pts)
-        self.t.want(take, view, lo, hi)
+        self.t.want(take, view, min(q[1] for q in pts), max(q[1] for q in pts))
         return {"key": f"{take}-{view}", "map": [[round(a, 4), round(b, 4)] for a, b in pts]}
 
-    def window(self, take, t0, t1, view="a", cam=None, enter="cut", rise=0.8, caption=None, **src):
-        self.items.append({"kind": "window", "t0": t0, "t1": t1, "src": self.source(take, view, t0, t1, **src),
-                           "cam": cam or [[t0, 1.0, 0.5, 0.5], [t1, 1.05, 0.5, 0.55]], "enter": enter, "riseDur": rise})
-        if caption:
-            self.caption(caption, t0, t1)
+    def rig(self, layout, s0, s1, enter="glide", exit="glide", cams=None, **opts):
+        """A scene: windows placed in 3D from s0 to s1. cams holds each
+        window's framing, (zoom, x, y, zoom at the end): one a scene, pushed
+        in slowly across it, never moved at a cut."""
+        self.rigs.append({"layout": layout, "s0": s0, "s1": s1, "enter": enter, "exit": exit, "cams": cams or [], **opts})
+        return len(self.rigs) - 1
 
-    def montage(self, take, labels, t0, n_beats, view="a", lead=0.06, cam=None, caption=None):
-        """One beat for each logged moment, the cut on the beat and the change
-        (a theme, a font) on it too."""
+    def piece(self, rig, take, t0, t1, slot=0, view="a", cam=None, **src):
+        """What one window shows from t0 to t1. cam gives this piece a framing
+        of its own, for a different view inside the same scene (a cut)."""
+        self.pieces.append({"rig": rig, "slot": slot, "t0": t0, "t1": t1, "cam": cam, "src": self.source(take, view, t0, t1, **src)})
+
+    def shot(self, rig, take, base, at, n, mark, land=1, view="a", slot=0):
+        """n beats of a take from beat `at` after `base`, its logged moment
+        `mark` landing `land` beats after the cut."""
+        if not self.t.has(take, mark):
+            return
+        p = self.s["period"]
+        t0, t1 = base + at * p, base + (at + n) * p
+        self.piece(rig, take, t0, t1, slot=slot, view=view, anchors=[(mark, t0 + land * p)])
+
+    def montage(self, rig, take, labels, t0, n_beats, lead=0.06):
+        """One beat for each logged moment, the cut and the change (a theme, a
+        font) on the beat together."""
         p = self.s["period"]
         labels = [l for l in labels if self.t.has(take, l)][:n_beats]
         for i, label in enumerate(labels):
             a = t0 + i * p
             b = t0 + (i + 1) * p if i < len(labels) - 1 else t0 + n_beats * p
-            m = self.t.mark(take, label, view)
-            src = self.source(take, view, a, b, src_in=m - lead)
-            self.items.append({"kind": "window", "t0": a, "t1": b, "src": src, "cam": cam or [[a, 1.0, 0.5, 0.5]], "enter": "cut"})
-        if caption:
-            self.caption(caption, t0, t0 + n_beats * p)
-
-    def split(self, take, t0, t1, views=("a", "b"), caption=None, cam=None, **src):
-        srcs = [self.source(take, v, t0, t1, **src) for v in views]
-        self.items.append({"kind": "split", "t0": t0, "t1": t1, "srcs": srcs, "cam": cam or [[t0, 1.0, 0.5, 0.5]]})
-        if caption:
-            self.caption(caption, t0, t1)
-
-    def duo(self, take, t0, t1, caption=None, **src):
-        self.items.append({"kind": "duo", "t0": t0, "t1": t1,
-                           "srcs": [self.source(take, "a", t0, t1, **src), self.source(take, "b", t0, t1, **src)]})
-        if caption:
-            self.caption(caption, t0, t1)
+            self.piece(rig, take, a, b, src_in=self.t.mark(take, label) - lead)
 
     # --- words -------------------------------------------------------------------
 
-    def caption(self, text, t0, t1, delay=None):
-        """A line above the window, coming in a beat after the cut."""
-        d = self.s["period"] * 0.5 if delay is None else delay
-        self.items.append({"kind": "caption", "t0": t0 + d, "t1": t1, "text": text})
-
-    def card(self, words, t0, t1, size=124, y=540, beats=None, weight=700):
-        """Big words in the middle of the stage, one at a time on the beats."""
+    def title(self, text, t0, t1, place="top"):
+        """A scene's title, a beat after the scene starts, gone just before it ends."""
         p = self.s["period"]
-        times = beats or [t0 + i * p for i in range(len(words))]
-        self.items.append({"kind": "card", "t0": t0, "t1": t1, "words": words, "times": times, "size": size, "y": y, "weight": weight})
+        self.texts.append({"kind": "title", "t0": t0 + p, "t1": t1 - 0.12, "text": text, "place": place})
+
+    def statement(self, text, t0, t1):
+        p = self.s["period"]
+        n = len(text.split(" "))
+        self.texts.append({"kind": "statement", "t0": t0, "t1": t1, "text": text, "times": [t0 + i * p for i in range(n)]})
 
     def colours(self, t, a, b, glow=1.0):
         self.bg.append([t, a, b, glow])
@@ -239,108 +246,133 @@ class Cut:
         s, T, p = self.s, self.t, self.s["period"]
         d1, d2, brk, outro, end = s["d1"], s["d2"], s["breakdown"], s["outro"], s["end"]
         B = lambda n, base=d1: self.bars(n, base)  # noqa: E731
-        b = lambda n, base=d1: self.beat(n, base)  # noqa: E731
+        shot, have = self.shot, T.has
 
-        # the intro: "hi", typed on the notes, then the wordmark, then the app rises to the drop
-        intro_bars = [d1 - k * s["bar"] for k in range(6, 0, -1)]
-        self.colours(0, "#0a0910", "#0a0910", 0.0)
-        self.colours(intro_bars[0], "#2a1450", "#120c22", 0.45)
-        self.items.append({"kind": "type", "t0": 0.35, "t1": intro_bars[2] + p, "text": "hi",
-                           "times": [intro_bars[0], intro_bars[0] + p]})
-        self.items.append({"kind": "wordmark", "t0": intro_bars[2] + p * 0.5, "t1": intro_bars[4] + 0.35, "size": 150, "y": 520})
-        self.window("hi", intro_bars[4], B(4), enter="rise", rise=d1 - intro_bars[4],
-                    anchors=[("hi", b(1)), ("hey", b(7)), ("how", b(11)), ("good", b(14))],
-                    cam=[[intro_bars[4], 1.0, 0.5, 0.5], [d1, 1.0, 0.5, 0.5], [b(3), 1.28, 0.4, 0.62], [B(4), 1.34, 0.4, 0.66]],
-                    hold_until=d1)
+        # the intro, on the piano: the first line on its first notes, the rest
+        # on the next phrase, the wordmark on the one after; then the app
+        # rises as the headline drifts off, landing on the drop
+        notes = s["notes"]
+
+        def note_after(t, gap=0.2):
+            return next((n for n in notes if n > t + gap), t + 1.0)
+        n1 = notes[0]
+        n2 = note_after(n1, 0.15)
+        n3 = note_after(n2, 1.4)
+        n4 = note_after(n3, 0.9)
+        rise = next((n for n in notes if d1 - 2.7 < n < d1 - 1.6), d1 - 2.2)
+        times = [n1, n2] + [n3 + k * 0.11 for k in range(6)]
+        self.colours(0, "#0e0b16", "#0e0b16", 0.0)
+        self.colours(n1, "#3a1a6e", "#14102a", 0.55)
+        self.texts.append({"kind": "headline", "t0": 0.0, "t1": rise + 0.6, "y": 430,
+                           "lines": ["Private Chat", "with All the Fun Left In"], "times": times})
+        self.texts.append({"kind": "wordmark", "t0": n4, "t1": rise + 0.6, "size": 58, "y": 330})
+
+        # 1: a conversation as it happens, then someone's own typing indicator
+        r = self.rig("single", rise, B(4), enter="rise", enterDur=d1 - rise, cams=[[1.22, 0.42, 0.64, 1.3]])
+        self.piece(r, "hi", rise, B(3), src_in=0, anchors=[("hi", self.beat(1)), ("hey", self.beat(5)), ("how", self.beat(8)), ("good", self.beat(10))],
+                   hold_until=d1)
         self.colours(d1, "#4c1d95", "#0f2a4a", 1.0)
-        self.caption("Say hi.", d1, B(4))
+        self.title("Chat in Real Time", d1, B(3))
+        if have("typing"):
+            self.piece(r, "typing", B(3), B(4), anchors=[("sent", B(4) - 0.05)], cam=[1.75, 0.36, 0.9, 1.82])
+            self.texts.append({"kind": "title", "t0": B(3) + p * 0.5, "t1": B(4) - 0.12, "text": "Even Your Typing Indicator", "place": "top"})
 
-        # formatting, one kind a bar, close up on the newest message
-        self.colours(B(4), "#6d1d5b", "#1b1650", 1.0)
-        fm = [("bold", 0.5, 0.8), ("colour", 0.5, 0.8), ("spoiler-open", 0.5, 0.8), ("code", 0.5, 0.78)]
-        for i, (label, fx, fy) in enumerate(fm):
-            if not T.has("formatting", label):
-                continue
-            t0, t1 = B(4 + i), B(5 + i)
-            self.window("formatting", t0, t1, anchors=[(label, t0 + 2 * p)],
-                        cam=[[t0, 1.65, fx, fy], [t1, 1.75, fx, fy]])
-        self.caption("Say it your way.", B(4), B(8))
+        # 2: formatting, a kind every two beats, then the editor
+        A2 = B(4)
+        self.colours(A2, "#6d1d5b", "#1b1650", 1.0)
+        r = self.rig("right", A2, B(8), cams=[[1.6, 0.52, 0.8, 1.68]])
+        for k, label in enumerate(["bold", "colour", "spoiler-open", "code"]):
+            shot(r, "formatting", A2, 2 * k, 2, label, land=1)
+        if have("editor"):
+            self.piece(r, "editor", A2 + 8 * p, B(8), anchors=[("callout", A2 + 10 * p), ("sent", A2 + 13.5 * p)],
+                       cam=[1.15, 0.4, 0.5, 1.2])
+        self.title("Say It\nYour Way", A2, B(8), place="left")
 
-        # calls
-        self.colours(B(8), "#0c4a4a", "#13204d", 1.0)
-        if T.has("voice"):
-            self.window("voice", B(8), B(10), anchors=[("joined", b(33))], caption="Talk.",
-                        cam=[[B(8), 1.0, 0.5, 0.5], [B(10), 1.08, 0.5, 0.45]])
-        if T.has("share"):
-            self.window("share", B(10), B(12), anchors=[("watch", b(41))], caption="Share your screen in 1080p60.",
-                        cam=[[B(10), 1.0, 0.5, 0.5], [B(12), 1.1, 0.55, 0.45]])
+        # 3: calls
+        A3 = B(8)
+        self.colours(A3, "#0c4a4a", "#13204d", 1.0)
+        r = self.rig("single", A3, B(12), cams=[[1.04, 0.5, 0.5, 1.1]])
+        shot(r, "voice", A3, 0, 6, "joined", land=1)
+        shot(r, "share", A3, 6, 10, "watch", land=1)
+        self.title("Calls and 1080p60 Screen Share", A3, B(12))
 
-        # looks
-        self.colours(B(12), "#5a2a0c", "#3a0f3f", 1.0)
-        if T.has("themes"):
-            self.montage("themes", [f"theme{i}" for i in range(12)], B(12), 8, caption="Make it yours.",
-                         cam=[[B(12), 1.3, 0.62, 0.42]])
-        if T.has("snow"):
-            self.colours(B(14), "#0f2f5c", "#0a1530", 1.0)
-            self.window("snow", B(14), brk, anchors=[("sent", B(14) + 3 * p)], caption="With themes for every season.",
-                        cam=[[B(14), 1.12, 0.6, 0.55], [brk, 1.2, 0.6, 0.5]])
+        # 4: looks, a theme a beat, a season, then CSS; then back into the dark
+        A4 = B(12)
+        self.colours(A4, "#5a2a0c", "#3a0f3f", 1.0)
+        r = self.rig("left", A4, brk, exit="recede", exitDur=0.6, cams=[[1.25, 0.62, 0.42, 1.3]])
+        if have("themes"):
+            self.montage(r, "themes", [f"theme{k}" for k in range(12)], A4, 8)
+        if have("snow"):
+            self.piece(r, "snow", A4 + 8 * p, A4 + 12 * p, anchors=[("sent", A4 + 10 * p)], cam=[1.1, 0.6, 0.5, 1.14])
+        if have("css"):
+            self.piece(r, "css", A4 + 12 * p, brk, anchors=[("closed", A4 + 14 * p)], cam=[1.0, 0.5, 0.5, 1.04])
+        self.title("Make It\nYours", A4, brk, place="right")
 
-        # the breakdown: privacy, said plainly
-        self.colours(brk, "#0b0b14", "#0b0b14", 0.2)
-        self.card(["Every", "message."], brk, B(1, brk) - 0.02)
-        self.card(["End-to-end", "encrypted."], B(1, brk), B(2, brk) - 0.02)
-        if T.has("e2ee"):
-            self.colours(B(2, brk), "#1d1342", "#0b0b14", 0.6)
-            self.window("e2ee", B(2, brk), d2 - p, src_in=T.mark("e2ee", "cut") + 2.6, enter="rise",
-                        cam=[[B(2, brk), 1.0, 0.5, 0.5], [d2 - p, 1.08, 0.5, 0.5]], caption="Not even the server can read it.")
+        # the breakdown: privacy, said plainly, then the server's view from far off
+        self.colours(brk, "#0b0b14", "#0b0b14", 0.15)
+        self.statement("Every Message.", brk, B(1, brk) - 0.03)
+        self.statement("End-to-End Encrypted.", B(1, brk), B(2, brk) - 0.03)
+        if have("e2ee"):
+            self.colours(B(2, brk), "#1d1342", "#0b0b14", 0.55)
+            r = self.rig("single", B(2, brk), d2 - p, enter="far", enterDur=1.2, exit="recede", exitDur=0.5, cams=[[1.0, 0.5, 0.5, 1.05]])
+            self.piece(r, "e2ee", B(2, brk), d2 - p, src_in=T.mark("e2ee", "cut") + 3.2)
+            self.title("Not Even the Server Can Read It", B(2, brk), d2 - p)
         self.colours(d2 - p, "#000000", "#000000", 0.0)
 
-        # names and profiles
+        # 5: names, a font or effect a beat, out of the dark on the second drop
         self.colours(d2, "#7a2e12", "#4a1060", 1.0)
-        if T.has("namestyle"):
-            labels = [f"font{i}" for i in range(4)] + [f"effect{i}" for i in range(4)]
-            self.montage("namestyle", labels, d2, 8, caption="Your name, your style.", cam=[[d2, 1.55, 0.865, 0.32]])
-        if T.has("css"):
-            self.window("css", B(2, d2), B(4, d2), anchors=[("closed", b(13, d2))], caption="Or restyle everything.",
-                        cam=[[B(2, d2), 1.3, 0.5, 0.45], [b(12.6, d2), 1.3, 0.5, 0.45], [b(13.6, d2), 1.0, 0.5, 0.5], [B(4, d2), 1.04, 0.5, 0.5]])
+        r = self.rig("right", d2, B(4, d2), enter="focus", enterDur=0.7, cams=[[1.72, 0.5, 0.38, 1.78]])
+        if have("namestyle"):
+            labels = [f"font{k}" for k in range(8)] + [f"effect{k}" for k in range(5)]
+            self.montage(r, "namestyle", labels, d2, 16)
+        self.title("Your Name,\nYour Style", d2, B(4, d2), place="left")
 
-        # writing together
-        self.colours(B(4, d2), "#123e6b", "#2a1458", 1.0)
-        if T.has("notes"):
-            self.split("notes", B(4, d2), B(8, d2), anchors=[("typing", b(18, d2))], caption="Write together, live.",
-                       cam=[[B(4, d2), 1.75, 0.62, 0.3], [B(8, d2), 1.85, 0.62, 0.3]])
+        # 6: notes, two people's screens at two depths
+        A6 = B(4, d2)
+        self.colours(A6, "#123e6b", "#2a1458", 1.0)
+        r = self.rig("pair", A6, B(8, d2), cams=[[1.7, 0.62, 0.3, 1.78], [1.7, 0.62, 0.3, 1.78]], titles=["test1", "test2"])
+        if have("notes"):
+            for slot, view in ((0, "a"), (1, "b")):
+                self.piece(r, "notes", A6, B(8, d2), slot=slot, view=view, anchors=[("typing", A6 + 3 * p)])
+        self.title("Write Together, Live", A6, B(8, d2))
 
-        # locked chats and plugins
-        self.colours(B(8, d2), "#0f4a33", "#1a1c4d", 1.0)
-        if T.has("subchat"):
-            self.window("subchat", B(8, d2), B(10, d2), anchors=[("made", b(33, d2)), ("inside", b(36, d2))],
-                        caption="Lock a chat with a password.", cam=[[B(8, d2), 1.3, 0.45, 0.6], [B(10, d2), 1.38, 0.42, 0.72]])
-        if T.has("plugins"):
-            self.window("plugins", B(10, d2), B(12, d2), anchors=[("waved", b(46, d2))], caption="Add your own plugins.",
-                        cam=[[B(10, d2), 1.05, 0.5, 0.65], [B(12, d2), 1.12, 0.5, 0.7]])
+        # 7: a locked chat, then plugins
+        A7 = B(8, d2)
+        self.colours(A7, "#0f4a33", "#1a1c4d", 1.0)
+        r = self.rig("single", A7, B(12, d2), cams=[[1.42, 0.42, 0.8, 1.48]])
+        shot(r, "subchat", A7, 0, 4, "made", land=1)
+        shot(r, "subchat", A7, 4, 4, "sent", land=2)
+        self.texts.append({"kind": "title", "t0": A7 + p, "t1": A7 + 8 * p - 0.12, "text": "Lock Any Chat with a Password", "place": "top"})
+        if have("plugins"):
+            self.piece(r, "plugins", A7 + 8 * p, B(12, d2), anchors=[("waved", A7 + 14 * p)], cam=[1.25, 0.5, 0.68, 1.3])
+            self.texts.append({"kind": "title", "t0": A7 + 8.5 * p, "t1": B(12, d2) - 0.12, "text": "Add Your Own Plugins", "place": "top"})
 
-        # everywhere, then everything once more, a beat each
-        self.colours(B(12, d2), "#3b1a6e", "#0d2f4f", 1.0)
-        if T.has("phone"):
-            self.duo("phone", B(12, d2), B(14, d2), anchors=[("arrived", b(51, d2)), ("back", b(55, d2))], caption="On every screen.")
-        recap = [("react", "reacted", 0.5, 1.35, 0.32, 0.62), ("themes", "theme3", 0.3, 1.0, 0.5, 0.5),
-                 ("voice", "joined", 1.5, 1.2, 0.45, 0.4), ("share", "watch", 1.6, 1.1, 0.55, 0.45),
-                 ("notes", "typed", -0.2, 1.3, 0.5, 0.35), ("namestyle", "effect3", 0.2, 1.0, 0.5, 0.5),
-                 ("safety", "open", 1.0, 1.15, 0.5, 0.5), ("snow", "sent", 0.8, 1.15, 0.6, 0.5)]
-        recap = [r for r in recap if T.has(r[0], r[1])]
-        for i, (take, label, off, z, fx, fy) in enumerate(recap[:8]):
-            a, c = b(56 + i, d2), b(57 + i, d2)
-            self.items.append({"kind": "window", "t0": a, "t1": c, "enter": "cut",
-                               "src": self.source(take, "a", a, c, src_in=T.mark(take, label) + off),
-                               "cam": [[a, z, fx, fy], [c, z + 0.03, fx, fy]]})
+        # 8: everywhere, then the wall of everything, falling back into the dark
+        A8 = B(12, d2)
+        self.colours(A8, "#3b1a6e", "#0d2f4f", 1.0)
+        r = self.rig("duo", A8, A8 + 8 * p, cams=[[1.12, 0.45, 0.6, 1.16]])
+        if have("phone"):
+            for slot, view in ((0, "a"), (1, "b")):
+                self.piece(r, "phone", A8, A8 + 8 * p, slot=slot, view=view, anchors=[("arrived", A8 + 3 * p), ("back", A8 + 7 * p)])
+        self.title("On Every Screen", A8, A8 + 8 * p)
+        tiles = [("hi", "good", 1.25, 0.42, 0.64), ("formatting", "code", 1.6, 0.52, 0.8), ("voice", "joined", 1.0, 0.5, 0.5),
+                 ("themes", "theme2", 1.25, 0.62, 0.42), ("share", "watch", 1.0, 0.5, 0.5), ("notes", "typed", 1.7, 0.62, 0.3),
+                 ("namestyle", "effect2", 1.72, 0.5, 0.38), ("snow", "sent", 1.1, 0.6, 0.5), ("editor", "sent", 1.25, 0.42, 0.75),
+                 ("subchat", "inside", 1.0, 0.5, 0.5), ("plugins", "waved", 1.25, 0.5, 0.68), ("css", "closed", 1.0, 0.5, 0.5)]
+        tiles = [x for x in tiles if have(x[0], x[1])][:12]
+        w0, w1 = A8 + 8 * p, outro + 3 * p
+        r = self.rig("wall", w0, w1, enter="cut", exit="recede", exitDur=1.8, stagger=p / 4,
+                     cams=[[z, fx, fy, z] for _, _, z, fx, fy in tiles])
+        for k, (take, label, *_rest) in enumerate(tiles):
+            self.piece(r, take, w0, w1, slot=k, src_in=T.mark(take, label) - 1.0)
 
         # the end
         self.colours(outro, "#3d1478", "#0c0a1a", 0.8)
-        self.items.append({"kind": "wordmark", "t0": outro + p, "t1": end, "size": 170, "y": 470})
-        self.card(["Free.", "Private.", "Yours."], B(1, outro), end, size=64, y=640, weight=600)
-        self.items.append({"kind": "url", "t0": B(2, outro) + 2 * p, "t1": end, "text": "nexa.fish"})
-        self.fade = [end - 2.6, end - 0.5]
-        return {"fps": FPS, "dur": end, "items": self.items, "bg": self.bg, "fade": self.fade}
+        self.texts.append({"kind": "wordmark", "t0": outro + 2 * p, "t1": end, "size": 170, "y": 470})
+        self.texts.append({"kind": "tagline", "t0": B(1, outro) + 2 * p, "t1": end, "text": "Free. Private. Yours."})
+        self.texts.append({"kind": "url", "t0": B(2, outro) + 2 * p, "t1": end, "text": "nexa.fish"})
+        return {"fps": FPS, "dur": end, "rigs": self.rigs, "pieces": self.pieces, "texts": self.texts,
+                "bg": self.bg, "fade": [end - 2.6, end - 0.4]}
 
 
 # ---------------------------------------------------------------------------
