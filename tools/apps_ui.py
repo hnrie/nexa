@@ -195,7 +195,8 @@ def flow(s, out, base, sid, general, failures):
         # let it settle, and open the menu again if it went anyway.
         p.wait_for_timeout(400)
         for tries in range(3):
-            row.click(button="right", position={"x": 120, "y": 12})
+            # on the words: a right click on the name or picture opens the person's menu
+            row.get_by_text("pressed by bob").last.click(button="right")
             p.wait_for_selector("[role=menu] [role=menuitem]:has-text('Apps')", timeout=5000)
             try:
                 p.locator("[role=menu] [role=menuitem]:has-text('Apps')").click(timeout=4000)
@@ -222,7 +223,7 @@ def flow(s, out, base, sid, general, failures):
         row.locator("img").first.wait_for(timeout=20000)
         p.wait_for_timeout(400)
         for tries in range(3):
-            row.click(button="right", position={"x": 120, "y": 12})
+            row.get_by_text(words).last.click(button="right")
             try:
                 p.locator("[role=menu] [role=menuitem]:has-text('Apps')").click(timeout=4000)
                 p.locator("[role=menuitem]:has-text('Quote')").click(timeout=4000)
@@ -353,7 +354,7 @@ def pages(alice, bob, base, sid, general, app, failures, a_api=None, b_api=None)
         row.wait_for(timeout=20000)
         b.wait_for_timeout(400)
         for tries in range(3):
-            row.click(button="right", position={"x": 120, "y": 12})
+            row.get_by_text(words).last.click(button="right")
             try:
                 b.locator("[role=menu] [role=menuitem]:has-text('Apps')").click(timeout=4000)
                 b.locator("[role=menuitem]:has-text('Peek')").click(timeout=4000)

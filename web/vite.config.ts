@@ -1,5 +1,6 @@
 import { defineConfig, searchForWorkspaceRoot, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import type { AtRule as PostcssAtRule, Node as PostcssNode, Plugin as PostcssPlugin } from "postcss";
 import { createReadStream, existsSync } from "node:fs";
 import { cp, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -118,8 +119,37 @@ function pruneOldAssets(): Plugin {
   };
 }
 
+/**
+ * Keeps every `:hover` style to screens with a pointer that hovers. A phone
+ * fires a hover on tap and keeps it until the next tap somewhere else, so a
+ * row tapped once stayed lit as if it were still under a finger. Each rule
+ * with `:hover` in it moves into `@media (hover: hover)` (its other
+ * selectors stay where they were), unless it already sits in a media query
+ * that asks about hovering.
+ */
+function hoverOnlyWithAMouse(): PostcssPlugin {
+  return {
+    postcssPlugin: "hover-only-with-a-mouse",
+    Rule(rule, { AtRule }) {
+      if (!rule.selector.includes(":hover")) return;
+      for (let up = rule.parent as PostcssNode | undefined; up; up = up.parent as PostcssNode | undefined) {
+        if (up.type === "atrule" && /hover/.test((up as PostcssAtRule).params)) return;
+        if (up.type === "atrule" && /keyframes/.test((up as PostcssAtRule).name)) return;
+      }
+      const hover = rule.selectors.filter((sel) => sel.includes(":hover"));
+      const rest = rule.selectors.filter((sel) => !sel.includes(":hover"));
+      const media = new AtRule({ name: "media", params: "(hover: hover)" });
+      media.append(rule.clone({ selectors: hover }));
+      rule.after(media);
+      if (rest.length) rule.selectors = rest;
+      else rule.remove();
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [react(), twemoji(), keepScriptsIntact(), pruneOldAssets(), versionFile()],
+  css: { postcss: { plugins: [hoverOnlyWithAMouse()] } },
   define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {

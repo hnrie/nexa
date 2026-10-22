@@ -550,7 +550,8 @@ fun replyWords(cm: ChatMessage): String {
     p?.poll?.let { poll -> return (listOf(poll.question) + poll.answers.map { it.text }).joinToString(" ") }
     val text = p?.t?.takeIf { it.isNotBlank() }
     if (text != null) return fish.nexa.ui.markdown.Markdown.plainText(fish.nexa.ui.markdown.Markdown.parse(text, inline = true), AppNames).replace(Regex("\\s+"), " ").trim()
-    return t("chat.messageItem.tapToSeeAttachment")
+    // a message with nothing in it (a thread started without one) says nothing, as on the web
+    return if (!p?.att.isNullOrEmpty() || p?.sticker != null) t("chat.messageItem.tapToSeeAttachment") else ""
 }
 
 /** ReplyWords: the original in one line with its formatting kept but inert (spoilers stay covered). */
@@ -560,7 +561,7 @@ fun ReplyExcerpt(cm: ChatMessage, serverId: String?, modifier: Modifier = Modifi
     val style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f))
     val text = cm.payload?.t?.takeIf { it.isNotBlank() && cm.error == null && cm.payload.poll == null }
     if (text != null) fish.nexa.ui.markdown.MarkdownLine(text, c.textMuted, style, modifier, serverId)
-    else Txt(replyWords(cm), style = style, color = c.textMuted, maxLines = 1, modifier = modifier)
+    else replyWords(cm).takeIf { it.isNotEmpty() }?.let { Txt(it, style = style, color = c.textMuted, maxLines = 1, modifier = modifier) }
 }
 
 /** Names as the app knows them, for plain-text versions of messages (copying, notifications, previews). */

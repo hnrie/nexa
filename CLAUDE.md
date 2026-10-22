@@ -1008,6 +1008,11 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
 - `pages/`: one per route. `styles/`: `tokens.css` (every theme token: colour, radius, shadow,
   motion), `base.css`, `markdown.css`, `fonts.css` (Wix Madefor) and `fonts-classic.css` (Onest,
   Mona Sans). `lib/theme.ts` applies a theme; `lib/look/` derives presets and custom themes.
+  Every `:hover` style only applies with a pointer that hovers: `hoverOnlyWithAMouse` in
+  `vite.config.ts`, a PostCSS step, moves each rule with `:hover` into `@media (hover: hover)`
+  (unless it already sits in a media query about hovering), since a phone keeps the hover of
+  the last thing tapped. Write `:hover` plainly; what only hovering reveals needs its own
+  `@media (hover: none)` rule to show on a touch screen.
 - The gallery (`components/settings/look/ThemeGallery.tsx`): Seasonal while one is in season, then
   Classic, Colours (the presets' dark and light groups together) and Greyscale and High Contrast.
   A theme with a light version (`forest` and `forest-light`, `presetCards`) is one card with two
