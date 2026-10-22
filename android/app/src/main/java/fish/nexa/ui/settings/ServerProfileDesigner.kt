@@ -452,7 +452,7 @@ private fun Designer(serverId: String, servers: List<String>, onServer: (String)
         }
     }
     Txt(
-        t("serverProfile.designer.intro", "name" to server.name),
+        t("serverProfile.designer.introTouch", "name" to server.name),
         style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), lineHeight = Nx.type.sp(21f)),
         color = c.textMuted,
         modifier = Modifier.padding(bottom = 18.dp),

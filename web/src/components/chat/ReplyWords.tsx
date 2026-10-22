@@ -1,3 +1,4 @@
+import { touchFirst } from "@/lib/touch";
 import { useMemo } from "react";
 import type { UnfurlResult } from "@/api/types";
 import { RenderNodes, flattenInline, parse, type Node, type RenderCtx } from "@/markdown";
@@ -25,7 +26,7 @@ export function useReplyWords(target: DecryptedMessage | undefined): { nodes: No
     if (nodes.length) return { nodes, text: "" };
     // a poll's words are its question and answers
     if (payload?.poll) return { nodes: null, text: pollWords(payload.poll).replace(/\n/g, " ").slice(0, 200) };
-    if (payload?.att?.length || mediaOnly || payload?.sticker) return { nodes: null, text: t("chat.messageItem.clickToSeeAttachment") };
+    if (payload?.att?.length || mediaOnly || payload?.sticker) return { nodes: null, text: t(touchFirst() ? "chat.messageItem.tapToSeeAttachment" : "chat.messageItem.clickToSeeAttachment") };
     return { nodes: null, text: failed ? t("chat.messageItem.encryptedMessage") : "" };
   }, [payload, hook, failed]);
 }

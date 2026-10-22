@@ -684,7 +684,7 @@ private fun NoteSection(userId: String, focus: Boolean, onDone: () -> Unit) {
             keyboardActions = KeyboardActions(onDone = { onDone() }),
             decorationBox = { inner ->
                 Box {
-                    if (text.isEmpty()) Txt(t("profile.profileCard.clickToAddANote"), style = style, color = c.textMuted)
+                    if (text.isEmpty()) Txt(t("profile.profileCard.tapToAddANote"), style = style, color = c.textMuted)
                     inner()
                 }
             },

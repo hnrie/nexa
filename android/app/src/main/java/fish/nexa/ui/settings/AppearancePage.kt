@@ -283,7 +283,9 @@ private fun GroupTitle(text: String, actions: (@Composable () -> Unit)? = null) 
 @Composable
 private fun CardGrid(content: @Composable (Dp) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val w = (maxWidth - 10.dp) / 2
+        // whole pixels, or two halves can round to a hair over the row and wrap one card a row
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val w = with(density) { (((maxWidth - 10.dp).toPx() / 2).toInt()).toDp() }
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(12.dp), maxItemsInEachRow = 2) {
             content(w)

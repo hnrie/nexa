@@ -550,7 +550,7 @@ fun replyWords(cm: ChatMessage): String {
     p?.poll?.let { poll -> return (listOf(poll.question) + poll.answers.map { it.text }).joinToString(" ") }
     val text = p?.t?.takeIf { it.isNotBlank() }
     if (text != null) return fish.nexa.ui.markdown.Markdown.plainText(fish.nexa.ui.markdown.Markdown.parse(text, inline = true), AppNames).replace(Regex("\\s+"), " ").trim()
-    return t("chat.messageItem.clickToSeeAttachment")
+    return t("chat.messageItem.tapToSeeAttachment")
 }
 
 /** ReplyWords: the original in one line with its formatting kept but inert (spoilers stay covered). */

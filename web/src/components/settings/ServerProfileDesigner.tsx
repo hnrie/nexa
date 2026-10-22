@@ -1,3 +1,4 @@
+import { touchFirst } from "@/lib/touch";
 import { AlignLeft, ChevronDown, CircleUserRound, Image as ImageIcon, ImagePlus, LayoutGrid, LoaderCircle, Palette, Pin, Plus, Type, UserRound, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ApiError } from "@/api/client";
@@ -363,7 +364,7 @@ function Designer({ serverId, servers, onServer }: { serverId: string; servers: 
           <Button size="sm" variant="ghost" onClick={useMain} data-testid="server-profile-use-main">{t("serverProfile.designer.useMain")}</Button>
         ) : null}
       </div>
-      <p className={d.intro}>{t("serverProfile.designer.intro", { name: server.name })}</p>
+      <p className={d.intro}>{t(touchFirst() ? "serverProfile.designer.introTouch" : "serverProfile.designer.intro", { name: server.name })}</p>
 
       <div className={d.toolbar}>
         <div className={d.views} role="tablist" aria-label={t("designer.view.label")}>

@@ -1,3 +1,4 @@
+import { touchFirst } from "@/lib/touch";
 import { NexaProfile } from "@/components/nexa/NexaProfile";
 import { isSystemAccount } from "@/lib/moderation";
 import { CirclePlus, Link2, LoaderCircle, Maximize2, MessageCircle, MoreHorizontal, NotebookPen, Pencil, Plus, SendHorizontal, UserPlus, X } from "lucide-react";
@@ -831,7 +832,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
           value={note}
           maxLength={256}
           rows={2}
-          placeholder={t("profile.profileCard.clickToAddANote")}
+          placeholder={t(touchFirst() ? "profile.profileCard.tapToAddANote" : "profile.profileCard.clickToAddANote")}
           aria-label={t("profile.profileCard.note")}
           onChange={(e) => setNote(e.target.value)}
           onBlur={() => setNoteOpen(false)}

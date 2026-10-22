@@ -464,7 +464,7 @@ private fun MainDesigner(anchor: String?) {
     val glow = theme?.top ?: tint ?: c.brand
 
     Txt(
-        t("designer.intro"),
+        t("designer.introTouch"),
         style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), lineHeight = Nx.type.sp(21f)),
         color = c.textMuted,
         modifier = Modifier.padding(top = 0.dp, bottom = 18.dp).settingAnchor("profile"),
@@ -493,7 +493,7 @@ private fun MainDesigner(anchor: String?) {
                         when {
                             url != null -> Brush.verticalGradient(listOf(c.bgSurface, c.bgSurface))
                             theme != null -> Brush.verticalGradient(listOf(theme.top, theme.bottom))
-                            else -> Brush.verticalGradient(listOf(f.accent?.let { rgbColor(it) } ?: c.brand, f.accent?.let { rgbColor(it) } ?: c.brand))
+                            else -> Brush.verticalGradient(listOf(f.accent?.let { rgbColor(it) } ?: fish.nexa.ui.components.AvatarColor.of(me.id), f.accent?.let { rgbColor(it) } ?: fish.nexa.ui.components.AvatarColor.of(me.id)))
                         },
                     ),
                 ) { if (url != null) AsyncImage(url, null, Media.loader, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
@@ -914,7 +914,7 @@ private fun openBannerSheet(choose: (String) -> Unit, onRemove: () -> Unit, onCo
                         when {
                             url != null -> Brush.verticalGradient(listOf(c.bgSurface, c.bgSurface))
                             theme != null -> Brush.verticalGradient(listOf(theme.top, theme.bottom))
-                            else -> Brush.verticalGradient(listOf(f.accent?.let { rgbColor(it) } ?: c.brand, f.accent?.let { rgbColor(it) } ?: c.brand))
+                            else -> Brush.verticalGradient(listOf(f.accent?.let { rgbColor(it) } ?: fish.nexa.ui.components.AvatarColor.of(me?.id ?: ""), f.accent?.let { rgbColor(it) } ?: fish.nexa.ui.components.AvatarColor.of(me?.id ?: "")))
                         },
                     )
                     .ring(Radii.Md, c.borderSubtle),

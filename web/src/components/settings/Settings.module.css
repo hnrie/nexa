@@ -118,6 +118,8 @@
 .check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text); cursor: pointer; }
 .check input { flex: none; margin: 3px 0 0; width: 18px; height: 18px; accent-color: var(--brand); }
 .dangerBox { padding: 16px 18px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--danger) 6%, transparent); border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+/* a phone has no room for the words beside the button: the button goes under them */
+@media (max-width: 767px) { .dangerBox { flex-direction: column; align-items: stretch; gap: 12px; } .dangerBox > :last-child { align-self: flex-end; } }
 /* beside the nav on a tablet there is no room for the form and a 300px preview */
 @media (max-width: 1023px) {
   .twoCol { grid-template-columns: minmax(0, 1fr); }

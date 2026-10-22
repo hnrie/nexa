@@ -355,7 +355,8 @@ private fun ItemGrid(pack: StickerPack, emoji: Boolean, onItem: ((Sticker) -> Un
     val c = Nx.colors
     val items = pack.stickers.sortedBy { it.position }
     BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-        val w = (maxWidth - 16.dp) / 3
+        // whole pixels, so three never round to a hair over the row
+        val w = with(androidx.compose.ui.platform.LocalDensity.current) { (((maxWidth - 16.dp).toPx() / 3).toInt()).toDp() }
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), maxItemsInEachRow = 3) {
             for (s in items) {

@@ -1,3 +1,4 @@
+import { touchFirst } from "@/lib/touch";
 import { ArrowLeft, ChevronRight, ChevronsLeft, ChevronsRight, ImagePlus, LoaderCircle, Palette, Pin, Plus } from "lucide-react";
 import { parse, plainText } from "@/markdown/parse";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
@@ -11,7 +12,7 @@ import { ProfileCard, type ProfileDesign, type ProfilePart, type ProfileTab } fr
 import { widgetName, type WidgetDesign } from "@/components/profile/Widgets";
 import { SaveBar } from "@/components/server/SettingsLayer";
 import { t } from "@/i18n";
-import { profileThemeOf } from "@/lib/avatarColor";
+import { avatarColor, profileThemeOf } from "@/lib/avatarColor";
 import { useDominantColor } from "@/lib/dominantColor";
 import { describeError } from "@/lib/errors";
 import { readTypingStyle, sameTypingStyle, type TypingStyle } from "@/lib/typingStyle";
@@ -367,7 +368,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
       title: t("designer.group.look"),
       rows: [
         { id: "avatar", label: t("settings.profile.avatar"), value: <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={28} />, setting: "avatar" },
-        { id: "banner", label: t("settings.profile.profileBanner"), value: <span className={d.rowBanner} style={me.banner_id ? { backgroundImage: `url(${bannerUrl(me.banner_id, 128)})` } : { background: theme ? `linear-gradient(180deg, ${theme.top}, ${theme.bottom})` : (accent ?? "var(--brand)") }} />, setting: "banner" },
+        { id: "banner", label: t("settings.profile.profileBanner"), value: <span className={d.rowBanner} style={me.banner_id ? { backgroundImage: `url(${bannerUrl(me.banner_id, 128)})` } : { background: theme ? `linear-gradient(180deg, ${theme.top}, ${theme.bottom})` : (accent ?? avatarColor(me.id)) }} />, setting: "banner" },
         { id: "colours", label: t("settings.profile.profileTheme"), value: accent ? <span className={d.rowSwatches}><i style={{ background: accent }} />{accent2 ? <i style={{ background: accent2 }} /> : null}</span> : null, setting: "profileTheme" },
       ],
     },
@@ -411,7 +412,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
       case "banner":
         return (
           <>
-            <div className={d.bannerThumb} style={me.banner_id ? { backgroundImage: `url(${bannerUrl(me.banner_id, 340)})` } : { background: theme ? `linear-gradient(180deg, ${theme.top}, ${theme.bottom})` : (accent ?? "var(--brand)") }} aria-hidden="true" />
+            <div className={d.bannerThumb} style={me.banner_id ? { backgroundImage: `url(${bannerUrl(me.banner_id, 340)})` } : { background: theme ? `linear-gradient(180deg, ${theme.top}, ${theme.bottom})` : (accent ?? avatarColor(me.id)) }} aria-hidden="true" />
             <div className={d.popBtns}>
               <Button size="sm" loading={uploading === "banner"} onClick={() => bannerRef.current?.click()} data-testid="designer-upload-banner">
                 <ImagePlus size={15} aria-hidden="true" /> {me.banner_id ? t("settings.profile.changeBanner") : t("designer.addBanner")}
@@ -469,7 +470,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
 
   return (
     <>
-      <p className={d.intro}>{t("designer.intro")}</p>
+      <p className={d.intro}>{t(touchFirst() ? "designer.introTouch" : "designer.intro")}</p>
 
       <div ref={layoutRef} className={d.layout} data-beside={beside || undefined} data-folded={(beside && folded) || undefined}>
         <aside className={d.panel} data-testid="designer-panel">
