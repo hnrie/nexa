@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -65,7 +67,6 @@ import fish.nexa.ui.components.Spinner
 import fish.nexa.ui.components.TabStrip
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
-import fish.nexa.ui.components.sidewaysScroll
 import fish.nexa.ui.describeError
 import fish.nexa.ui.layers.MenuItem
 import fish.nexa.ui.layers.openMenu
@@ -457,30 +458,38 @@ private fun Designer(serverId: String, servers: List<String>, onServer: (String)
         color = c.textMuted,
         modifier = Modifier.padding(bottom = 18.dp),
     )
+    // every part that can differ in this server, each showing what is set here (Add: the main profile's shows)
+    val valueStyle = Nx.type.body.copy(fontSize = Nx.type.sp(14f))
+    val density = LocalDensity.current.density
+    val groups = listOf(
+        t("designer.group.name") to listOf(
+            PartRow("name", t("modals.serverProfile.nickname"), null, empty = f.nick.isBlank()) { Txt(f.nick.trim(), style = valueStyle, color = c.textMuted, maxLines = 1) },
+            PartRow("pronouns", t("settings.profile.pronouns"), null, empty = f.pronouns.isBlank()) { Txt(f.pronouns.trim(), style = valueStyle, color = c.textMuted, maxLines = 1) },
+        ),
+        t("designer.group.look") to listOf(
+            PartRow("avatar", t("serverProfile.picture"), null, empty = member.avatarId == null) { Avatar(me.id, shownName, member.avatarId, 28.dp) },
+            PartRow("banner", t("serverProfile.banner"), null, empty = member.bannerId == null) {
+                AsyncImage(Media.bannerUrl(member.bannerId, 128, density), null, Media.loader, Modifier.size(56.dp, 24.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop)
+            },
+            PartRow("colours", t("settings.profile.profileTheme"), null, empty = f.accent == null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    for (col in listOfNotNull(f.accent, f.accent2)) Box(Modifier.size(18.dp).clip(RoundedCornerShape(6.dp)).background(rgbColor(col)))
+                }
+            },
+        ),
+        t("designer.group.about") to listOf(
+            PartRow("about", t("settings.profile.aboutMe"), null, empty = f.about.isBlank()) { Txt(f.about.trim().lineSequence().first(), style = valueStyle, color = c.textMuted, maxLines = 1) },
+            PartRow("widgets", t("widgets.title"), null, empty = f.widgets == null) { Txt((f.widgets?.size ?: 0).toString(), style = valueStyle, color = c.textMuted, maxLines = 1) },
+        ),
+    )
+    Column(Modifier.padding(bottom = 16.dp).semantics { contentDescription = t("designer.parts") }, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        for ((title, rows) in groups) PartGroup(title, rows) { open(it) }
+    }
     TabStrip(
         listOf("full" to t("designer.view.full"), "card" to t("designer.view.card"), "chat" to t("designer.view.chat")),
         view, t("designer.view.label"), tabHeight = 32.dp,
     ) { view = it }
-    val parts = listOf(
-        PartChip("name", "Type", t("modals.serverProfile.nickname")),
-        PartChip("pronouns", "UserRound", t("settings.profile.pronouns")),
-        PartChip("avatar", "CircleUserRound", t("serverProfile.picture")),
-        PartChip("banner", "Image", t("serverProfile.banner")),
-        PartChip("colours", "Palette", t("settings.profile.profileTheme")),
-        PartChip("about", "AlignLeft", t("settings.profile.aboutMe")),
-        PartChip("widgets", "LayoutGrid", t("widgets.title")),
-    )
-    Row(
-        Modifier
-            .padding(top = 12.dp, bottom = 14.dp)
-            .bleed(16.dp)
-            .sidewaysScroll()
-            .padding(horizontal = 16.dp, vertical = 2.dp)
-            .semantics { contentDescription = t("designer.parts") },
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        for (p in parts) PartButton(p, Modifier) { open(p.part) }
-    }
+    Box(Modifier.height(14.dp))
 
     if (f.widgetsFailed) Notice(t("widgets.couldNotLoad"), t("invite.tryAgain")) { scope.launch { f.loadWidgets(me.id, serverId) } }
     else if (f.widgets != null && f.widgetsLoaded) Notice(t("serverProfile.designer.ownWidgets", "name" to server.name), t("serverProfile.designer.mainWidgets")) { f.widgets = null }
@@ -631,7 +640,7 @@ private fun openServerBannerSheet(serverId: String, choose: (String) -> Unit) {
                         when {
                             url != null -> Brush.verticalGradient(listOf(c.bgSurface, c.bgSurface))
                             theme != null -> Brush.verticalGradient(listOf(theme.top, theme.bottom))
-                            else -> Brush.verticalGradient(listOf(accent?.let { rgbColor(it) } ?: c.brand, accent?.let { rgbColor(it) } ?: c.brand))
+                            else -> Brush.verticalGradient(listOf(accent?.let { rgbColor(it) } ?: fish.nexa.ui.components.AvatarColor.of(m.id), accent?.let { rgbColor(it) } ?: fish.nexa.ui.components.AvatarColor.of(m.id)))
                         },
                     )
                     .ring(Radii.Md, c.borderSubtle),

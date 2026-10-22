@@ -900,6 +900,11 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
   each recorded against the plugin and taken back by `dropChanges` when it stops); every menu
   module is listed in `lib/contextMenus/all.ts` so the plugin API can load them all before a plugin
   that may change menus starts, and a test fails when one is missing there.
+- A message's menu starts with a row of quick reactions (`ContextMenuState.reactions`, filled by
+  `quickReactions()` in `chat/messageMenu.ts`: the account's most used emoji, then the usual few):
+  four in a square row beside a mouse, six round ones and a button for the picker in a phone's
+  sheet, as Android's `QuickReactions` in `ui/chat/MessageMenu.kt`. A picker that offers emoji
+  alone shows a title (the reactions' "Add Reaction") in place of one tab, on both apps.
 - People's menus: a right click on someone's picture or name in a message, or the name a reply
   quotes, opens the menu the member list there opens (`chat/personMenu.ts`: `memberMenu` in a
   server, `groupMemberMenu` in a group or a one-to-one conversation, where it leaves out the group's
@@ -991,8 +996,11 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
   any page it has to show. Display name,
   pronouns and About Me are written in place on the profile (the name opening Name Style beside
   it), Status opens its dialog, Widgets the profile's widgets tab, Typing Indicator the In Chat
-  view. Android's `ProfilesPage.kt` has the same rows (`PartGroup`, `PartRow`) above the profile,
-  opening sheets.
+  view. The panel, its pages and folding are `DesignerLayout` with `usePanelLayout` in
+  `settings/designerParts.tsx`, shared by Server Profiles (`ServerProfileDesigner.tsx`), whose rows
+  are the parts a server can change (nickname, pronouns, server picture and banner, theme, About Me,
+  widgets), each saying what is set there. Android's `ProfilesPage.kt` and `ServerProfileDesigner.kt`
+  have the same rows (`PartGroup`, `PartRow`) above the profile, opening sheets.
 - Colours are picked with `components/common/ColourInput.tsx`, Nexa's own picker (a square of
   shades, a hue strip, opacity when asked for, the hex code, the browser's eyedropper where it has
   one), laid over whatever swatch shows the colour; never the browser's `<input type="color">`.

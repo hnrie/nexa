@@ -1,6 +1,6 @@
 import { touchFirst } from "@/lib/touch";
-import { AlignLeft, ChevronDown, CircleUserRound, Image as ImageIcon, ImagePlus, LayoutGrid, LoaderCircle, Palette, Pin, Plus, Type, UserRound, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { ChevronDown, ImagePlus, LoaderCircle, Palette, Pin, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { servers as serversApi, type MemberPatch } from "@/api/servers";
 import type { PublicUser } from "@/api/types";
@@ -14,7 +14,8 @@ import { widgetName, type WidgetDesign } from "@/components/profile/Widgets";
 import { SaveBar } from "@/components/server/SettingsLayer";
 import { t } from "@/i18n";
 import { button, defineMenu } from "@/lib/contextMenus/registry";
-import { profileThemeOf } from "@/lib/avatarColor";
+import { avatarColor, profileThemeOf } from "@/lib/avatarColor";
+import { parse, plainText } from "@/markdown/parse";
 import { useDominantColor } from "@/lib/dominantColor";
 import { describeError } from "@/lib/errors";
 import { P } from "@/lib/perms";
@@ -27,13 +28,14 @@ import { canI, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import { unlessUnsaved } from "@/stores/unsaved";
 import { aboutToEdit, aboutToSave } from "./AboutMeEditor";
-import { ChatPreview, ColoursPicker, EditPop, hexOf, InlineAbout, InlineText } from "./designerParts";
+import { ChatPreview, ColoursPicker, DesignerLayout, hexOf, InlineAbout, InlineText, usePanelLayout, type PanelGroup } from "./designerParts";
 import { AddWidgetDialog, CardDialog, GameWidgetDialog, MusicWidgetDialog } from "./WidgetsEditor";
 import d from "./Designer.module.css";
 
 type View = "full" | "card" | "chat";
 type Part = ProfilePart | "colours" | "widgets";
-type Pop = { part: "banner" | "avatar" | "colours"; anchor: HTMLElement };
+/** The parts edited on a page of the panel (or a sheet without room for it). */
+type Page = "avatar" | "banner" | "colours";
 
 /** A status and a server tag are the account's, the same in every server. */
 const FIXED: ProfilePart[] = ["status", "tag"];
@@ -109,7 +111,8 @@ function Designer({ serverId, servers, onServer }: { serverId: string; servers: 
   const [widgetsFailed, setWidgetsFailed] = useState(false);
   const [view, setView] = useState<View>("full");
   const [inline, setInline] = useState<"name" | "pronouns" | "about" | null>(null);
-  const [pop, setPop] = useState<Pop | null>(null);
+  const [page, setPage] = useState<Page | null>(null);
+  const layout = usePanelLayout(page);
   const [tab, setTab] = useState<{ tab: ProfileTab; n: number } | null>(null);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<{ widget: Widget; isNew: boolean } | null>(null);
@@ -248,10 +251,8 @@ function Designer({ serverId, servers, onServer }: { serverId: string; servers: 
       },
     });
 
-  const partOnStage = (part: string): HTMLElement | null => stageRef.current?.querySelector<HTMLElement>(`[data-spot="${part}"]`) ?? null;
   const showTab = (next: ProfileTab) => setTab((cur) => ({ tab: next, n: (cur?.n ?? 0) + 1 }));
-  const open = (part: Part, anchorEl: HTMLElement | null) => {
-    setPop(null);
+  const open = (part: Part) => {
     switch (part) {
       case "name":
         if (!canNick) return toast(t("serverProfile.designer.nickLocked"), "info");
@@ -271,12 +272,10 @@ function Designer({ serverId, servers, onServer }: { serverId: string; servers: 
         return;
       case "avatar":
       case "banner":
-      case "colours": {
+      case "colours":
         if (view === "chat" && part !== "colours") setView("full");
-        const at = (part !== "colours" ? partOnStage(part) : null) ?? anchorEl;
-        if (at) setPop({ part, anchor: at });
+        setPage(part);
         return;
-      }
       default:
         return;
     }
@@ -307,7 +306,7 @@ function Designer({ serverId, servers, onServer }: { serverId: string; servers: 
     add: () => setAdding(true),
   };
   const design: ProfileDesign = {
-    edit: (part, anchorEl) => open(part, anchorEl),
+    edit: (part) => open(part),
     fixed: canNick ? FIXED : [...FIXED, "name"],
     inline: {
       ...(inline === "name"
@@ -340,15 +339,76 @@ function Designer({ serverId, servers, onServer }: { serverId: string; servers: 
     accent_color: accent ? hex(accent) : me.accent_color,
     accent_color_2: accent ? hex(accent2) : me.accent_color_2,
   };
-  const parts: { id: Part; icon: LucideIcon; label: string }[] = [
-    { id: "name", icon: Type, label: t("modals.serverProfile.nickname") },
-    { id: "pronouns", icon: UserRound, label: t("settings.profile.pronouns") },
-    { id: "avatar", icon: CircleUserRound, label: t("serverProfile.picture") },
-    { id: "banner", icon: ImageIcon, label: t("serverProfile.banner") },
-    { id: "colours", icon: Palette, label: t("settings.profile.profileTheme") },
-    { id: "about", icon: AlignLeft, label: t("settings.profile.aboutMe") },
-    { id: "widgets", icon: LayoutGrid, label: t("widgets.title") },
+  // every part that can differ in this server, each showing what is set here (empty: the main profile's shows)
+  const groups: PanelGroup<Part>[] = [
+    {
+      title: t("designer.group.name"),
+      rows: [
+        { id: "name", label: t("modals.serverProfile.nickname"), value: nick.trim() ? <span>{nick.trim()}</span> : null },
+        { id: "pronouns", label: t("settings.profile.pronouns"), value: pronouns.trim() ? <span>{pronouns.trim()}</span> : null },
+      ],
+    },
+    {
+      title: t("designer.group.look"),
+      rows: [
+        { id: "avatar", label: t("serverProfile.picture"), value: member.avatar_id ? <Avatar id={me.id} avatarId={member.avatar_id} name={shownName} size={28} /> : null },
+        { id: "banner", label: t("serverProfile.banner"), value: member.banner_id ? <span className={d.rowBanner} style={{ backgroundImage: `url(${bannerUrl(member.banner_id, 128)})` }} /> : null },
+        { id: "colours", label: t("settings.profile.profileTheme"), value: accent ? <span className={d.rowSwatches}><i style={{ background: accent }} />{accent2 ? <i style={{ background: accent2 }} /> : null}</span> : null },
+      ],
+    },
+    {
+      title: t("designer.group.about"),
+      rows: [
+        { id: "about", label: t("settings.profile.aboutMe"), value: aboutOut.trim() ? <span>{plainText(parse(aboutOut)).replace(/\s+/g, " ").trim()}</span> : null },
+        { id: "widgets", label: t("widgets.title"), value: widgets ? String(widgets.length) : null },
+      ],
+    },
   ];
+  const pageTitle: Record<Page, string> = { avatar: t("serverProfile.picture"), banner: t("serverProfile.banner"), colours: t("settings.profile.profileTheme") };
+  const pageBody = (part: Page): ReactNode => {
+    switch (part) {
+      case "avatar":
+        return (
+          <>
+            <div className={d.popRow}>
+              <Avatar id={me.id} avatarId={pictureId} name={shownName} size={64} />
+              <div className={d.popBtns}>
+                <Button size="sm" loading={uploading === "avatar"} onClick={() => avatarRef.current?.click()} data-testid="designer-upload-avatar">
+                  <ImagePlus size={15} aria-hidden="true" /> {t("serverProfile.changePicture")}
+                </Button>
+                {member.avatar_id ? <Button size="sm" variant="ghost" onClick={() => void remove("avatar")}>{t("serverProfile.useOwnPicture")}</Button> : null}
+              </div>
+            </div>
+            <p className={d.popHint}>{t("designer.imageHint")}</p>
+          </>
+        );
+      case "banner":
+        return (
+          <>
+            <div className={d.bannerThumb} style={bannerId ? { backgroundImage: `url(${bannerUrl(bannerId, 340)})` } : { background: theme ? `linear-gradient(180deg, ${theme.top}, ${theme.bottom})` : avatarColor(me.id) }} aria-hidden="true" />
+            <div className={d.popBtns}>
+              <Button size="sm" loading={uploading === "banner"} onClick={() => bannerRef.current?.click()} data-testid="designer-upload-banner">
+                <ImagePlus size={15} aria-hidden="true" /> {member.banner_id ? t("settings.profile.changeBanner") : t("designer.addBanner")}
+              </Button>
+              {member.banner_id ? <Button size="sm" variant="ghost" onClick={() => void remove("banner")}>{t("serverProfile.useOwnBanner")}</Button> : null}
+            </div>
+            <p className={d.popHint}>{t("designer.imageHint")}</p>
+            {!bannerId ? (
+              <button type="button" className={d.popLink} onClick={() => setPage("colours")}>
+                <Palette size={14} aria-hidden="true" /> {t("designer.bannerColour")}
+              </button>
+            ) : null}
+          </>
+        );
+      case "colours":
+        return (
+          <>
+            <ColoursPicker accent={accent} accent2={accent2} setAccent={setAccent} setAccent2={setAccent2} />
+            <p className={d.popHint}>{t("serverProfile.designer.themeHint")}</p>
+          </>
+        );
+    }
+  };
   const views: { id: View; label: string }[] = [
     { id: "full", label: t("designer.view.full") },
     { id: "card", label: t("designer.view.card") },
@@ -366,27 +426,14 @@ function Designer({ serverId, servers, onServer }: { serverId: string; servers: 
       </div>
       <p className={d.intro}>{t(touchFirst() ? "serverProfile.designer.introTouch" : "serverProfile.designer.intro", { name: server.name })}</p>
 
-      <div className={d.toolbar}>
-        <div className={d.views} role="tablist" aria-label={t("designer.view.label")}>
-          {views.map((v) => (
-            <button key={v.id} type="button" role="tab" aria-selected={view === v.id} className={d.viewBtn} data-selected={view === v.id} onClick={() => setView(v.id)} data-testid={`designer-view-${v.id}`}>
-              {v.label}
-            </button>
-          ))}
-        </div>
-        <div className={d.parts} role="toolbar" aria-label={t("designer.parts")}>
-          {parts.map((p) => {
-            const Icon = p.icon;
-            const locked = p.id === "name" && !canNick;
-            return (
-              <button key={p.id} type="button" className={d.part} onClick={(e) => open(p.id, e.currentTarget)} aria-disabled={locked || undefined} data-testid={`designer-part-${p.id}`}>
-                <Icon size={15} aria-hidden="true" /> {p.label}
-              </button>
-            );
-          })}
-        </div>
+      <DesignerLayout layout={layout} groups={groups} current={(id) => page === id} onRow={open} page={page} pageTitle={(p) => pageTitle[p]} pageBody={pageBody} onBack={() => setPage(null)}>
+      <div className={d.views} role="tablist" aria-label={t("designer.view.label")}>
+        {views.map((v) => (
+          <button key={v.id} type="button" role="tab" aria-selected={view === v.id} className={d.viewBtn} data-selected={view === v.id} onClick={() => setView(v.id)} data-testid={`designer-view-${v.id}`}>
+            {v.label}
+          </button>
+        ))}
       </div>
-
       {widgetsFailed ? (
         <div className={d.notice} role="status">
           <span>{t("widgets.couldNotLoad")}</span>
@@ -438,6 +485,7 @@ function Designer({ serverId, servers, onServer }: { serverId: string; servers: 
         )}
       </div>
       <p className={d.caption}>{t(`serverProfile.caption.${view}`, { name: server.name })}</p>
+      </DesignerLayout>
       {uploading ? (
         <p className={d.uploading} role="status"><LoaderCircle size={14} className={d.spin} aria-hidden="true" /> {t("common.working")}</p>
       ) : null}
@@ -445,43 +493,6 @@ function Designer({ serverId, servers, onServer }: { serverId: string; servers: 
       <input ref={avatarRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop({ file: f, kind: "avatar" }); e.target.value = ""; }} />
       <input ref={bannerRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop({ file: f, kind: "banner" }); e.target.value = ""; }} />
 
-      {pop?.part === "avatar" ? (
-        <EditPop anchor={pop.anchor} title={t("serverProfile.picture")} onClose={() => setPop(null)} testId="designer-pop-avatar">
-          <div className={d.popRow}>
-            <Avatar id={me.id} avatarId={pictureId} name={shownName} size={64} />
-            <div className={d.popBtns}>
-              <Button size="sm" loading={uploading === "avatar"} onClick={() => avatarRef.current?.click()} data-testid="designer-upload-avatar">
-                <ImagePlus size={15} aria-hidden="true" /> {t("serverProfile.changePicture")}
-              </Button>
-              {member.avatar_id ? <Button size="sm" variant="ghost" onClick={() => { setPop(null); void remove("avatar"); }}>{t("serverProfile.useOwnPicture")}</Button> : null}
-            </div>
-          </div>
-          <p className={d.popHint}>{t("designer.imageHint")}</p>
-        </EditPop>
-      ) : null}
-      {pop?.part === "banner" ? (
-        <EditPop anchor={pop.anchor} title={t("serverProfile.banner")} onClose={() => setPop(null)} testId="designer-pop-banner">
-          <div className={d.bannerThumb} style={bannerId ? { backgroundImage: `url(${bannerUrl(bannerId, 340)})` } : { background: theme ? `linear-gradient(180deg, ${theme.top}, ${theme.bottom})` : "var(--brand)" }} aria-hidden="true" />
-          <div className={d.popBtns}>
-            <Button size="sm" loading={uploading === "banner"} onClick={() => bannerRef.current?.click()} data-testid="designer-upload-banner">
-              <ImagePlus size={15} aria-hidden="true" /> {member.banner_id ? t("settings.profile.changeBanner") : t("designer.addBanner")}
-            </Button>
-            {member.banner_id ? <Button size="sm" variant="ghost" onClick={() => { setPop(null); void remove("banner"); }}>{t("serverProfile.useOwnBanner")}</Button> : null}
-          </div>
-          <p className={d.popHint}>{t("designer.imageHint")}</p>
-          {!bannerId ? (
-            <button type="button" className={d.popLink} onClick={() => setPop({ part: "colours", anchor: pop.anchor })}>
-              <Palette size={14} aria-hidden="true" /> {t("designer.bannerColour")}
-            </button>
-          ) : null}
-        </EditPop>
-      ) : null}
-      {pop?.part === "colours" ? (
-        <EditPop anchor={pop.anchor} title={t("settings.profile.profileTheme")} onClose={() => setPop(null)} testId="designer-pop-colours">
-          <ColoursPicker accent={accent} accent2={accent2} setAccent={setAccent} setAccent2={setAccent2} />
-          <p className={d.popHint}>{t("serverProfile.designer.themeHint")}</p>
-        </EditPop>
-      ) : null}
 
       {adding ? <AddWidgetDialog widgets={shownWidgets} onPick={startWidget} onClose={() => setAdding(false)} /> : null}
       {editing && isGameWidget(editing.widget) ? <GameWidgetDialog initial={editing.widget} onDone={doneWidget} onClose={() => setEditing(null)} /> : null}
@@ -500,7 +511,6 @@ function Designer({ serverId, servers, onServer }: { serverId: string; servers: 
           onDone={({ blob, crop: area }) => {
             const kind = crop.kind;
             setCrop(null);
-            setPop(null);
             void upload(kind, new File([blob], kind + (blob.type === "image/png" ? ".png" : ""), { type: blob.type }), area ?? null);
           }}
         />

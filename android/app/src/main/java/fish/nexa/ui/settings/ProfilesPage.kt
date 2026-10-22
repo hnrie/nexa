@@ -277,9 +277,6 @@ private suspend fun wearServerTag(serverId: String?, text: String = ""): Boolean
     false
 }
 
-/** A part of the profile, in the strip of every part (designer.parts). */
-internal class PartChip(val part: String, val icon: String, val label: String, val setting: String? = null)
-
 /**
  * 3.2 Profiles (ProfilePage.tsx): the profile designer. What is edited is the
  * profile itself, as others see it: every part of it opens what changes it,
@@ -586,31 +583,6 @@ internal fun Modifier.bleed(side: androidx.compose.ui.unit.Dp): Modifier = layou
     val w = cs.maxWidth + extra
     val p = m.measure(cs.copy(minWidth = w, maxWidth = w))
     layout(cs.maxWidth, p.height) { p.place(-extra / 2, 0) }
-}
-
-/** A part in the strip: a raised chip with its icon (`.part`). */
-@Composable
-internal fun PartButton(p: PartChip, modifier: Modifier, onClick: () -> Unit) {
-    val c = Nx.colors
-    val shape = RoundedCornerShape(999.dp)
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    Row(
-        modifier
-            .height(32.dp)
-            .background(c.bgSurface, shape)
-            .background(sheen(c), shape)
-            .ring(shape, if (pressed) c.brand.copy(alpha = 0.55f) else c.borderSubtle)
-            .topEdge(shape, c.edgeLight)
-            .clip(shape)
-            .pressable(interaction, onClick = onClick)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
-    ) {
-        Icon(p.icon, if (pressed) c.textBrand else c.textMuted, size = 15.dp)
-        Txt(p.label, style = Nx.type.body.copy(fontSize = Nx.type.sp(13.5f), fontWeight = FontWeight(600)), color = if (pressed) c.textStrong else c.textSubtle, maxLines = 1)
-    }
 }
 
 /** A part of the profile in the list: its name, what it holds now (or Add), and the way to change it. */

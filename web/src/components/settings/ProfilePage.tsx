@@ -1,12 +1,11 @@
 import { touchFirst } from "@/lib/touch";
-import { ArrowLeft, ChevronRight, ChevronsLeft, ChevronsRight, ImagePlus, LoaderCircle, Palette, Pin, Plus } from "lucide-react";
+import { ImagePlus, LoaderCircle, Palette, Pin, Plus } from "lucide-react";
 import { parse, plainText } from "@/markdown/parse";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { avatarUrl, bannerUrl, users as usersApi } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
-import { Modal } from "@/components/common/Modal";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
 import { ProfileCard, type ProfileDesign, type ProfilePart, type ProfileTab } from "@/components/profile/ProfileCard";
 import { widgetName, type WidgetDesign } from "@/components/profile/Widgets";
@@ -21,7 +20,7 @@ import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
 import { unlessUnsaved } from "@/stores/unsaved";
 import { aboutToEdit, aboutToSave } from "./AboutMeEditor";
-import { ChatPreview, ColoursPicker, hexOf, InlineAbout, InlineText } from "./designerParts";
+import { ChatPreview, ColoursPicker, DesignerLayout, hexOf, InlineAbout, InlineText, usePanelLayout, type PanelGroup } from "./designerParts";
 import { ServerProfileDesigner } from "./ServerProfileDesigner";
 import { ServerTagList, wearServerTag } from "./ServerTagChooser";
 import { TypingStyleEditor } from "./TypingStyleEditor";
@@ -39,17 +38,6 @@ type Part = ProfilePart | "colours" | "widgets" | "typing" | "nameStyle";
 /** The parts edited on a page of their own: in the panel beside the profile, or a sheet where there is no room for it. */
 type Page = "nameStyle" | "avatar" | "banner" | "colours" | "tag";
 const PAGES: Part[] = ["nameStyle", "avatar", "banner", "colours", "tag"];
-/** Narrower than this, the panel's list goes above the profile and its pages open as sheets. */
-const PANEL_BESIDE = 820;
-/** Where this browser remembers the panel folded away, so the profile has the whole width. */
-const FOLDED_KEY = "nexa.profilePanelFolded";
-function readFolded(): boolean {
-  try {
-    return localStorage.getItem(FOLDED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
 
 /** Where the designer opens when Settings was asked for one of its parts (its search, a typing line's Make Your Own). */
 function viewFor(anchor: string | null | undefined): View {
@@ -117,32 +105,8 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
   const [view, setView] = useState<View>(() => viewFor(anchor));
   const [inline, setInline] = useState<"name" | "pronouns" | "about" | null>(null);
   const [page, setPage] = useState<Page | null>(null);
-  // the panel beside the profile can be folded to a thin strip; a page it has to show opens it again
-  const [folded, setFoldedState] = useState(readFolded);
-  const setFolded = (v: boolean) => {
-    setFoldedState(v);
-    try {
-      localStorage.setItem(FOLDED_KEY, v ? "1" : "0");
-    } catch {
-      // only this browser's convenience
-    }
-  };
-  useEffect(() => {
-    if (page) setFoldedState(false);
-  }, [page]);
-  // whether the panel stands beside the profile, measured on the designer itself
-  const layoutRef = useRef<HTMLDivElement>(null);
-  const [beside, setBeside] = useState(true);
-  useLayoutEffect(() => {
-    const el = layoutRef.current;
-    if (!el) return;
-    const measure = () => setBeside(el.clientWidth >= PANEL_BESIDE);
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const layout = usePanelLayout(page);
+  const { beside } = layout;
   const [tab, setTab] = useState<{ tab: ProfileTab; n: number } | null>(null);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<{ widget: Widget; isNew: boolean } | null>(null);
@@ -355,7 +319,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
   const typingWords = typingStyleText(typing);
   const nameLookShown = nameLook ? { own: nameLook } : undefined;
   // every part of the profile, grouped by what it changes, each showing what it holds now; with the anchor Settings' search knows it by
-  const groups: { title: string; rows: { id: Part; label: string; value: ReactNode; setting?: string }[] }[] = [
+  const groups: PanelGroup<Part>[] = [
     {
       title: t("designer.group.name"),
       rows: [
@@ -443,24 +407,6 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
         );
     }
   };
-  const partList = (
-    <nav className={d.partList} aria-label={t("designer.parts")} data-testid="designer-parts">
-      {groups.map((g) => (
-        <section key={g.title} className={d.group}>
-          <h3 className={d.groupTitle}>{g.title}</h3>
-          <div className={d.rows}>
-            {g.rows.map((row) => (
-              <button key={row.id} type="button" className={d.row} aria-current={(page === row.id || (row.id === "typing" && view === "chat")) || undefined} onClick={() => open(row.id)} data-setting={row.setting} data-testid={`designer-part-${row.id}`}>
-                <span className={d.rowLabel}>{row.label}</span>
-                <span className={d.rowValue} data-empty={row.value === null || undefined} dir="auto">{row.value ?? t("designer.value.add")}</span>
-                <ChevronRight size={16} className={d.rowChevron} aria-hidden="true" />
-              </button>
-            ))}
-          </div>
-        </section>
-      ))}
-    </nav>
-  );
   const views: { id: View; label: string }[] = [
     { id: "full", label: t("designer.view.full") },
     { id: "card", label: t("designer.view.card") },
@@ -472,34 +418,16 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     <>
       <p className={d.intro}>{t(touchFirst() ? "designer.introTouch" : "designer.intro")}</p>
 
-      <div ref={layoutRef} className={d.layout} data-beside={beside || undefined} data-folded={(beside && folded) || undefined}>
-        <aside className={d.panel} data-testid="designer-panel">
-          {beside && folded ? (
-            <button type="button" className={d.fold} onClick={() => setFolded(false)} aria-label={t("designer.showPanel")} title={t("designer.showPanel")} aria-expanded={false} data-testid="designer-unfold">
-              <ChevronsRight size={18} aria-hidden="true" />
-            </button>
-          ) : page && beside ? (
-            <div className={d.page} data-testid={`designer-page-${page}`}>
-              <div className={d.pageHead}>
-                <button type="button" className={d.back} onClick={() => setPage(null)} aria-label={t("designer.back")} data-testid="designer-page-back">
-                  <ArrowLeft size={18} aria-hidden="true" />
-                </button>
-                <h3 className={d.pageTitle}>{pageTitle[page]}</h3>
-              </div>
-              {pageBody(page)}
-            </div>
-          ) : (
-            <>
-              {beside ? (
-                <button type="button" className={[d.fold, d.foldOpen].join(" ")} onClick={() => setFolded(true)} aria-label={t("designer.hidePanel")} title={t("designer.hidePanel")} aria-expanded data-testid="designer-fold">
-                  <ChevronsLeft size={18} aria-hidden="true" />
-                </button>
-              ) : null}
-              {partList}
-            </>
-          )}
-        </aside>
-        <div className={d.main}>
+      <DesignerLayout
+        layout={layout}
+        groups={groups}
+        current={(id) => page === id || (id === "typing" && view === "chat")}
+        onRow={open}
+        page={page}
+        pageTitle={(p) => pageTitle[p]}
+        pageBody={pageBody}
+        onBack={() => setPage(null)}
+      >
           <div className={d.views} role="tablist" aria-label={t("designer.view.label")}>
             {views.map((v) => (
               <button key={v.id} type="button" role="tab" aria-selected={view === v.id} className={d.viewBtn} data-selected={view === v.id} onClick={() => setView(v.id)} data-testid={`designer-view-${v.id}`}>
@@ -558,8 +486,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
             )}
           </div>
           <p className={d.caption}>{t(`designer.caption.${view}`)}</p>
-        </div>
-      </div>
+      </DesignerLayout>
       {uploading ? (
         <p className={d.uploading} role="status"><LoaderCircle size={14} className={d.spin} aria-hidden="true" /> {t("common.working")}</p>
       ) : null}
@@ -567,11 +494,6 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
       <input ref={avatarRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop({ file: f, kind: "avatar" }); e.target.value = ""; }} />
       <input ref={bannerRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop({ file: f, kind: "banner" }); e.target.value = ""; }} />
 
-      {page && !beside ? (
-        <Modal open onClose={() => setPage(null)} title={pageTitle[page]} width={520}>
-          <div className={d.sheetPage} data-testid={`designer-page-${page}`}>{pageBody(page)}</div>
-        </Modal>
-      ) : null}
       {adding ? <AddWidgetDialog widgets={widgets} onPick={startWidget} onClose={() => setAdding(false)} /> : null}
       {editing && isGameWidget(editing.widget) ? <GameWidgetDialog initial={editing.widget} onDone={doneWidget} onClose={() => setEditing(null)} /> : null}
       {editing && isMusicWidget(editing.widget) ? <MusicWidgetDialog initial={editing.widget} onDone={doneWidget} onClose={() => setEditing(null)} /> : null}

@@ -1,10 +1,9 @@
-import { X } from "lucide-react";
+import { ArrowLeft, ChevronRight, ChevronsLeft, ChevronsRight, X } from "lucide-react";
 import { ColourInput } from "@/components/common/ColourInput";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
-import { Popout } from "@/components/common/Popout";
 import { StyledTyping } from "@/components/chat/TypingLine";
 import { ServerTagChip } from "@/components/servertag/ServerTagChip";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -87,29 +86,6 @@ export function InlineAbout({ value, onChange, outLength, onDone }: { value: str
         <Button size="sm" onClick={onDone} data-testid="designer-about-done">{t("pick.done")}</Button>
       </div>
     </div>
-  );
-}
-
-/** What changes a part: beside it on a computer, a sheet from the bottom on a phone. */
-export function EditPop({ anchor, title, onClose, children, testId }: { anchor: HTMLElement; title: string; onClose: () => void; children: ReactNode; testId: string }) {
-  const mobile = useIsMobile();
-  if (mobile) {
-    return (
-      <Modal open onClose={onClose} title={title} width={440}>
-        <div className={d.popBody} data-testid={testId}>{children}</div>
-      </Modal>
-    );
-  }
-  return (
-    <Popout anchor={anchor} onClose={onClose} label={title} prefer="below" className={d.pop} testId={testId}>
-      <div className={d.popHead}>
-        <h3 className={d.popTitle}>{title}</h3>
-        <button type="button" className={d.popClose} aria-label={t("chat.attachments.close")} onClick={onClose}>
-          <X size={16} />
-        </button>
-      </div>
-      <div className={d.popBody}>{children}</div>
-    </Popout>
   );
 }
 
@@ -225,3 +201,138 @@ export function ChatPreview({ name, avatarId, userId, typing, channel = "general
   );
 }
 
+
+/** One part of the profile in the panel: what it is called and what it holds now (null: nothing yet, "Add"). */
+export interface PanelRow<P extends string> { id: P; label: string; value: ReactNode; setting?: string | undefined }
+export interface PanelGroup<P extends string> { title: string; rows: PanelRow<P>[] }
+
+/** Narrower than this, the panel's list goes above the profile and its pages open as sheets. */
+const PANEL_BESIDE = 820;
+/** Where this browser remembers the panel folded away, so the profile has the whole width. Both designers share it. */
+const FOLDED_KEY = "nexa.profilePanelFolded";
+function readFolded(): boolean {
+  try {
+    return localStorage.getItem(FOLDED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether the panel stands beside the profile (measured on the designer
+ * itself), and whether it is folded away; a page it has to show opens it again.
+ */
+export function usePanelLayout(page: string | null) {
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const [beside, setBeside] = useState(true);
+  const [folded, setFoldedState] = useState(readFolded);
+  const setFolded = (v: boolean) => {
+    setFoldedState(v);
+    try {
+      localStorage.setItem(FOLDED_KEY, v ? "1" : "0");
+    } catch {
+      // only this browser's convenience
+    }
+  };
+  useEffect(() => {
+    if (page) setFoldedState(false);
+  }, [page]);
+  useLayoutEffect(() => {
+    const el = layoutRef.current;
+    if (!el) return;
+    const measure = () => setBeside(el.clientWidth >= PANEL_BESIDE);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return { layoutRef, beside, folded, setFolded };
+}
+
+/**
+ * The designer's two halves: the panel of every part (grouped, each row
+ * showing what the part holds) with the pages its rows open, and beside it
+ * (or under it, without room) the profile in `children`. Without room the
+ * pages open as sheets.
+ */
+export function DesignerLayout<P extends string, Pg extends P>({
+  layout,
+  groups,
+  current,
+  onRow,
+  page,
+  pageTitle,
+  pageBody,
+  onBack,
+  children,
+}: {
+  layout: ReturnType<typeof usePanelLayout>;
+  groups: PanelGroup<P>[];
+  /** Whether a row is the one being worked on. */
+  current: (id: P) => boolean;
+  onRow: (id: P) => void;
+  page: Pg | null;
+  pageTitle: (page: Pg) => string;
+  pageBody: (page: Pg) => ReactNode;
+  onBack: () => void;
+  children: ReactNode;
+}) {
+  const { layoutRef, beside, folded, setFolded } = layout;
+  const partList = (
+    <nav className={d.partList} aria-label={t("designer.parts")} data-testid="designer-parts">
+      {groups.map((g) => (
+        <section key={g.title} className={d.group}>
+          <h3 className={d.groupTitle}>{g.title}</h3>
+          <div className={d.rows}>
+            {g.rows.map((row) => (
+              <button key={row.id} type="button" className={d.row} aria-current={current(row.id) || undefined} onClick={() => onRow(row.id)} data-setting={row.setting} data-testid={`designer-part-${row.id}`}>
+                <span className={d.rowLabel}>{row.label}</span>
+                <span className={d.rowValue} data-empty={row.value === null || undefined} dir="auto">{row.value ?? t("designer.value.add")}</span>
+                <ChevronRight size={16} className={d.rowChevron} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+    </nav>
+  );
+  return (
+    <>
+      <div ref={layoutRef} className={d.layout} data-beside={beside || undefined} data-folded={(beside && folded) || undefined}>
+        <aside className={d.panel} data-testid="designer-panel">
+          {beside && folded ? (
+            <button type="button" className={d.fold} onClick={() => setFolded(false)} aria-label={t("designer.showPanel")} title={t("designer.showPanel")} aria-expanded={false} data-testid="designer-unfold">
+              <ChevronsRight size={18} aria-hidden="true" />
+            </button>
+          ) : page && beside ? (
+            <div className={d.page} data-testid={`designer-page-${page}`}>
+              <div className={d.pageHead}>
+                <button type="button" className={d.back} onClick={onBack} aria-label={t("designer.back")} data-testid="designer-page-back">
+                  <ArrowLeft size={18} aria-hidden="true" />
+                </button>
+                <h3 className={d.pageTitle}>{pageTitle(page)}</h3>
+              </div>
+              {pageBody(page)}
+            </div>
+          ) : (
+            <>
+              {beside ? (
+                <button type="button" className={[d.fold, d.foldOpen].join(" ")} onClick={() => setFolded(true)} aria-label={t("designer.hidePanel")} title={t("designer.hidePanel")} aria-expanded data-testid="designer-fold">
+                  <ChevronsLeft size={18} aria-hidden="true" />
+                </button>
+              ) : null}
+              {partList}
+            </>
+          )}
+        </aside>
+        <div className={d.main}>{children}</div>
+      </div>
+      {page && !beside ? (
+        <Modal open onClose={onBack} title={pageTitle(page)} width={520}>
+          <div className={d.sheetPage} data-testid={`designer-page-${page}`}>{pageBody(page)}</div>
+        </Modal>
+      ) : null}
+    </>
+  );
+}

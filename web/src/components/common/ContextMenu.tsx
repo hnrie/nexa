@@ -550,16 +550,17 @@ export function ContextMenuHost() {
         {sheet ? <span className={s.grip} aria-hidden="true" /> : null}
         {/* on a phone the menu says what it is for, far from the finger that opened it */}
         {sheet && menu.label && !drilled && !menu.items.some((it) => it.note && it.label === menu.label) ? <div className={s.sheetTitle} aria-hidden="true" dir="auto">{menu.label}</div> : null}
-        {sheet && menu.reactions && !drilled ? (
+        {menu.reactions && !drilled ? (
           <div className={s.quick} role="none">
-            {menu.reactions.emoji.map((e) => (
-              <button key={e} role="menuitem" className={s.quickBtn} data-on={menu.reactions!.mine.includes(e) || undefined} aria-label={t("chat.reactions.reactWith", { emoji: e })} onClick={() => { const r = menu.reactions!; close(); r.pick(e); }}>
+            {(sheet ? menu.reactions.emoji : menu.reactions.emoji.slice(0, 4)).map((e) => (
+              <button key={e} role="menuitem" data-menu-stop="" tabIndex={-1} className={s.quickBtn} data-on={menu.reactions!.mine.includes(e) || undefined} aria-label={t("chat.reactions.reactWith", { emoji: e })} onClick={() => { const r = menu.reactions!; close(); r.pick(e); }}>
                 <Twemoji text={e} />
               </button>
             ))}
-            <button role="menuitem" className={s.quickBtn} aria-label={t("chat.reactions.addReaction")} onClick={() => { const r = menu.reactions!; close(); r.more(); }}>
+            {/* beside a mouse, Add Reaction is the item right under the row */}
+            {sheet ? <button role="menuitem" data-menu-stop="" tabIndex={-1} className={s.quickBtn} aria-label={t("chat.reactions.addReaction")} onClick={() => { const r = menu.reactions!; close(); r.more(); }}>
               <SmilePlus size={22} aria-hidden="true" />
-            </button>
+            </button> : null}
           </div>
         ) : null}
         {drilled ? (
