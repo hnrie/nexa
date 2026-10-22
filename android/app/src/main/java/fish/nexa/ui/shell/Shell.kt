@@ -10,6 +10,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -65,6 +66,12 @@ import kotlin.math.min
  * time, the navigation drawer over it from the start side, the member list
  * from the end side, and the layer stack over everything.
  */
+/** The rail and sidebar pinned beside the page on a tablet (the web's 72 + 240, with the panel's margin). */
+private val SIDE_W = 328.dp
+
+/** The member list beside the chat (MemberList.module.css). */
+private val MEMBERS_W = 248.dp
+
 @Composable
 fun MainShell() {
     val c = Nx.colors
@@ -130,12 +137,21 @@ fun MainShell() {
         val drawerW: Dp = (screenW - 56.dp).coerceIn(240.dp, 420.dp)
         val drawerPx = drawerW.value * density
         val dir = if (rtl) -1f else 1f
+        // a tablet keeps the sidebar beside the page as the web does from 768 px, and the member list from 1100
+        val wide = screenW >= 768.dp
+        val roomy = screenW >= 1100.dp
+        LaunchedEffect(wide, roomy) {
+            Nav.wide = wide
+            Nav.roomy = roomy
+            if (wide) Nav.leftOpen = false
+            if (roomy) Nav.rightOpen = false
+        }
 
         // The one horizontal-swipe recogniser over the whole page (AppShell touch handlers).
         val swipe = Modifier.pointerInput(rtl, drawerPx) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                if (!Layers.isEmpty) return@awaitEachGesture
+                if (!Layers.isEmpty || Nav.roomy) return@awaitEachGesture
                 var total = Offset.Zero
                 var decided: Boolean? = null
                 val t0 = System.currentTimeMillis()
@@ -144,8 +160,9 @@ fun MainShell() {
                 while (true) {
                     val ev = awaitPointerEvent(PointerEventPass.Initial)
                     val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
-                    if (!ch.pressed) break
+                    // the lift can carry the last stretch of the swipe
                     total += ch.positionChange()
+                    if (!ch.pressed) break
                     if (decided == null) {
                         if (abs(total.x) >= 12 * density || abs(total.y) >= 12 * density) {
                             decided = abs(total.x) > 1.3f * abs(total.y)
@@ -159,7 +176,7 @@ fun MainShell() {
                     }
                     ch.consume()
                     val dx = total.x * dir
-                    if (!membersOpen) {
+                    if (!membersOpen && !Nav.wide) {
                         dragging = true
                         val off = ((if (wasOpen) drawerPx else 0f) + dx).coerceIn(0f, drawerPx)
                         scope.launch { drawer.snapTo(off / drawerPx) }
@@ -174,7 +191,12 @@ fun MainShell() {
                     if (dx > 60 * density || speed > 0.4f) Nav.rightOpen = false
                     return@awaitEachGesture
                 }
-                val open = if (abs(speed) > 0.4f) dx > 0 else drawer.value > 0.4f
+                if (Nav.wide) {
+                    if (dx < -60 * density && Nav.hasMembers) Nav.rightOpen = true
+                    return@awaitEachGesture
+                }
+                // a slow drag settles toward the side it was dragged to once it has gone 40% of the way
+                val open = if (abs(speed) > 0.4f) dx > 0 else if (wasOpen) drawer.value > 0.6f else drawer.value > 0.4f
                 if (open) {
                     Nav.leftOpen = true
                     scope.launch { drawer.animateTo(1f, tween(if (reduced) 0 else 200, easing = ease)) }
@@ -187,8 +209,15 @@ fun MainShell() {
             }
         }
 
+        // On the whole stack, not the page: an open drawer and its scrim sit above the page, and a
+        // swipe that starts on them has to close them.
+        Box(Modifier.fillMaxSize().then(swipe)) {
+        Row(Modifier.fillMaxSize()) {
+        if (wide) {
+            Box(Modifier.width(SIDE_W).fillMaxHeight().blurredBy { SCRIM_BLUR * Layers.dim }) { NavDrawer(open = true) }
+        }
         // what is behind a dialog or sheet blurs, and a little behind an open drawer (AppShell.module.css)
-        Column(Modifier.fillMaxSize().blurredBy { maxOf(SCRIM_BLUR * Layers.dim, 2.dp * maxOf(drawer.value, members.value)) }.statusBarsPadding().then(swipe)) {
+        Column(Modifier.weight(1f).fillMaxHeight().blurredBy { maxOf(SCRIM_BLUR * Layers.dim, 2.dp * maxOf(drawer.value, members.value)) }.statusBarsPadding()) {
             ConnectionBanner()
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (route) {
@@ -205,6 +234,10 @@ fun MainShell() {
             }
         }
 
+        if (roomy && Nav.hasMembers && Nav.membersPinned) {
+            Box(Modifier.width(MEMBERS_W).fillMaxHeight().blurredBy { SCRIM_BLUR * Layers.dim }) { MemberDrawer() }
+        }
+        }
         // scrim behind the drawer
         if (drawer.value > 0.001f) {
             Box(
@@ -216,7 +249,7 @@ fun MainShell() {
             )
         }
         // the navigation drawer: rail, list, dock
-        Box(
+        if (!wide) Box(
             Modifier
                 .width(drawerW)
                 .fillMaxHeight()
@@ -248,6 +281,7 @@ fun MainShell() {
             ) {
                 MemberDrawer()
             }
+        }
         }
         LayerHost()
         // a notice from Nexa, over everything until it is dismissed

@@ -232,7 +232,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (dx > 60 || speed > 0.4) setRightOpen(false);
       return;
     }
-    const open = Math.abs(speed) > 0.4 ? dx > 0 : (d.from ? w + dx : dx) > w * 0.4;
+    // a slow drag settles toward the side it was dragged to once it has gone 40% of the way
+    const open = Math.abs(speed) > 0.4 ? dx > 0 : d.from ? w + dx > w * 0.6 : dx > w * 0.4;
     setDragX(null);
     if (open) setLeftOpen(true);
     else if (d.from) setLeftOpen(false);

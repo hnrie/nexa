@@ -245,6 +245,8 @@ fun PageHeader(title: String, icon: (@Composable () -> Unit)? = null, actions: @
 /** PageHeaderButtons: the hamburger that opens the drawer; 40 dp to touch, laid out as 32 (margin -4). */
 @Composable
 fun NavButton() {
+    // with the sidebar always beside the page there is no drawer to open
+    if (Nav.wide) return
     val c = Nx.colors
     Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
         IconButton("Menu", t("shell.pageHeader.openNavigation"), { Nav.leftOpen = true }, Modifier.requiredSize(40.dp), tint = c.icon, size = 40.dp, iconSize = 22.dp)

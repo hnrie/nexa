@@ -1122,6 +1122,14 @@ notes.
   `search` (the web's index, ported), `voice` (calls: transports, audio routing, the call service,
   picture in picture, notifications), `notify` (alerts over the live connection), `ui/...` (screens
   by area, `ui/theme` with tokens from `tokens.css`, `ui/markdown` with the ported parser).
+- Layout by width (`ui/shell/Shell.kt`, the web's breakpoints): below 768 dp the rail and
+  sidebar are a drawer and the member list a drawer from the end side, both opened and closed by
+  a sideways swipe anywhere over the shell (a swipe that starts on an open drawer closes it);
+  from 768 dp (`Nav.wide`) the rail and sidebar stay beside the page and the menu button goes;
+  from 1100 dp (`Nav.roomy`) the member list stays beside the chat too, shown or hidden by
+  `Nav.toggleMembers` (`Nav.membersPinned`). A slow drag settles to the side it was dragged
+  to once it has gone 40% of the way, from open or closed, on both the web (`AppShell.tsx`) and
+  Android.
 - Nexa and moderation: `data/NexaInbox` is a member's side (standing, the Nexa conversation, case
   and bug report threads) and `data/Moderation` the staff's (what waits on them, `mod_unread`, the
   panel's requests, and `events` its open views follow). `ui/nexa/ThreadChat` draws a case thread or

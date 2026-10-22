@@ -304,7 +304,7 @@ private fun openMoreMenu(channel: Channel) {
         else items += MenuItem.Action(t("chat.chat.inviteToGroup")) { openGroupInvite(conv.id) }
     }
     if (server || channel.type == "group_dm") {
-        items += MenuItem.Action(if (Nav.rightOpen) t("chat.chat.hideMembers") else t("chat.chat.showMembers")) { Nav.rightOpen = !Nav.rightOpen }
+        items += MenuItem.Action(if (Nav.membersShown) t("chat.chat.hideMembers") else t("chat.chat.showMembers")) { Nav.toggleMembers() }
     }
     if (!server && fish.nexa.voice.Calls.inCallOf(callChannelOf(channel))) items += MenuItem.Action(t("chat.chat.inviteGuestsToCall")) { fish.nexa.voice.Calls.openGuestLink(callChannelOf(channel)) }
     if (!server) items += MenuItem.Action(t("bugs.report")) { openBugReport(if (channel.type == "dm") "dm" else "group") }

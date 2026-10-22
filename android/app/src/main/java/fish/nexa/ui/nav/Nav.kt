@@ -66,6 +66,22 @@ object Nav {
         private set
     var leftOpen by mutableStateOf(false)
     var rightOpen by mutableStateOf(false)
+
+    /** A tablet or wide window (768 dp, the web's phone breakpoint): the rail and sidebar stay beside the page. */
+    var wide by mutableStateOf(false)
+
+    /** Room for the member list beside the chat too (1100 dp, the web's useIsNarrow). */
+    var roomy by mutableStateOf(false)
+
+    /** Whether the member list beside the chat is shown, when there is room for it (the web's own toggle). */
+    var membersPinned by mutableStateOf(true)
+
+    /** The member list's toggle: beside the chat when there is room, otherwise the drawer. */
+    val membersShown: Boolean get() = if (roomy) membersPinned else rightOpen
+
+    fun toggleMembers() {
+        if (roomy) membersPinned = !membersPinned else rightOpen = !rightOpen
+    }
     private val history = ArrayDeque<Route>()
 
     val canGoBack get() = history.isNotEmpty()
