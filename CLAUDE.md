@@ -1225,7 +1225,11 @@ notes.
 - Releases: `android_release.py`, `desktop_release.py`, `mac_package.py`, `publish_desktop.py`,
   `licenses.py`.
 - Assets: `twemoji_font.py`, `twemoji_font_check.py`, `twemoji_sprites.py`, `trace_wordmark.py`,
-  `home_shots.py` and `home_gifs.py` (the front page's pictures and loops), `trailer.py`.
+  `home_shots.py` and `home_gifs.py` (the front page's pictures and loops), `trailer.py` (raw footage
+  of the app, with a macOS pointer at its real size that moves as a hand does) and `advert.py`, which
+  films test1 and test2 with `trailer.py`'s recorder, logs when things happen in each take, measures a
+  song (`advert_edit.py`, needs librosa; `--bpm` when it hears the wrong tempo) and cuts the takes to
+  its beats on a stage drawn frame by frame in headless Chrome (`advert_stage.html`), plus a thumbnail.
 - Schema: `gen_pg_schema.sh`, `pg_schema.py`.
 
 ## Deploying (only when the owner says "deploy")

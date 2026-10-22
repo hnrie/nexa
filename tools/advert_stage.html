@@ -1,0 +1,262 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+@font-face { font-family: "Madefor"; src: url("%FONT%") format("woff2"); font-weight: 400 900; }
+html, body { margin: 0; background: #000; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #07060c; font-family: "Madefor", system-ui, sans-serif; color: #fff; }
+.layer { position: absolute; inset: 0; }
+.glow { position: absolute; width: 1700px; height: 1700px; margin: -850px 0 0 -850px; border-radius: 50%; }
+.win { position: absolute; left: 0; top: 0; transform-origin: 0 0; border-radius: 14px; overflow: hidden; background: #17151d;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.09), 0 2px 6px rgba(0,0,0,.25), 0 30px 90px rgba(0,0,0,.55); will-change: transform; }
+.bar { position: relative; height: 30px; background: #1d1a24; display: flex; align-items: center; padding-left: 14px; gap: 8px; }
+.bar i { width: 12px; height: 12px; border-radius: 50%; display: block; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.25); }
+.bar i:nth-child(1) { background: #ff5f57; } .bar i:nth-child(2) { background: #febc2e; } .bar i:nth-child(3) { background: #28c840; }
+.bar span { position: absolute; left: 0; right: 0; text-align: center; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.55); letter-spacing: .01em; pointer-events: none; }
+.win .view { position: relative; overflow: hidden; }
+.win img { display: block; transform-origin: 0 0; will-change: transform; }
+.mark { position: absolute; left: 0; right: 0; display: flex; justify-content: center; }
+.phone { position: absolute; left: 0; top: 0; transform-origin: 0 0; padding: 13px; border-radius: 62px; background: #0b0b0e;
+  box-shadow: 0 0 0 2px #3a3940, 0 0 0 3px #111, 0 30px 90px rgba(0,0,0,.55); }
+.phone img { display: block; border-radius: 49px; }
+.phone .island { position: absolute; left: 50%; top: 26px; width: 118px; height: 34px; margin-left: -59px; border-radius: 20px; background: #000; }
+.words { position: absolute; left: 0; right: 0; text-align: center; white-space: nowrap; }
+.words b { display: inline-block; font-weight: inherit; }
+.caption { top: 50px; font-size: 46px; font-weight: 650; letter-spacing: -.012em; }
+.type { font-size: 190px; font-weight: 700; letter-spacing: -.03em; }
+.caret { display: inline-block; width: 9px; height: .78em; margin-left: 12px; vertical-align: -.04em; background: #b78cff; border-radius: 3px; }
+#fade { background: #000; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="layer" id="bg"><div class="glow" id="ga"></div><div class="glow" id="gb"></div></div>
+  <div class="layer" id="items"></div>
+  <div class="layer" id="fade" style="opacity:0"></div>
+</div>
+<script>
+const SPEC = /*SPEC*/null;
+const BRAND = /*BRAND*/null;
+const W = 1560, BAR = 30, CX = 960, CY = 598;
+
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, u) => a + (b - a) * u;
+const expoOut = (u) => (u >= 1 ? 1 : 1 - Math.pow(2, -10 * u));
+const cubicInOut = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+const quintOut = (u) => 1 - Math.pow(1 - u, 5);
+
+function hex(c) { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function mix(a, b, u) { const x = hex(a), y = hex(b); return x.map((v, i) => Math.round(lerp(v, y[i], u))); }
+
+function along(map, t) {
+  if (t <= map[0][0]) return map[0][1];
+  for (let i = 1; i < map.length; i++) {
+    const [a, sa] = map[i - 1], [b, sb] = map[i];
+    if (t <= b) return lerp(sa, sb, (t - a) / Math.max(1e-6, b - a));
+  }
+  return map[map.length - 1][1];
+}
+
+function camAt(cam, t) {
+  if (t <= cam[0][0] || cam.length === 1) return cam[0].slice(1);
+  for (let i = 1; i < cam.length; i++) {
+    const a = cam[i - 1], b = cam[i];
+    if (t <= b[0]) { const u = cubicInOut((t - a[0]) / Math.max(1e-6, b[0] - a[0])); return [1, 2, 3].map((k) => lerp(a[k], b[k], u)); }
+  }
+  return cam[cam.length - 1].slice(1);
+}
+
+// a word or a line arriving: up a little, out of a blur
+function arrive(el, t, at, dist = 0.45, dur = 0.7) {
+  const u = clamp((t - at) / dur), e = expoOut(u);
+  el.style.opacity = u <= 0 ? 0 : clamp(e * 1.4);
+  el.style.transform = `translateY(${(1 - e) * dist}em)`;
+  el.style.filter = `blur(${(1 - e) * 10}px)`;
+}
+function leave(el, t, t1, dur = 0.3) {
+  const u = clamp((t1 - t) / dur);
+  return u;
+}
+
+const items = [];
+const loads = [];
+function frameUrl(key, src, t) {
+  const f = SPEC.frames[key];
+  const s = along(src.map, t);
+  const i = clamp(Math.round((s - f.lo) * SPEC.fps), 0, f.n - 1);
+  return `${f.dir}/${String(i + 1).padStart(5, "0")}.jpg`;
+}
+function setImg(img, url) {
+  if (img.dataset.url === url) return;
+  img.dataset.url = url;
+  img.src = url;
+  loads.push(img.decode().catch(() => {}));
+}
+
+function makeWin(title, w) {
+  const el = document.createElement("div");
+  el.className = "win";
+  el.innerHTML = `<div class="bar"><i></i><i></i><i></i><span>${title}</span></div><div class="view" style="width:${w}px;height:${Math.round(w * 9 / 16)}px"><img width="${w}" height="${Math.round(w * 9 / 16)}"></div>`;
+  return el;
+}
+function makePhone(h) {
+  const el = document.createElement("div");
+  el.className = "phone";
+  const w = Math.round(h * 540 / 1170);
+  el.innerHTML = `<img width="${w}" height="${h}"><div class="island"></div>`;
+  return el;
+}
+function words(cls, list, style) {
+  const el = document.createElement("div");
+  el.className = "words " + cls;
+  Object.assign(el.style, style || {});
+  el.innerHTML = list.map((w) => `<b>${w}</b>`).join(" ");
+  return el;
+}
+function wordmark(size) {
+  const el = document.createElement("div");
+  el.className = "mark";
+  el.innerHTML = `<svg height="${size}" viewBox="0 0 229.45 100" style="overflow:visible"><path d="${BRAND.letters}" fill="#fff" fill-rule="evenodd"/><path d="${BRAND.spark}" fill="#9d4dff" fill-rule="evenodd"/></svg>`;
+  return el;
+}
+
+function build() {
+  const root = document.getElementById("items");
+  for (const it of SPEC.items) {
+    let el;
+    if (it.kind === "window") { el = makeWin("Nexa", W); }
+    else if (it.kind === "split") { el = document.createElement("div"); el.append(makeWin("test1", 1180), makeWin("test2", 1180)); }
+    else if (it.kind === "duo") { el = document.createElement("div"); el.append(makeWin("Nexa", 1240), makePhone(860)); }
+    else if (it.kind === "caption") el = words("caption", it.text.split(" "));
+    else if (it.kind === "card") el = words("", it.words, { fontSize: it.size + "px", fontWeight: it.weight, top: (it.y - it.size * 0.62) + "px", letterSpacing: "-.025em" });
+    else if (it.kind === "type") { el = words("type", []); el.style.top = "380px"; el.innerHTML = `${[...it.text].map((c) => `<b>${c}</b>`).join("")}<span class="caret"></span>`; }
+    else if (it.kind === "wordmark") { el = wordmark(it.size); el.style.top = (it.y - it.size / 2) + "px"; }
+    else if (it.kind === "url") { el = words("", [it.text], { top: "720px", fontSize: "34px", fontWeight: 500, color: "rgba(255,255,255,.72)" }); }
+    el.style.display = "none";
+    root.appendChild(el);
+    items.push({ it, el });
+  }
+}
+
+// the window keeps its place and grows a little; the camera moves inside it,
+// closing in on (fx, fy) of the screen and bringing that point to the middle
+function placeWin(el, w, left, top, z, fx, fy, push = 1) {
+  const h = w * 9 / 16;
+  const cx = left + w / 2, cy = top + (h + BAR) / 2;
+  el.style.transform = `translate(${cx - push * w / 2}px, ${cy - push * (h + BAR) / 2}px) scale(${push})`;
+  const k = clamp((z - 1) / 0.4);
+  const tx = clamp(lerp(fx * w, w / 2, k) - z * fx * w, w - z * w, 0);
+  const ty = clamp(lerp(fy * h, h / 2, k) - z * fy * h, h - z * h, 0);
+  el.querySelector("img").style.transform = `translate(${tx}px, ${ty}px) scale(${z})`;
+}
+
+function drawBg(t) {
+  const bg = SPEC.bg;
+  let i = 0;
+  while (i + 1 < bg.length && bg[i + 1][0] <= t) i++;
+  const cur = bg[i], prev = bg[Math.max(0, i - 1)];
+  const u = i === 0 ? 1 : expoOut(clamp((t - cur[0]) / 0.9));
+  const a = mix(prev[1], cur[1], u), b = mix(prev[2], cur[2], u), g = lerp(prev[3], cur[3], u);
+  const ga = document.getElementById("ga"), gb = document.getElementById("gb");
+  ga.style.left = (420 + Math.sin(t * 0.21) * 90) + "px"; ga.style.top = (190 + Math.cos(t * 0.17) * 60) + "px";
+  gb.style.left = (1560 + Math.cos(t * 0.19) * 90) + "px"; gb.style.top = (960 + Math.sin(t * 0.23) * 60) + "px";
+  ga.style.background = `radial-gradient(closest-side, rgba(${a},${0.95 * g}), rgba(${a},0))`;
+  gb.style.background = `radial-gradient(closest-side, rgba(${b},${0.85 * g}), rgba(${b},0))`;
+}
+
+function draw(t) {
+  loads.length = 0;
+  drawBg(t);
+  for (const { it, el } of items) {
+    const on = t >= it.t0 && t < it.t1;
+    el.style.display = on ? "" : "none";
+    if (!on) continue;
+    if (it.kind === "window") {
+      const [z, fx, fy] = camAt(it.cam, t);
+      let left = CX - W / 2, top = CY - (W * 9 / 16 + BAR) / 2;
+      if (it.enter === "rise") {
+        const u = quintOut(clamp((t - it.t0) / (it.riseDur || 0.8)));
+        top += (1 - u) * 760; el.style.opacity = clamp(u * 3);
+      } else el.style.opacity = 1;
+      const push = it.enter === "rise" ? lerp(0.94, 1, quintOut(clamp((t - it.t0) / (it.riseDur || 0.8)))) : 1 + 0.025 * clamp((t - it.t0) / (it.t1 - it.t0));
+      placeWin(el, W, left, top, Math.max(1, z), fx, fy, push);
+      setImg(el.querySelector("img"), frameUrl(it.src.key, it.src, t));
+    } else if (it.kind === "split") {
+      const [a, b] = el.children;
+      const u = (t - it.t0) / (it.t1 - it.t0), push = 1 + 0.03 * u;
+      const [z, fx, fy] = camAt(it.cam, t);
+      // two people's screens, overlapping, the second in front
+      placeWin(a, 1180, 60, 140, z, fx, fy, push);
+      placeWin(b, 1180, 680, 372, z, fx, fy, push);
+      setImg(a.querySelector("img"), frameUrl(it.srcs[0].key, it.srcs[0], t));
+      setImg(b.querySelector("img"), frameUrl(it.srcs[1].key, it.srcs[1], t));
+    } else if (it.kind === "duo") {
+      const [a, b] = el.children;
+      const u = (t - it.t0) / (it.t1 - it.t0), z = 1 + 0.03 * u;
+      placeWin(a, 1240, 95, CY - 363, 1, 0.5, 0.5, z);
+      b.style.transform = `translate(${1415}px, ${CY - 443 - u * 8}px) scale(${z})`;
+      setImg(a.querySelector("img"), frameUrl(it.srcs[0].key, it.srcs[0], t));
+      setImg(b.querySelector("img"), frameUrl(it.srcs[1].key, it.srcs[1], t));
+    } else if (it.kind === "caption") {
+      const out = leave(el, t, it.t1, 0.25);
+      [...el.children].forEach((w, i) => arrive(w, t, it.t0 + i * 0.07, 0.4, 0.75));
+      el.style.opacity = out;
+    } else if (it.kind === "card") {
+      [...el.children].forEach((w, i) => arrive(w, t, it.times[i], 0.35, 0.8));
+      const out = leave(el, t, it.t1, 0.3);
+      el.style.opacity = out; el.style.filter = `blur(${(1 - out) * 12}px)`;
+    } else if (it.kind === "type") {
+      const kids = [...el.children];
+      const letters = kids.slice(0, -1), caret = kids[kids.length - 1];
+      letters.forEach((l, i) => { const u = clamp((t - it.times[i]) / 0.14); l.style.opacity = u > 0 ? 1 : 0; l.style.transform = `scale(${lerp(0.86, 1, quintOut(u))})`; });
+      const last = it.times.filter((x) => x <= t).pop();
+      const typing = last !== undefined && t - last < 0.5;
+      caret.style.opacity = typing || ((t - (last ?? 0)) % 1.06) < 0.53 ? 1 : 0;
+      const out = leave(el, t, it.t1, 0.4);
+      el.style.opacity = out; el.style.filter = `blur(${(1 - out) * 14}px)`;
+      el.style.transform = `translateY(${-(1 - out) * 40}px)`;
+    } else if (it.kind === "wordmark") {
+      const u = expoOut(clamp((t - it.t0) / 1.1)), out = leave(el, t, it.t1, 0.4);
+      el.style.opacity = clamp(u * 1.3) * out;
+      el.style.filter = `blur(${(1 - u) * 16 + (1 - out) * 14}px)`;
+      el.style.transform = `scale(${lerp(0.9, 1, u) * lerp(1.04, 1, out)})`;
+    } else if (it.kind === "url") {
+      arrive(el.children[0], t, it.t0, 0.3, 0.8);
+    }
+  }
+  const [f0, f1] = SPEC.fade;
+  document.getElementById("fade").style.opacity = clamp((t - f0) / (f1 - f0));
+  return Promise.all(loads);
+}
+
+// the thumbnail: the app tilted on the right, the line big on the left
+window.drawThumb = async function (key, idx, line, accent) {
+  document.getElementById("items").style.display = "none";
+  const st = document.getElementById("stage");
+  st.style.transform = "scale(0.6667)"; st.style.transformOrigin = "0 0";
+  const f = SPEC.frames[key];
+  const ga = document.getElementById("ga"), gb = document.getElementById("gb");
+  ga.style.cssText += ";left:1500px;top:300px;background:radial-gradient(closest-side, rgba(140,60,255,.95), rgba(140,60,255,0))";
+  gb.style.cssText += ";left:200px;top:1100px;background:radial-gradient(closest-side, rgba(255,70,150,.7), rgba(255,70,150,0))";
+  const win = makeWin("Nexa", 1500);
+  win.style.transform = "translate(780px, 150px) perspective(2400px) rotateY(-16deg) rotateX(4deg) scale(1)";
+  win.style.transformOrigin = "0 50%";
+  st.appendChild(win);
+  const img = win.querySelector("img");
+  img.src = `${f.dir}/${String(idx).padStart(5, "0")}.jpg`;
+  await img.decode();
+  const mark = wordmark(70); mark.style.cssText += ";top:70px;left:90px;right:auto;justify-content:flex-start";
+  st.appendChild(mark);
+  const text = document.createElement("div");
+  text.style.cssText = "position:absolute;left:90px;top:250px;width:860px;font-size:150px;line-height:.98;font-weight:800;letter-spacing:-.045em;text-shadow:0 8px 40px rgba(0,0,0,.5)";
+  text.innerHTML = line;
+  st.appendChild(text);
+  return true;
+};
+
+window.draw = draw;
+document.fonts.load("700 40px Madefor").then(() => { build(); window.ready = true; });
+</script>
+</body>
+</html>

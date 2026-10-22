@@ -55,19 +55,21 @@ FILM_JS = r"""
   const realGDM = md && md.getDisplayMedia ? md.getDisplayMedia.bind(md) : null;
   const TOUCH = %TOUCH%;
   const INK = '#15131b';
+  // macOS's own pointers at the size macOS draws them: the arrow is 18 CSS
+  // pixels tall, about 27 in the 1080p film, as on a Mac's screen
   const SHAPES = {
-    arrow: { x: 3, y: 2, svg: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32"><path d="M3 2v22.6l5.6-5.4 3.9 8.9 4-1.7-3.8-8.7H20z" fill="${INK}" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>` },
-    hand: { x: 10, y: 2.4, svg: `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="30" viewBox="0 0 26 30"><path d="M10 2.2c-1.2 0-2.1.9-2.1 2.1v10.6l-1.5-1.6c-.9-.9-2.3-.9-3.1 0-.8.8-.8 2-.1 2.9l4.8 6.2c1.4 1.8 3.5 2.8 5.8 2.8h2.9c3.4 0 6.1-2.7 6.1-6.1v-5.7c0-1.1-.9-1.9-1.9-1.9-1.1 0-1.9.9-1.9 1.9v-.9c0-1.1-.9-1.9-1.9-1.9-1.1 0-1.9.9-1.9 1.9v-.6c0-1.1-.9-1.9-1.9-1.9s-1.9.9-1.9 1.9V4.3c0-1.2-.9-2.1-2.1-2.1z" fill="#fff" stroke="${INK}" stroke-width="1.5" stroke-linejoin="round"/><path d="M12.1 13.4v4.4M16 13.8v4M19.8 14.4v3.4" stroke="${INK}" stroke-width="1.3" stroke-linecap="round"/></svg>` },
-    beam: { x: 10, y: 13, svg: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="26" viewBox="0 0 20 26"><g fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h1.4c1.2 0 2.1.6 2.6 1.5.5-.9 1.4-1.5 2.6-1.5H14M10 5v16M6 23h1.4c1.2 0 2.1-.6 2.6-1.5.5.9 1.4 1.5 2.6 1.5H14" stroke="#fff" stroke-width="3.6"/><path d="M6 3h1.4c1.2 0 2.1.6 2.6 1.5.5-.9 1.4-1.5 2.6-1.5H14M10 5v16M6 23h1.4c1.2 0 2.1-.6 2.6-1.5.5.9 1.4 1.5 2.6 1.5H14" stroke="${INK}" stroke-width="1.5"/></g></svg>` },
+    arrow: { x: 1.2, y: 1.2, svg: `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="19" viewBox="0 0 13.7 20"><path d="M1.3 1.3v15.4l3.7-3.6 2.6 6 2.6-1.1-2.5-5.9h5.2z" fill="${INK}" stroke="#fff" stroke-width="1.35" stroke-linejoin="round" paint-order="stroke"/></svg>` },
+    hand: { x: 6.1, y: 1.4, svg: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="18.5" viewBox="0 0 26 30"><path d="M10 2.2c-1.2 0-2.1.9-2.1 2.1v10.6l-1.5-1.6c-.9-.9-2.3-.9-3.1 0-.8.8-.8 2-.1 2.9l4.8 6.2c1.4 1.8 3.5 2.8 5.8 2.8h2.9c3.4 0 6.1-2.7 6.1-6.1v-5.7c0-1.1-.9-1.9-1.9-1.9-1.1 0-1.9.9-1.9 1.9v-.9c0-1.1-.9-1.9-1.9-1.9-1.1 0-1.9.9-1.9 1.9v-.6c0-1.1-.9-1.9-1.9-1.9s-1.9.9-1.9 1.9V4.3c0-1.2-.9-2.1-2.1-2.1z" fill="#fff" stroke="${INK}" stroke-width="1.7" stroke-linejoin="round"/><path d="M12.1 13.4v4.4M16 13.8v4M19.8 14.4v3.4" stroke="${INK}" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+    beam: { x: 5.5, y: 8.5, svg: `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="17" viewBox="0 0 20 26"><g fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h1.4c1.2 0 2.1.6 2.6 1.5.5-.9 1.4-1.5 2.6-1.5H14M10 5v16M6 23h1.4c1.2 0 2.1-.6 2.6-1.5.5.9 1.4 1.5 2.6 1.5H14" stroke="#fff" stroke-width="4"/><path d="M6 3h1.4c1.2 0 2.1.6 2.6 1.5.5-.9 1.4-1.5 2.6-1.5H14M10 5v16M6 23h1.4c1.2 0 2.1-.6 2.6-1.5.5.9 1.4 1.5 2.6 1.5H14" stroke="${INK}" stroke-width="1.8"/></g></svg>` },
   };
   const CSS = `
 #__film-cursor{position:fixed;left:0;top:0;width:0;height:0;z-index:2147483647;pointer-events:none;opacity:0;transition:opacity 140ms ease;contain:layout style}
 #__film-cursor[data-on]{opacity:1}
-#__film-cursor .__film-shape{position:absolute;display:none;filter:drop-shadow(0 1.5px 2px rgba(0,0,0,.38));transition:transform 90ms ease}
+#__film-cursor .__film-shape{position:absolute;display:none;filter:drop-shadow(0 1px 1.2px rgba(0,0,0,.32));transition:transform 70ms ease}
 #__film-cursor .__film-shape[data-on]{display:block}
-#__film-cursor[data-down] .__film-shape{transform:scale(.86)}
+#__film-cursor[data-down] .__film-shape{transform:scale(.94)}
 #__film-cursor .__film-ring{position:absolute;left:-17px;top:-17px;width:34px;height:34px;border-radius:50%;border:2px solid rgba(255,255,255,.8);box-shadow:0 0 0 1px rgba(0,0,0,.2);opacity:0;pointer-events:none}
-#__film-cursor .__film-ring[data-go]{animation:__film-ring 420ms ease-out}
+#__film-cursor .__film-ring[data-go]{display:none}
 @keyframes __film-ring{from{opacity:.9;transform:scale(.4)}to{opacity:0;transform:scale(1.15)}}
 #__film-touch{position:fixed;left:0;top:0;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(255,255,255,.38);box-shadow:0 0 0 1.5px rgba(255,255,255,.7),0 4px 14px rgba(0,0,0,.3);z-index:2147483647;pointer-events:none;opacity:0;transform:scale(.6);transition:opacity 160ms ease,transform 160ms ease}
 #__film-touch[data-on]{opacity:1;transform:scale(1)}`;
@@ -372,8 +374,11 @@ class Actor(Session):
 
     # --- moving and clicking --------------------------------------------------
 
-    def glide(self, x, y, dur=None):
-        """Moves the pointer along a gentle curve, quick to start and soft to stop."""
+    def glide(self, x, y, dur=None, settle=True):
+        """Moves the pointer as a hand on a mouse does: one quick, slightly
+        curved throw that lands a little short or long of the target, then a
+        small slow correction onto it. Timed by Fitts's law, with the speed
+        peaking before halfway and a faint tremor along the way."""
         x0, y0 = self.mouse
         dist = math.hypot(x - x0, y - y0)
         if dist < 2:
@@ -381,21 +386,40 @@ class Actor(Session):
             self.mouse = (x, y)
             return
         if dur is None:
-            dur = min(1.0, 0.3 + dist / 1700)
-        bend = (random.random() * 2 - 1) * min(50.0, dist * 0.1)
-        nx, ny = -(y - y0) / dist, (x - x0) / dist
+            dur = (0.16 + 0.12 * math.log2(dist / 26 + 1)) * random.uniform(0.9, 1.12)
+        ux, uy = (x - x0) / dist, (y - y0) / dist
+        # the throw ends off the target, mostly along the way it was going
+        if settle and dist > 60:
+            along = random.choice((-1, 1)) * random.uniform(0.025, 0.06) * dist
+            side = random.uniform(-0.02, 0.02) * dist
+            mx, my = x + ux * along - uy * side, y + uy * along + ux * side
+        else:
+            mx, my = x, y
+        self._move(x0, y0, mx, my, dur)
+        if (mx, my) != (x, y):
+            time.sleep(random.uniform(0.01, 0.05))
+            self._move(mx, my, x, y, random.uniform(0.13, 0.2), bend_scale=0.2)
+        self.mouse = (x, y)
+
+    def _move(self, x0, y0, x, y, dur, bend_scale=1.0):
+        dist = math.hypot(x - x0, y - y0)
+        # a wrist pivots, so long moves bow the same way more often than not
+        bend = random.uniform(-0.35, 1.0) * min(36.0, dist * 0.08) * bend_scale
+        nx, ny = -(y - y0) / max(dist, 1e-6), (x - x0) / max(dist, 1e-6)
         cx, cy = (x0 + x) / 2 + nx * bend, (y0 + y) / 2 + ny * bend
+        phase = random.uniform(0, 6.3)
         steps = max(2, int(dur * 60))
         start = time.perf_counter()
         for i in range(1, steps + 1):
-            e = _ease(i / steps)
+            u = i / steps
+            e = _ease(u ** 0.82)  # quicker to get going than to stop
             px = (1 - e) ** 2 * x0 + 2 * (1 - e) * e * cx + e * e * x
             py = (1 - e) ** 2 * y0 + 2 * (1 - e) * e * cy + e * e * y
-            self.page.mouse.move(px, py)
+            wob = math.sin(u * math.pi) * 0.7 * math.sin(phase + u * 9.0)
+            self.page.mouse.move(px + nx * wob, py + ny * wob)
             wait = start + i / 60 - time.perf_counter()
             if wait > 0:
                 time.sleep(wait)
-        self.mouse = (x, y)
 
     def hover(self, target, fx=0.5, fy=0.5, dur=None):
         x, y = self.at(target, fx, fy)
@@ -404,16 +428,16 @@ class Actor(Session):
             return
         self.glide(x, y, dur)
 
-    def click(self, target, fx=0.5, fy=0.5, button="left", pause=0.12, after=0.2, dur=None):
+    def click(self, target, fx=0.5, fy=0.5, button="left", pause=None, after=0.2, dur=None):
         x, y = self.at(target, fx, fy)
         if self.phone:
             self.mouse = (x, y)
-            time.sleep(pause)
+            time.sleep(0.12 if pause is None else pause)
             self.page.touchscreen.tap(x, y)
             time.sleep(after)
             return
         self.glide(x, y, dur)
-        time.sleep(pause)
+        time.sleep(random.uniform(0.07, 0.16) if pause is None else pause)
         self.page.mouse.down(button=button)
         time.sleep(0.075)
         self.page.mouse.up(button=button)
