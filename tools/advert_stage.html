@@ -140,7 +140,8 @@ function layout(name, u) {
       { x: 560, y: 1215, w: 920, vh: 450, rx: 2, ry: lerp(-4, -2, u) }];
     case "phoneBig": return [{ x: 540, y: 950, h: 1060, rx: 1.5, ry: lerp(-6, -2, u), phone: true }];
     // the short's phone: as big as the frame allows below the title, clear of the apps' own tabs and captions
-    case "phoneTall": return [{ x: 540, y: 1075, w: 1000, vh: 1480, rx: 1, ry: lerp(-3, -1, u), screen: true }];
+    // a screen card: clear of the frame's sides by 80 px, facing straight on so neither edge swings out
+    case "phoneTall": return [{ x: 540, y: 1075, w: 920, vh: 1440, rx: 0.6, ry: 0, screen: true }];
     case "duo": return [
       { x: 720, y: 600, w: 1180, rx: 2, ry: lerp(9, 6, u) },
       { x: 1575, y: 600, h: 820, rx: 2, ry: lerp(-15, -11, u), phone: true, phase: 2.3 }];

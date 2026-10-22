@@ -511,53 +511,54 @@ class Cut:
         self.texts.append({"kind": "wordmark", "t0": start + 5 * p, "t1": d2 - 0.05, "size": 70, "y": 520})
 
         # Nexa's own phone layout, filmed on a phone (the m- takes), shown as its
-        # screen at the frame's full width so the app's words read on a phone; each
-        # scene picks how far down the screen to look
+        # screen nearly the frame's width so the app's words read on a phone; each
+        # scene shows the top of the screen (0) or the bottom (1), never a cut
+        # through the app's own bars
         ph = lambda k, n, title, cam, **o: sc("phoneTall", k, n, title, [cam], **o)  # noqa: E731
         self.colours(d2, "#4c1d95", "#0f2a4a", 1.0)
-        r = ph(0, 1, "Chat in Real Time", [1.0, 0.5, 0.82, 1.02], enter="focus")
+        r = ph(0, 1, "Chat in Real Time", [1.0, 0.5, 1, 1.0], enter="focus")
         self.shot(r, "m-hi", d2, 0, 4, "hey", land=2)
         self.colours(B(1), "#6d1d5b", "#1b1650", 1.0)
-        r = ph(1, 1, "Say It Your Way", [1.0, 0.5, 0.8, 1.02])
+        r = ph(1, 1, "Say It Your Way", [1.0, 0.5, 1, 1.0])
         for k, label in enumerate(["bold", "colour", "spoiler-open", "code"]):
             self.shot(r, "m-formatting", B(1), k, 1, label, land=0.5)
         self.colours(B(2), "#1f5a2a", "#13204d", 1.0)
-        r = ph(2, 2, "Your Own Sticker Packs", [1.0, 0.5, 0.36, 1.02])
-        self.shot(r, "m-stickers", B(2), 0, 3, "installed", land=1)
-        self.shot(r, "m-stickers", B(2), 3, 5, "sent", land=2)
+        r = ph(2, 2, "Your Own Sticker Packs", [1.0, 0.5, 0, 1.0])
+        self.piece(r, "m-stickers", B(2), B(2) + 3 * p, anchors=[("installed", B(2) + p)], cam=[1.0, 0.5, 0, 1.0])
+        self.piece(r, "m-stickers", B(2) + 3 * p, B(4), anchors=[("sent", B(2) + 5 * p)], cam=[1.0, 0.5, 1, 1.0])
         self.colours(B(4), "#3b1f8a", "#122a52", 1.0)
-        r = ph(4, 1, "Your Own Typing Indicator", [1.0, 0.5, 0.92, 1.02])
+        r = ph(4, 1, "Your Own Typing Indicator", [1.0, 0.5, 1, 1.0])
         self.piece(r, "m-typing", B(4), B(5), anchors=[("sent", B(5) - 0.15)])
         self.colours(B(5), "#5a2a0c", "#3a0f3f", 1.0)
-        r = ph(5, 1, "Make It Yours", [1.0, 0.5, 0.4, 1.02])
+        r = ph(5, 1, "Make It Yours", [1.0, 0.5, 0, 1.0])
         if have("m-themes"):
             self.montage(r, "m-themes", [f"theme{k}" for k in range(12)], B(5), 4)
         self.colours(B(6), "#4a1d7a", "#10234a", 1.0)
-        r = ph(6, 2, "A Profile That's All You", [1.0, 0.5, 0.62, 1.02])
+        r = ph(6, 2, "A Profile That's All You", [1.0, 0.5, 1, 1.0])
         if have("m-showcase"):
             self.shot(r, "m-showcase", B(6), 0, 3, "open", land=0.5)
             self.shot(r, "m-showcase", B(6), 3, 5, "widgets", land=0.5)
         self.colours(B(8), "#7a2e12", "#4a1060", 1.0)
-        r = ph(8, 1, "Your Name, Your Style", [1.0, 0.5, 0.45, 1.02])
+        r = ph(8, 1, "Your Name, Your Style", [1.0, 0.5, 1, 1.0])
         if have("m-namestyle"):
             self.montage(r, "m-namestyle", [f"font{k}" for k in (0, 2)] + [f"effect{k}" for k in (1, 3)], B(8), 4)
         self.colours(B(9), "#0c4a4a", "#13204d", 1.0)
-        r = ph(9, 1, "Full-Quality Screen Share", [1.0, 0.5, 0.48, 1.02])
+        r = ph(9, 1, "Full-Quality Screen Share", [1.0, 0.5, 1, 1.0])
         self.shot(r, "m-share", B(9), 0, 4, "watch", land=1)
         self.colours(B(10), "#123e6b", "#2a1458", 1.0)
-        r = ph(10, 2, "Write Together, Live", [1.0, 0.5, 0.2, 1.02])
+        r = ph(10, 2, "Write Together, Live", [1.0, 0.5, 0, 1.0])
         self.piece(r, "m-notes", B(10), B(12), anchors=[("typing", B(10) + 2 * p)])
         self.colours(B(12), "#0f4a33", "#1a1c4d", 1.0)
-        r = ph(12, 1, "Lock Chats with a Password", [1.0, 0.5, 0.6, 1.02])
+        r = ph(12, 1, "Lock Chats with a Password", [1.0, 0.5, 1, 1.0])
         self.shot(r, "m-subchat", B(12), 0, 4, "inside", land=2)
         self.colours(B(13), "#1c3a5e", "#1a1c4d", 1.0)
-        r = ph(13, 1, "Add Your Own Plugins", [1.0, 0.5, 0.55, 1.02])
+        r = ph(13, 1, "Add Your Own Plugins", [1.0, 0.5, 1, 1.0])
         self.piece(r, "m-plugins", B(13), B(14), anchors=[("waved", B(13) + 3 * p)])
         self.colours(B(14), "#5a1a6e", "#1b1e50", 1.0)
-        r = ph(14, 1, "Build Messages Visually", [1.0, 0.5, 0.15, 1.02])
+        r = ph(14, 1, "Build Messages Visually", [1.0, 0.5, 0, 1.0])
         self.piece(r, "m-editor", B(14), B(15), anchors=[("callout", B(14) + p), ("sent", B(14) + 3.2 * p)])
         self.colours(B(15), "#3b1a6e", "#0d2f4f", 1.0)
-        r = ph(15, 1, "Restyle It with CSS", [1.0, 0.5, 0.5, 1.02])
+        r = ph(15, 1, "Restyle It with CSS", [1.0, 0.5, 1, 1.0])
         self.piece(r, "m-css", B(15), B(16), anchors=[("closed", B(15) + 2 * p)])
 
         # the end: the promise, then the name
