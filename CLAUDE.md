@@ -1228,8 +1228,11 @@ notes.
   `home_shots.py` and `home_gifs.py` (the front page's pictures and loops), `trailer.py` (raw footage
   of the app, with a macOS pointer at its real size that moves as a hand does) and `advert.py`, which
   films test1 and test2 with `trailer.py`'s recorder, logs when things happen in each take, measures a
-  song (`advert_edit.py`, needs librosa; `--bpm` when it hears the wrong tempo) and cuts the takes to
-  its beats on a stage drawn frame by frame in headless Chrome (`advert_stage.html`), plus a thumbnail.
+  song (`advert_edit.py`, needs librosa; `--bpm` when it hears the wrong tempo: its beats, drops and
+  the piano's notes, which the quiet parts' words land on) and cuts the takes to its beats. The cut is
+  drawn by Remotion (`tools/advert-video`, its own npm project: motion blur, the song laid in on one
+  clock), using Playwright's Chromium since Remotion's own headless shell does not start on the Mac;
+  the takes' frames are served to it over localhost. The thumbnail is still drawn on `advert_stage.html`.
   `--cut` picks the trailer, a faster cut of it (`fast`) or a 1080x1920 short for phones (`short`),
   which uses takes filmed in Nexa's phone layout (`film --phones`, saved as `m-<shot>`), each shown
   as its screen at the frame's full width so the app's words read on a phone. Each shot

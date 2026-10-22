@@ -7,7 +7,7 @@ stage.html draws any moment of it; this file works out the moments from the
 song and the takes, pulls the frames each take needs out of its film, and has
 headless Chrome draw every frame of the advert, several pages at once.
 """
-import json, math, os, re, shutil, subprocess, sys, time
+import json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
 
 import numpy as np
@@ -86,11 +86,14 @@ def analyse(song, bpm=None):
     penv = librosa.onset.onset_strength(S=librosa.amplitude_to_db(band[(f > 220) & (f < 2500)], ref=np.max), sr=sr, hop_length=hop)
     pon = librosa.onset.onset_detect(onset_envelope=penv, sr=sr, hop_length=hop, units="time")
     pst = penv[librosa.time_to_frames(pon, sr=sr, hop_length=hop)]
+    # every clear piano note in the song, with how strong it is, for the
+    # quiet parts (the breakdown, the outro) to move on as the intro does
+    piano = [[round(float(t), 3), round(float(v) / float(pst.max()), 3)] for t, v in zip(pon, pst) if v > 0.25 * pst.max()]
     keep = (pon > 0.5) & (pon < d1 - 0.2)
     pon, pst = pon[keep], pst[keep]
     notes = sorted(float(t) for t in pon[np.argsort(-pst)[:14]])
     out = {
-        "notes": notes,
+        "notes": notes, "piano": piano,
         "period": float(period), "bar": float(bar), "d1": d1,
         "breakdown": on_bar(grid[i_b]), "d2": on_bar(hit(i_d2)), "outro": on_bar(grid[i_o]),
         "end": len(y) / sr, "bpm": 60 / float(period),
@@ -224,27 +227,43 @@ class Cut:
         t0, t1 = base + at * p, base + (at + n) * p
         self.piece(rig, take, t0, t1, slot=slot, view=view, anchors=[(mark, t0 + land * p)])
 
-    def montage(self, rig, take, labels, t0, n_beats, lead=0.06):
-        """One beat for each logged moment, the cut and the change (a theme, a
-        font) on the beat together."""
-        p = self.s["period"]
-        labels = [l for l in labels if self.t.has(take, l)][:n_beats]
+    def montage(self, rig, take, labels, t0, n_beats, lead=0.06, every=1):
+        """A logged moment every `every` beats, the cut and the change (a
+        theme, a font) on the beat together."""
+        p = self.s["period"] * every
+        labels = [l for l in labels if self.t.has(take, l)][:int(n_beats / every)]
         for i, label in enumerate(labels):
             a = t0 + i * p
-            b = t0 + (i + 1) * p if i < len(labels) - 1 else t0 + n_beats * p
+            b = t0 + (i + 1) * p if i < len(labels) - 1 else t0 + n_beats * self.s["period"]
             self.piece(rig, take, a, b, src_in=self.t.mark(take, label) - lead)
 
     # --- words -------------------------------------------------------------------
 
-    def title(self, text, t0, t1, place="top"):
-        """A scene's title, a beat after the scene starts, gone just before it ends."""
+    def title(self, text, t0, t1, place="top", rig=None, **o):
+        """A scene's title, a beat after the scene starts; with its rig it
+        travels with the scene, and leaves with it."""
         p = self.s["period"]
-        self.texts.append({"kind": "title", "t0": t0 + p, "t1": t1 - 0.12, "text": text, "place": place})
+        self.texts.append({"kind": "title", "t0": t0 + p, "t1": t1 - 0.12, "text": text, "place": place, "rig": rig, **o})
 
-    def statement(self, text, t0, t1):
-        p = self.s["period"]
+    def piano(self, a, b, n, gap=0.24):
+        """n of the piano's clearest notes between a and b, at least gap apart,
+        in order: what words land on in the quiet parts. Beats fill in when the
+        piano is too sparse there."""
+        chosen = []
+        for t, v in sorted((x for x in self.s.get("piano", []) if a <= x[0] < b), key=lambda x: -x[1]):
+            if len(chosen) < n and all(abs(t - c) >= gap for c in chosen):
+                chosen.append(t)
+        k = 0
+        while len(chosen) < n:
+            t = a + k * self.s["period"]
+            if all(abs(t - c) >= gap for c in chosen):
+                chosen.append(t)
+            k += 1
+        return sorted(chosen)
+
+    def statement(self, text, t0, t1, **o):
         n = len(text.split(" "))
-        self.texts.append({"kind": "statement", "t0": t0, "t1": t1, "text": text, "times": [t0 + i * p for i in range(n)]})
+        self.texts.append({"kind": "statement", "t0": t0, "t1": t1, "text": text, "times": self.piano(t0 - 0.05, t1 - 0.5, n), **o})
 
     def colours(self, t, a, b, glow=1.0):
         self.bg.append([t, a, b, glow])
@@ -297,15 +316,17 @@ class Cut:
         outro, end = s["outro"], s["end"]
         B = lambda n, base=outro: self.bars(n, base)  # noqa: E731
         self.colours(outro, "#3d1478", "#0c0a1a", 0.8)
-        self.texts.append({"kind": "wordmark", "t0": outro + 2 * p, "t1": end, "size": 170, "y": 470})
-        self.texts.append({"kind": "tagline", "t0": B(1, outro) + 2 * p, "t1": end, "text": "Free. Private. Yours."})
+        # the name, the promise and the address, each on a note of the piano
+        mark, tag, url = self.piano(outro + 1.5 * p, B(2, outro), 3, gap=0.9)
+        self.texts.append({"kind": "wordmark", "t0": mark, "t1": end, "size": 170, "y": 470})
+        self.texts.append({"kind": "tagline", "t0": tag, "t1": end, "text": "Free. Private. Yours."})
         # the address stays on screen past the music, so nobody misses it
         hold = end + URL_HOLD
-        self.texts.append({"kind": "url", "t0": B(1, outro) + 3.5 * p, "t1": hold, "text": "nexa.fish"})
+        self.texts.append({"kind": "url", "t0": url, "t1": hold, "text": "nexa.fish"})
         for t in self.texts:
             if t["t1"] == end:
                 t["t1"] = hold
-        return {"fps": FPS, "dur": hold, "hits": [s["d1"], s["d2"]], "rigs": self.rigs, "pieces": self.pieces, "texts": self.texts,
+        return {"fps": FPS, "dur": hold, "rigs": self.rigs, "pieces": self.pieces, "texts": self.texts,
                 "bg": self.bg, "fade": [hold - 1.3, hold - 0.2]}
 
     def build(self):
@@ -408,13 +429,17 @@ class Cut:
             opts.setdefault("exitDur", 0.34)
         r = self.rig(layout, s0, s1, cams=cams, **opts)
         if title:
-            self.title(title, s0, s1, place=place)
+            self.title(title, s0, s1, place=place, rig=r)
         return r
 
     def cam(self, *keys, drift=0.02):
         """A camera for a window: keys of [t, zoom, fx, fy, move time], each a
         framing it eases into and arrives at on t, then holds."""
-        return {"keys": [list(k) for k in keys], "drift": drift}
+        keys = [list(k) for k in keys]
+        for k in keys[1:]:
+            mv = k[4] if len(k) > 4 else 0.9
+            k[4:] = [mv if mv < 0.05 else max(1.0, mv * 1.4)]
+        return {"keys": keys, "drift": drift}
 
     def build_fast(self):
         """The trailer cut twice as often: a new scene every two bars, quicker
@@ -434,7 +459,7 @@ class Cut:
                                [B(1) + 1.6 * p, 1.55, *at("tour", "channel", (0.55, 0.85)), 0.9])])
         self.piece(r, "tour", rise, B(2), anchors=[("server", d1), ("channel", B(1) + 0.5 * p)])
         self.colours(d1, "#4c1d95", "#0f2a4a", 1.0)
-        self.title("Everything You're Used To", d1 - p, B(2))
+        self.title("Everything You're Used To", d1 - p, B(2), rig=r)
         # then what everyone wants from it, fast; then what only Nexa has
         self.colours(B(2), "#3b1f8a", "#0f2a4a", 1.0)
         r = sc("single", B(2), B(4), "Chat in Real Time", quick=True,
@@ -516,104 +541,89 @@ class Cut:
                  ("namestyle", "effect2", 1.72, 0.5, 0.38), ("snow", "sent", 1.1, 0.6, 0.5), ("editor", "sent", 1.25, 0.42, 0.75),
                  ("subchat", "inside", 1.0, 0.5, 0.5), ("plugins", "waved", 1.25, 0.5, 0.68), ("stickers", "sent", 1.3, 0.42, 0.45)]
         tiles = [x for x in tiles if T.has(x[0], x[1])][:12]
-        r = self.rig("wall", w0, w1, enter="cut", exit="recede", exitDur=1.8, stagger=p / 4,
+        r = self.rig("wall", w0, w1, enter="glide", exit="recede", exitDur=1.8, stagger=p / 4,
                      cams=[[z, fx, fy, z] for _, _, z, fx, fy in tiles])
         for k, (take, label, *_rest) in enumerate(tiles):
             self.piece(r, take, w0, w1, slot=k, src_in=T.mark(take, label) - 1.0)
 
     def build_short(self):
-        """A 9:16 cut for phones, from two bars before the second drop to a
-        little after the outro begins: Nexa's own phone layout, filmed on a
-        phone (the m- takes), each screen the frame's full width. A scene
-        opens on the top of the screen (the header, the lists) and the camera
-        eases down and in to what is happening, close enough to read; titles
-        sit above, clear of the space apps put their own buttons in."""
+        """A 9:16 cut for phones, from the piano breakdown before the second
+        drop to the end of the song: Nexa's own phone layout, filmed on a
+        phone (the m- takes), each screen the frame's full width.
+
+        The hook line lands word by word on the breakdown's piano, its last
+        word on the drop; on the drop it rises into the title's place and the
+        app comes up. Then a scene every two bars, each take playing at its
+        own speed, the camera opening on the top of the screen (the header,
+        the lists) and easing down and in to what happens, close enough to
+        read. The ending's words move on the outro's piano."""
         s, T, p = self.s, self.t, self.s["period"]
         d2, outro = s["d2"], s["outro"]
         B = lambda n: self.bars(n, d2)  # noqa: E731
-        have, cam, at = T.has, self.cam, T.at
-        start, end = B(-2), outro + 10 * p
+        have, cam = T.has, self.cam
+        start, end = B(-2) - 0.05, outro + 10 * p
 
         def sc(k, n, title, *keys, **o):
-            o.setdefault("enterDur", 0.45)
-            r = self.rig("phoneTall", B(k), B(k + n), cams=[{"keys": [list(x) for x in keys], "drift": 0.0}], exitDur=0.32, **o)
+            # every cut on a bar line, the push between scenes straddling it
+            r = self.rig("phoneTall", B(k), B(k + n), cams=[{"keys": cam(*keys)["keys"], "drift": 0.0}], **o)
             if title:
-                self.texts.append({"kind": "title", "t0": B(k) + 0.1, "t1": B(k + n) - 0.08, "text": title, "place": "top", "y": 196, "size": 70})
+                self.title(title, B(k), B(k + n), rig=r, y=196, size=70)
             return r
 
-        # the hook: the line, word by word on the eighths, in the middle of an
-        # empty frame; then it rises into the title's place as the app comes up
+        # the hook, on the piano
         self.colours(start, "#3a1a6e", "#14102a", 0.7)
         words = "Private Chat with All the Fun Left In".split()
-        self.texts.append({"kind": "headline", "t0": start, "t1": B(1) - 0.06, "y": 700, "size": 108,
-                           "lines": ["Private Chat with", "All the Fun Left In"], "times": [start + 0.05 + k * p / 2 for k in range(len(words))],
-                           "move": [B(-1) - 0.15, B(-1) + 0.65, -510, 0.62]})
-        # a screen is either shown at its full width, or pushed in from its left
-        # edge (where the words start) far enough that the crop reads as meant
-        r = sc(-1, 2, None, [B(-1), 1.0, 0.5, 0.0], [d2 + 3 * p, 1.0, 0.5, 1.0, 0.8], enter="rise", enterDur=0.8)
-        self.piece(r, "m-tour", B(-1), B(1), anchors=[("server", d2 - p), ("channel", d2 + 2 * p)])
+        times = self.piano(start + 0.02, d2 - 0.3, len(words) - 1, gap=0.28) + [d2 - 0.03]
+        self.texts.append({"kind": "headline", "t0": start, "t1": B(2) - 0.05, "y": 700, "size": 108,
+                           "lines": ["Private Chat with", "All the Fun Left In"], "times": times,
+                           "move": [d2 + 0.02, d2 + 0.8, -510, 0.62]})
+        # on the drop the app comes up: their messages, the server, a channel
+        r = sc(0, 2, None, [d2, 1.0, 0.5, 0.0], [B(1) + 3.6 * p, 1.0, 0.5, 1.0, 0.9], enter="rise", enterDur=1.25)
+        self.piece(r, "m-tour", d2, B(2), anchors=[("server", B(1))])
         self.colours(d2, "#4c1d95", "#0f2a4a", 1.0)
 
-        self.colours(B(1), "#6d1d5b", "#1b1650", 1.0)
-        r = sc(1, 1, "Say It Your Way", [B(1), 1.0, 0.5, 1.0])
-        for k, label in enumerate(["bold", "colour", "spoiler-open", "code"]):
-            self.shot(r, "m-formatting", B(1), k, 1, label, land=0.5)
+        # what only Nexa has, a feature every two bars
         self.colours(B(2), "#1f5a2a", "#13204d", 1.0)
-        r = sc(2, 2, "Your Own Sticker Packs", [B(2), 1.0, 0.5, 0.0], [B(2) + 1.6 * p, 1.5, 0.0, at("m-stickers", "installed", (0.3, 0.3))[1], 0.7],
-               [B(2) + 3 * p, 1.0, 0.5, 1.0, 0.01], [B(2) + 5.6 * p, 1.32, 0.0, at("m-stickers", "sent", (0.3, 0.85))[1], 0.7])
-        self.piece(r, "m-stickers", B(2), B(2) + 3 * p, anchors=[("installed", B(2) + p)])
-        self.piece(r, "m-stickers", B(2) + 3 * p, B(4), anchors=[("sent", B(2) + 5 * p)])
+        r = sc(2, 2, "Your Own Sticker Packs", [B(2), 1.0, 0.5, 0.0], [B(2) + 2 * p, 1.5, 0.0, T.at("m-stickers", "installed", (0.3, 0.3))[1], 0.9],
+               [B(3), 1.0, 0.5, 1.0, 0.01], [B(3) + 2.4 * p, 1.32, 0.0, T.at("m-stickers", "sent", (0.3, 0.85))[1], 0.9])
+        self.piece(r, "m-stickers", B(2), B(3), anchors=[("installed", B(2) + 2 * p)])
+        self.piece(r, "m-stickers", B(3), B(4), anchors=[("sent", B(3) + 2 * p)])
         self.colours(B(4), "#3b1f8a", "#122a52", 1.0)
-        r = sc(4, 1, "Your Own Typing Indicator", [B(4), 1.0, 0.5, 1.0], [B(4) + 2 * p, 1.45, 0.0, 1.0, 0.7])
-        self.piece(r, "m-typing", B(4), B(5), anchors=[("sent", B(5) - 0.15)])
-        self.colours(B(5), "#5a2a0c", "#3a0f3f", 1.0)
-        r = sc(5, 1, "Make It Yours", [B(5), 1.0, 0.5, 0.0])
+        r = sc(4, 2, "Your Own Typing Indicator", [B(4), 1.0, 0.5, 1.0], [B(4) + 3 * p, 1.45, 0.0, 1.0, 1.0])
+        self.piece(r, "m-typing", B(4), B(6), anchors=[("sent", B(6) - 2 * p)])
+        self.colours(B(6), "#5a2a0c", "#3a0f3f", 1.0)
+        r = sc(6, 2, "Make It Yours", [B(6), 1.0, 0.5, 0.0])
         if have("m-themes"):
-            self.montage(r, "m-themes", [f"theme{k}" for k in range(12)], B(5), 4)
-        self.colours(B(6), "#4a1d7a", "#10234a", 1.0)
-        r = sc(6, 2, "A Profile That's All You", [B(6), 1.0, 0.5, 0.0], [B(6) + 3.4 * p, 1.0, 0.5, 1.0, 0.9],
-               )
-        if have("m-showcase"):
-            self.shot(r, "m-showcase", B(6), 0, 3, "open", land=0.5)
-            self.shot(r, "m-showcase", B(6), 3, 5, "widgets", land=0.5)
-        self.colours(B(8), "#7a2e12", "#4a1060", 1.0)
-        r = sc(8, 1, "Your Name, Your Style", [B(8), 1.0, 0.5, 0.0])
+            self.montage(r, "m-themes", [f"theme{k}" for k in (0, 2, 5, 7)], B(6), 8, lead=0.25, every=2)
+        self.colours(B(8), "#4a1d7a", "#10234a", 1.0)
+        r = sc(8, 2, "A Profile That's All You", [B(8), 1.0, 0.5, 0.0], [B(9) + 1.4 * p, 1.0, 0.5, 1.0, 1.1])
+        self.piece(r, "m-showcase", B(8), B(10), anchors=[("widgets", B(9))])
+        self.colours(B(10), "#7a2e12", "#4a1060", 1.0)
+        r = sc(10, 2, "Your Name, Your Style", [B(10), 1.0, 0.5, 0.0])
         if have("m-namestyle"):
-            self.montage(r, "m-namestyle", [f"font{k}" for k in (0, 2)] + [f"effect{k}" for k in (1, 3)], B(8), 4)
-        self.colours(B(9), "#0c4a4a", "#13204d", 1.0)
-        r = sc(9, 1, "Full-Quality Screen Share", [B(9), 1.0, 0.5, at("m-share", "watch", (0.5, 0.47))[1]])
-        self.shot(r, "m-share", B(9), 0, 4, "watch", land=1)
-        self.colours(B(10), "#123e6b", "#2a1458", 1.0)
-        r = sc(10, 2, "Write Together, Live", [B(10), 1.0, 0.5, 0.0], [B(10) + 2.4 * p, 1.85, 0.0, 0.0, 0.8])
-        self.piece(r, "m-notes", B(10), B(12), anchors=[("typing", B(10) + 2 * p)])
-        self.colours(B(12), "#0f4a33", "#1a1c4d", 1.0)
+            self.montage(r, "m-namestyle", [f"font{k}" for k in (0, 4)] + [f"effect{k}" for k in (1, 3)], B(10), 8, lead=0.25, every=2)
+        self.colours(B(12), "#123e6b", "#2a1458", 1.0)
+        r = sc(12, 2, "Write Together, Live", [B(12), 1.0, 0.5, 0.0], [B(12) + 2.4 * p, 1.85, 0.0, 0.0, 1.0])
+        self.piece(r, "m-notes", B(12), B(14), anchors=[("typing", B(12) + 2 * p)])
+        self.colours(B(14), "#0f4a33", "#1a1c4d", 1.0)
         # the password going in, then the locked chat it makes
-        r = sc(12, 1, "Lock Chats with a Password", [B(12), 1.0, 0.5, 1.0])
-        self.piece(r, "m-subchat", B(12), B(13), anchors=[("made", B(12) + 2.2 * p)])
-        self.colours(B(13), "#1c3a5e", "#1a1c4d", 1.0)
-        r = sc(13, 1, "Add Your Own Plugins", [B(13), 1.0, 0.5, 1.0], [B(13) + 3 * p, 1.4, 0.0, 1.0, 0.6])
-        self.piece(r, "m-plugins", B(13), B(14), anchors=[("waved", B(13) + 3 * p)])
-        self.colours(B(14), "#5a1a6e", "#1b1e50", 1.0)
-        r = sc(14, 1, "Build Messages Visually", [B(14), 1.65, 0.0, 0.0], [B(14) + 3.4 * p, 1.0, 0.5, 1.0, 0.6])
-        self.piece(r, "m-editor", B(14), B(15), anchors=[("callout", B(14) + 2 * p), ("sent", B(14) + 3.2 * p)])
-        self.colours(B(15), "#3b1a6e", "#0d2f4f", 1.0)
-        r = sc(15, 1, "Restyle It with CSS", [B(15), 1.0, 0.5, 1.0])
-        self.piece(r, "m-css", B(15), B(16), anchors=[("closed", B(15) + 2 * p)])
+        r = sc(14, 2, "Lock Chats with a Password", [B(14), 1.0, 0.5, 1.0], exit="recede", exitDur=0.7)
+        self.piece(r, "m-subchat", B(14), B(16), anchors=[("made", B(14) + 4 * p)])
 
-        # the end: the promise, then the name
+        # the end, on the outro's piano: the promise, then the name and the address
         self.colours(outro, "#3d1478", "#0c0a1a", 0.85)
-        self.texts.append({"kind": "statement", "t0": outro, "t1": outro + 4 * p - 0.05, "text": "End-to-End Encrypted.", "y": 860, "size": 92,
-                           "times": [outro, outro + p, outro + 2 * p]})
-        self.texts.append({"kind": "wordmark", "t0": outro + 4 * p, "t1": end, "size": 150, "y": 860})
-        self.texts.append({"kind": "tagline", "t0": outro + 6 * p, "t1": end, "text": "Free. Private. Yours.", "y": 1010})
+        self.texts.append({"kind": "statement", "t0": outro - 0.05, "t1": outro + 4 * p - 0.05, "text": "End-to-End Encrypted.", "y": 860, "size": 92,
+                           "times": self.piano(outro - 0.1, outro + 3 * p, 3, gap=0.35)})
+        mark, tag, url = self.piano(outro + 4 * p, outro + 9 * p, 3, gap=0.7)
+        self.texts.append({"kind": "wordmark", "t0": mark, "t1": end, "size": 150, "y": 860})
+        self.texts.append({"kind": "tagline", "t0": tag, "t1": end, "text": "Free. Private. Yours.", "y": 1010})
         hold = end + URL_HOLD
-        self.texts.append({"kind": "url", "t0": outro + 6.5 * p, "t1": hold, "text": "nexa.fish", "y": 1110, "size": 96})
+        self.texts.append({"kind": "url", "t0": url, "t1": hold, "text": "nexa.fish", "y": 1110, "size": 96})
         for t in self.texts:
             if t["t1"] == end:
                 t["t1"] = hold
-        end = hold
-        return {"fps": FPS, "dur": end, "hits": [d2], "size": [1080, 1920], "span": [start, end], "rigs": self.rigs, "pieces": self.pieces,
-                "texts": self.texts, "bg": self.bg, "fade": [end - 1.4, end - 0.1]}
+        return {"fps": FPS, "dur": hold, "size": [1080, 1920], "span": [start, hold], "trans": 0.8, "rigs": self.rigs, "pieces": self.pieces,
+                "texts": self.texts, "bg": self.bg, "fade": [hold - 1.4, hold - 0.1]}
 
 
 # ---------------------------------------------------------------------------
@@ -627,30 +637,60 @@ def brand_paths():
     return {"letters": grab("WORDMARK_LETTERS"), "spark": grab("WORDMARK_SPARK"), "mark": grab("const MARK")}
 
 
+def font_path():
+    return ROOT / "web/node_modules/@fontsource-variable/wix-madefor-display/files/wix-madefor-display-latin-wght-normal.woff2"
+
+
 def font_url():
-    f = ROOT / "web/node_modules/@fontsource-variable/wix-madefor-display/files/wix-madefor-display-latin-wght-normal.woff2"
-    return f.as_uri()
+    return font_path().as_uri()
 
 
-def stage_page(spec):
-    html = (ROOT / "tools/advert_stage.html").read_text()
-    html = html.replace("%FONT%", font_url()).replace("/*SPEC*/null", json.dumps(spec)).replace("/*BRAND*/null", json.dumps(brand_paths()))
-    page = WORK / "stage.html"
-    page.write_text(html)
-    return page
+VIDEO = ROOT / "tools/advert-video"  # the Remotion project that draws the cut
 
 
-def render_range(page_path, out, first, last, fps, w=1920, h=1080):
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as pw:
-        br = pw.chromium.launch(channel="chromium", args=["--allow-file-access-from-files", "--disable-web-security"])
-        pg = br.new_page(viewport={"width": w, "height": h})
-        pg.goto(page_path.as_uri())
-        pg.wait_for_function("() => window.ready === true", timeout=60000)
-        for i in range(first, last):
-            pg.evaluate("(t) => window.draw(t)", i / fps)
-            pg.screenshot(path=str(out / f"{i:05d}.jpg"), type="jpeg", quality=93)
-        br.close()
+class FileServer:
+    """Hands the takes' frames and the song to Remotion's browser over
+    localhost, so nothing gigabytes large is copied into its bundle."""
+
+    def __init__(self, root):
+        import functools, http.server, threading
+        class Quiet(http.server.SimpleHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+        handler = functools.partial(Quiet, directory=str(root))
+        self.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        self.base = f"http://127.0.0.1:{self.httpd.server_address[1]}/"
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.httpd.shutdown()
+
+
+def remotion_render(spec, dest, frames=None):
+    """Draws the cut with Remotion: its motion blur, its renderer, the song
+    laid in by it, one clock for picture and sound."""
+    (VIDEO / "public/fonts").mkdir(parents=True, exist_ok=True)
+    shutil.copy(font_path(), VIDEO / "public/fonts/madefor.woff2")
+    if not (VIDEO / "node_modules").exists():
+        subprocess.run(["npm", "ci"], cwd=VIDEO, check=True)
+    srv = FileServer(WORK)
+    try:
+        spec = dict(spec, base=srv.base)
+        props = WORK / "props.json"
+        props.write_text(json.dumps({"spec": spec}))
+        cmd = ["npx", "remotion", "render", "src/index.ts", "Advert", str(dest), f"--props={props}",
+               f"--concurrency={os.environ.get('ADVERT_WORKERS', '6')}", "--crf=16", "--audio-bitrate=320k",
+               "--jpeg-quality=95", "--timeout=120000"]
+        if frames:
+            cmd.append(f"--frames={frames[0]}-{frames[1] - 1}")
+        # Remotion's own headless shell does not start on this Mac; Playwright's Chromium does
+        found = sorted(Path.home().glob("Library/Caches/ms-playwright/chromium-*/chrome-mac*/*.app/Contents/MacOS/*"))
+        browser = os.environ.get("ADVERT_BROWSER") or (str(found[-1]) if found else "")
+        if browser:
+            cmd.append(f"--browser-executable={browser}")
+        subprocess.run(cmd, cwd=VIDEO, check=True)
+    finally:
+        srv.close()
 
 
 def edit(args):
@@ -668,42 +708,32 @@ def edit(args):
     spec.setdefault("size", [1920, 1080])
     spec["frames"] = takes.extract(2560)
     (WORK / "cut.json").write_text(json.dumps(spec, indent=1))
-    page = stage_page(spec)
-    fps = args.fps
     # a cut may use only part of the song (the short does)
-    span = spec.get("span", [0.0, spec["dur"]])
-    t_from = span[0] if args.t_from is None else args.t_from
-    t_to = min(span[1] if args.t_to is None else args.t_to, spec["dur"])
-    out = WORK / "render"
-    shutil.rmtree(out, ignore_errors=True)
-    out.mkdir(parents=True)
-    first, last = int(round(t_from * fps)), int(round(t_to * fps))
-    workers = int(os.environ.get("ADVERT_WORKERS", "4"))
-    step = math.ceil((last - first) / workers)
-    print(f"drawing {last - first} frames with {workers} pages")
-    started = time.time()
-    procs = []
-    for w in range(workers):
-        a, z = first + w * step, min(last, first + (w + 1) * step)
-        if a >= z:
-            continue
-        procs.append(subprocess.Popen([sys.executable, __file__, "render", str(page), str(out), str(a), str(z), str(fps), *map(str, spec["size"])]))
-    if any(p.wait() for p in procs):
-        print("a page failed to draw", file=sys.stderr)
-        return 1
-    print(f"drawn in {time.time() - started:.0f} s")
-    dest = Path(args.out or (WORK / f"advert-{args.cut}.mp4"))
+    span = spec.setdefault("span", [0.0, spec["dur"]])
+    shutil.copy(args.song, WORK / "song.mp3")
+    spec["song"] = "song.mp3"
     # the song fades with the picture when the cut ends before the song does
-    # (apad: silence after the song, while the ending holds on the address)
-    fade = ["-af", "apad"]
-    if t_to < song["end"] - 0.5:
-        fade = ["-af", f"afade=t=out:st={max(0.0, t_to - t_from - 1.6):.3f}:d=1.6,apad"]
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-framerate", str(fps), "-start_number", str(first), "-i", str(out / "%05d.jpg"),
-                    "-ss", f"{t_from:.3f}", "-t", f"{t_to - t_from:.3f}", "-i", args.song,
-                    "-map", "0:v", "-map", "1:a", *fade, "-c:v", "libx264", "-preset", "slow", "-crf", "15", "-pix_fmt", "yuv420p",
-                    "-profile:v", "high", "-c:a", "aac", "-b:a", "320k", "-shortest", "-movflags", "+faststart", str(dest)], check=True)
-    print("wrote", dest)
+    spec["songEnd"] = span[1] if span[1] < song["end"] - 0.5 else None
+    spec["brand"] = brand_paths()
+    dest = Path(args.out or (WORK / f"advert-{args.cut}.mp4"))
+    frames = None
+    if args.t_from is not None or args.t_to is not None:
+        a = args.t_from if args.t_from is not None else span[0]
+        b = min(args.t_to if args.t_to is not None else span[1], span[1])
+        frames = (int(round((a - span[0]) * FPS)), int(round((b - span[0]) * FPS)))
+    started = time.time()
+    remotion_render(spec, dest, frames)
+    print(f"wrote {dest} in {time.time() - started:.0f} s")
     return 0
+
+
+def stage_page(spec):
+    """The old stage page, which the thumbnail is still drawn on."""
+    html = (ROOT / "tools/advert_stage.html").read_text()
+    html = html.replace("%FONT%", font_url()).replace("/*SPEC*/null", json.dumps(spec)).replace("/*BRAND*/null", json.dumps(brand_paths()))
+    page = WORK / "stage.html"
+    page.write_text(html)
+    return page
 
 
 def thumb(args):
@@ -724,8 +754,3 @@ def thumb(args):
         br.close()
     print("wrote", dest)
     return 0
-
-
-if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "render":
-    _, _, page, out, a, z, fps, w, h = sys.argv
-    render_range(Path(page), Path(out), int(a), int(z), int(fps), int(w), int(h))
