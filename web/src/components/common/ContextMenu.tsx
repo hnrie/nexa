@@ -241,8 +241,9 @@ export function ContextMenuHost() {
   const openSub = useCallback((item: ContextMenuItem, el: HTMLElement, focus: boolean) => {
     clearTimer();
     const r = el.getBoundingClientRect();
-    setSub({ item, mode: drills(pointer.current) ? "drill" : "flyout", focus, anchor: { top: r.top, bottom: r.bottom } });
-  }, [clearTimer]);
+    // a sheet across a phone has no room beside it, whatever pointer is used
+    setSub({ item, mode: sheet || drills(pointer.current) ? "drill" : "flyout", focus, anchor: { top: r.top, bottom: r.bottom } });
+  }, [clearTimer, sheet]);
 
   /** Back to the menu the submenu came from, focus on its item when a key or a tap asked. */
   const closeSub = useCallback(
@@ -456,7 +457,7 @@ export function ContextMenuHost() {
                 // opened with a key it takes focus; with a click only where the menu took focus itself
                 onClick={(e) => openSub(item, e.currentTarget, !menu.keepFocus || e.detail === 0)}
                 onPointerEnter={(e) => {
-                  if (e.pointerType === "touch" || drills(pointer.current)) return;
+                  if (e.pointerType === "touch" || sheet || drills(pointer.current)) return;
                   if (flyout?.id === item.id) {
                     clearTimer();
                     return;

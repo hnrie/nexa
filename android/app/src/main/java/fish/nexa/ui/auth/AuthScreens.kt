@@ -234,6 +234,8 @@ private enum class AuthPage { LOGIN, REGISTER, RECOVER }
 @Composable
 fun AuthFlow() {
     var page by remember { mutableStateOf(AuthPage.LOGIN) }
+    // Back from Register or Recover returns to Log In, as the browser's back does on the web
+    androidx.activity.compose.BackHandler(enabled = page != AuthPage.LOGIN) { page = AuthPage.LOGIN }
     when (page) {
         AuthPage.LOGIN -> LoginScreen(onRegister = { page = AuthPage.REGISTER }, onRecover = { page = AuthPage.RECOVER })
         AuthPage.REGISTER -> RegisterScreen(onLogin = { page = AuthPage.LOGIN })
