@@ -6551,6 +6551,7 @@
   "keybinds.takenByPlugin": "{name} von {plugin} nutzt diese Tasten schon.",
   "legal.newAddresses": "Aus Sicherheitsgründen speichert Nexa jetzt die IP-Adressen, von denen sich dein Konto anmeldet und aktiv ist, jeweils 180 Tage nach der letzten Nutzung. Das Team sieht, welche Konten sich eine Adresse teilen, aber nie die Adressen selbst.",
   "legal.newCaptcha": "Das Captcha ist jetzt hCaptcha. Dein Browser oder deine App lädt es von hcaptcha.com, und Nexa sendet hCaptcha deine IP-Adresse, wenn es eines prüft.",
+  "legal.newPasskeys": "Passkeys: Für jeden Passkey, den du hinzufügst, speichert Nexa seinen öffentlichen Schlüssel, seinen Namen und wann er benutzt wurde, sowie eine Kopie deines privaten Schlüssels, die nur dieser Passkey entsperren kann.",
   "look.plugins.back": "Zurück",
   "look.plugins.continue": "Weiter",
   "look.plugins.dangerous": "Gefährlich",

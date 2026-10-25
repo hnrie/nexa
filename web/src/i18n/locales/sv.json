@@ -6551,6 +6551,7 @@
   "keybinds.takenByPlugin": "{name} från {plugin} använder redan de här tangenterna.",
   "legal.newAddresses": "Av säkerhetsskäl sparar Nexa nu IP-adresserna ditt konto loggar in och är aktivt från, i 180 dagar efter att varje adress senast användes. Teamet ser vilka konton som delar en adress, aldrig själva adresserna.",
   "legal.newCaptcha": "Captchan är nu hCaptcha. Din webbläsare eller app laddar den från hcaptcha.com, och Nexa skickar din IP-adress till hCaptcha när den kontrollerar en.",
+  "legal.newPasskeys": "Nycklar: för varje nyckel du lägger till sparar Nexa dess publika nyckel, dess namn och när den användes, samt en kopia av din privata nyckel som bara den nyckeln kan låsa upp.",
   "look.plugins.back": "Tillbaka",
   "look.plugins.continue": "Fortsätt",
   "look.plugins.dangerous": "Farligt",

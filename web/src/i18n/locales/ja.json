@@ -6317,6 +6317,7 @@
   "keybinds.takenByPlugin": "{plugin} の {name} がすでにこのキーを使っています。",
   "legal.newAddresses": "セキュリティのため、Nexa はアカウントがサインイン・利用した IP アドレスを、それぞれ最後に使われてから 180 日間保存するようになりました。スタッフに見えるのはアドレスを共有するアカウントだけで、アドレスそのものは見えません。",
   "legal.newCaptcha": "キャプチャは hCaptcha になりました。ブラウザやアプリは hcaptcha.com から読み込み、Nexa はキャプチャを確認するときにあなたの IP アドレスを hCaptcha に送ります。",
+  "legal.newPasskeys": "パスキー：追加したパスキーごとに、Nexa はその公開鍵、名前、使用日時と、そのパスキーでしか開けない秘密鍵のコピーを保管します。",
   "look.plugins.back": "戻る",
   "look.plugins.continue": "続ける",
   "look.plugins.dangerous": "危険",

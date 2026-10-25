@@ -51,11 +51,12 @@ export function LegalHighlights() {
 
 /**
  * What changed since the version `previous` (what this account agreed to
- * before): the account addresses kept for security, then what each older
- * version brought, for an agreement from before it.
+ * before): the passkeys' wrapped keys, then what each older version
+ * brought, for an agreement from before it.
  */
 export function LegalChanges({ previous }: { previous: string }) {
-  const changes = [t("legal.newAddresses")];
+  const changes = [t("legal.newPasskeys")];
+  if (previous < "2026-10-20.2") changes.push(t("legal.newAddresses"));
   if (previous < "2026-10-20.1") changes.push(t("legal.newCaptcha"));
   if (previous < "2026-10-19") changes.push(t("legal.new1"), t("legal.new2"), t("legal.new3"), t("legal.new4"), t("legal.new5"));
   return (

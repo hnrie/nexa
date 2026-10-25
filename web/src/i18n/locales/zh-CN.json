@@ -6317,6 +6317,7 @@
   "keybinds.takenByPlugin": "{plugin} 的{name}已在使用这些按键。",
   "legal.newAddresses": "出于安全考虑，Nexa 现在会保存你的账号登录和活动时使用的 IP 地址，每个地址在最后一次使用后保留 180 天。管理团队能看到哪些账号共用地址，但永远看不到地址本身。",
   "legal.newCaptcha": "验证码现在使用 hCaptcha。你的浏览器或应用从 hcaptcha.com 加载它，Nexa 在检查验证码时会把你的 IP 地址发送给 hCaptcha。",
+  "legal.newPasskeys": "通行密钥：对于你添加的每个通行密钥，Nexa 会保存它的公钥、名称和使用时间，以及一份只有该通行密钥才能解锁的私钥副本。",
   "look.plugins.back": "返回",
   "look.plugins.continue": "继续",
   "look.plugins.dangerous": "危险",

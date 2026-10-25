@@ -6317,6 +6317,7 @@
   "keybinds.takenByPlugin": "{plugin}의 {name}이(가) 이미 이 키를 씁니다.",
   "legal.newAddresses": "보안을 위해 Nexa는 이제 계정이 로그인하고 활동한 IP 주소를 각각 마지막으로 사용된 뒤 180일 동안 보관합니다. 운영진은 어떤 계정이 주소를 공유하는지만 볼 수 있고 주소 자체는 볼 수 없습니다.",
   "legal.newCaptcha": "이제 캡차는 hCaptcha입니다. 브라우저나 앱이 hcaptcha.com에서 불러오며, Nexa는 캡차를 확인할 때 IP 주소를 hCaptcha에 보냅니다.",
+  "legal.newPasskeys": "패스키: 추가한 패스키마다 Nexa는 그 공개 키, 이름, 사용 시각과, 그 패스키로만 열 수 있는 개인 키 사본을 보관해요.",
   "look.plugins.back": "뒤로",
   "look.plugins.continue": "계속",
   "look.plugins.dangerous": "위험",

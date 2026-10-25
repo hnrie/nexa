@@ -6664,6 +6664,7 @@
   "keybinds.takenByPlugin": "{name} do {plugin} já usa estas teclas.",
   "legal.newAddresses": "Por segurança, a Nexa agora guarda os endereços IP de onde sua conta entra e fica ativa, por 180 dias depois do último uso de cada um. A equipe vê quais contas compartilham um endereço, nunca os endereços em si.",
   "legal.newCaptcha": "O captcha agora é o hCaptcha. Seu navegador ou app o carrega de hcaptcha.com, e o Nexa envia seu endereço IP ao hCaptcha ao verificar um.",
+  "legal.newPasskeys": "Chaves de acesso: para cada chave que você adicionar, o Nexa guarda a chave pública, o nome e quando foi usada, e uma cópia da sua chave privada que só essa chave pode desbloquear.",
   "look.plugins.back": "Voltar",
   "look.plugins.continue": "Continuar",
   "look.plugins.dangerous": "Perigoso",

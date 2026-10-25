@@ -1,7 +1,7 @@
 NEXA - PRIVACY POLICY
 Site: nexa.fish (also at mathtest.lol, and formerly chat.evilion.xyz)
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-10-20
+Effective: 2026-10-25
 
 This policy lists exactly what Nexa holds. It is written against the
 actual database, so if something is not listed here, there is no place
@@ -62,8 +62,10 @@ under data protection law, including the GDPR (sections 9 to 11).
   device; your browser or app only sends a derived check value. Your
   recovery key is shown once on your device and never stored anywhere.
 - Your private identity key and your conversation keys. Your private
-  key sits on the server only wrapped by your password or recovery
-  key. Conversation keys sit on the server only sealed separately to
+  key sits on the server only wrapped by your password, by your
+  recovery key, or by a passkey you added (wrapped with a secret only
+  that passkey can produce, which never reaches the server).
+  Conversation keys sit on the server only sealed separately to
   each member. Nobody who runs Nexa holds a key that can open any of
   this, except the keys of apps (section 3j). There is no spare key,
   no master key, and no escrow.
@@ -157,11 +159,14 @@ f) Login checks (values not handed over, listed to close the point):
    the password check value, the password stretching salt and
    settings, your public key, your wrapped private key (cannot be
    opened without your password), and the wrapped recovery copy with
-   its check value. With two-factor sign in on, also its secret,
-   sealed with a key only the server has (the server needs it to check
-   your codes), and your backup codes as keyed hashes, with when each
-   was used. None of these is a password, and none can be turned into
-   one.
+   its check value. For each passkey you add: its public key and id,
+   the name you gave it, the site it was made for, when it was added
+   and last used, a sign-in counter, and your private key wrapped by
+   it (cannot be opened without that passkey). With two-factor sign
+   in on, also its secret, sealed with a key only the server has (the
+   server needs it to check your codes), and your backup codes as
+   keyed hashes, with when each was used. None of these is a password,
+   and none can be turned into one.
 
 g) Moderation records (not end-to-end encrypted, kept as the record
    of how Nexa is moderated):
