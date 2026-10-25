@@ -7,6 +7,7 @@ import { hasSavedSession } from "@/stores/auth";
 
 const HomePage = lazyPage(() => import("@/pages/HomePage"));
 const LoginPage = lazyPage(() => import("@/pages/LoginPage"));
+const QrApprovePage = lazyPage(() => import("@/pages/QrApprovePage"));
 const RegisterPage = lazyPage(() => import("@/pages/RegisterPage"));
 const RecoverPage = lazyPage(() => import("@/pages/RecoverPage"));
 const FriendsPage = lazyPage(() => import("@/pages/FriendsPage"));
@@ -59,6 +60,7 @@ export function AppRoutes() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<RedirectIfAuthed><LoginPage /></RedirectIfAuthed>} />
+        <Route path="/login/qr" element={<QrApprovePage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/recover" element={<RecoverPage />} />
         <Route path="/invite/:code" element={<InvitePage />} />

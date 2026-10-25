@@ -153,7 +153,7 @@ class Session:
 
     def login(self):
         p = self.page
-        p.goto(self.base + "/login", wait_until="networkidle")
+        p.goto(self.base + "/login", wait_until="domcontentloaded")  # the QR code keeps a request open, so the network never goes quiet
         p.fill("input[autocomplete=username]", self.name)
         p.fill("input[type=password]", PASSWORD)
         p.click("button[type=submit]")

@@ -328,6 +328,7 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
 | `totp` | RFC 6238 codes for two-factor sign-in |
 | `unfurl` | link previews with SSRF protection (public addresses only, redirects checked, bodies capped) |
 | `voice` | the in-memory registry of who is in which call and what each device publishes |
+| `webauthn` | the server's half of passkeys: client data, authenticator data, COSE keys (a small CBOR reader) and ES256, EdDSA and RS256 signatures, standard library only; `webauthn/fake` is a software passkey for tests |
 
 ### HTTP API (`internal/api`)
 
@@ -344,7 +345,8 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
 - `moderation_gate.go` lists what a muted or banned account may still do. A new signed-in route is
   closed to them until it is added there.
 - Areas, by file: `auth_handlers` and `mfa_handlers` (register, KDF parameters, login, recovery,
-  password, sessions, TOTP and backup codes), `user_handlers` (me, encrypted settings, keys, search,
+  password, sessions, TOTP and backup codes), `passkey_handlers` and `qr_login` (see Signing in
+  below), `user_handlers` (me, encrypted settings, keys, search,
   profiles, deletion), `relationship_handlers`, `channel_handlers` (DMs, groups, icons, recipients,
   typing, attachments, pins), `group_handlers`, `subchat_handlers` (sub-conversations of a DM, with an
   optional password), `message_handlers` (history, send, edit, delete, bulk delete, ack, reactions),
@@ -491,7 +493,7 @@ request may meet a captcha is disabled until that request ends (the Public Pack 
   against. chatd refuses to start on a database a newer build has migrated, so a release with a
   migration cannot roll back to `bin/chatd.prev`.
 - The tables, by area: accounts (`users`, `sessions`, `user_ips`, `user_settings`, `user_mfa`,
-  `mfa_backup_codes`, `user_sounds`, `username_holds`), people (`relationships`), conversations
+  `mfa_backup_codes`, `passkeys`, `user_sounds`, `username_holds`), people (`relationships`), conversations
   (`channels` for every kind, `dm_participants`, `channel_overwrites`, `channel_unlocks`,
   `thread_members`, `channel_follows`, `crossposts`), messages (`messages` with `ciphertext`, and
   `plain` for webhook and system text; `attachments`, `reactions`, `pins`, `read_states`, `polls`,
@@ -675,6 +677,44 @@ and those it pulls, to `tunedRemote` (which sets what the sender's encoder makes
 (this device's own descriptions, where a decoder learns to play stereo) at every exchange. The SFU
 meter charges a pulled share sound at `StreamAudioBps` (128 kbit/s). The mesh keeps the voice tuning.
 
+### Signing in: passkeys, QR codes, more than one account
+
+- Passkeys (`api/passkey_handlers.go`, `internal/webauthn`, table `passkeys`) sign in and open the
+  messages in one step. The app asks the passkey for its PRF output for the fixed input
+  `nexa passkey prf v1`, makes a key from it with HKDF (`nexa passkey identity v1`) and wraps the
+  identity key with that; the server keeps the wrapped copy beside the passkey's public key and
+  hands it back only to a sign-in the passkey signed. A passkey that gives no PRF output is refused
+  when it is added (the owner's choice, 2026-10-25), since it could sign in but never read a
+  message. Adding one takes the password (`requirePassword`, captcha action `passkey`); signing in
+  takes no username and skips the second factor, as user verification is required. A passkey
+  belongs to the address it was made on (its RP ID, from the request's Origin, else PUBLIC_URL's
+  host); the Android app's origin is the published signing certificate's hash, and
+  `/.well-known/assetlinks.json` carries `get_login_creds` for it. Answered challenges are kept in
+  memory per process so one answer signs in once, and a counter that goes back is refused. Web
+  `lib/passkeys.ts` and `components/settings/PasskeysSection.tsx` (Settings, Security); Android
+  `data/Passkeys` through AndroidX Credential Manager, offered from Android 14 only, since the app
+  carries no Play services.
+- QR sign-in (`api/qr_login.go`, web `lib/qrLogin.ts`, Android `data/QrLogin`): a device that is
+  not signed in makes a one-time X25519 key and shows a code that is a link to
+  `/login/qr#<id>.<public key>`, and long-polls `GET /auth/qr/{id}` (so the login page never goes
+  network-idle: the test scripts load it with `domcontentloaded`). A signed-in phone scans it (the
+  Android app's Scan QR Code, CameraX with ZXing in `ui/auth/QrLogin.kt`, or any phone camera,
+  which opens `/login/qr`: web `pages/QrApprovePage.tsx`, Android `openQrApprove` through
+  `Nav.openPath`), is told the asking device's user agent, and on Log In seals the identity key to
+  the key in the code, never one the server names. The server makes the session and hands the
+  token and box over once. Requests live in memory for three minutes, per process. The login page
+  shows the code only from 768 px (web `pages/QrSignIn.tsx`, Android `QrSignInPanel`).
+- More than one account (web `lib/accounts.ts`, Android `data/Accounts`): the accounts signed in
+  on a device keep their tokens in a list (`ec.accounts`, Android's secure store `accounts`), at
+  most five; keys stay where they always were, per account. Only one runs: switching ends the
+  call and connection, puts the other token in place and opens the app again (a page load on the
+  web, `Auth.switchTo` on Android, run on `Nexa.scope` since the screen that asks leaves as it
+  starts). Add Account leaves the account signed in and opens the login page, which offers "Back
+  to" each saved one. Logging out goes on with the next saved account. The status menu (web
+  `shell/UserPanel.tsx`, Android `openStatusSheet` in `ui/shell/Dock.kt`) holds the switch for
+  notification sounds (the account's `notifications.sounds`), the other accounts with a way to log
+  each out, Add Account and, on Android, Scan QR Code.
+
 ### Nexa, moderation and safety
 
 - Nexa is the account the service speaks as: notices, announcements, and case threads where a
@@ -795,7 +835,7 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
 
 ### Routes (`routes.tsx`)
 
-`/` (home), `/login`, `/register`, `/recover`, `/invite/:code`, `/note/:token`, `/download`,
+`/` (home), `/login`, `/login/qr` (approving a QR sign-in), `/register`, `/recover`, `/invite/:code`, `/note/:token`, `/download`,
 `/terms`, `/privacy`, `/about`, `/call/:code` (guest call), `/stickers/pack/:packId`,
 `/connected/discord`, `/oauth2/authorize` (the consent page for adding an app), and inside the
 signed-in shell `/channels/@me` (friends), `@me/nexa` (with

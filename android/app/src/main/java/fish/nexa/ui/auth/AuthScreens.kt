@@ -24,6 +24,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -338,7 +342,31 @@ fun LoginScreen(onRegister: () -> Unit, onRecover: () -> Unit) {
         return
     }
 
-    AuthLayout(t("login.welcomeBack"), t("login.weReSoExcitedToSee")) {
+    val activity = androidx.activity.compose.LocalActivity.current
+    var passkeyBusy by remember { mutableStateOf(false) }
+    fun submitPasskey() {
+        val act = activity ?: return
+        if (passkeyBusy) return
+        passkeyBusy = true
+        error = null
+        wrong = null
+        scope.launch {
+            try {
+                val (me, token, identity) = fish.nexa.data.Passkeys.signIn(act)
+                Nexa.auth.loginWith(me, token, identity)
+            } catch (e: Exception) {
+                if (!fish.nexa.data.Passkeys.cancelled(e)) error = describe(e, t("passkeys.couldNotSignIn"))
+            } finally {
+                passkeyBusy = false
+            }
+        }
+    }
+    // the accounts already signed in here, when this is Add Account
+    val saved by fish.nexa.data.Accounts.list.collectAsState()
+    // a phone cannot scan its own screen, so the code is for wider ones (as the web's 768 px)
+    val wide = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 768
+
+    val form: @Composable ColumnScope.() -> Unit = {
         error?.let { ErrorBox(it) }
         NxTextField(username, { username = it; wrong = null }, label = t("settings.account.username"), required = true, keyboardType = KeyboardType.Email)
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -346,8 +374,47 @@ fun LoginScreen(onRegister: () -> Unit, onRecover: () -> Unit) {
             NxButton(t("login.forgotYourPassword"), onRecover, kind = ButtonKind.LINK, inline = true, modifier = Modifier.padding(top = 0.dp).graphicsLayer { translationY = -8.dp.toPx() })
         }
         NxButton(t("login.logIn"), { submitPassword() }, size = ButtonSize.LG, block = true, loading = busy)
+        if (fish.nexa.data.Passkeys.supported) {
+            NxButton(t("passkeys.logInWithAPasskey"), { submitPasskey() }, kind = ButtonKind.SECONDARY, size = ButtonSize.LG, block = true, icon = "KeyRound", loading = passkeyBusy)
+        }
         Note(t("login.staySignedIn"))
         Foot(t("login.needAnAccount"), t("login.register"), onRegister)
+        if (saved.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.graphicsLayer { translationY = -4.dp.toPx() }) {
+                // on the app's scope: this screen leaves as the switch begins, and its own scope goes with it
+                for (a in saved) BackToAccount(a) { Nexa.scope.launch { Nexa.auth.switchTo(a.id) } }
+            }
+        }
+    }
+
+    AuthLayout(t("login.welcomeBack"), t("login.weReSoExcitedToSee"), maxWidth = if (wide) 820 else 480) {
+        if (wide) {
+            Row(horizontalArrangement = Arrangement.spacedBy(32.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) { form() }
+                Box(Modifier.width(1.dp).height(320.dp).background(Nx.colors.borderSubtle))
+                QrSignInPanel(Modifier.width(232.dp)) { error = it }
+            }
+        } else {
+            form()
+        }
+    }
+}
+
+/** Add Account: the way back to an account already signed in on this phone. */
+@Composable
+private fun BackToAccount(a: fish.nexa.data.Accounts.Saved, onClick: () -> Unit) {
+    val c = Nx.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(Radii.Sm)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        fish.nexa.ui.components.Avatar(a.id, a.name, a.avatarId, 24.dp)
+        Txt(t("accounts.backTo", "name" to a.name), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
     }
 }
 

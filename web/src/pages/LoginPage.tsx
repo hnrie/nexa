@@ -7,7 +7,13 @@ import { safeNext } from "@/lib/nextPath";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { useAuth } from "@/stores/auth";
+import { useMediaQuery } from "@/hooks/useIsMobile";
+import { switchAccount, useAccounts } from "@/lib/accounts";
+import { passkeyCancelled, passkeysSupported, signInWithPasskey } from "@/lib/passkeys";
+import { KeyRound } from "lucide-react";
+import { Avatar } from "@/components/common/Avatar";
 import { AuthLayout, usePageTitle } from "./AuthLayout";
+import { QrSignIn } from "./QrSignIn";
 import s from "./Auth.module.css";
 
 import { t } from "@/i18n";
@@ -17,6 +23,12 @@ export default function LoginPage() {
   const login = useAuth((a) => a.login);
   const completeMfa = useAuth((a) => a.completeMfa);
   const cancelMfa = useAuth((a) => a.cancelMfa);
+  const loginWith = useAuth((a) => a.loginWith);
+  // the accounts already signed in here, when this is Add Account
+  const saved = useAccounts((a) => a.list);
+  // a phone cannot scan its own screen, so the code is for wider ones
+  const wide = useMediaQuery("(min-width: 768px)");
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -84,6 +96,22 @@ export default function LoginPage() {
       }
     } finally {
       setBusy(false);
+    }
+  };
+
+  const onPasskey = async () => {
+    if (passkeyBusy) return;
+    setPasskeyBusy(true);
+    setError(null);
+    setWrong(null);
+    try {
+      const out = await signInWithPasskey();
+      await loginWith(out.me, out.token, out.identity);
+      go();
+    } catch (err) {
+      if (!passkeyCancelled(err)) setError(describe(err, t("passkeys.couldNotSignIn")));
+    } finally {
+      setPasskeyBusy(false);
     }
   };
 
@@ -161,8 +189,7 @@ export default function LoginPage() {
     );
   }
 
-  return (
-    <AuthLayout title={t("login.welcomeBack")} subtitle={t("login.weReSoExcitedToSee")} banner>
+  const form = (
       <form className={s.form} onSubmit={(e) => void onPassword(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
         <Field label={t("settings.account.username")} required>
@@ -177,13 +204,41 @@ export default function LoginPage() {
           <Link to="/recover" className={s.forgot}>{t("login.forgotYourPassword")}</Link>
         </div>
         <Button type="submit" size="lg" block loading={busy}>{t("login.logIn")}</Button>
+        {passkeysSupported() ? (
+          <Button type="button" variant="secondary" size="lg" block loading={passkeyBusy} onClick={() => void onPasskey()} data-testid="passkey-login">
+            <KeyRound size={18} /> {t("passkeys.logInWithAPasskey")}
+          </Button>
+        ) : null}
         {/* Sessions are long, and nothing said so: someone on a shared
             computer had no reason to think they should log out. */}
         <p className={s.note}>{t("login.staySignedIn")}</p>
         <div className={s.foot}>
           {t("login.needAnAccount")} <Link to="/register">{t("login.register")}</Link>
         </div>
+        {saved.length ? (
+          // Add Account: the way back to an account already signed in here
+          <div className={s.backTo}>
+            {saved.map((a) => (
+              <button key={a.id} type="button" className={s.backToAccount} onClick={() => void switchAccount(a.id)}>
+                <Avatar id={a.id} avatarId={a.avatar_id} name={a.display_name} size={24} />
+                <span>{t("accounts.backTo", { name: a.display_name })}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </form>
+  );
+
+  return (
+    <AuthLayout title={t("login.welcomeBack")} subtitle={t("login.weReSoExcitedToSee")} banner width={wide ? 820 : 480}>
+      {wide ? (
+        <div className={s.split}>
+          {form}
+          <QrSignIn onDone={go} onError={setError} />
+        </div>
+      ) : (
+        form
+      )}
     </AuthLayout>
   );
 }

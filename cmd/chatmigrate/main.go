@@ -214,6 +214,7 @@ var keyColumns = []struct{ table, cols string }{
 	{"user_settings", "user_id, blob, version"},
 	{"blobs", "id, sha256, size, mime, kind"},
 	{"sessions", "id, user_id, token_hash"},
+	{"passkeys", "id, user_id, credential_id, public_key, alg, sign_count, rp_id, enc_private_key"},
 	{"attachments", "id, blob_id, size"},
 	// the second factor: a sealed secret or a backup code that came across
 	// wrong is an account nobody can sign in to

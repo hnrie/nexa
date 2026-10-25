@@ -124,6 +124,11 @@ object Nav {
             fish.nexa.ui.notes.openNoteLink(parts[1], path.substringAfter('#', ""))
             return true
         }
+        // a login page's QR code, scanned with the phone's own camera: let that device in
+        if (parts == listOf("login", "qr")) {
+            fish.nexa.ui.auth.openQrApprove(path.substringAfter('#', ""))
+            return true
+        }
         // an invite link, a profile link
         if (parts.size == 2 && parts[0] == "invite") {
             fish.nexa.ui.dialogs.Dialogs.openInvite(parts[1], path.substringAfter('#', "").let { if (it.isEmpty()) "" else "#$it" })

@@ -17,7 +17,7 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 
 
 def login(page, base, username, password):
-    page.goto(f"{base}/login", wait_until="networkidle")
+    page.goto(f"{base}/login", wait_until="domcontentloaded")  # the QR code keeps a request open, so the network never goes quiet
     page.fill("input[autocomplete=username]", username)
     page.fill("input[type=password]", password)
     page.click("button[type=submit]")

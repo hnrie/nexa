@@ -147,6 +147,7 @@ From the owner (CLAUDE.md and standing feedback):
 | Thread and Nexa headers keep their second line under the title instead of cutting it | Done: Nexa page, case and bug pages |
 | A subchat's password dialog keeps the name already typed; a new subchat opens; deleting one only leaves it if you are in it | Done: SubchatPanel, SubchatModal |
 | Share pictures and text into Nexa from any app | To do: a share target in the installed web app's manifest |
+| Scan QR Code in the status sheet, to let another device in | Partly: a phone's own camera opens the code's link on the web; a scanner in the web app is still to do |
 | Picture-in-picture when leaving the app mid-call | To do: the browser's picture-in-picture for the call's video |
 | Answer from the notification | Not possible on the web (notifications cannot take text) |
 | Pinch-to-zoom pictures that pull down to close | Already there (Lightbox) |

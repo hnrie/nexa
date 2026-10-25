@@ -71,6 +71,7 @@
                 <data android:pathPrefix="/invite/" />
                 <data android:pathPrefix="/note/" />
                 <data android:pathPattern="/@.*" />
+                <data android:path="/login/qr" />
                 <data android:path="/oauth2/authorize" />
             </intent-filter>
             <!-- sharing into Nexa from other apps: words, links, pictures and files -->

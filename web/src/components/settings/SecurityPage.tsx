@@ -13,6 +13,7 @@ import { authKeyFor } from "@/lib/passwordProof";
 import { users as usersApi } from "@/api/users";
 import { autoLockChoices, blurDelayChoices, DEFAULT_LOCK, loadLock, passcodeProblem, patchLock, type LockConfig } from "@/lib/appLock";
 import { EncryptionSection } from "./EncryptionSection";
+import { PasskeysSection } from "./PasskeysSection";
 import { describeError } from "@/lib/errors";
 import { copyText } from "@/lib/copyText";
 import { downloadText } from "@/pages/AuthLayout";
@@ -222,6 +223,8 @@ export default function SecurityPage() {
         )}
       </div>
       {!checking && !unknown && on && left === 0 ? <div className={s.dangerBox} style={{ marginTop: 12 }}>{t("settings.security.youHaveNoBackupCodesLeft")}</div> : null}
+
+      <PasskeysSection />
 
       <h3 data-setting="appLock" className={s.h5} style={{ marginTop: 28 }}><Lock size={16} /> {t("settings.security.appLock")}</h3>
       <p className={s.hint}>{t("settings.security.appLockHint")}</p>

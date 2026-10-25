@@ -23,6 +23,8 @@ var banAllowed = map[string]bool{
 	"POST /api/v1/auth/logout":          true,
 	"GET /api/v1/auth/sessions":         true,
 	"DELETE /api/v1/auth/sessions/{id}": true,
+	"GET /api/v1/auth/passkeys":         true,
+	"DELETE /api/v1/auth/passkeys/{id}": true,
 	"POST /api/v1/client-errors":        true,
 }
 
@@ -41,6 +43,13 @@ var muteAllowed = map[string]bool{
 	"POST /api/v1/auth/mfa/totp/enable":                                 true,
 	"POST /api/v1/auth/mfa/disable":                                     true,
 	"POST /api/v1/auth/mfa/backup":                                      true,
+	"POST /api/v1/auth/passkeys/options":                                true,
+	"POST /api/v1/auth/passkeys":                                        true,
+	"PATCH /api/v1/auth/passkeys/{id}":                                  true,
+	"DELETE /api/v1/auth/passkeys/{id}":                                 true,
+	"POST /api/v1/auth/qr/{id}/scan":                                    true, // signing themselves in elsewhere
+	"POST /api/v1/auth/qr/{id}/approve":                                 true,
+	"POST /api/v1/auth/qr/{id}/deny":                                    true,
 	"PUT /api/v1/users/@me/settings":                                    true,
 	"POST /api/v1/users/@me/delete":                                     true,
 	"PATCH /api/v1/users/@me":                                           true, // clearing fields and private preferences only

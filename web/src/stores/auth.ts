@@ -15,6 +15,7 @@ import { useNexa } from "@/stores/nexa";
 import { ReadableError } from "@/lib/readableError";
 import { storage } from "@/lib/storage";
 import { wipeSearchIndex } from "@/search/keys";
+import { forgetAccount, forgetToken, nextAccount, rememberAccount } from "@/lib/accounts";
 
 import { t } from "@/i18n";
 /** "offline": a token is stored, but the server or this device's key store could not be reached. */
@@ -56,6 +57,8 @@ interface AuthState {
   bootstrap: () => Promise<void>;
   register: (username: string, displayName: string, password: string, extra?: { invite_code?: string; registration_key?: string }) => Promise<{ recoveryKey: string }>;
   login: (username: string, password: string) => Promise<LoginOutcome>;
+  /** Signs in with what a passkey or a phone (a QR code) handed over: the session and the identity key. */
+  loginWith: (me: MeUser, token: string, identity: Identity) => Promise<void>;
   /** Finishes a sign-in that stopped for a second factor. */
   completeMfa: (proof: { code?: string; backupCode?: string }) => Promise<void>;
   cancelMfa: () => void;
@@ -125,6 +128,7 @@ async function finishLogin(set: (s: Partial<AuthState>) => void, me: MeUser, tok
   // With a passcode set, the only copy of the key on this device is the wrapped
   // one, so the plaintext must never go back into the key store.
   if (!hasLock(me.id)) await keystore.saveIdentity(me.id, identity);
+  rememberAccount(me, token);
   set({ status: "ready", me, token, identity, settingsKey: deriveSettingsKey(identity.privateKey), error: null });
 }
 
@@ -150,6 +154,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     try {
       const me = await usersApi.me();
       useNexa.getState().setState(me.nexa);
+      rememberAccount(me, token);
       if (hasLock(me.id)) {
         set({ status: "pinlocked", me, identity: null, settingsKey: null });
         return;
@@ -162,6 +167,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       set({ status: "ready", me, identity, settingsKey: deriveSettingsKey(identity.privateKey), error: null });
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
+        forgetToken(token);
         storage.remove(TOKEN_KEY);
         api.setToken(null);
         set({ status: "anonymous", token: null, me: null });
@@ -214,6 +220,11 @@ export const useAuth = create<AuthState>()((set, get) => ({
     const privateKey = await unwrapPrivateKey(b64.dec(res.enc_private_key), encKey);
     await finishLogin(set, res.user, res.token, { publicKey: b64.dec(res.public_key), privateKey });
     return { mfa: false };
+  },
+
+  loginWith: async (me, token, identity) => {
+    pendingMfa = null;
+    await finishLogin(set, me, token, identity);
   },
 
   completeMfa: async ({ code, backupCode }) => {
@@ -415,9 +426,21 @@ export const useAuth = create<AuthState>()((set, get) => ({
       // sat "ready" with no token and no connection, going nowhere.
       set({ status: "anonymous", me: null, token: null, identity: null, settingsKey: null, error: null });
     }
+    // another account signed in on this browser carries on in its place
+    if (me) forgetAccount(me.id);
+    const next = nextAccount();
+    if (next) {
+      storage.set(TOKEN_KEY, next.token);
+      location.assign("/channels/@me");
+    }
   },
 
-  setMe: (me) => set({ me }),
+  setMe: (me) => {
+    set({ me });
+    // the switcher shows the name and picture as they are now
+    const token = get().token;
+    if (token) rememberAccount(me, token);
+  },
 }));
 
 /**

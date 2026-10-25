@@ -26,6 +26,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -151,6 +152,7 @@ class Auth(private val nx: Nexa) {
             nx.api.get("/users/@me", MeUser.serializer())
         } catch (e: ApiError) {
             if (e.status == 401) {
+                Accounts.forgetToken(token)
                 clearLocal(null)
                 _state.value = AuthState.Anonymous
             } else if (e.isTransient) {
@@ -160,6 +162,7 @@ class Auth(private val nx: Nexa) {
             }
             return
         }
+        Accounts.remember(me, token)
         // with a passcode, every start opens on the passcode screen
         if (AppLock.has(me.id)) {
             _state.value = AuthState.PinLocked(me, adopting = false)
@@ -189,6 +192,7 @@ class Auth(private val nx: Nexa) {
     }
 
     private fun begin(me: MeUser, identity: Identity) {
+        nx.api.token?.let { Accounts.remember(me, it) }
         nx.users.setMe(me)
         nx.misc.nexa.value = me.nexa
         NexaInbox.setState(me.nexa)
@@ -235,6 +239,16 @@ class Auth(private val nx: Nexa) {
         }, auth = false)
         finish(res, enc)
         pendingEncKey = null
+    }
+
+    /** Signs in with what a passkey or a phone (a QR code) handed over: the session and the identity key. */
+    fun loginWith(me: MeUser, token: String, identity: Identity) {
+        pendingEncKey = null
+        nx.api.token = token
+        nx.secure.putString("token", token)
+        nx.secure.putString("account", me.id)
+        saveIdentity(me.id, identity)
+        begin(me, identity)
     }
 
     private fun finish(res: LoginResult, encKey: ByteArray) {
@@ -390,8 +404,71 @@ class Auth(private val nx: Nexa) {
         nx.session.reset()
         nx.settings.reset()
         clearLocal(uid)
-        _state.value = AuthState.Anonymous
         Log.i(TAG, "signed out: $reason")
+        // another account signed in on this phone carries on in its place
+        if (uid != null) Accounts.forget(uid)
+        val next = Accounts.next()
+        if (next != null) open(next) else _state.value = AuthState.Anonymous
+    }
+
+    // ---- more than one account (web/src/lib/accounts.ts) ----
+
+    /**
+     * Puts the account open here away without signing it out: its call and
+     * connection end and what it showed leaves memory, but its token stays on
+     * the list and its keys where they are.
+     */
+    private suspend fun putAway() {
+        fish.nexa.voice.Calls.leave()
+        nx.settings.flush()
+        nx.session.reset()
+        nx.settings.reset()
+        nx.keys.reset()
+        nx.users.setMe(null)
+        NexaInbox.reset()
+        PrivateFiles.clear()
+        fish.nexa.notes.Notes.clear()
+        fish.nexa.media.Media.clear()
+        nx.api.token = null
+        nx.secure.delete("token")
+    }
+
+    private suspend fun open(account: Accounts.Saved) {
+        nx.api.token = account.token
+        nx.secure.putString("token", account.token)
+        nx.secure.putString("account", account.id)
+        _state.value = AuthState.Loading
+        // waits for a check already running (the app starting) rather than
+        // skipping, which left the splash up for good
+        booting.withLock { bootstrapOnce() }
+    }
+
+    /** Opens the app as another account signed in on this phone. */
+    suspend fun switchTo(id: String) {
+        val to = Accounts.find(id) ?: return
+        if (to.id == nx.users.meId) return
+        putAway()
+        open(to)
+    }
+
+    /** Leaves the account open here signed in and shows the sign-in screen for another. */
+    suspend fun addAccount() {
+        putAway()
+        _state.value = AuthState.Anonymous
+    }
+
+    /** Signs out an account that is not the one open: its session on the server, then what this phone kept for it. */
+    suspend fun removeAccount(id: String) {
+        val acct = Accounts.find(id) ?: return
+        if (id == nx.users.meId) return
+        Accounts.forget(id)
+        try {
+            nx.api.request("POST", "/auth/logout", headers = mapOf("Authorization" to "Bearer ${acct.token}"), auth = false)
+        } catch (_: Exception) {
+        }
+        nx.secure.delete("identity-$id")
+        nx.secure.delete("roots-$id")
+        AppLock.clear(id)
     }
 
     private fun clearLocal(uid: String?) {

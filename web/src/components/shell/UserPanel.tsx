@@ -1,4 +1,4 @@
-import { Download, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Pencil, Settings } from "lucide-react";
+import { Bell, Download, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Pencil, Plus, Settings, X } from "lucide-react";
 import { applyUpdate } from "@/lib/appUpdate";
 import { useDesktop } from "@/stores/desktop";
 import { useEffect, useRef, useState } from "react";
@@ -12,6 +12,8 @@ import { useUI } from "@/stores/ui";
 import { useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 import s from "./UserPanel.module.css";
+import ts from "@/components/common/Toggle.module.css";
+import { addAccount, canAddAccount, MAX_ACCOUNTS, removeAccount, switchAccount, useAccounts } from "@/lib/accounts";
 import { openDeviceMenu } from "@/components/voice/deviceMenus";
 import { ActivityToggle } from "@/components/activity/ActivityToggle";
 import { bindText, keybindsOf } from "@/lib/keybinds";
@@ -51,6 +53,8 @@ export function UserPanel() {
   const modMute = useVoice((v) => !!v.mine?.server_mute && !v.mine.suppress);
   const modDeaf = useVoice((v) => !!v.mine?.server_deaf);
   const toast = useUI((u) => u.toast);
+  const sounds = useSettings((x) => x.settings.notifications.sounds);
+  const accounts = useAccounts((a) => a.list);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -93,6 +97,23 @@ export function UserPanel() {
     gateway()?.sendPresence({ status: value });
     setPresence({ user_id: me.id, status: value, status_text: presence?.status_text ?? "", status_emoji: presence?.status_emoji ?? "", status_expires_at: presence?.status_expires_at ?? null });
     setOpen(false);
+  };
+
+  const setSounds = (on: boolean) => {
+    const n = useSettings.getState().settings.notifications;
+    useSettings.getState().patch({ notifications: { ...n, sounds: on } });
+  };
+
+  const others = accounts.filter((a) => a.id !== me.id);
+  const askRemove = (id: string, name: string) => {
+    setOpen(false);
+    openModal("confirm", {
+      title: t("accounts.removeTitle", { name }),
+      body: t("accounts.removeBody"),
+      confirmLabel: t("accounts.remove"),
+      danger: true,
+      onConfirm: () => removeAccount(id),
+    });
   };
 
   const openMicMenu = (at: { x: number; y: number }) =>
@@ -180,6 +201,42 @@ export function UserPanel() {
               </span>
             </button>
           ))}
+          <div className={s.sep} role="separator" />
+          <button className={s.opt} role="menuitemcheckbox" aria-checked={sounds} onClick={() => setSounds(!sounds)} data-testid="menu-sounds">
+            <Bell size={16} />
+            <span className={s.optText} style={{ flex: 1 }}><span>{t("shell.user.notificationSounds")}</span></span>
+            <span className={ts.switch} data-on={sounds} aria-hidden><span className={ts.knob} /></span>
+          </button>
+          <div className={s.sep} role="separator" />
+          {others.map((a) => (
+            <div key={a.id} className={s.account}>
+              <button className={[s.opt, s.accountOpt].join(" ")} role="menuitem" onClick={() => { setOpen(false); void switchAccount(a.id); }} data-testid="menu-account">
+                <Avatar id={a.id} avatarId={a.avatar_id} name={a.display_name} size={24} />
+                <span className={s.optText}>
+                  <span>{a.display_name}</span>
+                  <span className={s.optSub}>@{a.username}</span>
+                </span>
+              </button>
+              <Tooltip text={t("accounts.remove")}>
+                <button className={s.accountRemove} role="menuitem" aria-label={t("accounts.removeTitle", { name: a.display_name })} onClick={() => askRemove(a.id, a.display_name)}>
+                  <X size={14} />
+                </button>
+              </Tooltip>
+            </div>
+          ))}
+          <button
+            className={s.opt}
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              if (canAddAccount()) void addAccount();
+              else toast(t("accounts.tooMany", { count: MAX_ACCOUNTS }));
+            }}
+            data-testid="menu-add-account"
+          >
+            <Plus size={16} />
+            <span className={s.optText}><span>{t("accounts.addAccount")}</span></span>
+          </button>
           <div className={s.sep} role="separator" />
           <button className={[s.opt, s.danger].join(" ")} role="menuitem" onClick={() => { setOpen(false); confirmLogout(); }}>
             <LogOut size={16} />

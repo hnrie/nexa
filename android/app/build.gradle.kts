@@ -258,8 +258,13 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.2")
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
-    // QR codes of safety numbers
+    // QR codes of safety numbers, and reading the ones a login page shows
     implementation("com.google.zxing:core:3.5.3")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
+    // passkeys, through the system's own credential manager (Android 14 and newer, no Play services)
+    implementation("androidx.credentials:credentials:1.5.0")
 
     implementation("io.coil-kt.coil3:coil-compose:3.6.3")
     implementation("io.coil-kt.coil3:coil-gif:3.6.3")

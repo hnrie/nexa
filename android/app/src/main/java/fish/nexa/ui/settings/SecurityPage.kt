@@ -68,6 +68,7 @@ import kotlinx.serialization.json.put
 fun SecurityPage() {
     PageTitle(t("settings.security.security"))
     TwoFactorSection()
+    PasskeysSection()
     AppLockSection()
     EncryptionSection()
 }
@@ -327,6 +328,118 @@ private fun openDisableSheet(refresh: () -> Unit) {
         Hint(t("settings.security.yourPasswordAloneWillGetInto"))
         NxTextField(password, { password = it }, Modifier.focusRequester(focus), label = t("chat.lockedChannel.password"), required = true, password = true, imeAction = ImeAction.Done, onIme = { submit() })
         NxButton(t("settings.security.turnItOff"), { submit() }, kind = ButtonKind.DANGER, block = true, size = ButtonSize.LG, loading = busy, enabled = password.isNotEmpty())
+    }
+}
+
+// ---- passkeys (web/src/components/settings/PasskeysSection.tsx) ----
+
+@Composable
+private fun PasskeysSection() {
+    val scope = rememberCoroutineScope()
+    var list by remember { mutableStateOf<List<fish.nexa.data.Passkeys.Info>?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    suspend fun refresh() {
+        try {
+            list = fish.nexa.data.Passkeys.list()
+            failed = false
+        } catch (_: Exception) {
+            if (list == null) failed = true
+        }
+    }
+    LaunchedEffect(Unit) { refresh() }
+    val again: () -> Unit = { scope.launch { refresh() } }
+    val activity = androidx.activity.compose.LocalActivity.current
+
+    SectionHeading(t("passkeys.title"), Modifier.settingAnchor("passkeys"), icon = "KeyRound")
+    Hint(t("passkeys.hint"), Modifier.padding(bottom = 14.dp))
+    val keys = list
+    when {
+        keys == null && !failed -> DeviceRow(t("settings.security.oneMoment"), null, "KeyRound", actions = { Spinner(size = 24.dp) })
+        keys == null -> DeviceRow(t("settings.security.weCouldNotAskTheServer"), null, "KeyRound", actions = {
+            NxButton(t("chat.messageList.tryAgain"), { failed = false; again() }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM)
+        })
+        else -> {
+            val host = android.net.Uri.parse(Nexa.api.baseUrl).host
+            for (k in keys) {
+                val sub = (if (k.lastUsedAt > 0) t("passkeys.addedAndUsed", "added" to Time.dateDivider(k.createdAt), "used" to Time.dateDivider(k.lastUsedAt)) else t("passkeys.addedOn", "added" to Time.dateDivider(k.createdAt))) +
+                    (if (k.rpId != host) "\n" + t("passkeys.worksAt", "site" to k.rpId) else "")
+                DeviceRow(k.name.ifBlank { t("passkeys.passkey") }, sub, "KeyRound", actions = {
+                    NxButton(t("passkeys.rename"), { openRenamePasskeySheet(k, again) }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM)
+                    NxButton(t("passkeys.remove"), {
+                        fish.nexa.ui.shell.confirm(t("passkeys.removeTitle", "name" to k.name.ifBlank { t("passkeys.passkey") }), t("passkeys.removeBody"), t("passkeys.remove")) {
+                            fish.nexa.data.Passkeys.remove(k.id)
+                            refresh()
+                        }
+                    }, kind = ButtonKind.DANGER, size = ButtonSize.SM)
+                })
+            }
+            val supported = fish.nexa.data.Passkeys.supported
+            DeviceRow(if (!supported) t("android.passkeys.needsAndroid14") else if (keys.isEmpty()) t("passkeys.none") else t("passkeys.addAnother"), null, null, actions = {
+                if (supported && activity != null) NxButton(t("passkeys.add"), { openAddPasskeySheet(activity, again) }, size = ButtonSize.SM)
+            })
+        }
+    }
+}
+
+/** Add a Passkey: the password, then the system's sheet. */
+private fun openAddPasskeySheet(activity: android.app.Activity, refresh: () -> Unit) {
+    val ctl = SheetCtl(t("passkeys.add"))
+    var password by mutableStateOf("")
+    var name by mutableStateOf("")
+    var error by mutableStateOf<String?>(null)
+    var busy by mutableStateOf(false)
+    val fallback = describeDevice(Nexa.api.userAgent).label
+    fun submit() {
+        val identity = Nexa.keys.identity ?: return
+        if (busy || password.isEmpty()) return
+        busy = true
+        error = null
+        onMain {
+            try {
+                fish.nexa.data.Passkeys.add(activity, password, identity, name.trim().ifEmpty { fallback })
+                refresh()
+                ctl.close()
+                Nexa.ui.toast(t("passkeys.added"), "success")
+            } catch (e: Exception) {
+                if (!fish.nexa.data.Passkeys.cancelled(e)) error = describeError(e, t("passkeys.couldNotAdd"))
+            } finally {
+                busy = false
+            }
+        }
+    }
+    openSettingsSheet("passkey-add", ctl) {
+        error?.let { ErrorBox(it) }
+        Hint(t("passkeys.addHint"))
+        NxTextField(password, { password = it }, label = t("chat.lockedChannel.password"), required = true, password = true, imeAction = ImeAction.Next)
+        NxTextField(name, { name = it.take(64) }, label = t("passkeys.name"), placeholder = fallback, imeAction = ImeAction.Done, onIme = { submit() })
+        NxButton(t("settings.security.continue"), { submit() }, block = true, size = ButtonSize.LG, loading = busy, enabled = password.isNotEmpty())
+    }
+}
+
+private fun openRenamePasskeySheet(key: fish.nexa.data.Passkeys.Info, refresh: () -> Unit) {
+    val ctl = SheetCtl(t("passkeys.rename"))
+    var name by mutableStateOf(key.name)
+    var busy by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
+    fun submit() {
+        if (busy) return
+        busy = true
+        onMain {
+            try {
+                fish.nexa.data.Passkeys.rename(key.id, name.trim())
+                refresh()
+                ctl.close()
+            } catch (e: Exception) {
+                error = describeError(e)
+            } finally {
+                busy = false
+            }
+        }
+    }
+    openSettingsSheet("passkey-rename", ctl) {
+        error?.let { ErrorBox(it) }
+        NxTextField(name, { name = it.take(64) }, label = t("passkeys.name"), imeAction = ImeAction.Done, onIme = { submit() })
+        NxButton(t("passkeys.save"), { submit() }, block = true, size = ButtonSize.LG, loading = busy)
     }
 }
 

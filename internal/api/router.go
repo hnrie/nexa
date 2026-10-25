@@ -72,6 +72,10 @@ type Server struct {
 	// InviteCheck reports whether an invite code allows registration (set by the server layer).
 	InviteCheck func(ctx context.Context, code string) bool
 
+	// QR sign-ins waiting for a phone, and passkey challenges already answered
+	qr           qrLogins
+	spentPasskey spentChallenges
+
 	limGeneric *ratelimit.Limiter
 	limAuthIP  *ratelimit.Limiter
 	limAuthUsr *ratelimit.Limiter

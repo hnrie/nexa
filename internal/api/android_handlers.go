@@ -181,7 +181,8 @@ func (s *Server) handleAssetLinks(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	WriteJSON(w, http.StatusOK, []map[string]any{{
-		"relation": []string{"delegate_permission/common.handle_all_urls"},
+		// links open in the app, and passkeys made here work in it
+		"relation": []string{"delegate_permission/common.handle_all_urls", "delegate_permission/common.get_login_creds"},
 		"target": map[string]any{
 			"namespace":                "android_app",
 			"package_name":             rel.Package,

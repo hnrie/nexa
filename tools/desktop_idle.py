@@ -90,7 +90,7 @@ def call_check(base, server):
                 ctx.set_default_timeout(20000)
                 ctx.add_init_script(count)
                 p = ctx.new_page()
-                p.goto(base + "/login", wait_until="networkidle")
+                p.goto(base + "/login", wait_until="domcontentloaded")  # the QR code keeps a request open, so the network never goes quiet
                 p.fill("input[autocomplete=username]", name)
                 p.fill("input[type=password]", PW)
                 p.click("button[type=submit]")
