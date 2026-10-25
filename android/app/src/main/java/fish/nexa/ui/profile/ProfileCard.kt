@@ -889,13 +889,12 @@ private fun Facts(user: PublicUser, rel: Relationship?, isMe: Boolean, serverId:
 
 /** The popout's own way to say something: a message sent in your DM with them, which then opens. */
 @Composable
-private fun MessageBox(user: PublicUser, onSent: () -> Unit) {
+private fun MessageBox(user: PublicUser, name: String, onSent: () -> Unit) {
     val c = Nx.colors
     var text by remember(user.id) { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val name = Names.display(user)
     val label = t("profile.popout.message", "name" to name)
     fun send() {
         val body = text.trim()
@@ -1096,7 +1095,10 @@ fun ProfilePopoutCard(user: PublicUser, serverId: String?, close: () -> Unit, de
                 }
                 // an app's card leads with adding it, the one thing people open it for
                 if (bot && design == null && canAddApp(app)) PrimaryPill("CirclePlus", t("apps.profile.addApp"), modifier = Modifier.fillMaxWidth()) { close(); addApp(user.id) }
-                if (!isMe && rel?.type != "blocked" && design == null) MessageBox(user, onSent = close)
+                if (!isMe && rel?.type != "blocked" && design == null) {
+                    val nick = if (rel?.type == "friend") rel.nickname.takeIf { it.isNotBlank() } else null
+                    MessageBox(user, name = nick ?: Names.display(user), onSent = close)
+                }
             }
         }
     }

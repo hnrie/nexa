@@ -1057,7 +1057,7 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
 Electron (version in `desktop/package.json`, bumped for every release). `src/main/index.ts` opens one
 window on the live site (`config.ts`: https://nexa.fish, or `EVILION_URL` in an unpackaged app
 while developing; `npm start` builds and runs it), with a tray, system-wide keybinds (`shortcuts.ts`), the screen picker
-(`displayPicker.ts`, `src/picker/`), window sound sharing (`appAudio.ts`), permissions limited to
+(`displayPicker.ts`, `src/picker/`), window sound sharing (`appAudio.ts`; a window of a voice changer or mixer that plays the person's own voice back, Voicemod, Voicemeeter, Clownfish, MorphVOX, Voice.ai, NVIDIA Broadcast, SteelSeries Sonar and the like, matched by `selfMonitoringApp`, is shared with no sound at all, from 1.2.7), permissions limited to
 Nexa's origin, takeover from an older Mac copy (`succession.ts`) and updates from Nexa's own server
 (`update/`, with a Mac updater of its own since the app is signed ad hoc). `src/main/rpc/` is a Rich
 Presence server speaking Discord's IPC and local WebSocket protocols, passing programs through to the

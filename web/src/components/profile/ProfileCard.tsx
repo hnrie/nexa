@@ -211,7 +211,7 @@ function ServerRoles({ serverId, userId, popout }: { serverId: string; userId: s
  * The popout's own way to say something: a message to them, sent in your DM
  * with them (begun if there is none yet), which then opens.
  */
-function MessageBox({ user, onSent }: { user: PublicUser; onSent?: (() => void) | undefined }) {
+function MessageBox({ user, name, onSent }: { user: PublicUser; name: string; onSent?: (() => void) | undefined }) {
   const nav = useNavigate();
   const upsertChannel = useChannels((c) => c.upsert);
   const toast = useUI((u) => u.toast);
@@ -247,8 +247,8 @@ function MessageBox({ user, onSent }: { user: PublicUser; onSent?: (() => void) 
         className={s.msgInput}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={t("profile.popout.message", { name: user.display_name || user.username })}
-        aria-label={t("profile.popout.message", { name: user.display_name || user.username })}
+        placeholder={t("profile.popout.message", { name })}
+        aria-label={t("profile.popout.message", { name })}
         maxLength={4000}
         data-testid="popout-message"
       />
@@ -918,7 +918,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
               <CirclePlus size={16} aria-hidden="true" /> {t("apps.profile.addApp")}
             </button>
           ) : null}
-          {interactive && !isMe && rel?.type !== "blocked" ? <MessageBox user={user} onSent={onClose} /> : null}
+          {interactive && !isMe && rel?.type !== "blocked" ? <MessageBox user={user} name={shownName || user.username} onSent={onClose} /> : null}
         </div>
       </div>
     );

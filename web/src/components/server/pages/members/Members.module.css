@@ -54,12 +54,12 @@
 .bulkBtns { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* Mod View: one member, everything a moderator needs about them, beside the list or over it */
-.sheet { position: fixed; z-index: 450; inset-block: 0; inset-inline-end: 0; width: min(440px, 100vw); display: flex; flex-direction: column; background: var(--bg-floating); box-shadow: 0 0 0 1px var(--panel-edge), var(--shadow-high); animation: sheetIn 220ms var(--ease-out); }
+.sheet { position: fixed; z-index: var(--z-modal); inset-block: 0; inset-inline-end: 0; width: min(440px, 100vw); display: flex; flex-direction: column; background: var(--bg-floating); box-shadow: 0 0 0 1px var(--panel-edge), var(--shadow-high); animation: sheetIn 220ms var(--ease-out); }
 @keyframes sheetIn { from { transform: translateX(24px); opacity: 0; } }
 [dir="rtl"] .sheet { animation-name: sheetInRtl; }
 @keyframes sheetInRtl { from { transform: translateX(-24px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
-.scrim { position: fixed; inset: 0; z-index: 449; background: var(--bg-overlay); }
+.scrim { position: fixed; inset: 0; z-index: var(--z-modal); background: var(--bg-overlay); }
 .sheetHead { display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 0 12px 0 16px; border-bottom: 1px solid var(--border-subtle); }
 .sheetTitle { flex: 1; margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 680; color: var(--text-strong); }
 .sheetClose { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-sm); color: var(--icon); }

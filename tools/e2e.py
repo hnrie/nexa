@@ -82,7 +82,10 @@ class Session:
         # record is a directory: the context films itself into it, for the
         # loops the front page plays (tools/home_gifs.py)
         film = {"record_video_dir": record, "record_video_size": {"width": w, "height": h}} if record else {}
-        self.ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=w < 768, has_touch=w < 768, permissions=["microphone", "camera"], service_workers=service_workers, **film)
+        # each person comes from an address of their own, as chatd sees it behind the tunnel,
+        # so a run that makes many accounts stays under the two sign-ups a day per address
+        ip = "10.%d.%d.%d" % tuple(zlib.crc32(name.encode()).to_bytes(4, "big")[1:])
+        self.ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=w < 768, has_touch=w < 768, permissions=["microphone", "camera"], service_workers=service_workers, extra_http_headers={"CF-Connecting-IP": ip}, **film)
         self.page = self.ctx.new_page()
         self.errors = []
         self.trace = []
@@ -299,12 +302,13 @@ def server_flow(srv, alice, bob, phone):
     a.click("[data-testid=save]")
     a.wait_for_selector("text=Role saved.", timeout=15000)
     a.click("[data-nav=members]")
-    b_row = a.locator(f"[data-member]:has-text('Bob')")
-    b_row.locator("button[aria-label='Edit Roles']").click()
+    # a member's row opens their sheet, where Edit Roles is
+    a.locator(f"[data-member]:has-text('Bob')").first.click()
+    a.locator("[data-testid=mod-view] button:has-text('Edit Roles')").click()
     a.locator("label:has-text('Muted') input").check()
     time.sleep(0.5)
-    a.keyboard.press("Escape")
-    a.keyboard.press("Escape")
+    for _ in range(3):
+        a.keyboard.press("Escape")
     # deny Send Messages for @everyone in general (the role and everyone are both muted for bob)
     general = a.locator("[data-channel] >> text=general").first
     general.hover()
@@ -335,9 +339,12 @@ def server_flow(srv, alice, bob, phone):
     a.click("button:has-text('Test Server')")
     a.click("text=Server Settings")
     a.click("[data-nav=members]")
-    a.locator("[data-member]:has-text('Bob') button[aria-label=Kick]").click()
-    a.click("button:has-text('Kick'):not(:has-text('Members'))")
+    a.locator("[data-member]:has-text('Bob')").first.click()
+    a.locator("[data-testid=mod-view] button:has-text('Kick')").click()
+    a.locator("[role=dialog]:not([data-testid=mod-view]) button:has-text('Kick')").last.click()
     b.wait_for_url("**/channels/@me**", timeout=20000)
+    if a.locator("[data-testid=mod-view]").count():
+        a.locator("[data-testid=mod-view] button[aria-label]").first.click()
     a.click("[data-nav=encryption]")
     a.wait_for_selector("text=/Key epoch [1-9]/", timeout=20000)
     alice.shot("server-encryption")
@@ -582,13 +589,18 @@ def polish_flow(srv, alice, bob, server_id):
     alice.open_dm_from_sidebar("Bobby", "Bob")
     a.locator("[data-author]:text-is('Bob')").first.click()
     # the nickname is in the profile's menu and the note behind the icon by the name, as in Discord
-    a.wait_for_selector("[data-testid=profile-modal] [data-testid=profile-more]", timeout=15000)
-    a.click("[data-testid=profile-modal] [data-testid=profile-more]")
+    a.wait_for_selector("[data-testid=profile-popout] [data-testid=profile-more]", timeout=15000)
+    a.click("[data-testid=profile-popout] [data-testid=profile-more]")
     a.click("text=Add Friend Nickname")
     a.fill("[data-testid=prompt-nickname]", "Bobby")
     a.click("[data-testid=prompt-confirm]")
-    a.wait_for_selector("[data-testid=profile-modal] h2:text-is('Bobby')", timeout=15000)
-    a.click("[data-testid=profile-modal] [data-testid=profile-note-toggle]")
+    # the prompt took the popout's place; open it again
+    a.wait_for_selector("[data-author]:text-is('Bobby')", timeout=15000)
+    a.wait_for_selector("[data-testid=prompt-confirm]", state="detached", timeout=5000)
+    time.sleep(0.4)
+    a.locator("[data-author]:text-is('Bobby')").first.click()
+    a.wait_for_selector("[data-testid=profile-popout] h2:has-text('Bobby')", timeout=15000)
+    a.click("[data-testid=profile-popout] [data-testid=profile-note-toggle]")
     a.fill("textarea[aria-label=Note]", "met at the thing")
     time.sleep(0.6)
     alice.shot("profile-note")

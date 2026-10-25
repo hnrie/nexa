@@ -10,7 +10,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { IPC, type DisplaySourceRequest } from "../shared/bridge";
-import { WINDOWS_PROCESS_LOOPBACK_BUILD, windowAudioDevice } from "./appAudio";
+import { NO_SOUND, WINDOWS_PROCESS_LOOPBACK_BUILD, windowAudioDevice } from "./appAudio";
 import { isAppUrl, originOf, ORIGIN } from "./config";
 import { askForDisplaySource } from "./displayPicker";
 
@@ -179,17 +179,17 @@ export function restartApp(): void {
 /** The audio device a share asks Chromium for: one program, everything but this app, or everything. */
 interface ShareSound {
   device: string;
-  kind: "program" | "own" | "all";
+  kind: "program" | "own" | "all" | "none";
 }
 
 /** The sound a share of this source carries. */
 async function audioDevice(source: DesktopCapturerSource, mode: ShareAudioMode, log: Log): Promise<ShareSound> {
+  // a window shares just its program's sound where the system can capture one program,
+  // and none at all when that program is a voice changer playing the sharer's voice back
+  const program = await windowAudioDevice(source.id, log);
+  if (program === NO_SOUND) return { device: NO_SOUND, kind: "none" };
   if (mode === "all" || noOwnExclusion) return { device: "loopback", kind: "all" };
-  // a window shares just its program's sound where the system can capture one program
-  if (!noProgramAudio) {
-    const program = await windowAudioDevice(source.id, log);
-    if (program) return { device: program, kind: "program" };
-  }
+  if (program && !noProgramAudio) return { device: program, kind: "program" };
   return { device: "loopbackWithoutChrome", kind: "own" };
 }
 
@@ -260,6 +260,11 @@ export function handleDisplayMedia(getWindow: () => BrowserWindow | null, log: L
               return;
             }
             const sound = await audioDevice(source, mode, log);
+            if (sound.kind === "none") {
+              log("share", { source: source.id, audio: "none (self-monitoring program)" });
+              callback({ video: source });
+              return;
+            }
             lastAnswer = { sourceId: source.id, sound, at: Date.now() };
             log("share", { source: source.id, audio: sound.device });
             // Electron hands any device name over to Chromium; its typings only list "loopback" and "loopbackWithMute"

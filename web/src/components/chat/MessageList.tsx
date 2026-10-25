@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { Channel, GroupAddNotice } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Spinner } from "@/components/common/Spinner";
-import { channelDisplayName } from "@/lib/names";
+import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { compareIds } from "@/lib/ids";
 import { setReadingPresent } from "@/lib/readPosition";
 import { interactedWithin, onInteraction } from "@/lib/interaction";
@@ -877,8 +877,9 @@ export function MessageList({ channel }: { channel: Channel }) {
   // apps that read every message here: the start of the channel names them with the encryption line
   const readingIds = useReadingApps(channel.server_id ?? null, channel.id);
   const readers = readingIds.length ? formatList(readingIds.map((id) => displayName(users[id]))) : "";
+  const rels = useRelationships((st) => st.byUser);
   const intro = useMemo(() => {
-    const name = channelDisplayName(channel, users, me?.id);
+    const name = channelDisplayName(channel, users, me?.id, friendNicknames(rels));
     if (channel.type === "dm") {
       const other = channel.recipient_ids.find((id) => id !== me?.id) ?? "";
       const u = users[other];
@@ -916,7 +917,7 @@ export function MessageList({ channel }: { channel: Channel }) {
         </p>}
       </div>
     );
-  }, [channel, users, me?.id, byIdChannels, readers]);
+  }, [channel, users, me?.id, byIdChannels, readers, rels]);
 
   useEffect(() => {
     if (loaded || loading) return;

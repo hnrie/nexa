@@ -70,6 +70,25 @@ function ownWindow(sourceId: string): boolean {
   }
 }
 
+/**
+ * Programs that play the person's own voice back to them: voice changers and
+ * mixers with a "hear myself" monitor. Their sound is the sharer's voice, so a
+ * share of one of their windows carries no sound at all rather than sending
+ * that voice into the call a second time. Matched on the program's file name
+ * (Windows) or bundle id (macOS).
+ */
+const SELF_MONITORING = /voicemod|voicemeeter|clownfish|morphvox|voxal|voice\.?ai|voicechanger|voice changer|magicmic|krisp|nvidia broadcast|nvbroadcast|steelseries ?gg|steelseries ?sonar|rogueamoeba\.(loopback|audiohijack|soundsource)/i;
+
+/** Whether a program (a Windows image path or a macOS bundle id) plays the person's own voice back to them. */
+export function selfMonitoringApp(program: string | null | undefined): boolean {
+  if (!program) return false;
+  const name = program.split(/[\\/]/).pop() ?? program;
+  return SELF_MONITORING.test(name);
+}
+
+/** What windowAudioDevice answers for a window whose program must not be heard in a share. */
+export const NO_SOUND = "none";
+
 // --- Windows ---------------------------------------------------------------
 
 interface WindowsApi {
@@ -124,7 +143,7 @@ function loadWindowsApi(log: Log): WindowsApi | null {
   return windowsApi;
 }
 
-function windowsDevice(hwnd: number, log: Log): string | null {
+function windowsDevice(hwnd: number, supported: boolean, log: Log): string | null {
   const api = loadWindowsApi(log);
   if (!api) return null;
   const pid = api.windowPid(hwnd);
@@ -132,6 +151,8 @@ function windowsDevice(hwnd: number, log: Log): string | null {
   const image = api.processImage(pid);
   // A Store app's window belongs to its frame host, not to the program making the sound.
   if (image && /\\ApplicationFrameHost\.exe$/i.test(image)) return null;
+  if (selfMonitoringApp(image)) return NO_SOUND;
+  if (!supported) return null;
   return `applicationLoopback:${pid}`;
 }
 
@@ -155,9 +176,11 @@ export function macWindowOwner(windowId: number): Promise<{ pid: number; bundle:
   });
 }
 
-async function macDevice(windowId: number, log: Log): Promise<string | null> {
+async function macDevice(windowId: number, supported: boolean, log: Log): Promise<string | null> {
   const owner = await macWindowOwner(windowId);
   if (!owner || ownPids().has(owner.pid)) return null;
+  if (selfMonitoringApp(owner.bundle)) return NO_SOUND;
+  if (!supported) return null;
   // this app (and Electron itself while developing); __CFBundleIdentifier is no help, it comes from whatever started the process
   const own = ["xyz.evilion.chat", "com.github.Electron"];
   if (!validBundleId(owner.bundle) || own.some((id) => owner.bundle === id || owner.bundle!.startsWith(`${id}.`))) {
@@ -169,17 +192,20 @@ async function macDevice(windowId: number, log: Log): Promise<string | null> {
 
 /**
  * The audio device that carries just the sound of the program behind a
- * shared window, or null when that is not possible here (a screen, this app's
- * own window, an older system, or anything failing).
+ * shared window, NO_SOUND for a program that plays the person's own voice
+ * back (selfMonitoringApp), or null when that is not possible here (a screen,
+ * this app's own window, an older system, or anything failing).
  */
 export async function windowAudioDevice(sourceId: string, log: Log): Promise<string | null> {
   const id = windowIdOf(sourceId);
-  if (id === null || !windowAudioSupported() || ownWindow(sourceId)) return null;
+  if (id === null || ownWindow(sourceId)) return null;
+  // the program is looked up even where its sound alone cannot be captured, to keep a voice changer out
+  const supported = windowAudioSupported();
   // tests of the fallback ask for a device that cannot start
-  if (process.env.EVILION_TEST_PROGRAM_AUDIO_DEVICE) return process.env.EVILION_TEST_PROGRAM_AUDIO_DEVICE;
+  if (supported && process.env.EVILION_TEST_PROGRAM_AUDIO_DEVICE) return process.env.EVILION_TEST_PROGRAM_AUDIO_DEVICE;
   try {
-    if (process.platform === "win32") return windowsDevice(id, log);
-    if (process.platform === "darwin") return await macDevice(id, log);
+    if (process.platform === "win32") return windowsDevice(id, supported, log);
+    if (process.platform === "darwin") return await macDevice(id, supported, log);
   } catch (err) {
     log("window audio: lookup failed", { err: String(err) });
   }
