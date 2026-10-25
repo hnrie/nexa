@@ -44,6 +44,7 @@ const ServerSettingsModal = lazyPage(() => import("@/components/server/ServerSet
 const ChannelSettingsModal = lazyPage(() => import("@/components/server/ChannelSettingsModal"));
 const MemberActionModal = lazyPage(() => import("@/components/server/MemberActionModal"));
 const SubchatModal = lazyPage(() => import("./SubchatModal"));
+const AddAccountModal = lazyPage(() => import("./AddAccountModal"));
 const VerifyKeyModal = lazyPage(() => import("./VerifyKeyModal"));
 const KeyChangeModal = lazyPage(() => import("./KeyChangeModal"));
 const ReportBugModal = lazyPage(() => import("@/components/bugs/ReportBugModal"));
@@ -137,6 +138,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
         {modal?.kind === "settings" ? <SettingsModal onClose={close} page={(modal.props?.["page"] as string | undefined) ?? "account"} packId={modal.props?.["packId"] as string | undefined} modalId={modal.id} resume={modal.props?.["resume"] as string | undefined} anchor={modal.props?.["anchor"] as string | undefined} serverId={modal.props?.["serverId"] as string | undefined} /> : null}
         {modal?.kind === "profile" ? <ProfileModal onClose={close} userId={modal.props?.["userId"] as string} tab={modal.props?.["tab"] as ProfileTab | undefined} full={!!modal.props?.["full"]} /> : null}
         {modal?.kind === "screenPermission" ? <ScreenPermission stale={Boolean(modal.props?.["stale"])} onClose={close} /> : null}
+        {modal?.kind === "addAccount" ? <AddAccountModal onClose={close} /> : null}
         {modal?.kind === "subchat" ? <SubchatModal onClose={close} channel={modal.props?.["channel"] as never} parentId={modal.props?.["parentId"] as string | undefined} name={modal.props?.["name"] as string | undefined} /> : null}
         {modal?.kind === "serverSettings" ? <ServerSettingsModal onClose={close} serverId={String(modal.props?.["serverId"])} page={modal.props?.["page"] as string | undefined} /> : null}
         {modal?.kind === "channelSettings" ? <ChannelSettingsModal onClose={close} channelId={String(modal.props?.["channelId"])} page={modal.props?.["page"] as string | undefined} /> : null}

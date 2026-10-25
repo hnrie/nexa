@@ -59,10 +59,8 @@
     .btns { flex: 1 0 100%; justify-content: space-evenly; }
   }
 }
-/* another account signed in here: switch to it, or sign it out of this browser */
-.account { position: relative; display: flex; align-items: center; }
-.accountOpt { padding-inline-end: 38px; }
-.accountRemove { position: absolute; inset-inline-end: 6px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; color: var(--text-muted); opacity: 0; transition: opacity 90ms ease, background-color 90ms ease, color 90ms ease; }
-.account:hover .accountRemove, .accountRemove:focus-visible { opacity: 1; }
-.accountRemove:hover { background: color-mix(in srgb, var(--danger) 22%, transparent); color: var(--text-danger); }
-@media (hover: none) { .accountRemove { opacity: 1; } }
+/* Switch Accounts and the menu it opens beside this one, level with its row */
+.switchWrap { position: relative; }
+.opt[data-open] { background: color-mix(in srgb, var(--brand) 20%, transparent); color: var(--text-strong); }
+.chev { color: var(--text-muted); }
+[dir="rtl"] .chev { transform: scaleX(-1); }

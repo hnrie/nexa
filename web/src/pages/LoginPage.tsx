@@ -8,10 +8,8 @@ import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { useAuth } from "@/stores/auth";
 import { useMediaQuery } from "@/hooks/useIsMobile";
-import { switchAccount, useAccounts } from "@/lib/accounts";
 import { passkeyCancelled, passkeysSupported, signInWithPasskey } from "@/lib/passkeys";
 import { KeyRound } from "lucide-react";
-import { Avatar } from "@/components/common/Avatar";
 import { AuthLayout, usePageTitle } from "./AuthLayout";
 import { QrSignIn } from "./QrSignIn";
 import s from "./Auth.module.css";
@@ -24,8 +22,6 @@ export default function LoginPage() {
   const completeMfa = useAuth((a) => a.completeMfa);
   const cancelMfa = useAuth((a) => a.cancelMfa);
   const loginWith = useAuth((a) => a.loginWith);
-  // the accounts already signed in here, when this is Add Account
-  const saved = useAccounts((a) => a.list);
   // a phone cannot scan its own screen, so the code is for wider ones
   const wide = useMediaQuery("(min-width: 768px)");
   const [passkeyBusy, setPasskeyBusy] = useState(false);
@@ -215,17 +211,6 @@ export default function LoginPage() {
         <div className={s.foot}>
           {t("login.needAnAccount")} <Link to="/register">{t("login.register")}</Link>
         </div>
-        {saved.length ? (
-          // Add Account: the way back to an account already signed in here
-          <div className={s.backTo}>
-            {saved.map((a) => (
-              <button key={a.id} type="button" className={s.backToAccount} onClick={() => void switchAccount(a.id)}>
-                <Avatar id={a.id} avatarId={a.avatar_id} name={a.display_name} size={24} />
-                <span>{t("accounts.backTo", { name: a.display_name })}</span>
-              </button>
-            ))}
-          </div>
-        ) : null}
       </form>
   );
 
@@ -234,7 +219,7 @@ export default function LoginPage() {
       {wide ? (
         <div className={s.split}>
           {form}
-          <QrSignIn onDone={go} onError={setError} />
+          <QrSignIn onSignedIn={async (out) => { await loginWith(out.me, out.token, out.identity); go(); }} onError={setError} />
         </div>
       ) : (
         form

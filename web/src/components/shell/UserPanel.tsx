@@ -1,7 +1,8 @@
-import { Bell, Download, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Pencil, Plus, Settings, X } from "lucide-react";
+import { ArrowLeftRight, Bell, ChevronRight, Download, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Pencil, Settings } from "lucide-react";
 import { applyUpdate } from "@/lib/appUpdate";
 import { useDesktop } from "@/stores/desktop";
 import { useEffect, useRef, useState } from "react";
+import AccountsFlyout from "./AccountsFlyout";
 import { Avatar, StatusDot, statusLabel } from "@/components/common/Avatar";
 import { Tooltip } from "@/components/common/Tooltip";
 import { gateway } from "@/gateway/session";
@@ -13,11 +14,11 @@ import { useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 import s from "./UserPanel.module.css";
 import ts from "@/components/common/Toggle.module.css";
-import { addAccount, canAddAccount, MAX_ACCOUNTS, removeAccount, switchAccount, useAccounts } from "@/lib/accounts";
 import { openDeviceMenu } from "@/components/voice/deviceMenus";
 import { ActivityToggle } from "@/components/activity/ActivityToggle";
 import { bindText, keybindsOf } from "@/lib/keybinds";
 import { useSettings } from "@/stores/settings";
+import { useMediaQuery } from "@/hooks/useIsMobile";
 
 import { t } from "@/i18n";
 import { confirmLogout } from "@/lib/confirmLogout";
@@ -54,8 +55,15 @@ export function UserPanel() {
   const modDeaf = useVoice((v) => !!v.mine?.server_deaf);
   const toast = useUI((u) => u.toast);
   const sounds = useSettings((x) => x.settings.notifications.sounds);
-  const accounts = useAccounts((a) => a.list);
   const [open, setOpen] = useState(false);
+  // Switch Accounts' side menu: opened by hovering where a pointer hovers, by a tap or click elsewhere
+  const [sub, setSub] = useState(false);
+  const hovers = useMediaQuery("(hover: hover)");
+  const subTrigger = useRef<HTMLButtonElement>(null);
+  const flyout = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) setSub(false);
+  }, [open]);
   const ref = useRef<HTMLDivElement>(null);
 
   const trigger = useRef<HTMLButtonElement>(null);
@@ -104,24 +112,12 @@ export function UserPanel() {
     useSettings.getState().patch({ notifications: { ...n, sounds: on } });
   };
 
-  const others = accounts.filter((a) => a.id !== me.id);
-  const askRemove = (id: string, name: string) => {
-    setOpen(false);
-    openModal("confirm", {
-      title: t("accounts.removeTitle", { name }),
-      body: t("accounts.removeBody"),
-      confirmLabel: t("accounts.remove"),
-      danger: true,
-      onConfirm: () => removeAccount(id),
-    });
-  };
-
   const openMicMenu = (at: { x: number; y: number }) =>
     void openDeviceMenu("mic", openModal, { ...at, above: true, label: t("voice.voice.microphoneOptions") });
 
   return (
     <div className={s.panel} ref={ref}>
-      <button ref={trigger} className={s.me} onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>
+      <button ref={trigger} className={s.me} onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} data-testid="user-panel">
         <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={32} status={status} className={s.avatar} data-speaking={speaking} />
         <span className={s.text}>
           <span className={s.name}>{me.display_name}</span>
@@ -208,35 +204,43 @@ export function UserPanel() {
             <span className={ts.switch} data-on={sounds} aria-hidden><span className={ts.knob} /></span>
           </button>
           <div className={s.sep} role="separator" />
-          {others.map((a) => (
-            <div key={a.id} className={s.account}>
-              <button className={[s.opt, s.accountOpt].join(" ")} role="menuitem" onClick={() => { setOpen(false); void switchAccount(a.id); }} data-testid="menu-account">
-                <Avatar id={a.id} avatarId={a.avatar_id} name={a.display_name} size={24} />
-                <span className={s.optText}>
-                  <span>{a.display_name}</span>
-                  <span className={s.optSub}>@{a.username}</span>
-                </span>
-              </button>
-              <Tooltip text={t("accounts.remove")}>
-                <button className={s.accountRemove} role="menuitem" aria-label={t("accounts.removeTitle", { name: a.display_name })} onClick={() => askRemove(a.id, a.display_name)}>
-                  <X size={14} />
-                </button>
-              </Tooltip>
-            </div>
-          ))}
-          <button
-            className={s.opt}
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              if (canAddAccount()) void addAccount();
-              else toast(t("accounts.tooMany", { count: MAX_ACCOUNTS }));
-            }}
-            data-testid="menu-add-account"
+          <div
+            className={s.switchWrap}
+            onMouseEnter={hovers ? () => setSub(true) : undefined}
+            onMouseLeave={hovers ? () => setSub(false) : undefined}
           >
-            <Plus size={16} />
-            <span className={s.optText}><span>{t("accounts.addAccount")}</span></span>
-          </button>
+            <button
+              ref={subTrigger}
+              className={s.opt}
+              role="menuitem"
+              aria-haspopup="menu"
+              aria-expanded={sub}
+              data-open={sub || undefined}
+              onClick={() => setSub((v) => !v)}
+              onKeyDown={(e) => {
+                if (e.key !== (document.documentElement.dir === "rtl" ? "ArrowLeft" : "ArrowRight")) return;
+                e.preventDefault();
+                setSub(true);
+                requestAnimationFrame(() => flyout.current?.querySelector<HTMLElement>("button")?.focus());
+              }}
+              data-testid="menu-switch-accounts"
+            >
+              <ArrowLeftRight size={16} />
+              <span className={s.optText} style={{ flex: 1 }}><span>{t("accounts.switchAccounts")}</span></span>
+              <ChevronRight size={16} className={s.chev} />
+            </button>
+            {sub ? (
+              <AccountsFlyout
+                meId={me.id}
+                flyoutRef={flyout}
+                closeMenu={() => setOpen(false)}
+                back={() => {
+                  setSub(false);
+                  subTrigger.current?.focus();
+                }}
+              />
+            ) : null}
+          </div>
           <div className={s.sep} role="separator" />
           <button className={[s.opt, s.danger].join(" ")} role="menuitem" onClick={() => { setOpen(false); confirmLogout(); }}>
             <LogOut size={16} />

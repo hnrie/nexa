@@ -63,6 +63,15 @@ sealed interface LoginStep {
     data class NeedsCode(val ticket: String, val backupCodesLeft: Int) : LoginStep
 }
 
+/** What a sign-in got, before anything is kept on this phone (web stores/auth.ts SignedIn). */
+data class SignedIn(val me: MeUser, val token: String, val identity: Identity)
+
+/** A password's answer without touching the account open here: signed in, or a code to send with [finish]. */
+sealed interface PasswordStep {
+    data class Done(val out: SignedIn) : PasswordStep
+    data class NeedsCode(val backupCodesLeft: Int, val finish: suspend (code: String?, backupCode: String?) -> SignedIn) : PasswordStep
+}
+
 class Auth(private val nx: Nexa) {
     private val _state = MutableStateFlow<AuthState>(AuthState.Loading)
     val state: StateFlow<AuthState> = _state
@@ -209,6 +218,65 @@ class Auth(private val nx: Nexa) {
         val pair = Kdf.authKey(master) to Kdf.encKey(master)
         master.fill(0)
         pair
+    }
+
+    /**
+     * Signs in with a password without touching the account open here: Add
+     * Another Account keeps the result beside it ([addSignedIn]).
+     */
+    suspend fun passwordSignIn(username: String, password: String): PasswordStep {
+        val name = username.trim().lowercase()
+        val kdf = nx.api.request("GET", "/auth/kdf?username=" + URLEncoder.encode(name, "UTF-8"), KdfInfo.serializer(), auth = false)
+        val p = params(kdf.params)
+        if (!Kdf.acceptable(p)) throw WeakKdfError("server asked for weak parameters")
+        val (authKey, encKey) = stretch(password, Bytes.unb64(kdf.salt), p)
+        val res = guarded("login") { token ->
+            nx.api.request("POST", "/auth/login", LoginResult.serializer(), buildJsonObject {
+                put("username", name)
+                put("auth_key", Bytes.b64(authKey))
+            }, captcha = token, auth = false)
+        }
+        if (!res.mfaRequired) return PasswordStep.Done(opened(res, encKey))
+        val ticket = res.ticket ?: ""
+        return PasswordStep.NeedsCode(res.backupCodesLeft) { code, backupCode ->
+            opened(nx.api.request("POST", "/auth/login/mfa", LoginResult.serializer(), buildJsonObject {
+                put("ticket", ticket)
+                if (!backupCode.isNullOrBlank()) put("backup_code", backupCode.trim()) else put("code", (code ?: "").replace(Regex("\\s"), ""))
+            }, auth = false), encKey)
+        }
+    }
+
+    private fun opened(res: LoginResult, encKey: ByteArray): SignedIn {
+        val me = res.user ?: throw ApiError(200, "bad_response", "The server's answer could not be read.")
+        val token = res.token ?: throw ApiError(200, "bad_response", "The server's answer could not be read.")
+        val priv = try {
+            Keys.unwrapPrivateKey(Bytes.unb64(res.encPrivateKey ?: ""), encKey)
+        } catch (_: Exception) {
+            throw DecryptError("Your keys could not be opened with that password.")
+        }
+        return SignedIn(me, token, Identity(Identity.publicKeyOf(priv), priv))
+    }
+
+    /**
+     * Keeps an account just signed in to (Add Another Account) beside the one
+     * open here, then switches to it (web lib/accounts.ts addSignedIn).
+     */
+    suspend fun addSignedIn(out: SignedIn) {
+        suspend fun logOut(token: String) = try {
+            nx.api.request("POST", "/auth/logout", headers = mapOf("Authorization" to "Bearer $token"), auth = false)
+        } catch (_: Exception) {
+        }
+        if (out.me.id == nx.users.meId) {
+            // the account already open: the second session is not wanted
+            nx.scope.launch { logOut(out.token) }
+            throw ReadableError(t("accounts.alreadyOpen"))
+        }
+        val before = Accounts.find(out.me.id)
+        saveIdentity(out.me.id, out.identity)
+        Accounts.remember(out.me, out.token)
+        // signed in to again: the session it had here goes
+        if (before != null && before.token != out.token) nx.scope.launch { logOut(before.token) }
+        switchTo(out.me.id)
     }
 
     suspend fun login(username: String, password: String): LoginStep {
@@ -449,12 +517,6 @@ class Auth(private val nx: Nexa) {
         if (to.id == nx.users.meId) return
         putAway()
         open(to)
-    }
-
-    /** Leaves the account open here signed in and shows the sign-in screen for another. */
-    suspend fun addAccount() {
-        putAway()
-        _state.value = AuthState.Anonymous
     }
 
     /** Signs out an account that is not the one open: its session on the server, then what this phone kept for it. */

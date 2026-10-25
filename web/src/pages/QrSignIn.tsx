@@ -4,7 +4,8 @@ import { Avatar } from "@/components/common/Avatar";
 import { QrCode } from "@/components/common/QrCode";
 import { Spinner } from "@/components/common/Spinner";
 import { waitForQrSignIn } from "@/lib/qrLogin";
-import { useAuth } from "@/stores/auth";
+import { ReadableError } from "@/lib/readableError";
+import type { SignedIn } from "@/stores/auth";
 import s from "./Auth.module.css";
 
 import { t } from "@/i18n";
@@ -14,8 +15,7 @@ import { t } from "@/i18n";
  * and approves, and this device signs in (lib/qrLogin.ts). It turns into the
  * person who scanned it while they decide, and a new code follows a no.
  */
-export function QrSignIn({ onDone, onError }: { onDone: () => void; onError: (message: string) => void }) {
-  const loginWith = useAuth((a) => a.loginWith);
+export function QrSignIn({ onSignedIn, onError, className }: { onSignedIn: (out: SignedIn) => Promise<void>; onError: (message: string) => void; className?: string }) {
   const [link, setLink] = useState<string | null>(null);
   const [scanned, setScanned] = useState<PublicUser | null>(null);
 
@@ -32,19 +32,16 @@ export function QrSignIn({ onDone, onError }: { onDone: () => void; onError: (me
       },
       stop.signal,
     )
-      .then(async (out) => {
-        await loginWith(out.me, out.token, out.identity);
-        onDone();
-      })
-      .catch(() => {
-        if (!stop.signal.aborted) onError(t("qrLogin.couldNotSignIn"));
+      .then(onSignedIn)
+      .catch((err) => {
+        if (!stop.signal.aborted) onError(err instanceof ReadableError ? err.message : t("qrLogin.couldNotSignIn"));
       });
     return () => stop.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <section className={s.qrSide} aria-live="polite" data-testid="qr-sign-in">
+    <section className={[s.qrSide, className ?? ""].join(" ")} aria-live="polite" data-testid="qr-sign-in">
       {scanned ? (
         <>
           <div className={s.qrPlate} data-scanned>

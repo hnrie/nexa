@@ -189,24 +189,12 @@ fun openStatusSheet() {
                 fish.nexa.ui.settings.patchNested("notifications", mapOf("sounds" to kotlinx.serialization.json.JsonPrimitive(!sounds)))
             }
             MenuSep()
-            // the other accounts signed in on this phone (web: UserPanel's account rows)
-            val accounts by fish.nexa.data.Accounts.list.collectAsState()
-            for (a in accounts.filter { it.id != me.id }) {
-                AccountOption(a, onSwitch = {
-                    close()
-                    fish.nexa.ui.nav.Nav.reset()
-                    Nexa.scope.launch { Nexa.auth.switchTo(a.id) }
-                }, onRemove = {
-                    close()
-                    confirm(t("accounts.removeTitle", "name" to a.name), t("accounts.removeBody"), t("accounts.remove")) { Nexa.auth.removeAccount(a.id) }
-                })
-            }
-            StatusOption("Plus", t("accounts.addAccount"), null) {
+            // the accounts on this phone, in a sheet of their own (web: Switch Accounts' side menu)
+            StatusOption("ArrowLeftRight", t("accounts.switchAccounts"), null, trailing = {
+                fish.nexa.ui.Icon("ChevronRight", c.textMuted, size = 16.dp)
+            }) {
                 close()
-                if (fish.nexa.data.Accounts.canAdd()) {
-                    fish.nexa.ui.nav.Nav.reset()
-                    Nexa.scope.launch { Nexa.auth.addAccount() }
-                } else Nexa.ui.toast(t("accounts.tooMany", "count" to fish.nexa.data.Accounts.MAX))
+                openAccountsSheet()
             }
             // let another device in: the camera reads the code its login page shows
             StatusOption("ScanQrCode", t("android.qrLogin.scanQrCode"), null) {
@@ -225,37 +213,12 @@ fun openStatusSheet() {
 
 /** UserPanel.module.css .sep: a line between the menu's groups. */
 @Composable
-private fun MenuSep() {
+internal fun MenuSep() {
     Box(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp).height(1.dp).background(Nx.colors.borderSubtle))
 }
 
-/** Another account signed in here: switch to it, or sign it out of this phone. */
 @Composable
-private fun AccountOption(a: fish.nexa.data.Accounts.Saved, onSwitch: () -> Unit, onRemove: () -> Unit) {
-    val c = Nx.colors
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(Radii.Sm)
-            .background(if (pressed) c.brand.copy(alpha = 0.2f) else Color.Transparent)
-            .pressable(interaction, onClick = onSwitch)
-            .padding(start = 10.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Avatar(a.id, a.name, a.avatarId, 24.dp)
-        Column(Modifier.weight(1f)) {
-            Txt(a.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(550)), color = if (pressed) c.textStrong else c.textSubtle, maxLines = 1)
-            Txt("@${a.username}", style = Nx.type.hint, color = c.textMuted, maxLines = 1)
-        }
-        IconButton("X", t("accounts.removeTitle", "name" to a.name), onRemove, tint = c.textMuted, size = 44.dp, iconSize = 14.dp)
-    }
-}
-
-@Composable
-private fun StatusOption(icon: String?, label: String, sub: String?, dot: String? = null, chosen: Boolean = false, danger: Boolean = false, trailing: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
+internal fun StatusOption(icon: String?, label: String, sub: String?, dot: String? = null, chosen: Boolean = false, danger: Boolean = false, trailing: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()

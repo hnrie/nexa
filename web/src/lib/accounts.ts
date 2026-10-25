@@ -83,20 +83,23 @@ async function leaveQuietly(): Promise<void> {
   }
 }
 
-/** Opens the app as another saved account. */
-export async function switchAccount(id: string, go: (path: string) => void = (p) => location.assign(p)): Promise<void> {
-  const to = read().find((a) => a.id === id);
-  if (!to || to.id === useAuth.getState().me?.id) return;
-  await leaveQuietly();
-  storage.set(TOKEN_KEY, to.token);
-  go("/channels/@me");
+const placeKey = (id: string) => `ec.place:${id}`;
+
+/** Where an account was in the app when it was last switched away from, to go back to. */
+export function placeOf(id: string): string {
+  const p = storage.get(placeKey(id));
+  return p && p.startsWith("/channels/") ? p : "/channels/@me";
 }
 
-/** Leaves the account signed in here and opens the sign-in page for another. */
-export async function addAccount(go: (path: string) => void = (p) => location.assign(p)): Promise<void> {
+/** Opens the app as another saved account, where that account was last. */
+export async function switchAccount(id: string, go: (path: string) => void = (p) => location.assign(p)): Promise<void> {
+  const to = read().find((a) => a.id === id);
+  const here = useAuth.getState().me?.id;
+  if (!to || to.id === here) return;
+  if (here && location.pathname.startsWith("/channels/")) storage.set(placeKey(here), location.pathname);
   await leaveQuietly();
-  storage.remove(TOKEN_KEY);
-  go("/login");
+  storage.set(TOKEN_KEY, to.token);
+  go(placeOf(to.id));
 }
 
 /**

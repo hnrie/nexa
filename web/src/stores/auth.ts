@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { auth as authApi } from "@/api/auth";
 import { api, ApiError } from "@/api/client";
-import { isMfaChallenge, type KdfParamsJson, type MeUser } from "@/api/types";
+import { isMfaChallenge, type KdfParamsJson, type LoginResponse, type MeUser } from "@/api/types";
 import { users as usersApi } from "@/api/users";
 import { b64, randomBytes } from "@/crypto/bytes";
 import { DEFAULT_KDF, deriveAuthKey, deriveEncKey, deriveMaster, deriveSettingsKey, newRecoveryKey, recoveryKeyToBytes, recoveryToKeys, type KdfParams } from "@/crypto/kdf";
@@ -15,7 +15,7 @@ import { useNexa } from "@/stores/nexa";
 import { ReadableError } from "@/lib/readableError";
 import { storage } from "@/lib/storage";
 import { wipeSearchIndex } from "@/search/keys";
-import { forgetAccount, forgetToken, nextAccount, rememberAccount } from "@/lib/accounts";
+import { forgetAccount, forgetToken, nextAccount, placeOf, rememberAccount } from "@/lib/accounts";
 
 import { t } from "@/i18n";
 /** "offline": a token is stored, but the server or this device's key store could not be reached. */
@@ -24,8 +24,18 @@ export type AuthStatus = "idle" | "loading" | "offline" | "anonymous" | "locked"
 /** What a password got us: either we are in, or the account wants a code. */
 export type LoginOutcome = { mfa: false } | { mfa: true; backupCodesLeft: number };
 
+/** What a sign-in got, before anything is kept on this device: the session and the identity key. */
+export interface SignedIn {
+  me: MeUser;
+  token: string;
+  identity: Identity;
+}
+
+/** A password's answer: signed in, or the account wants a code, which `finish` sends. */
+export type PasswordStep = { mfa: false; out: SignedIn } | { mfa: true; backupCodesLeft: number; finish: (proof: { code?: string; backupCode?: string }) => Promise<SignedIn> };
+
 /** Kept out of the store so a half-finished sign-in never lands in a snapshot. */
-let pendingMfa: { username: string; encKey: Uint8Array; ticket: string } | null = null;
+let pendingMfa: ((proof: { code?: string; backupCode?: string }) => Promise<SignedIn>) | null = null;
 /**
  * The account's passcode policy, held from the moment we decide to ask for it.
  * Showing the lock screen tears the session down, which clears the settings it
@@ -132,6 +142,30 @@ async function finishLogin(set: (s: Partial<AuthState>) => void, me: MeUser, tok
   set({ status: "ready", me, token, identity, settingsKey: deriveSettingsKey(identity.privateKey), error: null });
 }
 
+/**
+ * Signs in with a password without touching the account open here: the login
+ * page goes on with the result, Add Another Account keeps it beside this one.
+ */
+export async function passwordSignIn(username: string, password: string): Promise<PasswordStep> {
+  const kdf = await authApi.kdf(username);
+  const { authKey, encKey } = await deriveAll(password, b64.dec(kdf.salt), toParams(kdf.params));
+  const res = await guarded("login", (captcha) => authApi.login(username, b64.enc(authKey), captcha));
+  const open = async (r: LoginResponse): Promise<SignedIn> => ({
+    me: r.user,
+    token: r.token,
+    identity: { publicKey: b64.dec(r.public_key), privateKey: await unwrapPrivateKey(b64.dec(r.enc_private_key), encKey) },
+  });
+  if (isMfaChallenge(res)) {
+    const ticket = res.ticket;
+    return {
+      mfa: true,
+      backupCodesLeft: res.backup_codes_left,
+      finish: async ({ code, backupCode }) => open(await authApi.loginMfa(ticket, backupCode ? { backup_code: backupCode } : { code: (code ?? "").replace(/\s/g, "") })),
+    };
+  }
+  return { mfa: false, out: await open(res) };
+}
+
 export const useAuth = create<AuthState>()((set, get) => ({
   status: "idle",
   me: null,
@@ -209,16 +243,13 @@ export const useAuth = create<AuthState>()((set, get) => ({
   },
 
   login: async (username, password) => {
-    const kdf = await authApi.kdf(username);
-    const { authKey, encKey } = await deriveAll(password, b64.dec(kdf.salt), toParams(kdf.params));
-    const res = await guarded("login", (captcha) => authApi.login(username, b64.enc(authKey), captcha));
-    if (isMfaChallenge(res)) {
-      pendingMfa = { username, encKey, ticket: res.ticket };
-      return { mfa: true, backupCodesLeft: res.backup_codes_left };
+    const step = await passwordSignIn(username, password);
+    if (step.mfa) {
+      pendingMfa = step.finish;
+      return { mfa: true, backupCodesLeft: step.backupCodesLeft };
     }
     pendingMfa = null;
-    const privateKey = await unwrapPrivateKey(b64.dec(res.enc_private_key), encKey);
-    await finishLogin(set, res.user, res.token, { publicKey: b64.dec(res.public_key), privateKey });
+    await finishLogin(set, step.out.me, step.out.token, step.out.identity);
     return { mfa: false };
   },
 
@@ -227,14 +258,12 @@ export const useAuth = create<AuthState>()((set, get) => ({
     await finishLogin(set, me, token, identity);
   },
 
-  completeMfa: async ({ code, backupCode }) => {
-    const pending = pendingMfa;
-    if (!pending) throw new ReadableError(t("auth.startAgainFromYourPassword"));
-    const body = backupCode ? { backup_code: backupCode } : { code: (code ?? "").replace(/\s/g, "") };
-    const res = await authApi.loginMfa(pending.ticket, body);
-    const privateKey = await unwrapPrivateKey(b64.dec(res.enc_private_key), pending.encKey);
+  completeMfa: async (proof) => {
+    const finish = pendingMfa;
+    if (!finish) throw new ReadableError(t("auth.startAgainFromYourPassword"));
+    const out = await finish(proof);
     pendingMfa = null;
-    await finishLogin(set, res.user, res.token, { publicKey: b64.dec(res.public_key), privateKey });
+    await finishLogin(set, out.me, out.token, out.identity);
   },
 
   cancelMfa: () => {
@@ -431,7 +460,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     const next = nextAccount();
     if (next) {
       storage.set(TOKEN_KEY, next.token);
-      location.assign("/channels/@me");
+      location.assign(placeOf(next.id));
     }
   },
 

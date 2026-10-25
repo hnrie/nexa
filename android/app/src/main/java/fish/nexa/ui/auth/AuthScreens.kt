@@ -361,8 +361,6 @@ fun LoginScreen(onRegister: () -> Unit, onRecover: () -> Unit) {
             }
         }
     }
-    // the accounts already signed in here, when this is Add Account
-    val saved by fish.nexa.data.Accounts.list.collectAsState()
     // a phone cannot scan its own screen, so the code is for wider ones (as the web's 768 px)
     val wide = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 768
 
@@ -379,12 +377,6 @@ fun LoginScreen(onRegister: () -> Unit, onRecover: () -> Unit) {
         }
         Note(t("login.staySignedIn"))
         Foot(t("login.needAnAccount"), t("login.register"), onRegister)
-        if (saved.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.graphicsLayer { translationY = -4.dp.toPx() }) {
-                // on the app's scope: this screen leaves as the switch begins, and its own scope goes with it
-                for (a in saved) BackToAccount(a) { Nexa.scope.launch { Nexa.auth.switchTo(a.id) } }
-            }
-        }
     }
 
     AuthLayout(t("login.welcomeBack"), t("login.weReSoExcitedToSee"), maxWidth = if (wide) 820 else 480) {
@@ -397,24 +389,6 @@ fun LoginScreen(onRegister: () -> Unit, onRecover: () -> Unit) {
         } else {
             form()
         }
-    }
-}
-
-/** Add Account: the way back to an account already signed in on this phone. */
-@Composable
-private fun BackToAccount(a: fish.nexa.data.Accounts.Saved, onClick: () -> Unit) {
-    val c = Nx.colors
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(Radii.Sm)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        fish.nexa.ui.components.Avatar(a.id, a.name, a.avatarId, 24.dp)
-        Txt(t("accounts.backTo", "name" to a.name), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
     }
 }
 

@@ -707,13 +707,19 @@ meter charges a pulled share sound at `StreamAudioBps` (128 kbit/s). The mesh ke
 - More than one account (web `lib/accounts.ts`, Android `data/Accounts`): the accounts signed in
   on a device keep their tokens in a list (`ec.accounts`, Android's secure store `accounts`), at
   most five; keys stay where they always were, per account. Only one runs: switching ends the
-  call and connection, puts the other token in place and opens the app again (a page load on the
-  web, `Auth.switchTo` on Android, run on `Nexa.scope` since the screen that asks leaves as it
-  starts). Add Account leaves the account signed in and opens the login page, which offers "Back
-  to" each saved one. Logging out goes on with the next saved account. The status menu (web
+  call and connection, puts the other token in place and opens the app again where that account
+  last was (web `ec.place:<id>` and a page load, Android `Auth.switchTo` then
+  `Nav.restore(switched = true)` from its `last:<id>`), clearing Android's open layers first since
+  their screen leaves as the app reopens. Add Another Account is a dialog over the app (web
+  `modals/AddAccountModal.tsx`, Android `openAddAccountSheet` in `ui/shell/Accounts.kt`): a
+  password (`passwordSignIn` in `stores/auth.ts`, `Auth.passwordSignIn`), a passkey or a QR code
+  signs the other account in without touching the open one, and `addSignedIn` keeps it and
+  switches. Logging out goes on with the next saved account. The status menu (web
   `shell/UserPanel.tsx`, Android `openStatusSheet` in `ui/shell/Dock.kt`) holds the switch for
-  notification sounds (the account's `notifications.sounds`), the other accounts with a way to log
-  each out, Add Account and, on Android, Scan QR Code.
+  notification sounds (the account's `notifications.sounds`), Switch Accounts (a side menu on the
+  web, over the menu at phone width; a sheet of its own on Android, `openAccountsSheet`) listing
+  every account with the open one ticked and a way to log each other out, then Add Another
+  Account, and on Android, Scan QR Code.
 
 ### Nexa, moderation and safety
 

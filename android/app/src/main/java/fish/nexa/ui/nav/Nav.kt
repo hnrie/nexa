@@ -208,7 +208,14 @@ object Nav {
      * Opening the app after it was closed: back where you were, as a phone
      * app is expected to be, unless a notification or link said where to go.
      */
-    fun restore() {
+    fun restore(switched: Boolean = false) {
+        // after switching accounts: what the last one had open goes, without being saved as this one's place
+        if (switched) {
+            history.clear()
+            route = Route.Friends
+            leftOpen = false
+            rightOpen = false
+        }
         if (route != Route.Friends || history.isNotEmpty()) return
         val me = Nexa.users.meId ?: return
         val path = prefs().getString("last:$me", null) ?: return

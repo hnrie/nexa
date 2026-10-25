@@ -1,0 +1,25 @@
+/* Switch Accounts' side menu (AccountsFlyout.tsx) */
+/* another account signed in here: switch to it, or log it out of this device */
+.account { position: relative; display: flex; align-items: center; }
+.accountOpt { padding-inline-end: 38px; }
+.accountRemove { position: absolute; inset-inline-end: 6px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; color: var(--text-muted); opacity: 0; transition: opacity 90ms ease, background-color 90ms ease, color 90ms ease; }
+.account:hover .accountRemove, .accountRemove:focus-visible { opacity: 1; }
+.accountRemove:hover { background: color-mix(in srgb, var(--danger) 22%, transparent); color: var(--text-danger); }
+@media (hover: none) { .accountRemove { opacity: 1; } }
+.flyout { position: absolute; bottom: -8px; inset-inline-start: calc(100% + 16px); width: 280px; padding: 8px; background: var(--bg-floating); border-radius: var(--radius-md); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); z-index: 51; animation: flyIn 160ms var(--ease-out); }
+/* the pointer crosses the gap between the two menus without closing this one */
+.flyout::before { content: ""; position: absolute; inset-block: 0; inset-inline-end: 100%; width: 18px; }
+@keyframes flyUp { from { opacity: 0; transform: translateY(6px) scale(0.97); } }
+@keyframes flyIn { from { opacity: 0; transform: translateX(-6px); } }
+[dir="rtl"] .flyout { animation-name: flyInRtl; }
+@keyframes flyInRtl { from { opacity: 0; transform: translateX(6px); } }
+/* no room beside the menu on a phone: it opens over the menu's lower part instead */
+@media (max-width: 767px) {
+  .flyout { inset-inline: -8px; bottom: calc(100% + 6px); width: auto; animation-name: flyUp; }
+  .flyout::before { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .flyout { animation: none; } }
+.accountHere { cursor: default; }
+.accountHere:hover { background: none; box-shadow: none; color: var(--text-subtle); }
+.accountHere svg:last-child { color: var(--status-online); flex: none; }
+
