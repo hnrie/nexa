@@ -24,7 +24,8 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-enum class DecryptFail { NO_KEY, BAD }
+/** Why a message shows no words: its key hasn't come, it won't open, or it opened past what a message may hold (MessageCrypto.Limits). */
+enum class DecryptFail { NO_KEY, BAD, INVALID }
 
 /** A message as the app holds it: the row, and what it says once opened. */
 data class ChatMessage(
@@ -124,8 +125,8 @@ class MessagesStore(private val api: Api, private val keys: KeyManager) {
         val key = keys.channelKey(conv, epoch, msg.channelId) ?: return waitFor(msg, conv)
         return try {
             ChatMessage(msg, payload = MessageCrypto.decrypt(key, env, fish.nexa.crypto.Aad(conv, epoch, msg.channelId, msg.authorId)))
-        } catch (_: DecryptError) {
-            ChatMessage(msg, error = DecryptFail.BAD)
+        } catch (e: DecryptError) {
+            ChatMessage(msg, error = if (e.message == "over_limits") DecryptFail.INVALID else DecryptFail.BAD)
         }
     }
 

@@ -1,3 +1,4 @@
+import { useBilling } from "@/stores/billing";
 import type { GatewayEvent, MentionMeta } from "./events";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -603,6 +604,10 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         if (me) useAuth.getState().setMe({ ...me, ...e.d, flags: me.flags });
       }
       emitAppEvent({ type: "userUpdated", user: useUsers.getState().byId[e.d.id] ?? e.d });
+      return;
+    case "billing_update":
+      // only a page that has read it reads it again
+      if (useBilling.getState().billing) void useBilling.getState().load().catch(() => undefined);
       return;
     case "relationship_add": {
       const before = useRelationships.getState().byUser[e.d.user.id]?.type;

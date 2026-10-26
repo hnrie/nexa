@@ -176,21 +176,22 @@ object Staging {
     private var seq = 0
     const val MAX_FILES = 10
 
-    suspend fun stage(uri: Uri): Staged? = withContext(Dispatchers.IO) {
+    /** `channelId` is where it goes: its plan's limit, or a boosted server's, holds it. */
+    suspend fun stage(uri: Uri, channelId: String? = null): Staged? = withContext(Dispatchers.IO) {
         val cr = Nexa.app.contentResolver
         var name = "file"
         var size = -1L
         runCatching {
             cr.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cur ->
                 if (cur.moveToFirst()) {
-                    cur.getString(0)?.let { name = it }
+                    cur.getString(0)?.let { name = Uploads.fitName(it) }
                     if (!cur.isNull(1)) size = cur.getLong(1)
                 }
             }
         }
         val type = cr.getType(uri) ?: MimeTypeMap.getSingleton().getMimeTypeFromExtension(name.substringAfterLast('.', "").lowercase()) ?: "application/octet-stream"
-        if (size >= 0 && !Uploads.fits(size)) {
-            Nexa.ui.toast(t("composer.composer.overServerLimit", "name" to name, "limit" to limitText()), "error")
+        if (size >= 0 && !Uploads.fits(size, channelId)) {
+            tooBig(name, size, channelId)
             return@withContext null
         }
         val dir = File(Nexa.app.cacheDir, "staged").apply { mkdirs() }
@@ -202,9 +203,9 @@ object Staging {
             Nexa.ui.toast(t("composer.composer.uploadFailed"), "error")
             return@withContext null
         }
-        if (!Uploads.fits(out.length())) {
+        if (!Uploads.fits(out.length(), channelId)) {
             out.delete()
-            Nexa.ui.toast(t("composer.composer.overServerLimit", "name" to name, "limit" to limitText()), "error")
+            tooBig(name, out.length(), channelId)
             return@withContext null
         }
         fish.nexa.data.MetadataScrub.scrub(out)
@@ -220,9 +221,15 @@ object Staging {
         return Staged("f$seq", out, "message.txt", "text/plain")
     }
 
-    /** The server's upload limit, as people read sizes. */
-    fun limitText(): String {
-        val max = Nexa.auth.instance.value?.maxUploadBytes ?: (100L shl 20)
+    /** A file over the limit: a plan that would send it is offered; past every plan, it is only said. */
+    private fun tooBig(name: String, size: Long, channelId: String?) {
+        if (fish.nexa.data.Plans.offersFor(size)) fish.nexa.data.Plans.offer(fish.nexa.data.Plans.Offer.File(name, size))
+        else Nexa.ui.toast(t("composer.composer.overServerLimit", "name" to name, "limit" to limitText(channelId)), "error")
+    }
+
+    /** This account's upload limit there, as people read sizes. */
+    fun limitText(channelId: String? = null): String {
+        val max = fish.nexa.data.Plans.fileMaxIn(channelId)
         val gb = max / (1024.0 * 1024 * 1024)
         return if (gb >= 1) t("composer.composer.gigabytes", "n" to (Math.round(gb * 10) / 10.0)) else t("composer.composer.megabytes", "n" to Math.round(max / (1024.0 * 1024)))
     }
@@ -378,10 +385,10 @@ fun Composer(channel: Channel) {
     }
 
     val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        scope.launch { addFiles(uris.mapNotNull { Staging.stage(it) }) }
+        scope.launch { addFiles(uris.mapNotNull { Staging.stage(it, channel.id) }) }
     }
     val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(Staging.MAX_FILES)) { uris ->
-        scope.launch { addFiles(uris.mapNotNull { Staging.stage(it) }) }
+        scope.launch { addFiles(uris.mapNotNull { Staging.stage(it, channel.id) }) }
     }
 
     /** Sends what the box holds; false when it could not go (slow mode, too long, an unknown command). */
@@ -527,7 +534,7 @@ fun Composer(channel: Channel) {
                         )
                     },
                     onPasteTooLong = { notice = Notice.PasteTooLong(it) },
-                    onContent = { uris -> scope.launch { addFiles(uris.mapNotNull { Staging.stage(it) }) } },
+                    onContent = { uris -> scope.launch { addFiles(uris.mapNotNull { Staging.stage(it, channel.id) }) } },
                     onSend = { send() },
                 )
                 SeasonalPerch(Modifier.align(Alignment.TopEnd))
@@ -864,9 +871,40 @@ private fun Tray(channelId: String, files: List<Staged>, shape: androidx.compose
             Txt(t("composer.composer.trayCount", "count" to files.size, "max" to Staging.MAX_FILES), style = Nx.type.hint.copy(fontWeight = FontWeight(600)), color = c.textMuted)
             Txt(Time.bytes(files.sumOf { it.size }), style = Nx.type.hint.copy(fontWeight = FontWeight(500), fontFeatureSettings = "tnum"), color = c.textMuted)
         }
+        MonthMeter(files.sumOf { it.size })
         Row(Modifier.fillMaxWidth().sidewaysScroll().padding(16.dp, 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             for (f in files) TrayCard(channelId, f)
         }
+    }
+}
+
+/**
+ * Over the files waiting to be sent (the web's MonthMeter): how much of the
+ * 30-day upload allowance is used, how much these add in Supporter's rose,
+ * and when room comes back. Read again each time the tray opens.
+ */
+@Composable
+private fun MonthMeter(adding: Long) {
+    val c = Nx.colors
+    val me by Nexa.users.me.collectAsState()
+    val billing by fish.nexa.data.Plans.billing.collectAsState()
+    LaunchedEffect(Unit) { fish.nexa.data.Plans.load() }
+    val room = billing?.limits?.monthUploadMax ?: fish.nexa.data.Plans.limitsOf(me?.plan).monthUploadMax
+    val used = billing?.monthUsed ?: 0L
+    val over = used + adding > room
+    fun share(n: Long) = (n.toFloat() / maxOf(1L, room)).coerceIn(0f, 1f)
+    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(c.textStrong.copy(alpha = 0.08f))) {
+            Row(Modifier.matchParentSize()) {
+                if (used > 0) Box(Modifier.fillMaxWidth(share(used)).fillMaxHeight().background(if (over) c.danger else c.textMuted, CircleShape))
+                val add = share(minOf(adding, maxOf(0L, room - used)))
+                if (add > 0f) Box(Modifier.fillMaxWidth(add / maxOf(0.0001f, 1f - share(used))).fillMaxHeight().background(c.tierSupporter, CircleShape))
+            }
+        }
+        val freesAt = billing?.monthFreesAt ?: 0L
+        val line = if (over) t("support.meter.over", "room" to Time.bytes(room)) else t("support.meter.line", "adding" to Time.bytes(adding), "used" to Time.bytes(used), "room" to Time.bytes(room))
+        val tail = if (freesAt > 0 && (over || used.toFloat() / room > 0.8f)) " " + t("support.meter.freesAt", "date" to Time.shortDate(freesAt)) else ""
+        Txt(line + tail, style = Nx.type.hint.copy(fontSize = Nx.type.sp(12f), fontFeatureSettings = "tnum"), color = if (over) c.textDanger else c.textMuted)
     }
 }
 

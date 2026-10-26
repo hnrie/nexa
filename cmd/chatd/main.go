@@ -171,6 +171,7 @@ func main() {
 	srv.StartDiscord(ctx)
 	// whatever deleted accounts still own goes, now and every hour after
 	srv.StartAccountSweep(ctx)
+	srv.StartBilling(ctx)
 	if warp != nil {
 		go func() {
 			if err := warp.Ensure(ctx); err != nil {

@@ -7,7 +7,7 @@ import org.junit.Test
 class SharePlanTest {
     @Test fun performanceAndQuality() {
         assertEquals(VideoCap.SharePlan("1080p", 60, 6_000_000, true), VideoCap.sharePlan("performance", null, null, null, null))
-        assertEquals(VideoCap.SharePlan("source", 60, VideoCap.MAX_SHARE_BPS, false), VideoCap.sharePlan("quality", "720p", 15, 2e6, "smooth"))
+        assertEquals(VideoCap.SharePlan("source", 60, VideoCap.OPEN.maxBps, false), VideoCap.sharePlan("quality", "720p", 15, 2e6, "smooth"))
         // anything not understood, with the usual size and frame rate, is Performance
         assertEquals(VideoCap.PERFORMANCE, VideoCap.sharePlan("turbo", "1080p", 30, null, null))
     }
@@ -15,8 +15,18 @@ class SharePlanTest {
     @Test fun customAsChosen() {
         assertEquals(VideoCap.SharePlan("1440p", 30, VideoCap.shareBitrate("1440p", 30), true), VideoCap.sharePlan("custom", "1440p", 30, null, "smooth"))
         assertEquals(4_500_000, VideoCap.sharePlan("custom", "1440p", 30, 4.5e6, "sharp").bitrate)
-        assertEquals(VideoCap.MAX_SHARE_BPS, VideoCap.sharePlan("custom", "1440p", 30, 99e9, "sharp").bitrate)
+        assertEquals(VideoCap.OPEN.maxBps, VideoCap.sharePlan("custom", "1440p", 30, 99e9, "sharp").bitrate)
         assertEquals(VideoCap.MIN_SHARE_BPS, VideoCap.sharePlan("custom", "1440p", 30, 10.0, "sharp").bitrate)
+    }
+
+    @Test fun withinWhatThePlanAllows() {
+        val free = VideoCap.Allowance(false, 6_000_000)
+        val pro = VideoCap.Allowance(true, 20_000_000)
+        // Quality without a plan shares as Performance
+        assertEquals(VideoCap.PERFORMANCE, VideoCap.sharePlan("quality", null, null, null, null, free))
+        assertEquals(6_000_000, VideoCap.sharePlan("custom", "1440p", 60, 15e6, "sharp", free).bitrate)
+        assertEquals(VideoCap.SharePlan("source", 60, 20_000_000, false), VideoCap.sharePlan("quality", null, null, null, null, pro))
+        assertEquals(18_000_000, VideoCap.sharePlan("custom", "1440p", 60, 18e6, "sharp", pro).bitrate)
     }
 
     @Test fun settingsFromBeforeModes() {

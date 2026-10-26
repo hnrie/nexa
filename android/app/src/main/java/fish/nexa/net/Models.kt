@@ -50,6 +50,8 @@ data class PublicUser(
     @SerialName("typing_style") val typingStyle: JsonElement? = null,
     @SerialName("name_style") val nameStyle: JsonElement? = null,
     @SerialName("server_tag") val serverTag: WornTag? = null,
+    /** Their subscription, shown as a badge: "" (none), "supporter" or "pro" (api/billing.go). */
+    val plan: String = "",
 ) {
     val isAdmin get() = flags and 1L != 0L
     val isSystem get() = flags and 16L != 0L
@@ -103,6 +105,8 @@ data class MeUser(
     @SerialName("typing_style") val typingStyle: JsonElement? = null,
     @SerialName("name_style") val nameStyle: JsonElement? = null,
     @SerialName("server_tag") val serverTag: WornTag? = null,
+    /** Their subscription, shown as a badge: "" (none), "supporter" or "pro" (api/billing.go). */
+    val plan: String = "",
     @SerialName("presence_pref") val presencePref: String = "online",
     @SerialName("dm_privacy") val dmPrivacy: String = "friends_servers",
     @SerialName("has_recovery") val hasRecovery: Boolean = false,
@@ -299,6 +303,8 @@ data class Server(
     @SerialName("verify_member_minutes") val verifyMemberMinutes: Int = 0,
     /** When the AutoMod rules members' apps apply last changed; 0 when there are none. */
     @SerialName("automod_at") val automodAt: Long = 0,
+    /** How many Pro accounts boost it; one or more lets every member send bigger files. */
+    val boosts: Int = 0,
 ) {
     val invitesPaused get() = (invitesPausedUntil ?: 0L) > System.currentTimeMillis()
 }
@@ -365,6 +371,8 @@ data class ServerView(
     @SerialName("verify_account_minutes") val verifyAccountMinutes: Int = 0,
     @SerialName("verify_member_minutes") val verifyMemberMinutes: Int = 0,
     @SerialName("automod_at") val automodAt: Long = 0,
+    /** How many Pro accounts boost it; one or more lets every member send bigger files. */
+    val boosts: Int = 0,
     val channels: List<Channel> = emptyList(),
     /** Threads still going that this member can see, and the ones they are in. */
     val threads: List<Channel> = emptyList(),
@@ -568,6 +576,72 @@ data class InstanceInfo(
     @SerialName("upload_single_bytes") val uploadSingleBytes: Long = 33554432,
     @SerialName("upload_chunk_bytes") val uploadChunkBytes: Long = 33554432,
     @SerialName("max_sticker_bytes") val maxStickerBytes: Long = 5242880,
+    /** Every plan's limits (api/billing.go); absent from servers before plans. */
+    val plans: PlansInfo? = null,
+)
+
+/** What one plan allows (api/billing.go planLimits). */
+@Serializable
+data class PlanLimits(
+    @SerialName("file_max") val fileMax: Long = 104857600,
+    @SerialName("month_upload_max") val monthUploadMax: Long = 5L shl 30,
+    @SerialName("share_quality") val shareQuality: Boolean = false,
+    @SerialName("share_max_bps") val shareMaxBps: Long = 6_000_000,
+    @SerialName("name_effects") val nameEffects: Boolean = false,
+    val boosts: Int = 0,
+)
+
+@Serializable
+data class PlansInfo(
+    val enabled: Boolean = false,
+    val free: PlanLimits = PlanLimits(),
+    val supporter: PlanLimits = PlanLimits(1L shl 30, 100L shl 30, true, 12_000_000, true, 0),
+    val pro: PlanLimits = PlanLimits(4L shl 30, 500L shl 30, true, 20_000_000, true, 2),
+    @SerialName("boost_file_max") val boostFileMax: Long = 500L shl 20,
+)
+
+/** One of an account's boosts, with the server it is on. */
+@Serializable
+data class Boost(
+    val id: Snowflake,
+    @SerialName("server_id") val serverId: Snowflake,
+    @SerialName("server_name") val serverName: String = "",
+    @SerialName("server_icon_id") val serverIconId: Snowflake? = null,
+    @SerialName("created_at") val createdAt: Long = 0,
+)
+
+@Serializable
+data class PlanPrice(val amount: Long = 0, val currency: String = "usd")
+
+/** An account's side of its subscription (GET /billing). */
+@Serializable
+data class Billing(
+    val enabled: Boolean = false,
+    val plan: String = "",
+    val limits: PlanLimits = PlanLimits(),
+    @SerialName("month_used") val monthUsed: Long = 0,
+    @SerialName("month_frees_at") val monthFreesAt: Long = 0,
+    val boosts: List<Boost> = emptyList(),
+    val period: String = "",
+    val status: String = "",
+    @SerialName("period_end") val periodEnd: Long = 0,
+    @SerialName("cancel_at_end") val cancelAtEnd: Boolean = false,
+    val manageable: Boolean = false,
+    val prices: Map<String, Map<String, PlanPrice>> = emptyMap(),
+    /** What a month or a year of a plan costs as a gift, paid once. */
+    @SerialName("gift_prices") val giftPrices: Map<String, Map<String, PlanPrice>> = emptyMap(),
+    /** Plans given to this account that haven't run out, soonest first. */
+    val gifts: List<PlanGift>? = null,
+)
+
+/** A plan someone gave this account, for a month or a year (store.Gift). */
+@Serializable
+data class PlanGift(
+    @SerialName("from_id") val fromId: Snowflake,
+    @SerialName("from_name") val fromName: String = "",
+    val plan: String = "",
+    @SerialName("starts_at") val startsAt: Long = 0,
+    @SerialName("ends_at") val endsAt: Long = 0,
 )
 
 @Serializable

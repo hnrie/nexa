@@ -323,6 +323,7 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
 | `realtime` | Cloudflare Realtime SFU client and the monthly usage meter |
 | `rpcapps` | names and art of Discord Rich Presence applications, looked up once and kept |
 | `store` | every SQL query, grouped by domain; models; the permission cache |
+| `stripe` | the few Stripe API calls plans need (prices by lookup key, Checkout, the billing portal, subscriptions) and webhook signatures; standard library only |
 | `telegram` | the Bot API calls a sticker set import needs |
 | `textutil` | cleaning user text, shared by REST and gateway |
 | `totp` | RFC 6238 codes for two-factor sign-in |
@@ -359,7 +360,8 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   `note_handlers`, `sound_handlers`, `widgets` (profile widgets, game and music search),
   `typing_style`, `name_style`, `profile_links`, `discord_handlers`, `activity_glue`, `nexa` (a member's side of
   Nexa) and `moderation*` (the staff's side), `bugs`, `crash_handlers` (client errors),
-  `admin_handlers` (instance stats, users, runtime settings), `legal_handlers` (the admin's legal
+  `admin_handlers` (instance stats, users, runtime settings), `billing` (plans, see Plans and
+  payments below), `legal_handlers` (the admin's legal
   report), `desktop_handlers` and `android_handlers` (downloads and update manifests),
   `media_handlers`, `upload_handlers` (resumable uploads), `proxy_handlers` (the signed media proxy),
   `youtube_proxy`, `unfurl_handlers`,
@@ -436,6 +438,50 @@ request may meet a captcha is disabled until that request ends (the Public Pack 
 - `ChannelAccess`, `ConvForChannel`, `ServerChannelPatch` and `CanRotate` on `Server` are hooks the
   server-channel code (`server_glue.go`) installs; DM access is built in.
 
+### Plans and payments (`api/billing.go`, `internal/stripe`)
+
+- Supporter ($5 a month, $48 a year) and Pro ($10, $96) only raise what costs money to keep:
+  `planLimitsFor` gives each plan's largest file (free is `MAX_UPLOAD_BYTES`, then 1 GB and 4 GB),
+  uploads per 30 days (5 GB, 100 GB, 500 GB: a rolling window counted from the account's
+  attachment blobs and declared unfinished uploads, `Store.UploadedSince`, refused with
+  `upload_month_full`), the Quality screen share and its most bits a second (6, 12, 20 Mbit/s),
+  the paid name effects (Holo, Neon, Flame: the server refuses to save one without a plan,
+  `plan_required`, and sends an account without a plan its first colour as solid,
+  `store.styleForPlan`) and Pro's two server boosts (a boosted server lets every member send
+  files up to 500 MB, `fileMaxFor`). Chatting, calls and everything else stay free.
+  `users.plan` is public, as a badge.
+- Stripe Managed Payments is the merchant of record. Prices are found by lookup key
+  (`nexa_supporter_monthly`, `_yearly`, `nexa_pro_monthly`, `_yearly`, and the one-time
+  `nexa_supporter_gift_month`, `_year`, `nexa_pro_gift_month`, `_year`) and kept for a while.
+  `POST /billing/checkout` and `/billing/gift` answer a Checkout address, `/billing/portal` the
+  portal's, and `GET /billing` the account's side (limits, the 30 days' use and when room comes
+  back, boosts, gifts, prices). `POST /billing/webhook` checks Stripe's signature and always reads
+  the subscription again from Stripe, so repeated or out-of-order events end the same way; an
+  older subscription ending never overrides a newer one.
+- An account wears the better of its subscription (`billing`) and a running gift (`plan_gifts`,
+  a month of 30 days or a year of 365, paid once; another gift of the same plan starts when the
+  last ends; never to someone either side blocked). `recomputePlanTx` writes `users.plan` and drops
+  the boosts of an account that is no longer Pro; `StartBilling` ends gifts as they run out.
+  Every change emits `user_update`, `server_update` for servers that lost a boost, and
+  `billing_update` to the account. Deleting an account cancels its subscription
+  (`endSubscription`) and deletes its plan records.
+- Without `STRIPE_SECRET_KEY` plans cannot be bought (`billing_off`) and the apps say so; the
+  limits still hold. Web: `lib/plans.ts`, `stores/billing.ts`, `stores/upsell.ts` (`offerPlan`,
+  the dialog when a limit stops something), `components/support/` (the page at
+  `/channels/@me/support` and Settings, Subscription; `Upsell.tsx` with the once-per-release
+  Support Nexa prompt, kept as `supportPromptSeen` in the settings; `MonthMeter.tsx` over the
+  composer's files). Android: `data/Plans`, `ui/support/Support.kt`.
+
+### Forwarding
+
+A message is forwarded to one conversation or channel at a time (`body.forward` on send, web
+`lib/forward.ts` and `modals/ForwardModal.tsx`, Android `data/Forward` and
+`ui/chat/ForwardSheet.kt`). The server checks the source as a reader would (same channel, a
+person's default or reply message, Read Message History, unlocked), lets the new message carry
+the source's files without owning them, so nothing is uploaded again and no allowance is spent,
+clears its mentions, sets flag 1 << 14 and limits forwards on their own (`limForward`). The
+payload's `fwd.at` is when the original was sent, drawn as Forwarded with a bar down its side.
+
 ### Gateway (`internal/gateway`, `web/src/gateway`)
 
 - One WebSocket at `GET /gateway`. The client sends `{op, d}`, the server `{t, s, d}`. The first
@@ -499,7 +545,8 @@ request may meet a captcha is disabled until that request ends (the Public Pack 
   `plain` for webhook and system text; `attachments`, `reactions`, `pins`, `read_states`, `polls`,
   `poll_votes`), keys (`key_epochs`, `key_grants`, `key_flags`), servers (`servers`,
   `server_members`, `roles`, `member_roles`, `invites`, `bans`, `audit_log`, `automod_rules`,
-  `automod_events`), expressions (`emojis`, `sticker_packs`, `stickers`, `sticker_installs`,
+  `automod_events`), plans (`billing`, `server_boosts`, `plan_gifts`, `users.plan`,
+  `servers.boosts`), expressions (`emojis`, `sticker_packs`, `stickers`, `sticker_installs`,
   `recent_stickers`, `blocked_images`), files (`blobs`, `uploads`), calls (`guest_links`, `guests`,
   `realtime_usage`), integrations (`webhooks`, `discord_links`), notes (`notes`, `note_members`,
   `note_invites`, `note_links`, `note_files`, `note_versions`, `note_version_files`, `note_keys`,
@@ -635,7 +682,8 @@ findings decide it (web `voice/media.ts`, `shareQuality.ts`, `shareAdapt.ts`; An
 (`shareMode`; Custom's `shareResolution`, `shareFps`, `shareBitrate` in bits a second or null for
 automatic, and `shareKeep`). `sharePlan` (web `shareQuality.ts`, Android `VideoCap.sharePlan`)
 turns it into a `SharePlan`: Performance is 1080p at 60 fps within 6 Mbit/s, smooth; Quality is the
-screen's own size at up to 60 fps within 12 Mbit/s, sharp; Custom is as chosen. Settings from before
+screen's own size at up to 60 fps within the plan's most (12 Mbit/s with Supporter, 20 with Pro; without a plan it
+is locked and shares as Performance), sharp; Custom is as chosen. Settings from before
 modes read as Performance when they held the usual 1080p at 30 fps, otherwise as Custom (60 fps
 smooth, slower sharp), without being rewritten (`shareModeOf`). A smooth share gets no content hint
 and is steered by `ShareAdapter`; a sharp one gets `detail` (`text` at 15 fps), keeps its size and
@@ -770,7 +818,8 @@ addresses (`LISTEN`, `PUBLIC_URL`, `ALT_URLS`, `MOVED_FROM`), storage (`DATA_DIR
 `TURN_API_TOKEN`), outbound (`EGRESS_PROXY`, `WARP_PROXY_PORT`), integrations (`KLIPY_API_KEY`,
 `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `TELEGRAM_BOT_TOKEN`, `DISCORD_CLIENT_ID`,
 `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`, `DISCORD_ACTIVITY_GUILD_ID`, `DISCORD_REDIRECT_URL`
-left empty, `DISCORD_API_URL` for the fake), logging (`LOG_LEVEL`, `LOG_FILE`). A new setting goes
+left empty, `DISCORD_API_URL` for the fake), payments (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_API_URL` for a fake), logging
+(`LOG_LEVEL`, `LOG_FILE`). A new setting goes
 in `config.go`, `chatd.env.example` and this list.
 
 ### Go tests
@@ -804,7 +853,13 @@ deliver: author, channel, mentions, reactions, sizes.
   `key_rotation_needed` and an online holder makes a new epoch.
   Invite links can carry the root key in the URL fragment (`#k=<epoch>.<key>`), which never reaches
   the server.
-- Messages are AES-256-GCM envelopes with the channel and author bound in. Attachments are chunked
+- Messages are AES-256-GCM envelopes with the channel and author bound in. What a message may
+  hold is the clients' to keep, since the server sees only ciphertext: `MESSAGE_LIMITS` in
+  `crypto/message.ts` (Android `MessageCrypto.Limits`): 4000 characters as typed (a mention or
+  custom emoji counts as two, `typedLength`), 10 files with names of 255 characters, 5 link
+  previews, a sticker name of 30, and the poll limits. Both apps refuse to send a payload past
+  them (`brokenLimit`) and show one that arrives past them as breaking the limits rather than
+  drawing it. Attachments are chunked
   (`crypto/fileChunks.ts`: "ECF1", a base IV, then length-prefixed chunks), each file with its own
   key inside the message; pictures also send a small copy of their own. Downloads and video play
   decrypt as they stream, in `download-sw.ts`.
@@ -845,7 +900,7 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
 `/terms`, `/privacy`, `/about`, `/call/:code` (guest call), `/stickers/pack/:packId`,
 `/connected/discord`, `/oauth2/authorize` (the consent page for adding an app), and inside the
 signed-in shell `/channels/@me` (friends), `@me/nexa` (with
-`cases/:caseId`, `bugs/:reportId`), `@me/notes[/:noteId]`, `@admin/*` (the staff panel),
+`cases/:caseId`, `bugs/:reportId`), `@me/notes[/:noteId]`, `@me/support` (plans), `@admin/*` (the staff panel),
 `@discover`, `@me/:channelId[/:messageId]` (DMs), `:serverId[/:channelId[/:messageId]]`, then
 `/:handle` (a profile link, `/@name`).
 
@@ -1024,7 +1079,7 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
   styled name is drawn (`loadNameFonts`). Every font is sized to match the app's own:
   `font-size-adjust` gives it Wix Madefor Display's lowercase height (Bungee, all capitals, its
   capital height), and Android multiplies by the same measured `scale`. `styles/nameStyle.css` draws
-  the eight effects (Solid, Gradient, Glow, Ink, Pop, Candy, Aurora, Chrome) as `ns-*` classes. A new
+  the eleven effects (Solid, Gradient, Glow, Ink, Pop, Candy, Aurora, Chrome, and Holo, Neon and Flame, which come with a plan and show locked without one) as `ns-*` classes. A new
   font goes in `NAME_FONTS`, the CSS imports, `nameFonts` in the Go file, `FONTS` in
   `android/tools/name_fonts.py` (then run it to write `res/font/name_<id>.ttf`) and Android's
   `data/NameStyle.kt`. Names are drawn through `nameStyle`/`nameClass` in `lib/roleLook.ts`, whose

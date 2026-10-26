@@ -30,8 +30,8 @@ data class NameStyle(val font: String, val effect: String, val colors: List<Long
     /** A font on offer: how much it is scaled so its lowercase letters (Bungee's capitals) are as tall as the app font's, and its name. */
     data class Font(val id: String, val scale: Float, val label: String)
 
-    /** An effect, how many colours it takes, and the colours it starts with when picked. */
-    data class Effect(val id: String, val min: Int, val max: Int, val start: List<Long>)
+    /** An effect, how many colours it takes, and the colours it starts with when picked; `paid` ones come with a plan (data/Plans). */
+    data class Effect(val id: String, val min: Int, val max: Int, val start: List<Long>, val paid: Boolean = false)
 
     companion object {
         val PLAIN = NameStyle("", "solid", emptyList())
@@ -78,12 +78,16 @@ data class NameStyle(val font: String, val effect: String, val colors: List<Long
             Effect("candy", 2, 4, listOf(0xf7a8d0L, 0xa8dcf7L, 0xc3b1f5L, 0xb6f0c9L)),
             Effect("aurora", 2, 5, listOf(0xf29a4aL, 0x6ee38aL, 0xf6e05eL, 0xe85bc8L, 0x6a6af2L)),
             Effect("chrome", 1, 1, listOf(0x9fb6d6L)),
+            Effect("holo", 1, 1, listOf(0xa98bffL), paid = true),
+            Effect("neon", 1, 1, listOf(0x3df0ffL), paid = true),
+            Effect("flame", 2, 2, listOf(0xff4d1aL, 0xffd23fL), paid = true),
         )
 
         /** Ready-made colours for the effects that take more than one. */
         val PALETTES: Map<String, List<List<Long>>> = mapOf(
             "gradient" to listOf(listOf(0x5ec8c0L, 0xf2c58bL), listOf(0xc86bffL, 0x4f7cf2L), listOf(0xf0a3b8L, 0xc67be0L), listOf(0xe2513fL, 0xb98cf2L), listOf(0x45b86aL, 0x9fe6eeL), listOf(0xf09a4aL, 0xd65ad8L)),
             "candy" to listOf(listOf(0xf7a8d0L, 0xa8dcf7L, 0xc3b1f5L, 0xb6f0c9L), listOf(0xf06fb8L, 0xe0559fL, 0xf5a3d4L, 0xcc6aa8L), listOf(0xf6c28bL, 0xf09a76L, 0xee7f7fL, 0xdc6f8aL), listOf(0xd3ef7aL, 0xa6dc6eL, 0x82c96dL, 0x63b36aL), listOf(0x8ab8f8L, 0xa2e1d6L, 0x9b96eaL, 0x7fcde9L), listOf(0xca82f8L, 0xa86bf0L, 0xd45ed8L, 0x8a6cf2L)),
+            "flame" to listOf(listOf(0xff4d1aL, 0xffd23fL), listOf(0xe0124aL, 0xff8a3dL), listOf(0x6a5cffL, 0x3fe0ffL), listOf(0x2fd27aL, 0xe6ff6bL), listOf(0xd65ad8L, 0xffb3e6L), listOf(0x2b6cf2L, 0xb8f0ffL)),
             "aurora" to listOf(listOf(0xf29a4aL, 0x6ee38aL, 0xf6e05eL, 0xe85bc8L, 0x6a6af2L), listOf(0xe6533cL, 0xf4cf62L, 0xa45df0L), listOf(0x8a1d1dL, 0xe55b2bL, 0xf2b23aL), listOf(0x8fdcf2L, 0xc69cf5L, 0xf29bd6L), listOf(0x47c98aL, 0x4a8cf2L, 0x7a4ef0L), listOf(0xd8f2a0L, 0xf2e19aL, 0xf4bfd9L)),
         )
 
@@ -120,8 +124,9 @@ data class NameStyle(val font: String, val effect: String, val colors: List<Long
         }
 
         /** Something to try: a font, an effect and colours picked at random. */
-        fun surprise(rand: Random = Random.Default): NameStyle {
-            val effect = EFFECTS.drop(1).random(rand).id
+        /** Something to try; the paid effects only with a plan. */
+        fun surprise(rand: Random = Random.Default, paid: Boolean = false): NameStyle {
+            val effect = EFFECTS.drop(1).filter { paid || !it.paid }.random(rand).id
             val colors = PALETTES[effect]?.random(rand) ?: listOf(SWATCHES.random(rand))
             return NameStyle(FONTS.random(rand).id, effect, colors)
         }

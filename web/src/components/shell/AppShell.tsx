@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Rail } from "@/components/rail/Rail";
 import { DMSidebar } from "@/components/sidebar/DMSidebar";
@@ -7,6 +7,7 @@ import { ModalHost } from "@/components/modals/ModalHost";
 import { NexaNotices } from "@/components/nexa/NexaNotices";
 import { TermsGate } from "@/components/legal/TermsGate";
 import { WhatsNew } from "@/components/shell/WhatsNewDialog";
+import { lazyPage } from "@/lib/lazyChunk";
 import { DownloadBanner } from "@/components/shell/DownloadBanner";
 import { RpcBanner } from "@/components/shell/RpcBanner";
 import { isTypingField } from "@/lib/keyboardInset";
@@ -29,6 +30,18 @@ import { installSearchIndex } from "@/search/indexer";
 import { installBackLayers } from "./backLayers";
 import s from "./AppShell.module.css";
 import { t } from "@/i18n";
+
+/** The plan offers and the once-per-release Support Nexa prompt, loaded after the app opens (components/support/Upsell.tsx). */
+const Plans = lazyPage(() =>
+  import("@/components/support/Upsell").then((m) => ({
+    default: () => (
+      <>
+        <m.SupportPrompt />
+        <m.UpsellHost />
+      </>
+    ),
+  })),
+);
 
 /** Controls a horizontal drag already means something to. */
 const NATIVE_DRAG = "input, textarea, select, [contenteditable=''], [contenteditable='true'], [role=slider], [data-native-press]";
@@ -290,6 +303,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       <NexaNotices />
       <TermsGate />
       <WhatsNew />
+      <Suspense fallback={null}>
+        <Plans />
+      </Suspense>
       <Shortcuts />
       <DesktopEffects />
       <EmojiDetails />

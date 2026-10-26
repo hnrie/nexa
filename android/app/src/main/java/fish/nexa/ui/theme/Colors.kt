@@ -93,6 +93,12 @@ data class NexaColors(
     val gradPositiveTop: Color = mixOklab(positive, Color.White, 0.12f)
     val sheenTop: Color = Color.White.copy(alpha = if (isLight) 0.5f else 0.035f)
 
+    /** The plans' own lights (tokens.css --tier-*): Supporter rose, Pro the accent. */
+    val tierSupporter: Color = if (isLight) Color(0xFFE8336F) else Color(0xFFFF5C93)
+    val textSupporter: Color = mixOklab(tierSupporter, if (isLight) Color.Black else textStrong, 0.18f)
+    val tierPro: Color get() = brand
+    val textPro: Color get() = textBrand
+
     fun shadeAt(a: Float): Color = shade.copy(alpha = (a * shadeAlpha).coerceIn(0f, 1f))
 
     fun statusColor(status: String?): Color = when (status) {

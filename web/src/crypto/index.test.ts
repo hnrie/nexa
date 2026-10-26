@@ -56,6 +56,9 @@ describe("crypto module surface", () => {
       "POLL_ANSWERS_MIN",
       "POLL_ANSWERS_MAX",
       "POLL_HOURS_MAX",
+      "MESSAGE_LIMITS",
+      "typedLength",
+      "brokenLimit",
       // file
       "CHUNK",
       "encryptFile",

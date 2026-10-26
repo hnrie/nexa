@@ -89,6 +89,13 @@ type Config struct {
 	DiscordGuildID      string
 	// DiscordAPIURL is Discord's REST API; only end-to-end tests point it at a fake.
 	DiscordAPIURL string
+
+	// Subscriptions (api/billing.go) are on once both Stripe keys are set:
+	// the secret key and the webhook endpoint's signing secret. StripeAPIURL
+	// is Stripe's API; only tests point it at a fake.
+	StripeSecretKey     string
+	StripeWebhookSecret string
+	StripeAPIURL        string
 	// DiscordRedirectURL names the callback Discord sends people back through
 	// after linking, outright. Empty, as it is meant to be, the callback is
 	// chosen from the ones listed under OAuth2, Redirects in the Developer
@@ -188,6 +195,9 @@ func Load(getenv func(string) string) (Config, error) {
 	str("DISCORD_ACTIVITY_GUILD_ID", &c.DiscordGuildID)
 	str("DISCORD_API_URL", &c.DiscordAPIURL)
 	str("DISCORD_REDIRECT_URL", &c.DiscordRedirectURL)
+	str("STRIPE_SECRET_KEY", &c.StripeSecretKey)
+	str("STRIPE_WEBHOOK_SECRET", &c.StripeWebhookSecret)
+	str("STRIPE_API_URL", &c.StripeAPIURL)
 	str("HCAPTCHA_SITE_KEY", &c.HCaptchaSiteKey)
 	str("HCAPTCHA_SECRET_KEY", &c.HCaptchaSecretKey)
 	str("REALTIME_APP_ID", &c.RealtimeAppID)

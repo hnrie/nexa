@@ -129,6 +129,7 @@ object Settings {
                     SettingsPageInfo("profiles", t("settings.profile.profiles"), "IdCard"),
                     SettingsPageInfo("security", t("settings.security.security"), "KeyRound"),
                     SettingsPageInfo("devices", t("settings.devices.devices"), "MonitorSmartphone"),
+                    SettingsPageInfo("subscription", t("support.settingsLabel"), "Heart"),
                 ),
             ),
             SettingsGroup(
@@ -625,6 +626,7 @@ private fun SettingsPageContent(id: String, anchor: String?, openPage: (String, 
         "profiles" -> ProfilesPage(anchor)
         "security" -> SecurityPage()
         "devices" -> DevicesPage()
+        "subscription" -> fish.nexa.ui.support.SupportPanel(inSettings = true)
         "privacy" -> PrivacyPage()
         "blocked" -> BlockedPage()
         "data" -> DataPage(openPage)
@@ -697,6 +699,9 @@ private fun settingsIndex(groups: List<SettingsGroup>): List<SettingResult> {
         Triple("security", "appLock", "settings.security.lockAfterInactivity"),
         Triple("security", "appLock", "settings.security.lockWhenTheAppLosesFocus"),
         Triple("devices", "sessions", "settings.devices.logOutAllOtherDevices"),
+        Triple("subscription", "subscription", "support.manage"),
+        Triple("subscription", "subscription", "support.yourStorage"),
+        Triple("subscription", "subscription", "support.boosts.title"),
         Triple("privacy", "dmPrivacy", "settings.privacy.directMessages"),
         Triple("privacy", "groupAdd", "settings.privacy.letFriendsAddMe"),
         Triple("privacy", "encryption", "server.encryption.encryption"),

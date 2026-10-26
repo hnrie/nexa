@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -43,6 +44,7 @@ import fish.nexa.media.TwemojiImage
 import fish.nexa.net.Role
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.theme.Nx
+import fish.nexa.ui.theme.mixOklab
 import fish.nexa.ui.theme.rgbColor
 import java.util.WeakHashMap
 
@@ -249,6 +251,70 @@ private fun OwnName(text: String, own: NameStyle, style: TextStyle, modifier: Mo
                 1f to lerp(Color.White, c1, 0.35f),
             )
             PlainName(text, style.copy(brush = brush), modifier, maxLines)
+        }
+        "holo" -> {
+            // holographic foil: the colour with a sheen of every hue sweeping across it
+            val phase = if (!Nx.motion.reduced) {
+                val t = rememberInfiniteTransition(label = "holo")
+                val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(5000, easing = LinearEasing), RepeatMode.Restart), label = "holo")
+                p
+            } else 0f
+            val stops = listOf(
+                0f to c1, 0.18f to mixOklab(c1, Color(0xFF7FF3FF), 0.55f), 0.30f to mixOklab(c1, Color.White, 0.70f), 0.44f to mixOklab(c1, Color(0xFFFF8FF0), 0.55f),
+                0.58f to mixOklab(c1, Color(0xFFFFF38A), 0.55f), 0.72f to c1, 0.86f to mixOklab(c1, Color(0xFF7FF3FF), 0.55f), 1f to c1,
+            )
+            val brush = remember(c1, phase) {
+                object : ShaderBrush() {
+                    override fun createShader(size: Size): Shader {
+                        // the CSS's 105deg gradient 2.6 names wide, running from 100% to -160%
+                        val w = size.width * 2.6f
+                        val dx = w * 0.966f
+                        val dy = w * 0.259f
+                        // one whole turn of the foil a loop, starting and ending on the colour, so it has no seam
+                        val from = Offset(-phase * dx, -phase * dy)
+                        return LinearGradientShader(from, Offset(from.x + dx, from.y + dy), stops.map { it.second }, stops.map { it.first }, TileMode.Repeated)
+                    }
+                }
+            }
+            PlainName(text, style.copy(brush = brush), modifier, maxLines)
+        }
+        "neon" -> {
+            // a tube lit from inside: a pale core, a line of the colour round it, and its glow, with a flicker now and then
+            val flicker = if (!Nx.motion.reduced) {
+                val t = rememberInfiniteTransition(label = "neon")
+                val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(7000, easing = LinearEasing), RepeatMode.Restart), label = "neon")
+                if (p in 0.92f..0.935f || p in 0.945f..0.96f) 0.72f else 1f
+            } else 1f
+            Box(modifier.alpha(flicker)) {
+                if (light) PlainName(text, style.copy(color = c1, shadow = Shadow(c1.copy(alpha = 0.55f), Offset.Zero, em * 0.3f)), Modifier, maxLines)
+                else {
+                    PlainName(text, style.copy(color = c1.copy(alpha = 0.7f), shadow = Shadow(c1.copy(alpha = 0.7f), Offset.Zero, em * 0.5f)), Modifier, maxLines)
+                    PlainName(text, style.copy(color = c1, drawStyle = Stroke(width = em * 0.07f, join = StrokeJoin.Round), shadow = Shadow(c1, Offset.Zero, em * 0.2f)), Modifier, maxLines)
+                    PlainName(text, style.copy(color = lerp(Color.White, c1, 0.18f), shadow = Shadow(Color.White, Offset.Zero, em * 0.05f)), Modifier, maxLines)
+                }
+            }
+        }
+        "flame" -> {
+            // the colours rising through the name, with their warmth over it
+            val phase = if (!Nx.motion.reduced) {
+                val t = rememberInfiniteTransition(label = "flame")
+                val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Restart), label = "flame")
+                p
+            } else 0f
+            val mid = mixOklab(c1, c2, 0.5f)
+            val brush = remember(c1, c2, phase) {
+                object : ShaderBrush() {
+                    override fun createShader(size: Size): Shader {
+                        val h = size.height * 2f
+                        val y0 = size.height + phase * h
+                        return LinearGradientShader(Offset(0f, y0), Offset(0f, y0 - h), listOf(c1, mid, c2, mid, c1), listOf(0f, 0.25f, 0.5f, 0.75f, 1f), TileMode.Repeated)
+                    }
+                }
+            }
+            Box(modifier) {
+                PlainName(text, style.copy(color = c1.copy(alpha = 0.55f), shadow = Shadow(c1.copy(alpha = 0.7f), Offset(0f, -em * 0.04f), em * 0.16f)), Modifier, maxLines)
+                PlainName(text, style.copy(brush = brush), Modifier, maxLines)
+            }
         }
         else -> PlainName(text, style.copy(color = c1), modifier, maxLines)
     }

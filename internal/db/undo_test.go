@@ -46,6 +46,11 @@ const undoCommunities = `
 
 // undoBots takes away what migrations 0034 to 0037 add, for the same tests.
 const undoBots = `
+	DROP TABLE plan_gifts;
+	DROP TABLE server_boosts;
+	DROP TABLE billing;
+	ALTER TABLE servers DROP COLUMN boosts;
+	ALTER TABLE users DROP COLUMN plan;
 	DROP TABLE passkeys;
 	ALTER TABLE users DROP COLUMN name_style;
 	DROP TABLE user_ips;

@@ -5,7 +5,8 @@ import { openCopy } from "./follows";
 import { channelKeyFor, missingKeyListeners } from "./keyring";
 import { listedAttachments, sanitizeHook, type HookContent } from "./webhookMessage";
 
-export type DecryptError = "no_key" | "bad";
+/** no_key: not opened yet; bad: could not be opened; invalid: opened, and past what any app sends (crypto/message.ts MESSAGE_LIMITS). */
+export type DecryptError = "no_key" | "bad" | "invalid";
 
 export interface DecryptedMessage extends Message {
   payload?: MessagePayload;
@@ -83,8 +84,8 @@ export async function decryptForStore(msg: Message): Promise<DecryptedMessage> {
       channelId: msg.channel_id,
       authorId: msg.author_id,
     });
-  } catch {
-    out.decryptError = "bad";
+  } catch (e) {
+    out.decryptError = e instanceof Error && e.message === "over_limits" ? "invalid" : "bad";
   }
   return out;
 }

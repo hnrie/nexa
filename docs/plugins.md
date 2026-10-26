@@ -762,7 +762,7 @@ Message on someone else's message, for one).
 | `memberJoinedFilter` | The joined filter of Server Settings, Members | none | `memberJoinedFilter` |
 | `memberRoleFilter` | The roles filter of Server Settings, Members | none | `memberRoleFilter` |
 | `memberSort` | The sort order of Server Settings, Members | none | `memberSortOrder` |
-| `message` | A message | `message`, `user`, `channel`, `server` | `copyMessageImage`, `saveMessageImage`, `addReaction`, `editMessage`, `replyToMessage`, `createThreadFromMessage`, `publishMessage`, `copyMessageText`, `pinMessage`, `markUnread`, `toggleEmbeds`, `copyMessageLink`, `messageApps`, `copyMessageId`, `selectMessages`, `deleteMessage`, `messageTimes` |
+| `message` | A message | `message`, `user`, `channel`, `server` | `copyMessageImage`, `saveMessageImage`, `addReaction`, `editMessage`, `replyToMessage`, `forwardMessage`, `createThreadFromMessage`, `publishMessage`, `copyMessageText`, `pinMessage`, `markUnread`, `toggleEmbeds`, `copyMessageLink`, `messageApps`, `copyMessageId`, `selectMessages`, `deleteMessage`, `messageTimes` |
 | `microphone` | The arrow beside the microphone button in a call | none | `microphoneDevices`, `speakerDevices`, `microphoneNoiseModes`, `voiceSettings` |
 | `moderation` | The staff panel's entry in the server rail or the direct messages list | none | `markModerationRead` |
 | `nexa` | Nexa's own conversation in the direct messages list | none | `markNexaRead`, `selectNexa`, `pinNexa`, `addNexaToGroup`, `removeNexaFromGroup`, `moveNexa`, `closeNexa` |
@@ -775,7 +775,7 @@ Message on someone else's message, for one).
 | `profileMore` | The More button on a person's profile | `user` | `viewFullProfile`, `copyProfileCardLink`, `editFriendNickname`, `removeFriendFromProfile`, `blockFromProfile`, `copyProfileUserId`, `copyProfileBotId` |
 | `roleOrder` | Moving a role, in Server Settings, Roles | none | `moveRole` |
 | `searchSort` | The sort order of search results | none | `searchSortOrder` |
-| `server` | A server in the server rail | `server` | `markServerRead`, `pinServer`, `addServerToFolder`, `removeServerFromFolder`, `moveServer`, `selectServers`, `inviteToServer`, `serverSettings`, `createChannel`, `createCategory`, `muteServer`, `serverNotifications`, `editServerProfile`, `wearServerTag`, `leaveServer`, `copyServerId` |
+| `server` | A server in the server rail | `server` | `markServerRead`, `pinServer`, `addServerToFolder`, `removeServerFromFolder`, `moveServer`, `selectServers`, `inviteToServer`, `serverSettings`, `createChannel`, `createCategory`, `boostServer`, `muteServer`, `serverNotifications`, `editServerProfile`, `wearServerTag`, `leaveServer`, `copyServerId` |
 | `serverBulk` | Several servers picked in the server rail | none | `markServersRead`, `pinServers`, `addServersToFolder`, `muteServers`, `leaveServers` |
 | `serverProfilePick` | Picking a server, in Settings, Profiles | none | `pickProfileServer` |
 | `stickerOrder` | Moving a sticker, in a sticker pack's editor | none | `moveSticker` |

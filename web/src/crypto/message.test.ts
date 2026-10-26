@@ -10,6 +10,8 @@ import {
   type AttachmentMeta,
   type Envelope,
   type MessagePayload,
+  brokenLimit,
+  typedLength,
 } from "./message";
 
 const root = newRootKey();
@@ -154,7 +156,7 @@ describe("encryptMessage / decryptMessage", () => {
     }
   });
 
-  it("drops wrongly typed fields and keeps the usable ones", async () => {
+  it("drops fields that are not the message's and keeps the rest, but refuses a file or a card that is not one", async () => {
     const good = { blob_id: "b1", name: "a.png", type: "image/png", size: 10, key: "k", w: 5 };
     const forged = {
       t: "hi",
@@ -165,7 +167,11 @@ describe("encryptMessage / decryptMessage", () => {
       extra: 1,
     };
     const env = await forgeEnvelope(utf8.enc(JSON.stringify(forged)));
-    expect(await decryptMessage(key, env, aad)).toEqual({
+    // a broken file or card is something no app sends: the whole message is refused
+    await expect(decryptMessage(key, env, aad)).rejects.toThrow("over_limits");
+    // what is merely mistyped or not a message's at all is let go
+    const odd = await forgeEnvelope(utf8.enc(JSON.stringify({ t: "hi", att: [good, { ...good, blob_id: "b2", w: "wide", spoiler: "yes" }], sticker: { id: "s", w: "x", name: {} }, embeds: [{ url: "https://e.x", title: { bad: true }, image_w: "9", type: "link" }], flags: "3", extra: 1 })));
+    expect(await decryptMessage(key, odd, aad)).toEqual({
       t: "hi",
       att: [good, { blob_id: "b2", name: "a.png", type: "image/png", size: 10, key: "k" }],
       sticker: { id: "s" },
@@ -397,19 +403,20 @@ describe("polls in the payload", () => {
     expect(await decryptMessage(key, env, aad)).toEqual({ poll });
   });
 
-  it("holds a poll to the lengths the dialog allows, and fills in what it leaves unsaid", async () => {
-    const long = { question: "q".repeat(400), answers: [{ text: "a".repeat(80), emoji: { name: "🍕", id: "not-an-id" } }, { text: "b", emoji: { name: 5 } }], hours: 9999, multiselect: "yes" };
-    const env = await forgeEnvelope(utf8.enc(JSON.stringify({ poll: long })));
-    const out = await decryptMessage(key, env, aad);
+  it("refuses a poll past the lengths the dialog allows, and fills in what it leaves unsaid", async () => {
+    const long = { question: "q".repeat(400), answers: [{ text: "a" }, { text: "b" }] };
+    await expect(decryptMessage(key, await forgeEnvelope(utf8.enc(JSON.stringify({ poll: long }))), aad)).rejects.toThrow("over_limits");
+    const loose = { question: "q".repeat(300), answers: [{ text: "a".repeat(55), emoji: { name: "🍕", id: "not-an-id" } }, { text: "b", emoji: { name: 5 } }], hours: 9999, multiselect: "yes" };
+    const out = await decryptMessage(key, await forgeEnvelope(utf8.enc(JSON.stringify({ poll: loose }))), aad);
     expect(out.poll).toEqual({ question: "q".repeat(300), answers: [{ text: "a".repeat(55), emoji: { name: "🍕" } }, { text: "b" }], hours: 24, multiselect: false });
   });
 
-  it("never cuts an emoji in half", async () => {
-    const env = await forgeEnvelope(utf8.enc(JSON.stringify({ poll: { ...poll, answers: [{ text: "x".repeat(54) + "🍕🍕" }, { text: "b" }] } })));
+  it("counts an emoji as one character, as the dialog does", async () => {
+    const env = await forgeEnvelope(utf8.enc(JSON.stringify({ poll: { ...poll, answers: [{ text: "x".repeat(54) + "🍕" }, { text: "b" }] } })));
     expect((await decryptMessage(key, env, aad)).poll?.answers[0]?.text).toBe("x".repeat(54) + "🍕");
   });
 
-  it("keeps a message's other content when its poll is unusable", async () => {
+  it("refuses a message whose poll no app would send", async () => {
     for (const bad of [
       { ...poll, question: "" },
       { ...poll, question: 7 },
@@ -421,12 +428,58 @@ describe("polls in the payload", () => {
       "poll",
     ]) {
       const env = await forgeEnvelope(utf8.enc(JSON.stringify({ t: "hi", poll: bad })));
-      expect(await decryptMessage(key, env, aad)).toEqual({ t: "hi" });
+      await expect(decryptMessage(key, env, aad)).rejects.toThrow("over_limits");
     }
   });
 
   it("rejects a payload whose only content is a poll it cannot use", async () => {
     const env = await forgeEnvelope(utf8.enc(JSON.stringify({ poll: { question: "q", answers: [] } })));
     await expect(decryptMessage(key, env, aad)).rejects.toBeInstanceOf(DecryptError);
+  });
+});
+
+describe("a forwarded message in the payload", () => {
+  it("keeps when the original was sent, and drops a mark that is not one", async () => {
+    const att = [{ blob_id: "9", name: "a.png", type: "image/png", size: 10, key: b64.enc(randomBytes(32)) }];
+    const env = await encryptMessage(key, aad, { t: "hi", att, fwd: { at: 1761400000000 } });
+    expect(await decryptMessage(key, env, aad)).toEqual({ t: "hi", att, fwd: { at: 1761400000000 } });
+    const odd = await encryptMessage(key, aad, { t: "hi", fwd: { at: "yesterday" } } as never);
+    expect((await decryptMessage(key, odd, aad)).fwd).toBeUndefined();
+  });
+});
+
+describe("what a message may hold", () => {
+  const file = (name = "a.png") => ({ blob_id: "9", name, type: "image/png", size: 10, key: b64.enc(randomBytes(32)) });
+  const opens = async (payload: object) => {
+    const env = await encryptMessage(key, aad, payload as never);
+    return decryptMessage(key, env, aad).then(
+      () => true,
+      (e: Error) => (e.message === "over_limits" ? false : Promise.reject(e)),
+    );
+  };
+
+  it("opens a message up to the composer's length, counting mentions and custom emoji as typed", async () => {
+    expect(await opens({ t: "x".repeat(4000) })).toBe(true);
+    expect(await opens({ t: "x".repeat(4001) })).toBe(false);
+    // 1000 mentions are far longer sealed than typed, and still fit
+    expect(await opens({ t: "<@123456789012345678>".repeat(1000) + "x".repeat(1000) })).toBe(true);
+    expect(typedLength("hi <:wave:123456789012345678> <@&42>")).toBe(8);
+  });
+
+  it("refuses more files than a message takes, a file that is not one, and a name past any app's", async () => {
+    expect(await opens({ att: Array.from({ length: 10 }, () => file()) })).toBe(true);
+    expect(await opens({ att: Array.from({ length: 11 }, () => file()) })).toBe(false);
+    expect(await opens({ att: [file(), { blob_id: 5 }] })).toBe(false);
+    expect(await opens({ att: [file("n".repeat(256))] })).toBe(false);
+  });
+
+  it("refuses more link previews than the composer makes, and previews past what the server writes", async () => {
+    const card = (extra = {}) => ({ url: "https://example.com/", title: "t", ...extra });
+    expect(await opens({ embeds: Array.from({ length: 5 }, () => card()) })).toBe(true);
+    expect(await opens({ embeds: Array.from({ length: 6 }, () => card()) })).toBe(false);
+    expect(await opens({ embeds: [card({ description: "d".repeat(2049) })] })).toBe(false);
+    expect(brokenLimit({ t: 42 })).toBe("text");
+    expect(brokenLimit({ sticker: { id: "1", name: "s".repeat(31) } })).toBe("sticker");
+    expect(brokenLimit({ poll: { question: "q".repeat(301), answers: [{ text: "a" }, { text: "b" }] } })).toBe("poll");
   });
 });

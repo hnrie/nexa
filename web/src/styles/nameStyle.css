@@ -16,8 +16,13 @@
 /* polished metal tinted by the colour: a bright sky, a hard horizon, a dark ground */
 .ns-chrome { background-image: linear-gradient(180deg, color-mix(in srgb, var(--ns-c1) 20%, #fff) 0%, color-mix(in srgb, var(--ns-c1) 55%, #fff) 46%, color-mix(in srgb, var(--ns-c1) 60%, #10131a) 52%, var(--ns-c1) 78%, color-mix(in srgb, var(--ns-c1) 35%, #fff) 100%); }
 
+/* Room for a light round the letters. A name is usually its own overflow box
+   (cut short with an ellipsis), which cut Glow's light off square at the
+   letters' edges, so the box grows by room for it and the margin takes that
+   back from the layout. Two classes, so a tile's or a row's padding does not win. */
+.ns.ns-glow, .ns.ns-neon, .ns.ns-flame { padding: 0.5em; margin: -0.5em; }
 /* a light core inside the colour's own light */
-.ns-glow { color: color-mix(in srgb, var(--ns-c1) 35%, #fff) !important; text-shadow: 0 0 0.12em var(--ns-c1), 0 0 0.4em var(--ns-c1), 0 0 0.9em color-mix(in srgb, var(--ns-c1) 60%, transparent); }
+.ns-glow { color: color-mix(in srgb, var(--ns-c1) 35%, #fff) !important; text-shadow: 0 0 0.1em var(--ns-c1), 0 0 0.3em var(--ns-c1), 0 0 0.5em color-mix(in srgb, var(--ns-c1) 60%, transparent); }
 /* a cartoon: the colour, a dark line round it and a shadow under it */
 .ns-ink { --ns-line: color-mix(in srgb, var(--ns-c1) 35%, #12060c); color: var(--ns-c1) !important; text-shadow: 0.04em 0 0 var(--ns-line), -0.04em 0 0 var(--ns-line), 0 0.04em 0 var(--ns-line), 0 -0.04em 0 var(--ns-line), 0.03em 0.1em 0 var(--ns-line); }
 /* pale letters lifted off a block of the colour */
@@ -25,6 +30,19 @@
 :root[data-scheme="light"] .ns-pop { color: #fff !important; text-shadow: 0.05em 0.09em 0 var(--ns-c1), 0 0 0.04em color-mix(in srgb, var(--ns-c1) 70%, #000); }
 :root[data-scheme="light"] .ns-glow { color: color-mix(in srgb, var(--ns-c1) 75%, #000) !important; text-shadow: 0 0 0.35em color-mix(in srgb, var(--ns-c1) 70%, transparent); }
 
-@media (prefers-reduced-motion: reduce) { .ns-aurora { animation: none; } }
-[data-reduced-motion="true"] .ns-aurora { animation: none; }
+/* --- the effects that come with a plan ------------------------------------ */
+/* holographic foil: the colour with a sheen of every hue sweeping across it */
+.ns-holo { -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent !important; background-image: linear-gradient(105deg, var(--ns-c1) 0%, color-mix(in oklab, var(--ns-c1) 45%, #7ff3ff) 18%, color-mix(in oklab, var(--ns-c1) 30%, #fff) 30%, color-mix(in oklab, var(--ns-c1) 45%, #ff8ff0) 44%, color-mix(in oklab, var(--ns-c1) 45%, #fff38a) 58%, var(--ns-c1) 72%, color-mix(in oklab, var(--ns-c1) 45%, #7ff3ff) 86%, var(--ns-c1) 100%); background-size: 260% 100%; animation: ns-holo 5s linear infinite; }
+@keyframes ns-holo { from { background-position: 100% 0; } to { background-position: -160% 0; } }
+/* a lit tube: a pale core, the colour as its rim and a tight light round it
+   that catches now and then. Its light needs room, as Glow's does. */
+.ns-neon { color: color-mix(in srgb, var(--ns-c1) 18%, #fff) !important; -webkit-text-stroke: 0.035em var(--ns-c1); text-shadow: 0 0 0.05em #fff, 0 0 0.12em var(--ns-c1), 0 0 0.28em var(--ns-c1), 0 0 0.5em color-mix(in srgb, var(--ns-c1) 70%, transparent); animation: ns-neon 7s steps(1) infinite; }
+@keyframes ns-neon { 0%, 91%, 93.5%, 100% { opacity: 1; } 92%, 94.5% { opacity: 0.72; } }
+:root[data-scheme="light"] .ns-neon { color: var(--ns-c1) !important; -webkit-text-stroke: 0; text-shadow: 0 0 0.3em color-mix(in srgb, var(--ns-c1) 55%, transparent); }
+/* fire: the first colour at the root, the second at the tips, always rising */
+.ns-flame { -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent !important; background-image: linear-gradient(0deg, var(--ns-c1) 0%, color-mix(in oklab, var(--ns-c1), var(--ns-c2)) 25%, var(--ns-c2) 50%, color-mix(in oklab, var(--ns-c1), var(--ns-c2)) 75%, var(--ns-c1) 100%); background-size: 100% 200%; animation: ns-flame 1.8s linear infinite; filter: drop-shadow(0 -0.04em 0.16em color-mix(in srgb, var(--ns-c1) 70%, transparent)); }
+@keyframes ns-flame { from { background-position: 0 0; } to { background-position: 0 -200%; } }
+
+@media (prefers-reduced-motion: reduce) { .ns-aurora, .ns-holo, .ns-neon, .ns-flame { animation: none; } }
+[data-reduced-motion="true"] :is(.ns-aurora, .ns-holo, .ns-neon, .ns-flame) { animation: none; }
 @media (forced-colors: active) { .ns { -webkit-text-fill-color: currentColor; color: CanvasText !important; background: none; text-shadow: none; } }

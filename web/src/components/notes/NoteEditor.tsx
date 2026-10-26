@@ -9,6 +9,8 @@ import type { FileHost } from "@/components/composer/format/surface";
 import f from "@/components/composer/format/FormatEditor.module.css";
 import { useMediaQuery } from "@/hooks/useIsMobile";
 import { fitsUploadLimit, noteUploads, stage, uploadLimit, uploadStaged } from "@/lib/attachments";
+import { myPlan, planForFile } from "@/lib/plans";
+import { offerPlan } from "@/stores/upsell";
 import { describeError } from "@/lib/errors";
 import { NOTE_MAX_CHARS, NOTE_MAX_FILES, NOTE_TITLE_MAX, fileIds, headOf, type NoteDoc } from "@/lib/notes/model";
 import type { OpenNote } from "@/lib/notes/open";
@@ -204,7 +206,8 @@ export function NoteEditor({ noteId, note, initial, bridge, onTitle, autoFocus, 
     if (list.length > room) toast(t("notes.file.someLeftOut", { count: room }), "info");
     for (const file of list.slice(0, room)) {
       if (!fitsUploadLimit(file.size)) {
-        toast(t("notes.file.tooBig", { name: file.name, limit: formatBytes(uploadLimit()) }), "error");
+        if (planForFile(file.size) && myPlan() !== "pro") offerPlan({ kind: "file", name: file.name, size: file.size });
+        else toast(t("notes.file.tooBig", { name: file.name, limit: formatBytes(uploadLimit()) }), "error");
         continue;
       }
       const id = newFileId();

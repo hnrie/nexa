@@ -22,6 +22,7 @@ import { forgetFetchedPolls } from "@/components/chat/usePollOf";
 import { forgetUnsentAcks } from "@/stores/readStates";
 import { admin as adminApi } from "@/api/admin";
 import { setUploadLimits } from "@/lib/attachments";
+import { setPlans } from "@/lib/plans";
 import { clearLock, hasLock } from "@/lib/appLock";
 import { reportCrash } from "@/lib/crashReport";
 import { clearMediaCache } from "@/lib/mediaCache";
@@ -320,6 +321,7 @@ async function loadUploadLimits(): Promise<void> {
   try {
     const info = await adminApi.instance();
     setUploadLimits({ max: info.max_upload_bytes, single: info.upload_single_bytes, chunk: info.upload_chunk_bytes });
+    setPlans(info.plans);
   } catch {
     /* the built-in defaults stand */
   }

@@ -33,7 +33,8 @@ const (
 	CameraBps        = 1_500_000
 	DefaultScreenBps = 5_000_000
 	minScreenBps     = 1_000_000
-	maxScreenBps     = 12_000_000
+	// Pro shares up to 20 Mbit/s (api/billing.go)
+	maxScreenBps = 20_000_000
 )
 
 // ClampScreenBps bounds a screen share's declared bitrate.

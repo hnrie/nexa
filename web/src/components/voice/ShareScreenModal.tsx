@@ -1,10 +1,12 @@
-import { MonitorUp } from "lucide-react";
+import { Lock, MonitorUp } from "lucide-react";
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Toggle } from "@/components/common/Toggle";
 import { desktopBridge } from "@/lib/desktopBridge";
 import { useSettings, type ShareFps, type ShareKeep, type ShareMode, type ShareResolution } from "@/stores/settings";
+import { shareAllowance } from "@/lib/plans";
+import { offerPlan } from "@/stores/upsell";
 import { MAX_SHARE_BPS, MIN_SHARE_BPS, SHARE_FRAME_RATES, customShareBitrate, shareBitrate, sharePlan, shareResolutions } from "@/voice/shareQuality";
 import { startScreen } from "@/voice/session";
 import s from "./Voice.module.css";
@@ -71,7 +73,7 @@ function Choices<T extends string | number>({ label, id, options, value, onChang
  * The three ways a share can go, on one track: a lit thumb sits under the
  * chosen one and slides to the next, the only thing in the dialog that moves.
  */
-function ModeSwitch({ value, onChange }: { value: ShareMode; onChange: (m: ShareMode) => void }) {
+function ModeSwitch({ value, onChange, locked }: { value: ShareMode; onChange: (m: ShareMode) => void; locked: boolean }) {
   const row = useRef<HTMLDivElement>(null);
   return (
     <div ref={row} className={s.modeTrack} role="radiogroup" aria-label={t("voice.shareScreen.streamMode")} style={{ ["--at" as string]: MODES.indexOf(value) }}>
@@ -88,8 +90,10 @@ function ModeSwitch({ value, onChange }: { value: ShareMode; onChange: (m: Share
           onClick={() => onChange(m)}
           onKeyDown={(e) => arrowKeys(e, MODES, value, onChange, row.current)}
           data-testid={`share-mode-${m}`}
+          data-locked={(locked && m === "quality") || undefined}
         >
           {modeName(m)}
+          {locked && m === "quality" ? <Lock size={12} aria-label={t("support.locked")} className={s.modeLock} /> : null}
         </button>
       ))}
     </div>
@@ -100,7 +104,17 @@ function ModeSwitch({ value, onChange }: { value: ShareMode; onChange: (m: Share
 export function ShareScreenModal({ onClose }: { onClose: () => void }) {
   const voice = useSettings((x) => x.settings.voice);
   const patch = useSettings((x) => x.patch);
-  const [mode, setMode] = useState<ShareMode>(voice.shareMode);
+  const allow = shareAllowance();
+  // Quality is for plans: without one, a saved Quality opens as Performance
+  const [mode, setModeRaw] = useState<ShareMode>(voice.shareMode === "quality" && !allow.quality ? "performance" : voice.shareMode);
+  const setMode = (m: ShareMode) => {
+    if (m === "quality" && !allow.quality) {
+      onClose();
+      offerPlan({ kind: "share" });
+      return;
+    }
+    setModeRaw(m);
+  };
   const [resolution, setResolution] = useState<ShareResolution>(voice.shareResolution);
   const [fps, setFps] = useState<ShareFps>(voice.shareFps);
   const [bitrate, setBitrate] = useState<number | null>(customShareBitrate(voice.shareBitrate));
@@ -114,7 +128,7 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
   const windowAudio = bridge?.windowAudio === true;
   const [audio, setAudio] = useState((voice.shareAudio ?? true) && audioSupported);
   const chosen = { shareMode: mode, shareResolution: resolution, shareFps: fps, shareBitrate: bitrate, shareKeep: keep };
-  const plan = sharePlan(chosen);
+  const plan = sharePlan(chosen, allow);
   const auto = shareBitrate(resolution, fps);
 
   const goLive = () => {
@@ -141,7 +155,7 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
     >
       <div className={s.shareForm}>
         <div className={s.modeBlock}>
-          <ModeSwitch value={mode} onChange={setMode} />
+          <ModeSwitch value={mode} onChange={setMode} locked={!allow.quality} />
           {/* Custom's own rows say what it is */}
           {mode === "custom" ? null : <p className={s.modeAbout} data-testid="share-mode-about">{modeWords(mode)}</p>}
         </div>
@@ -159,7 +173,7 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
                 type="range"
                 className={s.bitrateSlider}
                 min={MIN_SHARE_BPS / 1_000_000}
-                max={MAX_SHARE_BPS / 1_000_000}
+                max={Math.min(MAX_SHARE_BPS, allow.maxBps) / 1_000_000}
                 step={0.5}
                 value={plan.bitrate / 1_000_000}
                 aria-valuetext={t("voice.shareScreen.mbps", { mbps: mbpsOf(plan.bitrate) })}

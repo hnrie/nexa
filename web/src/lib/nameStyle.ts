@@ -9,7 +9,7 @@
 import type { CSSProperties } from "react";
 import { t } from "@/i18n";
 
-export type NameEffect = "solid" | "gradient" | "glow" | "ink" | "pop" | "candy" | "aurora" | "chrome";
+export type NameEffect = "solid" | "gradient" | "glow" | "ink" | "pop" | "candy" | "aurora" | "chrome" | "holo" | "neon" | "flame";
 
 export interface NameStyle {
   /** One of NAME_FONTS' ids, or "" for the app's own. */
@@ -58,8 +58,12 @@ export const NAME_FONTS: { id: string; family: string; scale: number; label: str
   { id: "spacemono", family: "Space Mono", scale: 0.99, label: "Space Mono" },
 ];
 
-/** Each effect, how many colours it takes, and the colours it starts with when picked. */
-export const NAME_EFFECTS: { id: NameEffect; min: number; max: number; start: number[] }[] = [
+/**
+ * Each effect, how many colours it takes, and the colours it starts with when
+ * picked. `paid` ones come with a plan (lib/plans.ts); the server sends one an
+ * account without a plan still has saved as its first colour alone.
+ */
+export const NAME_EFFECTS: { id: NameEffect; min: number; max: number; start: number[]; paid?: boolean }[] = [
   { id: "solid", min: 0, max: 1, start: [] },
   { id: "gradient", min: 2, max: 2, start: [0x5ec8c0, 0xf2c58b] },
   { id: "glow", min: 1, max: 1, start: [0xb46cff] },
@@ -68,12 +72,16 @@ export const NAME_EFFECTS: { id: NameEffect; min: number; max: number; start: nu
   { id: "candy", min: 2, max: 4, start: [0xf7a8d0, 0xa8dcf7, 0xc3b1f5, 0xb6f0c9] },
   { id: "aurora", min: 2, max: 5, start: [0xf29a4a, 0x6ee38a, 0xf6e05e, 0xe85bc8, 0x6a6af2] },
   { id: "chrome", min: 1, max: 1, start: [0x9fb6d6] },
+  { id: "holo", min: 1, max: 1, start: [0xa98bff], paid: true },
+  { id: "neon", min: 1, max: 1, start: [0x3df0ff], paid: true },
+  { id: "flame", min: 2, max: 2, start: [0xff4d1a, 0xffd23f], paid: true },
 ];
 
 /** Ready-made colours for each effect that takes more than one, beside picking your own. */
 export const NAME_PALETTES: Partial<Record<NameEffect, number[][]>> = {
   gradient: [[0x5ec8c0, 0xf2c58b], [0xc86bff, 0x4f7cf2], [0xf0a3b8, 0xc67be0], [0xe2513f, 0xb98cf2], [0x45b86a, 0x9fe6ee], [0xf09a4a, 0xd65ad8]],
   candy: [[0xf7a8d0, 0xa8dcf7, 0xc3b1f5, 0xb6f0c9], [0xf06fb8, 0xe0559f, 0xf5a3d4, 0xcc6aa8], [0xf6c28b, 0xf09a76, 0xee7f7f, 0xdc6f8a], [0xd3ef7a, 0xa6dc6e, 0x82c96d, 0x63b36a], [0x8ab8f8, 0xa2e1d6, 0x9b96ea, 0x7fcde9], [0xca82f8, 0xa86bf0, 0xd45ed8, 0x8a6cf2]],
+  flame: [[0xff4d1a, 0xffd23f], [0xe0124a, 0xff8a3d], [0x6a5cff, 0x3fe0ff], [0x2fd27a, 0xe6ff6b], [0xd65ad8, 0xffb3e6], [0x2b6cf2, 0xb8f0ff]],
   aurora: [[0xf29a4a, 0x6ee38a, 0xf6e05e, 0xe85bc8, 0x6a6af2], [0xe6533c, 0xf4cf62, 0xa45df0], [0x8a1d1d, 0xe55b2b, 0xf2b23a], [0x8fdcf2, 0xc69cf5, 0xf29bd6], [0x47c98a, 0x4a8cf2, 0x7a4ef0], [0xd8f2a0, 0xf2e19a, 0xf4bfd9]],
 };
 
@@ -107,10 +115,10 @@ export function withEffect(style: NameStyle | null, effect: NameEffect): NameSty
   return { font: style?.font ?? "", effect, colors };
 }
 
-/** Something to try: a font, an effect and colours picked at random. */
-export function surpriseStyle(rand: () => number = Math.random): NameStyle {
+/** Something to try: a font, an effect and colours picked at random; the paid effects only with a plan. */
+export function surpriseStyle(rand: () => number = Math.random, paid = false): NameStyle {
   const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)]!;
-  const effect = pick(NAME_EFFECTS.slice(1)).id;
+  const effect = pick(NAME_EFFECTS.slice(1).filter((e) => paid || !e.paid)).id;
   const palettes = NAME_PALETTES[effect];
   const colors = palettes ? pick(palettes) : [pick(NAME_SWATCHES)];
   return { font: pick(NAME_FONTS).id, effect, colors };

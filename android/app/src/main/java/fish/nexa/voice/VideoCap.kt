@@ -147,7 +147,10 @@ object VideoCap {
     val RESOLUTIONS = listOf("720p", "1080p", "1440p", "source")
     val FRAME_RATES = listOf(15, 30, 60)
     const val MIN_SHARE_BPS = 1_000_000
-    const val MAX_SHARE_BPS = 12_000_000
+    /** The most any share may send (Pro's); a Custom limit goes up to it. */
+    const val MAX_SHARE_BPS = 20_000_000
+    /** The most a share's own automatic bitrate and Quality use without a plan's say. */
+    const val AUTO_MAX_BPS = 12_000_000
 
     /** The capture box for a resolution; "source" is the screen as it is, limited only by the cap. */
     fun shareBox(res: String): Pair<Int, Int> = when (res) {
@@ -165,7 +168,7 @@ object VideoCap {
     fun shareBitrate(res: String, fps: Int): Int {
         val r = if (res in RESOLUTIONS) res else "1080p"
         val f = if (fps in FRAME_RATES) fps else 30
-        return (BPS_AT_30.getValue(r) * FPS_SCALE.getValue(f)).toInt().coerceIn(MIN_SHARE_BPS, MAX_SHARE_BPS)
+        return (BPS_AT_30.getValue(r) * FPS_SCALE.getValue(f)).toInt().coerceIn(MIN_SHARE_BPS, AUTO_MAX_BPS)
     }
 
     fun clampShareBitrate(bps: Int): Int = if (bps <= 0) 6_000_000 else bps.coerceIn(MIN_SHARE_BPS, MAX_SHARE_BPS)
@@ -180,7 +183,11 @@ object VideoCap {
     /** Performance: smooth motion, 1080p at 60 fps within 6 Mbit/s (shareQuality.ts PERFORMANCE_PLAN). */
     val PERFORMANCE = SharePlan("1080p", 60, 6_000_000, true)
     /** Quality: the screen as it is, up to 60 fps, at the most a share may use (QUALITY_PLAN). */
-    val QUALITY = SharePlan("source", 60, MAX_SHARE_BPS, false)
+    val QUALITY = SharePlan("source", 60, AUTO_MAX_BPS, false)
+
+    /** What the account's plan lets a share do (data/Plans): Quality or not, and the most it sends (shareQuality.ts ShareAllowance). */
+    data class Allowance(val quality: Boolean, val maxBps: Int)
+    val OPEN = Allowance(true, AUTO_MAX_BPS)
     val MODES = listOf("performance", "quality", "custom")
 
     /** A Custom bitrate limit from settings, held to what a share may use; null when there is none (customShareBitrate). */
@@ -201,15 +208,19 @@ object VideoCap {
     /** What a Custom share keeps when the link is short; before modes, 60 fps stayed smooth and slower shares sharp. */
     fun shareKeep(keep: String?, fps: Int?): String = if (keep == "sharp" || keep == "smooth") keep else if ((fps ?: 30) >= 60) "smooth" else "sharp"
 
-    /** What a share is sent as, from the account's voice settings (sharePlan). */
-    fun sharePlan(mode: String?, res: String?, fps: Int?, bitrate: Double?, keep: String?): SharePlan = when (shareMode(mode, res, fps)) {
-        "quality" -> QUALITY
-        "custom" -> {
-            val r = if (res in RESOLUTIONS) res!! else "1080p"
-            val f = if (fps in FRAME_RATES) fps!! else 30
-            SharePlan(r, f, customBitrate(bitrate) ?: shareBitrate(r, f), shareKeep(keep, fps) == "smooth")
-        }
-        else -> PERFORMANCE
+    /**
+     * What a share is sent as, from the account's voice settings (sharePlan),
+     * within what its plan allows: Quality without a plan shares as
+     * Performance, and no mode sends more than the plan's most (Quality sends
+     * exactly that).
+     */
+    fun sharePlan(mode: String?, res: String?, fps: Int?, bitrate: Double?, keep: String?, allow: Allowance = OPEN): SharePlan {
+        val m = shareMode(mode, res, fps)
+        if (m == "quality" && allow.quality) return QUALITY.copy(bitrate = allow.maxBps)
+        if (m != "custom") return PERFORMANCE.copy(bitrate = minOf(PERFORMANCE.bitrate, allow.maxBps))
+        val r = if (res in RESOLUTIONS) res!! else "1080p"
+        val f = if (fps in FRAME_RATES) fps!! else 30
+        return SharePlan(r, f, minOf(customBitrate(bitrate) ?: shareBitrate(r, f), allow.maxBps), shareKeep(keep, fps) == "smooth")
     }
 
     /**

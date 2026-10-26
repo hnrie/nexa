@@ -202,6 +202,8 @@ class SettingsStore(private val api: Api, private val scope: CoroutineScope) {
     val smartEmoji get() = bool("smartEmoji", true)
     val skinTone get() = (_doc.value["skinTone"] as? JsonPrimitive)?.intOrNull ?: 0
     val whatsNewSeen get() = str("whatsNewSeen")
+    /** The newest release the Support Nexa prompt was shown for (components/support/Upsell.tsx). */
+    val supportPromptSeen get() = str("supportPromptSeen")
     val notifications get() = obj("notifications") ?: DEFAULT_NOTIFICATIONS
     val voice get() = obj("voice") ?: DEFAULT_VOICE
     val drafts get() = obj("drafts") ?: JsonObject(emptyMap())

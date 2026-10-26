@@ -32,3 +32,7 @@
 .text {
   color: inherit;
 }
+
+/* a subscription's badge: the same pill, in its plan's light */
+.badge[data-plan="supporter"] { color: var(--text-supporter); background: color-mix(in srgb, var(--tier-supporter) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tier-supporter) 34%, transparent); }
+.badge[data-plan="pro"] { color: var(--text-pro); background: color-mix(in srgb, var(--tier-pro) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tier-pro) 34%, transparent); }

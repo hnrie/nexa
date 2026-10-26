@@ -1,8 +1,10 @@
-import { Check, Dices, Minus, Pipette, Plus, RotateCcw } from "lucide-react";
+import { Check, Dices, Heart, Lock, Minus, Pipette, Plus, RotateCcw } from "lucide-react";
 import { ColourInput } from "@/components/common/ColourInput";
 import { Button } from "@/components/common/Button";
 import { t } from "@/i18n";
 import { nameClass, nameStyle } from "@/lib/roleLook";
+import { myLimits } from "@/lib/plans";
+import { offerPlan } from "@/stores/upsell";
 import { NAME_EFFECTS, NAME_FONTS, NAME_PALETTES, NAME_SWATCHES, surpriseStyle, withEffect, type NameStyle } from "@/lib/nameStyle";
 import n from "./NameStyle.module.css";
 
@@ -25,6 +27,8 @@ export function NameStyleEditor({ value, onChange, name, plate = false }: { valu
   const setStyle = (f: (s: NameStyle) => NameStyle) => set(f(style));
   const setColors = (colors: number[]) => set({ ...style, colors });
   const look = { own: style };
+  // the effects that come with a plan are shown to everyone, locked without one
+  const paid = myLimits().name_effects;
 
   return (
     <div className={n.controls}>
@@ -34,7 +38,7 @@ export function NameStyleEditor({ value, onChange, name, plate = false }: { valu
         </div>
       ) : null}
       <div className={n.actions}>
-        <Button size="sm" variant="secondary" onClick={() => set(surpriseStyle())} data-testid="name-style-surprise">
+        <Button size="sm" variant="secondary" onClick={() => set(surpriseStyle(Math.random, paid))} data-testid="name-style-surprise">
           <Dices size={15} aria-hidden="true" /> {t("nameStyle.surprise")}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => onChange(null)} disabled={!value} data-testid="name-style-reset">
@@ -63,8 +67,22 @@ export function NameStyleEditor({ value, onChange, name, plate = false }: { valu
           {NAME_EFFECTS.map((e) => {
             const sample = { own: { font: "", effect: e.id, colors: e.id === "solid" ? [] : e.start } };
             return (
-              <button key={e.id} type="button" role="radio" aria-checked={style.effect === e.id} className={[n.tile, n.effectTile].join(" ")} onClick={() => setStyle((s) => withEffect(s, e.id))} data-testid={`name-effect-${e.id}`}>
+              <button
+                key={e.id}
+                type="button"
+                role="radio"
+                aria-checked={style.effect === e.id}
+                className={[n.tile, n.effectTile].join(" ")}
+                onClick={() => (e.paid && !paid ? offerPlan({ kind: "effect" }) : setStyle((s) => withEffect(s, e.id)))}
+                data-testid={`name-effect-${e.id}`}
+                data-locked={(e.paid && !paid) || undefined}
+              >
                 <span className={nameClass(sample)} style={nameStyle(sample)}>{t(`nameStyle.effects.${e.id}`)}</span>
+                {e.paid ? (
+                  <span className={n.planMark} title={t("support.effects.withPlan")} aria-label={t("support.effects.withPlan")}>
+                    {paid ? <Heart size={11} fill="currentColor" aria-hidden="true" /> : <Lock size={11} aria-hidden="true" />}
+                  </span>
+                ) : null}
               </button>
             );
           })}

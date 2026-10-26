@@ -34,7 +34,8 @@ under data protection law, including the GDPR (sections 9 to 11).
   the server, so YouTube never learns who is watching.
 - No email, no phone number, no real name, no payment details, no
   location, no contacts, no analytics, and no push tokens are ever
-  collected.
+  collected. If you buy a plan, you pay on Stripe's page, and Nexa
+  learns only which plan you have (section 3k).
 - You can export your data, correct it, or delete your account
   yourself, and you can object or complain (section 11).
 
@@ -84,7 +85,8 @@ a) Profile information (public by design, typed by you): username,
    music you show, and the cards you make), presence preference, DM
    privacy setting, whether friends can add you to group chats, per
    server nicknames and pictures, account ID, creation and last change
-   times, and admin and disabled flags. None of this is identity
+   times, admin and disabled flags, and your plan (Supporter or Pro,
+   shown as a badge). None of this is identity
    checked. Servers are public in the same way: a server's name, icon,
    banner, description, and tag, its owner, and when it was made.
    Staff see these with how many members and channels a server has
@@ -246,10 +248,25 @@ j) Apps (not end-to-end encrypted, added only by people who choose
      members (3d) of the servers and channels it is in, and, if its
      maker turned it on, who is online and what they are doing.
 
+k) Plans (only if you buy one or are given one; not end-to-end
+   encrypted, and not shown in the staff panel): which plan you have,
+   monthly or yearly, its state as Stripe last reported it (such as
+   active, past due or cancelled), when it renews or ends, and the IDs
+   Stripe gives your customer record and your subscription, so the app
+   can open Stripe's page for you. For a gift: who gave which plan to
+   whom, for how long, the ID of its Stripe checkout, and when it
+   starts and ends. The person who gets a gift sees the name of the
+   person who gave it. Also the servers your boosts are on. What you
+   uploaded in the last 30 days is added up from your files (3c), not
+   kept separately. When you pay, Nexa sends Stripe your account ID
+   (for a gift, both accounts' IDs and the plan), and Stripe tells
+   Nexa when a payment or subscription changes. Your card, name, email
+   address and billing address go to Stripe and never reach Nexa.
+
 4. WHAT IS NEVER COLLECTED
 
 No email address. No phone number. No legal name, birth date, age, or
-ID documents. No payment details. No IP addresses beyond the sessions,
+ID documents. No payment details (Stripe takes those, section 6). No IP addresses beyond the sessions,
 account addresses and guest entries above. No access history beyond
 when each of those addresses was first and last used. No online time
 history. No call records beyond the line in 3c: who joined a call, and
@@ -315,6 +332,14 @@ These are the outside services Nexa uses. Each gets only what its job
 needs, and none of them can read your messages, files, notes, or
 calls.
 
+- Stripe, for plans. When you buy a plan or a gift, your app opens
+  Stripe's checkout page, and managing a plan opens Stripe's own page
+  for it. Stripe sells the plan as the merchant of record, so it
+  collects your payment details, name, email address and billing
+  address, works out the tax, and keeps the records of your payments
+  that the law requires of it. Nexa gets only what section 3k lists.
+  Stripe's own privacy policy covers what Stripe keeps. Why: to take
+  payments without Nexa ever holding card details.
 - Cloudflare, for the network. Every connection to Nexa reaches the
   server through Cloudflare's network (a Cloudflare Tunnel), so
   Cloudflare handles your IP address and every request your device
@@ -386,6 +411,8 @@ calls.
   for a day.
 - Crash reports: only about the newest 500 are kept.
 - Bug reports and their threads: until your account is deleted.
+- Plans (3k), with the gifts you were given: while your account
+  exists, including after a plan or gift ends.
 - A linked Discord account: until you unlink it or delete your
   account.
 - Apps: until their maker deletes them or the maker's account. What
@@ -415,8 +442,11 @@ calls.
   (for everyone in them), the apps you made with their bots, and your
   direct message conversations, for both people in them. Its profile
   is overwritten, and its sessions, account addresses, relationships,
-  settings, keys, second factor, linked Discord account, and crash
-  reports are deleted. What is left is a stand-in named Deleted User,
+  settings, keys, second factor, linked Discord account, crash
+  reports, plan records and the gifts given to it are deleted, and a
+  running subscription is cancelled at once. A gift it gave someone
+  else stays theirs until it ends. Stripe keeps its own record of
+  past payments. What is left is a stand-in named Deleted User,
   with the account ID, when it was made, its public key, and its color
   and privacy choices, which nobody can sign in as.
 - When someone you have a direct message conversation with deletes

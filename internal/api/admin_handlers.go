@@ -58,6 +58,7 @@ func (s *Server) handleInstanceInfo(w http.ResponseWriter, r *http.Request) {
 		"upload_chunk_bytes":  MaxChunkBytes,
 		"upload_single_bytes": SingleUploadBytes,
 		"captcha":             s.captchaInfo(),
+		"plans":               s.plansInfo(),
 	})
 }
 
@@ -280,6 +281,7 @@ func (s *Server) handleAdminUserDelete(w http.ResponseWriter, r *http.Request) {
 	s.Bcast.CloseUserSessions(id, 0)
 	pctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), purgeTimeout)
 	defer cancel()
+	s.endSubscription(pctx, id)
 	if err := s.purgeAccount(r.WithContext(pctx), id, purgeOptions{}); err != nil {
 		s.Log.Error("admin: delete account", "user", id.String(), "err", err)
 		WriteError(w, E(http.StatusInternalServerError, "delete_incomplete", "The account is closed, but not everything is gone yet. The rest goes by itself shortly."))

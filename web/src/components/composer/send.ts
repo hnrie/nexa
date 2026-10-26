@@ -1,7 +1,7 @@
 import { ApiError } from "@/api/client";
 import { messages as messagesApi } from "@/api/messages";
 import type { SendMessageRequest } from "@/api/types";
-import { encryptMessage, type AttachmentMeta, type MessagePayload, type PollPayload } from "@/crypto/message";
+import { brokenLimit, encryptMessage, type AttachmentMeta, type MessagePayload, type PollPayload } from "@/crypto/message";
 import { addressedBots, sealCopies } from "@/lib/botCopies";
 import { goesInOneRequest, sendInWorker, uploadStaged, type Staged } from "@/lib/attachments";
 import { encryptedSize } from "@/crypto/fileChunks";
@@ -43,6 +43,8 @@ export interface SendOptions {
   screened?: (messageId: string) => void;
   /** Told the message as the server took it, once it is sent (the plugin API's messages.send). */
   onSent?: (message: DecryptedMessage) => void;
+  /** Passes on another message (lib/forward.ts): its files go as they are, and nobody is pinged. */
+  forward?: { channelId: string; messageId: string; at: number };
 }
 
 /** The conversation whose keys encrypt a channel: the server tells us (itself for DMs and private channels, the server root otherwise). */
@@ -161,6 +163,11 @@ function written(channelId: string, rawText: string, opts: SendOptions): Written
   if (Array.isArray(opts.embeds) && opts.embeds.length) payload.embeds = opts.embeds;
   if (opts.sticker) payload.sticker = opts.sticker;
   if (opts.poll) payload.poll = opts.poll;
+  // someone else's words, passed on: they ping nobody
+  if (opts.forward) {
+    payload.fwd = { at: opts.forward.at };
+    return { payload, mentions: [], roles: [], everyone: false, raw: rawText };
+  }
   return { payload, mentions, roles, everyone, raw: rawText };
 }
 
@@ -224,6 +231,8 @@ export function sendMessage(channelId: string, rawText: string, opts: SendOption
   if (!me) return Promise.resolve();
   const w = written(channelId, rawText, opts);
   if (!w.payload.t && !w.payload.att && !w.payload.sticker && !w.payload.poll) return Promise.resolve();
+  // nothing goes out that the apps would refuse to show (crypto/message.ts MESSAGE_LIMITS), whoever asks to send it
+  if (brokenLimit(w.payload as Record<string, unknown>)) return Promise.reject(new Error("too_long"));
   const nonce = newNonce();
   const tmp = tmpId();
   const messages = useMessages.getState();
@@ -451,6 +460,7 @@ async function deliver(channelId: string, meId: string, w: Written, tmp: string,
     // a picture's small copy goes with it, marked as one so it does not count as a file of its own
     if (opts.attachments?.length) body.attachments = opts.attachments.flatMap((a) => [{ blob_id: a.blob_id, size: a.size }, ...(a.meta.preview ? [{ blob_id: a.meta.preview.blob_id, size: encryptedSize(a.meta.preview.size), preview: true }] : [])]);
     if (opts.flags) body.flags = opts.flags;
+    if (opts.forward) body.forward = { channel_id: opts.forward.channelId, message_id: opts.forward.messageId };
     if (payload.poll) body.poll = pollRequest(payload.poll);
     // the apps it is addressed to read their own copy, sealed to their bots
     const bots = addressedBots(channelId, body.mentions, body.reply_to_id ? replyAuthor(channelId, body.reply_to_id) : undefined, meId);

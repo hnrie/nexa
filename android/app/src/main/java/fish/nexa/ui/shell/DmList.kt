@@ -468,6 +468,7 @@ fun DmSidebar() {
                 item("friends") { NavRow("Users", t("sidebar.dMSidebar.friends"), route is Route.Friends, requests, t("rail.rail.friendRequestsCount", "count" to requests)) { Nav.go(Route.Friends); Nav.leftOpen = false } }
                 // note requests waiting for an answer, counted where the answering is done
                 item("notes") { NavRow("NotebookPen", t("notes.title"), route is Route.Notes, noteRequests, t("notes.requests.count", "count" to noteRequests)) { Nav.go(Route.Notes()); Nav.leftOpen = false } }
+                item("support") { SupportRow(route is Route.Support) { Nav.go(Route.Support); Nav.leftOpen = false } }
                 // case threads and bug reports waiting on the staff that hold something this person has not read
                 if (me?.isAdmin == true) item("mod") {
                     val waitingOnStaff = fish.nexa.data.Moderation.unread.collectAsState().value.count
@@ -569,7 +570,7 @@ private fun SearchButton() {
 }
 
 @Composable
-private fun NavRow(icon: String, label: String, selected: Boolean, badge: Int, badgeLabel: String?, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
+private fun NavRow(icon: String, label: String, selected: Boolean, badge: Int, badgeLabel: String?, onLongClick: (() -> Unit)? = null, iconTint: androidx.compose.ui.graphics.Color? = null, onClick: () -> Unit) {
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -585,11 +586,16 @@ private fun NavRow(icon: String, label: String, selected: Boolean, badge: Int, b
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) { Icon(icon, if (selected) c.textBrand else c.textChannel, size = 22.dp) }
+        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) { Icon(icon, if (selected) c.textBrand else iconTint ?: c.textChannel, size = 22.dp) }
         Txt(label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), fontWeight = FontWeight(550)), color = if (selected) c.textStrong else c.textChannel, maxLines = 1, modifier = Modifier.weight(1f))
         CountBadge(badge)
     }
 }
+
+/** Support Nexa, its heart in Supporter's rose (Sidebar.module.css `.navIcon[data-support]`). */
+@Composable
+private fun SupportRow(selected: Boolean, onClick: () -> Unit) =
+    NavRow("Heart", t("support.nav"), selected, 0, null, iconTint = Nx.colors.tierSupporter, onClick = onClick)
 
 /** The Pinned heading, or Direct Messages with List Options and Create DM. */
 @Composable

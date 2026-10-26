@@ -51,8 +51,9 @@ var errNoSpace = E(http.StatusInsufficientStorage, "no_space", "This server does
 // without that, transfers started together all pass a free-space check made
 // before any of their bytes arrive. And no one account may hold more than a
 // file of the largest size plus a working allowance in files it has not sent,
-// so one account cannot fill the disk for everyone. session says a resumable
-// transfer is being opened, which counts against the open-transfer cap.
+// so one account cannot fill the disk for everyone, and none may upload more
+// in 30 days than its plan allows. session says a resumable transfer is
+// being opened, which counts against the open-transfer cap.
 func (s *Server) roomForUpload(ctx context.Context, uid ids.ID, size int64, session bool) error {
 	room, err := s.Store.UploadRoomFor(ctx, uid)
 	if err != nil {
@@ -61,8 +62,15 @@ func (s *Server) roomForUpload(ctx context.Context, uid ids.ID, size int64, sess
 	if session && room.UserOpen >= maxOpenUploads {
 		return E(http.StatusTooManyRequests, "too_many_uploads", "You have too many uploads going at once. Let some finish first.")
 	}
-	if room.UserPending+size > s.Cfg.MaxUploadBytes+pendingAllowance {
+	limits := s.planLimitsFor(planOf(ctx))
+	if room.UserPending+size > limits.FileMax+pendingAllowance {
 		return E(http.StatusInsufficientStorage, "upload_quota", "You have too much uploaded that has not been sent yet. Send or cancel some of it first.")
+	}
+	// what is on its way counts too; files not sent yet are blobs already
+	if used, _, err := s.monthUsed(ctx, uid); err != nil {
+		return err
+	} else if used+room.UserDeclared+size > limits.MonthUploadMax {
+		return errMonthFull
 	}
 	if free, err := freeSpace(s.Media.Dir); err == nil && free-room.AllRemaining < size+diskHeadroom {
 		return errNoSpace
@@ -102,13 +110,24 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())
 	var req struct {
 		Size int64 `json:"size"`
+		// ChannelID is where the file is going, when that is a channel: a
+		// boosted server takes bigger files. Apps from before boosts leave it out.
+		ChannelID *ids.ID `json:"channel_id"`
 	}
 	if err := ReadJSON(w, r, &req, 4<<10); err != nil {
 		WriteError(w, err)
 		return
 	}
-	if req.Size <= 0 || req.Size > s.Cfg.MaxUploadBytes {
-		WriteError(w, E(http.StatusRequestEntityTooLarge, "too_large", "That file is larger than this server accepts."))
+	if req.ChannelID != nil {
+		// only a channel the sender may send files in counts
+		if ch, err := s.Store.ChannelByID(r.Context(), *req.ChannelID); err != nil {
+			req.ChannelID = nil
+		} else if ok, err := s.canAccess(r, me, ch, NeedAttach); err != nil || !ok {
+			req.ChannelID = nil
+		}
+	}
+	if req.Size <= 0 || req.Size > s.fileMaxFor(r.Context(), me.Plan, req.ChannelID) {
+		WriteError(w, errFileTooBig())
 		return
 	}
 	if ok, retry := s.limUpload.Allow("up:" + me.ID.String()); !ok {

@@ -99,6 +99,8 @@ export interface MessagePayload {
   embeds?: unknown[];
   flags?: number;
   poll?: PollPayload;
+  /** Forwarded from another message (lib/forward.ts): when that one was sent (Unix ms). Its files are the original's own. */
+  fwd?: { at: number };
 }
 
 export function aadBytes(a: Aad): Uint8Array {
@@ -371,7 +373,63 @@ function sanitizePoll(x: unknown): PollPayload | undefined {
  * client that shows the message. Only well-typed fields are kept, and a
  * payload that had content but none of it usable counts as undecryptable.
  */
+/**
+ * What a person's message may hold, as the apps send it (the composer's
+ * MAX_MESSAGE_LENGTH, ten files, five link previews, what the server lets a
+ * sticker or a preview be). The server only ever sees a message sealed, so it
+ * cannot hold anyone to these: every app holds every message it opens to them,
+ * and one that breaks them, which only an app made to could send, is not shown
+ * at all (Android data/MessageLimits keeps the same numbers). Mentions and
+ * custom emoji count as two characters each, never more than they took to type.
+ */
+export const MESSAGE_LIMITS = { text: 4000, files: 10, fileName: 255, fileType: 255, fileKey: 64, embeds: 5, embedTitle: 256, embedText: 2048, address: 8192, stickerName: 30 } as const;
+
+const TOKENS = /<(?:a?:[A-Za-z0-9_]{1,32}:|@&?|#)\d{1,20}>/g;
+
+/** A message's text as long as it was to type: each mention and custom emoji as two characters. */
+export function typedLength(t: string): number {
+  return t.replace(TOKENS, "··").length;
+}
+
+const runes = (v: string) => Array.from(v).length;
+
+/** The first limit a payload breaks, or null when it keeps to them all. */
+export function brokenLimit(p: Obj): string | null {
+  const L = MESSAGE_LIMITS;
+  if ("t" in p && (typeof p["t"] !== "string" || typedLength(p["t"]) > L.text)) return "text";
+  if ("att" in p) {
+    const att = p["att"];
+    if (!Array.isArray(att) || att.length > L.files) return "files";
+    for (const a of att) {
+      if (!isObj(a) || sanitizeAttachment(a) === null) return "file";
+      if (runes(String(a["name"])) > L.fileName || String(a["type"]).length > L.fileType || String(a["key"]).length > L.fileKey) return "file";
+    }
+  }
+  if ("embeds" in p) {
+    const embeds = p["embeds"];
+    if (!Array.isArray(embeds) || embeds.length > L.embeds) return "embeds";
+    for (const e of embeds) {
+      if (!isObj(e) || typeof e["url"] !== "string" || !webLink(e["url"])) return "embed";
+      for (const k of ["title", "site_name", "author"]) if (typeof e[k] === "string" && runes(e[k] as string) > L.embedTitle) return "embed";
+      if (typeof e["description"] === "string" && runes(e["description"]) > L.embedText) return "embed";
+      for (const k of EMBED_LINKS) if (typeof e[k] === "string" && (e[k] as string).length > L.address) return "embed";
+    }
+  }
+  const st = p["sticker"];
+  if ("sticker" in p && (!isObj(st) || (typeof st["name"] === "string" && runes(st["name"]) > L.stickerName))) return "sticker";
+  const poll = p["poll"];
+  if ("poll" in p) {
+    if (!isObj(poll) || typeof poll["question"] !== "string" || runes(poll["question"]) > POLL_QUESTION_MAX || !Array.isArray(poll["answers"])) return "poll";
+    if (poll["answers"].length < POLL_ANSWERS_MIN || poll["answers"].length > POLL_ANSWERS_MAX) return "poll";
+    for (const a of poll["answers"]) if (!isObj(a) || typeof a["text"] !== "string" || runes(a["text"]) > POLL_ANSWER_MAX) return "poll";
+    if (!sanitizePoll(poll)) return "poll";
+  }
+  return null;
+}
+
 export function sanitizePayload(p: Obj): MessagePayload {
+  // a message past what any app sends was made to be, and is not shown
+  if (brokenLimit(p)) throw new DecryptError("over_limits");
   const out: MessagePayload = {};
   if (typeof p["t"] === "string") out.t = p["t"];
   if (Array.isArray(p["att"])) {
@@ -396,6 +454,8 @@ export function sanitizePayload(p: Obj): MessagePayload {
   if (isNum(p["flags"])) out.flags = p["flags"];
   const poll = sanitizePoll(p["poll"]);
   if (poll) out.poll = poll;
+  const fwd = p["fwd"];
+  if (isObj(fwd) && isNum(fwd["at"])) out.fwd = { at: fwd["at"] };
   const hadContent = p["t"] !== undefined || p["att"] !== undefined || p["sticker"] !== undefined || p["embeds"] !== undefined || p["poll"] !== undefined;
   if (hadContent && out.t === undefined && !out.att && !out.sticker && !out.embeds && !out.poll) {
     throw new DecryptError("malformed message payload");

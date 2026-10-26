@@ -136,6 +136,10 @@
 /* tapped: written out to the second for a moment (a phone has no tooltip) */
 .time[data-exact] { color: var(--text); }
 .content { font-size: 16px; line-height: 22px; color: var(--text); word-break: break-word; }
+/* a forwarded message (lib/forward.ts): a bar beside what was passed on, and a line saying so with when it was first sent */
+.content[data-forwarded] { border-inline-start: 3px solid var(--border-strong); padding-inline-start: 10px; margin-block: 2px; }
+.forwarded { display: flex; align-items: center; gap: 5px; margin-bottom: 2px; font-size: 12px; font-weight: 600; line-height: 18px; color: var(--text-muted); }
+.forwarded time { font-weight: 500; }
 .edited { font-size: 10px; color: var(--text-muted); margin-inline-start: 4px; }
 .content > :global(.md-paragraph):last-of-type { display: inline; }
 /* Each paragraph reads, and lines up, in the direction of its own words: an

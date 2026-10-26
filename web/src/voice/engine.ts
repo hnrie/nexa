@@ -27,6 +27,7 @@ import { asGuest, iceConfig, me, sendState } from "./session";
 import { pushToTalkOn } from "./callPerms";
 import { SfuTransport } from "./sfu";
 import { type SharePlan, sharePlan } from "./shareQuality";
+import { shareAllowance } from "@/lib/plans";
 import { makeDenoiser, prepareDenoiser, releaseDenoiser } from "./denoise";
 import { AUDIBLE_LEVEL, SpeakingGate } from "./speaking";
 import type { TransportEvents, VoiceTransport } from "./transport";
@@ -805,7 +806,7 @@ export async function toggleScreen(quality?: { plan: SharePlan; audio?: boolean 
     useVoice.getState().setLocalScreen(null);
   } else {
     const v = useSettings.getState().settings.voice;
-    const plan = quality?.plan ?? sharePlan(v);
+    const plan = quality?.plan ?? sharePlan(v, shareAllowance());
     const audio = quality?.audio ?? v.shareAudio ?? true;
     s.screenPending = true;
     let stream: MediaStream | null = null;

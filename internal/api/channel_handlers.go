@@ -551,10 +551,7 @@ func (s *Server) handleAttachmentUpload(w http.ResponseWriter, r *http.Request) 
 	}
 	// One request only takes what fits through the proxy in front; anything
 	// larger goes through /uploads in pieces.
-	limit := s.Cfg.MaxUploadBytes
-	if limit > MaxSingleUploadBytes {
-		limit = MaxSingleUploadBytes
-	}
+	limit := min(s.fileMaxFor(r.Context(), me.Plan, &ch.ID), MaxSingleUploadBytes)
 	size := limit
 	if r.ContentLength > 0 && r.ContentLength < size {
 		size = r.ContentLength

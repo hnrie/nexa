@@ -1,0 +1,10 @@
+/* The 30-day allowance over the files waiting to be sent (MonthMeter.tsx):
+   what is used already, and in the Supporter rose what these files add. */
+.meter { display: flex; flex-direction: column; gap: 5px; padding: 8px 16px 0; }
+.bar { position: relative; display: block; block-size: 4px; border-radius: 999px; background: color-mix(in srgb, var(--text-strong) 8%, transparent); overflow: hidden; }
+.bar i { position: absolute; inset-block: 0; border-radius: inherit; }
+.used { inset-inline-start: 0; background: var(--text-muted); }
+.adding { background: var(--tier-supporter); }
+.text { font-size: 12px; line-height: 1.35; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.meter[data-over] .text { color: var(--text-danger); }
+.meter[data-over] .used { background: var(--danger); }

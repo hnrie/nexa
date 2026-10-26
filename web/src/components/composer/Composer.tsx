@@ -7,6 +7,9 @@ import { gateway } from "@/gateway/session";
 import { formatBytes } from "@/lib/time";
 import { favoriteFile } from "@/lib/gifFavorites";
 import { fitsUploadLimit, stage, uploadLimit, type Staged } from "@/lib/attachments";
+import { myPlan, planForFile } from "@/lib/plans";
+import { offerPlan } from "@/stores/upsell";
+import { MonthMeter } from "@/components/support/MonthMeter";
 import { useAuth } from "@/stores/auth";
 import { useMessages } from "@/stores/messages";
 import { useRelationships } from "@/stores/relationships";
@@ -614,8 +617,13 @@ export function Composer({ channel }: { channel: Channel }) {
     // taken now: a paste's or a drop's files cannot be read once the event is over
     const picked: File[] = [];
     for (const f of Array.from(list)) {
-      const max = uploadLimit();
-      if (!fitsUploadLimit(f.size)) {
+      const max = uploadLimit(channel.id);
+      if (!fitsUploadLimit(f.size, channel.id)) {
+        // a plan that would send it is offered; past every plan, it is only said
+        if (planForFile(f.size) && myPlan() !== "pro") {
+          offerPlan({ kind: "file", name: f.name, size: f.size });
+          continue;
+        }
         const gb = max / (1024 * 1024 * 1024);
         toast(tr_("composer.composer.overServerLimit", { name: f.name, limit: gb >= 1 ? tr_("composer.composer.gigabytes", { n: Math.round(gb * 10) / 10 }) : tr_("composer.composer.megabytes", { n: Math.round(max / (1024 * 1024)) }) }), "error");
         continue;
@@ -983,6 +991,7 @@ export function Composer({ channel }: { channel: Channel }) {
             <span>{tr_("composer.composer.trayCount", { count: files.length, max: MAX_FILES })}</span>
             <span className={s.traySize}>{formatBytes(files.reduce((n, f) => n + f.file.size, 0))}</span>
           </div>
+          <MonthMeter adding={files.reduce((n, f) => n + f.file.size, 0)} />
         <div className={s.tray}>
           {files.map((f) => (
             <div key={f.id} className={s.card}>

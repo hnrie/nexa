@@ -206,6 +206,12 @@ export interface Settings {
    * kept with the account so the pop-up comes once per account, not per device.
    */
   whatsNewSeen: string | null;
+  /**
+   * The release the "Nexa isn't free to run" prompt was last shown for
+   * (components/support/Upsell.tsx): it comes once per update, to accounts
+   * without a plan.
+   */
+  supportPromptSeen: string | null;
 
   // Search on this device.
   /**
@@ -296,6 +302,7 @@ export const DEFAULT_SETTINGS: Settings = {
   plugins: [],
 
   whatsNewSeen: null,
+  supportPromptSeen: null,
 
   searchIndex: true,
   searchRecent: [],
@@ -324,6 +331,7 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     plugins: Array.isArray(inc.plugins) ? inc.plugins : base.plugins,
 
     whatsNewSeen: typeof inc.whatsNewSeen === "string" || inc.whatsNewSeen === null ? inc.whatsNewSeen : base.whatsNewSeen,
+    supportPromptSeen: typeof inc.supportPromptSeen === "string" || inc.supportPromptSeen === null ? inc.supportPromptSeen : base.supportPromptSeen,
 
     fontFace: inc.fontFace === "classic" || inc.fontFace === "default" ? inc.fontFace : base.fontFace,
 

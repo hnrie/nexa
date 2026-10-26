@@ -1,4 +1,4 @@
-import { ChevronDown, GripVertical, Lock, MessageCircle, MoreHorizontal, NotebookPen, Pin, Plus, Search, Shield, Users, X } from "lucide-react";
+import { ChevronDown, GripVertical, Lock, MessageCircle, MoreHorizontal, Heart, NotebookPen, Pin, Plus, Search, Shield, Users, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar, showsTyping } from "@/components/common/Avatar";
 import { menuAnchor } from "@/components/common/ContextMenu";
@@ -643,6 +643,10 @@ export function DMSidebar() {
               <span className={s.mention} aria-hidden="true" data-testid="note-requests">{badgeText(noteRequests)}</span>
             </>
           ) : null}
+        </button>
+        <button className={s.nav} data-selected={loc.pathname.startsWith("/channels/@me/support")} onClick={() => go("/channels/@me/support")} data-testid="nav-support">
+          <span className={s.navIcon} data-support=""><Heart size={22} /></span>
+          <span className={s.navLabel}>{t("support.nav")}</span>
         </button>
         {isAdmin ? (
           <button

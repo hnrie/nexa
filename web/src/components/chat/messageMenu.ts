@@ -1,3 +1,4 @@
+import { canForward } from "@/lib/forward";
 import { rankedKeys, unicodeKey } from "@/lib/emojiUsage";
 import { channels as channelsApi } from "@/api/channels";
 import { BULK_DELETE_MAX, messages as messagesApi } from "@/api/messages";
@@ -155,6 +156,7 @@ export const messageMenu = defineMenu<MessageMenuCtx>("message", [
   [
     button("editMessage", ({ msg }) => canEdit(msg) && { id: "edit", label: t("chat.messageItem.editMessage"), onSelect: () => useUI.getState().setEditing({ channelId: msg.channel_id, messageId: msg.id }) }),
     button("replyToMessage", ({ msg }) => ({ id: "reply", label: t("chat.messageItem.reply"), onSelect: () => useUI.getState().setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true }) })),
+    button("forwardMessage", ({ msg }) => canForward(msg) && { id: "forward", label: t("forward.menu"), onSelect: () => useUI.getState().openModal("forward", { msg }) }),
     button("createThreadFromMessage", ({ msg }) => canThread(msg) && { id: "thread", label: t("threads.create.title"), onSelect: () => useUI.getState().openModal("createThread", { channelId: msg.channel_id, messageId: msg.id }) }),
     button("publishMessage", ({ msg }) => canPublish(msg) && { id: "publish", label: t("follows.publish"), onSelect: () => void publish(msg) }),
   ],

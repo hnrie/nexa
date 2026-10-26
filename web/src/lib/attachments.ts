@@ -2,10 +2,12 @@ import { ApiError, api, errorFrom } from "@/api/client";
 import { uploads as uploadsApi } from "@/api/uploads";
 import { b64 } from "@/crypto/bytes";
 import { FRAME_LEN, HEADER_LEN, chunkCount, encryptChunks, encryptedSize, frameOffset, newBaseIv, newFileKey } from "@/crypto/fileChunks";
-import type { AttachmentMeta, AttachmentPreview } from "@/crypto/message";
+import { MESSAGE_LIMITS, type AttachmentMeta, type AttachmentPreview } from "@/crypto/message";
 import { holdReload } from "./busy";
 import { seedMedia } from "./mediaCache";
 import { lookAtPicture, type PictureCopy, type PictureLook } from "./pictureCopy";
+import { fileMaxIn, setFreeFileMax } from "./plans";
+import { offerPlan } from "@/stores/upsell";
 import { scrubFile } from "./scrubMetadata";
 import type { PieceReply, PieceRequest } from "./upload.worker";
 
@@ -20,22 +22,24 @@ export const MAX_UPLOAD = 100 * 1024 * 1024;
  * and a dropped connection costs only the piece in flight, which on a phone
  * matters far more than the round trip a piece adds.
  */
-const limits = { max: MAX_UPLOAD, single: 32 * 1024 * 1024, chunk: 32 * 1024 * 1024 };
+const limits = { single: 32 * 1024 * 1024, chunk: 32 * 1024 * 1024 };
 
 /** Remembers the limits the server reported, so the composer can say no early. */
 export function setUploadLimits(reported: { max?: number | undefined; single?: number | undefined; chunk?: number | undefined }): void {
-  if (reported.max && reported.max > 0) limits.max = reported.max;
+  // the server's one limit is the free plan's (api/billing.go)
+  if (reported.max && reported.max > 0) setFreeFileMax(reported.max);
   if (reported.single && reported.single > 0) limits.single = reported.single;
   if (reported.chunk && reported.chunk > 0) limits.chunk = reported.chunk;
 }
 
-export function uploadLimit(): number {
-  return limits.max;
+/** The largest file this account may send, to a channel when one is named: its plan's (lib/plans.ts), or a boosted server's. */
+export function uploadLimit(channelId?: string): number {
+  return fileMaxIn(channelId);
 }
 
 /** Whether a file of `size` bytes is within the limit once encrypted, which is what the server measures. */
-export function fitsUploadLimit(size: number): boolean {
-  return encryptedSize(size) <= limits.max;
+export function fitsUploadLimit(size: number, channelId?: string): boolean {
+  return encryptedSize(size) <= uploadLimit(channelId);
 }
 
 /** Whether a file of `size` bytes goes up in one request, rather than in pieces. */
@@ -63,7 +67,20 @@ export async function stage(file: File): Promise<Staged> {
   const clean = await scrubFile(file);
   seq += 1;
   const preview = clean.type.startsWith("image/") || clean.type.startsWith("video/") ? URL.createObjectURL(clean) : null;
-  return { id: `f${seq}`, file: clean, name: file.name, spoiler: false, preview, progress: 0, error: null };
+  return { id: `f${seq}`, file: clean, name: fitName(file.name), spoiler: false, preview, progress: 0, error: null };
+}
+
+/**
+ * A file's name short enough for every app to open the message
+ * (MESSAGE_LIMITS.fileName): a longer one keeps its start and its extension.
+ */
+export function fitName(name: string): string {
+  const chars = Array.from(name);
+  const max = MESSAGE_LIMITS.fileName;
+  if (chars.length <= max) return name;
+  const dot = name.lastIndexOf(".");
+  const ext = dot > 0 && name.length - dot <= 16 ? Array.from(name.slice(dot)) : [];
+  return chars.slice(0, max - ext.length).join("") + ext.join("");
 }
 
 /**
@@ -242,7 +259,8 @@ async function sendCopy(to: UploadPlace, copy: PictureCopy, send: PieceSender, s
  * made and sent beside it for the chat to show.
  */
 export async function uploadStaged(to: UploadPlace, st: Staged, onProgress: (p: number) => void, send: PieceSender = sendInWorker, signal?: AbortSignal): Promise<{ meta: AttachmentMeta; blob_id: string; size: number }> {
-  if (!fitsUploadLimit(st.file.size)) throw new Error(t("attachments.overServerLimit", { limit: formatSize(limits.max) }));
+  const channelId = typeof to === "string" ? to : undefined;
+  if (!fitsUploadLimit(st.file.size, channelId)) throw new Error(t("attachments.overServerLimit", { limit: formatSize(uploadLimit(channelId)) }));
   const total = encryptedSize(st.file.size);
   const key = newFileKey();
   const baseIv = newBaseIv();
@@ -272,14 +290,18 @@ export async function uploadStaged(to: UploadPlace, st: Staged, onProgress: (p: 
         res = await once();
       }
     } else {
-      res = await uploadInPieces(st.file, key, baseIv, (sent) => onProgress(sent / total), send, signal);
+      res = await uploadInPieces(st.file, key, baseIv, (sent) => onProgress(sent / total), send, signal, channelId);
     }
     [seen, copy] = await Promise.all([look, copied]);
+  } catch (err) {
+    // this month's uploads used up: a plan with more is offered beside the failed upload
+    if (err instanceof ApiError && err.code === "upload_month_full") offerPlan({ kind: "storage" });
+    throw err;
   } finally {
     release();
   }
   if (signal?.aborted) throw cancelled();
-  const meta: AttachmentMeta = { blob_id: res.blob_id, name: st.name || st.file.name, type: st.file.type || "application/octet-stream", size: st.file.size, key: b64.enc(key) };
+  const meta: AttachmentMeta = { blob_id: res.blob_id, name: st.name || fitName(st.file.name), type: st.file.type || "application/octet-stream", size: st.file.size, key: b64.enc(key) };
   if (seen.w && seen.h) {
     meta.w = seen.w;
     meta.h = seen.h;
@@ -369,10 +391,11 @@ async function finishUpload(id: string): Promise<{ blob_id: string; size: number
  * that one piece rather than the whole transfer. Anything already spooled is
  * thrown away if the upload is abandoned.
  */
-export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8Array, onProgress: (sent: number) => void, send: PieceSender = sendInWorker, signal?: AbortSignal): Promise<{ blob_id: string; size: number }> {
+export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8Array, onProgress: (sent: number) => void, send: PieceSender = sendInWorker, signal?: AbortSignal, channelId?: string): Promise<{ blob_id: string; size: number }> {
   const total = encryptedSize(file.size);
   const chunks = chunkCount(file.size);
-  const session = await uploadsApi.create(total);
+  // the channel lets a boosted server take a bigger file
+  const session = await uploadsApi.create(total, channelId);
   const limit = Math.min(session.chunk_size || limits.chunk, limits.chunk);
   const perPiece = Math.max(1, Math.floor((limit - HEADER_LEN) / FRAME_LEN));
   let sent = 0;

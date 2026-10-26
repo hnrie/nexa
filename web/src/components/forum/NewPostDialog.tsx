@@ -11,6 +11,8 @@ import { AutomodNotice } from "@/components/composer/AutomodNotice";
 import { MAX_MESSAGE_LENGTH } from "@/components/composer/limit";
 import { t } from "@/i18n";
 import { fitsUploadLimit, stage, type Staged } from "@/lib/attachments";
+import { myPlan, planForFile } from "@/lib/plans";
+import { offerPlan } from "@/stores/upsell";
 import { startForumPost } from "@/lib/forumPost";
 import { P } from "@/lib/perms";
 import { formatBytes } from "@/lib/time";
@@ -58,8 +60,9 @@ export function NewPostDialog({ forum, onClose }: { forum: Channel; onClose: () 
   const addFiles = async (list: FileList) => {
     const picked: Staged[] = [];
     for (const f of Array.from(list)) {
-      if (!fitsUploadLimit(f.size)) {
-        useUI.getState().toast(t("forum.post.fileTooBig", { name: f.name }), "error");
+      if (!fitsUploadLimit(f.size, forum.id)) {
+        if (planForFile(f.size) && myPlan() !== "pro") offerPlan({ kind: "file", name: f.name, size: f.size });
+        else useUI.getState().toast(t("forum.post.fileTooBig", { name: f.name }), "error");
         continue;
       }
       picked.push(await stage(f));

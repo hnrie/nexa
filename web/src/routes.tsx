@@ -22,6 +22,7 @@ const NexaPage = lazyPage(() => import("@/pages/NexaPage"));
 const NexaCasePage = lazyPage(() => import("@/pages/NexaCasePage"));
 const NexaBugPage = lazyPage(() => import("@/pages/NexaBugPage"));
 const NotesPage = lazyPage(() => import("@/pages/NotesPage"));
+const SupportPage = lazyPage(() => import("@/components/support/SupportPage"));
 const NoteLinkPage = lazyPage(() => import("@/pages/NoteLinkPage"));
 const DiscordConnectedPage = lazyPage(() => import("@/pages/DiscordConnectedPage"));
 const NotFoundPage = lazyPage(() => import("@/pages/NotFoundPage"));
@@ -88,6 +89,7 @@ export function AppRoutes() {
                   <Route path="@me/nexa/cases/:caseId" element={<NexaCasePage />} />
                   <Route path="@me/nexa/bugs/:reportId" element={<NexaBugPage />} />
                   {/* the list and the note open beside it: one page, so moving between notes keeps the list */}
+                  <Route path="@me/support" element={<SupportPage />} />
                   <Route path="@me/notes" element={<NotesPage />} />
                   <Route path="@me/notes/:noteId" element={<NotesPage />} />
                   <Route path="@admin" element={<AdminPanelPage />}>

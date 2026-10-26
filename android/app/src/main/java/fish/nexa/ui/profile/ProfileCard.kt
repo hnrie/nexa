@@ -501,6 +501,7 @@ private fun Identity(user: PublicUser, rel: Relationship?, full: Boolean, theme:
                 GhostInline(design, line)
             }
             StaffBadge(user.id, user.flags)
+            fish.nexa.ui.support.PlanBadge(user.plan)
         }
     }
 }

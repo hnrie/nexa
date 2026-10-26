@@ -23,6 +23,7 @@ const ActivityPage = lazyPage(() => import("./ActivityPage"));
 const BlockedPage = lazyPage(() => import("./BlockedPage"));
 const SecurityPage = lazyPage(() => import("./SecurityPage"));
 const DevicesPage = lazyPage(() => import("./DevicesPage"));
+const SubscriptionPage = lazyPage(() => import("@/components/support/SupportPage").then((m) => ({ default: () => <m.SupportPanel inSettings /> })));
 const DataPage = lazyPage(() => import("./DataPage"));
 const ChatPage = lazyPage(() => import("./ChatPage"));
 const AppearancePage = lazyPage(() => import("./AppearancePage"));
@@ -58,6 +59,7 @@ function navGroups(opts: { inApp: boolean; admin: boolean }): NavGroup[] {
         { id: "profiles", label: t("settings.profile.profiles") },
         { id: "security", label: t("settings.security.security") },
         { id: "devices", label: t("settings.devices.devices") },
+        { id: "subscription", label: t("support.settingsLabel") },
       ],
     },
     {
@@ -186,6 +188,7 @@ export default function SettingsModal({ onClose, page: initial, packId, modalId,
     page === "activity" ? <ActivityPage /> :
     page === "security" ? <SecurityPage /> :
     page === "devices" ? <DevicesPage /> :
+    page === "subscription" ? <SubscriptionPage /> :
     page === "chat" ? <ChatPage /> :
     page === "appearance" ? <AppearancePage /> :
     page === "accessibility" ? <AccessibilityPage onTextSize={() => go({ page: "appearance", label: "", anchor: "textSize" })} /> :

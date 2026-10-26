@@ -119,6 +119,14 @@ type messageBody struct {
 	} `json:"attachments"`
 	Nonce string `json:"nonce"`
 	Flags int64  `json:"flags"`
+	// Forward names the message this one forwards. Its files may then be
+	// the original's (the same blobs, opened by the same keys inside the
+	// message), so forwarding uploads nothing and counts against no one's
+	// allowance; the sender has to be able to read the original.
+	Forward *struct {
+		ChannelID ids.ID `json:"channel_id"`
+		MessageID ids.ID `json:"message_id"`
+	} `json:"forward"`
 	// Poll opens a poll with the message. What it asks and offers is sealed
 	// in the ciphertext with the rest of the message; this is only what the
 	// server needs to take votes (see pollBody).
@@ -570,6 +578,31 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		m.ReplyToID = body.ReplyToID
 		m.Type = "reply"
 	}
+	// the files a forward may carry over from its original
+	forwarded := map[ids.ID]bool{}
+	if body.Forward != nil {
+		// a forward is the message passed on and nothing else
+		if body.ReplyToID != nil || poll != nil {
+			WriteError(w, E(http.StatusBadRequest, "bad_forward", "A forward can't also be a reply or a poll."))
+			return
+		}
+		if ok, retry := s.limForward.Allow("fwd:" + me.ID.String()); !ok {
+			w.Header().Set("Retry-After", retryAfter(retry))
+			WriteError(w, ErrRateLimited)
+			return
+		}
+		src, ok := s.forwardSource(r, me, body.Forward.ChannelID, body.Forward.MessageID)
+		if !ok {
+			WriteError(w, E(http.StatusBadRequest, "bad_forward", "The message you are forwarding is not one you can read."))
+			return
+		}
+		for _, a := range src.Attachments {
+			forwarded[a.BlobID] = true
+		}
+		// a forward pings nobody: it is someone else's words, passed on
+		m.Mentions, m.MentionRoles, m.MentionEveryone = nil, nil, false
+		m.Flags |= store.MsgFlagForwarded
+	}
 	copies, err := s.checkBotCopies(r, ch, &body, m.ReplyToID)
 	if err != nil {
 		WriteError(w, err)
@@ -582,6 +615,10 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		seenBlobs[a.BlobID] = true
 		b, err := s.Store.BlobByID(ctx, a.BlobID)
+		if err == nil && forwarded[a.BlobID] {
+			m.Attachments = append(m.Attachments, store.Attachment{BlobID: a.BlobID, Size: b.Size})
+			continue
+		}
 		if err != nil || b.Kind != "attachment" || b.OwnerID == nil || *b.OwnerID != me.ID {
 			WriteError(w, E(http.StatusBadRequest, "bad_attachment", "One of the attachments is not yours or does not exist."))
 			return
@@ -1055,4 +1092,22 @@ func (s *Server) messageAllowed(w http.ResponseWriter, kind string, me *store.Us
 		}
 	}
 	return true
+}
+
+// forwardSource is the message a forward passes on, when the sender can read
+// it where it is: the history of its channel, unlocked if it is a subchat.
+func (s *Server) forwardSource(r *http.Request, me *store.User, channelID, messageID ids.ID) (*store.Message, bool) {
+	src, err := s.Store.MessageByID(r.Context(), messageID, me.ID)
+	// a person's message only: not a system line, a webhook's or an app's
+	if err != nil || src.ChannelID != channelID || (src.Type != "default" && src.Type != "reply") || src.WebhookID != nil {
+		return nil, false
+	}
+	ch, err := s.Store.ChannelByID(r.Context(), channelID)
+	if err != nil {
+		return nil, false
+	}
+	if ok, err := s.canAccess(r, me, ch, NeedHistory); err != nil || !ok || !s.unlocked(r, ch) {
+		return nil, false
+	}
+	return src, true
 }

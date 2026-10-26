@@ -25,6 +25,17 @@ var nameFonts = map[string]bool{
 var nameEffects = map[string][2]int{
 	"solid": {0, 1}, "gradient": {2, 2}, "glow": {1, 1}, "ink": {1, 1},
 	"pop": {1, 1}, "candy": {2, 4}, "aurora": {2, 5}, "chrome": {1, 1},
+	// only for accounts with a plan (store.PaidNameEffects)
+	"holo": {1, 1}, "neon": {1, 1}, "flame": {2, 2},
+}
+
+// nameStyleEffect is the effect a cleaned style wears, "" for none.
+func nameStyleEffect(style string) string {
+	var st nameStyle
+	if style == "" || json.Unmarshal([]byte(style), &st) != nil {
+		return ""
+	}
+	return st.Effect
 }
 
 // cleanNameStyle checks a style its owner sent and writes it the one way it is

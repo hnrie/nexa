@@ -187,7 +187,9 @@ fun openMessageMenu(cm: ChatMessage, ctx: ListCtx, image: ImageTarget? = null) {
     }
     val threadable = canThread(cm)
     val publishable = canPublish(cm)
-    items += MenuItem.Action(t("chat.messageItem.reply"), separatorAfter = !threadable && !publishable) { ChatUi.reply[cm.channelId] = ChatUi.Reply(cm.id, ping = true) }
+    val forwardable = fish.nexa.data.Forward.can(cm)
+    items += MenuItem.Action(t("chat.messageItem.reply"), separatorAfter = !forwardable && !threadable && !publishable) { ChatUi.reply[cm.channelId] = ChatUi.Reply(cm.id, ping = true) }
+    if (forwardable) items += MenuItem.Action(t("forward.menu"), separatorAfter = !threadable && !publishable) { openForward(cm) }
     if (threadable) items += MenuItem.Action(t("threads.create.title"), separatorAfter = !publishable) { fish.nexa.ui.threads.openCreateThread(cm.channelId, cm.id) }
     if (publishable) items += MenuItem.Action(t("follows.publish"), separatorAfter = true) { publish(cm) }
     items += MenuItem.Action(t("chat.messageMenu.copyText"), disabled = cm.payload?.t.isNullOrEmpty()) {

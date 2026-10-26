@@ -134,6 +134,7 @@ object DataExport {
             put("error", when (dec.error) {
                 DecryptFail.NO_KEY -> JsonPrimitive("no_key")
                 DecryptFail.BAD -> JsonPrimitive("bad")
+                DecryptFail.INVALID -> JsonPrimitive("invalid")
                 null -> JsonNull
             })
         }

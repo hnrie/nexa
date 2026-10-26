@@ -97,6 +97,7 @@ fun MainShell() {
     LaunchedEffect(Unit) {
         fish.nexa.ui.legal.Legal.gateIfNeeded()
         fish.nexa.ui.WhatsNew.maybeShow()
+        fish.nexa.ui.support.maybePrompt()
     }
 
     // A drawer dragged or opened over the chat puts the keyboard away with it.
@@ -228,6 +229,7 @@ fun MainShell() {
                     is Route.NexaCase -> fish.nexa.ui.nexa.NexaCasePage(route.caseId)
                     is Route.NexaBug -> fish.nexa.ui.nexa.NexaBugPage(route.reportId)
                     is Route.Notes -> fish.nexa.ui.notes.NotesPage(route)
+                    is Route.Support -> fish.nexa.ui.support.SupportPage()
                     is Route.Discover -> fish.nexa.ui.discovery.DiscoverPage()
                     is Route.Admin -> fish.nexa.ui.moderation.AdminPanel(route)
                 }
@@ -284,6 +286,8 @@ fun MainShell() {
         }
         }
         LayerHost()
+        // a plan offered where the free one stopped something
+        fish.nexa.ui.support.UpsellHost()
         // a notice from Nexa, over everything until it is dismissed
         fish.nexa.ui.nexa.NoticePopupHost()
     }

@@ -117,7 +117,10 @@ func (s *Store) StaleUploads(ctx context.Context, cutoff int64) ([]ids.ID, error
 // transfers it has open, and what every unfinished transfer, anyone's, still
 // has to bring.
 type UploadRoom struct {
-	UserPending  int64
+	UserPending int64
+	// UserDeclared is what the account's unfinished transfers will bring,
+	// which UserPending counts too, beside its files not sent yet.
+	UserDeclared int64
 	UserOpen     int
 	AllRemaining int64
 }
@@ -135,6 +138,6 @@ func (s *Store) UploadRoomFor(ctx context.Context, uid ids.ID) (UploadRoom, erro
 	if err := s.db.R.QueryRowContext(ctx, `SELECT coalesce(sum(size - received), 0) FROM uploads WHERE blob_id IS NULL`).Scan(&r.AllRemaining); err != nil {
 		return r, err
 	}
-	r.UserPending = loose + declared
+	r.UserPending, r.UserDeclared = loose+declared, declared
 	return r, nil
 }

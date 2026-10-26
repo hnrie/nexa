@@ -36,10 +36,12 @@ sealed interface Route {
             val TABS = listOf("users", "bots", "servers", "expressions", "cases", "bugs", "logs", "announcements")
         }
     }
+    /** `/channels/@me/support`: Nexa's plans, and gifts. */
+    data object Support : Route
     /** `/channels/@discover`: servers anyone can join. */
     data object Discover : Route
 
-    val isHome get() = this is Friends || this is Dm || this is NexaConvo || this is NexaCase || this is NexaBug || this is Notes
+    val isHome get() = this is Friends || this is Dm || this is NexaConvo || this is NexaCase || this is NexaBug || this is Notes || this is Support
 
     /** The web address for this place (without a message to jump to). */
     fun toPath(): String = when (this) {
@@ -51,6 +53,7 @@ sealed interface Route {
         is Notes -> if (noteId != null) "/channels/@me/notes/$noteId" else "/channels/@me/notes"
         is Server -> if (channelId != null) "/channels/$serverId/$channelId" else "/channels/$serverId"
         is Admin -> "/channels/@admin/$path"
+        Support -> "/channels/@me/support"
         Discover -> "/channels/@discover"
     }
 }
@@ -149,6 +152,7 @@ object Nav {
         val next: Route = when (parts[1]) {
             "@me" -> when {
                 parts.size == 2 -> Route.Friends
+                parts[2] == "support" -> Route.Support
                 parts[2] == "notes" -> Route.Notes(parts.getOrNull(3)?.takeIf { id.matches(it) })
                 parts[2] == "nexa" -> when {
                     parts.getOrNull(3) == "cases" && parts.getOrNull(4)?.let { id.matches(it) } == true -> Route.NexaCase(parts[4])

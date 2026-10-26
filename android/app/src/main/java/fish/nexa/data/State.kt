@@ -48,7 +48,7 @@ class UsersStore {
             username = u.username, displayName = u.displayName, avatarId = u.avatarId, bannerId = u.bannerId, aboutMe = u.aboutMe,
             pronouns = u.pronouns, accentColor = u.accentColor, accentColor2 = u.accentColor2, statusText = u.statusText,
             statusEmoji = u.statusEmoji, statusExpiresAt = u.statusExpiresAt, publicKey = u.publicKey.ifEmpty { cur.publicKey },
-            groupLinkOnly = u.groupLinkOnly, typingStyle = u.typingStyle, serverTag = u.serverTag,
+            groupLinkOnly = u.groupLinkOnly, typingStyle = u.typingStyle, serverTag = u.serverTag, plan = u.plan,
         )
     }
 

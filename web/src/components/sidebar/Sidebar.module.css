@@ -15,6 +15,8 @@
 /* the row you are on is a tile lifted off the panel */
 .nav[data-selected="true"] { background: var(--sheen), var(--bg-selected); color: var(--text-strong); box-shadow: inset 0 1px 0 var(--edge-light), 0 1px 2px color-mix(in srgb, var(--shade) 35%, transparent); }
 .navIcon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+/* Support Nexa keeps the Supporter plan's own light on its heart */
+.navIcon[data-support] { color: var(--tier-supporter); }
 .nav[data-selected="true"] .navIcon { color: var(--text-brand); }
 .header { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 18px 8px 4px 10px; color: var(--text-muted); font-size: 12.5px; font-weight: 650; letter-spacing: 0.01em; }
 .header:hover { color: var(--text); }

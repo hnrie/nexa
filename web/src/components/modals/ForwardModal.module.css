@@ -1,0 +1,19 @@
+/* Forward Message (ForwardModal.tsx): the message as it will look, marked
+   forwarded, above the places it can go, picked one at a time. */
+.preview { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--bg-input); box-shadow: inset 3px 0 0 var(--border-strong); }
+.label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.text { margin: 0; font-size: 15px; line-height: 1.4; color: var(--text); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; word-break: break-word; }
+.files { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--text-subtle); }
+.free { margin: 0; font-size: 12px; color: var(--text-muted); }
+.hint { margin: 10px 0 0; font-size: 12px; color: var(--text-muted); }
+.list { margin-top: 8px; max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--radius-xs); cursor: pointer; }
+.row:hover { background: var(--bg-hover); }
+.row[data-on] { background: var(--bg-selected); }
+.row input { width: 20px; height: 20px; accent-color: var(--brand); margin-inline-start: auto; flex: none; }
+.glyph { inline-size: 32px; block-size: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; color: var(--icon); background: var(--bg-active); }
+.names { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.name { font-size: 15px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
+@media (pointer: coarse) { .row { min-height: 48px; } }

@@ -1,5 +1,8 @@
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
+import { billing as billingApi } from "@/api/billing";
+import { myPlan, plansInfo } from "@/lib/plans";
+import { formatBytes } from "@/lib/time";
 import { P } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
 import { channelTree, selectServerChannels, useChannels } from "@/stores/channels";
@@ -36,6 +39,16 @@ function copy(text: string): void {
 export interface ServerMenuCtx extends MenuCtx, RailServerCtx {}
 
 const serverOf = (id: string) => useServers.getState().byId[id];
+
+async function boostServer(serverId: string, name: string): Promise<void> {
+  const ui = useUI.getState();
+  try {
+    await billingApi.boost(serverId);
+    ui.toast(t("support.boosts.boosted", { server: name, size: formatBytes(plansInfo().boost_file_max) }), "success");
+  } catch (err) {
+    ui.toast(err instanceof ApiError ? err.message : t("support.error"), "error");
+  }
+}
 
 const leaveButton = button<ServerMenuCtx>("leaveServer", ({ serverId, nav, openModal }) => {
   const st = serverOf(serverId);
@@ -75,6 +88,11 @@ export const serverMenu = defineMenu<ServerMenuCtx>("server", [
     }),
     button("createChannel", ({ serverId, openModal }) => canI(serverOf(serverId), P.MANAGE_CHANNELS) && { id: "channel", label: t("modals.createChannel.createChannel"), onSelect: () => openModal("createChannel", { serverId }) }),
     button("createCategory", ({ serverId, openModal }) => canI(serverOf(serverId), P.MANAGE_CHANNELS) && { id: "category", label: t("modals.createCategory.createCategory"), onSelect: () => openModal("createCategory", { serverId }) }),
+    // Pro's boosts, one at a time; the Support page lists them and takes them back
+    button("boostServer", ({ serverId }) => {
+      const st = serverOf(serverId);
+      return !!st && myPlan() === "pro" && { id: "boost", label: t("support.boosts.boostServer"), onSelect: () => void boostServer(serverId, st.server.name) };
+    }),
   ],
   [
     button("muteServer", ({ serverId }) => {

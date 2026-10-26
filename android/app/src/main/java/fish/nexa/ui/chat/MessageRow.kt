@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -236,7 +237,9 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                 if (command != null && cm != null) fish.nexa.ui.apps.InteractionLine(cm, command, ctx)
                 else if (reply != null) ReplyLine(ctx, reply, cm?.m)
                 if (showHead) MessageHeader(item, ctx)
-                MessageBody(item, ctx, failed)
+                val fwdAt = (cm?.payload ?: p?.payload)?.fwdAt
+                if (fwdAt != null) Forwarded(fwdAt) { MessageBody(item, ctx, failed) }
+                else MessageBody(item, ctx, failed)
                 if (failed && p != null) FailedRow(ctx.channel.id, p.tmpId)
                 val sid = ctx.server?.server?.id
                 // an announcement not yet sent on to the channels following this one
@@ -574,6 +577,23 @@ object AppNames : fish.nexa.ui.markdown.NameLookup {
     override fun role(id: String): String? = Nexa.servers.byId.value.values.firstNotNullOfOrNull { it.roles[id]?.name }
 }
 
+/** A message passed on from another (data/Forward.kt): a bar down its start side, and when the original was sent (Chat.module.css `.forwarded`). */
+@Composable
+private fun Forwarded(at: Long, body: @Composable () -> Unit) {
+    val c = Nx.colors
+    Row(Modifier.padding(vertical = 2.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+        Box(Modifier.width(3.dp).fillMaxHeight().background(c.borderStrong))
+        Column(Modifier.padding(start = 10.dp)) {
+            Row(Modifier.padding(bottom = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Icon("CornerUpRight", c.textMuted, size = 13.dp)
+                Txt(t("forward.forwarded"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12f), fontWeight = FontWeight(600)), color = c.textMuted)
+                Txt(Time.shortDate(at), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12f), fontWeight = FontWeight(500)), color = c.textMuted)
+            }
+            body()
+        }
+    }
+}
+
 @Composable
 internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     val c = Nx.colors
@@ -606,9 +626,13 @@ internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
     val payload = cm?.payload ?: item.pending?.payload
     if (cm != null && cm.error != null && cm.call == null) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Icon("Lock", c.textMuted, size = 14.dp)
+            Icon(if (cm.error == DecryptFail.INVALID) "ShieldAlert" else "Lock", c.textMuted, size = 14.dp)
             Txt(
-                if (cm.error == DecryptFail.NO_KEY) t("chat.messageItem.waitingForTheEncryptionKey") else t("chat.messageItem.thisMessageCouldNotBeDecrypted"),
+                when (cm.error) {
+                    DecryptFail.NO_KEY -> t("chat.messageItem.waitingForTheEncryptionKey")
+                    DecryptFail.INVALID -> t("chat.messageItem.breaksLimits")
+                    else -> t("chat.messageItem.thisMessageCouldNotBeDecrypted")
+                },
                 style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
                 color = c.textMuted,
             )

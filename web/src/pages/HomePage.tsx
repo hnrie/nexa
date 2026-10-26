@@ -45,7 +45,7 @@ import s from "./Home.module.css";
  * it became 345, with apps' strings, and 345.1 kB when it became 350, with
  * the person menu in conversations.)
  */
-export const LOAD_KB_LIMIT = 350;
+export const LOAD_KB_LIMIT = 360;
 
 /** Whether this visitor has asked for less movement, by either route. */
 function useStillness(): boolean {

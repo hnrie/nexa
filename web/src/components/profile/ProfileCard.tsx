@@ -17,7 +17,7 @@ import { avatarUrl, bannerUrl, iconUrl, users as usersApi } from "@/api/users";
 import { ActivityList } from "@/components/activity/ActivityCard";
 import { StatusEmoji } from "@/components/activity/StatusEmoji";
 import { Avatar } from "@/components/common/Avatar";
-import { AdminBadge, OwnerBadge } from "@/components/common/OwnerBadge";
+import { AdminBadge, OwnerBadge, PlanBadge } from "@/components/common/OwnerBadge";
 import { ServerTagChip } from "@/components/servertag/ServerTagChip";
 import { ProfileWidgets, WidgetPeek, type WidgetDesign } from "./Widgets";
 import { readWidgets, type Widget } from "@/lib/widgets";
@@ -778,6 +778,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
             </>
           ) : null}
           {isOwner(user.id) ? <OwnerBadge /> : user.flags & 1 ? <AdminBadge /> : null}
+          <PlanBadge plan={user.plan} />
         </div>
       </div>
 

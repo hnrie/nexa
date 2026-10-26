@@ -235,6 +235,11 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 			bad("invalid_name_style", problem)
 			return
 		}
+		// a style already worn may stay after a plan ends; a new one may not
+		if store.PaidNameEffects[nameStyleEffect(style)] && !s.planLimitsFor(u.Plan).NameEffects && style != u.NameStyle {
+			WriteError(w, E(http.StatusForbidden, "plan_required", "That effect comes with Nexa Supporter."))
+			return
+		}
 		p.NameStyle = &style
 	}
 	if v, ok := raw["group_link_only"]; ok {
@@ -307,6 +312,8 @@ func (s *Server) handleMeDelete(w http.ResponseWriter, r *http.Request) {
 	// does not stop it half way.
 	pctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), purgeTimeout)
 	defer cancel()
+	// a closed account is not charged again
+	s.endSubscription(pctx, u.ID)
 	if err := s.purgeAccount(r.WithContext(pctx), u.ID, purgeOptions{DMs: true}); err != nil {
 		s.Log.Error("delete account", "user", u.ID.String(), "err", err)
 		WriteError(w, E(http.StatusInternalServerError, "delete_incomplete", "Your account is closed, but not everything is gone yet. The rest goes by itself shortly."))

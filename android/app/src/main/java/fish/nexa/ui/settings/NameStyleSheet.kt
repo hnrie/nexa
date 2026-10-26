@@ -15,10 +15,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -33,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fish.nexa.data.NameStyle
 import fish.nexa.net.MeUser
+import fish.nexa.Nexa
 import fish.nexa.ui.Icon
 import fish.nexa.ui.chat.RoleLook
 import fish.nexa.ui.chat.RoleName
@@ -93,7 +96,7 @@ private fun NameStyleBody(me: MeUser, name: String, state: MutableState<NameStyl
             RoleName(name, look, Nx.type.name.copy(fontSize = Nx.type.sp(26f), lineHeight = Nx.type.sp(32f), fontWeight = FontWeight(700), textAlign = TextAlign.Center), c.textStrong)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NxButton(t("nameStyle.surprise"), { state.value = NameStyle.surprise() }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "Dices")
+            NxButton(t("nameStyle.surprise"), { state.value = NameStyle.surprise(paid = fish.nexa.data.Plans.myLimits().nameEffects) }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "Dices")
             NxButton(t("nameStyle.reset"), { state.value = NameStyle.PLAIN }, kind = ButtonKind.GHOST, size = ButtonSize.SM, icon = "RotateCcw", enabled = !style.isPlain)
         }
 
@@ -109,11 +112,22 @@ private fun NameStyleBody(me: MeUser, name: String, state: MutableState<NameStyl
             }
         }
 
+        // the effects that come with a plan are shown to everyone, locked without one
+        val me by Nexa.users.me.collectAsState()
+        val paid = fish.nexa.data.Plans.limitsOf(me?.plan).nameEffects
         Section(t("nameStyle.effect")) {
             Grid(NameStyle.EFFECTS, 4) { e ->
                 val sample = RoleLook(color = null, own = NameStyle("", e.id, if (e.id == "solid") emptyList() else e.start))
-                Tile(style.effect == e.id, t("nameStyle.effects.${e.id}"), Modifier.height(52.dp), { state.value = NameStyle.withEffect(style, e.id) }) {
-                    RoleName(t("nameStyle.effects.${e.id}"), sample, Nx.type.name.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(700)), c.textStrong)
+                val locked = e.paid && !paid
+                Tile(style.effect == e.id, t("nameStyle.effects.${e.id}"), Modifier.height(52.dp), {
+                    if (locked) fish.nexa.data.Plans.offer(fish.nexa.data.Plans.Offer.Effect) else state.value = NameStyle.withEffect(style, e.id)
+                }) {
+                    Box(Modifier.alpha(if (locked) 0.6f else 1f)) {
+                        RoleName(t("nameStyle.effects.${e.id}"), sample, Nx.type.name.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(700)), c.textStrong)
+                    }
+                    if (e.paid) Box(Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 2.dp).semantics { contentDescription = t("support.effects.withPlan") }) {
+                        Icon(if (paid) "Heart" else "Lock", c.textSupporter, size = 11.dp, filled = paid)
+                    }
                 }
             }
         }
@@ -147,7 +161,7 @@ private fun <T> Grid(items: List<T>, cols: Int, cell: @Composable (T) -> Unit) {
 
 /** A choice drawn in what it gives; the chosen one takes the accent's ring. */
 @Composable
-private fun Tile(selected: Boolean, label: String, modifier: Modifier, onClick: () -> Unit, content: @Composable () -> Unit) {
+private fun Tile(selected: Boolean, label: String, modifier: Modifier, onClick: () -> Unit, content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) {
     val c = Nx.colors
     Box(
         modifier

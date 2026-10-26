@@ -26,6 +26,9 @@ var banAllowed = map[string]bool{
 	"GET /api/v1/auth/passkeys":         true,
 	"DELETE /api/v1/auth/passkeys/{id}": true,
 	"POST /api/v1/client-errors":        true,
+	// a subscription can always be seen and cancelled
+	"GET /api/v1/billing":         true,
+	"POST /api/v1/billing/portal": true,
 }
 
 // muteAllowed is what a muted account can still change besides reading, which
@@ -36,6 +39,8 @@ var banAllowed = map[string]bool{
 // their handlers ask mutedFor for that part (see there).
 var muteAllowed = map[string]bool{
 	"POST /api/v1/auth/logout":                                          true,
+	"POST /api/v1/billing/portal":                                       true,
+	"POST /api/v1/billing/checkout":                                     true,
 	"DELETE /api/v1/auth/sessions/{id}":                                 true,
 	"POST /api/v1/auth/password":                                        true,
 	"POST /api/v1/auth/recovery":                                        true,

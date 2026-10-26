@@ -554,6 +554,8 @@ fun serverMenu(serverId: String, fromRail: Boolean): List<MenuItem> {
         group += MenuItem.Action(t("modals.createChannel.createChannel")) { openCreateChannel(serverId, null) }
         group += MenuItem.Action(t("modals.createCategory.createCategory")) { openCreateCategory(serverId) }
     }
+    // a Pro account puts one of its boosts here: bigger files for everyone in it
+    if (fish.nexa.data.Plans.mine() == "pro") group += MenuItem.Action(t("support.boosts.boostServer")) { boostServer(serverId, st.server.name) }
     if (group.isNotEmpty()) items += group.dropLast(1) + group.last().copy(separatorAfter = true)
     val muted = serverId in Unread.mutedIds()
     items += MenuItem.Action(if (muted) t("sidebar.serverMenu.unmuteServer") else t("sidebar.serverMenu.muteServer")) { Unread.setMuted(serverId, !muted) }
@@ -562,6 +564,20 @@ fun serverMenu(serverId: String, fromRail: Boolean): List<MenuItem> {
     if (st.server.ownerId != Nexa.users.meId) items += MenuItem.Action(t("sidebar.serverMenu.leaveServer"), danger = true) { confirmLeaveServer(serverId) }
     if (Nexa.settings.developerMode) items += MenuItem.Action(t("sidebar.serverMenu.copyServerId")) { copyText(serverId) }
     return items
+}
+
+private fun boostServer(serverId: String, name: String) {
+    Nexa.scope.launch {
+        try {
+            Nexa.api.request("POST", "/billing/boosts", kotlinx.serialization.json.buildJsonObject { put("server_id", kotlinx.serialization.json.JsonPrimitive(serverId)) })
+            Nexa.ui.toast(t("support.boosts.boosted", "server" to name, "size" to fish.nexa.ui.Time.bytes(fish.nexa.data.Plans.info().boostFileMax)), "success")
+            fish.nexa.data.Plans.load()
+        } catch (e: fish.nexa.net.ApiError) {
+            Nexa.ui.toast(e.message ?: t("support.error"), "error")
+        } catch (e: Exception) {
+            Nexa.ui.toast(t("support.error"), "error")
+        }
+    }
 }
 
 fun copyText(text: String) {

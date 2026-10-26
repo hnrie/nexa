@@ -75,6 +75,8 @@ type Server struct {
 	// QR sign-ins waiting for a phone, and passkey challenges already answered
 	qr           qrLogins
 	spentPasskey spentChallenges
+	// the plans' prices from Stripe, kept for a while (billing.go)
+	priceCache priceCache
 
 	limGeneric *ratelimit.Limiter
 	limAuthIP  *ratelimit.Limiter
@@ -145,8 +147,10 @@ type Server struct {
 	// and messages across every channel (both fan out to whole channels),
 	// searches (people, GIFs, games), public lookups by IP (invite previews,
 	// profile links, KDF parameters) and building a server's structure
-	limReact   *ratelimit.Limiter
-	limMsgAll  *ratelimit.Limiter
+	limReact  *ratelimit.Limiter
+	limMsgAll *ratelimit.Limiter
+	// limForward: messages forwarded, per account, on top of the message limits
+	limForward *ratelimit.Limiter
 	limSearch  *ratelimit.Limiter
 	limLookup  *ratelimit.Limiter
 	limBuild   *ratelimit.Limiter
@@ -352,6 +356,8 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		// messages and edits per account across every channel, on top of
 		// limMsg's five every five seconds in one channel
 		limMsgAll: ratelimit.New(ratelimit.Every(120, time.Minute), 30, 10*time.Minute),
+		// passing things on is for now and then, not for spreading something everywhere at once
+		limForward: ratelimit.New(ratelimit.Every(20, time.Minute), 5, 10*time.Minute),
 		// searching people, GIFs and games, per account
 		limSearch: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
 		// what anyone can look up without signing in, per address, before a
@@ -382,7 +388,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"automod": s.limAutomod, "publish": s.limPublish, "thread": s.limThread, "discover": s.limDiscover,
 		"note": s.limNote, "note-save": s.limNoteSave, "note-update": s.limNoteUpdate, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,
 		"apps": s.limApps, "interact": s.limInteract,
-		"react": s.limReact, "message-all": s.limMsgAll, "search": s.limSearch, "lookup": s.limLookup, "build": s.limBuild,
+		"react": s.limReact, "message-all": s.limMsgAll, "forward": s.limForward, "search": s.limSearch, "lookup": s.limLookup, "build": s.limBuild,
 		"lookup-captcha": s.stepLookup.solves, "build-captcha": s.stepBuild.solves,
 	}
 	for name, l := range s.botLim.all() {

@@ -371,6 +371,15 @@
   /* a raised thing: its lit top edge, then the shadow under it */
   --lift: inset 0 1px 0 var(--edge-light), var(--shadow-medium);
   --lift-low: inset 0 1px 0 var(--edge-light), var(--shadow-low);
+  /* the plans' own lights (components/support): Supporter rose, Pro the accent */
+  --tier-supporter: #ff5c93;
+  --text-supporter: color-mix(in oklab, #ff5c93 82%, var(--text-strong));
+  --tier-pro: var(--brand);
+  --text-pro: var(--text-brand);
+}
+:root[data-scheme="light"] {
+  --tier-supporter: #e8336f;
+  --text-supporter: color-mix(in oklab, #e8336f 82%, #000);
 }
 [data-theme="light"] {
   --rail-shade: 93%;

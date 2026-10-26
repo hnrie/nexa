@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { AtSign, AudioLines, BadgeCheck, Bot, CodeXml, ScanEye, Compass, Gavel, KeyRound, Link2, Megaphone, MonitorUp, Pause, ScrollText, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, Eye, EyeOff, Feather, FolderPlus, Gamepad2, Globe, Headphones, House, IdCard, ImagePlay, ImagePlus, Images, Keyboard, LayoutGrid, Leaf, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessageSquareText, MessagesSquare, MousePointerClick, Move, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, QrCode, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Snowflake, Sparkles, SpellCheck, Sticker, StickyNote, Tag, Timer, Trash2, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Volume2, Vote, Webhook, ZoomIn, type LucideIcon } from "lucide-react";
+import { AtSign, Gift, AudioLines, BadgeCheck, Bot, CodeXml, ScanEye, Compass, Gavel, KeyRound, Link2, Megaphone, MonitorUp, Pause, ScrollText, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, CornerUpRight, Eye, EyeOff, Feather, FolderPlus, Gamepad2, Globe, Headphones, Heart, House, IdCard, ImagePlay, ImagePlus, Images, Keyboard, LayoutGrid, Leaf, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessageSquareText, MessagesSquare, MousePointerClick, Move, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, QrCode, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Snowflake, Sparkles, SpellCheck, Sticker, StickyNote, Tag, Timer, Trash2, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Volume2, Vote, Webhook, ZoomIn, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,15 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-10-25.2",
+    items: [
+      { icon: Heart, title: "whatsNew.r202610252.supportTitle", body: "whatsNew.r202610252.supportBody" },
+      { icon: Gift, title: "whatsNew.r202610252.giftTitle", body: "whatsNew.r202610252.giftBody" },
+      { icon: CornerUpRight, title: "whatsNew.r202610252.forwardTitle", body: "whatsNew.r202610252.forwardBody" },
+      { icon: Sparkles, title: "whatsNew.r202610252.effectsTitle", body: "whatsNew.r202610252.effectsBody" },
+    ],
+  },
   {
     id: "2026-10-25",
     items: [

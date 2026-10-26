@@ -1,5 +1,5 @@
 import type { ShareFps, ShareResolution } from "@/stores/settings";
-import { MAX_SHARE_BPS, MIN_SHARE_BPS, PERFORMANCE_PLAN, fromStreamQuality, isShareFps, isShareResolution, shareBitrate, shareModeOf, sharePlan, shareQuality, shareVideoConstraints } from "./shareQuality";
+import { MAX_SHARE_BPS, MIN_SHARE_BPS, OPEN_SHARE, PERFORMANCE_PLAN, fromStreamQuality, isShareFps, isShareResolution, shareBitrate, shareModeOf, sharePlan, shareQuality, shareVideoConstraints } from "./shareQuality";
 
 describe("screen share quality", () => {
   it("caps the picture at the chosen size, keeping its shape, and the frame rate at the chosen one", () => {
@@ -56,7 +56,7 @@ describe("screen share quality", () => {
 describe("stream modes", () => {
   it("sends Performance smooth at 1080p60 within 6 Mbit/s, and Quality sharp at the screen's own size at the most a share may use", () => {
     expect(sharePlan({ shareMode: "performance" })).toEqual({ res: "1080p", fps: 60, bitrate: 6_000_000, smooth: true });
-    expect(sharePlan({ shareMode: "quality" })).toEqual({ res: "source", fps: 60, bitrate: MAX_SHARE_BPS, smooth: false });
+    expect(sharePlan({ shareMode: "quality" })).toEqual({ res: "source", fps: 60, bitrate: OPEN_SHARE.maxBps, smooth: false });
     // anything not understood is Performance
     expect(sharePlan({ shareMode: "turbo" })).toEqual(PERFORMANCE_PLAN);
   });
@@ -66,9 +66,20 @@ describe("stream modes", () => {
     expect(sharePlan(custom)).toEqual({ res: "1440p", fps: 30, bitrate: shareBitrate("1440p", 30), smooth: true });
     expect(sharePlan({ ...custom, shareBitrate: 4_500_000, shareKeep: "sharp" })).toEqual({ res: "1440p", fps: 30, bitrate: 4_500_000, smooth: false });
     // a limit out of bounds is held to them, and nonsense is no limit
-    expect(sharePlan({ ...custom, shareBitrate: 99e9 }).bitrate).toBe(MAX_SHARE_BPS);
+    expect(sharePlan({ ...custom, shareBitrate: 99e9 }).bitrate).toBe(OPEN_SHARE.maxBps);
     expect(sharePlan({ ...custom, shareBitrate: 10 }).bitrate).toBe(MIN_SHARE_BPS);
     expect(sharePlan({ ...custom, shareBitrate: "fast" }).bitrate).toBe(shareBitrate("1440p", 30));
+  });
+
+  it("holds every mode to what the plan allows: Quality needs a plan, and none sends more than the plan's most", () => {
+    const free = { quality: false, maxBps: 6_000_000 };
+    const pro = { quality: true, maxBps: MAX_SHARE_BPS };
+    // a saved Quality without a plan shares as Performance
+    expect(sharePlan({ shareMode: "quality" }, free)).toEqual(PERFORMANCE_PLAN);
+    expect(sharePlan({ shareMode: "custom", shareResolution: "source", shareFps: 60, shareBitrate: 11_000_000 }, free).bitrate).toBe(6_000_000);
+    // Pro's Quality sends the most there is
+    expect(sharePlan({ shareMode: "quality" }, pro).bitrate).toBe(20_000_000);
+    expect(sharePlan({ shareMode: "performance" }, pro).bitrate).toBe(6_000_000);
   });
 
   it("turns settings from before modes into one: the usual 1080p30 becomes Performance, a choice stays as Custom", () => {

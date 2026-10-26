@@ -299,6 +299,8 @@ class Session(private val nx: Nexa) {
             }
             "sticker_recent" -> decode((d as? JsonObject)?.get("sticker"), Sticker.serializer())?.let { nx.expressions.useRecent(it) }
             "presence" -> decode(d, Presence.serializer())?.let { nx.presence.set(it) }
+            // this account's subscription or boosts changed; only a page that has read them reads them again
+            "billing_update" -> if (Plans.billing.value != null) nx.scope.launch { Plans.load() }
             "user_update" -> decode(d, PublicUser.serializer())?.let { u ->
                 judgeAll(listOf(u))
                 if (u.id == meId) nx.users.mergeMe(u)

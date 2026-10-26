@@ -52,7 +52,7 @@
 
 .effects { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
 .effectTile { height: 58px; padding: 0 8px; font-family: var(--font-display); font-size: 17px; font-weight: 700; }
-.effectTile > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0.15em 0.1em; }
+.effectTile > :where(span:first-child) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0.15em 0.1em; }
 
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 .swatch {
@@ -114,3 +114,8 @@
 
 .note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-muted); }
 
+
+/* an effect that comes with a plan: a heart in the Supporter rose, a lock without one */
+.effectTile { position: relative; }
+.planMark { position: absolute; inset-block-start: 5px; inset-inline-end: 6px; display: flex; color: var(--text-supporter); }
+.effectTile[data-locked] > :first-child { opacity: 0.6; }

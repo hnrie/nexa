@@ -196,7 +196,45 @@ here has a way to read them, apart from what was opened for an app.
   the other side, without its messages. The moderation case and the
   log entry about it stay.
 
-8. AVAILABILITY AND CHANGES
+8. PLANS AND PAYMENTS
+
+Nexa is free to use, and chatting, calls, encryption, servers and
+everything else stay free. Two optional plans give more room and help
+pay for running it:
+
+- Supporter, $5 a month or $48 a year: bigger files, more uploads
+  each 30 days, the Quality screen share, the Holo, Neon and Flame
+  name effects, and a Supporter badge.
+- Pro, $10 a month or $96 a year: all of that with more room still, a
+  Pro badge, and two server boosts. A boosted server lets everyone in
+  it send bigger files.
+
+The exact limits are on the Support Nexa page in the app. Prices are
+in US dollars before any tax your country adds, and the price shown
+when you pay is the one you pay.
+
+- Who sells it. Plans are sold through Stripe, which acts as the
+  merchant of record: it takes the payment, works out and pays the
+  tax, and sends your receipts. Nexa never sees your card or bank
+  details.
+- Renewing and cancelling. A plan renews every month or year until
+  you cancel it. You can cancel any time from Manage Subscription on
+  the Support Nexa page, and the plan stays until the time you paid
+  for ends. Deleting your account cancels it at once.
+- Refunds. If you change your mind, ask within 14 days of a payment
+  (see Contact below) and it is refunded in full.
+- When a plan ends. Nothing you sent is deleted: files over the free
+  limits stay where they are. New uploads follow the free limits
+  again, your boosts come off their servers, and a name effect that
+  comes with a plan shows in its first colour until you pick another.
+- Gifts. You can buy someone a month (30 days) or a year (365 days)
+  of a plan. A gift is paid once and never renews. A second gift of
+  the same plan starts when the first one ends. You cannot give a
+  gift to someone who has blocked you or whom you have blocked.
+- The rules still apply. A plan does not change these Terms or how
+  moderation works.
+
+9. AVAILABILITY AND CHANGES
 
 Nexa is a small project, provided as is, with no uptime guarantee.
 Parts of the service may be updated, limited, or stopped, and these
@@ -205,7 +243,7 @@ everyone to agree again and shows what changed, with the new
 effective date. Keeping your account after that means you accept the
 new Terms.
 
-9. CONTACT
+10. CONTACT
 
 Questions, reports, appeals, or legal process:
 

@@ -42,6 +42,84 @@ export interface PublicUser {
   name_style?: unknown;
   /** The server tag they wear beside their name, or null. */
   server_tag?: WornTag | null;
+  /** Their subscription, shown as a badge: "" (none), "supporter" or "pro". Absent from servers before plans. */
+  plan?: Plan;
+}
+
+/** A subscription: "" is the free plan. */
+export type Plan = "" | "supporter" | "pro";
+
+/** What one plan allows (api/billing.go planLimits). */
+export interface PlanLimits {
+  file_max: number;
+  /** How much may be uploaded in any 30 days; each upload counts until it is that old. */
+  month_upload_max: number;
+  /** The Quality share mode (the screen's own size). */
+  share_quality: boolean;
+  share_max_bps: number;
+  /** The name effects only plans have. */
+  name_effects: boolean;
+  boosts: number;
+}
+
+/** Every plan's limits, from the instance. */
+export interface PlansInfo {
+  /** Subscriptions can be bought here. */
+  enabled: boolean;
+  free: PlanLimits;
+  supporter: PlanLimits;
+  pro: PlanLimits;
+  /** The largest file anyone may send in a boosted server. */
+  boost_file_max: number;
+}
+
+/** One of an account's boosts, with the server it is on. */
+export interface Boost {
+  id: Snowflake;
+  server_id: Snowflake;
+  server_name: string;
+  server_icon_id: Snowflake | null;
+  created_at: number;
+}
+
+/** A price as Stripe has it: the smallest unit of the currency. */
+export interface PlanPrice {
+  amount: number;
+  currency: string;
+}
+
+/** An account's side of its subscription (GET /billing). */
+export interface Billing {
+  enabled: boolean;
+  plan: Plan;
+  limits: PlanLimits;
+  /** What was uploaded in the last 30 days. */
+  month_used: number;
+  /** When the first of that room comes back (Unix ms); 0 when nothing counts. */
+  month_frees_at: number;
+  boosts: Boost[];
+  period: "" | "month" | "year";
+  /** Stripe's word for it: active, past_due, canceled... */
+  status: string;
+  /** When it renews, or ends when cancel_at_end (Unix ms); 0 for none. */
+  period_end: number;
+  cancel_at_end: boolean;
+  /** There is a Stripe customer to open the portal for. */
+  manageable: boolean;
+  prices: Partial<Record<"supporter" | "pro", Partial<Record<"month" | "year", PlanPrice>>>>;
+  /** What a month or a year of a plan costs as a gift, paid once. */
+  gift_prices: Partial<Record<"supporter" | "pro", Partial<Record<"month" | "year", PlanPrice>>>>;
+  /** Plans given to this account that haven't run out, soonest first. */
+  gifts: PlanGift[] | null;
+}
+
+/** A plan someone gave this account, for a month or a year (store.Gift). */
+export interface PlanGift {
+  from_id: Snowflake;
+  from_name: string;
+  plan: Plan;
+  starts_at: number;
+  ends_at: number;
 }
 
 /** A server's tag as someone wears it: its letters, its badge and its colour. */
@@ -205,6 +283,8 @@ export interface Server {
   verify_member_minutes?: number;
   /** When the AutoMod rules members' apps apply last changed; 0 when there are none. */
   automod_at?: number;
+  /** How many Pro accounts boost it; one or more lets every member send bigger files. */
+  boosts?: number;
 }
 
 /** A server's tag, as its members and admins see it. */
@@ -571,6 +651,8 @@ export interface InstanceInfo {
   /** The size of each of those pieces. */
   upload_chunk_bytes?: number;
   max_sticker_bytes?: number;
+  /** Every plan's limits; absent from servers before plans. */
+  plans?: PlansInfo;
 }
 
 export interface ServerKeyInfo {
@@ -1220,6 +1302,8 @@ export interface SendMessageRequest {
   poll?: PollRequest;
   /** The message sealed to each app's bot it is addressed to, base64 by bot id (lib/botCopies). */
   bot_copies?: Record<Snowflake, string>;
+  /** The message this one forwards, whose files it may carry over as they are. */
+  forward?: { channel_id: Snowflake; message_id: Snowflake };
 }
 
 /** One AutoMod rule (see api/automod and lib/automod). */

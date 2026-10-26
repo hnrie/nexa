@@ -562,8 +562,8 @@ private fun NewPostSheet(layer: Layer, forumId: String, close: () -> Unit) {
         scope.launch {
             for (u in uris) {
                 if (files.size >= MAX_POST_FILES) break
-                val s = Staging.stage(u) ?: continue
-                if (!fish.nexa.data.Uploads.fits(s.file.length())) {
+                val s = Staging.stage(u, forumId) ?: continue
+                if (!fish.nexa.data.Uploads.fits(s.file.length(), forumId)) {
                     Nexa.ui.toast(t("forum.post.fileTooBig", "name" to s.name), "error")
                     s.file.delete()
                     continue

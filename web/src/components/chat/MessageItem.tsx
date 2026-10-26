@@ -1,9 +1,9 @@
-import { Check, Hash, Link2, Lock, MailOpen, Megaphone, MessageSquareText, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, ShieldAlert, SmilePlus, Trash2 } from "lucide-react";
+import { Check, CornerUpRight, Hash, Link2, Lock, MailOpen, Megaphone, MessageSquareText, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, ShieldAlert, SmilePlus, Trash2 } from "lucide-react";
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { Markdown, isEmojiOnly, parse, plainText } from "@/markdown";
 import { useRowRenderCtx } from "@/lib/markdownCtx";
-import { formatExact, formatFull, formatTime, formatTimestamp } from "@/lib/time";
+import { formatExact, formatFull, formatShortDate, formatTime, formatTimestamp } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useMessages, type DecryptedMessage, type PendingUpload } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
@@ -467,9 +467,19 @@ function MessageContent({ msg, name, id, pending, upload }: { msg: DecryptedMess
     );
   }
   return (
-    <div id={id} className={[s.content, jumbo ? s.jumbo : ""].join(" ")}>
+    <div id={id} className={[s.content, jumbo ? s.jumbo : ""].join(" ")} data-forwarded={msg.payload?.fwd ? "" : undefined}>
+      {msg.payload?.fwd ? (
+        // passed on from another message (lib/forward.ts), with when that one was sent
+        <span className={s.forwarded} data-testid="forwarded">
+          <CornerUpRight size={13} aria-hidden="true" />
+          {t("forward.forwarded")}
+          <time dateTime={new Date(msg.payload.fwd.at).toISOString()} title={formatFull(msg.payload.fwd.at)}>{formatShortDate(msg.payload.fwd.at)}</time>
+        </span>
+      ) : null}
       {msg.decryptError === "no_key" ? (
         <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.waitingForTheEncryptionKey")}</span>
+      ) : msg.decryptError === "invalid" ? (
+        <span className={s.waiting} data-testid="message-invalid"><ShieldAlert size={14} /> {t("chat.messageItem.breaksLimits")}</span>
       ) : msg.decryptError === "bad" ? (
         <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.thisMessageCouldNotBeDecrypted")}</span>
       ) : (

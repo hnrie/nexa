@@ -108,6 +108,8 @@ data class MessagePayload(
     val embeds: List<JsonObject>? = null,
     val flags: Double? = null,
     val poll: PollPayload? = null,
+    /** Forwarded from another message (data/Forward.kt): when that one was sent (Unix ms). Its files are the original's own. */
+    val fwdAt: Long? = null,
 ) {
     fun toJson(): JsonObject = buildJsonObject {
         t?.let { put("t", it) }
@@ -125,6 +127,7 @@ data class MessagePayload(
         }
         embeds?.let { put("embeds", JsonArray(it)) }
         flags?.let { put("flags", num(it)) }
+        fwdAt?.let { at -> put("fwd", buildJsonObject { put("at", at) }) }
         poll?.let { p ->
             put("poll", buildJsonObject {
                 put("question", p.question)
@@ -361,7 +364,67 @@ object MessageCrypto {
         return PollPayload(cap(q, POLL_QUESTION_MAX), answers, hours, o.bool("multiselect") == true)
     }
 
+    /** What a message may hold (the web's MESSAGE_LIMITS): past any of it, it was made by something other than an app, and is not shown. */
+    object Limits {
+        const val TEXT = 4000
+        const val FILES = 10
+        const val FILE_NAME = 255
+        const val FILE_TYPE = 255
+        const val FILE_KEY = 64
+        const val EMBEDS = 5
+        const val EMBED_TITLE = 256
+        const val EMBED_TEXT = 2048
+        const val ADDRESS = 8192
+        const val STICKER_NAME = 30
+    }
+
+    private val TOKENS = Regex("<(?:a?:[A-Za-z0-9_]{1,32}:|@&?|#)\\d{1,20}>")
+
+    /** A message's text as long as it was to type: each mention and custom emoji as two characters. */
+    fun typedLength(t: String): Int = t.replace(TOKENS, "··").length
+
+    private fun runes(v: String): Int = v.codePointCount(0, v.length)
+
+    /** The first limit a payload breaks, or null when it keeps to them all (the web's brokenLimit). */
+    fun brokenLimit(p: JsonObject): String? {
+        if (p.containsKey("t") && (p.str("t")?.let { typedLength(it) > Limits.TEXT } != false)) return "text"
+        if (p.containsKey("att")) {
+            val att = p["att"] as? JsonArray ?: return "files"
+            if (att.size > Limits.FILES) return "files"
+            for (a in att) {
+                val m = sanitizeAttachment(a) ?: return "file"
+                if (runes(m.name) > Limits.FILE_NAME || m.type.length > Limits.FILE_TYPE || m.key.length > Limits.FILE_KEY) return "file"
+            }
+        }
+        if (p.containsKey("embeds")) {
+            val embeds = p["embeds"] as? JsonArray ?: return "embeds"
+            if (embeds.size > Limits.EMBEDS) return "embeds"
+            for (x in embeds) {
+                val e = x as? JsonObject ?: return "embed"
+                if (e.str("url")?.let { webLink(it) } != true) return "embed"
+                for (k in listOf("title", "site_name", "author")) if ((e.str(k)?.let { runes(it) } ?: 0) > Limits.EMBED_TITLE) return "embed"
+                if ((e.str("description")?.let { runes(it) } ?: 0) > Limits.EMBED_TEXT) return "embed"
+                for (k in EMBED_LINKS) if ((e.str(k)?.length ?: 0) > Limits.ADDRESS) return "embed"
+            }
+        }
+        if (p.containsKey("sticker")) {
+            val st = p["sticker"] as? JsonObject ?: return "sticker"
+            if ((st.str("name")?.let { runes(it) } ?: 0) > Limits.STICKER_NAME) return "sticker"
+        }
+        if (p.containsKey("poll")) {
+            val poll = p["poll"] as? JsonObject ?: return "poll"
+            val q = poll.str("question") ?: return "poll"
+            val answers = poll["answers"] as? JsonArray ?: return "poll"
+            if (runes(q) > POLL_QUESTION_MAX || answers.size < POLL_ANSWERS_MIN || answers.size > POLL_ANSWERS_MAX) return "poll"
+            for (a in answers) if (((a as? JsonObject)?.str("text") ?: return "poll").let { runes(it) } > POLL_ANSWER_MAX) return "poll"
+            if (sanitizePoll(poll) == null) return "poll"
+        }
+        return null
+    }
+
     fun sanitizePayload(p: JsonObject): MessagePayload {
+        // a message past what any app sends was made to be, and is not shown
+        if (brokenLimit(p) != null) throw DecryptError("over_limits")
         val t = p.str("t")
         val att = (p["att"] as? JsonArray)?.mapNotNull { sanitizeAttachment(it) }?.takeIf { it.isNotEmpty() }
         val sticker = (p["sticker"] as? JsonObject)?.let { st ->
@@ -379,6 +442,7 @@ object MessageCrypto {
         if (hadContent && t == null && att == null && sticker == null && embeds == null && poll == null) {
             throw DecryptError("malformed message payload")
         }
-        return MessagePayload(t, att, sticker, embeds, flags, poll)
+        val fwdAt = (p["fwd"] as? JsonObject)?.number("at")?.toLong()
+        return MessagePayload(t, att, sticker, embeds, flags, poll, fwdAt)
     }
 }

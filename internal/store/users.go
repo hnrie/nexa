@@ -28,7 +28,7 @@ func init() {
 	})
 }
 
-const userCols = `id, username, display_name, auth_hash, kdf_salt, kdf_params, public_key, enc_private_key, enc_private_key_recovery, recovery_auth_hash, avatar_id, banner_id, about_me, pronouns, accent_color, accent_color_2, status_text, status_emoji, status_expires_at, presence_pref, dm_privacy, flags, created_at, updated_at, group_link_only, typing_style, tag_server_id, tag_text, tag_badge, tag_color, name_style`
+const userCols = `id, username, display_name, auth_hash, kdf_salt, kdf_params, public_key, enc_private_key, enc_private_key_recovery, recovery_auth_hash, avatar_id, banner_id, about_me, pronouns, accent_color, accent_color_2, status_text, status_emoji, status_expires_at, presence_pref, dm_privacy, flags, created_at, updated_at, group_link_only, typing_style, tag_server_id, tag_text, tag_badge, tag_color, name_style, plan`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -39,7 +39,7 @@ func scanUser(r rowScanner) (*User, error) {
 	var linkOnly int64
 	err := r.Scan(&u.ID, &u.Username, &u.DisplayName, &u.AuthHash, &u.KDFSalt, &u.KDFParams, &u.PublicKey, &u.EncPrivateKey, &u.EncPrivateKeyRecovery, &recoveryHash,
 		&avatar, &banner, &u.AboutMe, &u.Pronouns, &accent, &accent2, &u.StatusText, &u.StatusEmoji, &statusExp, &u.PresencePref, &u.DMPrivacy, &u.Flags, &u.CreatedAt, &u.UpdatedAt, &linkOnly,
-		&u.TypingStyle, &tagServer, &u.TagText, &u.TagBadge, &tagColor, &u.NameStyle)
+		&u.TypingStyle, &tagServer, &u.TagText, &u.TagBadge, &tagColor, &u.NameStyle, &u.Plan)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -86,10 +86,10 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 			}
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(username) DO NOTHING`,
+		res, err := tx.ExecContext(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(username) DO NOTHING`,
 			int64(u.ID), u.Username, u.DisplayName, u.AuthHash, u.KDFSalt, u.KDFParams, u.PublicKey, u.EncPrivateKey, u.EncPrivateKeyRecovery, recovery,
 			nullID(u.AvatarID), nullID(u.BannerID), u.AboutMe, u.Pronouns, nullInt(u.AccentColor), nullInt(u.AccentColor2), u.StatusText, u.StatusEmoji, nullInt64(u.StatusExpiresAt), u.PresencePref, u.DMPrivacy, u.Flags, u.CreatedAt, u.UpdatedAt, boolInt(u.GroupLinkOnly),
-			u.TypingStyle, nullID(u.TagServerID), u.TagText, u.TagBadge, nullInt(u.TagColor), u.NameStyle)
+			u.TypingStyle, nullID(u.TagServerID), u.TagText, u.TagBadge, nullInt(u.TagColor), u.NameStyle, u.Plan)
 		if err != nil {
 			return err
 		}
@@ -448,14 +448,14 @@ func (s *Store) DeleteAccount(ctx context.Context, id ids.ID) error {
 		if err := swapTypingImagesTx(ctx, tx, id, ""); err != nil && !errors.Is(err, ErrNotFound) {
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE users SET username = ?, display_name = 'Deleted User', auth_hash = '!', enc_private_key = ?, enc_private_key_recovery = NULL, recovery_auth_hash = NULL, avatar_id = NULL, banner_id = NULL, about_me = '', pronouns = '', status_text = '', status_emoji = '', typing_style = '', name_style = '', tag_server_id = NULL, tag_text = '', tag_badge = '', tag_color = NULL, widgets = '', signup_invite = NULL, flags = flags | ?, updated_at = ? WHERE id = ?`, anon, []byte{}, FlagDeleted, nowMs(), int64(id))
+		res, err := tx.ExecContext(ctx, `UPDATE users SET username = ?, display_name = 'Deleted User', auth_hash = '!', enc_private_key = ?, enc_private_key_recovery = NULL, recovery_auth_hash = NULL, avatar_id = NULL, banner_id = NULL, about_me = '', pronouns = '', status_text = '', status_emoji = '', typing_style = '', name_style = '', tag_server_id = NULL, tag_text = '', tag_badge = '', tag_color = NULL, widgets = '', signup_invite = NULL, plan = '', flags = flags | ?, updated_at = ? WHERE id = ?`, anon, []byte{}, FlagDeleted, nowMs(), int64(id))
 		if err != nil {
 			return err
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrNotFound
 		}
-		for _, q := range []string{`DELETE FROM sessions WHERE user_id = ?`, `DELETE FROM user_ips WHERE user_id = ?`, `DELETE FROM relationships WHERE user_id = ? OR target_id = ?`, `DELETE FROM user_settings WHERE user_id = ?`, `DELETE FROM key_grants WHERE user_id = ?`, `DELETE FROM user_mfa WHERE user_id = ?`, `DELETE FROM mfa_backup_codes WHERE user_id = ?`, `DELETE FROM passkeys WHERE user_id = ?`} {
+		for _, q := range []string{`DELETE FROM sessions WHERE user_id = ?`, `DELETE FROM user_ips WHERE user_id = ?`, `DELETE FROM relationships WHERE user_id = ? OR target_id = ?`, `DELETE FROM user_settings WHERE user_id = ?`, `DELETE FROM key_grants WHERE user_id = ?`, `DELETE FROM user_mfa WHERE user_id = ?`, `DELETE FROM mfa_backup_codes WHERE user_id = ?`, `DELETE FROM passkeys WHERE user_id = ?`, `DELETE FROM billing WHERE user_id = ?`, `DELETE FROM plan_gifts WHERE to_id = ?`} {
 			args := []any{int64(id)}
 			if strings.Count(q, "?") == 2 {
 				args = append(args, int64(id))

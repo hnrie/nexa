@@ -16,6 +16,7 @@ import fish.nexa.crypto.StickerRef
 import fish.nexa.net.ApiError
 import fish.nexa.net.Message
 import fish.nexa.net.wireJson
+import fish.nexa.ui.markdown.MessageLimit
 import fish.nexa.ui.t
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -79,7 +80,12 @@ data class SendOptions(
     val poll: PollPayload? = null,
     /** AutoMod has read it already (Send.screen): what to tell it once the message is sent. */
     val screened: ((String) -> Unit)? = null,
+    /** Passes on another message (data/Forward.kt): its files go as they are, and nobody is pinged. */
+    val forward: Forwarding? = null,
 )
+
+/** The message a forward passes on, and when that one was first sent. */
+data class Forwarding(val channelId: String, val messageId: String, val at: Long)
 
 data class Uploaded(val meta: AttachmentMeta, val blobId: String, val size: Long)
 
@@ -137,16 +143,17 @@ object Send {
 
     private fun written(channelId: String, rawText: String, opts: SendOptions): Written {
         val ex = Mentions.extract(rawText, channelId)
-        return Written(
-            MessagePayload(
-                t = ex.text.ifEmpty { null },
-                att = opts.attachments?.takeIf { it.isNotEmpty() }?.map { it.meta },
-                sticker = opts.sticker,
-                embeds = opts.embeds?.takeIf { it.isNotEmpty() },
-                poll = opts.poll,
-            ),
-            ex.mentions, ex.roles, ex.everyone,
+        val payload = MessagePayload(
+            t = ex.text.ifEmpty { null },
+            att = opts.attachments?.takeIf { it.isNotEmpty() }?.map { it.meta },
+            sticker = opts.sticker,
+            embeds = opts.embeds?.takeIf { it.isNotEmpty() },
+            poll = opts.poll,
+            fwdAt = opts.forward?.at,
         )
+        // someone else's words, passed on: they ping nobody
+        if (opts.forward != null) return Written(payload, emptyList(), emptyList(), false)
+        return Written(payload, ex.mentions, ex.roles, ex.everyone)
     }
 
     private fun pendingOf(channelId: String, tmp: String): PendingMessage? = Nexa.messages.get(channelId).pending.firstOrNull { it.tmpId == tmp }
@@ -189,6 +196,8 @@ object Send {
         val w = written(channelId, rawText, opts)
         val p = w.payload
         if (p.t == null && p.att == null && p.sticker == null && p.poll == null) return
+        // nothing goes out that the apps would refuse to show (MessageCrypto.Limits), whoever asks to send it
+        if (refused(p)) return
         val nonce = nonce()
         val tmp = tmpId()
         Nexa.messages.addPending(PendingMessage(tmp, nonce, channelId, me.id, p, System.currentTimeMillis(), replyToId = opts.replyTo, ping = opts.ping ?: true, flags = opts.flags))
@@ -196,11 +205,19 @@ object Send {
         Nexa.scope.launch { runCatching { inTurn(channelId) { deliver(channelId, me.id, w, tmp, nonce, opts) } } }
     }
 
+    /** Whether a message breaks what a message may hold; the box says so, and it stays unsent. */
+    private fun refused(p: MessagePayload): Boolean {
+        if (MessageCrypto.brokenLimit(p.toJson()) == null) return false
+        Nexa.ui.toast(t(MessageLimit.TOO_LONG_KEY, "count" to MessageLimit.MAX_MESSAGE_LENGTH), "error")
+        return true
+    }
+
     fun sendPoll(channelId: String, poll: PollPayload) = sendMessage(channelId, "", SendOptions(poll = poll))
 
     fun sendWithFiles(channelId: String, rawText: String, files: List<Staged>, opts: SendOptions = SendOptions()) {
         val me = Nexa.users.me.value ?: return
         val w = written(channelId, rawText, opts)
+        if (refused(w.payload)) return
         val nonce = nonce()
         val tmp = tmpId()
         val upload = PendingUpload(files.map { PendingFile(it.id, it.name, it.size, it.type, it.preview) }, 0, files.sumOf { it.size })
@@ -358,6 +375,7 @@ object Send {
                     }
                 }
                 if (opts.flags != 0L) put("flags", opts.flags)
+                opts.forward?.let { f -> put("forward", buildJsonObject { put("channel_id", f.channelId); put("message_id", f.messageId) }) }
                 payload.poll?.let { p ->
                     put("poll", buildJsonObject {
                         put("answer_count", p.answers.size)
@@ -575,6 +593,16 @@ object Send {
  * small copy under its own key that lists and previews load instead.
  */
 object Uploads {
+    /** A file's name held to what a message may hold (MessageCrypto.Limits.FILE_NAME code points), its extension kept (the web's fitName). */
+    fun fitName(name: String): String {
+        val max = MessageCrypto.Limits.FILE_NAME
+        if (name.codePointCount(0, name.length) <= max) return name
+        val dot = name.lastIndexOf('.')
+        val ext = if (dot > 0 && name.length - dot <= 16) name.substring(dot) else ""
+        val keep = max - ext.codePointCount(0, ext.length)
+        return name.substring(0, name.offsetByCodePoints(0, keep)) + ext
+    }
+
     private const val COPY_SIDE = 1280
     private const val COPY_FROM = 256L * 1024
     private const val COPY_SHARE = 0.6
@@ -587,12 +615,16 @@ object Uploads {
     data class Look(val w: Int? = null, val h: Int? = null, val copy: Copy? = null)
     class Copy(val bytes: ByteArray, val type: String, val w: Int, val h: Int)
 
-    private fun limits(): Triple<Long, Long, Long> {
+    /** The largest file (the plan's, or a boosted server's for its channel), the most in one request, and a piece's size. */
+    private fun limits(channelId: String? = null): Triple<Long, Long, Long> {
         val i = Nexa.auth.instance.value
-        return Triple(i?.maxUploadBytes ?: (100L shl 20), i?.uploadSingleBytes ?: (32L shl 20), i?.uploadChunkBytes ?: (32L shl 20))
+        return Triple(Plans.fileMaxIn(channelId), i?.uploadSingleBytes ?: (32L shl 20), i?.uploadChunkBytes ?: (32L shl 20))
     }
 
-    fun fits(size: Long) = FileCrypto.encryptedSize(size) <= limits().first
+    fun fits(size: Long, channelId: String? = null) = FileCrypto.encryptedSize(size) <= limits(channelId).first
+
+    /** The conversation a place to upload is, when it is one: a boosted server takes bigger files. */
+    private fun channelOf(path: String): String? = Regex("^/channels/(\\d+)/attachments$").find(path)?.groupValues?.get(1)
 
     /** A body that counts what has gone, for the progress bar. */
     private class Counted(private val data: ByteArray, private val onProgress: (Long) -> Unit) : RequestBody() {
@@ -695,11 +727,22 @@ object Uploads {
 
     /** uploadStaged: encrypts and sends one file, returning what the message lists for it. */
     suspend fun uploadStaged(path: String, st: Staged, onProgress: (Double) -> Unit): Uploaded {
-        val (max, single, _) = limits()
+        val channelId = channelOf(path)
+        val (max, single, _) = limits(channelId)
         if (FileCrypto.encryptedSize(st.size) > max) throw ApiError(0, "too_large", t("attachments.overServerLimit", "limit" to formatSize(max)))
         val total = FileCrypto.encryptedSize(st.size)
         val key = FileCrypto.newFileKey()
         val baseIv = FileCrypto.newBaseIv()
+        return try {
+            sendStaged(path, st, channelId, total, single, key, baseIv, onProgress)
+        } catch (e: ApiError) {
+            // this month's uploads used up: a plan with more is offered beside the failed upload
+            if (e.code == "upload_month_full") Plans.offer(Plans.Offer.Uploads)
+            throw e
+        }
+    }
+
+    private suspend fun sendStaged(path: String, st: Staged, channelId: String?, total: Long, single: Long, key: ByteArray, baseIv: ByteArray, onProgress: (Double) -> Unit): Uploaded {
         return coroutineScope {
             val looked = async(Dispatchers.Default) { runCatching { look(st.file, st.type) }.getOrDefault(Look()) }
             val copied = async { looked.await().copy?.let { runCatching { sendCopy(path, it) }.getOrNull() } }
@@ -715,7 +758,7 @@ object Uploads {
                     onProgress(0.0)
                     post(path, "POST", body, emptyMap()) { onProgress(it.toDouble() / total) }
                 }
-            } else inPieces(st, key, baseIv) { onProgress(it.toDouble() / total) }
+            } else inPieces(st, key, baseIv, channelId) { onProgress(it.toDouble() / total) }
             val blob = (res["blob_id"] as? JsonPrimitive)?.contentOrNull ?: throw ApiError(200, "bad_response", t("attachments.theServerSAnswerCouldNot"))
             val size = (res["size"] as? JsonPrimitive)?.longOrNull ?: total
             val seen = looked.await()
@@ -729,10 +772,10 @@ object Uploads {
         }
     }
 
-    private suspend fun inPieces(st: Staged, key: ByteArray, baseIv: ByteArray, onProgress: (Long) -> Unit): JsonObject {
+    private suspend fun inPieces(st: Staged, key: ByteArray, baseIv: ByteArray, channelId: String?, onProgress: (Long) -> Unit): JsonObject {
         val total = FileCrypto.encryptedSize(st.size)
         val chunks = FileCrypto.chunkCount(st.size)
-        val session = Nexa.api.request("POST", "/uploads", buildJsonObject { put("size", total) }).jsonObject
+        val session = Nexa.api.request("POST", "/uploads", buildJsonObject { put("size", total); if (channelId != null) put("channel_id", channelId) }).jsonObject
         val id = (session["id"] as JsonPrimitive).content
         val limit = minOf((session["chunk_size"] as? JsonPrimitive)?.longOrNull ?: limits().third, limits().third)
         val perPiece = maxOf(1, ((limit - FileCrypto.HEADER_LEN) / FileCrypto.FRAME_LEN).toInt())

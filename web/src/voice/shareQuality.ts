@@ -47,9 +47,22 @@ export function shareVideoConstraints(res: ShareResolution, fps: ShareFps): Medi
   return { width: { max: box.width }, height: { max: box.height }, frameRate: { ideal: q.fps, max: q.fps } };
 }
 
-/** The bounds internal/realtime.ClampScreenBps holds a share's declared rate to. */
+/** The bounds internal/realtime.ClampScreenBps holds a share's declared rate to; the top is Pro's. */
 export const MIN_SHARE_BPS = 1_000_000;
-export const MAX_SHARE_BPS = 12_000_000;
+export const MAX_SHARE_BPS = 20_000_000;
+/** The most a share's automatic bitrate asks for, before a plan allows more. */
+const AUTO_MAX_BPS = 12_000_000;
+
+/**
+ * What the account's plan allows a share (api/billing.go): the Quality mode,
+ * and the most any share may send. lib/plans.ts shareAllowance() gives the
+ * account's own; without one every mode is open at the usual 12 Mbit/s.
+ */
+export interface ShareAllowance {
+  quality: boolean;
+  maxBps: number;
+}
+export const OPEN_SHARE: ShareAllowance = { quality: true, maxBps: AUTO_MAX_BPS };
 
 /**
  * What a share may use at 30 fps. Hard motion needs about 0.06 bits a pixel
@@ -63,7 +76,7 @@ const FPS_SCALE: Record<ShareFps, number> = { 15: 0.6, 30: 1, 60: 1.65 };
 /** The bitrate cap for a share, which the SFU meter also charges it at. */
 export function shareBitrate(res: ShareResolution, fps: ShareFps): number {
   const q = shareQuality(res, fps);
-  return Math.min(MAX_SHARE_BPS, Math.max(MIN_SHARE_BPS, Math.round(BPS_AT_30[q.res] * FPS_SCALE[q.fps])));
+  return Math.min(AUTO_MAX_BPS, Math.max(MIN_SHARE_BPS, Math.round(BPS_AT_30[q.res] * FPS_SCALE[q.fps])));
 }
 
 /**
@@ -92,7 +105,7 @@ export const PERFORMANCE_PLAN: SharePlan = { res: "1080p", fps: 60, bitrate: 6_0
  * the most a share may use. When the link is short it gives up frames, never
  * detail.
  */
-export const QUALITY_PLAN: SharePlan = { res: "source", fps: 60, bitrate: MAX_SHARE_BPS, smooth: false };
+export const QUALITY_PLAN: SharePlan = { res: "source", fps: 60, bitrate: AUTO_MAX_BPS, smooth: false };
 
 const SHARE_MODES: readonly string[] = ["performance", "quality", "custom"];
 
@@ -102,11 +115,17 @@ export function customShareBitrate(bps: unknown): number | null {
 }
 
 /** What a share is sent as, from the account's voice settings. */
-export function sharePlan(v: { shareMode?: unknown; shareResolution?: unknown; shareFps?: unknown; shareBitrate?: unknown; shareKeep?: unknown }): SharePlan {
-  if (v.shareMode === "quality") return QUALITY_PLAN;
-  if (v.shareMode !== "custom") return PERFORMANCE_PLAN;
+/**
+ * What a share is sent as, from the account's voice settings, within what its
+ * plan allows: Quality without a plan shares as Performance, and no mode sends
+ * more than the plan's most (Quality sends exactly that).
+ */
+export function sharePlan(v: { shareMode?: unknown; shareResolution?: unknown; shareFps?: unknown; shareBitrate?: unknown; shareKeep?: unknown }, allow: ShareAllowance = OPEN_SHARE): SharePlan {
+  const cap = (bps: number) => Math.min(bps, allow.maxBps);
+  if (v.shareMode === "quality" && allow.quality) return { ...QUALITY_PLAN, bitrate: allow.maxBps };
+  if (v.shareMode !== "custom") return { ...PERFORMANCE_PLAN, bitrate: cap(PERFORMANCE_PLAN.bitrate) };
   const q = shareQuality(v.shareResolution, v.shareFps);
-  return { res: q.res, fps: q.fps, bitrate: customShareBitrate(v.shareBitrate) ?? shareBitrate(q.res, q.fps), smooth: v.shareKeep === "smooth" };
+  return { res: q.res, fps: q.fps, bitrate: cap(customShareBitrate(v.shareBitrate) ?? shareBitrate(q.res, q.fps)), smooth: v.shareKeep === "smooth" };
 }
 
 /**

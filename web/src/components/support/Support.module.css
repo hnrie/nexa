@@ -1,0 +1,115 @@
+/* The Support page (SupportPage.tsx): a lit statement, then one table of what
+   each plan changes, each plan in its own light (--tier-* in tokens.css), and
+   the limits drawn as gauges on one scale so the difference reads at a glance. */
+
+.page { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.header { flex: none; height: var(--header-h); display: flex; align-items: center; gap: 10px; padding-inline: 16px 12px; border-bottom: 1px solid var(--border-subtle); }
+.headerIcon { color: var(--tier-supporter); flex: none; }
+.headerName { font-size: 16px; font-weight: 600; color: var(--text-strong); }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+.panel { --gap: 22px; max-width: 920px; margin: 0 auto; padding: 36px 32px 48px; display: flex; flex-direction: column; gap: var(--gap); }
+.panel[data-in-settings] { padding: 0; max-width: none; }
+@media (max-width: 767px) { .panel { padding: 22px 16px 32px; --gap: 18px; } }
+
+/* --- the statement ------------------------------------------------------- */
+.hero { position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: 16px; row-gap: 6px; align-items: center; padding: 26px 28px; border-radius: var(--radius-lg); background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--tier-supporter) 16%, transparent), transparent 60%), radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, var(--tier-pro) 18%, transparent), transparent 62%), var(--sheen), var(--bg-raised); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium); }
+.heart { grid-row: span 2; width: 52px; height: 52px; border-radius: 18px; display: grid; place-items: center; color: #fff; background: linear-gradient(160deg, color-mix(in oklab, var(--tier-supporter), #fff 14%), var(--tier-supporter) 55%, color-mix(in oklab, var(--tier-supporter), var(--tier-pro) 45%)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 14px 30px -12px var(--tier-supporter); }
+.title { margin: 0; font-family: var(--font-display); font-size: 28px; line-height: 1.15; font-weight: 700; letter-spacing: -0.014em; color: var(--text-strong); text-wrap: balance; }
+.lede { margin: 0; max-width: 60ch; font-size: 16px; line-height: 1.5; color: var(--text-subtle); }
+.standing { grid-column: 1 / -1; margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 14px; color: var(--text-muted); }
+.standing > button { margin-inline-start: auto; }
+.notice { grid-column: 1 / -1; margin: 6px 0 0; font-size: 14px; color: var(--text); }
+@media (max-width: 767px) {
+  .hero { padding: 20px 18px; grid-template-columns: 1fr; }
+  .heart { grid-row: auto; width: 44px; height: 44px; border-radius: 15px; }
+  .title { font-size: 23px; }
+  .standing > button { margin-inline-start: 0; }
+}
+
+/* --- by the month or the year -------------------------------------------- */
+.period { align-self: center; display: inline-flex; padding: 4px; gap: 2px; border-radius: 999px; background: var(--bg-input); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.periodBtn { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text-muted); transition: background var(--transition), color var(--transition); }
+.periodBtn:hover { color: var(--text); }
+.periodBtn[aria-checked="true"] { color: var(--text-strong); background: var(--bg-surface); box-shadow: var(--lift-low); }
+.save { font-size: 12px; font-weight: 600; color: var(--text-supporter); }
+
+/* --- one plan at a time on a phone --------------------------------------- */
+.picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pick { height: 40px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; color: var(--text-muted); background: var(--bg-raised); box-shadow: 0 0 0 1px var(--panel-edge); }
+.pick[aria-selected="true"] { color: var(--text-strong); box-shadow: inset 0 -2px 0 var(--tint, var(--text-muted)), 0 0 0 1px var(--panel-edge); background: color-mix(in srgb, var(--tint, transparent) 10%, var(--bg-raised)); }
+
+/* every plan's light, for whatever wears it */
+[data-plan="supporter"] { --tint: var(--tier-supporter); --tint-text: var(--text-supporter); }
+[data-plan="pro"] { --tint: var(--tier-pro); --tint-text: var(--text-pro); }
+[data-plan="free"] { --tint: var(--text-muted); --tint-text: var(--text-subtle); }
+
+/* --- the table ----------------------------------------------------------- */
+.table { display: grid; grid-template-columns: minmax(130px, 0.9fr) repeat(var(--cols), minmax(0, 1fr)); border-radius: var(--radius-lg); background: var(--sheen), var(--bg-raised); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-low); overflow: hidden; }
+.row { display: contents; }
+.head, .cell, .foot, .label, .corner { padding: 14px 18px; }
+.head { display: flex; flex-direction: column; gap: 2px; padding-top: 20px; border-top: 3px solid var(--tint); background: linear-gradient(180deg, color-mix(in srgb, var(--tint) 10%, transparent), transparent); }
+.head[data-plan="free"] { border-top-color: transparent; background: none; }
+.planName { font-family: var(--font-display); font-size: 19px; font-weight: 700; color: var(--tint-text); }
+.head[data-plan="free"] .planName { color: var(--text-strong); }
+.price { font-size: 14px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.label { font-size: 14px; font-weight: 600; color: var(--text-subtle); border-top: 1px solid var(--border-subtle); display: flex; align-items: center; }
+.cell { border-top: 1px solid var(--border-subtle); display: flex; align-items: center; min-width: 0; }
+.cell[data-plan="supporter"], .cell[data-plan="pro"], .foot[data-plan="supporter"], .foot[data-plan="pro"] { background: color-mix(in srgb, var(--tint) 4%, transparent); }
+.value { display: flex; flex-direction: column; gap: 6px; min-width: 0; inline-size: 100%; }
+.value b { font-size: 15px; font-weight: 650; color: var(--text-strong); }
+.value small { font-size: 12px; line-height: 1.35; color: var(--text-muted); }
+.none { color: var(--text-placeholder); }
+.foot { border-top: 1px solid var(--border-subtle); display: flex; align-items: center; }
+.current { font-size: 13px; font-weight: 600; color: var(--tint-text); }
+.buy[data-plan="supporter"] { background: linear-gradient(180deg, color-mix(in oklab, var(--tier-supporter), #fff 12%), var(--tier-supporter)); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 8px 20px -10px var(--tier-supporter); }
+@media (max-width: 767px) {
+  .table { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+  .head, .cell, .foot, .label, .corner { padding: 12px 14px; }
+}
+
+/* how much each plan holds, on one scale for the row */
+.gauge { display: block; inline-size: 100%; max-inline-size: 150px; block-size: 6px; border-radius: 999px; background: color-mix(in srgb, var(--text-strong) 8%, transparent); overflow: hidden; }
+.gauge i { display: block; block-size: 100%; border-radius: inherit; background: var(--tint); box-shadow: 0 0 10px -1px var(--tint); }
+.cell[data-plan="free"] .gauge i { box-shadow: none; }
+
+.free { margin: -6px 0 0; font-size: 14px; line-height: 1.5; color: var(--text-muted); text-align: center; text-wrap: balance; }
+
+/* --- the account's own ---------------------------------------------------- */
+.mine { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; border-radius: var(--radius-md); background: var(--bg-raised); box-shadow: 0 0 0 1px var(--panel-edge); }
+.meterHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.h2 { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--text-strong); }
+.meterText { font-size: 14px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.meter { display: block; block-size: 8px; border-radius: 999px; background: color-mix(in srgb, var(--text-strong) 8%, transparent); overflow: hidden; }
+.meter i { display: block; block-size: 100%; border-radius: inherit; background: var(--grad-brand); }
+.meter i[data-full] { background: var(--danger); }
+.hint { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-muted); }
+.linkish { color: var(--link); font: inherit; }
+.linkish:hover { text-decoration: underline; }
+
+.boosts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.boosts:empty { display: none; }
+.boost { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--bg-surface); }
+.boostIcon { inline-size: 32px; block-size: 32px; border-radius: 10px; flex: none; display: grid; place-items: center; overflow: hidden; color: var(--text-pro); background: color-mix(in srgb, var(--tier-pro) 18%, transparent); }
+.boostIcon img { inline-size: 100%; block-size: 100%; object-fit: cover; }
+.boostName { flex: 1; min-width: 0; font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unboost { inline-size: 32px; block-size: 32px; border-radius: 8px; display: grid; place-items: center; color: var(--icon); }
+.unboost:hover { background: var(--bg-hover); color: var(--text-strong); }
+.boostAdd { display: flex; gap: 8px; align-items: center; }
+.boostAdd > :first-child { flex: 1; min-width: 0; }
+
+/* --- gifts: one person, a plan and how long, paid once ------------------ */
+.giftHead { display: flex; gap: 12px; align-items: flex-start; }
+.giftHead .h2 { margin-bottom: 2px; }
+.giftIcon { inline-size: 32px; block-size: 32px; flex: none; border-radius: 10px; display: grid; place-items: center; color: var(--text-supporter); background: color-mix(in srgb, var(--tier-supporter) 16%, transparent); }
+.giftTo { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--bg-surface); }
+.names { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.people { display: flex; flex-wrap: wrap; gap: 6px; }
+.person { display: inline-flex; align-items: center; gap: 8px; max-inline-size: 100%; padding: 4px 12px 4px 4px; border-radius: 999px; background: var(--bg-surface); box-shadow: 0 0 0 1px var(--border-subtle); font-size: 14px; }
+.person:hover { background: var(--bg-hover); }
+.giftChoices { display: flex; flex-wrap: wrap; gap: 10px; }
+.giftChoices .period { align-self: auto; }
+.gift .periodBtn[data-plan][aria-checked="true"] { color: var(--tint-text); }
+.gift > .buy { align-self: flex-start; }
+.giftChoices .periodBtn { white-space: nowrap; }
+@media (max-width: 767px) { .gift > .buy { align-self: stretch; } .giftChoices { flex-direction: column; } .giftChoices .periodBtn { flex: 1; justify-content: center; } }

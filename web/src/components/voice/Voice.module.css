@@ -257,6 +257,8 @@
 .modeOption { position: relative; min-width: 0; min-height: 40px; padding: 0 8px; border-radius: calc(var(--radius-lg) - 4px); font-size: 14.5px; font-weight: 650; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 160ms var(--ease-out); }
 .modeOption:hover { color: var(--text-strong); }
 .modeOption[data-on="true"] { color: var(--on-brand); }
+/* Quality without a plan: a lock in the Supporter rose, the offer one click away */
+.modeLock { margin-inline-start: 5px; vertical-align: -1px; color: var(--text-supporter); }
 .modeOption:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .modeAbout { margin: 0; min-height: 2.8em; font-size: 13.5px; line-height: 1.4; color: var(--text); }
 /* Custom unfolds under the switch, in answer to choosing it */

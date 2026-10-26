@@ -66,6 +66,7 @@ import fish.nexa.ui.components.NxTextField
 import fish.nexa.ui.components.NxToggle
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
+import fish.nexa.ui.layers.Layers
 import fish.nexa.ui.layers.MenuItem
 import fish.nexa.ui.layers.openMenu
 import fish.nexa.ui.layers.openSheet
@@ -370,7 +371,7 @@ private fun modeName(m: String): String = t(
  * moves (ShareScreenModal.tsx ModeSwitch).
  */
 @Composable
-private fun ModeSwitch(value: String, onChange: (String) -> Unit) {
+private fun ModeSwitch(value: String, onChange: (String) -> Unit, locked: Boolean = false) {
     val c = Nx.colors
     val at = VideoCap.MODES.indexOf(value).coerceAtLeast(0)
     val pos by animateFloatAsState(at.toFloat(), if (Nx.motion.reduced) snap() else tween(240, easing = Nx.motion.easeOut), label = "share-mode")
@@ -405,7 +406,11 @@ private fun ModeSwitch(value: String, onChange: (String) -> Unit) {
                         .semantics { selected = on },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Txt(modeName(m), style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(650)), color = if (on) c.onBrand else c.textMuted, maxLines = 1)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Txt(modeName(m), style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(650)), color = if (on) c.onBrand else c.textMuted, maxLines = 1)
+                        // Quality comes with a plan
+                        if (locked && m == "quality") Icon("Lock", c.textMuted, size = 12.dp, label = t("support.locked"))
+                    }
                 }
             }
         }
@@ -425,12 +430,14 @@ fun openShareScreen() {
     }) {
         val c = Nx.colors
         val savedFps = Voice.settingInt("shareFps", 30)
-        var mode by remember { mutableStateOf(VideoCap.shareMode(Voice.setting("shareMode"), Voice.setting("shareResolution"), savedFps)) }
+        val allow = fish.nexa.data.Plans.shareAllowance()
+        // Quality is for plans: without one, a saved Quality opens as Performance
+        var mode by remember { mutableStateOf(VideoCap.shareMode(Voice.setting("shareMode"), Voice.setting("shareResolution"), savedFps).let { if (it == "quality" && !allow.quality) "performance" else it }) }
         var res by remember { mutableStateOf(Voice.setting("shareResolution")?.takeIf { it in VideoCap.RESOLUTIONS } ?: "1080p") }
         var fps by remember { mutableIntStateOf(savedFps.takeIf { it in VideoCap.FRAME_RATES } ?: 30) }
         var bitrate by remember { mutableStateOf(VideoCap.customBitrate((Voice.settings["shareBitrate"] as? JsonPrimitive)?.doubleOrNull)) }
         var keep by remember { mutableStateOf(VideoCap.shareKeep(Voice.setting("shareKeep"), savedFps)) }
-        val plan = VideoCap.sharePlan(mode, res, fps, bitrate?.toDouble(), keep)
+        val plan = VideoCap.sharePlan(mode, res, fps, bitrate?.toDouble(), keep, allow)
         LaunchedEffect(mode, res, fps, bitrate, keep) {
             ShareChoice.mode = mode
             ShareChoice.res = res
@@ -439,7 +446,12 @@ fun openShareScreen() {
             ShareChoice.keep = keep
         }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            ModeSwitch(mode) { mode = it }
+            ModeSwitch(mode, {
+                if (it == "quality" && !allow.quality) {
+                    Layers.close("share-screen")
+                    fish.nexa.data.Plans.offer(fish.nexa.data.Plans.Offer.Share)
+                } else mode = it
+            }, locked = !allow.quality)
             // Custom's own rows say what it is
             if (mode != "custom") {
                 Txt(
@@ -467,8 +479,8 @@ fun openShareScreen() {
                     }
                     NxSlider(
                         plan.bitrate / 1_000_000f,
-                        { mb -> bitrate = ((mb * 2).roundToInt() / 2.0 * 1_000_000).toInt().coerceIn(VideoCap.MIN_SHARE_BPS, VideoCap.MAX_SHARE_BPS) },
-                        VideoCap.MIN_SHARE_BPS / 1_000_000f..VideoCap.MAX_SHARE_BPS / 1_000_000f,
+                        { mb -> bitrate = ((mb * 2).roundToInt() / 2.0 * 1_000_000).toInt().coerceIn(VideoCap.MIN_SHARE_BPS, allow.maxBps) },
+                        VideoCap.MIN_SHARE_BPS / 1_000_000f..allow.maxBps / 1_000_000f,
                         label = t("voice.shareScreen.bitrateLimit"),
                     )
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -521,7 +533,7 @@ private object ShareChoice {
     var keep = "sharp"
 
     fun goLive() {
-        val plan = VideoCap.sharePlan(mode, res, fps, bitrate?.toDouble(), keep)
+        val plan = VideoCap.sharePlan(mode, res, fps, bitrate?.toDouble(), keep, fish.nexa.data.Plans.shareAllowance())
         val savedBitrate = VideoCap.customBitrate((Voice.settings["shareBitrate"] as? JsonPrimitive)?.doubleOrNull)
         val changed = Voice.setting("shareMode") != mode || Voice.setting("shareResolution") != res || Voice.settingInt("shareFps", 30) != fps ||
             savedBitrate != bitrate || Voice.setting("shareKeep") != keep

@@ -14,8 +14,9 @@ export interface UploadSession {
  * connection costs one piece rather than the whole upload.
  */
 export const uploads = {
-  create(size: number): Promise<UploadSession> {
-    return api.request<UploadSession>("POST", "/uploads", { size });
+  /** `channelId` is where the file goes, when it is a channel: a boosted server takes bigger files. */
+  create(size: number, channelId?: Snowflake): Promise<UploadSession> {
+    return api.request<UploadSession>("POST", "/uploads", channelId ? { size, channel_id: channelId } : { size });
   },
   status(id: Snowflake): Promise<UploadSession> {
     return api.request<UploadSession>("GET", `/uploads/${id}`);

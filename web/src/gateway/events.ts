@@ -68,6 +68,8 @@ export type GatewayEvent =
   | { t: "role_delete"; d: { id: Snowflake; server_id: Snowflake } }
   | { t: "presence"; d: Presence }
   | { t: "user_update"; d: PublicUser }
+  /** This account's subscription or boosts changed (api/billing.go); read them again. */
+  | { t: "billing_update"; d: Record<string, never> }
   | { t: "relationship_add"; d: Relationship }
   | { t: "relationship_remove"; d: { user_id: Snowflake } }
   | { t: "read_state"; d: ReadState }

@@ -199,7 +199,8 @@ describe("uploadStaged", () => {
       const progress: number[] = [];
       const { meta, blob_id } = await uploadStaged("c1", staged(data), (p) => progress.push(p), send);
       expect(blob_id).toBe("b1");
-      expect(uploads.create).toHaveBeenCalledWith(total);
+      // the channel goes with it, for a boosted server's bigger limit
+      expect(uploads.create).toHaveBeenCalledWith(total, "c1");
       expect(server.jobs.map((j) => [j.first, j.count])).toEqual(Array.from({ length: 5 }, (_, i) => [i, 1]));
       expect(server.jobs.map((j) => j.headers?.["Upload-Offset"])).toEqual(Array.from({ length: 5 }, (_, i) => String(i === 0 ? 0 : HEADER_LEN + i * FRAME_LEN)));
       expect(await same(server.stored(), meta.key, data)).toBe(true);

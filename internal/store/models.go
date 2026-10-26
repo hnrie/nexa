@@ -91,6 +91,9 @@ type User struct {
 	TagText     string  `json:"-"`
 	TagBadge    string  `json:"-"`
 	TagColor    *int    `json:"-"`
+	// Plan is the subscription the account has now: "" (free), "supporter"
+	// or "pro" (api/billing.go). Public, as the badge it wears.
+	Plan string `json:"-"`
 
 	AuthHash              string `json:"-"`
 	KDFSalt               []byte `json:"-"`
@@ -127,6 +130,7 @@ type PublicUser struct {
 	TypingStyle     json.RawMessage `json:"typing_style"`
 	NameStyle       json.RawMessage `json:"name_style"`
 	ServerTag       *WornTag        `json:"server_tag"`
+	Plan            string          `json:"plan"`
 }
 
 // WornTag is the server tag someone wears, as everyone sees it beside their name.
@@ -141,12 +145,12 @@ type WornTag struct {
 func (u *User) Public() PublicUser {
 	p := PublicUser{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, AvatarID: u.AvatarID, BannerID: u.BannerID,
 		AboutMe: u.AboutMe, Pronouns: u.Pronouns, AccentColor: u.AccentColor, AccentColor2: u.AccentColor2, StatusText: u.StatusText, StatusEmoji: u.StatusEmoji,
-		StatusExpiresAt: u.StatusExpiresAt, PublicKey: u.PublicKey, Flags: u.Flags & publicFlags, GroupLinkOnly: u.GroupLinkOnly, CreatedAt: u.CreatedAt}
+		StatusExpiresAt: u.StatusExpiresAt, PublicKey: u.PublicKey, Flags: u.Flags & publicFlags, GroupLinkOnly: u.GroupLinkOnly, CreatedAt: u.CreatedAt, Plan: u.Plan}
 	if u.TypingStyle != "" {
 		p.TypingStyle = json.RawMessage(u.TypingStyle)
 	}
 	if u.NameStyle != "" {
-		p.NameStyle = json.RawMessage(u.NameStyle)
+		p.NameStyle = json.RawMessage(styleForPlan(u.NameStyle, u.Plan))
 	}
 	p.ServerTag = u.WornTag()
 	return p
@@ -369,6 +373,9 @@ type Server struct {
 	// AutomodAt is when the AutoMod rules members' apps apply last changed,
 	// or 0 when there are none: apps fetch them only where there are some.
 	AutomodAt int64 `json:"automod_at"`
+	// Boosts is how many Pro accounts boost the server (api/billing.go);
+	// one or more lets every member send bigger files there.
+	Boosts int `json:"boosts"`
 }
 
 // ServerPatch is an optional set of server changes.
@@ -575,6 +582,9 @@ const (
 	// MsgFlagComponentsV2 is a webhook message laid out entirely by its
 	// components: it has no content or embeds of its own.
 	MsgFlagComponentsV2 int64 = 1 << 15
+	// MsgFlagForwarded is a message forwarded from another (Discord's
+	// HAS_SNAPSHOT bit): its files are the original's own, not uploaded again.
+	MsgFlagForwarded int64 = 1 << 14
 	// MsgFlagPublished is a post of an announcement channel that has been
 	// published to the channels following it (Nexa's own bit).
 	MsgFlagPublished int64 = 1 << 20
