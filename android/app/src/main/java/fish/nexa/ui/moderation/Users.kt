@@ -49,6 +49,9 @@ import fish.nexa.Nexa
 import fish.nexa.data.ModEvent
 import fish.nexa.data.ModUser
 import fish.nexa.data.Moderation
+import fish.nexa.data.StaffRank
+import fish.nexa.data.StaffRanks
+import fish.nexa.data.atLeast
 import fish.nexa.ui.Time
 import fish.nexa.ui.components.Avatar
 import fish.nexa.ui.components.ButtonKind
@@ -236,8 +239,9 @@ fun UsersTab() {
     if (picking && picked.isNotEmpty()) BulkBar(
         picked.toList(), bulkBusy, Modifier.align(Alignment.BottomCenter),
         onClear = { picked.clear() },
-        onEnable = { bulkAccess(false) },
-        onDisable = { confirm(t("moderation.bulk.disableTitle", "count" to picked.size), t("moderation.menu.disableBody"), t("moderation.menu.disable")) { bulkAccess(true) } },
+        // disabling sign-in takes a developer
+        onEnable = if (StaffRanks.mine().atLeast(StaffRank.DEVELOPER)) ({ bulkAccess(false) }) else null,
+        onDisable = if (!StaffRanks.mine().atLeast(StaffRank.DEVELOPER)) null else ({ confirm(t("moderation.bulk.disableTitle", "count" to picked.size), t("moderation.menu.disableBody"), t("moderation.menu.disable")) { bulkAccess(true) } }),
         onModerate = {
             val list = picked.toList()
             openModerate(list.first(), null, bulk = list) { cs ->
@@ -252,7 +256,7 @@ fun UsersTab() {
 /** `.bulkBar`: what to do with the picked accounts, floating over the foot of the grid. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun BulkBar(picked: List<ModUser>, busy: Boolean, modifier: Modifier, onClear: () -> Unit, onEnable: () -> Unit, onDisable: () -> Unit, onModerate: () -> Unit) {
+private fun BulkBar(picked: List<ModUser>, busy: Boolean, modifier: Modifier, onClear: () -> Unit, onEnable: (() -> Unit)?, onDisable: (() -> Unit)?, onModerate: () -> Unit) {
     val c = Nx.colors
     val shape = Radii.Xl
     Column(
@@ -275,14 +279,14 @@ private fun BulkBar(picked: List<ModUser>, busy: Boolean, modifier: Modifier, on
             NxButton(t("moderation.bulk.clear"), onClear, kind = ButtonKind.GHOST, size = ButtonSize.SM, icon = "X")
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            NxButton(t("moderation.menu.enable"), onEnable, kind = ButtonKind.SECONDARY, size = ButtonSize.TOUCH, icon = "UserRoundCheck", loading = busy)
-            NxButton(t("moderation.menu.disable"), onDisable, kind = ButtonKind.SECONDARY, size = ButtonSize.TOUCH, icon = "UserRoundX", loading = busy)
+            if (onEnable != null) NxButton(t("moderation.menu.enable"), onEnable, kind = ButtonKind.SECONDARY, size = ButtonSize.TOUCH, icon = "UserRoundCheck", loading = busy)
+            if (onDisable != null) NxButton(t("moderation.menu.disable"), onDisable, kind = ButtonKind.SECONDARY, size = ButtonSize.TOUCH, icon = "UserRoundX", loading = busy)
             NxButton(t("moderation.moderate"), onModerate, icon = "Gavel", size = ButtonSize.TOUCH)
         }
     }
 }
 
-/** The ⋯ menu of an account: its profile, its id, and (for another member) staff access and signing in. */
+/** The ⋯ menu of an account: its profile, its id, and (for another member) its rank and signing in, as far as the viewer's rank reaches. */
 fun userMenu(u: ModUser, onChanged: () -> Unit) {
     val owner = Moderation.ownerId.value == u.id
     val items = ArrayList<MenuItem>()
@@ -290,30 +294,21 @@ fun userMenu(u: ModUser, onChanged: () -> Unit) {
     items += MenuItem.Action(t("moderation.menu.copyId")) { copyText(u.id) }
     items += copyBotIdItem(u.id, separatorAfter = true)
     if (u.blocked != "self" && !owner) {
-        val admin = u.isStaff
+        val mine = StaffRanks.mine()
         val disabled = u.isDisabled
-        fun set(adminTo: Boolean? = null, disabledTo: Boolean? = null) = Nexa.scope.launch {
+        fun set(disabledTo: Boolean) = Nexa.scope.launch {
             try {
-                Moderation.access(u.id, adminTo, disabledTo)
+                Moderation.access(u.id, disabled = disabledTo)
                 onChanged()
                 Nexa.ui.toast(t("moderation.accessChanged"), "success")
             } catch (e: Exception) {
                 Nexa.ui.toast(describeError(e, t("moderation.failed")), "error")
             }
         }
-        items += MenuItem.Action(if (admin) t("moderation.menu.removeAdmin") else t("moderation.menu.makeAdmin")) {
-            confirm(
-                if (admin) t("moderation.menu.removeAdminTitle", "name" to u.displayName) else t("moderation.menu.makeAdminTitle", "name" to u.displayName),
-                if (admin) t("moderation.menu.removeAdminBody") else t("moderation.menu.makeAdminBody"),
-                if (admin) t("moderation.menu.removeAdmin") else t("moderation.menu.makeAdmin"),
-                danger = admin,
-            ) {
-                Moderation.access(u.id, admin = !admin)
-                onChanged()
-                Nexa.ui.toast(t("moderation.accessChanged"), "success")
-            }
-        }
-        items += MenuItem.Action(if (disabled) t("moderation.menu.enable") else t("moderation.menu.disable"), danger = !disabled) {
+        // only the owner gives and takes ranks
+        if (mine == StaffRank.OWNER) items += MenuItem.Action(t("staff.rankModal.menu")) { openRankSheet(u, onChanged) }
+        // disabling sign-in takes a developer, and the owner for staff
+        if (mine.atLeast(if (u.isStaff) StaffRank.OWNER else StaffRank.DEVELOPER)) items += MenuItem.Action(if (disabled) t("moderation.menu.enable") else t("moderation.menu.disable"), danger = !disabled) {
             if (disabled) set(disabledTo = false)
             else confirm(t("moderation.menu.disableTitle", "name" to u.displayName), t("moderation.menu.disableBody"), t("moderation.menu.disable")) {
                 Moderation.access(u.id, disabled = true)

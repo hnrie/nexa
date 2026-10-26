@@ -184,11 +184,8 @@ private fun PlainMembers(serverId: String) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(600)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                        when {
-                            st.server.ownerId == m.userId && NexaOwner.isOwner(m.userId) -> Icon("Crown", c.textBrand, size = 14.dp, label = t("profile.profileCard.owner"))
-                            st.server.ownerId == m.userId -> Icon("Crown", c.warning, size = 14.dp, label = t("server.members.owner"))
-                            (users[m.userId]?.flags ?: 0L) and AccountFlags.ADMIN != 0L -> Icon("Hammer", c.textBrand, size = 14.dp, label = t("profile.profileCard.admin"))
-                        }
+                        if (st.server.ownerId == m.userId && !NexaOwner.isOwner(m.userId)) Icon("Crown", c.warning, size = 14.dp, label = t("server.members.owner"))
+                        fish.nexa.ui.shell.OwnerMarks(m.userId)
                         if (timedOut) Icon("Clock", c.danger, size = 14.dp, label = t("server.members.timedOut"))
                     }
                     Txt("@$username · " + t("server.members.joinedOn", "when" to Time.dateDivider(m.joinedAt)), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)

@@ -3,10 +3,9 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
-import { AdminHammer, OwnerCrown } from "@/components/common/OwnerBadge";
+import { RankMark } from "@/components/common/OwnerBadge";
 import { menuPoint } from "@/components/sidebar/ServerSidebar";
 import { isOwner } from "@/lib/owner";
-import { isInstanceAdmin } from "@/stores/servers";
 import { StatusLine } from "@/components/activity/StatusLine";
 import { friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
@@ -103,8 +102,8 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
             <span className={s.text}>
               <span className={s.name}>
                 <span className={s.nameText}>{row.name}</span>
-                {isOwner(row.id) ? <OwnerCrown /> : channel.owner_id === row.id ? <Crown size={14} className={s.crown} aria-label={t("chat.groupMemberList.groupOwner")} /> : null}
-                {!isOwner(row.id) && isInstanceAdmin(row.id) ? <AdminHammer /> : null}
+                {!isOwner(row.id) && channel.owner_id === row.id ? <Crown size={14} className={s.crown} aria-label={t("chat.groupMemberList.groupOwner")} /> : null}
+                <RankMark userId={row.id} />
                 <BotTag userId={row.id} />
                 <UserTag userId={row.id} size="sm" />
               </span>

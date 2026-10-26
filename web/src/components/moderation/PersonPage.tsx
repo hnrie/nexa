@@ -1,11 +1,12 @@
-import { ChevronLeft, FolderOpen, Gavel, IdCard, UserRound } from "lucide-react";
+import { ChevronLeft, FolderOpen, Gavel, IdCard, ShieldCheck, UserRound } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { moderation as modApi, type ModAction, type ModMembership, type ModUser, type People, type StaffCase, type ModPack } from "@/api/moderation";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
-import { FLAG_ADMIN, FLAG_DELETED, relativeTo } from "@/lib/moderation";
+import { FLAG_DELETED, relativeTo } from "@/lib/moderation";
+import { atLeast, rankOf, useMyRank } from "@/lib/staffRank";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { usePresence } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
@@ -13,7 +14,8 @@ import { t } from "@/i18n";
 import { CaseList, StaffCasePane } from "./CaseWorkspace";
 import { AltAccountsModal, AltBadge } from "./AltAccounts";
 import { ModerateModal, type ModeratePreset } from "./ModerateModal";
-import { modStatus, StatusSummary } from "./ModStatus";
+import { modStatus, RankPill, StatusSummary } from "./ModStatus";
+import { RankModal } from "./RankModal";
 import { ProfileSheet } from "./ProfileSheet";
 import m from "./Moderation.module.css";
 
@@ -42,6 +44,8 @@ export function PersonPage() {
   const [failed, setFailed] = useState(false);
   const [moderating, setModerating] = useState<ModerateIntent | null>(null);
   const [altsOpen, setAltsOpen] = useState(false);
+  const [ranking, setRanking] = useState(false);
+  const mine = useMyRank();
   const live = usePresence((p) => p.byUser[userId]);
   // the cases tab is open on its own address, so a case can be linked to
   const loc = useLocation();
@@ -111,6 +115,7 @@ export function PersonPage() {
     );
   }
   const deleted = (user.admin_flags & FLAG_DELETED) !== 0;
+  const rank = rankOf(user.id, user.admin_flags, ownerId ?? undefined);
   const st = modStatus(user, live);
   const base = `/channels/@admin/users/${userId}`;
   const awaiting = cases.filter((c) => c.status === "open" && c.awaiting === "staff").length;
@@ -125,8 +130,8 @@ export function PersonPage() {
           <div className={m.userNames}>
             <span className={m.userName}>
               <span>{deleted ? t("nexa.deletedUser") : user.display_name}</span>
-              <AltBadge user={user} onOpen={() => setAltsOpen(true)} />
-              {user.id === ownerId ? <span className={m.staffBadge}>{t("profile.profileCard.owner")}</span> : (user.admin_flags & FLAG_ADMIN) !== 0 ? <span className={m.staffBadge}>{t("moderation.staff")}</span> : null}
+              {atLeast(mine, "admin") ? <AltBadge user={user} onOpen={() => setAltsOpen(true)} /> : null}
+              {rank ? <RankPill rank={rank} /> : null}
             </span>
             <span className={m.userSub}>
               {deleted ? t("moderation.user.deleted") : `@${user.username}`} · {t("moderation.casesCount", { count: cases.length })}
@@ -139,6 +144,12 @@ export function PersonPage() {
           {!deleted ? (
             <Button size="sm" variant="ghost" onClick={() => openModal("profile", { userId: user.id })}>
               <UserRound size={15} aria-hidden="true" /> {t("moderation.menu.profile")}
+            </Button>
+          ) : null}
+          {/* the owner gives and takes ranks, from here as from the grid's menu */}
+          {mine === "owner" && user.blocked !== "self" && user.blocked !== "owner" && !deleted ? (
+            <Button size="sm" variant="secondary" onClick={() => setRanking(true)} data-testid="user-rank">
+              <ShieldCheck size={15} aria-hidden="true" /> {t("staff.rankModal.menu")}
             </Button>
           ) : null}
           {!user.blocked && !deleted ? (
@@ -187,6 +198,7 @@ export function PersonPage() {
           </div>
         </div>
       )}
+      {ranking ? <RankModal user={user} current={rank} onClose={() => setRanking(false)} onDone={() => void load()} /> : null}
       {altsOpen ? <AltAccountsModal user={user} onClose={() => setAltsOpen(false)} /> : null}
       {moderating ? (
         <ModerateModal

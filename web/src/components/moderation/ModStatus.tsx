@@ -5,6 +5,7 @@ import { ActivityIcon } from "@/components/activity/StatusLine";
 import { statusLabel } from "@/components/common/Avatar";
 import { activityLine, isSpotify } from "@/lib/activity";
 import { activitiesOf, customStatus } from "@/stores/presence";
+import { RANK_ICON, rankName, type StaffRank } from "@/lib/staffRank";
 import m from "./Moderation.module.css";
 
 export type ModStatus = { status: "online" | "idle" | "dnd" | "offline"; custom: { text: string; emoji: string } | null; activities: Activity[] };
@@ -48,5 +49,16 @@ export function StatusSummary({ st, compact = false }: { st: ModStatus; compact?
         </span>
       ) : null}
     </div>
+  );
+}
+
+/** Someone's staff rank as the panel shows it beside their name. */
+export function RankPill({ rank }: { rank: StaffRank }) {
+  const Icon = RANK_ICON[rank];
+  return (
+    <span className={m.staffBadge} data-rank={rank}>
+      <Icon size={12} aria-hidden="true" />
+      {rankName(rank)}
+    </span>
   );
 }

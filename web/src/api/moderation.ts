@@ -513,8 +513,8 @@ export const moderation = {
   retract(id: Snowflake): Promise<void> {
     return api.request("DELETE", `/moderation/announcements/${id}`);
   },
-  /** Grants or takes away admin access, or disables or restores sign-in, with an optional reason for the log. */
-  access(id: Snowflake, body: { admin?: boolean; disabled?: boolean; reason?: string }): Promise<{ flags: number }> {
+  /** Gives or takes a staff rank ("" for none; the owner alone), or disables or restores sign-in, with an optional reason for the log. */
+  access(id: Snowflake, body: { rank?: "developer" | "admin" | "mod" | ""; disabled?: boolean; reason?: string }): Promise<{ flags: number }> {
     return api.request("PATCH", `/admin/users/${id}`, body);
   },
 };

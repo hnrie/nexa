@@ -62,7 +62,7 @@ func TestEveryEventSentIsNamedHere(t *testing.T) {
 	// the argument that names the event, by method — the hub's, and the api
 	// package's helpers that pass one through
 	eventArg := map[string]int{"EmitUsers": 1, "EmitChannel": 1, "emitUsersExcept": 2, "EmitAll": 0, "EmitConn": 2, "Send": 0,
-		"emitServer": 2, "emitServerWithPerm": 3, "emitStaff": 1, "emitConn": 2, "removeMember": 3}
+		"emitServer": 2, "emitServerWithPerm": 3, "emitStaff": 2, "emitConn": 2, "removeMember": 3}
 	var unknown []string
 	for _, f := range append(own, parse("../api")...) {
 		ast.Inspect(f, func(n ast.Node) bool {

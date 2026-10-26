@@ -1,38 +1,39 @@
-import { Crown, Gem, Hammer, Heart } from "lucide-react";
+import { Gem, Heart } from "lucide-react";
 import type { Plan } from "@/api/types";
 import { t } from "@/i18n";
+import { RANK_ICON, rankName, rankOf, rankTip, type StaffRank } from "@/lib/staffRank";
+import { useOwnerId } from "@/lib/owner";
+import { useAuth } from "@/stores/auth";
+import { useUsers } from "@/stores/users";
 import { Tooltip } from "./Tooltip";
 import s from "./OwnerBadge.module.css";
 
-/** The owner's crown: the Crown icon server owners have, in the accent rather than gold. */
-export function OwnerCrown({ size = 14 }: { size?: number }) {
-  return <Crown size={size} className={s.crown} aria-label={t("profile.profileCard.owner")} />;
+/**
+ * A member of Nexa's staff's mark: the owner's crown, a developer's code
+ * brackets, an admin's hammer, a mod's shield, all in the accent. A server
+ * owner's crown stays gold elsewhere: it is a different thing to be.
+ */
+export function StaffMark({ rank, size = 14 }: { rank: StaffRank; size?: number }) {
+  const Icon = RANK_ICON[rank];
+  return <Icon size={size} className={s.mark} role="img" aria-label={rankName(rank)} data-rank={rank} />;
 }
 
-/** The owner's badge: the crown and "Owner" on a pill in the accent, as the admin panel draws staff. */
-export function OwnerBadge() {
+/** The mark of someone's rank in a list, from what this device knows of them; nothing for anyone else. */
+export function RankMark({ userId, size = 14 }: { userId: string; size?: number }) {
+  const owner = useOwnerId();
+  const flags = useUsers((u) => u.byId[userId]?.flags);
+  const mine = useAuth((a) => (a.me?.id === userId ? a.me.flags : undefined));
+  const rank = rankOf(userId, mine ?? flags, owner);
+  return rank ? <StaffMark rank={rank} size={size} /> : null;
+}
+
+/** A member of staff's badge on a profile: the mark and the rank's name on a pill in the accent. */
+export function StaffBadge({ rank }: { rank: StaffRank }) {
   return (
-    <Tooltip text={t("profile.profileCard.ownerTip")} side="top">
-      <span className={s.badge} tabIndex={0} data-testid="owner-badge">
-        <OwnerCrown size={12} />
-        <span className={s.text}>{t("profile.profileCard.owner")}</span>
-      </span>
-    </Tooltip>
-  );
-}
-
-/** A Nexa admin's mark: a hammer, in the accent as the owner's crown is. */
-export function AdminHammer({ size = 14 }: { size?: number }) {
-  return <Hammer size={size} className={s.hammer} role="img" aria-label={t("profile.profileCard.admin")} />;
-}
-
-/** A Nexa admin's badge: the hammer and "Admin" on the same pill as the owner's. */
-export function AdminBadge() {
-  return (
-    <Tooltip text={t("profile.profileCard.adminTip")} side="top">
-      <span className={s.badge} tabIndex={0} data-testid="admin-badge">
-        <AdminHammer size={12} />
-        <span className={s.text}>{t("profile.profileCard.admin")}</span>
+    <Tooltip text={rankTip(rank)} side="top">
+      <span className={s.badge} tabIndex={0} data-testid={`${rank}-badge`}>
+        <StaffMark rank={rank} size={12} />
+        <span className={s.text}>{rankName(rank)}</span>
       </span>
     </Tooltip>
   );

@@ -123,6 +123,13 @@ func (s *Server) handleModAction(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	switch rank := s.rankOf(ctx, me); {
+	case req.Action == store.ActionDelete && rank < rankDeveloper:
+		WriteError(w, staffRankError(rankDeveloper))
+		return
+	case rank == rankMod && !s.modMayRestrict(w, r, target, req):
+		return
+	}
 	c := &store.ModCase{UserID: target.ID, ModeratorID: me.ID, Action: req.Action, Reason: reason, TargetUsername: target.Username, TargetDisplayName: target.DisplayName}
 	log := &store.ModLogEntry{Action: req.Action, ModeratorID: me.ID, ModeratorUsername: me.Username, TargetID: &target.ID, TargetUsername: target.Username, Reason: reason}
 	switch req.Action {
@@ -137,6 +144,35 @@ func (s *Server) handleModAction(w http.ResponseWriter, r *http.Request) {
 	default:
 		WriteError(w, E(http.StatusBadRequest, "unknown_action", "Unknown moderation action."))
 	}
+}
+
+// modMayRestrict holds a mod to what their rank allows, and refuses
+// otherwise: a mute or a ban of at most a week, never permanent, and never in
+// place of one that would last longer (which would shorten it).
+func (s *Server) modMayRestrict(w http.ResponseWriter, r *http.Request, target *store.User, req modActionReq) bool {
+	if req.Action != store.ActionMute && req.Action != store.ActionBan {
+		WriteError(w, E(http.StatusForbidden, "mod_action", "Mods can only mute and ban, for at most a week."))
+		return false
+	}
+	if req.Permanent || req.DurationMS > modMaxDuration {
+		WriteError(w, E(http.StatusForbidden, "mod_duration", "Mods can mute and ban for at most a week."))
+		return false
+	}
+	now := time.Now().UnixMilli()
+	mute, ban, err := s.Store.ActiveRestrictions(r.Context(), target.ID, now)
+	if err != nil {
+		WriteError(w, err)
+		return false
+	}
+	cur := mute
+	if req.Action == store.ActionBan {
+		cur = ban
+	}
+	if cur != nil && (cur.ExpiresAt == nil || *cur.ExpiresAt > now+req.DurationMS) {
+		WriteError(w, E(http.StatusForbidden, "mod_shortens", "They already have a longer one. Only an admin can shorten it."))
+		return false
+	}
+	return true
 }
 
 func (s *Server) actRemoveImages(w http.ResponseWriter, r *http.Request, target *store.User, c *store.ModCase, log *store.ModLogEntry, req modActionReq) {
@@ -425,7 +461,7 @@ func (s *Server) emitCaseStaff(ctx context.Context, c *store.ModCase, lines ...*
 		last = m[c.ID]
 	}
 	counts, _ := s.Store.CountModCases(ctx, time.Now().UnixMilli())
-	s.emitStaff(ctx, "mod_case", map[string]any{"case": toStaffCase(c, s.caseStateFor(ctx, c.UserID), last), "messages": lines, "people": s.people(ctx, who...), "counts": counts})
+	s.emitStaff(ctx, rankMod, "mod_case", map[string]any{"case": toStaffCase(c, s.caseStateFor(ctx, c.UserID), last), "messages": lines, "people": s.people(ctx, who...), "counts": counts})
 	// what waits on the staff, and so what each of them has not read, may have changed
 	s.emitModUnreadAll(ctx)
 }

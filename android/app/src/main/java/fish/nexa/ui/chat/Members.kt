@@ -116,15 +116,10 @@ private sealed interface MemberRow {
     data class Person(override val key: String, val userId: String, val name: String, val user: PublicUser?, val avatarId: String?, val look: RoleLook?, val offline: Boolean, val crown: Crown) : MemberRow
 }
 
-/** The mark after a name: Nexa's owner (the accent), a server's or group's owner (gold), an admin's hammer. */
-private enum class Crown { NONE, NEXA, OWNER, ADMIN }
+/** A server's or group's owner's gold crown after a name; Nexa's staff carry their rank's mark (OwnerMarks) instead. */
+private enum class Crown { NONE, OWNER }
 
-private fun crownOf(userId: String, ownerId: String?): Crown = when {
-    NexaOwner.isOwner(userId) -> Crown.NEXA
-    ownerId == userId -> Crown.OWNER
-    Nexa.servers.isInstanceAdmin(userId) -> Crown.ADMIN
-    else -> Crown.NONE
-}
+private fun crownOf(userId: String, ownerId: String?): Crown = if (ownerId == userId && !NexaOwner.isOwner(userId)) Crown.OWNER else Crown.NONE
 
 @Composable
 private fun GroupHead(label: String, count: Int) {
@@ -184,12 +179,8 @@ private fun PersonRow(row: MemberRow.Person, list: String, ownerLabel: String, o
                     Modifier.weight(1f, fill = false),
                 )
                 row.look?.icon?.let { RoleIcon(it, 16.dp) }
-                when (row.crown) {
-                    Crown.NEXA -> Icon("Crown", c.textBrand, size = 14.dp, label = t("profile.profileCard.owner"))
-                    Crown.OWNER -> Icon("Crown", c.warning, size = 14.dp, label = ownerLabel)
-                    Crown.ADMIN -> Icon("Hammer", c.textBrand, size = 14.dp, label = t("profile.profileCard.admin"))
-                    Crown.NONE -> Unit
-                }
+                if (row.crown == Crown.OWNER) Icon("Crown", c.warning, size = 14.dp, label = ownerLabel)
+                fish.nexa.ui.shell.OwnerMarks(row.userId)
                 // an app's bot is marked as one wherever it is listed
                 if (row.user?.isBot == true) fish.nexa.ui.media.AppTag()
                 row.user?.serverTag?.let { ServerTagChip(it, small = true) }

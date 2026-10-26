@@ -14,23 +14,12 @@ import (
 
 func (s *Server) adminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/instance", s.handleInstanceInfo)
-	mux.Handle("GET /api/v1/admin/stats", s.admin(s.handleAdminStats))
-	mux.Handle("GET /api/v1/admin/users", s.admin(s.handleAdminUsers))
-	mux.Handle("PATCH /api/v1/admin/users/{id}", s.admin(s.handleAdminUserPatch))
-	mux.Handle("DELETE /api/v1/admin/users/{id}", s.admin(s.handleAdminUserDelete))
-	mux.Handle("GET /api/v1/admin/settings", s.admin(s.handleAdminSettings))
-	mux.Handle("PATCH /api/v1/admin/settings", s.admin(s.handleAdminSettingsPatch))
-}
-
-// admin gates a handler behind the admin flag.
-func (s *Server) admin(h http.HandlerFunc) http.Handler {
-	return s.authed(func(w http.ResponseWriter, r *http.Request) {
-		if auth.UserFrom(r.Context()).Flags&store.FlagAdmin == 0 {
-			WriteError(w, E(http.StatusForbidden, "admin_only", "Only Nexa admins can do that."))
-			return
-		}
-		h(w, r)
-	})
+	mux.Handle("GET /api/v1/admin/stats", s.staff(rankDeveloper, s.handleAdminStats))
+	mux.Handle("GET /api/v1/admin/users", s.staff(rankDeveloper, s.handleAdminUsers))
+	mux.Handle("PATCH /api/v1/admin/users/{id}", s.staff(rankMod, s.handleAdminUserPatch))
+	mux.Handle("DELETE /api/v1/admin/users/{id}", s.staff(rankDeveloper, s.handleAdminUserDelete))
+	mux.Handle("GET /api/v1/admin/settings", s.staff(rankDeveloper, s.handleAdminSettings))
+	mux.Handle("PATCH /api/v1/admin/settings", s.staff(rankDeveloper, s.handleAdminSettingsPatch))
 }
 
 // handleInstanceInfo is public: the register page needs to know the policy.
@@ -91,38 +80,65 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, list)
 }
 
+// handleAdminUserPatch changes an account's rank and whether it can sign in.
+// Only the owner gives or takes ranks, and only the owner disables the sign-in
+// of staff; disabling anyone else's takes a Developer.
 func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
-	me := auth.UserFrom(r.Context())
+	ctx := r.Context()
+	me := auth.UserFrom(ctx)
 	id, err := ids.Parse(r.PathValue("id"))
 	if err != nil {
 		WriteError(w, ErrNotFound)
 		return
 	}
-	u, err := s.Store.UserByID(r.Context(), id)
+	u, err := s.Store.UserByID(ctx, id)
 	if err != nil {
 		WriteError(w, ErrNotFound)
 		return
 	}
 	var req struct {
-		Disabled *bool  `json:"disabled"`
-		Admin    *bool  `json:"admin"`
-		Reason   string `json:"reason"`
+		Disabled *bool `json:"disabled"`
+		// Rank is "developer", "admin", "mod" or "" for none.
+		Rank *string `json:"rank"`
+		// Admin is what apps before ranks send: true for Developer, false for none.
+		Admin  *bool  `json:"admin"`
+		Reason string `json:"reason"`
 	}
 	if err := ReadJSON(w, r, &req, 4<<10); err != nil {
 		WriteError(w, err)
 		return
 	}
-	if id == me.ID && ((req.Disabled != nil && *req.Disabled) || (req.Admin != nil && !*req.Admin)) {
-		WriteError(w, E(http.StatusBadRequest, "self", "You cannot disable or demote yourself."))
+	if req.Rank == nil && req.Admin != nil {
+		name := ""
+		if *req.Admin {
+			name = rankNames[rankDeveloper]
+		}
+		req.Rank = &name
+	}
+	var want staffRank
+	if req.Rank != nil {
+		found := false
+		for r, name := range rankNames {
+			if name == *req.Rank && r != rankOwner {
+				want, found = r, true
+			}
+		}
+		if !found {
+			WriteError(w, E(http.StatusBadRequest, "invalid_value", "rank must be developer, admin, mod or empty."))
+			return
+		}
+	}
+	if id == me.ID && ((req.Disabled != nil && *req.Disabled) || req.Rank != nil) {
+		WriteError(w, E(http.StatusBadRequest, "self", "You cannot disable yourself or change your own rank."))
 		return
 	}
 	if notAPerson(u) {
 		WriteError(w, blockError(blockSystem))
 		return
 	}
-	// Nobody can take the owner's access away: without this, any admin could
-	// demote the owner and then act on them like anyone else.
-	owner, err := s.Store.InstanceOwnerID(r.Context())
+	// Nobody can take the owner's access away: without this, the owner could
+	// be demoted and then acted on like anyone else.
+	owner, err := s.Store.InstanceOwnerID(ctx)
 	if err != nil {
 		WriteError(w, err)
 		return
@@ -131,21 +147,28 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusForbidden, "owner_protected", "The owner's access cannot be changed."))
 		return
 	}
-	// The owner is the oldest admin, so making an older account an admin
-	// makes it the owner. Only the owner may hand that on; otherwise any
-	// admin could move the owner's protection to an account of their
-	// choosing and then act on the owner like anyone else.
-	if req.Admin != nil && *req.Admin && u.Flags&store.FlagAdmin == 0 && owner != 0 && u.ID < owner && me.ID != owner {
-		WriteError(w, E(http.StatusForbidden, "owner_protected", "Only the owner of Nexa can make this account an admin: it would become the owner."))
+	mine := s.rankOf(ctx, me)
+	if req.Rank != nil && mine < rankOwner {
+		WriteError(w, staffRankError(rankOwner))
 		return
+	}
+	if req.Disabled != nil {
+		need := rankDeveloper
+		if u.Flags&store.StaffFlags != 0 {
+			need = rankOwner
+		}
+		if mine < need {
+			WriteError(w, staffRankError(need))
+			return
+		}
 	}
 	reason, ok := CleanText(req.Reason, maxModReason)
 	if !ok {
 		WriteError(w, E(http.StatusBadRequest, "reason_too_long", "Reasons are at most 1000 characters."))
 		return
 	}
-	// Only the bits this request names are touched, so a second admin changing
-	// a different bit at the same moment does not have their change undone.
+	// Only the bits this request names are touched, so someone changing a
+	// different bit at the same moment does not have their change undone.
 	var set, clear int64
 	if req.Disabled != nil {
 		if *req.Disabled {
@@ -154,28 +177,26 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 			clear |= store.FlagDisabled
 		}
 	}
-	if req.Admin != nil {
-		if *req.Admin {
-			set |= store.FlagAdmin
-		} else {
-			clear |= store.FlagAdmin
-		}
+	if req.Rank != nil {
+		clear |= store.StaffFlags
+		set |= rankBits[want]
+		clear &^= set
 	}
-	// Nexa admins see every private channel of the servers they are in,
-	// so gaining or losing that changes their view (and who holds the keys)
-	isAdmin := func(f int64) bool { return f&store.FlagAdmin != 0 && f&(store.FlagDisabled|store.FlagDeleted) == 0 }
+	// Developers see every private channel of the servers they are in, so
+	// gaining or losing that changes their view (and who holds the keys)
+	isDev := func(f int64) bool { return f&store.FlagAdmin != 0 && f&(store.FlagDisabled|store.FlagDeleted) == 0 }
 	var servers []*store.Server
 	var before []visibility
-	if isAdmin(u.Flags) != isAdmin((u.Flags|set)&^clear) {
+	if isDev(u.Flags) != isDev((u.Flags|set)&^clear) {
 		// The snapshots come first: taken after the write they would show the
 		// new view as though it had always been there, and a failed one would
 		// make every channel look newly visible to every member.
-		if servers, err = s.Store.ServersForUser(r.Context(), id); err != nil {
+		if servers, err = s.Store.ServersForUser(ctx, id); err != nil {
 			WriteError(w, err)
 			return
 		}
 		for _, srv := range servers {
-			vis, err := s.snapshotVisibility(r.Context(), srv.ID)
+			vis, err := s.snapshotVisibility(ctx, srv.ID)
 			if err != nil {
 				WriteError(w, err)
 				return
@@ -183,40 +204,46 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 			before = append(before, vis)
 		}
 	}
-	flags, err := s.Store.ChangeUserFlags(r.Context(), id, set, clear)
+	flags, err := s.Store.ChangeUserFlags(ctx, id, set, clear)
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
 	// what actually changed goes in the log, one line per change
-	for _, ch := range []struct {
-		bit     int64
-		on, off string
-	}{{store.FlagAdmin, store.LogAdminGrant, store.LogAdminRevoke}, {store.FlagDisabled, store.LogAccountDisable, store.LogAccountEnable}} {
-		was, now := u.Flags&ch.bit != 0, flags&ch.bit != 0
-		if was == now {
-			continue
-		}
-		action := ch.off
+	var entries []*store.ModLogEntry
+	if was, now := rankFromFlags(u.Flags, false), rankFromFlags(flags, false); was != now {
+		entries = append(entries, &store.ModLogEntry{Action: store.LogRankChange, Details: mustJSON(map[string]string{"from": rankNames[was], "to": rankNames[now]})})
+	}
+	if was, now := u.Flags&store.FlagDisabled != 0, flags&store.FlagDisabled != 0; was != now {
+		action := store.LogAccountEnable
 		if now {
-			action = ch.on
+			action = store.LogAccountDisable
 		}
-		entry := &store.ModLogEntry{Action: action, ModeratorID: me.ID, ModeratorUsername: me.Username, TargetID: &u.ID, TargetUsername: u.Username, Reason: reason}
-		if err := s.Store.AppendModLog(r.Context(), entry); err != nil {
+		entries = append(entries, &store.ModLogEntry{Action: action})
+	}
+	for _, entry := range entries {
+		entry.ModeratorID, entry.ModeratorUsername, entry.TargetID, entry.TargetUsername, entry.Reason = me.ID, me.Username, &u.ID, u.Username, reason
+		if err := s.Store.AppendModLog(ctx, entry); err != nil {
 			s.Log.Warn("moderation: log access change", "user", id.String(), "err", err)
 			continue
 		}
-		s.emitLog(r.Context(), entry)
+		s.emitLog(ctx, entry)
 	}
 	for i, srv := range servers {
-		s.syncVisibility(r.Context(), srv.ID, before[i])
+		s.syncVisibility(ctx, srv.ID, before[i])
+	}
+	if flags != u.Flags {
+		// everyone who sees them sees the new rank on their profile
+		if updated, err := s.Store.UserByID(ctx, id); err == nil {
+			s.Bcast.UserUpdated(updated)
+		}
 	}
 	if req.Disabled != nil && *req.Disabled {
 		// out of any call first: closing its sockets only detaches a call,
 		// which would go on carrying its voice for the grace period
-		s.dropVoice(r.Context(), id, func(*store.Channel) bool { return true })
+		s.dropVoice(ctx, id, func(*store.Channel) bool { return true })
 		// a disabled account loses every session immediately
-		if err := s.Store.DeleteUserSessions(r.Context(), id, 0); err != nil {
+		if err := s.Store.DeleteUserSessions(ctx, id, 0); err != nil {
 			// the account is already disabled — the middleware re-checks the
 			// flag per request — but the rows should have gone with it
 			s.Log.Warn("disable: session sweep", "user", id.String(), "err", err)
@@ -252,8 +279,8 @@ func (s *Server) handleAdminUserDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, blockError(blockSystem))
 		return
 	}
-	if u.Flags&store.FlagAdmin != 0 {
-		WriteError(w, E(http.StatusBadRequest, "is_admin", "Take away their admin access before deleting their account."))
+	if u.Flags&store.StaffFlags != 0 {
+		WriteError(w, E(http.StatusBadRequest, "is_admin", "Take away their rank before deleting their account."))
 		return
 	}
 	counts, err := s.Store.PurgePreview(ctx, id)

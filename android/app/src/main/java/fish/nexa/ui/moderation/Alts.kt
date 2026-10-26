@@ -41,7 +41,8 @@ import fish.nexa.ui.theme.Nx
 /** "Alt Accounts: 5" (AltAccounts.tsx `AltBadge`) on an account that shares an address with others; opens the list. */
 @Composable
 fun AltBadge(u: ModUser) {
-    if (u.altCount <= 0) return
+    // alt accounts are for admins and above
+    if (u.altCount <= 0 || !fish.nexa.data.StaffRanks.mine().let { it != null && it.atLeast(fish.nexa.data.StaffRank.ADMIN) }) return
     val label = t("moderation.alts.badge", "count" to u.altCount)
     Box(
         Modifier

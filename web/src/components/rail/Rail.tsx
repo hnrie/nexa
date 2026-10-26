@@ -41,6 +41,7 @@ import { pickClick, usePick } from "@/stores/pick";
 import s from "./Rail.module.css";
 
 import { t } from "@/i18n";
+import { useMyRank } from "@/lib/staffRank";
 
 /** What Home's badge counts, read out: "3 unread messages and 1 friend request". */
 export function homeLabel(messages: number, requests: number): string {
@@ -116,7 +117,8 @@ export function Rail() {
   const nexaState = useNexa((n) => n.state);
   const nexaOpen = loc.pathname.startsWith("/channels/@me/nexa");
   const nexaUnread = nexaState && !nexaOpen && nexaListed(nexaState.latest, nexaClosed) ? nexaState.unread : 0;
-  const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
+  // every rank of staff opens the panel
+  const isAdmin = useMyRank() !== null;
   // case threads and bug reports waiting on the staff that hold something this person has not read
   const needsReply = useModeration((m) => unreadCount(m.unread));
   const inPanel = loc.pathname.startsWith("/channels/@admin");

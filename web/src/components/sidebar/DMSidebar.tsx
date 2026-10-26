@@ -2,7 +2,8 @@ import { ChevronDown, GripVertical, Lock, MessageCircle, MoreHorizontal, Heart, 
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar, showsTyping } from "@/components/common/Avatar";
 import { menuAnchor } from "@/components/common/ContextMenu";
-import { AdminHammer, OwnerCrown } from "@/components/common/OwnerBadge";
+import { StaffMark } from "@/components/common/OwnerBadge";
+import { rankOf, type StaffRank } from "@/lib/staffRank";
 import { PickBar, PickMark } from "@/components/common/Pick";
 import { useMediaQuery } from "@/hooks/useIsMobile";
 import { useReorder } from "@/hooks/useReorder";
@@ -10,7 +11,6 @@ import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { compareIds, idAt } from "@/lib/ids";
 import { dmListView, dropDM, groupOf, isGroupId, moveInMain, movePinnedDM, NEXA_ID, pruneDMs, rowId, setGroupCollapsed, type DMDrop, type DMRow } from "@/lib/dmLayout";
 import { useOwnerId } from "@/lib/owner";
-import { isInstanceAdmin } from "@/stores/servers";
 import { useAuth } from "@/stores/auth";
 import { selectDMs, selectSubchats, useChannels } from "@/stores/channels";
 import { activitiesOf, customStatus, statusOf, usePresence, type StatusKind } from "@/stores/presence";
@@ -43,6 +43,7 @@ import { BotTag } from "@/components/apps/BotTag";
 import s from "./Sidebar.module.css";
 
 import { t } from "@/i18n";
+import { useMyRank } from "@/lib/staffRank";
 
 /** What a dragged conversation or group is over, and what dropping it there would do. */
 type Over = { at: string; where?: "before" | "after" | "into" | "main" | "top"; drop: DMDrop };
@@ -77,7 +78,8 @@ export function DMSidebar() {
   // Nexa's conversation is listed once Nexa has said something, and after it
   // was closed only once it says something new; while it is open it shows.
   const nexaShown = !!nexa && nexa.latest > 0 && (nexaListed(nexa.latest, settings.nexaClosed) || nexaOpen);
-  const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
+  // every rank of staff opens the panel
+  const isAdmin = useMyRank() !== null;
   // cases the member wrote in last, and bug reports waiting for an answer
   // case threads and bug reports waiting on the staff that hold something this person has not read
   const needsReply = useModeration((m) => unreadCount(m.unread));
@@ -436,8 +438,7 @@ export function DMSidebar() {
     const { count, unread } = waitingIn(id);
     let sub: React.ReactNode = null;
     let avatar: React.ReactNode;
-    let crowned = false;
-    let admin = false;
+    let rank: StaffRank | null = null;
     let tagOf: string | null = null;
     if (ch.type === "dm") {
       const other = ch.recipient_ids.find((uid) => uid !== meId) ?? ch.recipient_ids[0] ?? "";
@@ -447,8 +448,7 @@ export function DMSidebar() {
       const act = activitiesOf(presence[other])[0];
       sub = <StatusLine className={s.sub} status={st} activity={act} more={Math.max(0, activitiesOf(presence[other]).length - 1)} />;
       avatar = <TypingAvatar channelId={ch.id} id={other} avatarId={u?.avatar_id ?? null} name={name} status={statusOf(presence[other])} />;
-      crowned = other === ownerId;
-      admin = !crowned && isInstanceAdmin(other);
+      rank = rankOf(other, other === meId ? undefined : u?.flags, ownerId);
     } else {
       sub = <span className={s.sub}>{t("chat.groupMemberList.membersOnly", { count: ch.recipient_ids.length })}</span>;
       avatar = <TypingAvatar channelId={ch.id} id={ch.id} avatarId={ch.icon_id} name={name} group />;
@@ -475,8 +475,8 @@ export function DMSidebar() {
             <span className={s.text}>
               <span className={s.nameRow}>
                 <span className={s.name} dir="auto">{name}</span>
-                {/* the owner of Nexa is crowned wherever they are listed, and its admins carry the hammer */}
-                {crowned ? <OwnerCrown size={14} /> : admin ? <AdminHammer size={14} /> : null}
+                {/* Nexa's staff carry their rank's mark wherever they are listed */}
+                {rank ? <StaffMark rank={rank} size={14} /> : null}
                 {tagOf ? <BotTag userId={tagOf} /> : null}
                 {tagOf ? <UserTag userId={tagOf} size="sm" /> : null}
               </span>

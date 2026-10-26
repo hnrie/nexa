@@ -21,8 +21,8 @@ func (s *Server) crashRoutes(mux *http.ServeMux) {
 	// reports are metered per account: one account cannot push everyone
 	// else's out, or fill the server log with warnings.
 	mux.Handle("POST /api/v1/client-errors", s.userLimited(s.limCrash, s.handleCrashReport))
-	mux.Handle("GET /api/v1/admin/errors", s.admin(s.handleCrashList))
-	mux.Handle("DELETE /api/v1/admin/errors", s.admin(s.handleCrashClear))
+	mux.Handle("GET /api/v1/admin/errors", s.staff(rankDeveloper, s.handleCrashList))
+	mux.Handle("DELETE /api/v1/admin/errors", s.staff(rankDeveloper, s.handleCrashClear))
 }
 
 // clip trims a field to a length the log can hold, without splitting a rune.

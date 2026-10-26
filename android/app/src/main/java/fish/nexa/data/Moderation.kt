@@ -169,7 +169,8 @@ data class ModUser(
     /** The profile's widgets, on one account's page only. */
     val widgets: JsonElement? = null,
 ) {
-    val isStaff get() = adminFlags and Moderation.FLAG_ADMIN != 0L
+    /** Holds any staff rank (data/StaffRanks). */
+    val isStaff get() = adminFlags and StaffRanks.ALL != 0L
     val isDisabled get() = adminFlags and Moderation.FLAG_DISABLED != 0L
     val isDeleted get() = adminFlags and Moderation.FLAG_DELETED != 0L
 }
@@ -618,10 +619,10 @@ object Moderation {
         Nexa.api.request("DELETE", "/moderation/announcements/$id")
     }
 
-    /** Grants or takes away admin access, or disables or restores sign-in. */
-    suspend fun access(id: String, admin: Boolean? = null, disabled: Boolean? = null) {
+    /** Gives or takes a staff rank ("" for none; the owner alone), or disables or restores sign-in. */
+    suspend fun access(id: String, rank: String? = null, disabled: Boolean? = null) {
         Nexa.api.request("PATCH", "/admin/users/$id", buildJsonObject {
-            if (admin != null) put("admin", admin)
+            if (rank != null) put("rank", rank)
             if (disabled != null) put("disabled", disabled)
         })
     }

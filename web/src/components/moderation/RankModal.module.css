@@ -1,0 +1,99 @@
+/* The owner's rank ladder. The rungs read top to bottom as the ranks do, the
+   staff ranks wearing the accent their badges wear and No Rank left plain, so
+   the line between staff and everyone else is the one thing that stands out. */
+.lede {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rung {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  cursor: pointer;
+  transition: box-shadow var(--transition), background var(--transition);
+}
+
+.rung:hover {
+  background: var(--bg-hover);
+}
+
+.rung[data-on] {
+  background: color-mix(in srgb, var(--brand) 12%, var(--bg-input));
+  box-shadow: inset 0 0 0 2px var(--brand);
+}
+
+/* No Rank sits a little apart from the ranks above it */
+.rung[data-rank="none"] {
+  margin-top: 6px;
+}
+
+.rung:has(.input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  color: var(--text-brand);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 30%, transparent);
+}
+
+.rung[data-rank="none"] .mark {
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-strong);
+}
+
+.now {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.powers {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}

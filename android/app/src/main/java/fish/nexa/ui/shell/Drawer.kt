@@ -282,7 +282,8 @@ fun Rail(modifier: Modifier = Modifier) {
             selected = home, unread = requests > 0 && !home, badge = requests, picture = false,
             onClick = { Nav.go(Route.Friends, keepDrawer = true) },
         ) { NexaMark(if (home) c.onBrand else c.textSubtle, 30.dp) }
-        if (me?.isAdmin == true) {
+        // every rank of staff opens the panel
+        if (fish.nexa.data.StaffRanks.of(me?.id, me?.flags ?: 0L) != null) {
             // case threads and bug reports waiting on the staff that hold something this person has not read
             val waitingOnStaff = fish.nexa.data.Moderation.unread.collectAsState().value.count
             val inPanel = route is Route.Admin

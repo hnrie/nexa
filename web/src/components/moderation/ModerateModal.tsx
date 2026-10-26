@@ -22,6 +22,7 @@ import { usePresence } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
 import { modStatus } from "./ModStatus";
+import { atLeast, MOD_MAX_MS, useMyRank, type StaffRank } from "@/lib/staffRank";
 import m from "./Moderation.module.css";
 
 const MAX_REASON = 1000;
@@ -32,6 +33,13 @@ const MAX_MUTE = 365 * SPAN.DAY;
 const MAX_BAN = 5 * 365 * SPAN.DAY;
 
 const ACTIONS: ModAction[] = ["avatar_remove", "field_reset", "mute", "ban", "delete"];
+
+/** The actions a rank may take: a mod mutes and bans, an admin does all but delete. */
+function actionsFor(rank: StaffRank | null): ModAction[] {
+  if (atLeast(rank, "developer")) return ACTIONS;
+  if (atLeast(rank, "admin")) return ACTIONS.filter((a) => a !== "delete");
+  return ["mute", "ban"];
+}
 /** The fields a reset empties rather than writing MODERATOR_REMOVED_ in. */
 const CLEARED: ResetField[] = ["status", "nicknames", "server_profiles", "typing_style", "name_style", "widgets", "server_tag"];
 
@@ -158,7 +166,13 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers,
   const toast = useUI((u) => u.toast);
   const live = usePresence((p) => p.byUser[user.id]);
   const presence = modStatus(user, live);
-  const [action, setAction] = useState<ModAction | null>(initial ?? null);
+  const mine = useMyRank();
+  const isMod = !atLeast(mine, "admin");
+  const offered = actionsFor(mine);
+  // a mod mutes and bans for a week at most, and never for good
+  const maxMute = isMod ? MOD_MAX_MS : MAX_MUTE;
+  const maxBan = isMod ? MOD_MAX_MS : MAX_BAN;
+  const [action, setAction] = useState<ModAction | null>(initial && offered.includes(initial) ? initial : null);
   const [reason, setReason] = useState("");
   const [images, setImages] = useState(preset?.images ?? { avatar: !!user.avatar_id || !!servers?.some((x) => x.avatar_id), banner: !user.avatar_id && (!!user.banner_id || !!servers?.some((x) => x.banner_id)) });
   const [fields, setFields] = useState<ResetField[]>(preset?.fields ?? []);
@@ -217,13 +231,13 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers,
       case "field_reset":
         return fields.length > 0;
       case "mute":
-        return typeof muteFor === "number" && muteFor >= SPAN.MINUTE && muteFor <= MAX_MUTE;
+        return typeof muteFor === "number" && muteFor >= SPAN.MINUTE && muteFor <= maxMute;
       case "ban":
-        return banFor === "permanent" || (banFor >= SPAN.MINUTE && banFor <= MAX_BAN);
+        return (banFor === "permanent" && !isMod) || (typeof banFor === "number" && banFor >= SPAN.MINUTE && banFor <= maxBan);
       default:
         return confirmed;
     }
-  }, [action, reasonOk, images, fields, muteFor, banFor, confirmed]);
+  }, [action, reasonOk, images, fields, muteFor, banFor, confirmed, maxMute, maxBan, isMod]);
 
   const submitLabel = (): string => {
     switch (action) {
@@ -333,7 +347,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers,
             <div className={m.section}>
               <span className={m.sectionLabel}>{t("moderation.form.chooseAction")}</span>
               <div className={m.actionList}>
-                {ACTIONS.map((a) => {
+                {offered.map((a) => {
                   const Icon = actionIcon(a);
                   const nothing = a === "avatar_remove" && !hasAvatar && !hasBanner;
                   let desc = actionBlurb(a);
@@ -421,15 +435,15 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers,
 
           {action === "mute" ? (
             <>
-              <DurationPicker presets={MUTE_PRESETS} value={muteFor} onChange={setMuteFor} max={MAX_MUTE} />
-              <p className={m.note}>{t("moderation.form.muteNote")}</p>
+              <DurationPicker presets={MUTE_PRESETS.filter((x) => x <= maxMute)} value={muteFor} onChange={setMuteFor} max={maxMute} />
+              <p className={m.note}>{t("moderation.form.muteNote")}{isMod ? ` ${t("staff.modWeek")}` : ""}</p>
             </>
           ) : null}
 
           {action === "ban" ? (
             <>
-              <DurationPicker presets={BAN_PRESETS} value={banFor} onChange={setBanFor} max={MAX_BAN} permanent />
-              <p className={m.note}>{t("moderation.form.banNote")}</p>
+              <DurationPicker presets={BAN_PRESETS.filter((x) => x <= maxBan)} value={banFor} onChange={setBanFor} max={maxBan} permanent={!isMod} />
+              <p className={m.note}>{t("moderation.form.banNote")}{isMod ? ` ${t("staff.modWeek")}` : ""}</p>
             </>
           ) : null}
 

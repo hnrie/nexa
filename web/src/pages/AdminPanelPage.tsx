@@ -4,8 +4,7 @@ import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { moderation as modApi } from "@/api/moderation";
 import { Spinner } from "@/components/common/Spinner";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
-import { FLAG_ADMIN } from "@/lib/moderation";
-import { useAuth } from "@/stores/auth";
+import { atLeast, useMyRank } from "@/lib/staffRank";
 import { useModeration } from "@/stores/moderation";
 import { t } from "@/i18n";
 import m from "@/components/moderation/Moderation.module.css";
@@ -27,6 +26,9 @@ type Tab = "users" | "bots" | "servers" | "expressions" | "cases" | "bugs" | "lo
 
 const BASE = "/channels/@admin";
 
+/** The tabs a mod has; admins and above have every one. */
+const MOD_TABS: Tab[] = ["users", "cases", "logs"];
+
 function tabOf(path: string): Tab {
   const seg = path.slice(BASE.length + 1).split("/")[0];
   return seg === "bots" || seg === "servers" || seg === "expressions" || seg === "cases" || seg === "bugs" || seg === "logs" || seg === "announcements" ? seg : "users";
@@ -35,10 +37,12 @@ function tabOf(path: string): Tab {
 /**
  * The Admin & Moderation panel: every account at a glance, the cases waiting
  * on the staff, the record of everything done, and announcements to everyone.
- * Only Nexa admins get here; the server refuses everyone else anyway.
+ * Every rank of staff gets here, a mod to the people, cases and log alone
+ * (lib/staffRank.ts); the server refuses the rest anyway.
  */
 export default function AdminPanelPage() {
-  const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & FLAG_ADMIN) !== 0);
+  const rank = useMyRank();
+  const isAdmin = rank !== null;
   const unread = useModeration((s) => s.unread);
   const loc = useLocation();
   const nav = useNavigate();
@@ -73,7 +77,7 @@ export default function AdminPanelPage() {
 
   if (!isAdmin) return <Navigate to="/channels/@me" replace />;
 
-  const tabs: { id: Tab; label: string; icon: JSX.Element; badge?: number; badgeLabel?: string }[] = [
+  const all: { id: Tab; label: string; icon: JSX.Element; badge?: number; badgeLabel?: string }[] = [
     { id: "users", label: t("moderation.tabs.users"), icon: <LayoutGrid size={17} /> },
     { id: "bots", label: t("moderation.tabs.bots"), icon: <Bot size={17} /> },
     { id: "servers", label: t("moderation.tabs.servers"), icon: <Server size={17} /> },
@@ -84,6 +88,8 @@ export default function AdminPanelPage() {
     { id: "logs", label: t("moderation.tabs.logs"), icon: <ScrollText size={17} /> },
     { id: "announcements", label: t("moderation.tabs.announcements"), icon: <Megaphone size={17} /> },
   ];
+  const tabs = atLeast(rank, "admin") ? all : all.filter((x) => MOD_TABS.includes(x.id));
+  if (!tabs.some((x) => x.id === tab)) return <Navigate to={BASE} replace />;
 
   // Left and Right across the strip, as a tablist moves
   const onKey = (e: KeyboardEvent<HTMLButtonElement>) => {

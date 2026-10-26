@@ -31,6 +31,7 @@ fun actionLabel(action: String): String = when (action) {
     "unban" -> t("moderation.action.unban")
     "announcement" -> t("moderation.action.announcement")
     "announcement_delete" -> t("moderation.action.announcementDelete")
+    "rank_change" -> t("staff.log.rankChange")
     "admin_grant" -> t("moderation.action.adminGrant")
     "admin_revoke" -> t("moderation.action.adminRevoke")
     "account_disable" -> t("moderation.action.accountDisable")
@@ -56,7 +57,7 @@ fun logIcon(action: String): String = when (action) {
     "delete", "account_delete_profile" -> "UserX"
     "unmute", "unban", "expression_relist", "discovery_restore" -> "LockOpen"
     "announcement", "announcement_delete" -> "Megaphone"
-    "admin_grant" -> "ShieldPlus"
+    "admin_grant", "rank_change" -> "ShieldPlus"
     "admin_revoke" -> "ShieldMinus"
     "account_disable" -> "Lock"
     else -> "KeyRound"
@@ -67,7 +68,7 @@ val LOG_GROUPS: Map<String, List<String>> = mapOf(
     "punishments" to listOf("avatar_remove", "field_reset", "server_reset", "expression_takedown", "mute", "ban", "delete", "account_delete_profile"),
     "lifts" to listOf("unmute", "unban", "expression_relist", "discovery_restore"),
     "announcements" to listOf("announcement", "announcement_delete"),
-    "access" to listOf("admin_grant", "admin_revoke", "account_disable", "account_enable"),
+    "access" to listOf("rank_change", "admin_grant", "admin_revoke", "account_disable", "account_enable"),
 )
 
 private fun JsonObject.str(k: String) = (this[k] as? JsonPrimitive)?.contentOrNull
@@ -107,6 +108,10 @@ fun logDetail(e: ModLogEntry): String {
         } ?: ""
         "announcement", "announcement_delete" -> d.str("title")?.takeIf { it.isNotEmpty() }?.let { "“$it”" } ?: ""
         "account_delete_profile" -> t("moderation.log.messagesKept")
+        "rank_change" -> {
+            fun name(x: String?) = fish.nexa.data.StaffRank.entries.firstOrNull { it.key == x && it != fish.nexa.data.StaffRank.OWNER }?.label ?: t("staff.rankModal.none")
+            t("staff.log.fromTo", "from" to name(d.str("from")), "to" to name(d.str("to")))
+        }
         else -> ""
     }
 }

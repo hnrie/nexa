@@ -189,7 +189,7 @@ tools/.venv/bin/python tools/seed.py http://127.0.0.1:$PORT
 
 `seed.py` registers alice and bob (password `correct horse battery staple`), makes a server whose
 #general bob joins, posts one message of every kind of formatting and prints the ids. Registration
-is open by default, the first account becomes the Nexa admin, and captchas, calls through the SFU,
+is open by default, the first account becomes the owner (staff rank Developer, the oldest), and captchas, calls through the SFU,
 GIF search and the other keyed services stay off without their keys.
 
 ### Web in a headless browser
@@ -809,9 +809,26 @@ meter charges a pulled share sound at `StreamAudioBps` (128 kbit/s). The mesh ke
 ### Nexa, moderation and safety
 
 - Nexa is the account the service speaks as: notices, announcements, and case threads where a
-  member can appeal (not end-to-end encrypted, and the app says so). The staff are Nexa admins (user
-  flag bit 1: the first account, or `ADMIN_USERNAME` while nobody has been admin yet). Their panel is
+  member can appeal (not end-to-end encrypted, and the app says so). Their panel is
   `/channels/@admin` (`/api/v1/moderation/*`); the member's side is `/api/v1/nexa/*`.
+- Staff ranks (`api/staff.go`, web `lib/staffRank.ts`, Android `data/StaffRanks.kt`), each holding
+  everything below it, kept as public user flags so every app draws them: Mod (flag 512) has the
+  panel's people, cases and log, mutes and bans of at most a week (`modMaxDuration`, never
+  permanent, never shortening a longer one), and lifts, closes and reopens only the cases they
+  opened; Admin (256) has the rest of the panel (other actions, permanent bans, servers,
+  expressions, apps, bugs, alts, announcements) but not Disable Sign-In or deleting accounts, and
+  no rights in other people's servers; Developer (flag 1, what Nexa admins always were: the first
+  account, or `ADMIN_USERNAME` while nobody has been admin yet) adds every right in every server
+  they are in, Disable Sign-In, deleting accounts and the instance's settings, stats and crash
+  reports; Owner is the oldest Developer (`InstanceOwnerID`) and adds the legal report and ranks.
+  Only the owner gives and takes ranks (`PATCH /admin/users/{id}` with `rank`; the old `admin`
+  bool means Developer) and disables staff's sign-in; anyone holding a rank cannot be moderated.
+  Every route says its least rank with `s.staff(rank, h)`; `emitStaff` takes one too (bug events
+  go to admins and up). A change is logged as `rank_change` with `from` and `to`. Badges: the
+  owner's crown, a developer's CodeXml, an admin's hammer, a mod's ShieldCheck, all in the accent
+  (web `StaffMark`, `StaffBadge`, `RankMark` in `components/common/OwnerBadge.tsx`, the panel's
+  `RankPill`, the owner's Set Rank dialog `moderation/RankModal.tsx`; Android `OwnerMarks` in
+  `ui/shell/DmList.kt`, `RankBadge`, `openRankSheet` in `ui/moderation/Ranks.kt`).
 - Staff can act on accounts (mutes, bans, purges, removing pictures, resetting fields), servers
   (including Discovery holds), sticker packs, emoji and uploads (`moderation_actions.go` and the
   other `moderation_*` files). The Bots tab (`GET /api/v1/moderation/apps`, `moderation_apps.go`,

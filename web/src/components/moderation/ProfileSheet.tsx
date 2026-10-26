@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronRight, Clock, Copy, Crown, Eraser, ImageOff, ShieldCheck, UserRoundX } from "lucide-react";
+import { CalendarDays, ChevronRight, Clock, Copy, Eraser, ImageOff, ShieldCheck, UserRoundX } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { hasServerProfile, type ModMembership, type ModPack, type ModUser, type ResetField } from "@/api/moderation";
 import { bannerUrl } from "@/api/users";
@@ -8,7 +8,7 @@ import { Button } from "@/components/common/Button";
 import { profileTheme } from "@/lib/avatarColor";
 import { copyAndSay } from "@/lib/copyText";
 import { useRenderCtx } from "@/lib/markdownCtx";
-import { FLAG_ADMIN, FLAG_DELETED, FLAG_DISABLED, fieldLabel, fullDate, previewText } from "@/lib/moderation";
+import { FLAG_DELETED, FLAG_DISABLED, fieldLabel, fullDate, previewText } from "@/lib/moderation";
 import { readTypingStyle, typingStyleText } from "@/lib/typingStyle";
 import { nameStyleText, readNameStyle } from "@/lib/nameStyle";
 import { readWidgets, widgetsText } from "@/lib/widgets";
@@ -19,6 +19,7 @@ import { Markdown } from "@/markdown";
 import { usePresence } from "@/stores/presence";
 import { t } from "@/i18n";
 import { modStatus } from "./ModStatus";
+import { atLeast, RANK_ICON, rankName, rankOf, useMyRank, type StaffRank } from "@/lib/staffRank";
 import type { ModerateIntent } from "./PersonPage";
 import p from "./Sheet.module.css";
 import { PackRows } from "./ExpressionsTab";
@@ -57,10 +58,18 @@ function blockedText(b: ModUser["blocked"]): string {
  * down. Looking at a part lights it up on the profile, so what an action
  * touches is never in doubt.
  */
+function RankIcon({ rank }: { rank: StaffRank }) {
+  const Icon = RANK_ICON[rank];
+  return <Icon size={14} aria-hidden="true" />;
+}
+
 export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, packs = [], onOpenPack }: Props) {
+  const rank = owner ? "owner" : rankOf(null, user.admin_flags);
   const [hl, setHl] = useState<Part>(null);
   const deleted = (user.admin_flags & FLAG_DELETED) !== 0;
-  const blocked = deleted ? t("moderation.user.deleted") : blockedText(user.blocked);
+  // taking down part of a profile is for admins and above; a mod mutes and bans
+  const mine = useMyRank();
+  const blocked = deleted ? t("moderation.user.deleted") : blockedText(user.blocked) || (atLeast(mine, "admin") ? "" : t("staff.modOnlyRestricts"));
   const locked = !!blocked;
   const reset = (f: ResetField) => onModerate({ action: "field_reset", preset: { fields: [f] } });
   const status = [statusEmojiText(user.status_emoji), user.status_text].filter(Boolean).join(" ");
@@ -299,10 +308,8 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
               <div>
                 <dt><ShieldCheck size={14} aria-hidden="true" /> {t("moderation.sheet.access")}</dt>
                 <dd>
-                  {owner ? (
-                    <span className={p.inline}><Crown size={14} aria-hidden="true" /> {t("profile.profileCard.owner")}</span>
-                  ) : (user.admin_flags & FLAG_ADMIN) !== 0 ? (
-                    t("moderation.staff")
+                  {rank ? (
+                    <span className={p.inline}><RankIcon rank={rank} /> {rankName(rank)}</span>
                   ) : (user.admin_flags & FLAG_DISABLED) !== 0 ? (
                     <span className={p.inline}><UserRoundX size={14} aria-hidden="true" /> {t("moderation.state.disabled")}</span>
                   ) : (

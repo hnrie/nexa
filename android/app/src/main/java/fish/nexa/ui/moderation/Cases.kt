@@ -325,6 +325,9 @@ fun StaffCasePane(caseId: String, showMember: Boolean, onBack: () -> Unit, onCha
     val target = person(cs.userId)
     val gone = target == null || target.deleted
     val targetName = target?.let { nameOf(it) } ?: cs.targetDisplayName
+    // a mod lifts, closes and reopens only the cases they opened; admins and above any
+    val mine = fish.nexa.data.StaffRanks.mine()
+    val handles = (mine != null && mine.atLeast(fish.nexa.data.StaffRank.ADMIN)) || cs.moderatorId == Nexa.users.me.value?.id
     Column(Modifier.fillMaxSize()) {
         PaneHeader(
             onBack,
@@ -335,9 +338,9 @@ fun StaffCasePane(caseId: String, showMember: Boolean, onBack: () -> Unit, onCha
         ) {
             // on the member's own page the way to them goes nowhere
             if (!gone && showMember) ModIconButton("UserRound", t("moderation.case.openPerson", "name" to targetName), { goPanel("users/${cs.userId}") })
-            if (cs.inEffect) ModIconButton("LockOpen", if (cs.action == "ban") t("moderation.case.liftBan") else t("moderation.case.liftMute"), { lift(cs) }, enabled = !busy, positive = true)
-            if (cs.status == "open") ModIconButton("CircleCheck", t("moderation.case.close"), { setClosed(true) }, enabled = !busy)
-            else ModIconButton("RotateCcw", t("moderation.case.reopen"), { setClosed(false) }, enabled = !busy)
+            if (cs.inEffect && handles) ModIconButton("LockOpen", if (cs.action == "ban") t("moderation.case.liftBan") else t("moderation.case.liftMute"), { lift(cs) }, enabled = !busy, positive = true)
+            if (handles && cs.status == "open") ModIconButton("CircleCheck", t("moderation.case.close"), { setClosed(true) }, enabled = !busy)
+            else if (handles) ModIconButton("RotateCcw", t("moderation.case.reopen"), { setClosed(false) }, enabled = !busy)
         }
         ThreadChat(
             lines = messages.map { it.line() },
@@ -361,9 +364,9 @@ fun StaffCasePane(caseId: String, showMember: Boolean, onBack: () -> Unit, onCha
             }),
             uploadPath = "/moderation/cases/attachments",
             locked = if (gone) ({ LockNote(t("moderation.case.goneNote")) }) else ({
-                LockNote(t("moderation.case.closedNote")) {
+                LockNote(t("moderation.case.closedNote"), if (!handles) null else ({
                     NxButton(t("moderation.case.reopen"), { setClosed(false) }, kind = ButtonKind.SECONDARY, size = ButtonSize.TOUCH, icon = "RotateCcw", enabled = !busy)
-                }
+                }))
             }),
             note = {
                 Txt(t("moderation.case.replyNote", "name" to nameOf(target)), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(17.5f)), color = c.textMuted)

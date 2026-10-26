@@ -69,7 +69,7 @@ type person struct {
 }
 
 func personOf(u *store.User) person {
-	return person{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, AvatarID: u.AvatarID, Flags: u.Flags & (store.FlagAdmin | store.FlagSystem), Deleted: u.Flags&store.FlagDeleted != 0}
+	return person{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, AvatarID: u.AvatarID, Flags: u.Flags & (store.StaffFlags | store.FlagSystem), Deleted: u.Flags&store.FlagDeleted != 0}
 }
 
 // people loads the named accounts; ids that are zero or gone are left out.
@@ -273,12 +273,15 @@ func (s *Server) nexaState(ctx context.Context, u *store.User) (*nexaState, erro
 		return nil, err
 	}
 	st.OwnerID, _ = s.Store.InstanceOwnerID(ctx)
-	if u.Flags&store.FlagAdmin != 0 {
+	if rank := s.rankOf(ctx, u); rank != rankNone {
 		counts, err := s.Store.CountModCases(ctx, now)
 		if err != nil {
 			return nil, err
 		}
-		st.Staff = &staffSummary{Counts: counts, OwnerID: st.OwnerID, Bugs: s.bugCountsFor(ctx), Unread: s.modUnreadFor(ctx, u.ID)}
+		st.Staff = &staffSummary{Counts: counts, OwnerID: st.OwnerID, Unread: s.modUnreadFor(ctx, u.ID)}
+		if rank >= rankAdmin {
+			st.Staff.Bugs = s.bugCountsFor(ctx)
+		}
 	}
 	st.People = s.people(ctx, who...)
 	return st, nil
@@ -324,9 +327,9 @@ func (s *Server) emitCase(ctx context.Context, c *store.ModCase, lines ...*store
 	s.Bcast.EmitUsers([]ids.ID{c.UserID}, "nexa_case", map[string]any{"case": toMemberCase(c, s.caseStateFor(ctx, c.UserID)), "messages": lines, "people": s.people(ctx, who...), "state": st})
 }
 
-// emitStaff sends an event to every account that can use the moderation panel.
-func (s *Server) emitStaff(ctx context.Context, event string, data any) {
-	staff, err := s.Store.StaffIDs(ctx)
+// emitStaff sends an event to every member of staff of at least rank need.
+func (s *Server) emitStaff(ctx context.Context, need staffRank, event string, data any) {
+	staff, err := s.Store.StaffIDs(ctx, staffBits(need))
 	if err != nil {
 		s.Log.Warn("moderation: staff list", "err", err)
 		return
@@ -615,7 +618,7 @@ func (s *Server) handleNexaAck(w http.ResponseWriter, r *http.Request) {
 			last = m[c.ID]
 		}
 		counts, _ := s.Store.CountModCases(r.Context(), time.Now().UnixMilli())
-		s.emitStaff(r.Context(), "mod_case", map[string]any{"case": toStaffCase(updated, cs, last), "messages": []*store.ModMessage{}, "people": s.people(r.Context(), casePeople(updated)...), "counts": counts})
+		s.emitStaff(r.Context(), rankMod, "mod_case", map[string]any{"case": toStaffCase(updated, cs, last), "messages": []*store.ModMessage{}, "people": s.people(r.Context(), casePeople(updated)...), "counts": counts})
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

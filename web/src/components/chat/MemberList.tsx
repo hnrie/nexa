@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { servers as serversApi } from "@/api/servers";
 import type { Member, PublicUser, Role } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
-import { AdminHammer, OwnerCrown } from "@/components/common/OwnerBadge";
+import { RankMark } from "@/components/common/OwnerBadge";
 import { isOwner } from "@/lib/owner";
 import { memberName } from "@/lib/names";
 import { memberMenu } from "@/components/server/memberMenu";
@@ -267,8 +267,8 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
               <span className={s.name} style={row.look?.color ? { color: row.look.color } : undefined}>
                 <span className={[s.nameText, nameClass(row.look)].join(" ")} style={nameStyle(row.look)}>{name}</span>
                 {row.look?.icon ? <RoleIcon icon={row.look.icon} size={16} /> : null}
-                {isOwner(row.member.user_id) ? <OwnerCrown /> : st.server.owner_id === row.member.user_id ? <Crown size={14} className={s.crown} aria-label={t("chat.memberList.serverOwner")} /> : null}
-                {!isOwner(row.member.user_id) && isInstanceAdmin(row.member.user_id) ? <AdminHammer /> : null}
+                {!isOwner(row.member.user_id) && st.server.owner_id === row.member.user_id ? <Crown size={14} className={s.crown} aria-label={t("chat.memberList.serverOwner")} /> : null}
+                <RankMark userId={row.member.user_id} />
                 <BotTag userId={row.member.user_id} />
                 <UserTag userId={row.member.user_id} size="sm" />
               </span>

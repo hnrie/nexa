@@ -14,6 +14,7 @@ import { searchSettings, settingsIndex, type SettingEntry } from "./settingsInde
 import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
+import { atLeast, useMyRank } from "@/lib/staffRank";
 import { confirmLogout } from "@/lib/confirmLogout";
 import { openReportBug } from "@/components/bugs/ReportBugButton";
 const AccountPage = lazyPage(() => import("./AccountPage"));
@@ -148,7 +149,8 @@ export default function SettingsModal({ onClose, page: initial, packId, modalId,
   useEffect(() => {
     if (modalId !== undefined) useUI.getState().setModalProps(modalId, { resume: page });
   }, [page, modalId]);
-  const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
+  // the instance's own settings are for developers and the owner
+  const isAdmin = atLeast(useMyRank(), "developer");
   const inApp = !!desktopBridge();
   const mobile = useIsMobile();
   // an Android browser is offered the Android app instead, once one is published

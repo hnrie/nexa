@@ -17,10 +17,10 @@ import (
 // owner, who reads why in their Nexa conversation and can answer there.
 
 func (s *Server) modServerRoutes(mux *http.ServeMux) {
-	mux.Handle("GET /api/v1/moderation/servers", s.admin(s.handleModServers))
-	mux.Handle("GET /api/v1/moderation/servers/{id}", s.admin(s.handleModServer))
-	mux.Handle("POST /api/v1/moderation/servers/{id}/actions", s.admin(s.handleModServerAction))
-	mux.Handle("DELETE /api/v1/moderation/servers/{id}/discovery-hold", s.admin(s.handleModDiscoveryRestore))
+	mux.Handle("GET /api/v1/moderation/servers", s.staff(rankAdmin, s.handleModServers))
+	mux.Handle("GET /api/v1/moderation/servers/{id}", s.staff(rankAdmin, s.handleModServer))
+	mux.Handle("POST /api/v1/moderation/servers/{id}/actions", s.staff(rankAdmin, s.handleModServerAction))
+	mux.Handle("DELETE /api/v1/moderation/servers/{id}/discovery-hold", s.staff(rankAdmin, s.handleModDiscoveryRestore))
 }
 
 // serverResetFields are what a server_reset can take back. "discovery" takes

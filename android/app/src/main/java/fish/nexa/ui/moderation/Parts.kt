@@ -256,14 +256,12 @@ fun StaffBadge(label: String, icon: String?) {
     }
 }
 
-/** Owner, or Staff, as the panel marks them. */
+/** Someone's staff rank as the panel marks them, nothing for anyone else. */
 @Composable
 fun RankBadge(userId: String, flags: Long, withIcon: Boolean = true) {
-    val owner = Moderation.ownerId.collectAsState().value == userId
-    when {
-        owner -> StaffBadge(t("profile.profileCard.owner"), if (withIcon) "Crown" else null)
-        flags and Moderation.FLAG_ADMIN != 0L -> StaffBadge(t("moderation.staff"), if (withIcon) "ShieldCheck" else null)
-    }
+    val owner = Moderation.ownerId.collectAsState().value
+    val rank = fish.nexa.data.StaffRanks.of(userId, flags, owner?.ifEmpty { null }) ?: return
+    StaffBadge(rank.label, if (withIcon) rank.icon else null)
 }
 
 /** `.tag`: a small label in a list (Needs Reply, a mute's end, Closed). */

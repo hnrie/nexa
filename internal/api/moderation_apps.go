@@ -15,7 +15,7 @@ import (
 // app offers nothing anywhere.
 
 func (s *Server) modAppRoutes(mux *http.ServeMux) {
-	mux.Handle("GET /api/v1/moderation/apps", s.admin(s.handleModApps))
+	mux.Handle("GET /api/v1/moderation/apps", s.staff(rankAdmin, s.handleModApps))
 }
 
 type modAppView struct {

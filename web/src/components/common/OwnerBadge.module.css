@@ -1,4 +1,5 @@
-/* The owner's crown and an admin's hammer, and the badges on a profile that
+/* The marks of Nexa's staff (the owner's crown, a developer's brackets, an
+   admin's hammer, a mod's shield), and the badges on a profile that
    carry them. They wear the accent the way the admin panel's own staff badges
    do (components/moderation/Moderation.module.css, .staffBadge): the mark in
    the accent's text colour, the badge a pill tinted with it and ringed in it,
@@ -6,8 +7,7 @@
    card's own white or near black, so the badge still reads on it. A server
    owner's crown stays gold (MemberList, GroupMemberList): it is a different
    thing to be. */
-.crown,
-.hammer {
+.mark {
   color: var(--text-brand);
   flex: none;
 }

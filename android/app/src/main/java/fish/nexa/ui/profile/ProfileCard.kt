@@ -402,16 +402,14 @@ private fun ProfileTop(
 // ---------------------------------------------------------------------------
 // Who they are
 
-/** The owner's crown or an admin's hammer, on a pill tinted with the accent. */
+/** A member of Nexa's staff's rank: its mark and name on a pill tinted with the accent. */
 @Composable
 private fun StaffBadge(userId: String, flags: Long) {
     val c = Nx.colors
-    val (icon, label) = when {
-        NexaOwner.isOwner(userId) -> "Crown" to t("profile.profileCard.owner")
-        flags and AccountFlags.ADMIN != 0L -> "Hammer" to t("profile.profileCard.admin")
-        else -> return
-    }
-    val tip = if (icon == "Crown") t("profile.profileCard.ownerTip") else t("profile.profileCard.adminTip")
+    val rank = fish.nexa.data.StaffRanks.of(userId, flags) ?: return
+    val icon = rank.icon
+    val label = rank.label
+    val tip = rank.tip
     val shape = RoundedCornerShape(999.dp)
     Row(
         Modifier

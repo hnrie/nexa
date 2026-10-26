@@ -120,9 +120,9 @@ func TestModerationHierarchy(t *testing.T) {
 		t.Errorf("disable the owner: %d %v", res.StatusCode, body)
 	}
 	// every access change is in the log
-	_, logBody := do(t, ts, "GET", "/api/v1/moderation/log?action=admin_grant", ownTok, nil)
+	_, logBody := do(t, ts, "GET", "/api/v1/moderation/log?action=rank_change", ownTok, nil)
 	if n := len(logBody["entries"].([]any)); n != 2 {
-		t.Errorf("admin grants logged: %d", n)
+		t.Errorf("rank changes logged: %d", n)
 	}
 	if res, body := modAct(t, ts, modTok, memID, map[string]any{"action": "mute", "reason": "x", "duration_ms": 3600000}); errCode(body) != "reason_required" {
 		t.Errorf("short reason: %d %v", res.StatusCode, body)

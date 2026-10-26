@@ -1,5 +1,6 @@
 package fish.nexa.ui.shell
 
+import fish.nexa.data.StaffRanks
 import fish.nexa.ui.profile.copyBotIdItem
 import fish.nexa.data.NexaInbox
 
@@ -470,7 +471,8 @@ fun DmSidebar() {
                 item("notes") { NavRow("NotebookPen", t("notes.title"), route is Route.Notes, noteRequests, t("notes.requests.count", "count" to noteRequests)) { Nav.go(Route.Notes()); Nav.leftOpen = false } }
                 item("support") { SupportRow(route is Route.Support) { Nav.go(Route.Support); Nav.leftOpen = false } }
                 // case threads and bug reports waiting on the staff that hold something this person has not read
-                if (me?.isAdmin == true) item("mod") {
+                // every rank of staff opens the panel
+                if (StaffRanks.of(me?.id, me?.flags ?: 0L) != null) item("mod") {
                     val waitingOnStaff = fish.nexa.data.Moderation.unread.collectAsState().value.count
                     NavRow("Shield", t("moderation.navLabel"), route is Route.Admin, waitingOnStaff, t("moderation.railWithCount", "count" to waitingOnStaff), onLongClick = { fish.nexa.ui.moderation.openModerationMenu() }) {
                         Nav.go(Route.Admin())
@@ -677,15 +679,14 @@ private fun ConversationRow(ch: Channel, selected: Boolean, parentSelected: Bool
     }
 }
 
-/** The Nexa owner's crown, or a Nexa admin's hammer, beside a name in a list. */
+/** The mark of a member of Nexa's staff beside their name in a list: the owner's crown, a developer's brackets, an admin's hammer, a mod's shield. */
 @Composable
 fun OwnerMarks(userId: String) {
     val c = Nx.colors
-    val user = Nexa.users.get(userId)
-    when {
-        NexaOwner.isOwner(userId) -> Icon("Crown", c.textBrand, size = 14.dp, modifier = Modifier.semantics { contentDescription = t("profile.profileCard.owner") })
-        user != null && user.flags and AccountFlags.ADMIN != 0L -> Icon("Hammer", c.textBrand, size = 14.dp, modifier = Modifier.semantics { contentDescription = t("profile.profileCard.admin") })
-    }
+    Nexa.users.byId.collectAsState().value
+    val flags = if (Nexa.users.me.collectAsState().value?.id == userId) Nexa.users.me.value?.flags else Nexa.users.get(userId)?.flags
+    val rank = StaffRanks.of(userId, flags ?: 0L) ?: return
+    Icon(rank.icon, c.textBrand, size = 14.dp, modifier = Modifier.semantics { contentDescription = rank.label })
 }
 
 @Composable

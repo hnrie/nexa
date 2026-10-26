@@ -787,7 +787,7 @@ Message on someone else's message, for one).
 | `threadLine` | A line of a case thread or bug report | none | `copyThreadLine` |
 | `threadTools` | The tools button of a case thread's or bug report's box on a phone | none | `threadFormattingEditor`, `threadEmojiPicker` |
 | `typingSlot` | One of the pictures of your typing style, in Settings | none | `pickTypingEmoji`, `useTypingPicture`, `removeTypingItem` |
-| `userGrid` | A person in the staff panel's list of accounts | `user` | `viewModUserProfile`, `copyModUserId`, `copyModUserBotId`, `toggleStaffAdmin`, `toggleAccountDisabled` |
+| `userGrid` | A person in the staff panel's list of accounts | `user` | `viewModUserProfile`, `copyModUserId`, `copyModUserBotId`, `setStaffRank`, `toggleAccountDisabled` |
 | `videoMore` | The More button of a video player | none | `playbackSpeed`, `pictureInPicture`, `downloadVideo` |
 
 <!-- menus:end -->

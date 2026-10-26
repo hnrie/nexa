@@ -16,9 +16,9 @@ import (
 // everything at once, the way any conversation is read.
 
 func (s *Server) modReadRoutes(mux *http.ServeMux) {
-	mux.Handle("POST /api/v1/moderation/read", s.admin(s.handleModReadAll))
-	mux.Handle("POST /api/v1/moderation/cases/{id}/read", s.admin(s.handleModThreadRead(store.ModReadCase)))
-	mux.Handle("POST /api/v1/moderation/bugs/{id}/read", s.admin(s.handleModThreadRead(store.ModReadBug)))
+	mux.Handle("POST /api/v1/moderation/read", s.staff(rankMod, s.handleModReadAll))
+	mux.Handle("POST /api/v1/moderation/cases/{id}/read", s.staff(rankMod, s.handleModThreadRead(store.ModReadCase)))
+	mux.Handle("POST /api/v1/moderation/bugs/{id}/read", s.staff(rankAdmin, s.handleModThreadRead(store.ModReadBug)))
 }
 
 // modUnreadFor is what a member of staff has not read, or empty lists when it
@@ -28,6 +28,10 @@ func (s *Server) modUnreadFor(ctx context.Context, uid ids.ID) store.ModUnread {
 	if err != nil {
 		s.Log.Warn("moderation: unread", "user", uid.String(), "err", err)
 		return store.ModUnread{Cases: []ids.ID{}, Bugs: []ids.ID{}}
+	}
+	// bug reports wait only on admins and above
+	if me, err := s.Store.UserByID(ctx, uid); err != nil || s.rankOf(ctx, me) < rankAdmin {
+		u.Bugs = []ids.ID{}
 	}
 	return u
 }
@@ -43,7 +47,7 @@ func (s *Server) emitModUnread(ctx context.Context, uids ...ids.ID) {
 // something that changes what waits on the staff: a member writing, a new
 // report, a reply or a change of state.
 func (s *Server) emitModUnreadAll(ctx context.Context) {
-	staff, err := s.Store.StaffIDs(ctx)
+	staff, err := s.Store.StaffIDs(ctx, store.StaffFlags)
 	if err != nil {
 		s.Log.Warn("moderation: staff list", "err", err)
 		return

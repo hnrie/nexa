@@ -83,21 +83,21 @@ private data class PanelTab(val id: String, val label: String, val icon: String,
 /**
  * The Admin & Moderation panel (AdminPanelPage.tsx): every account at a
  * glance, the cases waiting on the staff, the record of everything done, and
- * announcements to everyone. Only Nexa admins get here; the server refuses
- * everyone else anyway.
+ * announcements to everyone. Every rank of staff gets here, a mod to the
+ * people, cases and log alone (data/StaffRanks); the server refuses the rest.
  */
 @Composable
 fun AdminPanel(route: Route.Admin) {
     val c = Nx.colors
     val me by Nexa.users.me.collectAsState()
     val unread by Moderation.unread.collectAsState()
-    if (me != null && me?.isAdmin != true) {
+    val rank = fish.nexa.data.StaffRanks.of(me?.id, me?.flags ?: 0L)
+    if (me != null && rank == null) {
         LaunchedEffect(Unit) { Nav.go(Route.Friends, replace = true) }
         return
     }
     LaunchedEffect(Unit) { runCatching { Moderation.summary() } }
-    val tab = route.tab
-    val tabs = listOf(
+    val all = listOf(
         PanelTab("users", t("moderation.tabs.users"), "LayoutGrid"),
         PanelTab("bots", t("moderation.tabs.bots"), "Bot"),
         PanelTab("servers", t("moderation.tabs.servers"), "Server"),
@@ -108,6 +108,9 @@ fun AdminPanel(route: Route.Admin) {
         PanelTab("logs", t("moderation.tabs.logs"), "ScrollText"),
         PanelTab("announcements", t("moderation.tabs.announcements"), "Megaphone"),
     )
+    // a mod has the people, cases and log; admins and above every tab
+    val tabs = if (rank != null && rank.atLeast(fish.nexa.data.StaffRank.ADMIN)) all else all.filter { it.id in listOf("users", "cases", "logs") }
+    val tab = route.tab.takeIf { t -> tabs.any { it.id == t } } ?: "users"
     Column(Modifier.fillMaxSize()) {
         Column(
             Modifier

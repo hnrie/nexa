@@ -32,11 +32,11 @@ import (
 const legalLabelWidth = 26
 
 func (s *Server) legalRoutes(mux *http.ServeMux) {
-	mux.Handle("GET /api/v1/admin/legal-report", s.admin(s.handleLegalReport))
+	mux.Handle("GET /api/v1/admin/legal-report", s.staff(rankOwner, s.handleLegalReport))
 }
 
 // handleLegalReport compiles the document for one account. It is guarded and
-// rate-limited exactly as the other admin routes are, through s.admin.
+// rate-limited exactly as the other admin routes are, through s.staff.
 //
 // Only the owner of Nexa may compile one. It carries what nothing else in
 // the admin tools shows — the account's addresses and devices, its private
@@ -44,13 +44,6 @@ func (s *Server) legalRoutes(mux *http.ServeMux) {
 // whom the moderation tools deliberately keep out of each other's reach.
 func (s *Server) handleLegalReport(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())
-	if owner, err := s.Store.InstanceOwnerID(r.Context()); err != nil {
-		WriteError(w, err)
-		return
-	} else if owner != me.ID {
-		WriteError(w, E(http.StatusForbidden, "owner_only", "Only the owner of Nexa can compile a legal report."))
-		return
-	}
 	who := strings.TrimPrefix(strings.TrimSpace(r.URL.Query().Get("user")), "@")
 	if who == "" {
 		WriteError(w, E(http.StatusBadRequest, "no_account", "Name the account the request is about: a username or an account id."))
@@ -231,8 +224,13 @@ func legalBytes(n int64) string {
 // keeps for an account.
 func legalFlags(f int64) string {
 	var on []string
-	if f&store.FlagAdmin != 0 {
-		on = append(on, "Nexa administrator")
+	switch {
+	case f&store.FlagAdmin != 0:
+		on = append(on, "Nexa staff, rank Developer (or Owner, as the oldest)")
+	case f&store.FlagStaffAdmin != 0:
+		on = append(on, "Nexa staff, rank Admin")
+	case f&store.FlagStaffMod != 0:
+		on = append(on, "Nexa staff, rank Mod")
 	}
 	if f&store.FlagDisabled != 0 {
 		on = append(on, "disabled by an administrator")

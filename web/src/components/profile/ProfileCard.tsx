@@ -17,11 +17,11 @@ import { avatarUrl, bannerUrl, iconUrl, users as usersApi } from "@/api/users";
 import { ActivityList } from "@/components/activity/ActivityCard";
 import { StatusEmoji } from "@/components/activity/StatusEmoji";
 import { Avatar } from "@/components/common/Avatar";
-import { AdminBadge, OwnerBadge, PlanBadge } from "@/components/common/OwnerBadge";
+import { PlanBadge, StaffBadge } from "@/components/common/OwnerBadge";
+import { rankOf } from "@/lib/staffRank";
 import { ServerTagChip } from "@/components/servertag/ServerTagChip";
 import { ProfileWidgets, WidgetPeek, type WidgetDesign } from "./Widgets";
 import { readWidgets, type Widget } from "@/lib/widgets";
-import { isOwner } from "@/lib/owner";
 import { Tooltip } from "@/components/common/Tooltip";
 import { promptFields } from "@/components/modals/PromptModal";
 import { KeyStatusChip } from "./KeyVerify";
@@ -777,7 +777,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
               </button>
             </>
           ) : null}
-          {isOwner(user.id) ? <OwnerBadge /> : user.flags & 1 ? <AdminBadge /> : null}
+          {rankOf(user.id, user.flags) ? <StaffBadge rank={rankOf(user.id, user.flags)!} /> : null}
           <PlanBadge plan={user.plan} />
         </div>
       </div>

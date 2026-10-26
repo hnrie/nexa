@@ -126,11 +126,15 @@ fun PersonPage(userId: String, cases: Boolean, caseId: String?) {
             sub = listOf(if (deleted) t("moderation.user.deleted") else "@${user.username}", t("moderation.casesCount", "count" to d.cases.size)).plus(standing).joinToString(" · "),
             badge = {
                 AltBadge(user)
-                if (user.id == ownerId) StaffBadge(t("profile.profileCard.owner"), null) else if (user.isStaff) StaffBadge(t("moderation.staff"), null)
+                RankBadge(user.id, user.adminFlags, withIcon = true)
             },
             below = if (deleted) null else ({ StatusSummary(st, compact = true) }),
             actions = if (deleted) null else ({
                 NxButton(t("moderation.menu.profile"), { openProfile(user.id) }, kind = ButtonKind.GHOST, size = ButtonSize.TOUCH, icon = "UserRound")
+                // the owner gives and takes ranks, from here as from the grid's menu
+                if (fish.nexa.data.StaffRanks.mine() == fish.nexa.data.StaffRank.OWNER && user.blocked != "self" && user.blocked != "owner") {
+                    NxButton(t("staff.rankModal.menu"), { openRankSheet(user) { load() } }, kind = ButtonKind.SECONDARY, size = ButtonSize.TOUCH, icon = "ShieldCheck")
+                }
                 if (user.blocked.isEmpty()) NxButton(t("moderation.moderate"), { moderate() }, size = ButtonSize.TOUCH, icon = "Gavel")
             }),
         )
@@ -161,7 +165,9 @@ fun PersonPage(userId: String, cases: Boolean, caseId: String?) {
 private fun ProfileSheet(user: ModUser, servers: List<ModMembership>, packs: List<ModPack>, owner: Boolean, onModerate: (String, ModeratePreset) -> Unit) {
     val c = Nx.colors
     val deleted = user.isDeleted
-    val blocked = if (deleted) t("moderation.user.deleted") else blockedText(user.blocked)
+    // taking down part of a profile is for admins and above; a mod mutes and bans
+    val mine = fish.nexa.data.StaffRanks.mine()
+    val blocked = if (deleted) t("moderation.user.deleted") else blockedText(user.blocked).ifEmpty { if (mine != null && mine.atLeast(fish.nexa.data.StaffRank.ADMIN)) "" else t("staff.modOnlyRestricts") }
     val locked = blocked.isNotEmpty()
     fun reset(f: String) = onModerate("field_reset", ModeratePreset(fields = listOf(f)))
     val status = listOf(statusEmojiText(user.statusEmoji), user.statusText).filter { it.isNotEmpty() }.joinToString(" ")
@@ -241,7 +247,7 @@ private fun ProfileSheet(user: ModUser, servers: List<ModMembership>, packs: Lis
                         FactText(
                             when {
                                 owner -> t("profile.profileCard.owner")
-                                user.isStaff -> t("moderation.staff")
+                                user.isStaff -> fish.nexa.data.StaffRanks.of(null, user.adminFlags)?.label ?: t("moderation.staff")
                                 user.isDisabled -> t("moderation.state.disabled")
                                 else -> t("moderation.sheet.member")
                             },

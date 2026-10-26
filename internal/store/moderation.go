@@ -34,10 +34,13 @@ const (
 	LogUnban              = "unban"
 	LogAnnouncement       = "announcement"
 	LogAnnouncementDelete = "announcement_delete"
-	LogAdminGrant         = "admin_grant"
-	LogAdminRevoke        = "admin_revoke"
-	LogAccountDisable     = "account_disable"
-	LogAccountEnable      = "account_enable"
+	// LogAdminGrant and LogAdminRevoke are from before ranks; LogRankChange
+	// has replaced them, with the rank before and after in its details.
+	LogAdminGrant     = "admin_grant"
+	LogAdminRevoke    = "admin_revoke"
+	LogRankChange     = "rank_change"
+	LogAccountDisable = "account_disable"
+	LogAccountEnable  = "account_enable"
 	// LogExpressionRelist lets a pack taken out of Discover be listed again.
 	LogExpressionRelist = "expression_relist"
 	// LogDiscoveryRestore lets a server taken off Discovery be listed again.
@@ -1252,10 +1255,10 @@ func (s *Store) SystemUser(ctx context.Context) (*User, error) {
 	return scanUser(s.db.R.QueryRowContext(ctx, `SELECT `+userCols+` FROM users WHERE flags & ? != 0 AND flags & ? = 0 ORDER BY id LIMIT 1`, FlagSystem, FlagDeleted))
 }
 
-// StaffIDs lists every account that can use the moderation panel: the
-// Nexa admins who can sign in.
-func (s *Store) StaffIDs(ctx context.Context) ([]ids.ID, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT id FROM users WHERE flags & ? != 0 AND flags & ? = 0`, FlagAdmin, FlagDisabled|FlagDeleted|NotPeople)
+// StaffIDs lists the staff who can sign in and hold one of the rank bits in
+// ranks: StaffFlags for everyone who can use the moderation panel.
+func (s *Store) StaffIDs(ctx context.Context, ranks int64) ([]ids.ID, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT id FROM users WHERE flags & ? != 0 AND flags & ? = 0`, ranks, FlagDisabled|FlagDeleted|NotPeople)
 	if err != nil {
 		return nil, err
 	}
@@ -1361,7 +1364,7 @@ func (s *Store) ModUsers(ctx context.Context, f ModUserFilter) ([]*ModUser, erro
 		where = append(where, `br.case_id IS NOT NULL`)
 	case "staff":
 		where = append(where, `u.flags & ? != 0`)
-		args = append(args, FlagAdmin)
+		args = append(args, StaffFlags)
 	case "disabled":
 		where = append(where, `u.flags & ? != 0`)
 		args = append(args, FlagDisabled)

@@ -21,22 +21,22 @@ import (
 // are in moderation_actions.go.
 
 func (s *Server) moderationRoutes(mux *http.ServeMux) {
-	mux.Handle("GET /api/v1/moderation/summary", s.admin(s.handleModSummary))
-	mux.Handle("GET /api/v1/moderation/users", s.admin(s.handleModUsers))
-	mux.Handle("GET /api/v1/moderation/users/{id}", s.admin(s.handleModUser))
-	mux.Handle("GET /api/v1/moderation/users/{id}/alts", s.admin(s.handleModAlts))
-	mux.Handle("GET /api/v1/moderation/users/{id}/purge-preview", s.admin(s.handleModPurgePreview))
-	mux.Handle("POST /api/v1/moderation/users/{id}/actions", s.admin(s.handleModAction))
-	mux.Handle("GET /api/v1/moderation/cases", s.admin(s.handleModCases))
-	mux.Handle("GET /api/v1/moderation/cases/{id}", s.admin(s.handleModCase))
-	mux.Handle("POST /api/v1/moderation/cases/{id}/messages", s.admin(s.handleModReply))
-	mux.Handle("POST /api/v1/moderation/cases/{id}/lift", s.admin(s.handleModLift))
-	mux.Handle("POST /api/v1/moderation/cases/{id}/close", s.admin(s.handleModClose(true)))
-	mux.Handle("POST /api/v1/moderation/cases/{id}/reopen", s.admin(s.handleModClose(false)))
-	mux.Handle("GET /api/v1/moderation/log", s.admin(s.handleModLog))
-	mux.Handle("GET /api/v1/moderation/announcements", s.admin(s.handleModAnnouncements))
-	mux.Handle("POST /api/v1/moderation/announcements", s.admin(s.handleModAnnounce))
-	mux.Handle("DELETE /api/v1/moderation/announcements/{id}", s.admin(s.handleModAnnouncementDelete))
+	mux.Handle("GET /api/v1/moderation/summary", s.staff(rankMod, s.handleModSummary))
+	mux.Handle("GET /api/v1/moderation/users", s.staff(rankMod, s.handleModUsers))
+	mux.Handle("GET /api/v1/moderation/users/{id}", s.staff(rankMod, s.handleModUser))
+	mux.Handle("GET /api/v1/moderation/users/{id}/alts", s.staff(rankAdmin, s.handleModAlts))
+	mux.Handle("GET /api/v1/moderation/users/{id}/purge-preview", s.staff(rankDeveloper, s.handleModPurgePreview))
+	mux.Handle("POST /api/v1/moderation/users/{id}/actions", s.staff(rankMod, s.handleModAction))
+	mux.Handle("GET /api/v1/moderation/cases", s.staff(rankMod, s.handleModCases))
+	mux.Handle("GET /api/v1/moderation/cases/{id}", s.staff(rankMod, s.handleModCase))
+	mux.Handle("POST /api/v1/moderation/cases/{id}/messages", s.staff(rankMod, s.handleModReply))
+	mux.Handle("POST /api/v1/moderation/cases/{id}/lift", s.staff(rankMod, s.handleModLift))
+	mux.Handle("POST /api/v1/moderation/cases/{id}/close", s.staff(rankMod, s.handleModClose(true)))
+	mux.Handle("POST /api/v1/moderation/cases/{id}/reopen", s.staff(rankMod, s.handleModClose(false)))
+	mux.Handle("GET /api/v1/moderation/log", s.staff(rankMod, s.handleModLog))
+	mux.Handle("GET /api/v1/moderation/announcements", s.staff(rankAdmin, s.handleModAnnouncements))
+	mux.Handle("POST /api/v1/moderation/announcements", s.staff(rankAdmin, s.handleModAnnounce))
+	mux.Handle("DELETE /api/v1/moderation/announcements/{id}", s.staff(rankAdmin, s.handleModAnnouncementDelete))
 }
 
 // Why an account cannot be acted on, as the codes the panel shows.
@@ -49,9 +49,9 @@ const (
 )
 
 // moderationBlock says why me may not act on target, or "" when they may.
-// Staff are out of reach until their access is taken away, and the owner's
-// access can never be; so nobody can use the panel on the owner, and a
-// moderator cannot quietly mute or ban another.
+// Staff of any rank are out of reach until the owner takes their rank away,
+// and the owner's can never be; so nobody can use the panel on the owner, and
+// a moderator cannot quietly mute or ban another.
 func (s *Server) moderationBlock(ctx context.Context, me, target *store.User) string {
 	switch {
 	case target.ID == me.ID:
@@ -64,7 +64,7 @@ func (s *Server) moderationBlock(ctx context.Context, me, target *store.User) st
 	if owner, err := s.Store.InstanceOwnerID(ctx); err == nil && owner == target.ID {
 		return blockOwner
 	}
-	if target.Flags&store.FlagAdmin != 0 {
+	if target.Flags&store.StaffFlags != 0 {
 		return blockStaff
 	}
 	return ""
@@ -81,7 +81,7 @@ func blockError(code string) *Error {
 	case blockOwner:
 		return E(http.StatusForbidden, "moderate_owner", "The owner of Nexa cannot be moderated.")
 	default:
-		return E(http.StatusForbidden, "moderate_staff", "Staff cannot be moderated. Take away their admin access first.")
+		return E(http.StatusForbidden, "moderate_staff", "Staff cannot be moderated. The owner has to take their rank away first.")
 	}
 }
 
@@ -97,13 +97,17 @@ func (s *Server) handleModSummary(w http.ResponseWriter, r *http.Request) {
 	if sys, err := s.systemUser(ctx); err == nil {
 		nexa = sys.ID
 	}
-	staff, err := s.Store.StaffIDs(ctx)
+	staff, err := s.Store.StaffIDs(ctx, store.StaffFlags)
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
 	me := auth.UserFrom(ctx)
-	WriteJSON(w, http.StatusOK, map[string]any{"counts": counts, "bugs": s.bugCountsFor(ctx), "unread": s.modUnreadFor(ctx, me.ID), "owner_id": owner, "nexa_id": nexa, "staff_ids": staff, "people": s.people(ctx, staff...)})
+	var bugs *store.BugCounts
+	if s.rankOf(ctx, me) >= rankAdmin {
+		bugs = s.bugCountsFor(ctx)
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"counts": counts, "bugs": bugs, "unread": s.modUnreadFor(ctx, me.ID), "owner_id": owner, "nexa_id": nexa, "staff_ids": staff, "people": s.people(ctx, staff...)})
 }
 
 // modUserView is one account in the grid or at the top of its case list:
@@ -183,7 +187,7 @@ func (s *Server) handleModUsers(w http.ResponseWriter, r *http.Request) {
 			v.Blocked = blockSelf
 		case m.ID == owner:
 			v.Blocked = blockOwner
-		case m.AdminFlags&store.FlagAdmin != 0:
+		case m.AdminFlags&store.StaffFlags != 0:
 			v.Blocked = blockStaff
 		}
 		out = append(out, v)
@@ -438,6 +442,16 @@ func (s *Server) staffCaseFor(w http.ResponseWriter, r *http.Request) *store.Mod
 	return c
 }
 
+// handlesCase says whether me may lift, close or reopen c, and refuses when
+// not: a mod handles only the cases they opened, admins and above any.
+func (s *Server) handlesCase(w http.ResponseWriter, r *http.Request, me *store.User, c *store.ModCase) bool {
+	if c.ModeratorID == me.ID || s.rankOf(r.Context(), me) >= rankAdmin {
+		return true
+	}
+	WriteError(w, E(http.StatusForbidden, "not_your_case", "Mods can only lift, close or reopen the cases they opened."))
+	return false
+}
+
 func (s *Server) handleModCase(w http.ResponseWriter, r *http.Request) {
 	c := s.staffCaseFor(w, r)
 	if c == nil {
@@ -486,6 +500,9 @@ func (s *Server) handleModLift(w http.ResponseWriter, r *http.Request) {
 	if c == nil {
 		return
 	}
+	if !s.handlesCase(w, r, me, c) {
+		return
+	}
 	var req struct {
 		Reason string `json:"reason"`
 	}
@@ -524,7 +541,7 @@ func (s *Server) handleModClose(closed bool) http.HandlerFunc {
 		ctx := r.Context()
 		me := auth.UserFrom(ctx)
 		c := s.staffCaseFor(w, r)
-		if c == nil {
+		if c == nil || !s.handlesCase(w, r, me, c) {
 			return
 		}
 		updated, line, err := s.Store.SetModCaseClosed(ctx, c.ID, me.ID, closed)
@@ -545,7 +562,7 @@ func (s *Server) emitLog(ctx context.Context, e *store.ModLogEntry) {
 	if e.TargetID != nil {
 		who = append(who, *e.TargetID)
 	}
-	s.emitStaff(ctx, "mod_log", map[string]any{"entry": e, "people": s.people(ctx, who...)})
+	s.emitStaff(ctx, rankMod, "mod_log", map[string]any{"entry": e, "people": s.people(ctx, who...)})
 }
 
 func (s *Server) handleModLog(w http.ResponseWriter, r *http.Request) {

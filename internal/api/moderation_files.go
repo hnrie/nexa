@@ -21,7 +21,7 @@ import (
 
 func (s *Server) caseFileRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/nexa/cases/attachments", s.authed(s.handleCaseUpload))
-	mux.Handle("POST /api/v1/moderation/cases/attachments", s.admin(s.handleCaseUpload))
+	mux.Handle("POST /api/v1/moderation/cases/attachments", s.staff(rankMod, s.handleCaseUpload))
 	mux.Handle("GET /media/cases/{id}", s.authed(s.handleCaseFile))
 }
 
@@ -90,7 +90,7 @@ func (s *Server) handleCaseFile(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	staff := me.Flags&store.FlagAdmin != 0 && sent
+	staff := me.Flags&store.StaffFlags != 0 && sent
 	if member != me.ID && !staff {
 		http.NotFound(w, r)
 		return

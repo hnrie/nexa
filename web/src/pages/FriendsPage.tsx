@@ -7,12 +7,12 @@ import { acceptFriendRequest, addRequestNote, dropFriendRequest, requestError, u
 import { REQUEST_NOTE_MAX, cleanRequestNote } from "@/lib/requestNote";
 import type { Relationship } from "@/api/types";
 import { Avatar, statusLabel } from "@/components/common/Avatar";
-import { AdminHammer, OwnerCrown } from "@/components/common/OwnerBadge";
+import { StaffMark } from "@/components/common/OwnerBadge";
+import { rankOf } from "@/lib/staffRank";
 import { StatusLine } from "@/components/activity/StatusLine";
 import { Button } from "@/components/common/Button";
 import { Field, TextArea } from "@/components/common/TextInput";
 import { Tooltip } from "@/components/common/Tooltip";
-import { isOwner } from "@/lib/owner";
 import { RequestNote } from "@/components/friends/RequestNote";
 import { audioContext } from "@/voice/media";
 import { joinVoice } from "@/voice/session";
@@ -22,7 +22,6 @@ import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/pres
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { copyAndSay } from "@/lib/copyText";
-import { isInstanceAdmin } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
 import { useAuth } from "@/stores/auth";
 import { UserTag } from "@/components/servertag/UserTag";
@@ -336,11 +335,9 @@ function FriendRow({ rel, presenceUser, order, picking, picked }: { rel: Relatio
         <span className={s.rowText}>
           <span className={s.rowName}>
             <span className={s.rowDisplay} dir="auto">{name}</span>
-            {/* the owner of Nexa is crowned here as in every list, and its admins carry the hammer */}
-            {isOwner(rel.user.id) ? (
-              <span className={s.rowBadge}><OwnerCrown size={14} /></span>
-            ) : isInstanceAdmin(rel.user.id) || (rel.user.flags & 1) !== 0 ? (
-              <span className={s.rowBadge}><AdminHammer size={14} /></span>
+            {/* Nexa's staff carry their rank's mark here as in every list */}
+            {rankOf(rel.user.id, rel.user.flags) ? (
+              <span className={s.rowBadge}><StaffMark rank={rankOf(rel.user.id, rel.user.flags)!} size={14} /></span>
             ) : null}
             <UserTag userId={rel.user.id} size="sm" />
             <span className={s.rowUser}>{presenceUser.username}</span>

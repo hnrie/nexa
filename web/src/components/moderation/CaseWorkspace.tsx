@@ -16,6 +16,8 @@ import { useModEvents, useModeration } from "@/stores/moderation";
 import { usePresence } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
+import { atLeast, useMyRank } from "@/lib/staffRank";
+import { useAuth } from "@/stores/auth";
 import { ModerateModal } from "./ModerateModal";
 import { modStatus, StatusSummary } from "./ModStatus";
 import m from "./Moderation.module.css";
@@ -115,6 +117,8 @@ export function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: 
   const [data, setData] = useState<{ case: StaffCase; messages: CaseMessage[]; people: People } | null>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const rank = useMyRank();
+  const meId = useAuth((a) => a.me?.id);
 
   useEffect(() => {
     let alive = true;
@@ -197,6 +201,8 @@ export function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: 
   const target = data.people[c.user_id];
   const gone = !target || target.deleted;
   const Icon = actionIcon(c.action);
+  // a mod lifts, closes and reopens only the cases they opened; admins and above any
+  const handles = atLeast(rank, "admin") || c.moderator_id === meId;
   return (
     <>
       <div className={m.paneHeader}>
@@ -216,12 +222,12 @@ export function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: 
               <UserRound size={15} aria-hidden="true" /> <span className={m.btnLabel}>{personName(target)}</span>
             </Button>
           ) : null}
-          {c.in_effect ? (
+          {c.in_effect && handles ? (
             <Button size="sm" variant="positive" disabled={busy} onClick={() => void lift()} data-testid="case-lift" aria-label={c.action === "ban" ? t("moderation.case.liftBan") : t("moderation.case.liftMute")}>
               <LockOpen size={15} aria-hidden="true" /> <span className={m.btnLabel}>{c.action === "ban" ? t("moderation.case.liftBan") : t("moderation.case.liftMute")}</span>
             </Button>
           ) : null}
-          {c.status === "open" ? (
+          {!handles ? null : c.status === "open" ? (
             <Button size="sm" variant="secondary" disabled={busy} onClick={() => void setClosed(true)} data-testid="case-close" aria-label={t("moderation.case.close")}>
               <CircleCheck size={15} aria-hidden="true" /> <span className={m.btnLabel}>{t("moderation.case.close")}</span>
             </Button>
@@ -265,9 +271,11 @@ export function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: 
             <LockNote
               text={t("moderation.case.closedNote")}
               action={
-                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void setClosed(false)} data-testid="case-reopen-locked">
-                  <RotateCcw size={15} aria-hidden="true" /> {t("moderation.case.reopen")}
-                </Button>
+                handles ? (
+                  <Button size="sm" variant="secondary" disabled={busy} onClick={() => void setClosed(false)} data-testid="case-reopen-locked">
+                    <RotateCcw size={15} aria-hidden="true" /> {t("moderation.case.reopen")}
+                  </Button>
+                ) : undefined
               }
             />
           )

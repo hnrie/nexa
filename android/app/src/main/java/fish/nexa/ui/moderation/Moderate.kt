@@ -169,6 +169,13 @@ private val UNITS = listOf(MINUTE, HOUR, DAY, WEEK)
 private const val MAX_MUTE = 365 * DAY
 private const val MAX_BAN = 5 * 365 * DAY
 private val ACTIONS = listOf("avatar_remove", "field_reset", "mute", "ban", "delete")
+
+/** The actions a rank may take: a mod mutes and bans, an admin does all but delete. */
+private fun actionsFor(rank: fish.nexa.data.StaffRank?): List<String> = when {
+    rank == null || !rank.atLeast(fish.nexa.data.StaffRank.ADMIN) -> listOf("mute", "ban")
+    !rank.atLeast(fish.nexa.data.StaffRank.DEVELOPER) -> ACTIONS - "delete"
+    else -> ACTIONS
+}
 private val RESET_FIELDS = listOf("username", "display_name", "about_me", "pronouns", "status", "nicknames", "server_profiles", "typing_style", "name_style", "widgets", "server_tag")
 /** The fields a reset empties rather than writing a stand-in in. */
 private val CLEARED = setOf("status", "nicknames", "server_profiles", "typing_style", "name_style", "widgets", "server_tag")
@@ -293,7 +300,13 @@ private class ModerateState(u: ModUser, initial: String?, preset: ModeratePreset
 fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = null, preset: ModeratePreset? = null, bulk: List<ModUser>? = null, onDone: (StaffCase) -> Unit) {
     // everyone the action is for when it is more than one account (u is the first); each gets a case of their own
     val many = bulk?.takeIf { it.size > 1 }
-    val s = ModerateState(u, initial, preset, servers)
+    val mine = fish.nexa.data.StaffRanks.mine()
+    val isMod = mine == null || !mine.atLeast(fish.nexa.data.StaffRank.ADMIN)
+    val offered = actionsFor(mine)
+    // a mod mutes and bans for a week at most, and never for good
+    val maxMute = if (isMod) fish.nexa.data.StaffRanks.MOD_MAX_MS else MAX_MUTE
+    val maxBan = if (isMod) fish.nexa.data.StaffRanks.MOD_MAX_MS else MAX_BAN
+    val s = ModerateState(u, initial?.takeIf { it in offered }, preset, servers)
     if (many != null) {
         s.avatar = true
         s.banner = false
@@ -329,8 +342,8 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
         return when (a) {
             "avatar_remove" -> s.avatar || s.banner
             "field_reset" -> s.fields.isNotEmpty()
-            "mute" -> s.muteFor.value in MINUTE..MAX_MUTE
-            "ban" -> s.banFor.value == -1L || s.banFor.value in MINUTE..MAX_BAN
+            "mute" -> s.muteFor.value in MINUTE..maxMute
+            "ban" -> (s.banFor.value == -1L && !isMod) || s.banFor.value in MINUTE..maxBan
             else -> s.confirm.trim().lowercase() == confirmWord
         }
     }
@@ -422,7 +435,7 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
         when (s.action) {
             null -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel(t("moderation.form.chooseAction"))
-                for (a in ACTIONS) {
+                for (a in offered) {
                     val nothing = a == "avatar_remove" && !hasAvatar && !hasBanner
                     val desc = when {
                         many != null -> actionBlurb(a)
@@ -474,12 +487,12 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
                 )
             }
             "mute" -> {
-                DurationPicker(s.muteFor, MUTE_PRESETS, MAX_MUTE, permanent = false)
-                NoteBox(t("moderation.form.muteNote"))
+                DurationPicker(s.muteFor, MUTE_PRESETS.filter { it <= maxMute }, maxMute, permanent = false)
+                NoteBox(t("moderation.form.muteNote") + if (isMod) " " + t("staff.modWeek") else "")
             }
             "ban" -> {
-                DurationPicker(s.banFor, BAN_PRESETS, MAX_BAN, permanent = true)
-                NoteBox(t("moderation.form.banNote"))
+                DurationPicker(s.banFor, BAN_PRESETS.filter { it <= maxBan }, maxBan, permanent = !isMod)
+                NoteBox(t("moderation.form.banNote") + if (isMod) " " + t("staff.modWeek") else "")
             }
             "delete" -> {
                 LaunchedEffect(Unit) { if (s.preview == null && many == null) s.preview = runCatching { Moderation.purgePreview(u.id) }.getOrNull() }

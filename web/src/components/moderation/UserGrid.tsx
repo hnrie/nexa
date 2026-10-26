@@ -1,5 +1,5 @@
 import { copyBotIdItem } from "@/lib/copyId";
-import { Ban, CalendarDays, Check, Clock, Crown, Ellipsis, FolderOpen, Gavel, ListChecks, MessageSquareOff, Search, ShieldCheck, UserRoundCheck, UserRoundX, Users, X } from "lucide-react";
+import { Ban, CalendarDays, Check, Clock, Ellipsis, FolderOpen, Gavel, ListChecks, MessageSquareOff, Search, UserRoundCheck, UserRoundX, Users, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { moderation as modApi, type GridShow, type GridSort, type ModUser } from "@/api/moderation";
@@ -11,7 +11,8 @@ import { Spinner } from "@/components/common/Spinner";
 import { Tooltip } from "@/components/common/Tooltip";
 import { profileTheme } from "@/lib/avatarColor";
 import { describeError } from "@/lib/errors";
-import { FLAG_ADMIN, FLAG_DISABLED, previewText, relativeTo } from "@/lib/moderation";
+import { FLAG_DISABLED, previewText, relativeTo } from "@/lib/moderation";
+import { atLeast, rankOf, STAFF_FLAGS, useMyRank, type StaffRank } from "@/lib/staffRank";
 import { formatRelative } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { usePresence } from "@/stores/presence";
@@ -25,8 +26,11 @@ interface UserGridMenuCtx {
   user: ModUser;
   /** The account is the instance's owner, whom nobody changes. */
   owner: boolean;
+  /** The rank of whoever opened the menu. */
+  mine: StaffRank | null;
   openModal: (kind: string, props?: Record<string, unknown>) => void;
-  setAccess: (body: { admin?: boolean; disabled?: boolean }) => Promise<void>;
+  setAccess: (body: { disabled?: boolean }) => Promise<void>;
+  setRank: () => void;
 }
 
 /** What staff can do to an account from the users grid. */
@@ -37,24 +41,14 @@ const userGridMenu = defineMenu<UserGridMenuCtx>("userGrid", [
     button("copyModUserBotId", ({ user }) => copyBotIdItem(user.id)),
   ],
   [
-    button("toggleStaffAdmin", ({ user: u, owner, openModal, setAccess }) => {
-      if (u.blocked === "self" || owner) return null;
-      const admin = (u.admin_flags & FLAG_ADMIN) !== 0;
-      return {
-        id: "admin",
-        label: admin ? t("moderation.menu.removeAdmin") : t("moderation.menu.makeAdmin"),
-        onSelect: () =>
-          openModal("confirm", {
-            title: admin ? t("moderation.menu.removeAdminTitle", { name: u.display_name }) : t("moderation.menu.makeAdminTitle", { name: u.display_name }),
-            body: admin ? t("moderation.menu.removeAdminBody") : t("moderation.menu.makeAdminBody"),
-            confirmLabel: admin ? t("moderation.menu.removeAdmin") : t("moderation.menu.makeAdmin"),
-            danger: admin,
-            onConfirm: () => setAccess({ admin: !admin }),
-          }),
-      };
+    // only the owner gives and takes ranks
+    button("setStaffRank", ({ user: u, owner, mine, setRank }) => {
+      if (u.blocked === "self" || owner || mine !== "owner") return null;
+      return { id: "rank", label: t("staff.rankModal.menu"), onSelect: setRank };
     }),
-    button("toggleAccountDisabled", ({ user: u, owner, openModal, setAccess }) => {
-      if (u.blocked === "self" || owner) return null;
+    // disabling sign-in takes a developer, and the owner for staff
+    button("toggleAccountDisabled", ({ user: u, owner, mine, openModal, setAccess }) => {
+      if (u.blocked === "self" || owner || !atLeast(mine, (u.admin_flags & STAFF_FLAGS) !== 0 ? "owner" : "developer")) return null;
       const disabled = (u.admin_flags & FLAG_DISABLED) !== 0;
       return {
         id: "disable",
@@ -78,7 +72,8 @@ about(userGridMenu, ["user"], ({ user }) => ({ userId: user.id }));
 
 import { AltAccountsModal, AltBadge } from "./AltAccounts";
 import { AvatarStack, ModerateModal } from "./ModerateModal";
-import { modStatus, StatusSummary } from "./ModStatus";
+import { modStatus, RankPill, StatusSummary } from "./ModStatus";
+import { RankModal } from "./RankModal";
 import m from "./Moderation.module.css";
 
 const PAGE = 60;
@@ -114,6 +109,8 @@ export function UserGrid() {
   const [failed, setFailed] = useState(false);
   const [moderating, setModerating] = useState<ModUser | null>(null);
   const [altsOf, setAltsOf] = useState<ModUser | null>(null);
+  const [ranking, setRanking] = useState<ModUser | null>(null);
+  const mine = useMyRank();
   // the accounts picked for an action on all of them at once, by id
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState<Map<string, ModUser>>(new Map());
@@ -195,10 +192,10 @@ export function UserGrid() {
 
   useModEvents((e) => {
     if (e.type === "case" && users?.some((u) => u.id === e.case.user_id)) void refresh(e.case.user_id);
-    if (e.type === "log" && e.entry.target_id && e.entry.action.startsWith("admin_") && users?.some((u) => u.id === e.entry.target_id)) void refresh(e.entry.target_id);
+    if (e.type === "log" && e.entry.target_id && (e.entry.action.startsWith("admin_") || e.entry.action === "rank_change") && users?.some((u) => u.id === e.entry.target_id)) void refresh(e.entry.target_id);
   });
 
-  const setAccess = async (u: ModUser, body: { admin?: boolean; disabled?: boolean }) => {
+  const setAccess = async (u: ModUser, body: { disabled?: boolean }) => {
     try {
       await modApi.access(u.id, body);
       await refresh(u.id);
@@ -212,7 +209,7 @@ export function UserGrid() {
     e.preventDefault();
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     userGridMenu.open(
-      { user: u, owner: u.id === ownerId, openModal, setAccess: (body) => setAccess(u, body) },
+      { user: u, owner: u.id === ownerId, mine, openModal, setAccess: (body) => setAccess(u, body), setRank: () => setRanking(u) },
       {
         // from the button's start edge, which is its right one in a right-to-left language
         x: e.type === "contextmenu" ? e.clientX : document.documentElement.dir === "rtl" ? r.right : r.left,
@@ -341,7 +338,7 @@ export function UserGrid() {
               onCases={() => nav(`/channels/@admin/users/${u.id}/cases`)}
               onProfile={() => nav(`/channels/@admin/users/${u.id}`)}
               onMenu={(e) => menu(e, u)}
-              onAlts={() => setAltsOf(u)}
+              onAlts={atLeast(mine, "admin") ? () => setAltsOf(u) : undefined}
               picking={picking}
               picked={picked.has(u.id)}
               onPick={pickable(u) ? () => togglePick(u) : undefined}
@@ -370,12 +367,16 @@ export function UserGrid() {
           <Button size="sm" variant="ghost" onClick={() => setPicked(new Map())} aria-label={t("moderation.bulk.clear")}>
             <X size={15} aria-hidden="true" /> {t("moderation.bulk.clear")}
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => askBulkAccess(false)} loading={bulkBusy}>
-            <UserRoundCheck size={15} aria-hidden="true" /> {t("moderation.menu.enable")}
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => askBulkAccess(true)} loading={bulkBusy}>
-            <UserRoundX size={15} aria-hidden="true" /> {t("moderation.menu.disable")}
-          </Button>
+          {atLeast(mine, "developer") ? (
+            <>
+              <Button size="sm" variant="secondary" onClick={() => askBulkAccess(false)} loading={bulkBusy}>
+                <UserRoundCheck size={15} aria-hidden="true" /> {t("moderation.menu.enable")}
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => askBulkAccess(true)} loading={bulkBusy}>
+                <UserRoundX size={15} aria-hidden="true" /> {t("moderation.menu.disable")}
+              </Button>
+            </>
+          ) : null}
           <Button size="sm" variant="primary" onClick={() => setBulk([...picked.values()])} data-testid="bulk-moderate">
             <Gavel size={15} aria-hidden="true" /> {t("moderation.moderate")}
           </Button>
@@ -397,6 +398,7 @@ export function UserGrid() {
           }}
         />
       ) : null}
+      {ranking ? <RankModal user={ranking} current={rankOf(ranking.id, ranking.admin_flags, ownerId ?? undefined)} onClose={() => setRanking(null)} onDone={() => void refresh(ranking.id)} /> : null}
       {altsOf ? <AltAccountsModal user={altsOf} onClose={() => setAltsOf(null)} /> : null}
       {moderating ? <ModerateModal user={moderating} onClose={() => setModerating(null)} onDone={(c) => (c.action === "delete" ? setUsers((cur) => cur?.filter((x) => x.id !== c.user_id) ?? cur) : void refresh(c.user_id))} /> : null}
     </div>
@@ -410,7 +412,7 @@ interface UserCardProps {
   onCases: () => void;
   onProfile: () => void;
   onMenu: (e: MouseEvent) => void;
-  onAlts: () => void;
+  onAlts: (() => void) | undefined;
   /** The grid is picking accounts for an action on all of them. */
   picking: boolean;
   picked: boolean;
@@ -422,7 +424,7 @@ function UserCard({ u, owner, onModerate, onCases, onProfile, onMenu, onAlts, pi
   const live = usePresence((p) => p.byUser[u.id]);
   const st = modStatus(u, live);
   const banner = bannerUrl(u.banner_id, 320);
-  const staff = (u.admin_flags & FLAG_ADMIN) !== 0;
+  const rank = owner ? "owner" : rankOf(null, u.admin_flags);
   const disabled = (u.admin_flags & FLAG_DISABLED) !== 0;
   const state = u.ban ? "banned" : u.mute ? "muted" : undefined;
   const blocked = blockedText(u.blocked);
@@ -443,7 +445,7 @@ function UserCard({ u, owner, onModerate, onCases, onProfile, onMenu, onAlts, pi
       ) : null}
       <div className={m.cardBanner} style={banner ? { backgroundImage: `url(${banner})` } : { background: profileTheme(u.accent_color, u.accent_color_2, u.id) }} />
       <div className={m.cardFlags}>
-        <AltBadge user={u} onOpen={onAlts} />
+        {onAlts ? <AltBadge user={u} onOpen={onAlts} /> : null}
         {u.ban ? (
           <span className={m.flag} data-tone="danger" title={u.ban.expires_at ? relativeTo(u.ban.expires_at) : undefined}>
             <Ban size={12} aria-hidden="true" />
@@ -471,17 +473,7 @@ function UserCard({ u, owner, onModerate, onCases, onProfile, onMenu, onAlts, pi
           <button type="button" className={[m.cardNameText, m.cardNameLink].join(" ")} onClick={onProfile} data-testid="card-profile">
             {u.display_name}
           </button>
-          {owner ? (
-            <span className={m.staffBadge} title={t("profile.profileCard.owner")}>
-              <Crown size={12} aria-hidden="true" />
-              {t("profile.profileCard.owner")}
-            </span>
-          ) : staff ? (
-            <span className={m.staffBadge}>
-              <ShieldCheck size={12} aria-hidden="true" />
-              {t("moderation.staff")}
-            </span>
-          ) : null}
+          {rank ? <RankPill rank={rank} /> : null}
           {u.awaiting_cases > 0 ? (
             <Tooltip text={t("moderation.awaitingTip", { count: u.awaiting_cases })}>
               <span className={m.dot} aria-label={t("moderation.awaitingTip", { count: u.awaiting_cases })} />

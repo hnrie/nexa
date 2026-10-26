@@ -9,6 +9,7 @@ import type { BugStatus } from "@/api/bugs";
 import { bugStatusLabel } from "@/lib/bugs";
 import { formatStamp } from "@/lib/time";
 import { t } from "@/i18n";
+import { rankName } from "@/lib/staffRank";
 
 /** The flag the server sets on the Nexa system account. */
 export const FLAG_SYSTEM = 16;
@@ -68,6 +69,7 @@ export function actionIcon(action: string): LucideIcon {
     case "announcement_delete":
       return Megaphone;
     case "admin_grant":
+    case "rank_change":
       return ShieldPlus;
     case "admin_revoke":
       return ShieldMinus;
@@ -111,6 +113,8 @@ export function actionLabel(action: string): string {
       return t("moderation.action.adminGrant");
     case "admin_revoke":
       return t("moderation.action.adminRevoke");
+    case "rank_change":
+      return t("staff.log.rankChange");
     case "account_disable":
       return t("moderation.action.accountDisable");
     case "account_enable":
@@ -366,6 +370,11 @@ export function logDetail(e: ModLogEntry): string {
       return d.title ? `“${d.title}”` : "";
     case "account_delete_profile":
       return t("moderation.log.messagesKept");
+    case "rank_change": {
+      const r = e.details as { from?: string; to?: string };
+      const name = (x: string | undefined) => (x === "developer" || x === "admin" || x === "mod" ? rankName(x) : t("staff.rankModal.none"));
+      return t("staff.log.fromTo", { from: name(r.from), to: name(r.to) });
+    }
     default:
       return "";
   }
@@ -387,7 +396,7 @@ export const LOG_GROUPS: Record<string, string[]> = {
   punishments: ["avatar_remove", "field_reset", "server_reset", "expression_takedown", "mute", "ban", "delete", "account_delete_profile"],
   lifts: ["unmute", "unban", "expression_relist", "discovery_restore"],
   announcements: ["announcement", "announcement_delete"],
-  access: ["admin_grant", "admin_revoke", "account_disable", "account_enable"],
+  access: ["rank_change", "admin_grant", "admin_revoke", "account_disable", "account_enable"],
 };
 
 /** Why a muted account cannot do something, in a sentence for a toast. */

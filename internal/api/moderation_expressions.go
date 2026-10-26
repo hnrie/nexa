@@ -23,12 +23,12 @@ import (
 // in their Nexa conversation and can answer there.
 
 func (s *Server) modExpressionRoutes(mux *http.ServeMux) {
-	mux.Handle("GET /api/v1/moderation/packs", s.admin(s.handleModPacks))
-	mux.Handle("GET /api/v1/moderation/packs/{id}", s.admin(s.handleModPack))
-	mux.Handle("POST /api/v1/moderation/packs/{id}/actions", s.admin(s.handleModPackAction))
-	mux.Handle("POST /api/v1/moderation/packs/{id}/relist", s.admin(s.handleModPackRelist))
-	mux.Handle("POST /api/v1/moderation/servers/{id}/emojis/actions", s.admin(s.handleModEmojiAction))
-	mux.Handle("GET /api/v1/moderation/uploads", s.admin(s.handleModUploads))
+	mux.Handle("GET /api/v1/moderation/packs", s.staff(rankAdmin, s.handleModPacks))
+	mux.Handle("GET /api/v1/moderation/packs/{id}", s.staff(rankAdmin, s.handleModPack))
+	mux.Handle("POST /api/v1/moderation/packs/{id}/actions", s.staff(rankAdmin, s.handleModPackAction))
+	mux.Handle("POST /api/v1/moderation/packs/{id}/relist", s.staff(rankAdmin, s.handleModPackRelist))
+	mux.Handle("POST /api/v1/moderation/servers/{id}/emojis/actions", s.staff(rankAdmin, s.handleModEmojiAction))
+	mux.Handle("GET /api/v1/moderation/uploads", s.staff(rankAdmin, s.handleModUploads))
 }
 
 // packPreview is how many of a pack's stickers come with it in a list.
