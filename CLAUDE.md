@@ -441,7 +441,7 @@ request may meet a captcha is disabled until that request ends (the Public Pack 
 ### Plans and payments (`api/billing.go`, `internal/stripe`)
 
 - Supporter ($5 a month, $48 a year) and Pro ($10, $96) only raise what costs money to keep:
-  `planLimitsFor` gives each plan's largest file (1 GB free, or `MAX_UPLOAD_BYTES` when that is more, then 2 GB and 4 GB),
+  `planLimitsFor` gives each plan's largest file (1 GB free, 2 GB and 4 GB, whatever `MAX_UPLOAD_BYTES` says: that sizes only the files no plan covers, from webhooks, apps and notes),
   uploads per 30 days (5 GB, 100 GB, 500 GB: a rolling window counted from the account's
   attachment blobs and declared unfinished uploads, `Store.UploadedSince`, refused with
   `upload_month_full`), the Quality screen share and its most bits a second (6, 12, 20 Mbit/s),

@@ -47,13 +47,15 @@ const (
 )
 
 func (s *Server) planLimitsFor(plan string) planLimits {
-	atLeast := func(n int64) int64 { return max(n, s.Cfg.MaxUploadBytes) }
-	free := planLimits{FileMax: atLeast(freeFileMax), MonthUploadMax: 5 * gib, ShareMaxBps: 6_000_000}
+	// The plans' sizes are their own: MAX_UPLOAD_BYTES sizes the files that
+	// come with no plan (webhooks, apps, notes), and raising it once lifted
+	// every plan to the same number, so the plans meant nothing.
+	free := planLimits{FileMax: freeFileMax, MonthUploadMax: 5 * gib, ShareMaxBps: 6_000_000}
 	switch plan {
 	case store.PlanSupporter:
-		return planLimits{FileMax: atLeast(2 * gib), MonthUploadMax: 100 * gib, ShareQuality: true, ShareMaxBps: 12_000_000, NameEffects: true}
+		return planLimits{FileMax: 2 * gib, MonthUploadMax: 100 * gib, ShareQuality: true, ShareMaxBps: 12_000_000, NameEffects: true}
 	case store.PlanPro:
-		return planLimits{FileMax: atLeast(4 * gib), MonthUploadMax: 500 * gib, ShareQuality: true, ShareMaxBps: 20_000_000, NameEffects: true, Boosts: 2}
+		return planLimits{FileMax: 4 * gib, MonthUploadMax: 500 * gib, ShareQuality: true, ShareMaxBps: 20_000_000, NameEffects: true, Boosts: 2}
 	}
 	return free
 }
@@ -65,7 +67,7 @@ func (s *Server) plansInfo() map[string]any {
 		"free":           s.planLimitsFor(store.PlanFree),
 		"supporter":      s.planLimitsFor(store.PlanSupporter),
 		"pro":            s.planLimitsFor(store.PlanPro),
-		"boost_file_max": max(boostFileMax, s.Cfg.MaxUploadBytes),
+		"boost_file_max": boostFileMax,
 	}
 }
 

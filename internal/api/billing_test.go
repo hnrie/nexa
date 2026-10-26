@@ -359,3 +359,23 @@ func TestGiftLink(t *testing.T) {
 		t.Fatalf("buyer's view: %v", l)
 	}
 }
+
+// A big MAX_UPLOAD_BYTES (the live server's is 15 GB) sizes webhook, app and
+// note files only: it once lifted every plan to the same size.
+func TestPlansKeepTheirOwnFileSizes(t *testing.T) {
+	srv, ts := newTestServer(t)
+	srv.Cfg.MaxUploadBytes = 15 << 30
+	_, info := do(t, ts, "GET", "/api/v1/instance", "", nil)
+	plans := info["plans"].(map[string]any)
+	for plan, want := range map[string]float64{"free": 1 << 30, "supporter": 2 << 30, "pro": 4 << 30} {
+		if got := plans[plan].(map[string]any)["file_max"].(float64); got != want {
+			t.Errorf("%s file_max %v, want %v", plan, got, want)
+		}
+	}
+	if got := plans["boost_file_max"].(float64); got != 2<<30 {
+		t.Errorf("boost_file_max %v", got)
+	}
+	if got := info["max_upload_bytes"].(float64); got != 1<<30 {
+		t.Errorf("max_upload_bytes %v, want the free plan's", got)
+	}
+}
