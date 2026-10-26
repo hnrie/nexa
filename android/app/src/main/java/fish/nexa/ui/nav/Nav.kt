@@ -132,6 +132,11 @@ object Nav {
             fish.nexa.ui.auth.openQrApprove(path.substringAfter('#', ""))
             return true
         }
+        // a plan bought as a link: what it holds, and claiming it
+        if (parts.size == 2 && parts[0] == "gift") {
+            fish.nexa.ui.support.openGiftLink(parts[1])
+            return true
+        }
         // an invite link, a profile link
         if (parts.size == 2 && parts[0] == "invite") {
             fish.nexa.ui.dialogs.Dialogs.openInvite(parts[1], path.substringAfter('#', "").let { if (it.isEmpty()) "" else "#$it" })

@@ -115,7 +115,7 @@ export function SupportPrompt() {
     { icon: Gem, text: t("support.prompt.perkBoosts", { size: formatBytes(plansInfo().boost_file_max) }) },
   ];
   return (
-    <Modal open centered onClose={close} ariaLabel={t("support.prompt.title")} width={440} bare>
+    <Modal open centered onClose={close} ariaLabel={t("support.prompt.title")} width={440} bare className={s.promptCard}>
       <div className={s.prompt} data-testid="support-prompt">
         <span className={s.heart} aria-hidden="true"><Heart size={28} fill="currentColor" /></span>
         <h2 className={s.title}>{t("support.prompt.title")}</h2>

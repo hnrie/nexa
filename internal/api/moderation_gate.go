@@ -41,6 +41,7 @@ var muteAllowed = map[string]bool{
 	"POST /api/v1/auth/logout":                                          true,
 	"POST /api/v1/billing/portal":                                       true,
 	"POST /api/v1/billing/checkout":                                     true,
+	"POST /api/v1/gifts/{code}/claim":                                   true,
 	"DELETE /api/v1/auth/sessions/{id}":                                 true,
 	"POST /api/v1/auth/password":                                        true,
 	"POST /api/v1/auth/recovery":                                        true,

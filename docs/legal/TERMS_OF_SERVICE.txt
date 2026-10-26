@@ -1,7 +1,7 @@
 NEXA - TERMS OF SERVICE
 Site: nexa.fish (also at mathtest.lol, and formerly chat.evilion.xyz)
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-10-25
+Effective: 2026-10-26
 
 These Terms are the agreement between you and the owner of Nexa.
 They are short on purpose and written in plain language. The Privacy
@@ -230,7 +230,9 @@ when you pay is the one you pay.
 - Gifts. You can buy someone a month (30 days) or a year (365 days)
   of a plan. A gift is paid once and never renews. A second gift of
   the same plan starts when the first one ends. You cannot give a
-  gift to someone who has blocked you or whom you have blocked.
+  gift to someone who has blocked you or whom you have blocked. A
+  gift bought as a link goes to whoever claims it first, once; keep
+  it to the person it is for, as anyone with the link can claim it.
 - The rules still apply. A plan does not change these Terms or how
   moderation works.
 

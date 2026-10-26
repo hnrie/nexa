@@ -164,8 +164,8 @@ type Gift struct {
 }
 
 // AddGift gives an account a plan for days, bought in one Checkout session;
-// the same session twice gives it once. A gift of a plan the account already
-// has a gift of starts when that one ends, so two months make two months.
+// a session seen before adds nothing. Another gift of the same plan starts
+// when the last one running ends.
 func (s *Store) AddGift(ctx context.Context, sessionID string, from, to ids.ID, plan string, days int) (added, changed bool, unboosted []ids.ID, err error) {
 	err = s.Tx(ctx, func(tx *db.Tx) error {
 		var seen int
@@ -175,25 +175,132 @@ func (s *Store) AddGift(ctx context.Context, sessionID string, from, to ids.ID, 
 		if seen > 0 {
 			return nil
 		}
-		now := nowMs()
-		start := now
-		var last sql.NullInt64
-		if err := tx.QueryRowContext(ctx, `SELECT max(ends_at) FROM plan_gifts WHERE to_id = ? AND plan = ? AND ends_at > ?`, int64(to), plan, now).Scan(&last); err != nil {
-			return err
-		}
-		if last.Valid && last.Int64 > start {
-			start = last.Int64
-		}
-		end := start + int64(days)*24*60*60*1000
-		if _, err := tx.ExecContext(ctx, `INSERT INTO plan_gifts (id, session_id, from_id, to_id, plan, starts_at, ends_at, created_at) VALUES (?,?,?,?,?,?,?,?)`,
-			int64(ids.New()), sessionID, int64(from), int64(to), plan, start, end, now); err != nil {
-			return err
-		}
 		added = true
-		changed, unboosted, err = recomputePlanTx(ctx, tx, to)
+		changed, unboosted, err = addGiftTx(ctx, tx, sessionID, from, to, plan, days)
 		return err
 	})
 	return added, changed, unboosted, err
+}
+
+func addGiftTx(ctx context.Context, tx *db.Tx, sessionID string, from, to ids.ID, plan string, days int) (changed bool, unboosted []ids.ID, err error) {
+	now := nowMs()
+	start := now
+	var last sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `SELECT max(ends_at) FROM plan_gifts WHERE to_id = ? AND plan = ? AND ends_at > ?`, int64(to), plan, now).Scan(&last); err != nil {
+		return false, nil, err
+	}
+	if last.Valid && last.Int64 > start {
+		start = last.Int64
+	}
+	end := start + int64(days)*24*60*60*1000
+	if _, err := tx.ExecContext(ctx, `INSERT INTO plan_gifts (id, session_id, from_id, to_id, plan, starts_at, ends_at, created_at) VALUES (?,?,?,?,?,?,?,?)`,
+		int64(ids.New()), sessionID, int64(from), int64(to), plan, start, end, now); err != nil {
+		return false, nil, err
+	}
+	return recomputePlanTx(ctx, tx, to)
+}
+
+// GiftLink is a plan bought as a link, which whoever opens it first claims.
+type GiftLink struct {
+	Code        string `json:"code"`
+	FromID      ids.ID `json:"from_id"`
+	FromName    string `json:"from_name"`
+	Plan        string `json:"plan"`
+	Days        int    `json:"days"`
+	CreatedAt   int64  `json:"created_at"`
+	Claimed     bool   `json:"claimed"`
+	ClaimedBy   ids.ID `json:"claimed_by"`
+	ClaimedName string `json:"claimed_name"`
+	ClaimedAt   int64  `json:"claimed_at"`
+}
+
+// ErrGiftClaimed is a gift link someone has already claimed.
+var ErrGiftClaimed = errors.New("store: gift link already claimed")
+
+// giftLinkCodeLen is long enough that a link can't be guessed.
+const giftLinkCodeLen = 20
+
+// AddGiftLink makes the link a paid Checkout session bought, once; a session
+// seen before answers the link it already made.
+func (s *Store) AddGiftLink(ctx context.Context, sessionID string, from ids.ID, plan string, days int) (code string, err error) {
+	err = s.Tx(ctx, func(tx *db.Tx) error {
+		err := tx.QueryRowContext(ctx, `SELECT code FROM gift_links WHERE session_id = ?`, sessionID).Scan(&code)
+		if err == nil || !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		code = randomCode(giftLinkCodeLen)
+		_, err = tx.ExecContext(ctx, `INSERT INTO gift_links (code, session_id, from_id, plan, days, created_at) VALUES (?,?,?,?,?,?)`, code, sessionID, int64(from), plan, days, nowMs())
+		return err
+	})
+	return code, err
+}
+
+const giftLinkCols = `g.code, g.from_id, coalesce(f.display_name, ''), g.plan, g.days, g.created_at, g.claimed_by, coalesce(c.display_name, ''), g.claimed_at
+	FROM gift_links g LEFT JOIN users f ON f.id = g.from_id LEFT JOIN users c ON c.id = g.claimed_by AND g.claimed_by <> 0`
+
+func scanGiftLink(r rowScanner) (*GiftLink, error) {
+	var g GiftLink
+	var from, by int64
+	if err := r.Scan(&g.Code, &from, &g.FromName, &g.Plan, &g.Days, &g.CreatedAt, &by, &g.ClaimedName, &g.ClaimedAt); err != nil {
+		return nil, err
+	}
+	g.FromID, g.ClaimedBy, g.Claimed = ids.ID(from), ids.ID(by), g.ClaimedAt > 0
+	return &g, nil
+}
+
+// GiftLinkByCode reads a gift link.
+func (s *Store) GiftLinkByCode(ctx context.Context, code string) (*GiftLink, error) {
+	g, err := scanGiftLink(s.db.R.QueryRowContext(ctx, `SELECT `+giftLinkCols+` WHERE g.code = ?`, code))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return g, err
+}
+
+// GiftLinksFrom lists the gift links an account bought, newest first.
+func (s *Store) GiftLinksFrom(ctx context.Context, uid ids.ID) ([]GiftLink, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+giftLinkCols+` WHERE g.from_id = ? ORDER BY g.created_at DESC LIMIT 100`, int64(uid))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []GiftLink{}
+	for rows.Next() {
+		g, err := scanGiftLink(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *g)
+	}
+	return out, rows.Err()
+}
+
+// ClaimGiftLink gives uid the plan a link holds, if nobody has claimed it
+// yet (ErrGiftClaimed otherwise), as a gift from whoever bought it.
+func (s *Store) ClaimGiftLink(ctx context.Context, code string, uid ids.ID) (g *GiftLink, changed bool, unboosted []ids.ID, err error) {
+	err = s.Tx(ctx, func(tx *db.Tx) error {
+		var from int64
+		var plan string
+		var days int
+		var at int64
+		if err := tx.QueryRowContext(ctx, `SELECT from_id, plan, days, claimed_at FROM gift_links WHERE code = ?`, code).Scan(&from, &plan, &days, &at); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+		res, err := tx.ExecContext(ctx, `UPDATE gift_links SET claimed_by = ?, claimed_at = ? WHERE code = ? AND claimed_at = 0`, int64(uid), nowMs(), code)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 || at > 0 {
+			return ErrGiftClaimed
+		}
+		g = &GiftLink{Code: code, FromID: ids.ID(from), Plan: plan, Days: days}
+		changed, unboosted, err = addGiftTx(ctx, tx, "link:"+code, ids.ID(from), uid, plan, days)
+		return err
+	})
+	return g, changed, unboosted, err
 }
 
 // GiftsFor lists the gifts an account has that have not ended, soonest first.

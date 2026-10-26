@@ -94,7 +94,7 @@ val TAG_ICONS = listOf(
 )
 
 const val DEFAULT_TAG_BADGE = "icon:sparkles"
-private const val MAX_TAG_LETTERS = 8
+private const val MAX_TAG_LETTERS = 4
 private const val SYMBOLS = "!?.-_+&#@$%*~^=:'"
 
 /** lib/serverTags.ts readTagText: one to eight letters, numbers or symbols, no spaces, no zalgo. */

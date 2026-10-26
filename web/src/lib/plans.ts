@@ -13,10 +13,10 @@ const GiB = 1024 * MiB;
  */
 let plans: PlansInfo = {
   enabled: false,
-  free: { file_max: 100 * MiB, month_upload_max: 5 * GiB, share_quality: false, share_max_bps: 6_000_000, name_effects: false, boosts: 0 },
-  supporter: { file_max: 1 * GiB, month_upload_max: 100 * GiB, share_quality: true, share_max_bps: 12_000_000, name_effects: true, boosts: 0 },
+  free: { file_max: 1 * GiB, month_upload_max: 5 * GiB, share_quality: false, share_max_bps: 6_000_000, name_effects: false, boosts: 0 },
+  supporter: { file_max: 2 * GiB, month_upload_max: 100 * GiB, share_quality: true, share_max_bps: 12_000_000, name_effects: true, boosts: 0 },
   pro: { file_max: 4 * GiB, month_upload_max: 500 * GiB, share_quality: true, share_max_bps: 20_000_000, name_effects: true, boosts: 2 },
-  boost_file_max: 500 * MiB,
+  boost_file_max: 2 * GiB,
 };
 
 /** Takes the table the instance answered with. */

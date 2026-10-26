@@ -161,7 +161,8 @@ func (c *Client) CreateCheckout(ctx context.Context, p CheckoutParams) (string, 
 type GiftParams struct {
 	PriceID    string
 	FromID     string
-	ToID       string
+	ToID       string // empty for a gift link
+	Link       bool
 	Plan       string
 	Period     string
 	SuccessURL string
@@ -183,6 +184,10 @@ func (c *Client) CreateGiftCheckout(ctx context.Context, p GiftParams) (string, 
 		"metadata[gift_period]":     {p.Period},
 		"success_url":               {p.SuccessURL},
 		"cancel_url":                {p.CancelURL},
+	}
+	if p.Link {
+		f.Del("metadata[gift_to]")
+		f.Set("metadata[gift_link]", "1")
 	}
 	var out struct {
 		URL string `json:"url"`

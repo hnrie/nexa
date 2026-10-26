@@ -583,7 +583,7 @@ data class InstanceInfo(
 /** What one plan allows (api/billing.go planLimits). */
 @Serializable
 data class PlanLimits(
-    @SerialName("file_max") val fileMax: Long = 104857600,
+    @SerialName("file_max") val fileMax: Long = 1L shl 30,
     @SerialName("month_upload_max") val monthUploadMax: Long = 5L shl 30,
     @SerialName("share_quality") val shareQuality: Boolean = false,
     @SerialName("share_max_bps") val shareMaxBps: Long = 6_000_000,
@@ -595,9 +595,9 @@ data class PlanLimits(
 data class PlansInfo(
     val enabled: Boolean = false,
     val free: PlanLimits = PlanLimits(),
-    val supporter: PlanLimits = PlanLimits(1L shl 30, 100L shl 30, true, 12_000_000, true, 0),
+    val supporter: PlanLimits = PlanLimits(2L shl 30, 100L shl 30, true, 12_000_000, true, 0),
     val pro: PlanLimits = PlanLimits(4L shl 30, 500L shl 30, true, 20_000_000, true, 2),
-    @SerialName("boost_file_max") val boostFileMax: Long = 500L shl 20,
+    @SerialName("boost_file_max") val boostFileMax: Long = 2L shl 30,
 )
 
 /** One of an account's boosts, with the server it is on. */
@@ -632,6 +632,33 @@ data class Billing(
     @SerialName("gift_prices") val giftPrices: Map<String, Map<String, PlanPrice>> = emptyMap(),
     /** Plans given to this account that haven't run out, soonest first. */
     val gifts: List<PlanGift>? = null,
+    /** Gift links this account bought, newest first. */
+    @SerialName("gift_links") val giftLinks: List<GiftLink>? = null,
+)
+
+/** A plan bought as a link, which whoever opens it first claims (store.GiftLink). */
+@Serializable
+data class GiftLink(
+    val code: String,
+    val plan: String = "",
+    val days: Int = 30,
+    @SerialName("created_at") val createdAt: Long = 0,
+    val claimed: Boolean = false,
+    @SerialName("claimed_by") val claimedBy: Snowflake = "",
+    @SerialName("claimed_name") val claimedName: String = "",
+)
+
+/** A gift link as someone who opened it sees it (api/billing.go giftLinkView). */
+@Serializable
+data class GiftLinkView(
+    val code: String,
+    @SerialName("from_id") val fromId: Snowflake = "",
+    @SerialName("from_name") val fromName: String = "",
+    val plan: String = "",
+    val days: Int = 30,
+    val claimed: Boolean = false,
+    @SerialName("claimed_by_me") val claimedByMe: Boolean = false,
+    val mine: Boolean = false,
 )
 
 /** A plan someone gave this account, for a month or a year (store.Gift). */

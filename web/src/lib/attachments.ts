@@ -12,8 +12,6 @@ import { scrubFile } from "./scrubMetadata";
 import type { PieceReply, PieceRequest } from "./upload.worker";
 
 import { t } from "@/i18n";
-/** Fallback until the server says what it accepts. */
-export const MAX_UPLOAD = 100 * 1024 * 1024;
 
 /**
  * What this server takes: the largest file, the most to send in one request,

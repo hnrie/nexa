@@ -111,6 +111,33 @@ export interface Billing {
   gift_prices: Partial<Record<"supporter" | "pro", Partial<Record<"month" | "year", PlanPrice>>>>;
   /** Plans given to this account that haven't run out, soonest first. */
   gifts: PlanGift[] | null;
+  /** Gift links this account bought, newest first (absent on a server from before them). */
+  gift_links?: GiftLink[] | null;
+}
+
+/** A plan bought as a link, which whoever opens it first claims (store.GiftLink). */
+export interface GiftLink {
+  code: string;
+  plan: Plan;
+  days: number;
+  created_at: number;
+  claimed: boolean;
+  claimed_by: Snowflake;
+  claimed_name: string;
+  claimed_at: number;
+}
+
+/** A gift link as someone who opened it sees it (api/billing.go giftLinkView). */
+export interface GiftLinkView {
+  code: string;
+  from_id: Snowflake;
+  from_name: string;
+  plan: Plan;
+  days: number;
+  claimed: boolean;
+  claimed_by_me: boolean;
+  /** This account bought it. */
+  mine: boolean;
 }
 
 /** A plan someone gave this account, for a month or a year (store.Gift). */

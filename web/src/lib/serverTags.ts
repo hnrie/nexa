@@ -53,7 +53,7 @@ const SYMBOLS = "!?.-_+&#@$%*~^=:'";
  * few symbols, and no spaces. `count` is how many it has.
  */
 /** A tag's most letters (internal/api/server_tags.go maxTagLetters): what still sits beside a name on a phone. */
-export const MAX_TAG_LETTERS = 8;
+export const MAX_TAG_LETTERS = 4;
 
 export function readTagText(raw: string): { text: string; count: number; ok: boolean } {
   const text = raw.trim();

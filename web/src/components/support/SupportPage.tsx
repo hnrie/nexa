@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Gift, Heart, Rocket, X } from "lucide-react";
+import { Check, Copy, Gift, Heart, Link2, Rocket, X } from "lucide-react";
 import { ApiError, iconUrl } from "@/api";
 import { billing as billingApi } from "@/api/billing";
 import type { Plan, PlanLimits } from "@/api/types";
@@ -10,7 +10,9 @@ import { SearchBox } from "@/components/common/SearchBox";
 import { Select } from "@/components/common/Select";
 import { PlanBadge } from "@/components/common/OwnerBadge";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
+import { shareOrigin } from "@/lib/appLinks";
 import { isBot } from "@/lib/botCopies";
+import { copyText } from "@/lib/clipboard";
 import { limitsOf, PAID_PLANS, plansInfo } from "@/lib/plans";
 import { formatBytes, formatShortDate } from "@/lib/time";
 import { fold } from "@/search/text";
@@ -257,6 +259,7 @@ export function SupportPanel({ inSettings = false }: { inSettings?: boolean }) {
       {plan === "pro" ? <Boosts /> : null}
       {billing?.gifts?.length ? <GiftsGot /> : null}
       {enabled ? <GiveAPlan /> : null}
+      {billing?.gift_links?.length ? <GiftLinksMade /> : null}
       {inSettings ? null : (
         <p className={s.hint}>
           <button className={s.linkish} onClick={() => nav("/terms")}>{t("support.termsLink")}</button>
@@ -345,10 +348,48 @@ function GiftsGot() {
   );
 }
 
+/** The address of a gift link, as it is shared. */
+export function giftLinkUrl(code: string): string {
+  return `${shareOrigin()}/gift/${code}`;
+}
+
+/** How long a gift lasts, as its title says it ("A Month of Pro"). */
+export function giftTitle(plan: Plan, days: number): string {
+  return t(days >= 365 ? "support.giftLink.yearOf" : "support.giftLink.monthOf", { plan: planName(plan) });
+}
+
+/** The gift links this account bought: copy one to send it, and who has claimed which. */
+function GiftLinksMade() {
+  const links = useBilling((b) => b.billing?.gift_links) ?? [];
+  return (
+    <section className={s.mine} aria-labelledby="support-gift-links" data-testid="gift-links">
+      <h2 className={s.h2} id="support-gift-links">{t("support.giftLink.yours")}</h2>
+      <p className={s.hint}>{t("support.giftLink.yoursHint")}</p>
+      <ul className={s.boosts}>
+        {links.map((l) => (
+          <li key={l.code} className={s.boost} data-plan={l.plan}>
+            <span className={s.giftIcon} aria-hidden="true">{l.claimed ? <Check size={16} /> : <Link2 size={16} />}</span>
+            <span className={s.names}>
+              <span className={s.boostName}>{giftTitle(l.plan, l.days)}</span>
+              <span className={s.giftState}>{l.claimed ? t("support.giftLink.claimedBy", { name: l.claimed_name || t("support.giftLink.someone") }) : t("support.giftLink.waiting")}</span>
+            </span>
+            {l.claimed ? null : (
+              <Button variant="secondary" size="sm" onClick={() => void copyText(giftLinkUrl(l.code), t("support.giftLink.copied"))} data-testid="gift-link-copy">
+                <Copy size={15} aria-hidden="true" /> {t("support.giftLink.copy")}
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /**
  * Gift a Plan: a month or a year of Supporter or Pro for a friend or someone
- * this account talks to, paid once on Stripe's page and never renewed.
- * /channels/@me/support?gift=<id> starts with that person picked.
+ * this account talks to, or as a link for anyone, paid once on Stripe's page
+ * and never renewed. /channels/@me/support?gift=<id> starts with that person
+ * picked.
  */
 function GiveAPlan() {
   const loc = useLocation();
@@ -359,12 +400,14 @@ function GiveAPlan() {
   const prices = useBilling((b) => b.billing?.gift_prices);
   const toast = useUI((u) => u.toast);
   const params = new URLSearchParams(loc.search);
-  const [to, setTo] = useState<string | null>(params.get("gift") && params.get("gift") !== "done" ? params.get("gift") : null);
+  const back = params.get("gift");
+  const [to, setTo] = useState<string | null>(back && back !== "done" && back !== "link" ? back : null);
   const [query, setQuery] = useState("");
   const [plan, setPlan] = useState<Paid>("supporter");
   const [period, setPeriod] = useState<Period>("month");
   const [busy, setBusy] = useState(false);
-  const given = params.get("gift") === "done";
+  const [asLink, setAsLink] = useState(false);
+  const given = back === "done";
 
   // friends first, then the people of one-to-one conversations
   const people = useMemo(() => {
@@ -381,10 +424,10 @@ function GiveAPlan() {
   const cost = got ? money(got.amount, got.currency) : money(LIST_PRICES[plan][period], "usd");
 
   const give = async () => {
-    if (!to) return;
+    if (!to && !asLink) return;
     setBusy(true);
     try {
-      const { url } = await billingApi.gift(to, plan, period);
+      const { url } = asLink ? await billingApi.giftLink(plan, period) : await billingApi.gift(to!, plan, period);
       window.location.assign(url);
     } catch (err) {
       toast(err instanceof ApiError ? err.message : t("support.error"), "error");
@@ -402,7 +445,18 @@ function GiveAPlan() {
         </div>
       </div>
       {given ? <p className={s.notice} role="status">{t("support.gift.done")}</p> : null}
-      {picked ? (
+      {back === "link" ? <p className={s.notice} role="status">{t("support.giftLink.done")}</p> : null}
+      <div className={s.period} role="radiogroup" aria-label={t("support.gift.who")}>
+        <button role="radio" aria-checked={!asLink} className={s.periodBtn} onClick={() => setAsLink(false)} data-testid="gift-to-friend">
+          {t("support.giftLink.toFriend")}
+        </button>
+        <button role="radio" aria-checked={asLink} className={s.periodBtn} onClick={() => setAsLink(true)} data-testid="gift-as-link">
+          {t("support.giftLink.asLink")}
+        </button>
+      </div>
+      {asLink ? (
+        <p className={s.hint}>{t("support.giftLink.about")}</p>
+      ) : picked ? (
         <div className={s.giftTo}>
           <Avatar id={picked.id} avatarId={picked.avatar_id} name={displayName(picked)} size={32} />
           <span className={s.names}>
@@ -439,7 +493,7 @@ function GiveAPlan() {
           ))}
         </div>
       </div>
-      <Button className={s.buy} data-plan={plan} onClick={() => void give()} disabled={!to} loading={busy} data-testid="gift-buy">
+      <Button className={s.buy} data-plan={plan} onClick={() => void give()} disabled={!to && !asLink} loading={busy} data-testid="gift-buy">
         <Gift size={16} aria-hidden="true" /> {t("support.gift.buy", { price: cost })}
       </Button>
     </section>

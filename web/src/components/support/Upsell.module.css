@@ -9,7 +9,11 @@
 .cta { background: linear-gradient(180deg, color-mix(in oklab, var(--tier-supporter), #fff 12%), var(--tier-supporter)); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 10px 24px -12px var(--tier-supporter); }
 .cta:hover { background: var(--tier-supporter); }
 
-.prompt { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 30px 28px 18px; background: radial-gradient(110% 70% at 50% 0%, color-mix(in srgb, var(--tier-supporter) 20%, transparent), transparent 70%); }
+/* a bare dialog draws no card of its own, so the prompt is the card: the
+   floating colour with the rose rising from its top, lit and edged as every
+   dialog is (Modal.module.css .card) */
+[role="dialog"].promptCard { box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); }
+.prompt { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 30px 28px 18px; background: radial-gradient(110% 70% at 50% 0%, color-mix(in srgb, var(--tier-supporter) 20%, transparent), transparent 70%), var(--bg-floating); }
 .heart { inline-size: 60px; block-size: 60px; border-radius: 20px; display: grid; place-items: center; color: #fff; background: linear-gradient(160deg, color-mix(in oklab, var(--tier-supporter), #fff 14%), var(--tier-supporter) 55%, color-mix(in oklab, var(--tier-supporter), var(--tier-pro) 45%)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 16px 34px -12px var(--tier-supporter); animation: beat 1.6s var(--ease-out) 1 both; }
 @keyframes beat { 0% { transform: scale(0.7); opacity: 0; } 40% { transform: scale(1.08); opacity: 1; } 60% { transform: scale(0.97); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .heart { animation: none; } }

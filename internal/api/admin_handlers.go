@@ -50,7 +50,7 @@ func (s *Server) handleInstanceInfo(w http.ResponseWriter, r *http.Request) {
 		"version":             s.Version,
 		"registration":        mode,
 		"needs_key":           mode == "invite" && key != "",
-		"max_upload_bytes":    s.Cfg.MaxUploadBytes,
+		"max_upload_bytes":    s.planLimitsFor(store.PlanFree).FileMax,
 		"gif_search":          s.gifEnabled(),
 		"public_url":          s.Cfg.PublicURL,
 		"turn_configured":     len(s.Cfg.TurnURLs) > 0 || s.Cfg.TurnKeyID != "",

@@ -202,9 +202,9 @@ func TestBillingOlderSubscriptionEndingKeepsNewer(t *testing.T) {
 func TestPlanCaps(t *testing.T) {
 	srv, ts, f := billingServer(t)
 	tok, uid := register(t, ts, "capped")
-	big := int64(200) << 20
+	big := int64(1500) << 20
 	if res, body := do(t, ts, "POST", "/api/v1/uploads", tok, map[string]any{"size": big}); res.StatusCode != 413 || errCode(body) != "too_large" {
-		t.Fatalf("free 200 MB: %d %v", res.StatusCode, body)
+		t.Fatalf("free 1.5 GB: %d %v", res.StatusCode, body)
 	}
 	// a boosted server's channel takes it
 	sid := createServer(t, ts, tok, "boosted")["id"].(string)
@@ -222,7 +222,7 @@ func TestPlanCaps(t *testing.T) {
 		}
 	}
 	if res, body := do(t, ts, "POST", "/api/v1/uploads", tok, map[string]any{"size": big, "channel_id": chID}); res.StatusCode != 201 {
-		t.Fatalf("boosted 200 MB: %d %v", res.StatusCode, body)
+		t.Fatalf("boosted 1.5 GB: %d %v", res.StatusCode, body)
 	}
 
 	// a paid name effect is for plans
@@ -236,7 +236,7 @@ func TestPlanCaps(t *testing.T) {
 		t.Fatalf("supporter neon: %d %v", res.StatusCode, body)
 	}
 	if res, body := do(t, ts, "POST", "/api/v1/uploads", tok, map[string]any{"size": big}); res.StatusCode != 201 {
-		t.Fatalf("supporter 200 MB: %d %v", res.StatusCode, body)
+		t.Fatalf("supporter 1.5 GB: %d %v", res.StatusCode, body)
 	}
 }
 
@@ -309,5 +309,53 @@ func TestGiftAPlan(t *testing.T) {
 	}
 	if u, _ := srv.Store.UserByID(t.Context(), modID(idB)); u.Plan != "" {
 		t.Fatalf("plan after the gift: %q", u.Plan)
+	}
+}
+
+func TestGiftLink(t *testing.T) {
+	srv, ts, f := billingServer(t)
+	tokA, idA := register(t, ts, "linkgiver")
+	tokB, idB := register(t, ts, "claimer")
+	tokC, _ := register(t, ts, "toolate")
+	if res, body := do(t, ts, "POST", "/api/v1/billing/gift", tokA, map[string]any{"link": true, "plan": "pro", "period": "year"}); res.StatusCode != 200 {
+		t.Fatalf("link checkout: %d %v", res.StatusCode, body)
+	}
+	got := f.checkouts[len(f.checkouts)-1]
+	if got["metadata[gift_link]"] != "1" || got["metadata[gift_to]"] != "" || got["line_items[0][price]"] != "price_nexa_pro_gift_year" {
+		t.Fatalf("link checkout form: %v", got)
+	}
+	obj := map[string]any{"id": "cs_link", "mode": "payment", "payment_status": "paid", "metadata": map[string]string{"gift_from": idA, "gift_link": "1", "gift_plan": "pro", "gift_period": "year"}}
+	for range 2 { // sent twice, made once
+		if code := sendWebhook(t, ts, "checkout.session.completed", obj, testWebhookSecret); code != 200 {
+			t.Fatalf("link webhook: %d", code)
+		}
+	}
+	_, bill := do(t, ts, "GET", "/api/v1/billing", tokA, nil)
+	links, _ := bill["gift_links"].([]any)
+	if len(links) != 1 {
+		t.Fatalf("gift links: %v", bill["gift_links"])
+	}
+	code := links[0].(map[string]any)["code"].(string)
+	if res, body := do(t, ts, "POST", "/api/v1/gifts/"+code+"/claim", tokA, nil); res.StatusCode != 400 || errCode(body) != "gift_self" {
+		t.Fatalf("claiming your own: %d %v", res.StatusCode, body)
+	}
+	if res, body := do(t, ts, "GET", "/api/v1/gifts/"+code, tokB, nil); res.StatusCode != 200 || body["plan"] != "pro" || body["claimed"] != false || body["days"].(float64) != 365 {
+		t.Fatalf("preview: %d %v", res.StatusCode, body)
+	}
+	if res, body := do(t, ts, "POST", "/api/v1/gifts/"+code+"/claim", tokB, nil); res.StatusCode != 200 || body["claimed_by_me"] != true {
+		t.Fatalf("claim: %d %v", res.StatusCode, body)
+	}
+	if u, _ := srv.Store.UserByID(t.Context(), modID(idB)); u.Plan != "pro" {
+		t.Fatalf("plan: %q", u.Plan)
+	}
+	if res, body := do(t, ts, "POST", "/api/v1/gifts/"+code+"/claim", tokC, nil); res.StatusCode != 410 || errCode(body) != "gift_claimed" {
+		t.Fatalf("second claim: %d %v", res.StatusCode, body)
+	}
+	if res, body := do(t, ts, "GET", "/api/v1/gifts/nope", tokC, nil); res.StatusCode != 404 || errCode(body) != "unknown_gift" {
+		t.Fatalf("unknown: %d %v", res.StatusCode, body)
+	}
+	_, bill = do(t, ts, "GET", "/api/v1/billing", tokA, nil)
+	if l := bill["gift_links"].([]any)[0].(map[string]any); l["claimed"] != true || l["claimed_name"] == "" || l["claimed_by"] != idB {
+		t.Fatalf("buyer's view: %v", l)
 	}
 }

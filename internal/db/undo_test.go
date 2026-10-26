@@ -44,8 +44,9 @@ const undoCommunities = `
 	ALTER TABLE channels DROP COLUMN forum;
 `
 
-// undoBots takes away what migrations 0034 to 0037 add, for the same tests.
+// undoBots takes away what migrations 0034 to 0039 add, for the same tests.
 const undoBots = `
+	DROP TABLE gift_links;
 	DROP TABLE plan_gifts;
 	DROP TABLE server_boosts;
 	DROP TABLE billing;

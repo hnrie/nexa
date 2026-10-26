@@ -453,7 +453,7 @@ private fun Identity(user: PublicUser, rel: Relationship?, full: Boolean, theme:
                         shadow = shadow,
                     ),
                     fallback = c.textStrong,
-                    maxLines = 2,
+                    maxLines = 1,
                     modifier = Modifier
                         .semantics { heading() }
                         .then(if (onName != null) Modifier.clip(Radii.Xs).pressable(remember { MutableInteractionSource() }, onClick = onName) else Modifier),

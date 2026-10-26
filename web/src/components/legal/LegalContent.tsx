@@ -55,7 +55,8 @@ export function LegalHighlights() {
  * brought, for an agreement from before it.
  */
 export function LegalChanges({ previous }: { previous: string }) {
-  const changes = [t("legal.newPasskeys")];
+  const changes = [t("legal.newPlans")];
+  if (previous < "2026-10-25.1") changes.push(t("legal.newPasskeys"));
   if (previous < "2026-10-20.2") changes.push(t("legal.newAddresses"));
   if (previous < "2026-10-20.1") changes.push(t("legal.newCaptcha"));
   if (previous < "2026-10-19") changes.push(t("legal.new1"), t("legal.new2"), t("legal.new3"), t("legal.new4"), t("legal.new5"));

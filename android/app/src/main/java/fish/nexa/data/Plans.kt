@@ -22,7 +22,7 @@ object Plans {
     /** The table the instance answered with, or the built-in one before it has. */
     fun info(): PlansInfo {
         val inst = Nexa.auth.instance.value
-        return inst?.plans ?: PlansInfo(free = PlanLimits(fileMax = inst?.maxUploadBytes ?: (100L shl 20)))
+        return inst?.plans ?: PlansInfo(free = PlanLimits(fileMax = inst?.maxUploadBytes ?: (1L shl 30)))
     }
 
     fun mine(): String = Nexa.users.me.value?.plan ?: ""

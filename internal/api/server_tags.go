@@ -34,7 +34,7 @@ const (
 	tagBadgeSide = 96
 	maxTagRoles  = 25
 	// a tag's letters: short enough to sit beside a name on a phone
-	maxTagLetters = 8
+	maxTagLetters = 4
 )
 
 // The badges every server can use without putting up a picture of its own,

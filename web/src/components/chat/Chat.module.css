@@ -201,17 +201,17 @@
 @media (hover: none) { .msg[data-menu="true"]:not(:focus-visible):not(:has(:focus-visible)) .toolbar { display: none; } }
 .tBtn { width: 28px; height: 26px; display: flex; align-items: center; justify-content: center; color: var(--icon); border-radius: 7px; transition: background-color 90ms ease, color 90ms ease; }
 .tBtn:hover { color: var(--text-strong); background: var(--bg-hover); }
-.reactions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; position: relative; }
-.pill { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px 0 7px; border-radius: 999px; background: var(--bg-surface); border: 1px solid var(--border-subtle); font-size: 14px; font-weight: 600; color: var(--text-subtle); font-variant-numeric: tabular-nums; transition: border-color var(--transition), background-color var(--transition), transform 120ms var(--ease-spring); }
+.reactions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; position: relative; }
+.pill { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px 0 9px; border-radius: 999px; background: var(--bg-surface); border: 1px solid var(--border-subtle); font-size: 15px; font-weight: 600; color: var(--text-subtle); font-variant-numeric: tabular-nums; transition: border-color var(--transition), background-color var(--transition), transform 120ms var(--ease-spring); }
 .pill:hover { border-color: var(--border-strong); }
 .pill:active { transform: scale(0.94); }
 .pill[data-me="true"] { background: color-mix(in srgb, var(--brand) 20%, var(--bg-surface)); border-color: color-mix(in srgb, var(--brand) 70%, transparent); color: var(--text-strong); box-shadow: 0 0 12px -4px color-mix(in srgb, var(--brand) 70%, transparent); }
 /* where no new reaction may be added, someone else's can only be looked at */
 .pill[data-locked="true"] { cursor: default; }
 .pill[data-locked="true"]:hover { border-color: transparent; }
-.pill img { width: 16px; height: 16px; object-fit: contain; }
-.pillEmoji { font-size: 16px; line-height: 1; }
-.addReact { width: 30px; height: 26px; display: none; align-items: center; justify-content: center; border-radius: 999px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-muted); }
+.pill img { width: 20px; height: 20px; object-fit: contain; }
+.pillEmoji { font-size: 20px; line-height: 1; }
+.addReact { width: 38px; height: 32px; display: none; align-items: center; justify-content: center; border-radius: 999px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-muted); }
 .addReact:hover { color: var(--text-strong); border-color: var(--border-strong); }
 /* --sys-icon is where the line's icon starts, in the avatars' column */
 .system { --sys-icon: 16px; display: flex; align-items: center; gap: 12px; padding-block: 4px; padding-inline: 64px 12px; margin-inline: 8px; border-radius: var(--radius-sm); position: relative; min-height: 26px; margin-top: 17px; color: var(--text-muted); font-size: 15.5px; line-height: 22px; }
@@ -483,10 +483,10 @@ button.sysName:hover { text-decoration: underline; }
   /* a reaction is a toggle everyone sees, so a miss adds a name where it was
      not meant: taller pills, set further apart, each with a few pixels more
      around it that still count as a hit */
-  .reactions { gap: 6px; }
-  .pill { position: relative; height: 32px; padding: 0 10px; }
+  .reactions { gap: 7px; }
+  .pill { position: relative; height: 36px; padding: 0 12px 0 10px; }
   .pill::after, .addReact::after { content: ""; position: absolute; inset: -3px; }
-  .addReact { position: relative; width: 40px; height: 32px; }
+  .addReact { position: relative; width: 44px; height: 36px; }
   .retry { height: 32px; padding: 0 12px; }
   .popClose { width: 40px; height: 40px; }
   .pinRemove { width: 36px; height: 36px; }

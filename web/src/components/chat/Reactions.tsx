@@ -145,7 +145,7 @@ export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Pr
         );
       })}
       {msg.reactions.length > 0 && mayReact ? (
-        <button className={s.addReact} aria-label={t("chat.reactions.addReaction")} onClick={(e) => onOpenPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={16} /></button>
+        <button className={s.addReact} aria-label={t("chat.reactions.addReaction")} onClick={(e) => onOpenPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={19} /></button>
       ) : null}
       {showing && open ? (
         <ReactorsPopover

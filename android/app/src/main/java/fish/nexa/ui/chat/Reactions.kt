@@ -94,9 +94,9 @@ fun ReactionsRow(cm: ChatMessage, ctx: ListCtx) {
     if (reactions.isEmpty()) return
     val can = canReact(cm, ctx)
     FlowRow(
-        Modifier.padding(top = 5.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        Modifier.padding(top = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         for (r in reactions) ReactionPill(cm, ctx, r.emoji, r.count, r.me, locked = !can && !r.me)
         if (can) AddReactionPill(cm, ctx)
@@ -120,7 +120,7 @@ private fun ReactionPill(cm: ChatMessage, ctx: ListCtx, emoji: String, count: In
             .then(if (me) Modifier.boxShadow(shape, 0f, 12f, c.brand.copy(alpha = 0.7f), spread = -4f) else Modifier)
             .ring(shape, if (me) c.brand.copy(alpha = 0.7f) else c.borderSubtle)
             .background(bg, shape)
-            .height(32.dp)
+            .height(36.dp)
             .pressable(
                 interaction,
                 enabled = true,
@@ -134,15 +134,15 @@ private fun ReactionPill(cm: ChatMessage, ctx: ListCtx, emoji: String, count: In
                     Send.react(ctx.channel.id, cm.id, emoji, add = !me)
                 }
             }
-            .padding(horizontal = 10.dp)
+            .padding(start = 10.dp, end = 12.dp)
             .semantics { contentDescription = t("chat.reactions.pillLabel", "emoji" to emojiLabel(emoji), "count" to count) },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        EmojiGlyph(emoji, 16.dp, source = 24)
+        EmojiGlyph(emoji, 20.dp, source = 24)
         Txt(
             count.toString(),
-            style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600), fontFeatureSettings = "tnum"),
+            style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(600), fontFeatureSettings = "tnum"),
             color = if (me) c.textStrong else c.textSubtle,
         )
     }
@@ -156,12 +156,12 @@ private fun AddReactionPill(cm: ChatMessage, ctx: ListCtx) {
         Modifier
             .ring(shape, c.borderSubtle)
             .background(c.bgSurface, shape)
-            .size(40.dp, 32.dp)
+            .size(44.dp, 36.dp)
             .pressable(remember { MutableInteractionSource() }) { openReactionPicker(cm, ctx) }
             .semantics { contentDescription = t("chat.reactions.addReaction") },
         contentAlignment = Alignment.Center,
     ) {
-        Icon("SmilePlus", c.textMuted, size = 16.dp)
+        Icon("SmilePlus", c.textMuted, size = 19.dp)
     }
 }
 

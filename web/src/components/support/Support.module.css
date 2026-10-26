@@ -112,4 +112,6 @@
 .gift .periodBtn[data-plan][aria-checked="true"] { color: var(--tint-text); }
 .gift > .buy { align-self: flex-start; }
 .giftChoices .periodBtn { white-space: nowrap; }
-@media (max-width: 767px) { .gift > .buy { align-self: stretch; } .giftChoices { flex-direction: column; } .giftChoices .periodBtn { flex: 1; justify-content: center; } }
+.gift > .period { align-self: flex-start; }
+.giftState { font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 767px) { .gift > .buy { align-self: stretch; } .gift > .period { align-self: stretch; } .gift > .period .periodBtn { flex: 1; justify-content: center; } .giftChoices { flex-direction: column; } .giftChoices .periodBtn { flex: 1; justify-content: center; } }

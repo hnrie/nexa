@@ -70,6 +70,7 @@
                 <data android:pathPrefix="/channels/" />
                 <data android:pathPrefix="/invite/" />
                 <data android:pathPrefix="/note/" />
+                <data android:pathPrefix="/gift/" />
                 <data android:pathPattern="/@.*" />
                 <data android:path="/login/qr" />
                 <data android:path="/oauth2/authorize" />

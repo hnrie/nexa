@@ -324,6 +324,7 @@ fun SupportPanel(inSettings: Boolean = false) {
         if (plan == "pro") Boosts()
         if (!billing?.gifts.isNullOrEmpty()) GiftsGot()
         if (enabled) GiveAPlan()
+        if (!billing?.giftLinks.isNullOrEmpty()) GiftLinksMade()
         if (!inSettings) NxButton(t("support.termsLink"), { fish.nexa.ui.legal.Legal.openDocument("terms") }, kind = ButtonKind.LINK, inline = true)
     }
 }
@@ -593,9 +594,107 @@ private fun giftable(): List<PublicUser> {
 
 private fun nameOf(u: PublicUser) = u.displayName.ifEmpty { u.username }
 
+/** The address of a gift link, as it is shared. */
+fun giftLinkUrl(code: String): String = fish.nexa.ui.markdown.AppLinks.shareOrigin(Nexa.api.baseUrl).trimEnd('/') + "/gift/" + code
+
+/** How long a gift lasts, as its title says it ("A Month of Pro"). */
+fun giftTitle(plan: String, days: Int): String = t(if (days >= 365) "support.giftLink.yearOf" else "support.giftLink.monthOf", "plan" to planName(plan))
+
+/** The gift links this account bought: copy one to send it, and who has claimed which. */
+@Composable
+private fun GiftLinksMade() {
+    val c = Nx.colors
+    val links = Plans.billing.collectAsState().value?.giftLinks.orEmpty()
+    Section(t("support.giftLink.yours")) {
+        Hint(t("support.giftLink.yoursHint"))
+        for (l in links) {
+            Row(
+                Modifier.fillMaxWidth().background(c.bgSurface, Radii.Sm).padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Glyph(if (l.claimed) "Check" else "Link2", c.tierSupporter, c.textSupporter)
+                Column(Modifier.weight(1f)) {
+                    Txt(giftTitle(l.plan, l.days), style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
+                    Txt(
+                        if (l.claimed) t("support.giftLink.claimedBy", "name" to l.claimedName.ifEmpty { t("support.giftLink.someone") }) else t("support.giftLink.waiting"),
+                        style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1,
+                    )
+                }
+                if (!l.claimed) NxButton(t("support.giftLink.copy"), { copyGiftLink(l.code) }, kind = ButtonKind.SECONDARY, size = ButtonSize.TOUCH, icon = "Copy")
+            }
+        }
+    }
+}
+
+private fun copyGiftLink(code: String) {
+    val cm = Nexa.app.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+    cm.setPrimaryClip(android.content.ClipData.newPlainText("Nexa", giftLinkUrl(code)))
+    Nexa.ui.toast(t("support.giftLink.copied"), "success")
+}
+
+/**
+ * What a gift link opens (/gift/<code>): the plan someone bought as a link,
+ * and Claim Gift for whoever opens it first. The web's GiftPage.
+ */
+fun openGiftLink(code: String) {
+    Nexa.scope.launch {
+        var gift = try {
+            fish.nexa.net.wireJson.decodeFromJsonElement(fish.nexa.net.GiftLinkView.serializer(), Nexa.api.request("GET", "/gifts/" + java.net.URLEncoder.encode(code, "UTF-8")))
+        } catch (e: Exception) {
+            Nexa.ui.toast(errorText(e), "error")
+            return@launch
+        }
+        fish.nexa.ui.layers.openSheet("gift-link") { close ->
+            val c = Nx.colors
+            var shown by remember { mutableStateOf(gift) }
+            var busy by remember { mutableStateOf(false) }
+            val g = shown
+            val title = giftTitle(g.plan, g.days)
+            val tone = if (g.claimedByMe) c.statusOnline else tint(c, g.plan.ifEmpty { "supporter" })
+            Column(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(Modifier.size(64.dp).background(tone.copy(alpha = 0.16f), CircleShape).ring(CircleShape, tone.copy(alpha = 0.42f)), contentAlignment = Alignment.Center) {
+                    Icon(if (g.claimedByMe) "Check" else "Gift", tone, size = 28.dp)
+                }
+                Txt(if (g.claimedByMe) t("support.giftLink.yoursNow") else title, style = Nx.type.title.copy(fontSize = Nx.type.sp(22f)), color = c.textStrong, align = TextAlign.Center)
+                Txt(
+                    when {
+                        g.claimedByMe -> t("support.giftLink.yoursNowBody", "gift" to title)
+                        g.mine -> if (g.claimed) t("support.giftLink.mineClaimed") else t("support.giftLink.mine")
+                        g.claimed -> t("support.giftLink.taken")
+                        else -> t("support.giftLink.fromName", "name" to g.fromName.ifEmpty { t("support.giftLink.someone") })
+                    },
+                    style = Nx.type.body, color = c.textMuted, align = TextAlign.Center,
+                )
+                when {
+                    g.claimedByMe -> NxButton(t("support.giftLink.seePlan"), { close(); Nav.go(Route.Support) }, size = ButtonSize.LG, block = true)
+                    g.mine && !g.claimed -> NxButton(t("support.giftLink.copy"), { copyGiftLink(g.code) }, size = ButtonSize.LG, block = true)
+                    !g.mine && !g.claimed -> NxButton(t("support.giftLink.claim"), {
+                        busy = true
+                        Nexa.scope.launch {
+                            try {
+                                shown = fish.nexa.net.wireJson.decodeFromJsonElement(fish.nexa.net.GiftLinkView.serializer(), Nexa.api.request("POST", "/gifts/" + java.net.URLEncoder.encode(g.code, "UTF-8") + "/claim"))
+                                gift = shown
+                                Plans.load()
+                            } catch (e: Exception) {
+                                Nexa.ui.toast(errorText(e), "error")
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    }, size = ButtonSize.LG, block = true, loading = busy)
+                    else -> {}
+                }
+                NxButton(t("qrLogin.openNexa"), close, kind = ButtonKind.SECONDARY, size = ButtonSize.LG, block = true, enabled = !busy)
+            }
+        }
+    }
+}
+
 /**
  * Gift a Plan: a month or a year of Supporter or Pro for a friend or someone
- * this account talks to, paid once on Stripe's page and never renewed.
+ * this account talks to, or as a link for anyone, paid once on Stripe's page
+ * and never renewed.
  */
 @Composable
 private fun GiveAPlan() {
@@ -608,6 +707,7 @@ private fun GiveAPlan() {
     var plan by remember { mutableStateOf("supporter") }
     var period by remember { mutableStateOf("month") }
     var busy by remember { mutableStateOf(false) }
+    var asLink by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val q = query.trim().lowercase()
     val found = (if (q.isEmpty()) people else people.filter { nameOf(it).lowercase().contains(q) || it.username.lowercase().contains(q) }).take(6)
@@ -626,7 +726,10 @@ private fun GiveAPlan() {
                 Hint(t("support.gift.about"))
             }
         }
-        if (picked != null) {
+        Segmented(listOf("friend" to t("support.giftLink.toFriend"), "link" to t("support.giftLink.asLink")), if (asLink) "link" else "friend", { asLink = it == "link" }, t("support.gift.who"))
+        if (asLink) {
+            Hint(t("support.giftLink.about"))
+        } else if (picked != null) {
             ListRow({ Avatar(picked.id, nameOf(picked), picked.avatarId, 32.dp) }, nameOf(picked)) {
                 NxButton(t("support.gift.change"), { to = null }, kind = ButtonKind.GHOST, size = ButtonSize.TOUCH)
             }
@@ -656,18 +759,20 @@ private fun GiveAPlan() {
         Segmented(Plans.PAID.map { it to planName(it) }, plan, { plan = it }, t("support.plans"), tones = mapOf("supporter" to c.textSupporter, "pro" to c.textPro))
         Segmented(listOf("month" to t("support.gift.aMonth"), "year" to t("support.gift.aYear")), period, { period = it }, t("support.period"))
         TierButton(t("support.gift.buy", "price" to cost), plan, {
-            val id = to ?: return@TierButton
+            val id = to
+            if (id == null && !asLink) return@TierButton
             busy = true
             scope.launch {
                 try {
-                    val res = Nexa.api.request("POST", "/billing/gift", buildJsonObject { put("to", id); put("plan", plan); put("period", period) }) as JsonObject
+                    val body = buildJsonObject { if (asLink) put("link", true) else put("to", id); put("plan", plan); put("period", period) }
+                    val res = Nexa.api.request("POST", "/billing/gift", body) as JsonObject
                     openExternal(res["url"]!!.jsonPrimitive.content)
                 } catch (e: Exception) {
                     Nexa.ui.toast(errorText(e), "error")
                 }
                 busy = false
             }
-        }, enabled = to != null, loading = busy, icon = "Gift")
+        }, enabled = to != null || asLink, loading = busy, icon = "Gift")
     }
 }
 

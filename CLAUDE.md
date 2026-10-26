@@ -441,14 +441,14 @@ request may meet a captcha is disabled until that request ends (the Public Pack 
 ### Plans and payments (`api/billing.go`, `internal/stripe`)
 
 - Supporter ($5 a month, $48 a year) and Pro ($10, $96) only raise what costs money to keep:
-  `planLimitsFor` gives each plan's largest file (free is `MAX_UPLOAD_BYTES`, then 1 GB and 4 GB),
+  `planLimitsFor` gives each plan's largest file (1 GB free, or `MAX_UPLOAD_BYTES` when that is more, then 2 GB and 4 GB),
   uploads per 30 days (5 GB, 100 GB, 500 GB: a rolling window counted from the account's
   attachment blobs and declared unfinished uploads, `Store.UploadedSince`, refused with
   `upload_month_full`), the Quality screen share and its most bits a second (6, 12, 20 Mbit/s),
   the paid name effects (Holo, Neon, Flame: the server refuses to save one without a plan,
   `plan_required`, and sends an account without a plan its first colour as solid,
   `store.styleForPlan`) and Pro's two server boosts (a boosted server lets every member send
-  files up to 500 MB, `fileMaxFor`). Chatting, calls and everything else stay free.
+  files up to 2 GB, `fileMaxFor`). Chatting, calls and everything else stay free.
   `users.plan` is public, as a badge.
 - Stripe Managed Payments is the merchant of record. Prices are found by lookup key
   (`nexa_supporter_monthly`, `_yearly`, `nexa_pro_monthly`, `_yearly`, and the one-time
@@ -460,7 +460,11 @@ request may meet a captcha is disabled until that request ends (the Public Pack 
   older subscription ending never overrides a newer one.
 - An account wears the better of its subscription (`billing`) and a running gift (`plan_gifts`,
   a month of 30 days or a year of 365, paid once; another gift of the same plan starts when the
-  last ends; never to someone either side blocked). `recomputePlanTx` writes `users.plan` and drops
+  last ends; never to someone either side blocked). A gift can also be bought as a link
+  (`POST /billing/gift` with `link: true`, table `gift_links`, made by the webhook once paid): the
+  buyer copies it from Your Gift Links, and whoever opens `/gift/<code>` first claims it
+  (`GET /gifts/{code}`, `POST /gifts/{code}/claim`, which adds the `plan_gifts` row; web
+  `pages/GiftPage.tsx`, Android `openGiftLink` in `ui/support/Support.kt` through `Nav.openPath`). `recomputePlanTx` writes `users.plan` and drops
   the boosts of an account that is no longer Pro; `StartBilling` ends gifts as they run out.
   Every change emits `user_update`, `server_update` for servers that lost a boost, and
   `billing_update` to the account. Deleting an account cancels its subscription
@@ -546,7 +550,7 @@ payload's `fwd.at` is when the original was sent, drawn as Forwarded with a bar 
   `poll_votes`), keys (`key_epochs`, `key_grants`, `key_flags`), servers (`servers`,
   `server_members`, `roles`, `member_roles`, `invites`, `bans`, `audit_log`, `automod_rules`,
   `automod_events`), plans (`billing`, `server_boosts`, `plan_gifts`, `users.plan`,
-  `servers.boosts`), expressions (`emojis`, `sticker_packs`, `stickers`, `sticker_installs`,
+  `servers.boosts`, `gift_links`), expressions (`emojis`, `sticker_packs`, `stickers`, `sticker_installs`,
   `recent_stickers`, `blocked_images`), files (`blobs`, `uploads`), calls (`guest_links`, `guests`,
   `realtime_usage`), integrations (`webhooks`, `discord_links`), notes (`notes`, `note_members`,
   `note_invites`, `note_links`, `note_files`, `note_versions`, `note_version_files`, `note_keys`,
@@ -897,7 +901,7 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
 ### Routes (`routes.tsx`)
 
 `/` (home), `/login`, `/login/qr` (approving a QR sign-in), `/register`, `/recover`, `/invite/:code`, `/note/:token`, `/download`,
-`/terms`, `/privacy`, `/about`, `/call/:code` (guest call), `/stickers/pack/:packId`,
+`/terms`, `/privacy`, `/about`, `/call/:code` (guest call), `/gift/:code` (claiming a gift link), `/stickers/pack/:packId`,
 `/connected/discord`, `/oauth2/authorize` (the consent page for adding an app), and inside the
 signed-in shell `/channels/@me` (friends), `@me/nexa` (with
 `cases/:caseId`, `bugs/:reportId`), `@me/notes[/:noteId]`, `@me/support` (plans), `@admin/*` (the staff panel),

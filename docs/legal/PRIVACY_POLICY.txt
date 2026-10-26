@@ -1,7 +1,7 @@
 NEXA - PRIVACY POLICY
 Site: nexa.fish (also at mathtest.lol, and formerly chat.evilion.xyz)
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-10-25
+Effective: 2026-10-26
 
 This policy lists exactly what Nexa holds. It is written against the
 actual database, so if something is not listed here, there is no place
@@ -255,8 +255,11 @@ k) Plans (only if you buy one or are given one; not end-to-end
    Stripe gives your customer record and your subscription, so the app
    can open Stripe's page for you. For a gift: who gave which plan to
    whom, for how long, the ID of its Stripe checkout, and when it
-   starts and ends. The person who gets a gift sees the name of the
-   person who gave it. Also the servers your boosts are on. What you
+   starts and ends. For a gift bought as a link: who bought it, which
+   plan, for how long, the ID of its Stripe checkout, the link's code,
+   and who claimed it and when. The person who gets a gift sees the
+   name of the person who gave it, and the buyer of a gift link sees
+   the name of whoever claimed it. Also the servers your boosts are on. What you
    uploaded in the last 30 days is added up from your files (3c), not
    kept separately. When you pay, Nexa sends Stripe your account ID
    (for a gift, both accounts' IDs and the plan), and Stripe tells
@@ -445,10 +448,12 @@ calls.
   settings, keys, second factor, linked Discord account, crash
   reports, plan records and the gifts given to it are deleted, and a
   running subscription is cancelled at once. A gift it gave someone
-  else stays theirs until it ends. Stripe keeps its own record of
-  past payments. What is left is a stand-in named Deleted User,
-  with the account ID, when it was made, its public key, and its color
-  and privacy choices, which nobody can sign in as.
+  else stays theirs until it ends, and a gift link it bought can still
+  be claimed; one it claimed no longer says who claimed it. Stripe
+  keeps its own record of past payments. What is left is a stand-in
+  named Deleted User, with the account ID, when it was made, its
+  public key, and its color and privacy choices, which nobody can
+  sign in as.
 - When someone you have a direct message conversation with deletes
   their own account, that conversation is deleted for you too.
 - When staff delete an account, everything it posted and uploaded is

@@ -123,8 +123,9 @@
 .card[data-variant="modal"] .info { gap: 16px; padding: calc(var(--av) * 0.4 + 16px) 24px 24px; }
 .ident { min-width: 0; }
 .nameRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.display { margin: 0; min-width: 0; font-family: var(--font-display); font-size: 22px; line-height: 1.15; font-weight: 700; letter-spacing: -0.01em; color: var(--text-strong); overflow-wrap: anywhere; }
-.displayBtn { font: inherit; color: inherit; text-align: start; overflow-wrap: anywhere; letter-spacing: inherit; }
+/* a name stays on one line, however long: what does not fit ends in an ellipsis */
+.display { margin: 0; min-width: 0; font-family: var(--font-display); font-size: 22px; line-height: 1.15; font-weight: 700; letter-spacing: -0.01em; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.displayBtn { display: block; max-width: 100%; font: inherit; color: inherit; text-align: start; letter-spacing: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .displayBtn:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
 /* in the column beside a DM the picture is the way to the whole profile */
 .avatarBtn { display: block; line-height: 0; border-radius: 50%; transition: transform var(--dur) var(--ease-out); }
@@ -137,6 +138,7 @@
 .noteBtn { display: inline-flex; padding: 4px; border-radius: 8px; color: var(--text-muted); flex: none; transition: color var(--transition), background-color var(--transition); }
 .noteBtn:hover { color: var(--text-strong); background: var(--bg-hover); }
 .user { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; margin-top: 4px; font-size: 14px; line-height: 20px; color: var(--text-subtle); }
+.user > span:not([aria-hidden]) { min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card[data-variant="modal"] .user { font-size: 15.5px; line-height: 22px; }
 .sep { color: var(--text-muted); }
 /* words like the rest of the line, with the text cursor they have */

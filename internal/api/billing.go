@@ -40,16 +40,18 @@ type planLimits struct {
 
 const (
 	gib = int64(1) << 30
+	// freeFileMax is the largest file an account without a plan may send.
+	freeFileMax = 1 * gib
 	// boostFileMax is the largest file anyone may send in a boosted server.
-	boostFileMax = int64(500) << 20
+	boostFileMax = 2 * gib
 )
 
 func (s *Server) planLimitsFor(plan string) planLimits {
-	free := planLimits{FileMax: s.Cfg.MaxUploadBytes, MonthUploadMax: 5 * gib, ShareMaxBps: 6_000_000}
 	atLeast := func(n int64) int64 { return max(n, s.Cfg.MaxUploadBytes) }
+	free := planLimits{FileMax: atLeast(freeFileMax), MonthUploadMax: 5 * gib, ShareMaxBps: 6_000_000}
 	switch plan {
 	case store.PlanSupporter:
-		return planLimits{FileMax: atLeast(1 * gib), MonthUploadMax: 100 * gib, ShareQuality: true, ShareMaxBps: 12_000_000, NameEffects: true}
+		return planLimits{FileMax: atLeast(2 * gib), MonthUploadMax: 100 * gib, ShareQuality: true, ShareMaxBps: 12_000_000, NameEffects: true}
 	case store.PlanPro:
 		return planLimits{FileMax: atLeast(4 * gib), MonthUploadMax: 500 * gib, ShareQuality: true, ShareMaxBps: 20_000_000, NameEffects: true, Boosts: 2}
 	}
@@ -186,6 +188,8 @@ func (s *Server) billingRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/billing/checkout", s.authed(s.handleCheckout))
 	mux.Handle("POST /api/v1/billing/portal", s.authed(s.handlePortal))
 	mux.Handle("POST /api/v1/billing/gift", s.authed(s.handleGift))
+	mux.Handle("GET /api/v1/gifts/{code}", s.authed(s.handleGiftLink))
+	mux.Handle("POST /api/v1/gifts/{code}/claim", s.authed(s.handleGiftClaim))
 	mux.Handle("POST /api/v1/billing/boosts", s.authed(s.handleBoostAdd))
 	mux.Handle("DELETE /api/v1/billing/boosts/{id}", s.authed(s.handleBoostRemove))
 	// Stripe's, signed with the endpoint's secret
@@ -212,9 +216,14 @@ func (s *Server) handleBilling(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	links, err := s.Store.GiftLinksFrom(ctx, me.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	out := map[string]any{
 		"enabled": s.billingEnabled(), "plan": me.Plan, "limits": s.planLimitsFor(me.Plan),
-		"month_used": used, "month_frees_at": freesAt, "boosts": boosts, "gifts": gifts,
+		"month_used": used, "month_frees_at": freesAt, "boosts": boosts, "gifts": gifts, "gift_links": links,
 		"period": "", "status": "", "period_end": 0, "cancel_at_end": false, "manageable": false,
 		"prices": map[string]any{}, "gift_prices": map[string]any{},
 	}
@@ -516,7 +525,9 @@ func giftable(u *store.User) bool {
 	return u.Flags&(store.NotPeople|store.FlagDeleted|store.FlagDisabled) == 0
 }
 
-// handleGift starts buying a month or a year of a plan for someone else.
+// handleGift starts buying a month or a year of a plan for someone else: a
+// person named by to, or, with link, a gift link the buyer passes on, which
+// whoever opens it first claims.
 func (s *Server) handleGift(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())
 	if !s.billingEnabled() {
@@ -525,6 +536,7 @@ func (s *Server) handleGift(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		To     ids.ID `json:"to"`
+		Link   bool   `json:"link"`
 		Plan   string `json:"plan"`
 		Period string `json:"period"`
 	}
@@ -537,19 +549,23 @@ func (s *Server) handleGift(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "invalid_plan", "Pick supporter or pro, for a month or a year."))
 		return
 	}
-	if req.To == me.ID {
-		WriteError(w, E(http.StatusBadRequest, "gift_self", "A gift is for someone else. Get a plan for yourself above."))
-		return
-	}
-	to, err := s.Store.UserByID(r.Context(), req.To)
-	if err != nil || !giftable(to) {
-		WriteError(w, E(http.StatusNotFound, "unknown_user", "There's nobody to give it to."))
-		return
-	}
-	// a gift goes to someone who would take a message from you
-	if a, b, _ := s.Store.Blocked(r.Context(), me.ID, to.ID); a || b {
-		WriteError(w, E(http.StatusForbidden, "cannot_gift", "You can't give a gift to this person."))
-		return
+	var toID string
+	if !req.Link {
+		if req.To == me.ID {
+			WriteError(w, E(http.StatusBadRequest, "gift_self", "A gift is for someone else. Get a plan for yourself above."))
+			return
+		}
+		to, err := s.Store.UserByID(r.Context(), req.To)
+		if err != nil || !giftable(to) {
+			WriteError(w, E(http.StatusNotFound, "unknown_user", "There's nobody to give it to."))
+			return
+		}
+		// a gift goes to someone who would take a message from you
+		if a, b, _ := s.Store.Blocked(r.Context(), me.ID, to.ID); a || b {
+			WriteError(w, E(http.StatusForbidden, "cannot_gift", "You can't give a gift to this person."))
+			return
+		}
+		toID = to.ID.String()
 	}
 	prices, err := s.prices(r.Context())
 	if err != nil {
@@ -563,9 +579,13 @@ func (s *Server) handleGift(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadGateway, "billing_unavailable", "That gift can't be bought right now."))
 		return
 	}
+	done := "?gift=done"
+	if req.Link {
+		done = "?gift=link"
+	}
 	url, err := s.stripeClient().CreateGiftCheckout(r.Context(), stripe.GiftParams{
-		PriceID: price.ID, FromID: me.ID.String(), ToID: to.ID.String(), Plan: req.Plan, Period: req.Period,
-		SuccessURL: s.billingReturnURL(r) + "?gift=done", CancelURL: s.billingReturnURL(r),
+		PriceID: price.ID, FromID: me.ID.String(), ToID: toID, Link: req.Link, Plan: req.Plan, Period: req.Period,
+		SuccessURL: s.billingReturnURL(r) + done, CancelURL: s.billingReturnURL(r),
 	})
 	if err != nil {
 		s.Log.Error("billing: gift checkout", "err", err)
@@ -575,14 +595,22 @@ func (s *Server) handleGift(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]string{"url": url})
 }
 
-// applyGift gives the plan a paid gift session names to its recipient, once.
-// What the session says is what this server wrote on it, under the secret
-// key, so it is taken as it stands; a gift to a closed account goes nowhere.
+// applyGift gives the plan a paid gift session names to its recipient, once,
+// or makes the gift link it bought. What the session says is what this
+// server wrote on it, under the secret key, so it is taken as it stands; a
+// gift to a closed account goes nowhere.
 func (s *Server) applyGift(ctx context.Context, sessionID string, meta map[string]string) error {
 	from, _ := ids.Parse(meta["gift_from"])
-	to, err := ids.Parse(meta["gift_to"])
 	days := giftDays[meta["gift_period"]]
 	plan := meta["gift_plan"]
+	if meta["gift_link"] == "1" && days > 0 && giftPrices[plan] != nil && !from.IsZero() {
+		if _, err := s.Store.AddGiftLink(ctx, sessionID, from, plan, days); err != nil {
+			return err
+		}
+		s.Bcast.EmitUsers([]ids.ID{from}, "billing_update", map[string]any{})
+		return nil
+	}
+	to, err := ids.Parse(meta["gift_to"])
 	if err != nil || days == 0 || giftPrices[plan] == nil {
 		s.Log.Warn("billing: a payment that is no gift", "session", sessionID)
 		return nil
@@ -604,6 +632,62 @@ func (s *Server) applyGift(ctx context.Context, sessionID string, meta map[strin
 		s.Bcast.EmitUsers([]ids.ID{from}, "billing_update", map[string]any{})
 	}
 	return nil
+}
+
+// giftLinkView is a gift link as someone who opens it sees it: who it is from
+// and what it holds, whether it is still to be claimed, and whether they were
+// the one who claimed it. Who claimed it is for the buyer's list alone.
+func giftLinkView(g *store.GiftLink, me ids.ID) map[string]any {
+	return map[string]any{
+		"code": g.Code, "from_id": g.FromID, "from_name": g.FromName, "plan": g.Plan, "days": g.Days,
+		"claimed": g.Claimed, "claimed_by_me": g.Claimed && g.ClaimedBy == me, "mine": g.FromID == me,
+	}
+}
+
+// handleGiftLink shows a gift link to someone who opened it.
+func (s *Server) handleGiftLink(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	g, err := s.Store.GiftLinkByCode(r.Context(), r.PathValue("code"))
+	if err != nil {
+		WriteError(w, E(http.StatusNotFound, "unknown_gift", "That gift link doesn't exist."))
+		return
+	}
+	WriteJSON(w, http.StatusOK, giftLinkView(g, me.ID))
+}
+
+// handleGiftClaim puts the plan a gift link holds on the account claiming
+// it, the first time anyone does.
+func (s *Server) handleGiftClaim(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	code := r.PathValue("code")
+	g, err := s.Store.GiftLinkByCode(r.Context(), code)
+	if err != nil {
+		WriteError(w, E(http.StatusNotFound, "unknown_gift", "That gift link doesn't exist."))
+		return
+	}
+	if g.FromID == me.ID {
+		WriteError(w, E(http.StatusBadRequest, "gift_self", "This is your own gift. Send the link to the person it's for."))
+		return
+	}
+	if !giftable(me) {
+		WriteError(w, E(http.StatusForbidden, "cannot_gift", "This account can't take a gift."))
+		return
+	}
+	_, changed, unboosted, err := s.Store.ClaimGiftLink(r.Context(), code, me.ID)
+	if errors.Is(err, store.ErrGiftClaimed) {
+		WriteError(w, E(http.StatusGone, "gift_claimed", "Someone has already claimed this gift."))
+		return
+	}
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	s.afterPlanChange(r.Context(), me.ID, changed, unboosted)
+	if !g.FromID.IsZero() {
+		s.Bcast.EmitUsers([]ids.ID{g.FromID}, "billing_update", map[string]any{})
+	}
+	g.Claimed, g.ClaimedBy = true, me.ID
+	WriteJSON(w, http.StatusOK, giftLinkView(g, me.ID))
 }
 
 // StartBilling ends gifts as their time runs out, every few minutes, putting

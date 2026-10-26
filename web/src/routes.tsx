@@ -29,6 +29,7 @@ const NotFoundPage = lazyPage(() => import("@/pages/NotFoundPage"));
 const ProfilePage = lazyPage(() => import("@/pages/ProfilePage"));
 const DiscoveryPage = lazyPage(() => import("@/components/discovery/DiscoveryPage"));
 const AuthorizePage = lazyPage(() => import("@/pages/AuthorizePage"));
+const GiftPage = lazyPage(() => import("@/pages/GiftPage"));
 // The app itself: its sidebars, conversations, calls and every store behind
 // them. The public pages (the front page, signing in, an invite) never load it.
 const loadAppShell = () => import("@/components/shell/AppShell");
@@ -75,6 +76,8 @@ export function AppRoutes() {
         <Route path="/call/:code" element={<GuestCallPage />} />
         <Route path="/stickers/pack/:packId" element={<RequireAuth><StickerPackPage /></RequireAuth>} />
         {/* a link that adds an app: what it is, where it goes and what it may do there */}
+        {/* a plan bought as a link: whoever opens it first claims it */}
+        <Route path="/gift/:code" element={<GiftPage />} />
         <Route path="/oauth2/authorize" element={<RequireAuth><AuthorizePage /></RequireAuth>} />
         {/* where the browser lands after linking Discord from the desktop app: how it went, signed in or not */}
         <Route path="/connected/discord" element={<DiscordConnectedPage />} />

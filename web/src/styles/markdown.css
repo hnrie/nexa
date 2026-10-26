@@ -33,7 +33,7 @@
 /* where a masked link really goes, after its words */
 .md-link-host { margin-inline-start: 0.35em; padding: 0 0.3em; border-radius: 3px; background: var(--bg-active); color: var(--text-muted); font-size: 0.8em; font-weight: 500; unicode-bidi: isolate; white-space: nowrap; }
 /* Only the mentions that do something look as if they would: @everyone, @here and roles are labels. */
-.md-mention { display: inline; padding: 0 3px; border-radius: 5px; background: var(--mention-bg); color: var(--mention-fg); font-weight: 600; cursor: default; unicode-bidi: plaintext; transition: background-color var(--transition); }
+.md-mention { display: inline; white-space: nowrap; padding: 0 3px; border-radius: 5px; background: var(--mention-bg); color: var(--mention-fg); font-weight: 600; cursor: default; unicode-bidi: plaintext; transition: background-color var(--transition); }
 .md-mention[role="button"] { cursor: pointer; }
 .md-mention[role="button"]:hover { background: var(--mention-bg-hover); color: var(--mention-fg); }
 /* An emoji's picture fills a box of its own and lets the pointer through to it:

@@ -215,7 +215,7 @@ func TestUploadRefusesWhatItCannotHold(t *testing.T) {
 	srv, ts := newTestServer(t)
 	token, _ := register(t, ts, "alice")
 
-	res, body := do(t, ts, "POST", "/api/v1/uploads", token, map[string]any{"size": srv.Cfg.MaxUploadBytes + 1})
+	res, body := do(t, ts, "POST", "/api/v1/uploads", token, map[string]any{"size": srv.planLimitsFor("free").FileMax + 1})
 	if res.StatusCode != 413 || errCode(body) != "too_large" {
 		t.Errorf("over the limit: %d %v", res.StatusCode, body)
 	}
@@ -327,9 +327,12 @@ func TestSingleUploadIsCapped(t *testing.T) {
 		t.Errorf("the single-request cap must fit Cloudflare and older clients: %d", MaxSingleUploadBytes)
 	}
 
-	// the smaller of the two limits applies to one request
-	srv.Cfg.MaxUploadBytes = 1000
-	req, _ := http.NewRequest("POST", ts.URL+"/api/v1/channels/"+dm+"/attachments", bytes.NewReader(bytes.Repeat([]byte("z"), 2000)))
+	// the smaller of the two limits applies to one request: the plan's file
+	// limit is far past the single-request one, so that one holds
+	if srv.planLimitsFor("").FileMax <= MaxSingleUploadBytes {
+		t.Fatalf("the free plan's files should outgrow one request: %d", srv.planLimitsFor("").FileMax)
+	}
+	req, _ := http.NewRequest("POST", ts.URL+"/api/v1/channels/"+dm+"/attachments", bytes.NewReader(bytes.Repeat([]byte("z"), MaxSingleUploadBytes+1)))
 	req.Header.Set("Authorization", "Bearer "+tokA)
 	req.Header.Set("Content-Type", "application/octet-stream")
 	res, err := http.DefaultClient.Do(req)
@@ -375,12 +378,11 @@ func TestUploadsHaveAnAllowancePerAccount(t *testing.T) {
 	}
 
 	// files uploaded and never sent count against the account too
-	srv.Cfg.MaxUploadBytes = 1 << 20
 	room, err := srv.Store.UploadRoomFor(t.Context(), modID(mustID(t, ts, token)))
 	if err != nil || room.UserOpen != maxOpenUploads || room.UserPending != maxOpenUploads*1000 {
 		t.Fatalf("room: %+v %v", room, err)
 	}
-	if err := srv.roomForUpload(t.Context(), modID(mustID(t, ts, token)), pendingAllowance+(1<<20), false); err == nil {
+	if err := srv.roomForUpload(t.Context(), modID(mustID(t, ts, token)), pendingAllowance+srv.planLimitsFor("").FileMax+1, false); err == nil {
 		t.Error("a file past the allowance was let in")
 	}
 }

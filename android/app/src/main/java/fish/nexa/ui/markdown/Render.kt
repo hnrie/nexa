@@ -454,11 +454,13 @@ private class Builder(
                 }
             }
         }
+        // a mention stays on one line, as the web's white-space: nowrap keeps it
+        val unbroken = words.replace(' ', '\u00A0')
         chip(fill, 5.dp, 3f / 16f) {
             val style = SpanStyle(color = fg, fontWeight = FontWeight(600))
             val a = action
-            if (a != null && !ctx.inert && !covered) withLink(LinkAnnotation.Clickable("mention:${n.kind}:${n.id}") { a() }) { withStyle(style) { append(words) } }
-            else withStyle(style) { append(words) }
+            if (a != null && !ctx.inert && !covered) withLink(LinkAnnotation.Clickable("mention:${n.kind}:${n.id}") { a() }) { withStyle(style) { append(unbroken) } }
+            else withStyle(style) { append(unbroken) }
         }
     }
 
