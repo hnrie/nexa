@@ -9,6 +9,7 @@ import (
 	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
+	"evilion.xyz/chat/internal/perms"
 	"evilion.xyz/chat/internal/store"
 )
 
@@ -354,13 +355,51 @@ func (s *Server) handleChannelPatch(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, updated)
 }
 
-func (s *Server) handleChannelIcon(w http.ResponseWriter, r *http.Request) {
-	ch, me := s.channel(w, r, NeedManage)
+// iconChannel is the channel whose picture a request changes: a group DM its
+// owner manages, or a server channel the caller has Manage Channels in, which
+// wears it in place of its # or speaker (the picture takes over from its glyph).
+func (s *Server) iconChannel(w http.ResponseWriter, r *http.Request) (*store.Channel, *store.User) {
+	ch, me := s.channel(w, r, NeedView)
 	if ch == nil {
-		return
+		return nil, nil
+	}
+	if ch.ServerID != nil && !store.IsThread(ch.Type) {
+		p, _, err := s.Store.ChannelPerms(r.Context(), ch.ID, me.ID)
+		if err != nil || !p.Has(perms.ManageChannels) {
+			WriteError(w, E(http.StatusForbidden, "missing_permission", "You need Manage Channels to edit this channel."))
+			return nil, nil
+		}
+		return ch, me
 	}
 	if ch.Type != "group_dm" {
-		WriteError(w, E(http.StatusBadRequest, "not_group", "Only group DMs have icons."))
+		WriteError(w, E(http.StatusBadRequest, "not_group", "Only group DMs and server channels have icons."))
+		return nil, nil
+	}
+	if ok, err := s.canAccess(r, me, ch, NeedManage); err != nil || !ok {
+		WriteError(w, E(http.StatusForbidden, "missing_permission", "You do not have permission to do that here."))
+		return nil, nil
+	}
+	return ch, me
+}
+
+// iconChanged tells everyone who sees the channel, and records it for a server's audit log.
+func (s *Server) iconChanged(r *http.Request, ch *store.Channel, me *store.User, set bool) (*store.Channel, error) {
+	updated, err := s.Store.ChannelByID(r.Context(), ch.ID)
+	if err != nil {
+		return nil, err
+	}
+	if ch.ServerID != nil {
+		s.audit(r, *ch.ServerID, me.ID, "channel_update", "channel", &ch.ID, map[string]any{"icon": set}, "")
+		s.Bcast.EmitChannel(ch.ID, "channel_update", updated)
+	} else {
+		s.Bcast.EmitUsers(updated.Recipients, "channel_update", updated)
+	}
+	return updated, nil
+}
+
+func (s *Server) handleChannelIcon(w http.ResponseWriter, r *http.Request) {
+	ch, me := s.iconChannel(w, r)
+	if ch == nil {
 		return
 	}
 	b := s.cropUpload(w, r, "icon", avatarSide, avatarSide, me.ID)
@@ -373,37 +412,38 @@ func (s *Server) handleChannelIcon(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	if ch.ServerID != nil && ch.Glyph != "" {
+		// the picture is the channel's icon now, not whatever was picked before
+		empty := ""
+		if err := s.Store.UpdateChannel(r.Context(), ch.ID, store.ChannelPatch{Glyph: &empty}); err != nil {
+			WriteError(w, err)
+			return
+		}
+	}
 	// The icon has already been swapped. A discarded error here left updated
 	// nil, so the next line read Recipients off nothing and panicked after the
 	// change had landed.
-	updated, err := s.Store.ChannelByID(r.Context(), ch.ID)
+	updated, err := s.iconChanged(r, ch, me, true)
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
-	s.Bcast.EmitUsers(updated.Recipients, "channel_update", updated)
 	WriteJSON(w, http.StatusOK, updated)
 }
 
 func (s *Server) handleChannelIconDelete(w http.ResponseWriter, r *http.Request) {
-	ch, _ := s.channel(w, r, NeedManage)
+	ch, me := s.iconChannel(w, r)
 	if ch == nil {
-		return
-	}
-	if ch.Type != "group_dm" {
-		WriteError(w, E(http.StatusBadRequest, "not_group", "Only group DMs have icons."))
 		return
 	}
 	if err := s.Store.SwapImage(r.Context(), "channels", "icon_id", ch.ID, nil); err != nil {
 		WriteError(w, err)
 		return
 	}
-	updated, err := s.Store.ChannelByID(r.Context(), ch.ID)
-	if err != nil {
+	if _, err := s.iconChanged(r, ch, me, false); err != nil {
 		WriteError(w, err)
 		return
 	}
-	s.Bcast.EmitUsers(updated.Recipients, "channel_update", updated)
 	w.WriteHeader(http.StatusNoContent)
 }
 

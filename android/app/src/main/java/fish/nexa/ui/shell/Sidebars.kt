@@ -137,7 +137,7 @@ fun ServerSidebar(serverId: String, channelId: String?) {
                 val isCollapsed = cat.channel.id in collapsed
                 item(cat.channel.id) { CategoryHeader(serverId, cat.channel, isCollapsed) }
                 val shown = if (!isCollapsed) cat.children else cat.children.filter { ch ->
-                    ch.id == channelId || inside(ch) || (ch.isTextLike && Unread.isUnread(Nexa.readStates.get(ch.id), ch.lastMessageId) && !Unread.isMuted(ch.id, serverId)) || (Nexa.readStates.get(ch.id)?.mentions ?: 0) > 0 ||
+                    ch.id == channelId || inside(ch) || (ch.hasChat && Unread.isUnread(Nexa.readStates.get(ch.id), ch.lastMessageId) && !Unread.isMuted(ch.id, serverId)) || (Nexa.readStates.get(ch.id)?.mentions ?: 0) > 0 ||
                         threadsUnder(ch).any { it.id == channelId }
                 }
                 items(shown, key = { it.id }) { ch -> ChannelRow(st.server.id, ch, ch.id == channelId || inside(ch), threadsUnder(ch), channelId) }
@@ -218,10 +218,13 @@ fun ChannelGlyph(ch: Channel, size: androidx.compose.ui.unit.Dp, tint: Color, mo
     val custom = g?.removePrefix("custom:")?.takeIf { g.startsWith("custom:") }?.let { Nexa.expressions.emoji(it) }
     val st = ch.serverId?.let { Nexa.servers.get(it) }
     val private = st != null && ch.type != "voice" && Perms.isPrivateChannel(st.server.id, ch.overwrites)
-    val voiceOwn = ch.isVoice && (icon != null || emoji != null || custom != null)
+    // a picture uploaded for it comes first: picking a glyph again puts the picture away
+    val picture = ch.iconId?.takeIf { ch.serverId != null }
+    val voiceOwn = ch.isVoice && (picture != null || icon != null || emoji != null || custom != null)
     val density = LocalDensity.current.density
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         when {
+            picture != null -> AsyncImage(Media.iconUrl(picture, size.value.toInt(), density), null, Media.loader, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.size(size * 0.86f).clip(RoundedCornerShape(percent = 28)))
             icon != null -> Icon(icon, tint, size = size)
             emoji != null -> TwemojiImage(emoji, size * 0.86f)
             custom != null -> AsyncImage(Media.emojiUrl(custom.blobId, (size.value * 0.86f).toInt(), density), null, Media.loader, modifier = Modifier.size(size * 0.86f))
@@ -264,7 +267,7 @@ private fun ChannelRow(serverId: String, ch: Channel, selected: Boolean, threads
     val voices by Nexa.voiceStates.byUser.collectAsState()
     val read = reads[ch.id]
     val muted = Unread.isMuted(ch.id, serverId)
-    val unread = ch.isTextLike && !selected && Unread.isUnread(read, ch.lastMessageId) && !muted
+    val unread = ch.hasChat && !selected && Unread.isUnread(read, ch.lastMessageId) && !muted
     val mentions = read?.mentions ?: 0
     val people = if (ch.isVoice) voices.values.filter { it.channelId == ch.id }.sortedBy { it.joinedAt } else emptyList()
     Column {

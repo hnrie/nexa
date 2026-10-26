@@ -56,6 +56,30 @@ import { SnowFall } from "./SnowFall";
 import { t as tr_ } from "@/i18n";
 const PROFILE_PANEL_KEY = "ec:dmProfilePanel";
 
+/**
+ * A channel's messages and the box to write in: the heart of every chat,
+ * and the chat beside a voice channel's call.
+ */
+export function ChannelTalk({ channel }: { channel: Channel }) {
+  const mute = useMute();
+  const selecting = useSelection((x) => x.channelId === channel.id);
+  return (
+    <>
+      <MessageList key={channel.id} channel={channel} />
+      {/* the composer stays mounted underneath, so a draft and its attachments survive picking — and a mute */}
+      <div className={s.composerSlot} hidden={selecting}>
+        <TypingBar channelId={channel.id} />
+        {isThread(channel) ? <ThreadStateBar thread={channel} /> : null}
+        <div hidden={!!mute} className={s.composerSlot}>
+          <Composer channel={channel} />
+        </div>
+        {mute ? <MutedBar mute={mute} /> : null}
+      </div>
+      {selecting ? <SelectionBar channelId={channel.id} /> : null}
+    </>
+  );
+}
+
 export function ChatView({ channel }: { channel: Channel }) {
   const me = useAuth((a) => a.me);
   const mute = useMute();
@@ -415,19 +439,7 @@ export function ChatView({ channel }: { channel: Channel }) {
               onRecheck={() => setRecheck((n) => n + 1)}
             />
           ) : (
-            <>
-              <MessageList key={channel.id} channel={channel} />
-              {/* the composer stays mounted underneath, so a draft and its attachments survive picking — and a mute */}
-              <div className={s.composerSlot} hidden={selecting}>
-                <TypingBar channelId={channel.id} />
-                {thread ? <ThreadStateBar thread={channel} /> : null}
-                <div hidden={!!mute} className={s.composerSlot}>
-                  <Composer channel={channel} />
-                </div>
-                {mute ? <MutedBar mute={mute} /> : null}
-              </div>
-              {selecting ? <SelectionBar channelId={channel.id} /> : null}
-            </>
+            <ChannelTalk channel={channel} />
           )}
         </div>
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}

@@ -1,0 +1,36 @@
+/* Laid over the message box, in its own shape: the box becomes the recorder,
+   rather than a dialog appearing somewhere else. */
+.bar { position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; gap: 8px; padding-inline: 6px; border-radius: inherit; background: var(--bg-composer); animation: open 160ms var(--ease-out); }
+@keyframes open { from { opacity: 0; } }
+.discard, .listen, .stop, .send { flex: none; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background-color var(--transition), color var(--transition), transform 90ms var(--ease-out), box-shadow var(--transition); }
+.discard:active, .listen:active, .stop:active, .send:active { transform: scale(0.92); }
+.discard { width: 36px; height: 36px; color: var(--icon); }
+.discard:hover { color: var(--text-danger, var(--danger)); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.listen { width: 32px; height: 32px; color: var(--text-strong); background: var(--bg-active); }
+.listen:hover { background: var(--bg-hover); }
+/* the red dot breathes while the microphone is open */
+.dot { flex: none; width: 10px; height: 10px; margin-inline: 11px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 55%, transparent); }
+.dot[data-live="true"] { animation: breathe 1.4s var(--ease-in-out) infinite; }
+@keyframes breathe { 50% { box-shadow: 0 0 0 6px transparent; opacity: 0.55; } }
+.time { flex: none; min-width: 40px; font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--text-strong); }
+.time[data-warn="true"] { color: var(--text-danger, var(--danger)); }
+/* the voice as it comes: bars of the accent, lit like the rest of Nexa's accent */
+.wave { flex: 1; min-width: 0; height: 28px; display: flex; align-items: center; justify-content: flex-end; gap: 2px; overflow: hidden; }
+.waveBar { flex: 1 1 0; min-width: 2px; max-width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--text-muted) 45%, transparent); transition: height 100ms linear; }
+.waveBar[data-on="true"] { background: var(--text-brand); }
+.bar[data-phase="recording"] .waveBar { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--brand) 55%, transparent)); }
+.stop { width: 32px; height: 32px; color: var(--text-strong); background: var(--bg-active); }
+.stop:hover { background: var(--bg-hover); }
+.send { width: 36px; height: 36px; color: var(--on-brand); background: var(--grad-brand); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 12px -4px color-mix(in srgb, var(--brand) 80%, transparent); }
+.send:hover:not(:disabled) { filter: brightness(1.08); }
+.send:disabled { opacity: 0.5; }
+.send:focus-visible, .stop:focus-visible, .listen:focus-visible, .discard:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+@media (pointer: coarse) {
+  .discard, .send { width: 44px; height: 44px; }
+  .listen, .stop { width: 40px; height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar { animation: none; }
+  .dot[data-live="true"] { animation: none; }
+  .waveBar { transition: none; }
+}

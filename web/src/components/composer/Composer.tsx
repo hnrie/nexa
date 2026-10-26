@@ -1,4 +1,4 @@
-import { ChevronUp, CirclePlus, SendHorizontal, Smile, X, Eye, EyeOff, Trash2, Timer, Type, File as FileIcon } from "lucide-react";
+import { ChevronUp, CirclePlus, Mic, SendHorizontal, Smile, X, Eye, EyeOff, Trash2, Timer, Type, File as FileIcon } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type SyntheticEvent } from "react";
 import { flushSync } from "react-dom";
 import { lazyPage } from "@/lib/lazyChunk";
@@ -7,6 +7,8 @@ import { gateway } from "@/gateway/session";
 import { formatBytes } from "@/lib/time";
 import { favoriteFile } from "@/lib/gifFavorites";
 import { fitsUploadLimit, stage, uploadLimit, type Staged } from "@/lib/attachments";
+import { canRecordVoice, voiceFileName, type Recording } from "@/lib/voiceMessage";
+import { VoiceRecordBar } from "./VoiceRecordBar";
 import { myPlan, planForFile } from "@/lib/plans";
 import { offerPlan } from "@/stores/upsell";
 import { MonthMeter } from "@/components/support/MonthMeter";
@@ -748,6 +750,24 @@ export function Composer({ channel }: { channel: Channel }) {
     return true;
   };
 
+  // A voice message: the mic takes the send button's place while the box is empty.
+  const [recording, setRecording] = useState(false);
+  useEffect(() => setRecording(false), [channel.id]);
+  const startVoice = () => {
+    if (remaining > 0) return toast(tr_("composer.composer.slowModeOnSeconds", { seconds: remaining }), "error");
+    setRecording(true);
+  };
+  const sendVoice = async (rec: Recording) => {
+    setRecording(false);
+    const channelId = channel.id;
+    const file = new File([rec.blob], voiceFileName(rec.type), { type: rec.type });
+    if (!fitsUploadLimit(file.size, channelId)) return toast(tr_("voiceMessage.tooLong"), "error");
+    const opts: SendOptions = takeReply();
+    const staged = { ...(await stage(file)), voice: { duration: rec.duration, wave: rec.wave } };
+    sendWithFiles(channelId, "", [staged], opts).catch(() => undefined);
+    taRef.current?.focus({ preventScroll: true });
+  };
+
   /** The formatting editor's markdown in place of what the box held, the caret at its end. */
   const replaceText = (value: string) => {
     touched.current = true;
@@ -1103,6 +1123,18 @@ export function Composer({ channel }: { channel: Channel }) {
               <button className={s.iconBtn} data-on={picker} data-picker-toggle={picker || undefined} aria-label={tr_("composer.composer.selectEmoji")} onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
             </>
           )}
+          {!cmd.active && !text.trim() && files.length === 0 && canAttach && canRecordVoice() ? (
+            <button
+              type="button"
+              className={[s.iconBtn, s.mic].join(" ")}
+              aria-label={tr_("voiceMessage.record")}
+              title={tr_("voiceMessage.record")}
+              onClick={startVoice}
+              data-testid="voice-record"
+            >
+              <Mic size={22} />
+            </button>
+          ) : (
           <button
             className={[s.iconBtn, s.send, s.sendMobile, sendButton ? s.sendShown : ""].join(" ")}
             aria-label={tr_("composer.composer.sendMessage")}
@@ -1132,7 +1164,9 @@ export function Composer({ channel }: { channel: Channel }) {
           >
             <SendHorizontal size={22} />
           </button>
+          )}
         </div>
+        {recording ? <VoiceRecordBar onSend={(rec) => void sendVoice(rec)} onClose={() => { setRecording(false); taRef.current?.focus({ preventScroll: true }); }} /> : null}
       </div>
       <MessageCounter text={text} className={s.counter} />
       {channel.slowmode_seconds > 0 && !bypassSlowmode ? (

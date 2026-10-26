@@ -18,7 +18,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import { OverwriteGrid } from "./PermissionGrid";
-import { ChannelIconPicker } from "./ChannelIconPicker";
+import { ChannelIconPicker, PICTURE } from "./ChannelIconPicker";
 import { ChannelGlyph } from "@/components/common/ChannelGlyph";
 import { SaveBar, SettingsLayer, type NavGroup } from "./SettingsLayer";
 import { Spinner } from "@/components/common/Spinner";
@@ -133,7 +133,9 @@ function OverviewPage({ channel }: { channel: Channel }) {
   const slow = edits.slow ?? channel.slowmode_seconds;
   const nsfw = edits.nsfw ?? channel.nsfw;
   const limit = edits.limit ?? channel.user_limit;
-  const glyph = edits.glyph ?? channel.glyph ?? "";
+  // an uploaded picture is edited as PICTURE: picking anything else and saving puts it away
+  const savedGlyph = channel.icon_id ? PICTURE : (channel.glyph ?? "");
+  const glyph = edits.glyph ?? savedGlyph;
   const announce = edits.announce ?? channel.type === "announcement";
   const defaultArchive = edits.defaultArchive ?? channel.default_auto_archive ?? 4320;
   const archive = edits.archive ?? channel.thread?.auto_archive ?? 4320;
@@ -153,7 +155,7 @@ function OverviewPage({ channel }: { channel: Channel }) {
     slow !== channel.slowmode_seconds ||
     nsfw !== channel.nsfw ||
     limit !== channel.user_limit ||
-    glyph !== (channel.glyph ?? "") ||
+    glyph !== savedGlyph ||
     (textLike && announce !== (channel.type === "announcement")) ||
     ((textLike || forum) && defaultArchive !== (channel.default_auto_archive ?? 4320)) ||
     (thread && (archive !== (channel.thread?.auto_archive ?? 4320) || locked !== !!channel.thread?.locked || !sameList(applied, channel.thread?.applied_tags ?? []))) ||
@@ -167,7 +169,7 @@ function OverviewPage({ channel }: { channel: Channel }) {
       if (slow !== channel.slowmode_seconds) body.slowmode_seconds = slow;
       if (nsfw !== channel.nsfw) body.nsfw = nsfw;
       if (limit !== channel.user_limit) body.user_limit = limit;
-      if (glyph !== (channel.glyph ?? "")) body.glyph = glyph;
+      if (glyph !== savedGlyph && glyph !== PICTURE) body.glyph = glyph;
       if (textLike && announce !== (channel.type === "announcement")) body.type = announce ? "announcement" : "text";
       if ((textLike || forum) && defaultArchive !== (channel.default_auto_archive ?? 4320)) body.default_auto_archive = defaultArchive;
       if (thread) {
@@ -197,13 +199,13 @@ function OverviewPage({ channel }: { channel: Channel }) {
         <Field label={nameLabel} required>
           <div className={s.iconInput}>
             {/* what the channel list will show, as it is being picked below */}
-            <span className={s.nameGlyph}><ChannelGlyph channel={{ type: textLike ? (announce ? "announcement" : "text") : channel.type, server_id: channel.server_id, glyph }} size={16} /></span>
+            <span className={s.nameGlyph}><ChannelGlyph channel={{ type: textLike ? (announce ? "announcement" : "text") : channel.type, server_id: channel.server_id, glyph: glyph === PICTURE ? "" : glyph, icon_id: glyph === PICTURE ? channel.icon_id : null }} size={16} /></span>
             <TextInput value={name} onChange={(e) => set({ name: slugged ? typedChannelName(e.target.value) : e.target.value })} maxLength={100} data-testid="channel-settings-name" {...(slugged ? { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } : {})} />
           </div>
         </Field>
         {!thread ? (
           <Field as="div" label={channel.type === "category" ? tr_("server.channelIcon.categoryTitle") : tr_("server.channelIcon.title")} hint={channel.type === "category" ? tr_("server.channelIcon.categoryHint") : tr_("server.channelIcon.hint")}>
-            <ChannelIconPicker channel={channel} value={glyph} onChange={(v) => set({ glyph: v })} label={channel.type === "category" ? tr_("server.channelIcon.categoryTitle") : tr_("server.channelIcon.title")} />
+            <ChannelIconPicker channel={channel} value={glyph} onChange={(v) => set({ glyph: v })} onUploaded={(ch) => { upsert(ch); setEdits(({ glyph: _, ...rest }) => rest); }} label={channel.type === "category" ? tr_("server.channelIcon.categoryTitle") : tr_("server.channelIcon.title")} />
           </Field>
         ) : null}
         {textLike || forum ? (

@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { AtSign, Gift, AudioLines, BadgeCheck, Bot, CodeXml, ScanEye, Compass, Gavel, KeyRound, Link2, Megaphone, MonitorUp, Pause, ScrollText, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, CornerUpRight, Eye, EyeOff, Feather, FolderPlus, Gamepad2, Globe, Headphones, Heart, House, IdCard, ImagePlay, ImagePlus, Images, Keyboard, LayoutGrid, Leaf, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessageSquareText, MessagesSquare, MousePointerClick, Move, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, QrCode, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Snowflake, Sparkles, SpellCheck, Sticker, StickyNote, Tag, Timer, Trash2, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Volume2, Vote, Webhook, ZoomIn, type LucideIcon } from "lucide-react";
+import { AtSign, Gift, AudioLines, BadgeCheck, Bot, CodeXml, ScanEye, Compass, Gavel, KeyRound, Link2, Megaphone, MonitorUp, Pause, ScrollText, BellRing, Bug, CircleX, Clapperboard, ClipboardCopy, CloudUpload, CornerUpRight, Eye, EyeOff, Feather, FolderPlus, Gamepad2, Globe, Headphones, Heart, House, IdCard, ImagePlay, ImagePlus, Images, Keyboard, LayoutGrid, Leaf, Link, MapPinOff, MessageCircleMore, MessageSquareDashed, MessageSquarePlus, MessageSquareText, MessagesSquare, Mic, MousePointerClick, Move, Music, Newspaper, NotebookPen, Paintbrush, Palette, PanelBottom, PanelsTopLeft, Pin, Play, Puzzle, QrCode, RefreshCw, RemoveFormatting, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Snowflake, Sparkles, SpellCheck, Sticker, StickyNote, Tag, Timer, Trash2, TvMinimalPlay, Type, UserCheck, UserCog, UserPen, Users, UsersRound, Volume2, Vote, Webhook, ZoomIn, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,14 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-10-26.2",
+    items: [
+      { icon: Mic, title: "whatsNew.r202610262.voiceMessagesTitle", body: "whatsNew.r202610262.voiceMessagesBody" },
+      { icon: MessageSquareText, title: "whatsNew.r202610262.voiceChatTitle", body: "whatsNew.r202610262.voiceChatBody" },
+      { icon: ImagePlus, title: "whatsNew.r202610262.channelPicturesTitle", body: "whatsNew.r202610262.channelPicturesBody" },
+    ],
+  },
   {
     id: "2026-10-26",
     items: [

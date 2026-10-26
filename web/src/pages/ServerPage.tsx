@@ -8,7 +8,7 @@ import { lazyPage } from "@/lib/lazyChunk";
 import { isThread } from "@/stores/threads";
 import { Button } from "@/components/common/Button";
 import { ChatView } from "@/components/chat/ChatView";
-import { VoiceView } from "@/components/voice/VoiceView";
+import { VoiceRoom } from "@/components/voice/VoiceRoom";
 import { PaneSpinner } from "@/components/common/Spinner";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { channelTree, useChannels } from "@/stores/channels";
@@ -125,6 +125,8 @@ export default function ServerPage() {
   const chId = channel?.id;
   const chType = channel?.type;
   useEffect(() => {
+    // a voice channel's chat says for itself while it is open (VoiceRoom)
+    if (chType === "voice") return;
     if (!chId || !talkable(chType)) {
       setActiveChannel(null);
       return;
@@ -182,15 +184,6 @@ function NoChannels() {
         <h2>{tr_("server.noTextChannels")}</h2>
         <p>{tr_("server.youFindYourselfInAStrange")}</p>
       </div>
-    </div>
-  );
-}
-
-function VoiceRoom({ channel }: { channel: import("@/api/types").Channel }) {
-  return (
-    <div className={s.empty}>
-      <header className={s.header}><PageHeaderButtons /><ChannelGlyph channel={channel} size={22} className={s.hIcon} /><span className={s.hName}>{channel.name}</span></header>
-      <VoiceView channel={channel} />
     </div>
   );
 }

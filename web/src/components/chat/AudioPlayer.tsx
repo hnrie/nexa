@@ -7,14 +7,14 @@ import { BARS, waveform } from "./waveform";
 import s from "./AudioPlayer.module.css";
 
 import { t as tr_ } from "@/i18n";
-function clock(t: number): string {
+export function clock(t: number): string {
   if (!Number.isFinite(t) || t < 0) t = 0;
   const total = Math.floor(t);
   const m = Math.floor(total / 60);
   return `${m}:${String(total % 60).padStart(2, "0")}`;
 }
 
-const SPEEDS = [1, 1.25, 1.5, 2, 0.75];
+export const SPEEDS = [1, 1.25, 1.5, 2, 0.75];
 /** Until the recording's own shape is worked out (or where it cannot be), an even row: honest about knowing nothing. */
 const FLAT = Array.from({ length: BARS }, () => 0.3);
 

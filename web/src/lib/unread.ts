@@ -44,13 +44,13 @@ export function badgeText(n: number): string {
   return n > 99 ? "99+" : String(n);
 }
 
-/** Aggregates unread state over a server's text channels, honouring mutes. */
+/** Aggregates unread state over a server's text channels and the chats of its voice channels, honouring mutes. */
 export function serverUnread(serverId: string, channels: Record<string, Channel>, reads: Record<string, ChannelRead>, settings: Settings): UnreadSummary {
   let unread = false;
   let mentions = 0;
   const serverMuted = settings.notifications.muted.includes(serverId);
   for (const ch of Object.values(channels)) {
-    if (ch.server_id !== serverId || ch.type !== "text") continue;
+    if (ch.server_id !== serverId || (ch.type !== "text" && ch.type !== "voice")) continue;
     const rs = reads[ch.id];
     mentions += rs?.mentions ?? 0;
     if (!serverMuted && !settings.notifications.muted.includes(ch.id) && isUnread(rs, ch.last_message_id)) unread = true;

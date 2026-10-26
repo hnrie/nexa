@@ -115,6 +115,8 @@
 .acEmojiImg { width: 22px; height: 22px; margin: 0 3px; object-fit: contain; flex: none; }
 .acSub { flex: 1 1 0; min-width: 0; padding-inline-start: 8px; text-align: end; color: var(--text-muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sendMobile { display: none; }
+/* the way to a voice message, where Send would be while there is nothing to send */
+.mic:hover { color: var(--text-brand); }
 /* A phone has no padding under the box to hold the counter, so it goes on a
    line of its own under the box rather than being hidden: it is how one learns
    a message is too long before Send refuses it. The tray shows more files. */

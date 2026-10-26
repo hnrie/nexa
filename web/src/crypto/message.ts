@@ -62,6 +62,10 @@ export interface AttachmentMeta {
   plain?: boolean;
   /** Alt text a webhook gave the file. */
   alt?: string;
+  /** A voice message recorded in the app: drawn as one, with the shape of its sound. */
+  voice?: boolean;
+  /** base64 of the recording's loudness, a byte per bar (lib/voiceMessage.ts). */
+  wave?: string;
 }
 
 /** An answer's emoji: a character (its name), or one of the app's custom emoji. */
@@ -181,6 +185,9 @@ function sanitizePreview(x: unknown): AttachmentPreview | undefined {
   return { blob_id, key, size, type, w, h };
 }
 
+/** A voice message's shape: at most 96 bytes of base64. */
+const WAVE = /^[A-Za-z0-9+/]{1,128}={0,2}$/;
+
 /** A file as something another person wrote into a message or a note: held to what a file can be. */
 export function sanitizeAttachment(x: unknown): AttachmentMeta | null {
   if (!isObj(x)) return null;
@@ -194,6 +201,11 @@ export function sanitizeAttachment(x: unknown): AttachmentMeta | null {
   if (typeof spoiler === "boolean") a.spoiler = spoiler;
   const preview = type.startsWith("image/") ? sanitizePreview(x["preview"]) : undefined;
   if (preview) a.preview = preview;
+  if (type.startsWith("audio/")) {
+    if (x["voice"] === true) a.voice = true;
+    const wave = x["wave"];
+    if (typeof wave === "string" && WAVE.test(wave)) a.wave = wave;
+  }
   // a message sealed by a person holds only encrypted files, whatever it says
   return a;
 }

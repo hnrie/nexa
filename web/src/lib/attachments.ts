@@ -53,6 +53,8 @@ export interface Staged {
   preview: string | null;
   progress: number;
   error: string | null;
+  /** A voice message recorded in the box: how long it runs and the shape of its sound. */
+  voice?: { duration: number; wave: string };
 }
 
 let seq = 0;
@@ -306,6 +308,11 @@ export async function uploadStaged(to: UploadPlace, st: Staged, onProgress: (p: 
   }
   if (copy) meta.preview = copy.meta;
   if (st.spoiler) meta.spoiler = true;
+  if (st.voice) {
+    meta.voice = true;
+    meta.duration = st.voice.duration;
+    meta.wave = st.voice.wave;
+  }
   // what was just sent is on this device already, so showing it here takes no download
   if (/^(image|video|audio)\//.test(meta.type)) seedMedia(res.blob_id, st.file, meta.type);
   if (copy) seedMedia(copy.meta.blob_id, copy.blob, copy.meta.type);

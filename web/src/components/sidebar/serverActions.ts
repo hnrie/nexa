@@ -13,7 +13,7 @@ export function markServerRead(serverId: string): void {
   const channels = useChannels.getState().byId;
   const reads = useReadStates.getState();
   for (const ch of Object.values(channels)) {
-    if (ch.server_id !== serverId || ch.type !== "text" || !ch.last_message_id) continue;
+    if (ch.server_id !== serverId || (ch.type !== "text" && ch.type !== "voice") || !ch.last_message_id) continue;
     if (isUnread(reads.byChannel[ch.id], ch.last_message_id) || (reads.byChannel[ch.id]?.mentions ?? 0) > 0) void reads.ack(ch.id, ch.last_message_id);
   }
 }

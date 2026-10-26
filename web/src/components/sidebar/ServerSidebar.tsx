@@ -319,7 +319,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
 
   const renderChannel = (ch: Channel) => {
     const rs = reads[ch.id];
-    const unread = (ch.type === "text" || ch.type === "announcement") && isUnread(rs, ch.last_message_id) && !isMuted(settings, ch.id, serverId);
+    const unread = (ch.type === "text" || ch.type === "announcement" || ch.type === "voice") && isUnread(rs, ch.last_message_id) && !isMuted(settings, ch.id, serverId);
     // The threads this account is in, still going, under the channel they
     // belong to: ones it started, wrote in or was brought into. Looking at a
     // thread or a forum post is not joining it, so it does not stand here

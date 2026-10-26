@@ -1,0 +1,16 @@
+/* The call takes what the chat leaves. */
+.stage { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* Beside the call, the chat is a column of the page, as the member list is; it
+   reads as part of the channel rather than something laid over it. */
+.chat { position: relative; flex: none; width: 400px; min-height: 0; display: flex; flex-direction: column; background: var(--bg-raised); box-shadow: inset 1px 0 0 var(--border-subtle); }
+:global([dir="rtl"]) .chat { box-shadow: inset -1px 0 0 var(--border-subtle); }
+/* With no room beside it, it covers the call, which carries on underneath. */
+.chat[data-cover="true"] { position: absolute; inset: 0; z-index: 5; width: auto; box-shadow: none; animation: rise 180ms var(--ease-out); }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) { .chat[data-cover="true"] { animation: none; } }
+.chatHead { flex: none; display: flex; align-items: center; gap: 8px; height: 44px; padding-inline: 16px 8px; color: var(--text-muted); box-shadow: 0 1px 0 var(--border-subtle); }
+.chatTitle { flex: 1; min-width: 0; font-family: var(--font-display); font-size: 15px; font-weight: 650; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Something new waits in the chat: a dot, or the mentions counted in the danger red the sidebar uses. */
+.chatBtn { position: relative; }
+.dot { position: absolute; top: 5px; inset-inline-end: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--text-strong); box-shadow: 0 0 0 2px var(--bg-raised); }
+.mentions { position: absolute; top: 1px; inset-inline-end: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--grad-danger); color: var(--on-danger); font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; box-shadow: 0 0 0 2px var(--bg-raised); }

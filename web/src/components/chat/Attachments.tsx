@@ -12,6 +12,7 @@ import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import { Spinner } from "@/components/common/Spinner";
 import { AudioPlayer } from "./AudioPlayer";
+import { VoiceMessage } from "./VoiceMessage";
 import { FavoriteButton } from "./FavoriteButton";
 import { Lightbox, type LightboxItem } from "./Lightbox";
 import { VideoPlayer } from "./VideoPlayer";
@@ -420,6 +421,21 @@ function WholeVideo({ att, fill }: { att: AttachmentMeta; fill?: boolean }) {
   );
 }
 
+/** A voice message recorded in the app: always fetched by itself (they are small), drawn whole from the start. */
+function VoiceAttachment({ att }: { att: AttachmentMeta }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { url, error, wanted, load, retry } = useDecrypted(att, ref, true);
+  return (
+    <div ref={ref} className={s.audio}>
+      {error && !url ? (
+        <span className={s.fileSize}><LoadFailed error={error} what="audio" onRetry={retry} /></span>
+      ) : (
+        <VoiceMessage src={url} duration={att.duration} wave={att.wave} loading={wanted || !url} onLoad={load} />
+      )}
+    </div>
+  );
+}
+
 function AudioAttachment({ att }: { att: AttachmentMeta }) {
   const ref = useRef<HTMLDivElement>(null);
   const auto = att.size <= AUTO_LOAD_MAX;
@@ -502,7 +518,7 @@ export function Attachments({ list, from, fill }: { list: AttachmentMeta[]; from
         const inline = att.size <= INLINE_MAX;
         if (inline && t.startsWith("image/")) return tiles ? null : <ImageAttachment key={att.blob_id} att={att} onOpen={() => setViewing(att.blob_id)} fill={fill} />;
         if ((inline || canStream()) && t.startsWith("video/")) return <VideoAttachment key={att.blob_id} att={att} fill={fill} />;
-        if (inline && t.startsWith("audio/")) return <AudioAttachment key={att.blob_id} att={att} />;
+        if (inline && t.startsWith("audio/")) return att.voice ? <VoiceAttachment key={att.blob_id} att={att} /> : <AudioAttachment key={att.blob_id} att={att} />;
         return <FileAttachment key={att.blob_id} att={att} />;
       })}
       {viewing ? <Lightbox items={gallery} start={Math.max(0, gallery.findIndex((g) => g.att?.blob_id === viewing))} onClose={() => setViewing(null)} /> : null}

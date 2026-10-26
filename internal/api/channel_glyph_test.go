@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -114,4 +115,50 @@ func asJSON(t *testing.T, v any) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+func TestChannelPictureIcon(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice")
+	tokB, _ := register(t, ts, "bob")
+	view := createServer(t, ts, tokA, "Pictures")
+	general := channelNamed(view, "general")["id"].(string)
+	join(t, ts, tokB, inviteFor(t, ts, tokA, general))
+	gb := connectGW(t, ts, tokB)
+	path := "/api/v1/channels/" + general
+
+	// A member without Manage Channels cannot give it one.
+	if res, _ := rawPut(t, ts.URL+path+"/icon", tokB, "image/png", pngBytes(64, 64)); res.StatusCode != 403 {
+		t.Fatalf("bob uploaded: %d", res.StatusCode)
+	}
+	do(t, ts, "PATCH", path, tokA, map[string]any{"glyph": "icon:megaphone"})
+	gb.next("channel_update", 3*time.Second)
+
+	// The picture takes over from the glyph, and everyone sees it.
+	res, raw := rawPut(t, ts.URL+path+"/icon", tokA, "image/png", pngBytes(64, 64))
+	var ch map[string]any
+	_ = json.Unmarshal(raw, &ch)
+	if res.StatusCode != 200 || ch["icon_id"] == nil || ch["glyph"] != nil {
+		t.Fatalf("upload: %d %s", res.StatusCode, raw)
+	}
+	if ev := gb.next("channel_update", 3*time.Second); ev == nil || ev["icon_id"] != ch["icon_id"] {
+		t.Fatalf("channel_update: %v", ev)
+	}
+	if res, err := http.Get(ts.URL + "/media/icon/" + ch["icon_id"].(string)); err != nil || res.StatusCode != 200 {
+		t.Fatalf("picture not served: %v %v", res, err)
+	}
+
+	// Picking a glyph again puts the picture away.
+	if res, body := do(t, ts, "PATCH", path, tokA, map[string]any{"glyph": "emoji:🎉"}); res.StatusCode != 200 || body["icon_id"] != nil || body["glyph"] != "emoji:🎉" {
+		t.Fatalf("glyph after picture: %d %v", res.StatusCode, body)
+	}
+
+	// And it can be taken off on its own.
+	rawPut(t, ts.URL+path+"/icon", tokA, "image/png", pngBytes(64, 64))
+	if res, _ := do(t, ts, "DELETE", path+"/icon", tokA, nil); res.StatusCode != 204 {
+		t.Fatalf("delete: %d", res.StatusCode)
+	}
+	if _, body := do(t, ts, "GET", "/api/v1/channels/"+general, tokA, nil); body["icon_id"] != nil {
+		t.Fatalf("still has a picture: %v", body)
+	}
 }

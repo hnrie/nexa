@@ -333,6 +333,7 @@ fun AudioPlayer(source: Uri, name: String, fileSize: Long?, durationHint: Double
 /** An uploaded recording: opened first (small ones by themselves), then played from this device. */
 @Composable
 fun AudioAttachment(att: AttachmentMeta) {
+    if (att.voice) return VoiceAttachment(att)
     val c = Nx.colors
     Saving.Track()
     val auto = att.size <= AUTO_LOAD_MAX

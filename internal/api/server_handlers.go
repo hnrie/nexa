@@ -1082,6 +1082,14 @@ func (s *Server) handleServerChannelPatch(w http.ResponseWriter, r *http.Request
 		}
 		patch.Glyph = &glyph
 		changes["glyph"] = glyph
+		if ch.IconID != nil {
+			// picking an icon, an emoji or the default puts the uploaded picture away
+			if err := s.Store.SwapImage(r.Context(), "channels", "icon_id", ch.ID, nil); err != nil {
+				WriteError(w, err)
+				return
+			}
+			changes["icon"] = false
+		}
 	}
 	if err := s.Store.UpdateChannel(r.Context(), ch.ID, patch); err != nil {
 		WriteError(w, err)

@@ -486,6 +486,22 @@ the source's files without owning them, so nothing is uploaded again and no allo
 clears its mentions, sets flag 1 << 14 and limits forwards on their own (`limForward`). The
 payload's `fwd.at` is when the original was sent, drawn as Forwarded with a bar down its side.
 
+### Voice messages
+
+A voice message is an ordinary encrypted audio attachment whose meta says `voice: true`, with
+`duration` and `wave` (base64, a byte of loudness per bar, 48 bars; both apps accept at most 96
+bytes, and only on `audio/` files). The shape travels in the message, so the bubble is drawn whole
+before the file comes down; it is drawn with 32 bars (`SHOWN_BARS`). The server knows nothing of
+it. While the box is empty (no words, files or command) a mic takes the send button's place, for
+anyone with Attach Files; it opens a bar laid over the box that records at once (red dot, time,
+live shape), Stop gives a review to listen back, Send goes from either, the bin, Escape or Back
+throws it away. At most ten minutes, under half a second is dropped. The web records with
+MediaRecorder from the microphone chosen in Voice & Video, AAC in MP4 where the browser makes it,
+else Opus in WebM or Ogg (`lib/voiceMessage.ts`, `composer/VoiceRecordBar.tsx`,
+`chat/VoiceMessage.tsx`, `Staged.voice` in `lib/attachments.ts`); Android records AAC in MP4 with
+MediaRecorder (`data/VoiceMessages`, `ui/chat/VoiceRecordBar.kt`, `ui/media/VoiceMessage.kt`,
+`Staged.voice` in `data/Send.kt`).
+
 ### Gateway (`internal/gateway`, `web/src/gateway`)
 
 - One WebSocket at `GET /gateway`. The client sends `{op, d}`, the server `{t, s, d}`. The first
@@ -622,6 +638,13 @@ How each permission is held, as Discord holds it:
 - The server strips hidden metadata from the pictures and videos it keeps readable (`scrub.go`);
   the apps do the same before encrypting (web `lib/scrubMetadata.ts`, Android `MetadataScrub`), all
   checked against `internal/media/testdata/scrub`.
+- A server channel can wear an uploaded picture in place of its # or speaker: `PUT` and `DELETE
+  /channels/{id}/icon` (`iconChannel` in `channel_handlers.go`: a group DM's owner, or Manage
+  Channels in a server channel) keep it in `channels.icon_id` as for a group's icon (kind `icon`,
+  256 px). Uploading clears the channel's glyph; a glyph saved afterwards (an icon, an emoji or the
+  default) puts the picture away, so the picture always wins when both are set (web
+  `ChannelGlyph`, Android `ChannelGlyph` in `ui/shell/Sidebars.kt`). The channel icon picker
+  uploads at once (Upload Picture, cropped square) and edits the picture as the value `picture`.
 - Small files go up in one request (`POST /channels/{id}/attachments`); big ones through
   `/api/v1/uploads` in pieces (Cloudflare caps a request at 100 MB), with disk headroom and
   per-account caps (`roomForUpload`).
@@ -643,6 +666,16 @@ goes through Cloudflare's SFU, with chatd as its signalling proxy (`/api/v1/voic
 who may pull which track. The usage meter pauses video near `REALTIME_MONTHLY_GB` and stops calls
 just short of it. A call through the SFU outlives a dropped socket for `voiceGrace`. Guest links let
 someone without an account into one call. Frames are encrypted in the apps.
+
+A server's voice channel has a chat of its own: the server never refused messages there, and the
+apps show it as the channel's messages and box (web `components/voice/VoiceRoom.tsx`, reusing
+`ChannelTalk` from `ChatView.tsx`; Android `ui/voice/VoiceRoom.kt`). A chat button in the call's
+header opens it, with a dot or a mention count while it holds something unread. From 1100 px (dp)
+it stands beside the call, 400 wide, and whether it is open is remembered on the device; narrower
+it covers the call (which carries on underneath) until closed, Back closing it on Android. A link
+to one of its messages opens it. Only while it shows is it the active channel, so it is marked read
+then. Voice channels count towards the sidebar's unread state, a server's unread badge and Mark as
+Read (web `lib/unread.ts`, `sidebar/serverActions.ts`; Android `Channel.hasChat`).
 
 Call timers: the registry keeps when each channel went from empty to occupied and stamps it on
 every voice state as `call_since` (the same for everyone in the call, kept when the person who
@@ -896,7 +929,10 @@ React 18, TypeScript, Vite, zustand and react-router; `@/` is `web/src`. `main.t
 registers the two service workers: `sw.ts` (no fetch handler; a new copy taking over means a
 deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.ts` (scoped to
 `/__download/`, streams and decrypts large downloads and videos). Pages load lazily
-(`lib/lazyChunk.ts`).
+(`lib/lazyChunk.ts`). A dialog whose pages load lazily makes them with `readyPage` and calls
+`ready()` on the page it opens on, so its frame and that page show together (Server Settings);
+switching pages goes through `startTransition`, which keeps the page on screen until the next one's
+file is here.
 
 ### Routes (`routes.tsx`)
 

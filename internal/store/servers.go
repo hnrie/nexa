@@ -389,7 +389,7 @@ func (s *Store) DeleteServer(ctx context.Context, id ids.ID) error {
 		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - (SELECT count(*) FROM attachments a WHERE a.blob_id = blobs.id AND a.channel_id IN (SELECT id FROM channels WHERE server_id = ?))")+` WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id IN (SELECT id FROM channels WHERE server_id = ?))`, int64(id), int64(id)); err != nil {
 			return err
 		}
-		// the icon, banner, emoji and server sticker packs go with the server
+		// the icon, banner, emoji, channel pictures and server sticker packs go with the server
 		// (by cascade), so their images must be let go of here
 		if err := releaseBlobRefs(ctx, tx, `SELECT icon_id FROM servers WHERE id = ?
 			UNION ALL SELECT banner_id FROM servers WHERE id = ?
@@ -398,8 +398,9 @@ func (s *Store) DeleteServer(ctx context.Context, id ids.ID) error {
 			UNION ALL SELECT avatar_id FROM webhooks WHERE server_id = ?
 			UNION ALL SELECT avatar_id FROM server_members WHERE server_id = ?
 			UNION ALL SELECT banner_id FROM server_members WHERE server_id = ?
-			UNION ALL SELECT icon_id FROM roles WHERE server_id = ?`,
-			int64(id), int64(id), int64(id), int64(id), int64(id), int64(id), int64(id), int64(id)); err != nil {
+			UNION ALL SELECT icon_id FROM roles WHERE server_id = ?
+			UNION ALL SELECT icon_id FROM channels WHERE server_id = ?`,
+			int64(id), int64(id), int64(id), int64(id), int64(id), int64(id), int64(id), int64(id), int64(id)); err != nil {
 			return err
 		}
 		if err := releaseWidgetRefs(ctx, tx, `SELECT widgets FROM server_members WHERE server_id = ? AND widgets IS NOT NULL`, int64(id)); err != nil {

@@ -227,26 +227,6 @@ fun VoiceView(channelId: String, modifier: Modifier = Modifier, embedded: Boolea
     else Stage(channelId, state, byUser, modifier, embedded, full)
 }
 
-/** ServerPage.tsx's VoiceRoom: a server's voice channel, its header with the channel's glyph, and the call filling the rest. */
-@Composable
-fun VoiceChannelPage(channel: Channel) {
-    // A moderator moved the call to another voice channel of the server while
-    // this one was on screen: the screen follows it there, rather than leave
-    // its owner looking at the lobby they were taken out of.
-    val callAt = Voice.state.collectAsState().value.mine?.channelId
-    var callWas by remember { mutableStateOf(callAt) }
-    LaunchedEffect(callAt) {
-        val was = callWas
-        callWas = callAt
-        val sid = channel.serverId
-        if (sid != null && was == channel.id && callAt != null && callAt != channel.id && Nexa.channels.get(callAt)?.serverId == sid) Nav.go(Route.Server(sid, callAt))
-    }
-    Column(Modifier.fillMaxSize()) {
-        PageHeader(channel.name, icon = { ChannelGlyph(channel, 22.dp, Nx.colors.textMuted) })
-        VoiceView(channel.id, Modifier.weight(1f).fillMaxWidth())
-    }
-}
-
 /** Before joining: who is in there, and one clear way in. */
 @Composable
 private fun Lobby(channelId: String, state: CallState, byUser: Map<String, VoiceState>, modifier: Modifier) {

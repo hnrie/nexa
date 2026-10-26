@@ -320,6 +320,8 @@ fun Composer(channel: Channel) {
         fish.nexa.data.AutomodNotices.restored(channelId)
     }
     var preview by remember { mutableStateOf(false) }
+    // a voice message being made: the bar covers the box while it lasts
+    var recording by remember(channelId) { mutableStateOf(false) }
     var ac by remember(channelId) { mutableStateOf<AcToken?>(null) }
     var lastUnknown by remember(channelId) { mutableStateOf<String?>(null) }
     val tray = ChatUi.trays[channelId] ?: emptyList()
@@ -536,8 +538,24 @@ fun Composer(channel: Channel) {
                     onPasteTooLong = { notice = Notice.PasteTooLong(it) },
                     onContent = { uris -> scope.launch { addFiles(uris.mapNotNull { Staging.stage(it, channel.id) }) } },
                     onSend = { send() },
+                    onVoice = if (canAttach && tray.isEmpty() && !cmd.active) ({
+                        if (slowLeft > 0) Nexa.ui.toast(t("composer.composer.slowModeOnSeconds", "seconds" to kotlin.math.ceil(slowLeft).toInt()), "error") else recording = true
+                    }) else null,
                 )
                 SeasonalPerch(Modifier.align(Alignment.TopEnd))
+                if (recording) VoiceRecordBar(Modifier.matchParentSize(), boxShape, onClose = { recording = false }) { rec ->
+                    recording = false
+                    if (!Uploads.fits(rec.file.length(), channelId)) {
+                        rec.file.delete()
+                        Nexa.ui.toast(t("voiceMessage.tooLong"), "error")
+                        return@VoiceRecordBar
+                    }
+                    val opts = SendOptions(replyTo = reply?.messageId, ping = reply?.ping)
+                    ChatUi.reply.remove(channelId)
+                    ChatUi.snapToBottom(channelId)
+                    val st = fish.nexa.data.Staged("v${System.nanoTime()}", rec.file, fish.nexa.data.VoiceMessages.fileName(), rec.type, voice = fish.nexa.data.VoiceNote(rec.duration, rec.wave))
+                    Send.sendWithFiles(channelId, "", listOf(st), opts)
+                }
             }
             val text = state.text
             val left = Send.MAX_MESSAGE_LENGTH - text.length
@@ -654,6 +672,8 @@ private fun ComposerBox(
     onPasteTooLong: (String) -> Unit,
     onContent: (List<Uri>) -> Unit,
     onSend: () -> Unit,
+    /** Starts a voice message; offered in Send's place while the box is empty. */
+    onVoice: (() -> Unit)?,
 ) {
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
@@ -730,7 +750,8 @@ private fun ComposerBox(
         Row(Modifier.height(48.dp).padding(end = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             // a command's options are its slots: formatting, the preview and emoji are for words
             if (!command.active) ComposerIconButton("ChevronUp", t("composer.more.label"), on = optionsOn, onClick = onOptions)
-            SendButton(sendEnabled, onSend)
+            if (onVoice != null && state.text.isBlank()) ComposerIconButton("Mic", t("voiceMessage.record"), on = false, onClick = onVoice)
+            else SendButton(sendEnabled, onSend)
         }
     }
 }

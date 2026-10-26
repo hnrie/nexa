@@ -1,7 +1,10 @@
-import { Hash, SmilePlus, Volume2 } from "lucide-react";
+import { Hash, ImagePlus, SmilePlus, Volume2 } from "lucide-react";
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { channels as channelsApi } from "@/api/channels";
 import type { Channel } from "@/api/types";
+import { iconUrl } from "@/api/users";
 import { Button } from "@/components/common/Button";
+import { ImageCropModal } from "@/components/common/ImageCropModal";
 import { ChannelGlyph } from "@/components/common/ChannelGlyph";
 import { CHANNEL_ICONS, channelIconName } from "@/components/common/channelIcons";
 import { Tooltip } from "@/components/common/Tooltip";
@@ -9,6 +12,8 @@ import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { t } from "@/i18n";
 import { parseGlyph } from "@/lib/channelGlyph";
 import { useExpressions } from "@/stores/expressions";
+import { useUI } from "@/stores/ui";
+import { describeError } from "@/lib/errors";
 import p from "./ChannelIconPicker.module.css";
 
 interface Props {
@@ -18,7 +23,12 @@ interface Props {
   onChange: (glyph: string) => void;
   /** What the group of icons is called: the field's own caption. */
   label: string;
+  /** A picture was uploaded for the channel (saved at once, as a role's icon is). */
+  onUploaded: (channel: Channel) => void;
 }
+
+/** The value that stands for the channel's uploaded picture while it is being edited. */
+export const PICTURE = "picture";
 
 function Tile({ checked, label, onSelect, children, testId }: { checked: boolean; label: string; onSelect: () => void; children: ReactNode; testId?: string }) {
   return (
@@ -36,8 +46,23 @@ function Tile({ checked, label, onSelect, children, testId }: { checked: boolean
  * included). A radio group: arrows move through it and pick as they go, as
  * any set of radio buttons does; nothing is saved until the page is.
  */
-export function ChannelIconPicker({ channel, value, onChange, label }: Props) {
+export function ChannelIconPicker({ channel, value, onChange, label, onUploaded }: Props) {
   const [picker, setPicker] = useState<DOMRect | null>(null);
+  const file = useRef<HTMLInputElement>(null);
+  const [crop, setCrop] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const toast = useUI((u) => u.toast);
+  const upload = async (blob: Blob, area: { x: number; y: number; w: number; h: number } | null) => {
+    setUploading(true);
+    try {
+      onUploaded(await channelsApi.uploadIcon(channel.id, blob, area));
+      toast(t("server.channelIcon.pictureSaved"), "success");
+    } catch (err) {
+      toast(describeError(err, t("server.channelIcon.pictureFailed")), "error");
+    } finally {
+      setUploading(false);
+    }
+  };
   const grid = useRef<HTMLDivElement>(null);
   const g = parseGlyph(value);
   // the emoji last picked here keeps its tile, so going to an icon and back is one click
@@ -50,7 +75,7 @@ export function ChannelIconPicker({ channel, value, onChange, label }: Props) {
     return custom ? `:${custom.name}:` : t("server.channelIcon.chooseEmoji");
   };
   const isCategory = channel.type === "category";
-  const noneChecked = !g || (g.kind === "icon" && !CHANNEL_ICONS[g.name]);
+  const noneChecked = value !== PICTURE && (!g || (g.kind === "icon" && !CHANNEL_ICONS[g.name]));
 
   // Arrows move through the tiles and pick as they go, a row at a time up and
   // down; left and right follow the reading direction.
@@ -75,6 +100,11 @@ export function ChannelIconPicker({ channel, value, onChange, label }: Props) {
         <Tile checked={noneChecked} label={isCategory ? t("server.channelIcon.none") : t("server.channelIcon.default")} onSelect={() => onChange("")} testId="channel-icon-default">
           {channel.type === "voice" ? <Volume2 size={20} /> : isCategory ? <span className={p.none} aria-hidden="true" /> : <Hash size={20} />}
         </Tile>
+        {channel.icon_id ? (
+          <Tile checked={value === PICTURE} label={t("server.channelIcon.picture")} onSelect={() => onChange(PICTURE)} testId="channel-icon-picture">
+            <img className={p.picture} src={iconUrl(channel.icon_id, 22) ?? undefined} alt="" draggable={false} />
+          </Tile>
+        ) : null}
         {emojiShown ? (
           <Tile checked={value === emojiShown} label={emojiLabel(emojiShown)} onSelect={() => onChange(emojiShown)} testId="channel-icon-emoji">
             <ChannelGlyph channel={{ type: "text", server_id: channel.server_id, glyph: emojiShown }} size={22} />
@@ -87,6 +117,21 @@ export function ChannelIconPicker({ channel, value, onChange, label }: Props) {
         ))}
       </div>
       <div className={p.actions}>
+        <Button type="button" size="sm" variant="secondary" disabled={uploading} onClick={() => file.current?.click()} data-testid="channel-icon-upload">
+          <ImagePlus size={16} aria-hidden="true" /> {t("server.channelIcon.uploadPicture")}
+        </Button>
+        <input
+          ref={file}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) setCrop(f);
+          }}
+          data-testid="channel-icon-file"
+        />
         <Button type="button" size="sm" variant="secondary" onClick={(e) => setPicker(picker ? null : e.currentTarget.getBoundingClientRect())} data-picker-toggle={picker ? "" : undefined} data-testid="channel-icon-choose-emoji">
           <SmilePlus size={16} aria-hidden="true" /> {t("server.channelIcon.chooseEmoji")}
         </Button>
@@ -94,6 +139,20 @@ export function ChannelIconPicker({ channel, value, onChange, label }: Props) {
           <Button type="button" size="sm" variant="ghost" onClick={() => onChange("")} data-testid="channel-icon-remove">{t("server.channelIcon.removeIcon")}</Button>
         ) : null}
       </div>
+      {crop ? (
+        <ImageCropModal
+          file={crop}
+          aspect={1}
+          maxSize={256}
+          title={t("server.channelIcon.cropPicture")}
+          serverCrop
+          onClose={() => setCrop(null)}
+          onDone={({ blob, crop: area }) => {
+            setCrop(null);
+            void upload(blob, area ?? null);
+          }}
+        />
+      ) : null}
       {picker ? (
         <ExpressionPicker
           anchor={picker}

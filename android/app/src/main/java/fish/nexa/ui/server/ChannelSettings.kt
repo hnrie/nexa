@@ -56,6 +56,10 @@ import fish.nexa.ui.components.ToggleLine
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
 import fish.nexa.ui.describeError
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import fish.nexa.ui.layers.Layer
 import fish.nexa.ui.nav.Nav
 import fish.nexa.ui.nav.Route
@@ -187,7 +191,9 @@ private fun ChannelOverviewPage(ch: Channel) {
     val slow = slowEdit ?: ch.slowmodeSeconds
     val nsfw = nsfwEdit ?: ch.nsfw
     val limit = limitEdit ?: ch.userLimit
-    val glyph = glyphEdit ?: ch.glyph ?: ""
+    // an uploaded picture is edited as PICTURE: picking anything else and saving puts it away
+    val savedGlyph = if (ch.iconId != null) PICTURE else ch.glyph ?: ""
+    val glyph = glyphEdit ?: savedGlyph
     val announce = announceEdit ?: ch.isAnnouncement
     val defaultArchive = defaultArchiveEdit ?: ch.defaultAutoArchive ?: 4320
     val archive = archiveEdit ?: ch.thread?.autoArchive ?: 4320
@@ -198,7 +204,7 @@ private fun ChannelOverviewPage(ch: Channel) {
     val sort = sortEdit ?: ch.forum?.sort ?: "activity"
     val requireTag = requireTagEdit ?: (ch.forum?.requireTag == true)
     val forumDirty = forum && (!sameTags(tags, savedTags) || layout != (ch.forum?.layout ?: "list") || sort != (ch.forum?.sort ?: "activity") || requireTag != (ch.forum?.requireTag == true))
-    val dirty = name != ch.name || topic != ch.topic || slow != ch.slowmodeSeconds || nsfw != ch.nsfw || limit != ch.userLimit || glyph != (ch.glyph ?: "") ||
+    val dirty = name != ch.name || topic != ch.topic || slow != ch.slowmodeSeconds || nsfw != ch.nsfw || limit != ch.userLimit || glyph != savedGlyph ||
         (textLike && announce != ch.isAnnouncement) ||
         ((textLike || forum) && defaultArchive != (ch.defaultAutoArchive ?: 4320)) ||
         (thread && (archive != (ch.thread?.autoArchive ?: 4320) || locked != (ch.thread?.locked == true) || applied != ch.thread?.appliedTags.orEmpty())) ||
@@ -218,7 +224,7 @@ private fun ChannelOverviewPage(ch: Channel) {
                     if (slow != ch.slowmodeSeconds) put("slowmode_seconds", slow)
                     if (nsfw != ch.nsfw) put("nsfw", nsfw)
                     if (limit != ch.userLimit) put("user_limit", limit)
-                    if (glyph != (ch.glyph ?: "")) put("glyph", glyph)
+                    if (glyph != savedGlyph && glyph != PICTURE) put("glyph", glyph)
                     if (textLike && announce != ch.isAnnouncement) put("type", if (announce) "announcement" else "text")
                     if ((textLike || forum) && defaultArchive != (ch.defaultAutoArchive ?: 4320)) put("default_auto_archive", defaultArchive)
                     if (thread) {
@@ -263,13 +269,13 @@ private fun ChannelOverviewPage(ch: Channel) {
                 capitalize = !slugged,
                 leading = {
                     // what the channel list will show, as it is being picked below
-                    ChannelGlyph(ch.copy(type = if (textLike) (if (announce) "announcement" else "text") else ch.type, glyph = glyph), 16.dp, Nx.colors.textMuted, cut = Nx.colors.bgInput)
+                    ChannelGlyph(ch.copy(type = if (textLike) (if (announce) "announcement" else "text") else ch.type, glyph = glyph.takeIf { it != PICTURE }, iconId = ch.iconId.takeIf { glyph == PICTURE }), 16.dp, Nx.colors.textMuted, cut = Nx.colors.bgInput)
                 },
             )
             if (!thread) Field(
                 if (ch.isCategory) t("server.channelIcon.categoryTitle") else t("server.channelIcon.title"),
                 hint = if (ch.isCategory) t("server.channelIcon.categoryHint") else t("server.channelIcon.hint"),
-            ) { ChannelIconPicker(ch, glyph) { glyphEdit = it } }
+            ) { ChannelIconPicker(ch, glyph, onUploaded = { glyphEdit = null }) { glyphEdit = it } }
             if (textLike || forum) Field(
                 if (forum) t("forum.settings.guidelines") else t("server.channelSettings.channelTopic"),
                 hint = if (forum) t("forum.settings.guidelinesHint") else null,
@@ -405,18 +411,48 @@ private fun ForumTagsEditor(tags: List<TagEdit>, onChange: (List<TagEdit>) -> Un
     }
 }
 
+/** The value that stands for the channel's uploaded picture while it is being edited. */
+private const val PICTURE = "picture"
+
 /**
- * ChannelIconPicker: the default, an emoji (this server's own included) and
+ * ChannelIconPicker: an uploaded picture, the default, an emoji (this server's own included) and
  * the app's 48 line icons, as tiles in a well; Choose Emoji opens the picker.
  */
 @Composable
-private fun ChannelIconPicker(ch: Channel, value: String, onChange: (String) -> Unit) {
+private fun ChannelIconPicker(ch: Channel, value: String, onUploaded: () -> Unit, onChange: (String) -> Unit) {
     val c = Nx.colors
     val isCategory = ch.isCategory
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var uploading by remember { mutableStateOf(false) }
+    // a picture is saved at once, as a role's icon is
+    fun upload(r: CropResult) {
+        uploading = true
+        scope.launch {
+            try {
+                val area = r.crop?.let { "?x=${it.x}&y=${it.y}&w=${it.w}&h=${it.h}" } ?: ""
+                val el = ServerApi.upload("PUT", "/channels/${ch.id}/icon$area", r.bytes, r.type)
+                Nexa.channels.upsert(listOf(fish.nexa.net.wireJson.decodeFromJsonElement(Channel.serializer(), el)))
+                onUploaded()
+                Nexa.ui.toast(t("server.channelIcon.pictureSaved"), "success")
+            } catch (e: Exception) {
+                Nexa.ui.toast(describeError(e, t("server.channelIcon.pictureFailed")), "error")
+            } finally {
+                uploading = false
+            }
+        }
+    }
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val f = runCatching { ServerApi.read(context, uri) }.getOrNull() ?: return@launch
+            openImageCrop(f, 1f, round = false, title = t("server.channelIcon.cropPicture"), maxSize = 256, serverCrop = true) { upload(it) }
+        }
+    }
     val iconName = value.removePrefix("icon:").takeIf { value.startsWith("icon:") }
     var emoji by remember { mutableStateOf(if (value.startsWith("emoji:") || value.startsWith("custom:")) value else null) }
     val emojiShown = if (value.startsWith("emoji:") || value.startsWith("custom:")) value else emoji
-    val noneChecked = value.isEmpty() || (iconName != null && iconName !in CHANNEL_ICONS)
+    val noneChecked = value != PICTURE && (value.isEmpty() || (iconName != null && iconName !in CHANNEL_ICONS))
     fun emojiLabel(raw: String): String = when {
         raw.startsWith("emoji:") -> raw.removePrefix("emoji:")
         else -> Nexa.expressions.emoji(raw.removePrefix("custom:"))?.let { ":${it.name}:" } ?: t("server.channelIcon.chooseEmoji")
@@ -430,6 +466,9 @@ private fun ChannelIconPicker(ch: Channel, value: String, onChange: (String) -> 
                     else -> Icon("Hash", it, size = 20.dp)
                 }
             }
+            ch.iconId?.let {
+                IconTile(value == PICTURE, t("server.channelIcon.picture"), { onChange(PICTURE) }) { tint -> ChannelGlyph(ch.copy(type = "text", glyph = null), 22.dp, tint) }
+            }
             emojiShown?.let { e ->
                 IconTile(value == e, emojiLabel(e), { onChange(e) }) { ChannelGlyph(ch.copy(type = "text", glyph = e), 22.dp, it) }
             }
@@ -438,6 +477,7 @@ private fun ChannelIconPicker(ch: Channel, value: String, onChange: (String) -> 
             }
         }
         Wrap {
+            NxButton(t("server.channelIcon.uploadPicture"), { pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "ImagePlus", enabled = !uploading)
             NxButton(t("server.channelIcon.chooseEmoji"), {
                 Pickers.open(Pickers.Opener(listOf(Pickers.Tab.EMOJI), ch.serverId, thisServerOnly = true, draggable = false, closeOnEmoji = true, onEmoji = { p ->
                     val next = if (p.custom != null) "custom:${p.custom.id}" else "emoji:${p.text}"

@@ -58,9 +58,14 @@ data class Staged(
     val spoiler: Boolean = false,
     /** A local picture to show while it uploads (the file itself, for pictures and videos). */
     val preview: String? = null,
+    /** A voice message recorded in the box: how long it runs (seconds) and the shape of its sound. */
+    val voice: VoiceNote? = null,
 ) {
     val size: Long get() = file.length()
 }
+
+/** A voice message's length and shape, as lib/voiceMessage.ts sends them. */
+data class VoiceNote(val duration: Double, val wave: String)
 
 /** What the composer asks for besides the words (send.ts SendOptions). */
 data class SendOptions(
@@ -766,6 +771,7 @@ object Uploads {
             val meta = AttachmentMeta(
                 blobId = blob, name = st.name, type = st.type.ifEmpty { "application/octet-stream" }, size = st.size, key = Bytes.b64(key),
                 w = seen.w?.toDouble(), h = seen.h?.toDouble(), spoiler = if (st.spoiler) true else null, preview = copy,
+                voice = st.voice != null, duration = st.voice?.duration, wave = st.voice?.wave,
             )
             if (Regex("^(image|video|audio)/").containsMatchIn(meta.type)) fish.nexa.media.Media.seed(blob, st.file)
             Uploaded(meta, blob, size)

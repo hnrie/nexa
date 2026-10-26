@@ -88,3 +88,27 @@ export async function loadChunk<T>(load: () => Promise<T>): Promise<T> {
 export function lazyPage<T extends ComponentType<any>>(load: () => Promise<{ default: T }>): LazyExoticComponent<T> {
   return lazy(() => loadChunk(load));
 }
+
+/** A lazy page whose owner can wait for it too (`ready()`, called while rendering). */
+export type ReadyPage<T extends ComponentType<any>> = LazyExoticComponent<T> & { ready(): void };
+
+/**
+ * lazyPage, plus `ready()`, which suspends whoever calls it until the page's
+ * file is here. A dialog calls it for the page it opens on, so its frame and
+ * that page arrive together, rather than the frame first with a spinner in it
+ * and then, a moment later, the page.
+ */
+export function readyPage<T extends ComponentType<any>>(load: () => Promise<{ default: T }>): ReadyPage<T> {
+  let loaded = false;
+  let pending: Promise<{ default: T }> | null = null;
+  const once = () =>
+    (pending ??= loadChunk(load).then((m) => {
+      loaded = true;
+      return m;
+    }));
+  const page = lazy(once) as ReadyPage<T>;
+  page.ready = () => {
+    if (!loaded) throw once();
+  };
+  return page;
+}

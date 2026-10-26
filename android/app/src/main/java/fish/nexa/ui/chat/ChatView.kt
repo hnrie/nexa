@@ -235,7 +235,7 @@ fun ChatHeader(channel: Channel) {
 private fun callChannelOf(channel: Channel): String = if (channel.type == "subchat") channel.parentId ?: channel.id else channel.id
 
 @Composable
-private fun HeaderButton(icon: String, label: String, on: Boolean = false, onClick: () -> Unit) {
+internal fun HeaderButton(icon: String, label: String, on: Boolean = false, onClick: () -> Unit) {
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()

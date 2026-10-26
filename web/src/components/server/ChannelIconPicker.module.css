@@ -13,3 +13,5 @@
   .grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); }
   .actions button { min-height: 40px; }
 }
+/* an uploaded picture: a rounded square, as it sits in the channel list */
+.picture { width: 22px; height: 22px; border-radius: 6px; object-fit: cover; }

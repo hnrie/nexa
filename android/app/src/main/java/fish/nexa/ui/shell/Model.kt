@@ -94,7 +94,7 @@ object Unread {
         var mentions = 0
         for (ch in Nexa.channels.byId.value.values) {
             // a thread counts once this account is in it
-            if (ch.serverId != serverId || !ch.isTextLike || (ch.isThread && !Nexa.threads.isJoined(ch.id))) continue
+            if (ch.serverId != serverId || !ch.hasChat || (ch.isThread && !Nexa.threads.isJoined(ch.id))) continue
             val read = Nexa.readStates.get(ch.id)
             mentions += read?.mentions ?: 0
             if (!unread && serverId !in muted && ch.id !in muted && isUnread(read, ch.lastMessageId)) unread = true
@@ -111,7 +111,7 @@ object Unread {
     /** Marks every unread text channel of a server read. */
     fun markServerRead(serverId: String) {
         for (ch in Nexa.channels.byId.value.values) {
-            if (ch.serverId != serverId || !ch.isTextLike) continue
+            if (ch.serverId != serverId || !ch.hasChat) continue
             val last = ch.lastMessageId ?: continue
             val read = Nexa.readStates.get(ch.id)
             if (isUnread(read, last) || (read?.mentions ?: 0) > 0) Nexa.scope.launch { Nexa.session.ack(ch.id, last) }

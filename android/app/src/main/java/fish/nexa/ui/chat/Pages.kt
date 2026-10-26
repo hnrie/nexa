@@ -126,7 +126,7 @@ fun ServerPage(route: Route.Server) {
             }
         }
         ch == null || ch.serverId != route.serverId || ch.isCategory -> NoChannel(route.serverId)
-        ch.type == "voice" -> fish.nexa.ui.voice.VoiceChannelPage(ch)
+        ch.type == "voice" -> fish.nexa.ui.voice.VoiceChannelPage(ch, openChat = route.jumpTo != null)
         ch.isForum -> fish.nexa.ui.forum.ForumView(ch)
         else -> ChatView(ch.id)
     }

@@ -1,7 +1,7 @@
 import { Hash, Lock, Megaphone, MessageSquareText, MessagesSquare, Volume2 } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import type { Channel } from "@/api/types";
-import { emojiUrl } from "@/api/users";
+import { emojiUrl, iconUrl } from "@/api/users";
 import { parseGlyph } from "@/lib/channelGlyph";
 import { useExpressions } from "@/stores/expressions";
 import { CHANNEL_ICONS } from "./channelIcons";
@@ -9,7 +9,7 @@ import { Twemoji } from "./Twemoji";
 import s from "./ChannelGlyph.module.css";
 
 interface Props {
-  channel: Pick<Channel, "type" | "server_id"> & { glyph?: string | undefined };
+  channel: Pick<Channel, "type" | "server_id"> & { glyph?: string | undefined; icon_id?: string | null | undefined };
   /** How many pixels across it is drawn. */
   size: number;
   /** A private channel: a small lock over the corner. */
@@ -29,7 +29,10 @@ export function ChannelGlyph({ channel, size, locked = false, className }: Props
   // only the channel's own server's emoji; one that has been deleted falls back to the default
   const custom = useExpressions((x) => (g?.kind === "custom" && channel.server_id ? x.emojis[channel.server_id]?.find((e) => e.id === g.id) : undefined));
   let own: ReactNode = null;
-  if (g?.kind === "icon") {
+  // a picture uploaded for it comes first: picking a glyph again puts the picture away
+  if (channel.server_id && channel.icon_id) {
+    own = <img className={[s.picture, s.uploaded].join(" ")} src={iconUrl(channel.icon_id, size) ?? undefined} alt="" draggable={false} loading="lazy" decoding="async" />;
+  } else if (g?.kind === "icon") {
     const Icon = CHANNEL_ICONS[g.name];
     if (Icon) own = <Icon size={size} />;
   } else if (g?.kind === "emoji") {
@@ -69,12 +72,12 @@ export function TypeIcon({ type, size }: { type: Channel["type"]; size: number }
  * What leads a channel mention in a message: the channel's own icon, small
  * and in line with the text, or the "#" every other mention has.
  */
-export function MentionGlyph({ channel }: { channel: { name: string; type?: Channel["type"]; server_id?: string | null; glyph?: string | undefined } }) {
+export function MentionGlyph({ channel }: { channel: { name: string; type?: Channel["type"]; server_id?: string | null; glyph?: string | undefined; icon_id?: string | null | undefined } }) {
   const g = parseGlyph(channel.glyph);
   const found = useExpressions((x) => (g?.kind === "custom" && channel.server_id ? !!x.emojis[channel.server_id]?.some((e) => e.id === g.id) : false));
-  const own = g?.kind === "emoji" || (g?.kind === "icon" && !!CHANNEL_ICONS[g.name]) || found;
+  const own = (!!channel.server_id && !!channel.icon_id) || g?.kind === "emoji" || (g?.kind === "icon" && !!CHANNEL_ICONS[g.name]) || found;
   if (!own) return <>#</>;
-  return <ChannelGlyph channel={{ type: channel.type ?? "text", server_id: channel.server_id ?? null, glyph: channel.glyph }} size={16} className={s.inline} />;
+  return <ChannelGlyph channel={{ type: channel.type ?? "text", server_id: channel.server_id ?? null, glyph: channel.glyph, icon_id: channel.icon_id }} size={16} className={s.inline} />;
 }
 
 /** The corner mark: half the glyph, and never so small it turns to a smudge. */

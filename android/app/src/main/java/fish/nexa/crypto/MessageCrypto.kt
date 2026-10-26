@@ -65,6 +65,10 @@ data class AttachmentMeta(
     /** A webhook's file: stored as sent, not encrypted; `key` is empty. */
     val plain: Boolean = false,
     val alt: String? = null,
+    /** A voice message recorded in the app: drawn as one, with the shape of its sound. */
+    val voice: Boolean = false,
+    /** base64 of the recording's loudness, a byte per bar (VoiceWave). */
+    val wave: String? = null,
 ) {
     val isImage get() = type.startsWith("image/")
     val isVideo get() = type.startsWith("video/")
@@ -80,6 +84,8 @@ data class AttachmentMeta(
         put("key", key)
         spoiler?.let { put("spoiler", it) }
         duration?.let { put("duration", num(it)) }
+        if (voice) put("voice", true)
+        wave?.let { put("wave", it) }
         preview?.let { p ->
             put("preview", buildJsonObject {
                 put("blob_id", p.blobId)
@@ -230,8 +236,13 @@ object MessageCrypto {
             w = o.number("w"), h = o.number("h"), duration = o.number("duration"),
             spoiler = o.bool("spoiler"),
             preview = if (type.startsWith("image/")) sanitizePreview(o["preview"]) else null,
+            voice = type.startsWith("audio/") && o.bool("voice") == true,
+            wave = o.str("wave")?.takeIf { type.startsWith("audio/") && WAVE.matches(it) },
         )
     }
+
+    /** A voice message's shape: at most 96 bytes of base64 (crypto/message.ts). */
+    private val WAVE = Regex("^[A-Za-z0-9+/]{1,128}={0,2}$")
 
     private val EMBED_STRINGS = listOf("url", "type", "title", "description", "site_name", "image", "video_id", "mime", "color", "invite_code", "author", "author_url", "icon", "media", "media_mime", "player", "player_site", "banner")
     private val EMBED_NUMBERS = listOf("image_w", "image_h", "member_count", "online_count", "published_at", "media_w", "media_h", "video_start")

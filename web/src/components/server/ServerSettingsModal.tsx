@@ -1,7 +1,7 @@
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, startTransition, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Spinner } from "@/components/common/Spinner";
-import { lazyPage } from "@/lib/lazyChunk";
+import { readyPage, type ReadyPage } from "@/lib/lazyChunk";
 import { P } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
 import { canI, useServers } from "@/stores/servers";
@@ -9,21 +9,27 @@ import { useChannels } from "@/stores/channels";
 import { SettingsLayer, type NavGroup } from "./SettingsLayer";
 
 import { t } from "@/i18n";
-const OverviewPage = lazyPage(() => import("./pages/ServerOverviewPage"));
-const ServerTagPage = lazyPage(() => import("./pages/ServerTagPage"));
-const RolesPage = lazyPage(() => import("./pages/RolesPage"));
-const MembersPage = lazyPage(() => import("./pages/MembersPage"));
-const BansPage = lazyPage(() => import("./pages/BansPage"));
-const InvitesPage = lazyPage(() => import("./pages/InvitesPage"));
-const AuditLogPage = lazyPage(() => import("./pages/AuditLogPage"));
-const EncryptionPage = lazyPage(() => import("./pages/EncryptionPage"));
-const EmojiPage = lazyPage(() => import("./pages/EmojiPage"));
-const ServerStickersPage = lazyPage(() => import("./pages/ServerStickersPage"));
-const IntegrationsPage = lazyPage(() => import("./pages/IntegrationsPage"));
-const DeleteServerPage = lazyPage(() => import("./pages/DeleteServerPage"));
-const AutomodPage = lazyPage(() => import("./pages/automod/AutomodPage"));
-const DiscoverySettingsPage = lazyPage(() => import("./pages/DiscoverySettingsPage"));
-const SafetyPage = lazyPage(() => import("./pages/SafetyPage"));
+const OverviewPage = readyPage(() => import("./pages/ServerOverviewPage"));
+const ServerTagPage = readyPage(() => import("./pages/ServerTagPage"));
+const RolesPage = readyPage(() => import("./pages/RolesPage"));
+const MembersPage = readyPage(() => import("./pages/MembersPage"));
+const BansPage = readyPage(() => import("./pages/BansPage"));
+const InvitesPage = readyPage(() => import("./pages/InvitesPage"));
+const AuditLogPage = readyPage(() => import("./pages/AuditLogPage"));
+const EncryptionPage = readyPage(() => import("./pages/EncryptionPage"));
+const EmojiPage = readyPage(() => import("./pages/EmojiPage"));
+const ServerStickersPage = readyPage(() => import("./pages/ServerStickersPage"));
+const IntegrationsPage = readyPage(() => import("./pages/IntegrationsPage"));
+const DeleteServerPage = readyPage(() => import("./pages/DeleteServerPage"));
+const AutomodPage = readyPage(() => import("./pages/automod/AutomodPage"));
+const DiscoverySettingsPage = readyPage(() => import("./pages/DiscoverySettingsPage"));
+const SafetyPage = readyPage(() => import("./pages/SafetyPage"));
+
+const PAGES: Record<string, ReadyPage<never>> = {
+  overview: OverviewPage, tag: ServerTagPage, roles: RolesPage, members: MembersPage, bans: BansPage, invites: InvitesPage, audit: AuditLogPage,
+  encryption: EncryptionPage, emoji: EmojiPage, stickers: ServerStickersPage, integrations: IntegrationsPage, delete: DeleteServerPage,
+  automod: AutomodPage, discovery: DiscoverySettingsPage, safety: SafetyPage,
+} as unknown as Record<string, ReadyPage<never>>;
 
 export default function ServerSettingsModal({ onClose, serverId, page: initial }: { onClose: () => void; serverId: string; page?: string | undefined }) {
   const st = useServers((x) => x.byId[serverId]);
@@ -49,11 +55,16 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
     { id: "delete", label: t("server.deleteServer.deleteServer"), ok: owner, group: 2, danger: true },
   ];
   const allowed = pages.filter((p) => p.ok);
-  const [page, setPage] = useState(initial && allowed.some((p) => p.id === initial) ? initial : (allowed[0]?.id ?? "members"));
+  const [page, setShown] = useState(initial && allowed.some((p) => p.id === initial) ? initial : (allowed[0]?.id ?? "members"));
+  // Another page keeps the one on screen until its file is here, rather than
+  // blanking the panel to a spinner for the moment it takes.
+  const setPage = (id: string) => startTransition(() => setShown(id));
   useEffect(() => {
     if (!st) onClose();
   }, [st, onClose]);
   if (!st) return null;
+  // the frame waits for the page it opens on, so both show at once (the dialog's place is held meanwhile)
+  PAGES[page]?.ready();
   const groups: NavGroup[] = [
     { head: st.server.name, items: allowed.filter((p) => p.group === 0).map((p) => ({ id: p.id, label: p.label })) },
     { head: t("server.serverSettings.moderation"), items: allowed.filter((p) => p.group === 1).map((p) => ({ id: p.id, label: p.label })) },

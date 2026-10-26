@@ -181,6 +181,8 @@ data class Channel(
     val isThread get() = type == "thread" || type == "private_thread"
     /** Where messages are read and written in a server: text and announcement channels, and threads. */
     val isTextLike get() = type == "text" || type == "announcement" || isThread
+    /** Holds messages that count as unread: a text-like channel, or the chat of a voice channel. */
+    val hasChat get() = isTextLike || type == "voice"
     /** Channels threads start in (a forum's posts are its threads). */
     val holdsThreads get() = type == "text" || type == "announcement" || type == "forum"
 }
