@@ -468,7 +468,7 @@ private class Builder(
                 val (width, height) = measureName(unbroken, n.id)
                 content[key] = InlineTextContent(Placeholder(width, height, PlaceholderVerticalAlign.TextCenter)) {
                     val modifier = if (ctx.inert || a == null) Modifier else Modifier.pressable(remember { MutableInteractionSource() }, onClick = a)
-                    fish.nexa.ui.chat.PersonName(n.id, unbroken, nameStyle, fg, modifier, serverId = ctx.serverId)
+                    fish.nexa.ui.chat.PersonName(n.id, unbroken, nameStyle, fg, modifier, serverId = ctx.serverId, showNameStyle = false)
                 }
                 appendInlineContent(key, unbroken)
             } else if (a != null && !ctx.inert && !covered) withLink(LinkAnnotation.Clickable("mention:${n.kind}:${n.id}") { a() }) { withStyle(style) { append(unbroken) } }

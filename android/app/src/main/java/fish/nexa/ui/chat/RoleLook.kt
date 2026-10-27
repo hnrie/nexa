@@ -182,15 +182,16 @@ fun PersonName(
     maxLines: Int = 1,
     serverId: String? = null,
     nameStyle: JsonElement? = null,
+    showNameStyle: Boolean = true,
 ) {
-    if (userId == null && nameStyle == null) {
+    if (userId == null && (nameStyle == null || !showNameStyle)) {
         RoleName(text, null, style, color, modifier, maxLines)
         return
     }
     val users by Nexa.users.byId.collectAsState()
     val me by Nexa.users.me.collectAsState()
     val servers by Nexa.servers.byId.collectAsState()
-    val own = when {
+    val own = if (!showNameStyle) null else when {
         userId != null && userId == me?.id -> me?.nameStyle
         users.containsKey(userId) -> users[userId]?.nameStyle
         else -> nameStyle

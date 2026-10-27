@@ -11,14 +11,14 @@ import { readNameStyle } from "./nameStyle";
  * string so a change anywhere else in the server leaves the name (and its row)
  * alone.
  */
-export function useMemberLook(serverId: string | null | undefined, userId: string | undefined, fallbackStyle?: unknown): RoleLook | undefined {
+export function useMemberLook(serverId: string | null | undefined, userId: string | undefined, fallbackStyle?: unknown, includeOwn = true): RoleLook | undefined {
   const key = useServers((st) => {
     if (!serverId || !userId) return "";
     const look = memberLook(st.byId[serverId], userId);
     return look ? JSON.stringify(look) : "";
   });
-  const ownKey = useUsers((u) => (userId ? JSON.stringify(u.byId[userId] ? (u.byId[userId]!.name_style ?? null) : (fallbackStyle ?? null)) : "null"));
-  const meKey = useAuth((a) => a.me && a.me.id === userId ? JSON.stringify(a.me.name_style ?? null) : undefined);
+  const ownKey = useUsers((u) => (userId ? JSON.stringify(includeOwn ? (u.byId[userId] ? (u.byId[userId]!.name_style ?? null) : (fallbackStyle ?? null)) : null) : "null"));
+  const meKey = useAuth((a) => includeOwn && a.me && a.me.id === userId ? JSON.stringify(a.me.name_style ?? null) : undefined);
   const styleKey = meKey ?? ownKey;
   return useMemo(() => withOwn(key ? (JSON.parse(key) as RoleLook) : undefined, JSON.parse(styleKey)), [key, styleKey]);
 }

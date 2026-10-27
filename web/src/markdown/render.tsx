@@ -554,7 +554,7 @@ function pressed(e: KeyboardEvent): boolean {
 function UserMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
   const user = props.ctx.users[props.id];
   const name = user ? user.display_name || user.username || t("render.unknownUser") : t("render.unknownUser");
-  if (props.ctx.inert) return <span className="md-mention md-user-mention">@<PersonName userId={props.id} serverId={props.ctx.serverId} user={user ? { id: props.id, name_style: user.name_style } : undefined}>{name}</PersonName></span>;
+  if (props.ctx.inert) return <span className="md-mention md-user-mention">@<PersonName showNameStyle={false} userId={props.id} serverId={props.ctx.serverId} user={user ? { id: props.id, name_style: user.name_style } : undefined}>{name}</PersonName></span>;
   return (
     <span
       className="md-mention md-user-mention"
@@ -563,7 +563,7 @@ function UserMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
       onClick={(e) => props.ctx.onUserClick?.(props.id, e.currentTarget)}
       onKeyDown={(e) => pressed(e) && props.ctx.onUserClick?.(props.id, e.currentTarget)}
     >
-      @<PersonName userId={props.id} serverId={props.ctx.serverId} user={user ? { id: props.id, name_style: user.name_style } : undefined}>{name}</PersonName>
+      @<PersonName showNameStyle={false} userId={props.id} serverId={props.ctx.serverId} user={user ? { id: props.id, name_style: user.name_style } : undefined}>{name}</PersonName>
     </span>
   );
 }
