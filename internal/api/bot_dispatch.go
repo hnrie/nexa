@@ -161,7 +161,12 @@ func (sess *botSession) translate(ctx context.Context, f gateway.ServerFrame) {
 		if ch == nil || !sess.onShard(ch.ServerID) {
 			return
 		}
-		ev := map[string]any{"channel_id": snow(d.ChannelID), "user_id": snow(d.UserID), "timestamp": d.TS / 1000, "guild_id": botproto.SP(ch.ServerID)}
+		ev := map[string]any{"channel_id": snow(d.ChannelID), "user_id": snow(d.UserID), "timestamp": d.TS / 1000}
+		// Discord omits guild_id for direct-message events. Some bot libraries
+		// treat an explicit null as malformed and stop their gateway session.
+		if ch.ServerID != nil {
+			ev["guild_id"] = snow(*ch.ServerID)
+		}
 		if ch.ServerID != nil {
 			if mem, err := sess.s.Store.Member(ctx, *ch.ServerID, d.UserID); err == nil {
 				ev["member"] = b.memberObj(mem, true)
