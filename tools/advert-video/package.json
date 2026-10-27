@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "My Remotion video",
   "repository": {},
-  "license": "UNLICENSED",
+  "license": "MIT",
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || >=24"
   },

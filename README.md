@@ -143,3 +143,8 @@ to peer ones), an optional Klipy key for GIF search, and optional Discord activi
 Developer Portal settings and the OAuth redirect it needs).
 The registration mode and key can also be changed at runtime from Settings → Nexa
 Admin, which overrides the file until you clear it.
+
+## License
+
+Nexa is licensed under the [MIT License](LICENSE). Copyright (c) 2026 terrydavisthe2nd / Nexa.
+Third-party components retain their own licenses and notices.

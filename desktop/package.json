@@ -5,7 +5,7 @@
   "description": "Nexa for your computer, with Rich Presence that works alongside Discord.",
   "author": "Evilion <evilionx3@proton.me>",
   "homepage": "https://nexa.fish",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "main": "dist-app/main.js",
   "scripts": {

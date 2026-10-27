@@ -9,6 +9,9 @@ app that runs the web app (`desktop/`) and the native Android app (`android/`, K
 Compose). README.md describes the features and how the encryption works; the original design spec is
 `docs/superpowers/specs/2026-09-11-chat-design.md` (section 6 is the cryptography).
 
+Nexa's first-party code is licensed under the root `LICENSE` (MIT), with the copyright
+notice `2026 terrydavisthe2nd / Nexa`. Third-party components retain their own licenses and notices.
+
 The rules come first, then commands and testing, then how each part is built.
 
 ## Rules that always apply
