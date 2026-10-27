@@ -4,7 +4,7 @@ import { admin as adminApi } from "@/api/admin";
 import { NexaTile, NexaWordmark } from "@/components/common/Brand";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
-import { LegalHighlights } from "@/components/legal/LegalContent";
+import { LegalHighlights, OpenSourceBlock } from "@/components/legal/LegalContent";
 import { LegalDocument } from "@/components/legal/LegalDocument";
 import { WhatsNewDialog, markSeen } from "@/components/shell/WhatsNewDialog";
 import { CONTACT_EMAIL, LEGAL_EFFECTIVE, LEGAL_VERSION, OWNER_USERNAME, termsAccepted } from "@/lib/legal";
@@ -95,6 +95,8 @@ export default function AboutPage() {
           <p className={l.aboutLead}>{t("legal.aboutLead")}</p>
         </div>
       </div>
+
+      <OpenSourceBlock />
 
       <section className={l.aboutGroup}>
         <h3 className={l.aboutLabel}>{t("settings.about.glance")}</h3>

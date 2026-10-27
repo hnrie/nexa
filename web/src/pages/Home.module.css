@@ -279,14 +279,17 @@
 }
 .lede { margin: 0; max-width: 33em; font-size: clamp(17px, 0.45vw + 15.5px, 21px); line-height: 1.6; color: var(--ink-soft); }
 .fine { margin: 18px 0 0; font-size: 15px; line-height: 1.5; color: var(--ink-faint); }
+.sourceIntro { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 18px 0 0; color: var(--violet-text); font-size: 16px; font-weight: 700; line-height: 1.5; }
+.sourceIntro span { color: var(--ink-soft); font-weight: 400; }
 
 /* ---- the promises -------------------------------------------------------- */
 
-/* Four promises set as type: each one large, with what keeps it beside it.
+/* The promises set as type: each one large, with what keeps it beside it.
    Nothing frames them; the page's panels are kept for what is really the app. */
 .why { display: grid; gap: 64px; padding-top: 8px; padding-bottom: 112px; scroll-margin-top: calc(var(--top-h) + 8px); }
 .promise { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
 .promiseHead { min-width: 0; }
+.promiseGithub { margin: 20px 0 0; }
 /* "pretty" rather than "balance": a promise that wraps keeps its first words together ("Nothing to / Pay For") */
 .promiseTitle { margin: 0; font-family: var(--font-display); font-size: clamp(34px, 1.9vw + 24px, 54px); font-weight: 780; line-height: 1; letter-spacing: -0.03em; color: var(--ink-strong); text-wrap: pretty; }
 .promiseLede { max-width: 24em; margin: 14px 0 0; font-size: 17.5px; line-height: 1.55; color: var(--ink-soft); }

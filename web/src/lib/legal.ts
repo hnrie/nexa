@@ -25,6 +25,9 @@ export const CONTACT_EMAIL = "evilionx3@proton.me";
 /** In-app owner account for contact / reports. */
 export const OWNER_USERNAME = "nora";
 
+/** Public source for every Nexa client and the server; also read by Android. */
+export const GITHUB_URL = "https://github.com/terrydavisthe2nd/nexa";
+
 export function termsKey(userId: string): string {
   return `nexa.terms-accepted.${userId}`;
 }

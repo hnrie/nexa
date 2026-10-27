@@ -1,5 +1,5 @@
 import { Database, Eye, Gavel, Lock, ScrollText, Sparkles } from "lucide-react";
-import { CONTACT_EMAIL, OWNER_USERNAME } from "@/lib/legal";
+import { CONTACT_EMAIL, GITHUB_URL, OWNER_USERNAME } from "@/lib/legal";
 import { t } from "@/i18n";
 import s from "./Legal.module.css";
 
@@ -20,6 +20,18 @@ export function ContactBlock() {
       <br />
       {t("legal.inApp", { user: `@${OWNER_USERNAME}` })}
     </p>
+  );
+}
+
+/** The same source and contribution invitation on the public and in-app About pages. */
+export function OpenSourceBlock() {
+  return (
+    <section className={s.aboutGroup}>
+      <h3 className={s.aboutLabel}>{t("project.openSource")}</h3>
+      <p className={s.body}>{t("project.sourceBody")}</p>
+      <p className={s.body}><strong>{t("project.contributions")}</strong><br />{t("project.contributeBody")}</p>
+      <p className={s.body}><a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">{t("project.viewGithub")}</a></p>
+    </section>
   );
 }
 

@@ -6904,6 +6904,16 @@
   "home.demo.accountTitle": "続行するにはアカウントを作成",
   "home.demo.accountBody": "プライベートなデモを体験中です。友達の追加やサーバーへの参加、実際の Nexa の利用には無料のアカウントを作成してください。",
   "home.demo.keepExploring": "体験を続ける",
+  "home.why.codeBody": "Nexaの仕組みを調べたり、改良したり、自分でホストしたりできます。",
+  "home.why.codeTitle": "読めるソースコード",
+  "project.contributeBody": "バグ修正、機能追加、テスト、翻訳、ドキュメントの改善など、あらゆる貢献を歓迎します。",
+  "project.contributions": "貢献を歓迎します",
+  "project.github": "GitHub",
+  "project.openSource": "オープンソース",
+  "project.sourceBody": "Nexaのウェブ、デスクトップ、Androidアプリとサーバーは、MITライセンスのオープンソースです。",
+  "project.viewGithub": "GitHubで見る",
   "whatsNew.r202610265.demoTitle": "登録前に Nexa を体験",
-  "whatsNew.r202610265.demoBody": "ホームページから実際のアプリを新しい状態で体験できます。変更はデモ内だけに保存され、再読み込みすると消えます。"
+  "whatsNew.r202610265.demoBody": "ホームページから実際のアプリを新しい状態で体験できます。変更はデモ内だけに保存され、再読み込みすると消えます。",
+  "whatsNew.r202610266.openSourceBody": "GitHubでコードを見て開発に参加できます。リポジトリのリンクはホームページ、設定、Nexaについてにあります。",
+  "whatsNew.r202610266.openSourceTitle": "Nexaがオープンソースに"
 }

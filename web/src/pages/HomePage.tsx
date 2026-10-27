@@ -1,12 +1,12 @@
 /** The public homepage, with an isolated, temporary copy of the real app to explore. */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Archive, AudioLines, Eye, EyeOff, FileUp, Headphones, HeartHandshake, KeyRound, Lock, LockKeyhole, MailX, MessagesSquare, MonitorUp, NotebookPen, Palette, Pause, Play, Puzzle, QrCode, Search, ShieldCheck, Smile, Sparkles, Users, Zap, type LucideIcon } from "lucide-react";
+import { Archive, AudioLines, CodeXml, Eye, EyeOff, FileUp, Headphones, HeartHandshake, KeyRound, Lock, LockKeyhole, MailX, MessagesSquare, MonitorUp, NotebookPen, Palette, Pause, Play, Puzzle, QrCode, Search, ShieldCheck, Smile, Sparkles, Users, Zap, type LucideIcon } from "lucide-react";
 import { NexaTile, NexaWordmark } from "@/components/common/Brand";
 import { hasSavedSession, useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
 import { currentPlatform, isAndroidBrowser } from "@/lib/platform";
-import { CONTACT_EMAIL } from "@/lib/legal";
+import { CONTACT_EMAIL, GITHUB_URL } from "@/lib/legal";
 import { formatBytes } from "@/lib/time";
 import { admin } from "@/api/admin";
 import { android } from "@/api/android";
@@ -284,11 +284,17 @@ function SealedGround({ texts }: { texts: string[] }) {
 }
 
 /**
- * What Nexa promises, four of them, each with the things that keep it. Every
- * one of these was checked as something people may not get elsewhere, which
- * is why they come before the tour.
+ * What Nexa promises, starting with the public code and invitation to contribute,
+ * followed by the things people can expect when using it, before the tour.
  */
 const PROMISES: { key: string; items: { key: string; icon: LucideIcon }[] }[] = [
+  {
+    key: "open",
+    items: [
+      { key: "code", icon: CodeXml },
+      { key: "contribute", icon: HeartHandshake },
+    ],
+  },
   {
     key: "private",
     items: [
@@ -349,20 +355,21 @@ function useUploadLimit(): number | null {
 }
 
 /**
- * The four promises, set as type: each one large, the things that keep it
+ * The promises, set as type: each one large, the things that keep it
  * beside it. No panels: these are words, and the panels on this page are kept
  * for what is really the app.
  */
 function Promises({ uploadLimit }: { uploadLimit: number | null }) {
-  const title = (key: string): string => (key !== "files" ? t(`home.why.${key}Title`) : uploadLimit ? t("home.why.filesTitle", { size: formatBytes(uploadLimit) }) : t("home.why.filesTitlePlain"));
+  const title = (key: string): string => key === "contribute" ? t("project.contributions") : (key !== "files" ? t(`home.why.${key}Title`) : uploadLimit ? t("home.why.filesTitle", { size: formatBytes(uploadLimit) }) : t("home.why.filesTitlePlain"));
   return (
     <section className={s.why} id="home-why" aria-labelledby="home-why-title">
       <h2 id="home-why-title" className="visually-hidden">{t("home.why.title")}</h2>
       {PROMISES.map((promise) => (
         <div key={promise.key} className={s.promise}>
           <div className={s.promiseHead}>
-            <h3 className={s.promiseTitle}>{t(`home.why.${promise.key}Title`)}</h3>
-            <p className={s.promiseLede}>{t(`home.why.${promise.key}Body`)}</p>
+            <h3 className={s.promiseTitle}>{promise.key === "open" ? t("project.openSource") : t(`home.why.${promise.key}Title`)}</h3>
+            <p className={s.promiseLede}>{promise.key === "open" ? t("project.sourceBody") : t(`home.why.${promise.key}Body`)}</p>
+            {promise.key === "open" ? <p className={s.promiseGithub}><a className={s.small} href={GITHUB_URL} target="_blank" rel="noopener noreferrer">{t("project.viewGithub")}</a></p> : null}
           </div>
           <ul className={s.promiseItems}>
             {promise.items.map(({ key, icon: Icon }) => (
@@ -370,7 +377,7 @@ function Promises({ uploadLimit }: { uploadLimit: number | null }) {
                 <Icon size={20} aria-hidden="true" className={s.promiseIcon} />
                 <div>
                   <h4 className={s.promiseItemTitle}>{title(key)}</h4>
-                  <p className={s.promiseItemBody}>{t(`home.why.${key}Body`)}</p>
+                  <p className={s.promiseItemBody}>{key === "contribute" ? t("project.contributeBody") : t(`home.why.${key}Body`)}</p>
                 </div>
               </li>
             ))}
@@ -460,9 +467,11 @@ export default function HomePage() {
             <HomeDemo />
             <div className={s.heroText}>
               <p className={s.lede}>{t("home.hero.lede")}</p>
+              <p className={s.sourceIntro}>{t("project.openSource")} <span>{t("project.contributions")}</span></p>
               <div className={s.actions}>
                 {start}
                 <Link className={s.secondary} to="/download">{os ? t("home.hero.downloadFor", { os }) : t("home.nav.download")}</Link>
+                <a className={s.secondary} href={GITHUB_URL} target="_blank" rel="noopener noreferrer">{t("project.viewGithub")}</a>
               </div>
               <p className={s.fine}>{t("home.hero.fine")}</p>
             </div>
@@ -561,6 +570,7 @@ export default function HomePage() {
           <NexaWordmark height={20} className={s.footMark} />
           <p className={s.footTag}>{t("home.foot.tagline")}</p>
           <ul className={s.footLinks}>
+            <li><a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">{t("project.github")}</a></li>
             <li><Link to="/about">{t("legal.aboutTitle")}</Link></li>
             <li><Link to="/terms">{t("legal.termsTitle")}</Link></li>
             <li><Link to="/privacy">{t("legal.privacyTitle")}</Link></li>

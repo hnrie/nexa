@@ -969,6 +969,17 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
 `@discover`, `@me/:channelId[/:messageId]` (DMs), `:serverId[/:channelId[/:messageId]]`, then
 `/:handle` (a profile link, `/@name`).
 
+### Public source and contributions
+
+`lib/legal.ts` exports `GITHUB_URL`, the public repository for every client and the server.
+Android reads the same constant from its copied legal asset (`Legal.githubUrl`). The homepage
+names open source in its introduction and as the first of its five promises, invites contributions,
+and links GitHub in its actions and footer. Settings has a GitHub shortcut on web, desktop and
+Android; both the public About page and Settings, About explain the MIT license and invite
+contributions. The web shares that content through `OpenSourceBlock`; Android uses the same
+`project.*` translations and opens the repository in the browser. README.md reuses the synthetic
+`web/public/home/app.png` screenshot, which contains no personal conversations.
+
 ### Homepage demo
 
 The homepage's `HomeDemo.tsx` embeds `demo.html`, a second Vite entry, in a sandboxed iframe.

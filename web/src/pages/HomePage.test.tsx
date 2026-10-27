@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { admin } from "@/api/admin";
 import type { InstanceInfo } from "@/api/types";
@@ -48,12 +48,19 @@ describe("HomePage", () => {
     expect(document.body.textContent).toContain("under 365 kB");
   });
 
-  it("makes four promises before the tour, naming the server's own upload limit", async () => {
+  it("leads with open source and contribution links, and names the server's own upload limit", async () => {
     motion(false);
     vi.spyOn(admin, "instance").mockResolvedValue({ max_upload_bytes: 15 * 1024 ** 3 } as InstanceInfo);
     await open();
     const promises = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(promises.slice(0, 4)).toEqual(["Nobody Reading Along", "Nothing to Hand Over", "Nothing to Pay For", "Nothing Left Out"]);
+    expect(promises.slice(0, 5)).toEqual(["Open Source", "Nobody Reading Along", "Nothing to Hand Over", "Nothing to Pay For", "Nothing Left Out"]);
+    expect(screen.getByRole("heading", { level: 4, name: "Contributions Welcome" })).toBeTruthy();
+    const hero = document.getElementById("home-top")!;
+    expect(within(hero).getByRole("link", { name: "View on GitHub" }).getAttribute("href")).toBe("https://github.com/terrydavisthe2nd/nexa");
+    for (const link of screen.getAllByRole("link", { name: /GitHub/ })) {
+      expect(link.getAttribute("href")).toBe("https://github.com/terrydavisthe2nd/nexa");
+      expect(link.getAttribute("rel")).toContain("noopener");
+    }
     expect(screen.getByRole("heading", { level: 4, name: "Files up to 15 GB" })).toBeTruthy();
     expect(screen.getByRole("heading", { level: 4, name: "Notes You Write Together" })).toBeTruthy();
   });

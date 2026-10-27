@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { NexaWordmark } from "@/components/common/Brand";
 import { Spinner } from "@/components/common/Spinner";
-import { ContactBlock, LegalHighlights } from "@/components/legal/LegalContent";
+import { ContactBlock, LegalHighlights, OpenSourceBlock } from "@/components/legal/LegalContent";
 import { LegalDocument } from "@/components/legal/LegalDocument";
 import { CONTACT_EMAIL } from "@/lib/legal";
 import { useLegalDocs } from "@/lib/legalDocs";
@@ -47,6 +47,7 @@ export default function LegalPage({ page }: { page: "terms" | "privacy" | "about
           <>
             <h1 className={s.title}>{t("legal.aboutTitle")}</h1>
             <p className={l.body} dir="auto">{t("legal.aboutLead")}</p>
+            <OpenSourceBlock />
             <LegalHighlights />
             <p className={l.body} style={{ marginTop: 16 }}>
               <Link to="/terms">{t("legal.termsTitle")}</Link>

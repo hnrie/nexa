@@ -1,4 +1,5 @@
-import { Bug, Download, LogOut, Smartphone } from "lucide-react";
+import { Bug, CodeXml, Download, LogOut, Smartphone } from "lucide-react";
+import { GITHUB_URL } from "@/lib/legal";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { android } from "@/api/android";
 import { SearchBox } from "@/components/common/SearchBox";
@@ -218,6 +219,10 @@ export default function SettingsModal({ onClose, page: initial, packId, modalId,
       <div className={s.navSep} />
       <div className={s.navGroup}>
         {/* over the settings, which stay where they were */}
+        <button className={s.navItem} onClick={() => window.open(GITHUB_URL, "_blank", "noopener,noreferrer")} data-nav="github">
+          <NavIcon icon={CodeXml} />
+          <span className={s.navLabel}>{t("project.github")}</span>
+        </button>
         <button className={s.navItem} onClick={() => openReportBug("settings")} data-nav="report-bug">
           <NavIcon icon={Bug} />
           <span className={s.navLabel}>{t("bugs.report")}</span>

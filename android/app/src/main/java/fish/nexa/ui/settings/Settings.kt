@@ -1,6 +1,8 @@
 package fish.nexa.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.platform.LocalContext
+import fish.nexa.ui.legal.Legal
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -364,6 +366,7 @@ private fun TopBar(onBack: (() -> Unit)?, onClose: (() -> Unit)?, title: Boolean
 @Composable
 private fun SettingsList(query: String, setQuery: (String) -> Unit, onOpen: (String, String?) -> Unit, onClose: () -> Unit, selected: String? = null) {
     val c = Nx.colors
+    val context = LocalContext.current
     val me by Nexa.users.me.collectAsState()
     val groups = remember(me?.flags, fish.nexa.ui.I18n.tag) { Settings.groups() }
     Column(Modifier.fillMaxSize()) {
@@ -404,7 +407,8 @@ private fun SettingsList(query: String, setQuery: (String) -> Unit, onOpen: (Str
                     }
                     Spacer(Modifier.height(20.dp))
                     NavCard {
-                        NavRow("Bug", t("bugs.report"), first = true, chevron = false) { fish.nexa.ui.bugs.openBugReport("settings") }
+                        NavRow("CodeXml", t("project.github"), first = true, chevron = false) { Legal.openGitHub(context) }
+                        NavRow("Bug", t("bugs.report"), chevron = false) { fish.nexa.ui.bugs.openBugReport("settings") }
                         NavRow("LogOut", t("settings.settings.logOut"), danger = true, chevron = false) { fish.nexa.ui.shell.confirmLogout() }
                     }
                 }

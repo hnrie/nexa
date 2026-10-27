@@ -81,6 +81,11 @@ object Legal {
 
     val contactEmail: String by lazy { Regex("""CONTACT_EMAIL\s*=\s*"([^"]+)"""").find(src)?.groupValues?.get(1) ?: "" }
     val ownerUsername: String by lazy { Regex("""OWNER_USERNAME\s*=\s*"([^"]+)"""").find(src)?.groupValues?.get(1) ?: "" }
+    val githubUrl: String by lazy { Regex("""GITHUB_URL\s*=\s*"([^"]+)"""").find(src)?.groupValues?.get(1) ?: "" }
+
+    fun openGitHub(context: Context) {
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(githubUrl))) }
+    }
 
     private fun prefs() = Nexa.app.getSharedPreferences("legal", Context.MODE_PRIVATE)
     private fun key(userId: String) = "nexa.terms-accepted.$userId"

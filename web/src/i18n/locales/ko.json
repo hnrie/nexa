@@ -6904,6 +6904,16 @@
   "home.demo.accountTitle": "계속하려면 계정을 만드세요",
   "home.demo.accountBody": "비공개 데모를 둘러보고 있습니다. 사람을 추가하고 서버에 참여하며 실제 Nexa를 사용하려면 무료 계정을 만드세요.",
   "home.demo.keepExploring": "계속 둘러보기",
+  "home.why.codeBody": "Nexa의 작동 방식을 살펴보고, 개선하거나 직접 호스팅할 수 있습니다.",
+  "home.why.codeTitle": "직접 읽을 수 있는 코드",
+  "project.contributeBody": "버그 수정, 기능 추가, 테스트, 번역, 문서 작성 등 모든 기여를 환영합니다.",
+  "project.contributions": "기여를 환영합니다",
+  "project.github": "GitHub",
+  "project.openSource": "오픈 소스",
+  "project.sourceBody": "Nexa의 웹, 데스크톱, Android 앱과 서버는 MIT 라이선스로 공개된 오픈 소스입니다.",
+  "project.viewGithub": "GitHub에서 보기",
   "whatsNew.r202610265.demoTitle": "가입 전에 Nexa 체험하기",
-  "whatsNew.r202610265.demoBody": "홈페이지에서 실제 앱을 새로 시작한 상태로 둘러보세요. 변경 사항은 데모에만 남으며 새로고침하면 사라집니다."
+  "whatsNew.r202610265.demoBody": "홈페이지에서 실제 앱을 새로 시작한 상태로 둘러보세요. 변경 사항은 데모에만 남으며 새로고침하면 사라집니다.",
+  "whatsNew.r202610266.openSourceBody": "GitHub에서 코드를 살펴보고 기여하세요. 홈페이지, 설정, 정보에서 저장소 링크를 찾을 수 있습니다.",
+  "whatsNew.r202610266.openSourceTitle": "Nexa가 오픈 소스로 공개되었습니다"
 }

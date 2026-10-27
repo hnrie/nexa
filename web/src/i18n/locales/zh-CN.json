@@ -6904,6 +6904,16 @@
   "home.demo.accountTitle": "创建账号以继续",
   "home.demo.accountBody": "你正在体验私人演示。创建免费账号，即可添加好友、加入服务器并使用真正的 Nexa。",
   "home.demo.keepExploring": "继续探索",
+  "home.why.codeBody": "了解 Nexa 的工作原理、参与改进，或自行托管实例。",
+  "home.why.codeTitle": "可以阅读的代码",
+  "project.contributeBody": "欢迎提交错误修复、新功能、测试、翻译和文档。",
+  "project.contributions": "欢迎贡献",
+  "project.github": "GitHub",
+  "project.openSource": "开源",
+  "project.sourceBody": "Nexa 的网页、桌面和 Android 应用以及服务器均以 MIT 许可证开源。",
+  "project.viewGithub": "在 GitHub 上查看",
   "whatsNew.r202610265.demoTitle": "注册前先体验 Nexa",
-  "whatsNew.r202610265.demoBody": "从首页探索真正的应用，从全新状态开始。更改仅保留在演示中，重新加载后就会消失。"
+  "whatsNew.r202610265.demoBody": "从首页探索真正的应用，从全新状态开始。更改仅保留在演示中，重新加载后就会消失。",
+  "whatsNew.r202610266.openSourceBody": "在 GitHub 上探索代码并参与贡献。你可以在主页、设置和关于页面找到代码仓库链接。",
+  "whatsNew.r202610266.openSourceTitle": "Nexa 已开源"
 }

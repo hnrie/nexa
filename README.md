@@ -5,6 +5,8 @@ app, desktop apps for Windows, macOS and Linux, and a native Android app.
 
 Try [Nexa in your browser](https://nexa.fish) or [download an app](https://nexa.fish/download).
 
+![Nexa's chat interface with a server, channels, messages and member list](web/public/home/app.png)
+
 ## Features
 
 - Direct messages, group chats, friends and custom status.

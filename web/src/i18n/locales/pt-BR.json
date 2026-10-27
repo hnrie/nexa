@@ -7255,6 +7255,16 @@
   "home.demo.accountTitle": "Crie uma Conta para Continuar",
   "home.demo.accountBody": "Você está explorando uma demonstração privada. Crie uma conta gratuita para adicionar pessoas, entrar em servidores e usar o Nexa de verdade.",
   "home.demo.keepExploring": "Continuar Explorando",
+  "home.why.codeBody": "Veja como o Nexa funciona, aprimore o projeto ou hospede sua própria instância.",
+  "home.why.codeTitle": "Código que Você Pode Ler",
+  "project.contributeBody": "Correções de bugs, recursos, testes, traduções e documentação são bem-vindos.",
+  "project.contributions": "Contribuições São Bem-vindas",
+  "project.github": "GitHub",
+  "project.openSource": "Código Aberto",
+  "project.sourceBody": "Os aplicativos web, para desktop e Android do Nexa e seu servidor são de código aberto sob a licença MIT.",
+  "project.viewGithub": "Ver no GitHub",
   "whatsNew.r202610265.demoTitle": "Experimente o Nexa antes de se Cadastrar",
-  "whatsNew.r202610265.demoBody": "Explore o aplicativo real pela página inicial, começando do zero. As alterações ficam na demonstração e desaparecem ao recarregar."
+  "whatsNew.r202610265.demoBody": "Explore o aplicativo real pela página inicial, começando do zero. As alterações ficam na demonstração e desaparecem ao recarregar.",
+  "whatsNew.r202610266.openSourceBody": "Explore o código e contribua no GitHub. O repositório está na página inicial, nas Configurações e em Sobre.",
+  "whatsNew.r202610266.openSourceTitle": "O Nexa É de Código Aberto"
 }

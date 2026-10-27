@@ -7141,6 +7141,16 @@
   "home.demo.accountTitle": "Skapa ett Konto för att Fortsätta",
   "home.demo.accountBody": "Du utforskar en privat demo. Skapa ett gratis konto för att lägga till personer, gå med i servrar och använda riktiga Nexa.",
   "home.demo.keepExploring": "Fortsätt Utforska",
+  "home.why.codeBody": "Se hur Nexa fungerar, bygg vidare på projektet eller kör en egen instans.",
+  "home.why.codeTitle": "Kod Du Kan Läsa",
+  "project.contributeBody": "Buggfixar, funktioner, tester, översättningar och dokumentation är alla välkomna.",
+  "project.contributions": "Bidrag Välkomnas",
+  "project.github": "GitHub",
+  "project.openSource": "Öppen Källkod",
+  "project.sourceBody": "Nexas webb-, dator- och Android-appar samt server har öppen källkod under MIT-licensen.",
+  "project.viewGithub": "Visa på GitHub",
   "whatsNew.r202610265.demoTitle": "Prova Nexa Innan du Registrerar dig",
-  "whatsNew.r202610265.demoBody": "Utforska den riktiga appen från startsidan, från början. Ändringarna stannar i demon och försvinner vid omladdning."
+  "whatsNew.r202610265.demoBody": "Utforska den riktiga appen från startsidan, från början. Ändringarna stannar i demon och försvinner vid omladdning.",
+  "whatsNew.r202610266.openSourceBody": "Utforska koden och bidra på GitHub. Du hittar kodförrådet på startsidan, i Inställningar och i Om Nexa.",
+  "whatsNew.r202610266.openSourceTitle": "Nexa Har Öppen Källkod"
 }

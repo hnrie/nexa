@@ -120,6 +120,11 @@ fun AboutPage() {
         }
     }
 
+    SectionHeading(t("project.openSource"))
+    Hint(t("project.sourceBody"))
+    InfoRow("CodeXml", t("project.contributions"), { SubText(t("project.contributeBody")) })
+    NxButton(t("project.viewGithub"), { Legal.openGitHub(ctx) }, kind = ButtonKind.SECONDARY)
+
     SectionHeading(t("settings.about.glance"))
     // the legal words are English in every language on purpose, as the documents are
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
