@@ -1,5 +1,6 @@
 package fish.nexa.ui.components
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -104,12 +105,14 @@ fun Avatar(
     typing: Boolean? = null,
     face: (@Composable () -> Unit)? = null,
 ) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val px = size.value
     val (dotDp, ringDp) = dot?.let { it.value to max(2f, (it.value * 0.3f).roundToInt().toFloat()) } ?: dotFor(px)
-    val url = remember(avatarId, size, density.density, icon) {
+    val animate = fish.nexa.ui.shell.settingOn(if (icon) "animateIcons" else "animateAvatars")
+    val url = remember(avatarId, size, density.density, icon, animate) {
         if (icon) Media.iconUrl(avatarId, px.toInt(), density.density) else Media.avatarUrl(avatarId, px.toInt(), density.density)
     }
     val statusColor = status?.let { c.statusColor(it) }

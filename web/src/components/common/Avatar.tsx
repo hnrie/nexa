@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import type { CSSProperties, ReactNode } from "react";
 import { avatarUrl, iconUrl } from "@/api/users";
 import { avatarColor, initials } from "@/lib/avatarColor";
@@ -49,6 +50,7 @@ export function statusGeometry(size: number): { dot: number; ring: number } {
 
 /** A user or group avatar with an optional presence dot. Animated avatars play as-is. */
 export function Avatar({ id, avatarId, name, size = 32, status = null, className, square = false, style, kind = "avatar", "data-speaking": speaking, dotSize, typing, face }: Props) {
+  useMediaAnimation();
   const url = kind === "icon" ? iconUrl(avatarId, size) : avatarUrl(avatarId, size);
   const geometry = statusGeometry(size);
   const dot = dotSize ?? geometry.dot;

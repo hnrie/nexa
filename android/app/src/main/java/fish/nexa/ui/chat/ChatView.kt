@@ -139,8 +139,8 @@ fun ChatHeader(channel: Channel) {
                     val presence by Nexa.presence.byId.collectAsState()
                     val name = Names.shown(other)
                     Avatar(other, name, Nexa.users.get(other)?.avatarId, 24.dp, status = presence[other]?.status ?: "offline")
-                    Txt(
-                        name, style = nameStyle, color = c.textStrong, maxLines = 1,
+                    RoleName(
+                        name, RoleLooks.withOwn(null, Nexa.users.byId.collectAsState().value[other]?.nameStyle), style = nameStyle, fallback = c.textStrong, maxLines = 1,
                         modifier = Modifier.weight(1f, fill = false).padding(start = 4.dp).pressable(remember { MutableInteractionSource() }) { openProfile(other) },
                     )
                     KeyChip(other)

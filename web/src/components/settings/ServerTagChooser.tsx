@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useState } from "react";
 import { servers as serversApi } from "@/api/servers";
 import { iconUrl } from "@/api/users";
@@ -89,6 +90,7 @@ export function ServerTagChooser() {
  * dialog and the profile designer.
  */
 export function ServerTagList({ onWorn }: { onWorn?: () => void }) {
+  useMediaAnimation();
   const me = useAuth((a) => a.me);
   const servers = useServers((x) => x.byId);
   const order = useServers((x) => x.order);

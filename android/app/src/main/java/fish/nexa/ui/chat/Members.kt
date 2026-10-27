@@ -515,7 +515,7 @@ fun GroupMemberList(channel: Channel) {
         ch.recipientIds.map { id ->
             val nick = rels[id]?.takeIf { it.type == "friend" }?.nickname?.ifBlank { null }
             val name = nick ?: users[id]?.let { Names.display(it) } ?: if (id == me?.id) me?.displayName?.ifBlank { me?.username } ?: unknown else unknown
-            MemberRow.Person(id, id, name, users[id], users[id]?.avatarId ?: if (id == me?.id) me?.avatarId else null, null, offline(presence[id]?.status), crownOf(id, ch.ownerId))
+            MemberRow.Person(id, id, name, users[id], users[id]?.avatarId ?: if (id == me?.id) me?.avatarId else null, RoleLooks.withOwn(null, users[id]?.nameStyle ?: if (id == me?.id) me?.nameStyle else null), offline(presence[id]?.status), crownOf(id, ch.ownerId))
         }.sortedWith { a, b -> if (a.offline != b.offline) (if (a.offline) 1 else -1) else order.compare(a.name, b.name) }
     }
     val list = "members:${ch.id}"

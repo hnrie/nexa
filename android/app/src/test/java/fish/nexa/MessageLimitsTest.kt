@@ -22,6 +22,14 @@ class MessageLimitsTest {
         assertEquals("text", broken("""{"t":42}"""))
     }
 
+    @Test fun forwardCommentLimitsAndRoundTrip() {
+        val payload = fish.nexa.crypto.MessagePayload(t = "Original", fwdAt = 1761400000000L, fwdComment = "Some context")
+        val json = payload.toJson()
+        assertNull(MessageCrypto.brokenLimit(json))
+        assertEquals("text", broken("""{"t":"Original","fwd":{"at":1761400000000,"comment":"${"x".repeat(4001)}"}}"""))
+        assertEquals("text", broken("""{"fwd":{"at":1761400000000,"comment":42}}"""))
+    }
+
     @Test fun filesAndTheirNames() {
         assertNull(broken("""{"att":[${List(10) { file() }.joinToString(",")}]}"""))
         assertEquals("files", broken("""{"att":[${List(11) { file() }.joinToString(",")}]}"""))

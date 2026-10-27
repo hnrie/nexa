@@ -215,7 +215,7 @@ export interface Readable {
 /** The words of a message (with a poll's question and answers) and its files' names. */
 export function readable(p: MessagePayload | undefined): Readable {
   if (!p) return { text: "", files: [] };
-  const parts = [p.t ?? ""];
+  const parts = [p.fwd?.comment ?? "", p.t ?? ""];
   if (p.poll) {
     parts.push(p.poll.question ?? "");
     for (const a of p.poll.answers ?? []) parts.push(a.text ?? "");

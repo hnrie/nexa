@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { AtSign, Hash, SquareSlash } from "lucide-react";
 import type { Channel, Emoji, PublicUser, Role } from "@/api/types";
 import type { CommandApp } from "@/api/apps";
@@ -175,6 +176,7 @@ function CommandPicker({ items, index, onHover, onPick, docked }: { items: AcIte
 }
 
 function SuggestionList({ kind, items, index, onHover, onPick, tone, heading: title, style, docked }: { kind: string; items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number; heading?: string | undefined; style?: CSSProperties | undefined; docked?: boolean | undefined }) {
+  useMediaAnimation();
   const listRef = useRef<HTMLDivElement>(null);
   // the list scrolls when it is taller than the room above the keyboard
   useRowInView(listRef, index, items);

@@ -1,5 +1,6 @@
 package fish.nexa.ui.chat
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -138,6 +139,7 @@ fun openCreatePoll(channelId: String) {
 
 @Composable
 private fun EmojiButton(row: AnswerRow, number: Int, serverId: String?) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = androidx.compose.ui.platform.LocalDensity.current.density
     Box {

@@ -1,3 +1,5 @@
+import { useMemberLook } from "@/lib/useMemberLook";
+import { nameClass, nameStyle } from "@/lib/roleLook";
 import { AtSign, BellPlus, ChevronLeft, MessageCircle, MessageSquareText, MoreVertical, Phone, Pin, Search, UserPlus, UserRound, Users, Video, X } from "lucide-react";
 import { ThreadsPanel } from "@/components/threads/ThreadsPanel";
 import { ThreadActions, ThreadParentLink, ThreadStateBar, useThreadMenu } from "@/components/threads/ThreadBar";
@@ -151,6 +153,7 @@ export function ChatView({ channel }: { channel: Channel }) {
   const rels = useRelationships((r) => r.byUser);
   const nicknames = useMemo(() => friendNicknames(rels), [rels]);
   const name = channelDisplayName(channel, users, me?.id, nicknames);
+  const dmLook = useMemberLook(null, channel.type === "dm" ? channel.recipient_ids.find((id) => id !== me?.id) : undefined);
   // a topic can be formatted: the header gives its words on one line, the topic's dialog the whole of it
   const topicLine = useMemo(() => (channel.topic ? plainText(parse(channel.topic)).replace(/\s+/g, " ").trim() : ""), [channel.topic]);
   const thread = isThread(channel);
@@ -259,7 +262,7 @@ export function ChatView({ channel }: { channel: Channel }) {
             )}
             {channel.type === "dm" && other ? (
               // the other person's name is the way to their profile, as their avatar is
-              <button className={[s.hName, s.hNameBtn].join(" ")} onClick={() => openModal("profile", { userId: other })} data-testid="dm-header-name" dir="auto">{name}</button>
+              <button className={[s.hName, s.hNameBtn, nameClass(dmLook)].join(" ")} style={nameStyle(dmLook)} onClick={() => openModal("profile", { userId: other })} data-testid="dm-header-name" dir="auto">{name}</button>
             ) : (
               <span className={s.hName} dir="auto">{name}</span>
             )}

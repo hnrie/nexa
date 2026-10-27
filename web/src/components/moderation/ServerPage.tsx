@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { CalendarDays, ChevronLeft, ChevronRight, Compass, Copy, Eraser, Eye, FolderOpen, Gavel, Hash, ImageOff, Smile, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -31,6 +32,7 @@ import x from "./Expressions.module.css";
  * said inside it is never shown: the panel has no way to see it.
  */
 export function ServerPage() {
+  useMediaAnimation();
   const { serverId = "" } = useParams();
   const nav = useNavigate();
   const mergePeople = useModeration((s) => s.mergePeople);

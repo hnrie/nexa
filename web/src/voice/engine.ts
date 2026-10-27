@@ -369,6 +369,10 @@ export async function join(channelId: string, ice: { servers: RTCIceServer[]; sf
     s.rnnoise = plan.rnnoise;
     mic = await getMic(useSettings.getState().settings.voice, { browserNoise: plan.browserNoise });
     if (plan.rnnoise) denoiser = await makeDenoiser(audioContext());
+    if (plan.rnnoise && !denoiser) {
+      s.rnnoise = false;
+      await mic.getAudioTracks()[0]?.applyConstraints({ noiseSuppression: true });
+    }
     useVoice.getState().setMicBlocked(false);
   } catch (err) {
     // The toast is gone in five seconds and the call then looked entirely
@@ -610,6 +614,7 @@ async function swapMic(s: Session, failure: string | null): Promise<void> {
     const plan = await noisePlan(s);
     const next = await getMic(useSettings.getState().settings.voice, { browserNoise: plan.browserNoise });
     const denoiser = plan.rnnoise ? await makeDenoiser(audioContext()) : null;
+    if (plan.rnnoise && !denoiser) await next.getAudioTracks()[0]?.applyConstraints({ noiseSuppression: true });
     if (session !== s) {
       next.getTracks().forEach((t) => t.stop());
       releaseDenoiser(denoiser);
@@ -617,7 +622,7 @@ async function swapMic(s: Session, failure: string | null): Promise<void> {
     }
     // a volume change still building its graph is overtaken by this one
     s.inputGen++;
-    s.rnnoise = plan.rnnoise;
+    s.rnnoise = plan.rnnoise && !!denoiser;
     stopMeter(s);
     disconnectInput(s);
     s.mic?.getTracks().forEach((t) => t.stop());

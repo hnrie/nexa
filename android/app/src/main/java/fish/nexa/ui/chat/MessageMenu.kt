@@ -192,8 +192,8 @@ fun openMessageMenu(cm: ChatMessage, ctx: ListCtx, image: ImageTarget? = null) {
     if (forwardable) items += MenuItem.Action(t("forward.menu"), separatorAfter = !threadable && !publishable) { openForward(cm) }
     if (threadable) items += MenuItem.Action(t("threads.create.title"), separatorAfter = !publishable) { fish.nexa.ui.threads.openCreateThread(cm.channelId, cm.id) }
     if (publishable) items += MenuItem.Action(t("follows.publish"), separatorAfter = true) { publish(cm) }
-    items += MenuItem.Action(t("chat.messageMenu.copyText"), disabled = cm.payload?.t.isNullOrEmpty()) {
-        copy(fish.nexa.data.Mentions.humanize(cm.payload?.t ?: ""), t("clipboard.textCopied"))
+    items += MenuItem.Action(t("chat.messageMenu.copyText"), disabled = cm.payload?.t.isNullOrEmpty() && cm.payload?.fwdComment.isNullOrEmpty()) {
+        copy(fish.nexa.data.Mentions.humanize(listOfNotNull(cm.payload?.fwdComment, cm.payload?.t).joinToString("\n")), t("clipboard.textCopied"))
     }
     if (canPin(cm.m)) items += MenuItem.Action(if (cm.m.pinned) t("chat.messageItem.unpinMessage") else t("chat.messageItem.pinMessage")) {
         Nexa.scope.launch {

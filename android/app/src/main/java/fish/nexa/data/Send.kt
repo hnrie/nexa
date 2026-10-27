@@ -90,7 +90,7 @@ data class SendOptions(
 )
 
 /** The message a forward passes on, and when that one was first sent. */
-data class Forwarding(val channelId: String, val messageId: String, val at: Long)
+data class Forwarding(val channelId: String, val messageId: String, val at: Long, val comment: String? = null)
 
 data class Uploaded(val meta: AttachmentMeta, val blobId: String, val size: Long)
 
@@ -155,6 +155,7 @@ object Send {
             embeds = opts.embeds?.takeIf { it.isNotEmpty() },
             poll = opts.poll,
             fwdAt = opts.forward?.at,
+            fwdComment = opts.forward?.comment,
         )
         // someone else's words, passed on: they ping nobody
         if (opts.forward != null) return Written(payload, emptyList(), emptyList(), false)

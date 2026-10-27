@@ -20,6 +20,8 @@ import { groupMemberBulk } from "@/components/server/memberBulk";
 import { PickBar, PickMark } from "@/components/common/Pick";
 import { pickClick, usePick } from "@/stores/pick";
 import { openProfilePopout } from "@/stores/profilePopout";
+import { withOwn } from "@/lib/useMemberLook";
+import { nameClass, nameStyle } from "@/lib/roleLook";
 import { nameOrder } from "./nameOrder";
 import s from "./MemberList.module.css";
 import { UserTag } from "@/components/servertag/UserTag";
@@ -71,6 +73,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
       <div className={s.head}>{t("chat.groupMemberList.membersCount", { count: rows.length })}</div>
       {rows.map((row) => {
         const p = presence[row.id];
+        const look = withOwn(undefined, users[row.id]?.name_style ?? (row.id === me?.id ? me.name_style : null));
         const activity = activitiesOf(p)[0];
         return (
           <button
@@ -101,7 +104,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
             <Avatar id={row.id} avatarId={users[row.id]?.avatar_id ?? null} name={row.name} size={32} status={statusOf(p)} typing={typingOn ? typers.includes(row.id) : undefined} />
             <span className={s.text}>
               <span className={s.name}>
-                <span className={s.nameText}>{row.name}</span>
+                <span className={[s.nameText, nameClass(look)].join(" ")} style={nameStyle(look)}>{row.name}</span>
                 {!isOwner(row.id) && channel.owner_id === row.id ? <Crown size={14} className={s.crown} aria-label={t("chat.groupMemberList.groupOwner")} /> : null}
                 <RankMark userId={row.id} />
                 <BotTag userId={row.id} />

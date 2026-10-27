@@ -347,6 +347,7 @@ private fun Container(c: Webhook.Component, hook: Webhook.Content, from: String)
 
 @Composable
 fun HookEmojiGlyph(e: Webhook.Emoji, size: Int) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = LocalDensity.current.density
     if (e.id != null) AsyncImage(Media.emojiUrl(e.id, size, density), e.name?.let { ":$it:" }, imageLoader = Media.loader, modifier = Modifier.size(size.dp))
     else if (e.name != null) TwemojiImage(e.name, size.dp)

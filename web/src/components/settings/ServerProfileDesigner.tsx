@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { touchFirst } from "@/lib/touch";
 import { ChevronDown, ImagePlus, LoaderCircle, Palette, Pin, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
@@ -92,6 +93,7 @@ function ServerPicker({ serverId, servers, onServer }: { serverId: string; serve
 }
 
 function Designer({ serverId, servers, onServer }: { serverId: string; servers: string[]; onServer: (id: string) => void }) {
+  useMediaAnimation();
   const me = useAuth((a) => a.me);
   const st = useServers((x) => x.byId[serverId]);
   const upsertMember = useServers((x) => x.upsertMember);

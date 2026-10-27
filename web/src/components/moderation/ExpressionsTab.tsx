@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { CalendarDays, ChevronRight, Download, Gavel, Search, Server, Smile, Sticker as StickerIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -46,6 +47,7 @@ export function packBlockedText(b: ModPack["blocked"]): string {
  * play all at once.
  */
 export function ExpressionPic({ kind, blobId, format, name, size }: { kind: "sticker" | "emoji"; blobId: string; format?: string | undefined; name: string; size: number }) {
+  useMediaAnimation();
   const [play, setPlay] = useState(false);
   const src = kind === "emoji" ? emojiUrl(blobId, false, size) : stickerUrl(blobId, size);
   return (

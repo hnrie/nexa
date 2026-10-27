@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { ArrowLeft, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { hasServerProfile, moderation as modApi, type ActionRequest, type ModAction, type ModMembership, type ModUser, type PurgeCounts, type ResetField, type StaffCase } from "@/api/moderation";
@@ -162,6 +163,7 @@ interface ModerateProps {
  * the dialog says so beside the box it is typed in.
  */
 export function ModerateModal({ user, onClose, onDone, initial, preset, servers, bulk }: ModerateProps) {
+  useMediaAnimation();
   const many = bulk && bulk.length > 1 ? bulk : null;
   const toast = useUI((u) => u.toast);
   const live = usePresence((p) => p.byUser[user.id]);

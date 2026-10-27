@@ -1,5 +1,6 @@
 package fish.nexa.ui.moderation
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -279,6 +280,7 @@ fun OwnerChip(userId: String, text: String, onClick: () -> Unit) {
  */
 @Composable
 fun StaffServerPage(serverId: String) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val scope = rememberCoroutineScope()
     var data by remember(serverId) { mutableStateOf<Moderation.OneServer?>(null) }

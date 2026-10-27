@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { CalendarDays, Gavel, Hash, Search, Server, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -178,6 +179,7 @@ export function ServersTab() {
 }
 
 function ServerCard({ s, people, onModerate, onOpen, onOwner }: { s: ModServer; people: People; onModerate: () => void; onOpen: () => void; onOwner: () => void }) {
+  useMediaAnimation();
   const banner = bannerUrl(s.banner_id, 320);
   const owner = people[s.owner_id];
   const blocked = serverBlockedText(s.blocked);

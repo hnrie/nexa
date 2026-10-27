@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Check } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -38,6 +39,7 @@ export function percents(tally: PollTally | undefined): Map<number, number> {
 }
 
 function AnswerEmoji({ a }: { a: HookPollAnswer }) {
+  useMediaAnimation();
   if (!a.emoji) return null;
   return (
     <span className={s.answerEmoji} aria-hidden="true">

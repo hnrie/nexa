@@ -731,6 +731,12 @@ private fun settingsIndex(groups: List<SettingsGroup>): List<SettingResult> {
         Triple("sounds", "soundPack", "settings.sounds.createPack"),
         Triple("sounds", "soundVolume", "settings.sounds.volume"),
         Triple("appearance", "theme", "settings.appearance.theme"),
+        Triple("appearance", "animateAvatars", "settings.appearance.animateAvatars"),
+        Triple("appearance", "animateIcons", "settings.appearance.animateIcons"),
+        Triple("appearance", "animateBanners", "settings.appearance.animateBanners"),
+        Triple("appearance", "animateEmoji", "settings.appearance.animateEmoji"),
+        Triple("appearance", "animateStickers", "settings.appearance.animateStickers"),
+
         Triple("appearance", "accent", "settings.appearance.accentColour"),
         Triple("appearance", "font", "settings.appearance.font"),
         Triple("appearance", "textSize", "settings.appearance.textSize"),

@@ -21,3 +21,11 @@
   .speed { height: 32px; min-width: 40px; }
 }
 @media (prefers-reduced-motion: reduce) { .play, .bar { transition: none; } }
+
+.message { max-width: 360px; width: 100%; }
+.transcription { padding: 4px 8px; font-size: 12px; color: var(--text-muted); }
+.transcribe { min-height: 32px; color: var(--text-brand); font-size: 12px; font-weight: 600; }
+.transcribe:disabled { opacity: .5; }
+.transcriptHint { display: block; }
+.transcript { white-space: pre-wrap; font-size: 14px; line-height: 1.5; color: var(--text); margin: 6px 0; user-select: text; }
+@media (pointer: coarse) { .transcribe { min-height: 48px; } }

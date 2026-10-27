@@ -1,3 +1,4 @@
+import { useSettings } from "@/stores/settings";
 import { api } from "./client";
 import type { PurgeCounts } from "./moderation";
 import type { KdfParamsJson, MeUser, PublicUser, SettingsBlob, Snowflake } from "./types";
@@ -148,7 +149,13 @@ export function mediaSize(css: number): number {
 function mediaUrl(kind: string, id: Snowflake | null, css?: number, version = ""): string | null {
   if (!id) return null;
   const url = `${api.baseUrl}/media/${kind}/${id}`;
-  return css ? `${url}?size=${mediaSize(css)}${version}` : url;
+  const key = ({ avatar: "animateAvatars", icon: "animateIcons", banner: "animateBanners", emoji: "animateEmoji", sticker: "animateStickers" } as const)[kind as "avatar"];
+  const still = key && useSettings.getState().settings[key] === false;
+  const params = new URLSearchParams();
+  if (css) params.set("size", String(mediaSize(css)));
+  if (still) params.set("still", "1");
+  if (css && version) params.set("v", "2");
+  return params.size ? `${url}?${params}` : url;
 }
 
 /**

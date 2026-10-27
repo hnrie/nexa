@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Pin, Plus, Shield, Users, Compass, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -68,6 +69,7 @@ const RAIL_DRAG = "application/x-nexa-rail";
  * separator, the pinned servers and folders, the rest, add.
  */
 export function Rail() {
+  useMediaAnimation();
   const nav = useNavigate();
   const loc = useLocation();
   const channels = useChannels((c) => c.byId);

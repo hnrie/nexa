@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { emojiUrl, iconUrl } from "@/api/users";
 import type { RoleIconInfo } from "@/lib/roleLook";
 import { useExpressions } from "@/stores/expressions";
@@ -5,6 +6,7 @@ import { Twemoji } from "./Twemoji";
 
 /** A role's picture beside a name, named for the role it stands for. */
 export function RoleIcon({ icon, size = 18 }: { icon: RoleIconInfo; size?: number }) {
+  useMediaAnimation();
   // one of the server's own emoji is drawn from its picture, which it is found by
   const custom = useExpressions((x) => {
     if (icon.kind !== "custom") return undefined;

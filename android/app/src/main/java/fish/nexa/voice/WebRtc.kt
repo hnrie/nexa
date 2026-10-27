@@ -59,9 +59,9 @@ object WebRtc {
     val factory: PeerConnectionFactory by lazy {
         PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(app).createInitializationOptions())
         adm = JavaAudioDeviceModule.builder(app)
-            // The phone's own echo canceller makes a speakerphone call usable; its
-            // noise suppressor stays off, since the call's noise mode decides that.
-            .setUseHardwareAcousticEchoCanceler(true)
+            // Use WebRTC AEC3 with its playback reference, rather than a vendor effect
+            // whose quality and interaction with capture processing vary by phone.
+            .setUseHardwareAcousticEchoCanceler(false)
             .setUseHardwareNoiseSuppressor(false)
             // a share's sound arrives in stereo; voices are mono either way
             .setUseStereoOutput(true)

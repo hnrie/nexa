@@ -266,6 +266,7 @@ internal fun ServerProfileDesigner(serverId: String?, onServer: (String) -> Unit
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Designer(serverId: String, servers: List<String>, onServer: (String) -> Unit) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()

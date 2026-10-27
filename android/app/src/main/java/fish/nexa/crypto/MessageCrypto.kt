@@ -116,6 +116,7 @@ data class MessagePayload(
     val poll: PollPayload? = null,
     /** Forwarded from another message (data/Forward.kt): when that one was sent (Unix ms). Its files are the original's own. */
     val fwdAt: Long? = null,
+    val fwdComment: String? = null,
 ) {
     fun toJson(): JsonObject = buildJsonObject {
         t?.let { put("t", it) }
@@ -133,7 +134,7 @@ data class MessagePayload(
         }
         embeds?.let { put("embeds", JsonArray(it)) }
         flags?.let { put("flags", num(it)) }
-        fwdAt?.let { at -> put("fwd", buildJsonObject { put("at", at) }) }
+        fwdAt?.let { at -> put("fwd", buildJsonObject { put("at", at); fwdComment?.let { put("comment", it) } }) }
         poll?.let { p ->
             put("poll", buildJsonObject {
                 put("question", p.question)
@@ -399,6 +400,8 @@ object MessageCrypto {
 
     /** The first limit a payload breaks, or null when it keeps to them all (the web's brokenLimit). */
     fun brokenLimit(p: JsonObject): String? {
+        val fwd = p["fwd"] as? JsonObject
+        if (fwd?.containsKey("comment") == true && (fwd.str("comment")?.let { typedLength(it) > Limits.TEXT } != false)) return "text"
         if (p.containsKey("t") && (p.str("t")?.let { typedLength(it) > Limits.TEXT } != false)) return "text"
         if (p.containsKey("att")) {
             val att = p["att"] as? JsonArray ?: return "files"
@@ -455,6 +458,6 @@ object MessageCrypto {
             throw DecryptError("malformed message payload")
         }
         val fwdAt = (p["fwd"] as? JsonObject)?.number("at")?.toLong()
-        return MessagePayload(t, att, sticker, embeds, flags, poll, fwdAt)
+        return MessagePayload(t, att, sticker, embeds, flags, poll, fwdAt, if (fwdAt != null) (p["fwd"] as? JsonObject)?.str("comment") else null)
     }
 }

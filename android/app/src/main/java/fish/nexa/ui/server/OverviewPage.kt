@@ -204,6 +204,7 @@ fun OverviewPage(serverId: String) {
 /** `.serverIcon`: 100 dp, rounded 30, the picture or the initials on the raised surface. */
 @Composable
 private fun BigServerIcon(server: Server) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val shape = RoundedCornerShape(30.dp)
     val density = LocalDensity.current.density
@@ -227,6 +228,7 @@ private fun BigServerIcon(server: Server) {
 /** `.serverBanner`: 16:9, at most 360 dp wide, the picture as cover, its buttons on it. */
 @Composable
 private fun BannerBox(server: Server, buttons: @Composable () -> Unit) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val shape = fish.nexa.ui.theme.Radii.Md
     val density = LocalDensity.current.density

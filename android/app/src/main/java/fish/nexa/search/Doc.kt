@@ -122,7 +122,7 @@ object SearchDocs {
             if (rest.isNotEmpty()) hx = rest.take(8000)
         }
         return SearchDoc(
-            id = m.id, c = m.channelId, a = m.authorId, ts = m.createdAt, ed = m.editedAt, t = p.t ?: "", fl = m.flags,
+            id = m.id, c = m.channelId, a = m.authorId, ts = m.createdAt, ed = m.editedAt, t = listOfNotNull(p.fwdComment, p.t).joinToString("\n"), fl = m.flags,
             mn = m.mentions.ifEmpty { null }, ev = m.mentionEveryone, att = att?.ifEmpty { null }, emb = emb, st = p.sticker, hn = hn, hx = hx,
         )
     }

@@ -186,6 +186,7 @@ class Collector:
         self.packages: list[dict[str, str]] = []
         self.texts: dict[str, Counter[str]] = {}
         self.unknown: list[str] = []
+        self.seen: set[tuple[str, str, str]] = set()
 
     def add(self, *, part: str, name: str, version: str, license_: str | None, url: str, text: str | None, notice: str | None = None, whole: bool = False) -> None:
         spdx = license_ or (detect(text) if text else None)
@@ -204,7 +205,10 @@ class Collector:
             # be; the one most packages ship wins, so a single mangled file cannot
             # become the text everyone reads.
             self.texts.setdefault(spdx, Counter())[text.replace("\r\n", "\n").strip() + "\n" if whole else without_copyright(text)] += 1
-        self.packages.append(entry)
+        key = (part, name, version)
+        if key not in self.seen:
+            self.seen.add(key)
+            self.packages.append(entry)
 
 
 # ---------------------------------------------------------------------------- npm
@@ -350,21 +354,18 @@ def assets_part(collector: Collector) -> int:
             notice="Copyright 2019 Twitter, Inc and other contributors",
         )
         count += 1
-    # RNNoise is compiled into the WebAssembly that @sapphi-red/web-noise-suppressor
-    # ships, by @shiguredo/rnnoise-wasm (2022.2.0 for its 0.4.1), from Shiguredo's
-    # fork of RNNoise at 2022.1.0 (its build-rnnoise.sh). Neither is in a lockfile,
-    # and the wrapper's MIT licence covers only its own code. The notices are the
-    # ones those versions carry; both licence texts are already on the page.
-    if (ROOT / "web/node_modules/@sapphi-red/web-noise-suppressor/package.json").is_file():
+    # The modern wrapper embeds the same pinned Xiph model the native app uses.
+    if (ROOT / "web/node_modules/@shiguredo/rnnoise-wasm/package.json").is_file():
         collector.add(
-            part="assets", name="RNNoise", version="2022.1.0", license_="BSD-3-Clause", url="https://github.com/shiguredo/rnnoise", text=None,
-            notice="Copyright (c) 2021, Shiguredo Inc.; Copyright (c) 2017, Mozilla; Copyright (c) 2007-2017, Jean-Marc Valin; Copyright (c) 2005-2017, Xiph.Org Foundation; Copyright (c) 2003-2004, Mark Borgerding",
+            part="assets", name="RNNoise", version="70f1d256acd4b34a572f999a05c87bf00b67730d", license_="BSD-3-Clause", url="https://github.com/xiph/rnnoise", text=None,
+            notice="Copyright (c) 2017, Mozilla; Copyright (c) 2007-2017, Jean-Marc Valin; Copyright (c) 2005-2017, Xiph.Org Foundation; Copyright (c) 2003-2004, Mark Borgerding",
         )
-        collector.add(
-            part="assets", name="rnnoise-wasm", version="2022.2.0", license_="Apache-2.0", url="https://github.com/shiguredo/rnnoise-wasm", text=None,
-            notice="Copyright 2021-2021, Takeru Ohta (Original Author); Copyright 2021-2021, Shiguredo Inc.",
-        )
-        count += 2
+        count += 1
+    collector.add(
+        part="assets", name="Whisper Tiny", version="tiny", license_="MIT", url="https://github.com/openai/whisper", text=None,
+        notice="Copyright (c) 2022 OpenAI",
+    )
+    count += 1
     return count
 
 

@@ -164,8 +164,8 @@ export const messageMenu = defineMenu<MessageMenuCtx>("message", [
     button("copyMessageText", ({ msg }) => ({
       id: "copy",
       label: t("chat.messageMenu.copyText"),
-      disabled: !msg.payload?.t,
-      onSelect: () => void copyText(humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId, knownNames()), t("clipboard.textCopied")),
+      disabled: !(msg.payload?.t || msg.payload?.fwd?.comment),
+      onSelect: () => void copyText(humanizeMentions([msg.payload?.fwd?.comment, msg.payload?.t].filter(Boolean).join("\n"), useUsers.getState().byId, knownNames()), t("clipboard.textCopied")),
     })),
     button("pinMessage", ({ msg }) => {
       if (!canPin(msg)) return null;

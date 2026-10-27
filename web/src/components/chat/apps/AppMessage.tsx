@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Eye } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { emojiUrl } from "@/api/users";
@@ -166,6 +167,7 @@ export function OnlyYou({ msg }: { msg: DecryptedMessage }) {
 }
 
 function Glyph({ e, size = 18 }: { e: HookEmoji; size?: number }) {
+  useMediaAnimation();
   if (e.id) return <img className={s.glyph} src={emojiUrl(e.id, !!e.animated, size)} alt={e.name ? `:${e.name}:` : ""} width={size} height={size} loading="lazy" draggable={false} />;
   return e.name ? <Twemoji text={e.name} className={s.glyph} /> : null;
 }

@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Megaphone } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/api/client";
@@ -21,6 +22,7 @@ import s from "@/components/server/pages/Integrations.module.css";
  * and the way to stop following it.
  */
 export function FollowedChannels({ serverId, channelId }: { serverId: string; channelId?: string | undefined }) {
+  useMediaAnimation();
   const channels = useChannels((c) => c.byId);
   const [list, setList] = useState<Follow[] | null>(null);
   const [failed, setFailed] = useState(false);

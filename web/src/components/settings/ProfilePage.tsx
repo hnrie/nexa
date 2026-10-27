@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { touchFirst } from "@/lib/touch";
 import { ImagePlus, LoaderCircle, Palette, Pin, Plus } from "lucide-react";
 import { parse, plainText } from "@/markdown/parse";
@@ -80,6 +81,7 @@ export default function ProfilePage({ anchor, serverId }: { anchor?: string | nu
 
 /** The account's own profile, as it shows everywhere a server has not been given one of its own. */
 function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
+  useMediaAnimation();
   const me = useAuth((a) => a.me);
   const setMe = useAuth((a) => a.setMe);
   const toast = useUI((u) => u.toast);

@@ -145,6 +145,7 @@ def main():
         ident = spdx(*lic[0]) if lic else "Unknown"
         packages.append({"part": "android", "name": name, "version": version, "license": ident, "url": url or ""})
     packages += rust_packages()
+    packages.append({"part": "android", "name": "whisper.cpp", "version": "1.9.5", "license": "MIT", "url": "https://github.com/ggml-org/whisper.cpp", "copyright": "Copyright (c) 2023-2026 The ggml authors"})
     packages += [p for p in web["packages"] if p["part"] == "server"]
     packages += [dict(a, part="assets") for a in ASSETS]
     packages += [p for p in web["packages"] if p["part"] == "assets" and (p["name"] == "Twemoji" or rnnoise_bundled())]

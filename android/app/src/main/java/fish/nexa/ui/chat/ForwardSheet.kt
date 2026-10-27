@@ -68,6 +68,7 @@ fun openForward(msg: ChatMessage) {
     openSheet("forward", title = t("forward.title")) { close ->
         val c = Nx.colors
         var query by remember { mutableStateOf("") }
+        var comment by remember { mutableStateOf("") }
         var picked by remember { mutableStateOf<String?>(null) }
         var busy by remember { mutableStateOf(false) }
         val q = query.trim().lowercase()
@@ -91,6 +92,7 @@ fun openForward(msg: ChatMessage) {
                 Txt(t("forward.noUpload"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12f)), color = c.textMuted)
             }
         }
+        fish.nexa.ui.components.NxTextField(comment, { if (it.length <= 4000) comment = it }, label = t("forward.comment"), singleLine = false, minLines = 2, enabled = !busy)
         fish.nexa.ui.server.SearchBox(query, { query = it }, t("forward.search"))
         Txt(t("forward.pickOne"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12f)), color = c.textMuted, modifier = Modifier.padding(top = 10.dp, bottom = 8.dp))
         Column(Modifier.fillMaxWidth().semantics { contentDescription = t("forward.where") }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -130,7 +132,7 @@ fun openForward(msg: ChatMessage) {
             NxButton(t("forward.send"), {
                 val to = picked ?: return@NxButton
                 busy = true
-                Forward.send(msg, to)
+                Forward.send(msg, to, comment)
                 Nexa.ui.toast(t("forward.sent"), "success")
                 close()
             }, icon = "CornerUpRight", enabled = picked != null, loading = busy)

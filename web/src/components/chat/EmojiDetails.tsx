@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { emojiUrl } from "@/api/users";
@@ -137,6 +138,7 @@ export function EmojiDetails() {
 }
 
 function EmojiCard({ open, onClose }: { open: Open; onClose: () => void }) {
+  useMediaAnimation();
   const { box, emoji, pinned } = open;
   const card = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);

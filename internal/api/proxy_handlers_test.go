@@ -78,10 +78,10 @@ func TestMediaProxy(t *testing.T) {
 	if r2, err := http.Get(forged); err != nil || r2.StatusCode != 403 {
 		t.Errorf("forged signature: %v %v", err, r2 != nil && r2.StatusCode == 403)
 	}
-	// SVG never passes through
+	// SVG is an image, with downloads and a sandbox for direct navigation.
 	r3, err := http.Get(ts.URL + srv.ProxyURL(host+"/evil.svg"))
-	if err != nil || r3.StatusCode != http.StatusUnsupportedMediaType {
-		t.Errorf("svg blocked: %v %d", err, r3.StatusCode)
+	if err != nil || r3.StatusCode != http.StatusOK || r3.Header.Get("Content-Disposition") != `attachment; filename="preview.svg"` || r3.Header.Get("Content-Security-Policy") != "default-src 'none'; sandbox" {
+		t.Errorf("svg image isolation: %v %d", err, r3.StatusCode)
 	}
 	// and neither does HTML
 	r4, _ := http.Get(ts.URL + srv.ProxyURL(host+"/page"))

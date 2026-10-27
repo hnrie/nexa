@@ -49,16 +49,17 @@ object Media {
     }
 
     private fun base() = Nexa.api.baseUrl
+    private fun still(key: String): String = if ((Nexa.settings.doc.value[key] as? kotlinx.serialization.json.JsonPrimitive)?.content == "false") "&still=1" else ""
 
     // &v=2: sized avatars, banners and icons used to be a still picture when the
     // upload was a GIF over 512 pixels; the server now shrinks every frame, and
     // a new address keeps the old still out of the image cache (api/users.ts MOVING)
-    fun avatarUrl(id: String?, css: Int, density: Float): String? = id?.let { "${base()}/media/avatar/$it?size=${sized(css, density)}&v=2" }
-    fun bannerUrl(id: String?, css: Int, density: Float): String? = id?.let { "${base()}/media/banner/$it?size=${sized(css, density)}&v=2" }
-    fun iconUrl(id: String?, css: Int, density: Float): String? = id?.let { "${base()}/media/icon/$it?size=${sized(css, density)}&v=2" }
+    fun avatarUrl(id: String?, css: Int, density: Float): String? = id?.let { "${base()}/media/avatar/$it?size=${sized(css, density)}&v=2" + still("animateAvatars") }
+    fun bannerUrl(id: String?, css: Int, density: Float): String? = id?.let { "${base()}/media/banner/$it?size=${sized(css, density)}&v=2" + still("animateBanners") }
+    fun iconUrl(id: String?, css: Int, density: Float): String? = id?.let { "${base()}/media/icon/$it?size=${sized(css, density)}&v=2" + still("animateIcons") }
     fun emojiUrl(blobId: String, css: Int, density: Float, still: Boolean = false): String =
-        "${base()}/media/emoji/$blobId?size=${sized(css, density)}" + if (still) "&still=1" else ""
-    fun stickerUrl(blobId: String, css: Int, density: Float): String = "${base()}/media/sticker/$blobId?size=${sized(css, density)}"
+        "${base()}/media/emoji/$blobId?size=${sized(css, density)}" + if (still) "&still=1" else still("animateEmoji")
+    fun stickerUrl(blobId: String, css: Int, density: Float): String = "${base()}/media/sticker/$blobId?size=${sized(css, density)}" + still("animateStickers")
     fun tagUrl(id: String, css: Int, density: Float): String = "${base()}/media/tag/$id?size=${sized(css, density).coerceIn(16, 128)}"
     fun typingUrl(id: String, css: Int, density: Float): String = "${base()}/media/typing/$id?size=${sized(css, density)}"
     fun widgetUrl(id: String, css: Int, density: Float): String = "${base()}/media/widget/$id?size=${sized(css, density)}"

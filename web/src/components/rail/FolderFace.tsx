@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Folder } from "lucide-react";
 import { iconUrl } from "@/api/users";
 import { initials } from "@/lib/avatarColor";
@@ -11,6 +12,7 @@ import s from "./Rail.module.css";
  * ancestor.
  */
 export function FolderFace({ serverIds, open }: { serverIds: string[]; open: boolean }) {
+  useMediaAnimation();
   const servers = useServers((st) => st.byId);
   if (open) return <Folder size={24} className={s.folderIcon} aria-hidden="true" />;
   return (

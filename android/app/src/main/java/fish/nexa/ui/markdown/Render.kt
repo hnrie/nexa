@@ -475,6 +475,7 @@ private class Builder(
                 Box(mod) {
                     if (custom != null) {
                         val density = LocalDensity.current.density
+                        @Suppress("UNUSED_VARIABLE") val animate = fish.nexa.ui.shell.settingOn("animateEmoji")
                         AsyncImage(Media.emojiUrl(custom.id, if (jumbo) 48 else 48, density), custom.name, Modifier.size(if (jumbo) 48.dp else 22.dp))
                     } else TwemojiImage(alt, if (jumbo) 48.dp else 22.dp)
                 }
@@ -564,6 +565,7 @@ private fun openEmojiDetails(n: Node, at: Rect) {
             val (name, from) = when (n) {
                 is Node.Emoji -> {
                     val density = LocalDensity.current.density
+                    @Suppress("UNUSED_VARIABLE") val animate = fish.nexa.ui.shell.settingOn("animateEmoji")
                     AsyncImage(Media.emojiUrl(n.id, 48, density), n.name, Modifier.size(48.dp))
                     val server = Nexa.expressions.emojis.value.entries.firstOrNull { (_, list) -> list.any { it.blobId == n.id } }?.key?.let { Nexa.servers.get(it)?.server?.name }
                     val pack = if (server == null) Nexa.expressions.packs.value.values.firstOrNull { p -> p.stickers.any { it.blobId == n.id } }?.name else null

@@ -32,10 +32,10 @@ object Forward {
     }
 
     /** Passes a message on to one conversation or channel; one at a time, so forwarding passes something on rather than spreading it (the server limits how often, too). */
-    fun send(msg: ChatMessage, to: String) {
+    fun send(msg: ChatMessage, to: String, comment: String = "") {
         val p = msg.payload ?: return
         val attachments = p.att.orEmpty().map { Uploaded(it, it.blobId, it.size) }
-        val forward = Forwarding(msg.channelId, msg.id, p.fwdAt ?: Ids.createdAt(msg.id))
+        val forward = Forwarding(msg.channelId, msg.id, p.fwdAt ?: Ids.createdAt(msg.id), comment.trim().takeIf { it.isNotEmpty() })
         Send.sendMessage(
             to, p.t ?: "",
             SendOptions(ping = false, attachments = attachments.takeIf { it.isNotEmpty() }, sticker = p.sticker, embeds = p.embeds, forward = forward),

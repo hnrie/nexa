@@ -85,6 +85,7 @@ fun packUrl(id: String) = AppLinks.shareOrigin(Nexa.api.baseUrl) + "/stickers/pa
 /** A sticker's picture: moving pictures move; a TGS or WebM shows its first frame. */
 @Composable
 fun StickerImage(pack: StickerPack, s: Sticker, css: Int, modifier: Modifier) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = LocalDensity.current.density
     val url = if (pack.kind == "emoji") Media.emojiUrl(s.blobId, 48, density)
     else Media.stickerUrl(s.blobId, css, density) + if (s.format == "tgs" || s.format == "webm") "&still=1" else ""

@@ -5,6 +5,7 @@ import { t } from "@/i18n";
 import { decodeWave, shapeOf, SHOWN_BARS } from "@/lib/voiceMessage";
 import { clock, SPEEDS } from "./AudioPlayer";
 import { mediaPrefs, saveMediaPrefs } from "./mediaPrefs";
+import type { TranscriptPhase } from "@/lib/transcribe";
 import s from "./VoiceMessage.module.css";
 
 interface Props {
@@ -27,6 +28,25 @@ const FLAT = Array.from({ length: SHOWN_BARS }, () => 0.3);
  */
 export function VoiceMessage({ src, duration: hinted, wave, loading, onLoad }: Props) {
   const audio = useRef<HTMLAudioElement>(null);
+  const transcription = useRef<AbortController | null>(null);
+  const [phase, setPhase] = useState<TranscriptPhase | null>(null);
+  const [transcript, setTranscript] = useState<string | null>(null);
+  const [transcriptError, setTranscriptError] = useState(false);
+  useEffect(() => {
+    setTranscript(null); setTranscriptError(false); setPhase(null);
+    return () => { transcription.current?.abort(); transcription.current = null; };
+  }, [src]);
+  const transcribe = async () => {
+    if (!src || transcription.current) return;
+    const controller = new AbortController();
+    transcription.current = controller; setTranscriptError(false);
+    try {
+      const { transcribeVoice } = await import("@/lib/transcribe");
+      const text = await transcribeVoice(src, setPhase, controller.signal);
+      if (!controller.signal.aborted) setTranscript(text);
+    } catch { if (!controller.signal.aborted) setTranscriptError(true); }
+    finally { if (transcription.current === controller) { transcription.current = null; setPhase(null); } }
+  };
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(hinted ?? 0);
@@ -132,43 +152,51 @@ export function VoiceMessage({ src, duration: hinted, wave, loading, onLoad }: P
   const pct = duration > 0 ? time / duration : 0;
   const busy = (loading || queued) && !src && !broken;
   return (
-    <div className={s.voice} data-playing={playing} role="group" aria-label={t("voiceMessage.label")} data-testid="voice-message">
-      {src ? <audio ref={audio} src={src} preload="metadata" /> : null}
-      <button className={s.play} onClick={toggle} disabled={broken} aria-label={playing ? t("voiceMessage.pause") : t("voiceMessage.play")} data-testid="voice-play">
-        {busy ? <Spinner size={18} /> : playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className={s.playIcon} />}
-      </button>
-      {broken ? (
-        <span className={s.failed}>{t("chat.audioPlayer.thisAudioCannotBePlayedHere")}</span>
-      ) : (
-        <div
-          className={s.wave}
-          role="slider"
-          aria-label={t("chat.audioPlayer.seek")}
-          aria-valuemin={0}
-          aria-valuemax={Math.round(duration)}
-          aria-valuenow={Math.round(time)}
-          aria-valuetext={`${clock(time)} / ${clock(duration)}`}
-          tabIndex={0}
-          onKeyDown={onKey}
-          // dragging along the shape scrubs, rather than pulling a drawer open on a phone
-          data-no-swipe
-          onPointerDown={(e) => {
-            if (!src) return;
-            e.currentTarget.setPointerCapture(e.pointerId);
-            scrub(e);
-          }}
-          onPointerMove={(e) => {
-            if (e.currentTarget.hasPointerCapture(e.pointerId)) scrub(e);
-          }}
-        >
-          {shape.map((h, i) => (
-            <span key={i} className={s.bar} data-on={(i + 0.5) / shape.length <= pct} style={{ height: `${Math.round(14 + h * 86)}%` }} />
-          ))}
-        </div>
-      )}
-      {/* while it plays, the time counts up; still, it says how long it is */}
-      <span className={s.time}>{clock(playing || time > 0 ? time : duration)}</span>
-      <button className={s.speed} onClick={nextSpeed} aria-label={t("chat.audioPlayer.playbackSpeed")} title={t("chat.audioPlayer.playbackSpeed")}>{speed}×</button>
+    <div className={s.message}>
+      <div className={s.voice} data-playing={playing} role="group" aria-label={t("voiceMessage.label")} data-testid="voice-message">
+        {src ? <audio ref={audio} src={src} preload="metadata" /> : null}
+        <button className={s.play} onClick={toggle} disabled={broken} aria-label={playing ? t("voiceMessage.pause") : t("voiceMessage.play")} data-testid="voice-play">
+          {busy ? <Spinner size={18} /> : playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className={s.playIcon} />}
+        </button>
+        {broken ? (
+          <span className={s.failed}>{t("chat.audioPlayer.thisAudioCannotBePlayedHere")}</span>
+        ) : (
+          <div
+            className={s.wave}
+            role="slider"
+            aria-label={t("chat.audioPlayer.seek")}
+            aria-valuemin={0}
+            aria-valuemax={Math.round(duration)}
+            aria-valuenow={Math.round(time)}
+            aria-valuetext={`${clock(time)} / ${clock(duration)}`}
+            tabIndex={0}
+            onKeyDown={onKey}
+            // dragging along the shape scrubs, rather than pulling a drawer open on a phone
+            data-no-swipe
+            onPointerDown={(e) => {
+              if (!src) return;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              scrub(e);
+            }}
+            onPointerMove={(e) => {
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) scrub(e);
+            }}
+          >
+            {shape.map((h, i) => (
+              <span key={i} className={s.bar} data-on={(i + 0.5) / shape.length <= pct} style={{ height: `${Math.round(14 + h * 86)}%` }} />
+            ))}
+          </div>
+        )}
+        {/* while it plays, the time counts up; still, it says how long it is */}
+        <span className={s.time}>{clock(playing || time > 0 ? time : duration)}</span>
+        <button className={s.speed} onClick={nextSpeed} aria-label={t("chat.audioPlayer.playbackSpeed")} title={t("chat.audioPlayer.playbackSpeed")}>{speed}×</button>
+      </div>
+      <div className={s.transcription}>
+        {phase ? <button className={s.transcribe} onClick={() => { transcription.current?.abort(); }}>{t("voiceMessage.cancelTranscript")}</button> : <button className={s.transcribe} disabled={!src} onClick={() => void transcribe()}>{t("voiceMessage.transcribe")}</button>}
+        <span className={s.transcriptHint} role="status">{phase ? t(phase === "loading" ? "voiceMessage.modelLoading" : "voiceMessage.transcribing") : t("voiceMessage.localTranscript")}</span>
+        {transcriptError ? <p role="alert">{t("voiceMessage.transcriptFailed")}</p> : null}
+        {transcript !== null ? <p className={s.transcript} dir="auto">{transcript || t("voiceMessage.noSpeech")}</p> : null}
+      </div>
     </div>
   );
 }

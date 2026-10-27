@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { CalendarDays, ChevronRight, Clock, Copy, Eraser, ImageOff, ShieldCheck, UserRoundX } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { hasServerProfile, type ModMembership, type ModPack, type ModUser, type ResetField } from "@/api/moderation";
@@ -64,6 +65,7 @@ function RankIcon({ rank }: { rank: StaffRank }) {
 }
 
 export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, packs = [], onOpenPack }: Props) {
+  useMediaAnimation();
   const rank = owner ? "owner" : rankOf(null, user.admin_flags);
   const [hl, setHl] = useState<Part>(null);
   const deleted = (user.admin_flags & FLAG_DELETED) !== 0;
@@ -340,6 +342,7 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
  * lights up while that row is looked at.
  */
 function PublicFace({ user, hl }: { user: ModUser; hl: Part }) {
+  useMediaAnimation();
   const ctx = useRenderCtx();
   const live = usePresence((x) => x.byUser[user.id]);
   const st = modStatus(user, live);

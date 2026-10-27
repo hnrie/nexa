@@ -134,6 +134,11 @@ export interface Settings {
   typingChannels: boolean;
   /** Snow behind the messages in a seasonal theme that has it (components/chat/SnowFall.tsx). */
   seasonalSnow: boolean;
+  animateAvatars: boolean;
+  animateIcons: boolean;
+  animateBanners: boolean;
+  animateEmoji: boolean;
+  animateStickers: boolean;
   sidebarWidth: number;
   showMembers: boolean;
   recentEmoji: string[];
@@ -248,6 +253,12 @@ export const DEFAULT_SETTINGS: Settings = {
   customTyping: true,
   typingAvatars: true,
   seasonalSnow: true,
+  animateAvatars: true,
+  animateIcons: true,
+  animateBanners: true,
+  animateEmoji: true,
+  animateStickers: true,
+
   typingChannels: true,
   sidebarWidth: 240,
   showMembers: true,
@@ -351,6 +362,11 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
         : base.pluginKeybinds,
     customTyping: typeof inc.customTyping === "boolean" ? inc.customTyping : base.customTyping,
     typingAvatars: typeof inc.typingAvatars === "boolean" ? inc.typingAvatars : base.typingAvatars,
+    animateAvatars: typeof inc.animateAvatars === "boolean" ? inc.animateAvatars : base.animateAvatars,
+    animateIcons: typeof inc.animateIcons === "boolean" ? inc.animateIcons : base.animateIcons,
+    animateBanners: typeof inc.animateBanners === "boolean" ? inc.animateBanners : base.animateBanners,
+    animateEmoji: typeof inc.animateEmoji === "boolean" ? inc.animateEmoji : base.animateEmoji,
+    animateStickers: typeof inc.animateStickers === "boolean" ? inc.animateStickers : base.animateStickers,
     seasonalSnow: typeof inc.seasonalSnow === "boolean" ? inc.seasonalSnow : base.seasonalSnow,
     typingChannels: typeof inc.typingChannels === "boolean" ? inc.typingChannels : base.typingChannels,
 

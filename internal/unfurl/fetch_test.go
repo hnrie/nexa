@@ -426,7 +426,7 @@ func TestFetchUnsupportedContentType(t *testing.T) {
 
 // An image the media proxy will not pass on would only be a broken picture.
 func TestFetchImageTheProxyRefuses(t *testing.T) {
-	for _, ct := range []string{"image/svg+xml", "image/heic", "image/tiff"} {
+	for _, ct := range []string{"image/heic", "image/tiff"} {
 		f, _ := fetcherFor(t, body(ct, "<svg/>"))
 		if _, err := f.Fetch(context.Background(), "http://example.test/logo"); !errors.Is(err, ErrUnsupported) {
 			t.Errorf("%s: err = %v, want ErrUnsupported", ct, err)
@@ -848,5 +848,14 @@ func TestFetchPageWithOnlyPlayableMedia(t *testing.T) {
 	r := mustFetch(t, f, "http://example.test/page")
 	if r.Media != "http://example.test/track.mp3" || r.MediaKind != "audio" {
 		t.Fatalf("media-only card: %+v", r)
+	}
+}
+
+// Dynamic preview endpoints (including BenchLM's /api/og) can return SVG without a filename extension.
+func TestFetchSVGPreview(t *testing.T) {
+	f, _ := fetcherFor(t, body("image/svg+xml", `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630"><text>Preview</text></svg>`))
+	r, err := f.Fetch(context.Background(), "http://example.test/api/og")
+	if err != nil || r.Type != "image" || r.Mime != "image/svg+xml" || r.Image != "http://example.test/api/og" {
+		t.Fatalf("SVG: %+v %v", r, err)
 	}
 }

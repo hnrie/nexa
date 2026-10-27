@@ -160,6 +160,7 @@ fun statusEmojiText(emoji: String): String = CUSTOM_STATUS_EMOJI.matchEntire(emo
 /** A status's emoji: a standard one drawn as Twemoji, a server's or a pack's own as its picture (StatusEmoji.tsx). */
 @Composable
 fun StatusEmojiImage(emoji: String, size: Dp, modifier: Modifier = Modifier) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val m = CUSTOM_STATUS_EMOJI.matchEntire(emoji)
     if (m == null) {
         TwemojiImage(emoji, size, modifier)

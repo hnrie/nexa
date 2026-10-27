@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Hash, ImagePlus, SmilePlus, Volume2 } from "lucide-react";
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { channels as channelsApi } from "@/api/channels";
@@ -47,6 +48,7 @@ function Tile({ checked, label, onSelect, children, testId }: { checked: boolean
  * any set of radio buttons does; nothing is saved until the page is.
  */
 export function ChannelIconPicker({ channel, value, onChange, label, onUploaded }: Props) {
+  useMediaAnimation();
   const [picker, setPicker] = useState<DOMRect | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const [crop, setCrop] = useState<File | null>(null);

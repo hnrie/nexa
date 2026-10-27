@@ -1,5 +1,6 @@
 package fish.nexa.ui.moderation
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -93,6 +94,7 @@ fun packBlockedText(b: String): String = when (b) {
 /** One sticker or emoji as the panel draws it, fetched at [size] and drawn [size] square. */
 @Composable
 fun ExpressionPic(kind: String, blobId: String, format: String?, name: String, size: Dp) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = LocalDensity.current.density
     if (kind == "emoji") AsyncImage(Media.emojiUrl(blobId, size.value.toInt(), density, still = true), name, imageLoader = Media.loader, contentScale = ContentScale.Fit, modifier = Modifier.size(size))
     else StickerMedia(format, Media.stickerUrl(blobId, size.value.toInt(), density), name, size)

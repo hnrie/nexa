@@ -1,6 +1,17 @@
 package fish.nexa.data
 
 import android.media.MediaRecorder
+import android.media.AudioRecord
+import android.media.AudioFormat
+import android.media.MediaCodec
+import android.media.MediaCodecInfo
+import android.media.MediaFormat
+import android.media.MediaMuxer
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
+import java.nio.ByteOrder
+import kotlin.math.sqrt
 import android.os.Build
 import android.os.SystemClock
 import android.util.Base64
@@ -59,73 +70,133 @@ object VoiceMessages {
         val type get() = "audio/mp4"
     }
 
-    /** One recording from the microphone, sampled for its loudness as it goes. */
+    /** 48 kHz AAC at 128 kbps, through the call's neural filter with no microphone gain boost. */
     class Recorder {
         private val file = File(Nexa.app.cacheDir, "voice-${System.nanoTime()}.m4a")
-        private val rec: MediaRecorder = (if (Build.VERSION.SDK_INT >= 31) MediaRecorder(Nexa.app) else @Suppress("DEPRECATION") MediaRecorder())
+        private val audio: AudioRecord
+        private val encoder: MediaCodec
+        private val muxer = MediaMuxer(file.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        private val dsp = RecordingDsp.create().also { check(it != 0L) }
+        private val enhanced = (Nexa.settings.doc.value["voice"] as? kotlinx.serialization.json.JsonObject)?.get("noiseMode")?.toString()?.trim('"')?.let { it == "enhanced" } ?: true
+        private val effects = ArrayList<android.media.audiofx.AudioEffect>()
         private val started: Long
+        private val worker: Thread
+        @Volatile private var running = true
+        @Volatile private var failure: Exception? = null
+        @Volatile private var now = 0f
         private var ended = 0L
         private val levels = ArrayList<Float>()
-        @Volatile private var now = 0f
         private var released = false
 
         init {
-            rec.setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
-            rec.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            rec.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            rec.setAudioChannels(1)
-            rec.setAudioSamplingRate(48_000)
-            rec.setAudioEncodingBitRate(64_000)
-            rec.setMaxDuration((MAX_SECONDS * 1000).toInt())
-            rec.setOutputFile(file.path)
+            val buffer = maxOf(480 * 8, AudioRecord.getMinBufferSize(48000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT))
+            audio = AudioRecord.Builder()
+                .setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+                .setAudioFormat(AudioFormat.Builder().setSampleRate(48000).setChannelMask(AudioFormat.CHANNEL_IN_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build())
+                .setBufferSizeInBytes(buffer).build()
+            encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
             try {
-                rec.prepare()
-                rec.start()
+                check(audio.state == AudioRecord.STATE_INITIALIZED)
+                // VOICE_RECOGNITION avoids vendor speech-volume boosts. Use only requested effects.
+                AutomaticGainControl.create(audio.audioSessionId)?.let { it.enabled = false; effects += it }
+                val voice = Nexa.settings.doc.value["voice"] as? kotlinx.serialization.json.JsonObject
+                val echo = voice?.get("echoCancellation")?.toString() != "false"
+                val mode = voice?.get("noiseMode")?.toString()?.trim('"') ?: "enhanced"
+                AcousticEchoCanceler.create(audio.audioSessionId)?.let { it.enabled = echo; effects += it }
+                NoiseSuppressor.create(audio.audioSessionId)?.let { it.enabled = mode == "standard"; effects += it }
+                val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, 48000, 1).apply {
+                    setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+                    setInteger(MediaFormat.KEY_BIT_RATE, 128000)
+                    setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 960)
+                }
+                encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                encoder.start(); audio.startRecording()
+                check(audio.recordingState == AudioRecord.RECORDSTATE_RECORDING)
             } catch (e: Exception) {
-                rec.release()
-                file.delete()
-                throw e
+                effects.forEach { it.release() }; audio.release(); encoder.release(); muxer.release(); RecordingDsp.destroy(dsp); file.delete(); throw e
             }
             started = SystemClock.elapsedRealtime()
+            worker = Thread({ capture() }, "nexa-voice-recording").apply { start() }
         }
 
-        /** Seconds recorded so far. */
+        private fun capture() {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO)
+            val pcm = ShortArray(480)
+            var track = -1
+            var muxing = false
+            var frames = 0L
+            val info = MediaCodec.BufferInfo()
+            try {
+                var eos = false
+                var finished = false
+                while (!finished) {
+                    if (!eos) {
+                        val i = encoder.dequeueInputBuffer(10000)
+                        if (i >= 0) {
+                            if (!running || frames >= 48000L * MAX_SECONDS.toLong()) {
+                                encoder.queueInputBuffer(i, 0, 0, frames * 1000000 / 48000, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                                eos = true
+                            } else {
+                                var read = 0
+                                while (read < pcm.size && running) {
+                                    val n = audio.read(pcm, read, pcm.size - read, AudioRecord.READ_BLOCKING)
+                                    check(n >= 0)
+                                    if (n == 0) break
+                                    read += n
+                                }
+                                if (read < pcm.size) java.util.Arrays.fill(pcm, read, pcm.size, 0.toShort())
+                                RecordingDsp.process(dsp, pcm, enhanced)
+                                var sum = 0.0
+                                for (v in pcm) { val x = v / 32768.0; sum += x * x }
+                                now = (sqrt(sum / pcm.size) * 4).toFloat().coerceIn(0f, 1f)
+                                val input = encoder.getInputBuffer(i)!!.order(ByteOrder.nativeOrder())
+                                input.clear(); input.asShortBuffer().put(pcm)
+                                encoder.queueInputBuffer(i, 0, 960, frames * 1000000 / 48000, 0)
+                                frames += 480
+                            }
+                        }
+                    }
+                    var o = encoder.dequeueOutputBuffer(info, 10000)
+                    while (o >= 0 || o == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                        if (o == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                            track = muxer.addTrack(encoder.outputFormat); muxer.start(); muxing = true
+                        } else {
+                            val output = encoder.getOutputBuffer(o)!!
+                            if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0 && info.size > 0) {
+                                check(muxing); output.position(info.offset); output.limit(info.offset + info.size)
+                                muxer.writeSampleData(track, output, info)
+                            }
+                            finished = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
+                            encoder.releaseOutputBuffer(o, false)
+                        }
+                        if (finished) break
+                        o = encoder.dequeueOutputBuffer(info, 0)
+                    }
+                }
+            } catch (e: Exception) { failure = e }
+            finally {
+                runCatching { audio.stop() }; audio.release()
+                effects.forEach { it.release() }
+                runCatching { encoder.stop() }; encoder.release()
+                if (muxing) runCatching { muxer.stop() }; muxer.release()
+                RecordingDsp.destroy(dsp); pcm.fill(0)
+            }
+        }
         fun elapsed(): Double = ((if (ended > 0) ended else SystemClock.elapsedRealtime()) - started) / 1000.0
-
-        /** Reads the loudness now (called every 50 ms), from 0 to 1. */
-        fun sample(): Float {
-            if (released) return now
-            val amp = runCatching { rec.maxAmplitude }.getOrDefault(0)
-            // speech sits far below full scale: lifted so a normal voice fills most of the height
-            now = minOf(1f, amp / 12_000f)
-            levels += now
-            return now
-        }
-
+        fun sample(): Float { if (!released) levels += now; return now }
         fun level(): Float = now
-
-        /** Ends the recording; null when it was too short to keep. */
+        private fun finish() {
+            if (released) return
+            released = true; ended = SystemClock.elapsedRealtime(); running = false
+            worker.join(2500)
+            check(!worker.isAlive) { "Recording did not finish" }
+        }
         fun stop(): Recording? {
             if (released) return null
-            ended = SystemClock.elapsedRealtime()
-            released = true
-            val ok = runCatching { rec.stop() }.isSuccess
-            rec.release()
-            val duration = minOf(MAX_SECONDS, elapsed())
-            if (!ok || duration < MIN_SECONDS || file.length() == 0L) {
-                file.delete()
-                return null
-            }
-            return Recording(file, Math.round(duration * 10) / 10.0, encodeWave(shapeOf(levels)))
+            finish()
+            if (failure != null || elapsed() < MIN_SECONDS || file.length() == 0L) { file.delete(); return null }
+            return Recording(file, Math.round(minOf(MAX_SECONDS, elapsed()) * 10) / 10.0, encodeWave(shapeOf(levels)))
         }
-
-        /** Ends it and throws it away. */
-        fun cancel() {
-            if (released) return
-            released = true
-            runCatching { rec.stop() }
-            rec.release()
-            file.delete()
-        }
+        fun cancel() { if (!released) finish(); file.delete() }
     }
 }

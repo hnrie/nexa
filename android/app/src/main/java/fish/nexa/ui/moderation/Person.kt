@@ -163,6 +163,7 @@ fun PersonPage(userId: String, cases: Boolean, caseId: String?) {
  */
 @Composable
 private fun ProfileSheet(user: ModUser, servers: List<ModMembership>, packs: List<ModPack>, owner: Boolean, onModerate: (String, ModeratePreset) -> Unit) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val deleted = user.isDeleted
     // taking down part of a profile is for admins and above; a mod mutes and bans

@@ -1,3 +1,6 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
+import { withOwn } from "@/lib/useMemberLook";
+import { nameClass, nameStyle } from "@/lib/roleLook";
 import { ChevronDown, GripVertical, Lock, MessageCircle, MoreHorizontal, Heart, NotebookPen, Pin, Plus, Search, Shield, Users, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar, showsTyping } from "@/components/common/Avatar";
@@ -453,6 +456,7 @@ export function DMSidebar() {
       sub = <span className={s.sub}>{t("chat.groupMemberList.membersOnly", { count: ch.recipient_ids.length })}</span>;
       avatar = <TypingAvatar channelId={ch.id} id={ch.id} avatarId={ch.icon_id} name={name} group />;
     }
+    const look = withOwn(undefined, tagOf ? users[tagOf]?.name_style : null);
     const subs = activeConvo === ch.id && !isPicking ? selectSubchats(channels, ch.id) : [];
     return (
       <div key={ch.id}>
@@ -474,7 +478,7 @@ export function DMSidebar() {
             {avatar}
             <span className={s.text}>
               <span className={s.nameRow}>
-                <span className={s.name} dir="auto">{name}</span>
+                <span className={[s.name, nameClass(look)].join(" ")} style={nameStyle(look)} dir="auto">{name}</span>
                 {/* Nexa's staff carry their rank's mark wherever they are listed */}
                 {rank ? <StaffMark rank={rank} size={14} /> : null}
                 {tagOf ? <BotTag userId={tagOf} /> : null}
@@ -762,6 +766,7 @@ function SearchButton({ onOpen }: { onOpen: () => void }) {
  * shows it, and the setting turns it off (Settings, Chat).
  */
 function TypingAvatar({ channelId, id, avatarId, name, status = null, group = false }: { channelId: string; id: string; avatarId: string | null; name: string; status?: StatusKind | null; group?: boolean }) {
+  useMediaAnimation();
   const meId = useAuth((a) => a.me?.id);
   const on = useSettings((x) => x.settings.typingAvatars !== false);
   const typers = useTypingIn(on ? channelId : null, meId);

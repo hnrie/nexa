@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { touchFirst } from "@/lib/touch";
 import { NexaProfile } from "@/components/nexa/NexaProfile";
 import { isSystemAccount } from "@/lib/moderation";
@@ -404,6 +405,7 @@ function useCardWidth(el: HTMLElement | null, on: boolean): number {
  * bottom, with its text and buttons turned to read on it.
  */
 export function ProfileCard({ userId, variant, onClose, preview, previewWidgets, serverId, visitor, initialTab, design, embedded }: Props) {
+  useMediaAnimation();
   const nav = useNavigate();
   const inServer = useServerInView(serverId);
   const me = useAuth((a) => a.me);

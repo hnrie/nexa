@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import type { CSSProperties } from "react";
 import { emojiUrl } from "@/api/users";
 import { Button } from "@/components/common/Button";
@@ -11,6 +12,7 @@ import s from "./Typing.module.css";
 
 /** One emoji of a typing style: an emoji itself, a server or pack emoji's picture, or a picture of the person's own. */
 export function TypingEmoji({ token, className }: { token: string; className?: string }) {
+  useMediaAnimation();
   const image = typingImage(token);
   if (image) return <img className={className} src={typingImageUrl(image, 32)} alt="" draggable={false} />;
   const custom = customEmoji(token);

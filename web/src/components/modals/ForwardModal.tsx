@@ -13,6 +13,7 @@ import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { t } from "@/i18n";
+import { Field, TextArea } from "@/components/common/TextInput";
 import s from "./ForwardModal.module.css";
 
 /**
@@ -25,6 +26,7 @@ export function ForwardModal({ msg, onClose }: { msg: DecryptedMessage; onClose:
   const users = useUsers((u) => u.byId);
   const servers = useServers((st) => st.byId);
   const [query, setQuery] = useState("");
+  const [comment, setComment] = useState("");
   const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const files = msg.payload?.att?.length ?? 0;
@@ -51,7 +53,7 @@ export function ForwardModal({ msg, onClose }: { msg: DecryptedMessage; onClose:
     if (!picked) return;
     setBusy(true);
     try {
-      await forwardMessage(msg, picked);
+      await forwardMessage(msg, picked, comment);
       useUI.getState().toast(t("forward.sent"), "success");
       onClose();
     } catch {
@@ -82,6 +84,7 @@ export function ForwardModal({ msg, onClose }: { msg: DecryptedMessage; onClose:
         {files ? <span className={s.files}><Paperclip size={14} aria-hidden="true" />{t("forward.files", { count: files })}</span> : null}
         {files ? <p className={s.free}>{t("forward.noUpload")}</p> : null}
       </div>
+      <Field label={t("forward.comment")}><TextArea value={comment} onChange={(e) => setComment(e.target.value)} maxLength={4000} rows={2} disabled={busy} data-testid="forward-comment" /></Field>
       <SearchBox value={query} onChange={setQuery} placeholder={t("forward.search")} aria-label={t("forward.search")} autoFocus />
       <p className={s.hint}>{t("forward.pickOne")}</p>
       <div className={s.list} role="radiogroup" aria-label={t("forward.where")} data-testid="forward-list">

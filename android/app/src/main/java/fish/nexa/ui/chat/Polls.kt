@@ -110,6 +110,7 @@ fun timeLeft(expiry: Long, now: Long): String {
 
 @Composable
 private fun AnswerEmoji(a: PollShape.Answer) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = LocalDensity.current.density
     when {
         a.emojiId != null -> AsyncImage(Media.emojiUrl(a.emojiId, 22, density, still = false), a.emojiName, imageLoader = Media.loader, modifier = Modifier.size(22.dp))

@@ -193,7 +193,7 @@ object Notifier {
     /** What a notification may say about a message (notify.ts previewOf). */
     private fun previewOf(dec: ChatMessage): String {
         val p = dec.payload ?: return if (dec.error != null) t("chat.messageItem.encryptedMessage") else t("notify.newMessage")
-        p.t?.takeIf { it.isNotBlank() }?.let { return plainText(it).take(140) }
+        listOfNotNull(p.fwdComment, p.t).joinToString("\n").takeIf { it.isNotBlank() }?.let { return plainText(it).take(140) }
         p.poll?.let { poll -> return (listOf(poll.question) + poll.answers.map { it.text }).joinToString("\n").take(140) }
         p.att?.takeIf { it.isNotEmpty() }?.let { return if (it.size == 1) t("notify.sentFile", "name" to it[0].name) else t("notify.sentFiles", "count" to it.size) }
         if (p.sticker != null) return t("notify.sentASticker")

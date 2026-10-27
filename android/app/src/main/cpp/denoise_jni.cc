@@ -16,7 +16,7 @@
 #include <algorithm>
 
 extern "C" {
-#include "rnnoise/rnnoise.h"
+#include "rnnoise.h"
 }
 
 namespace {
@@ -27,6 +27,11 @@ struct Denoiser {
   DenoiseState* state = nullptr;
   float up[kFrame];
   float out[kFrame];
+  float history[3][kFrame] = {};
+  bool audible[3] = {true, true, true};
+  int history_pos = 0;
+  int hold = 0;
+  float gate_gain = 1.f;
   float prev = 0.f;  // the last input sample of the block before, so stretching joins up
   long tone_at = 0;  // samples of test signal made so far
   uint32_t noise = 2463534242u;  // xorshift state of the test noise
@@ -64,6 +69,19 @@ void Tone(Denoiser* d, float* data, int frames, int rate, int mode) {
   }
 }
 
+void SpeechGate(Denoiser* d, float probability) {
+  const bool speech = probability >= (d->hold ? .2f : .5f);
+  if (speech) { d->hold = 20; std::fill_n(d->audible, 3, true); }
+  else d->hold = std::max(0, d->hold - 1);
+  memcpy(d->history[d->history_pos], d->out, sizeof(d->out));
+  d->audible[d->history_pos] = d->hold > 0;
+  d->history_pos = (d->history_pos + 1) % 3;
+  const float target = d->audible[d->history_pos] ? 1.f : .02f;
+  for (int i = 0; i < kFrame; ++i) {
+    d->gate_gain += (target - d->gate_gain) * (target > d->gate_gain ? .02f : .002f);
+    d->out[i] = d->history[d->history_pos][i] * d->gate_gain;
+  }
+}
 }  // namespace
 
 extern "C" {
@@ -101,12 +119,12 @@ JNIEXPORT jfloat JNICALL Java_fish_nexa_voice_Denoise_nativeProcess(
 
   if (denoise == JNI_TRUE && frames <= kFrame) {
     if (frames == kFrame) {
-      rnnoise_process_frame(d->state, d->out, data);
+      SpeechGate(d, rnnoise_process_frame(d->state, d->out, data));
       memcpy(data, d->out, sizeof(float) * kFrame);
     } else {
       const float last = data[frames - 1];
       Stretch(data, frames, d->prev, d->up, kFrame);
-      rnnoise_process_frame(d->state, d->out, d->up);
+      SpeechGate(d, rnnoise_process_frame(d->state, d->out, d->up));
       // and back down, sample for sample in time
       for (int i = 0; i < frames; i++) {
         const float pos = (float(i) + 1.f) * float(kFrame) / float(frames) - 1.f;
@@ -132,3 +150,28 @@ JNIEXPORT jfloat JNICALL Java_fish_nexa_voice_Denoise_nativeProcess(
 }
 
 }  // extern "C"
+
+// Voice recordings own a separate filter state from a running call.
+extern "C" JNIEXPORT jlong JNICALL Java_fish_nexa_data_RecordingDsp_create(JNIEnv* e, jobject o) {
+  return Java_fish_nexa_voice_Denoise_nativeCreate(e, o);
+}
+extern "C" JNIEXPORT void JNICALL Java_fish_nexa_data_RecordingDsp_destroy(JNIEnv* e, jobject o, jlong p) {
+  Java_fish_nexa_voice_Denoise_nativeDestroy(e, o, p);
+}
+extern "C" JNIEXPORT void JNICALL Java_fish_nexa_data_RecordingDsp_process(JNIEnv* env, jobject, jlong ptr, jshortArray pcm, jboolean enhanced) {
+  auto* d = reinterpret_cast<Denoiser*>(ptr);
+  if (!d || env->GetArrayLength(pcm) != kFrame) return;
+  jshort data[kFrame];
+  env->GetShortArrayRegion(pcm, 0, kFrame, data);
+  for (int i = 0; i < kFrame; ++i) d->up[i] = float(data[i]);
+  if (enhanced) SpeechGate(d, rnnoise_process_frame(d->state, d->out, d->up));
+  else memcpy(d->out, d->up, sizeof(d->up));
+  // A soft limiter only turns peaks down; never amplify the microphone or its noise.
+  for (int i = 0; i < kFrame; ++i) {
+    const float x = d->out[i] / 32768.f;
+    const float magnitude = fabsf(x);
+    const float limited = magnitude > .25f ? .25f + (magnitude - .25f) * .25f : magnitude;
+    data[i] = jshort(std::clamp(copysignf(limited * .79f, x), -.79f, .79f) * 32767.f);
+  }
+  env->SetShortArrayRegion(pcm, 0, kFrame, data);
+}

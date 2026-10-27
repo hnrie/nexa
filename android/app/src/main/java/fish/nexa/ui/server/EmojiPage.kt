@@ -158,6 +158,7 @@ fun EmojiPage(serverId: String) {
 
 @Composable
 private fun EmojiRow(e: Emoji, uploader: String, manage: Boolean, onRename: () -> Unit, onDelete: () -> Unit) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current.density
     Row(

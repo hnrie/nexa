@@ -144,6 +144,7 @@ private fun PickerSheet(layer: Layer, opener: Pickers.Opener, close: () -> Unit)
     }
     var full by remember { mutableStateOf(false) }
     var drag by remember { mutableStateOf(0f) }
+    val recentEmoji = remember(opener) { Nexa.settings.recentEmoji.toList() }
     var tab by remember { mutableStateOf(if (Pickers.Tab.EMOJI in opener.tabs) Pickers.Tab.EMOJI else opener.tabs.first()) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val screenH = maxHeight
@@ -212,7 +213,7 @@ private fun PickerSheet(layer: Layer, opener: Pickers.Opener, close: () -> Unit)
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (tab) {
-                    Pickers.Tab.EMOJI -> EmojiTab(opener) { picked ->
+                    Pickers.Tab.EMOJI -> EmojiTab(opener, recentEmoji) { picked ->
                         opener.onEmoji(picked)
                         if (opener.closeOnEmoji) close()
                     }
@@ -278,13 +279,12 @@ private sealed interface Cell {
 private data class Section(val key: String, val title: String, val icon: @Composable () -> Unit, val cells: List<Cell>)
 
 @Composable
-private fun EmojiTab(opener: Pickers.Opener, pick: (Pickers.Picked) -> Unit) {
+private fun EmojiTab(opener: Pickers.Opener, recent: List<String>, pick: (Pickers.Picked) -> Unit) {
     val c = Nx.colors
     var query by remember { mutableStateOf("") }
     val tone = Nexa.settings.doc.collectAsState().value.let { Nexa.settings.skinTone }
     val emojis by Nexa.expressions.emojis.collectAsState()
     val packs by Nexa.expressions.packs.collectAsState()
-    val recent = Nexa.settings.recentEmoji
     var loaded by remember { mutableStateOf(EmojiData.loaded()) }
     LaunchedEffect(Unit) {
         if (!loaded) {
@@ -453,6 +453,7 @@ private fun EmojiCell(cell: Cell, tone: Int, onClick: () -> Unit) {
 
 @Composable
 private fun CellGlyph(cell: Cell, tone: Int, size: androidx.compose.ui.unit.Dp) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = LocalDensity.current.density
     when (cell) {
         is Cell.Std -> TwemojiImage(EmojiData.withTone(cell.e, tone), size)
@@ -463,6 +464,7 @@ private fun CellGlyph(cell: Cell, tone: Int, size: androidx.compose.ui.unit.Dp) 
 
 @Composable
 private fun PackCover(p: StickerPack) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val first = p.stickers.firstOrNull()
     val density = LocalDensity.current.density
@@ -594,6 +596,7 @@ private fun StickerTab(serverId: String?, pick: (Sticker) -> Unit) {
 
 @Composable
 private fun StickerTile(s: Sticker, onClick: () -> Unit) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val shape = Radii.Md
     val density = LocalDensity.current.density

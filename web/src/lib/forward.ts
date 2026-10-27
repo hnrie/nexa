@@ -42,10 +42,10 @@ export function forwardTargets(withFiles: boolean): Channel[] {
  * message), so nothing is uploaded again and nobody's monthly allowance is
  * spent. A forward pings nobody.
  */
-export async function forwardMessage(msg: DecryptedMessage, to: string): Promise<void> {
+export async function forwardMessage(msg: DecryptedMessage, to: string, comment = ""): Promise<void> {
   const p = msg.payload ?? {};
   const attachments = (p.att ?? []).map((meta) => ({ meta, blob_id: meta.blob_id, size: meta.size }));
-  const forward = { channelId: msg.channel_id, messageId: msg.id, at: p.fwd?.at ?? idTime(msg.id) };
+  const forward = { channelId: msg.channel_id, messageId: msg.id, at: p.fwd?.at ?? idTime(msg.id), comment: comment.trim() };
   await sendMessage(to, p.t ?? "", {
     forward,
     ping: false,

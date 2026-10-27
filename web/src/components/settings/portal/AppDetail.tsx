@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { ChevronLeft, ImagePlus, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apps as appsApi, type AppCommand, type AppPatch, type IntegrationTypes, type OwnedApp } from "@/api/apps";
@@ -203,6 +204,7 @@ function PicturePick({ shown, round, onPick, onRemove, canRemove, label }: { sho
 }
 
 function GeneralTab({ app, draft, setApp, onDeleted }: TabProps & { onDeleted: () => void }) {
+  useMediaAnimation();
   const [deleting, setDeleting] = useState(false);
   const [tag, setTag] = useState("");
   const v = draft.app;
@@ -319,6 +321,7 @@ function GeneralTab({ app, draft, setApp, onDeleted }: TabProps & { onDeleted: (
 }
 
 function BotTab({ app, draft, setApp, setBot }: TabProps & { setBot: (patch: Draft["bot"]) => void }) {
+  useMediaAnimation();
   const [resetting, setResetting] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const v = draft.app;

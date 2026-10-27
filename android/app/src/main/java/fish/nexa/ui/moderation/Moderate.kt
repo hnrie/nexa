@@ -560,6 +560,7 @@ fun AvatarStack(users: List<ModUser>, size: androidx.compose.ui.unit.Dp = 32.dp)
 /** `.bannerPreview`: a banner, small, beside its pick. */
 @Composable
 fun BannerChip(bannerId: String?, brush: androidx.compose.ui.graphics.Brush) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = LocalDensity.current.density
     Box(Modifier.size(72.dp, 32.dp).clip(RoundedCornerShape(6.dp)).background(brush)) {
         if (bannerId != null) AsyncImage(Media.bannerUrl(bannerId, 160, density), null, imageLoader = Media.loader, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())

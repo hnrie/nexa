@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { touchFirst } from "@/lib/touch";
 import { Pencil, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
@@ -28,6 +29,7 @@ function slug(name: string): string {
 
 /** Server settings → Emoji: upload static or animated emoji, no cap, usable by anyone anywhere. */
 export default function EmojiPage({ serverId }: { serverId: string }) {
+  useMediaAnimation();
   const server = useServers((x) => x.byId[serverId]);
   const emojis = useExpressions((x) => x.emojis[serverId]) ?? NO_EMOJI;
   const setEmojis = useExpressions((x) => x.setEmojis);

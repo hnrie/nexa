@@ -113,7 +113,7 @@ private fun TgsView(url: String, alt: String, size: Dp, modifier: Modifier) {
     Box(modifier.size(size).semantics { contentDescription = alt }) {
         if (text != null) {
             val composition by rememberLottieComposition(LottieCompositionSpec.JsonString(text))
-            LottieAnimation(composition, iterations = LottieConstants.IterateForever, modifier = Modifier.fillMaxSize())
+            LottieAnimation(composition, isPlaying = fish.nexa.ui.shell.settingOn("animateStickers"), iterations = LottieConstants.IterateForever, modifier = Modifier.fillMaxSize())
         }
     }
 }
@@ -127,14 +127,15 @@ private fun WebmView(url: String, alt: String, size: Dp, modifier: Modifier) {
     val box = with(LocalDensity.current) { size.roundToPx() }
     var frame by remember(url) { mutableStateOf<Bitmap?>(null) }
     var plain by remember(url) { mutableStateOf(false) }
-    LaunchedEffect(url, box) {
+    val animate = fish.nexa.ui.shell.settingOn("animateStickers")
+    LaunchedEffect(url, box, animate) {
         val clip = Webm.load(url)
         if (clip == null) {
             plain = true
             return@LaunchedEffect
         }
         val (w, h) = Webm.fit(clip, box)
-        if (!Webm.play(clip, w, h, loop = true) { frame = it }) plain = true
+        if (!Webm.play(clip, w, h, loop = animate) { frame = it }) plain = true
     }
     if (plain) {
         PlainWebm(url, alt, size, modifier)
@@ -159,6 +160,7 @@ private fun WebmView(url: String, alt: String, size: Dp, modifier: Modifier) {
 @Composable
 private fun PlainWebm(url: String, alt: String, size: Dp, modifier: Modifier) {
     val context = LocalContext.current
+    val animate = fish.nexa.ui.shell.settingOn("animateStickers")
     val player = remember(url) {
         ExoPlayer.Builder(context).setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(Streams.factory())).build().apply {
             setMediaItem(MediaItem.fromUri(url))
@@ -168,6 +170,7 @@ private fun PlainWebm(url: String, alt: String, size: Dp, modifier: Modifier) {
             prepare()
         }
     }
+    LaunchedEffect(player, animate) { player.playWhenReady = animate; if (!animate) player.seekTo(0) }
     DisposableEffect(player) { onDispose { player.release() } }
     Box(modifier.size(size).semantics { contentDescription = alt }) {
         ContentFrame(player, Modifier.fillMaxSize(), surfaceType = SURFACE_TYPE_TEXTURE_VIEW, contentScale = ContentScale.Fit)
@@ -181,6 +184,7 @@ private fun PlainWebm(url: String, alt: String, size: Dp, modifier: Modifier) {
  */
 @Composable
 fun StickerView(sticker: StickerRef) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current.density
     val packs by Nexa.expressions.packs.collectAsState()

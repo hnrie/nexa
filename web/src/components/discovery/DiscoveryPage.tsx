@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Compass, Users, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -42,6 +43,7 @@ function useBand(card: Pick<DiscoveryCard, "id" | "icon_id" | "banner_id">): Rea
 }
 
 function ServerIcon({ card, className }: { card: DiscoveryCard; className: string | undefined }) {
+  useMediaAnimation();
   const icon = iconUrl(card.icon_id, 96);
   return (
     <div className={className} style={{ "--icon-bg": avatarColor(card.id) } as React.CSSProperties} aria-hidden="true">
@@ -82,6 +84,7 @@ export function ServerCard({ card, onOpen, onTag }: { card: DiscoveryCard; onOpe
 
 /** One server, opened from Discovery: everything its listing says, and the way in. */
 function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => void }) {
+  useMediaAnimation();
   const nav = useNavigate();
   const ctx = useRenderCtx();
   const band = useBand(card);

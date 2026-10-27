@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Plus, SmilePlus, Trash2, X } from "lucide-react";
 import { useRef, useState, type KeyboardEvent } from "react";
 import { emojiUrl } from "@/api/users";
@@ -50,6 +51,7 @@ export function pollFromForm(question: string, rows: { text: string; emoji?: Pol
  * the poll shows in the list at once and settles there.
  */
 export function CreatePollModal({ onClose, channelId }: { onClose: () => void; channelId: string }) {
+  useMediaAnimation();
   const serverId = useChannels((c) => c.byId[channelId]?.server_id ?? null);
   const [question, setQuestion] = useState("");
   const [rows, setRows] = useState<Row[]>([

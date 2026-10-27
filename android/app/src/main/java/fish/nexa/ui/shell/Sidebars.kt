@@ -96,6 +96,7 @@ fun UnreadEdge(modifier: Modifier = Modifier) {
 
 @Composable
 fun ServerSidebar(serverId: String, channelId: String?) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val servers by Nexa.servers.byId.collectAsState()
     val channels by Nexa.channels.byId.collectAsState()
@@ -212,6 +213,7 @@ private fun categoryMenu(serverId: String, cat: Channel, collapsed: Boolean): Li
 /** ChannelGlyph.tsx: the channel's own icon (lucide, emoji or custom emoji), else # or the speaker; a lock on private text channels. */
 @Composable
 fun ChannelGlyph(ch: Channel, size: androidx.compose.ui.unit.Dp, tint: Color, modifier: Modifier = Modifier, cut: Color = Nx.colors.bgBase) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val g = ch.glyph
     val icon = g?.removePrefix("icon:")?.takeIf { g.startsWith("icon:") }?.let { CHANNEL_ICONS[it] ?: it }?.takeIf { Lucide.exists(it) }
     val emoji = g?.removePrefix("emoji:")?.takeIf { g.startsWith("emoji:") }

@@ -253,6 +253,10 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	h := w.Header()
 	h.Set("Content-Type", ct)
+	if ct == "image/svg+xml" {
+		// SVG is inert in image elements; direct navigation downloads it.
+		h.Set("Content-Disposition", `attachment; filename="preview.svg"`)
+	}
 	h.Set("Cache-Control", proxyCacheCtl)
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Content-Security-Policy", "default-src 'none'; sandbox")

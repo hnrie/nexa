@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { UserX } from "lucide-react";
 import { useEffect, type CSSProperties } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -36,6 +37,7 @@ export default function ProfilePage() {
 }
 
 function ProfileLinkPage({ username }: { username: string }) {
+  useMediaAnimation();
   const loc = useLocation();
   const nav = useNavigate();
   const status = useAuth((a) => a.status);

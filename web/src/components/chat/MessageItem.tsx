@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Check, CornerUpRight, Hash, Link2, Lock, MailOpen, Megaphone, MessageSquareText, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, ShieldAlert, SmilePlus, Trash2 } from "lucide-react";
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
@@ -467,51 +468,54 @@ function MessageContent({ msg, name, id, pending, upload }: { msg: DecryptedMess
     );
   }
   return (
-    <div id={id} className={[s.content, jumbo ? s.jumbo : ""].join(" ")} data-forwarded={msg.payload?.fwd ? "" : undefined}>
-      {msg.payload?.fwd ? (
-        // passed on from another message (lib/forward.ts), with when that one was sent
-        <span className={s.forwarded} data-testid="forwarded">
-          <CornerUpRight size={13} aria-hidden="true" />
-          {t("forward.forwarded")}
-          <time dateTime={new Date(msg.payload.fwd.at).toISOString()} title={formatFull(msg.payload.fwd.at)}>{formatShortDate(msg.payload.fwd.at)}</time>
-        </span>
-      ) : null}
-      {msg.decryptError === "no_key" ? (
-        <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.waitingForTheEncryptionKey")}</span>
-      ) : msg.decryptError === "invalid" ? (
-        <span className={s.waiting} data-testid="message-invalid"><ShieldAlert size={14} /> {t("chat.messageItem.breaksLimits")}</span>
-      ) : msg.decryptError === "bad" ? (
-        <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.thisMessageCouldNotBeDecrypted")}</span>
-      ) : (
-        <>
-          {text ? <Markdown source={text} ctx={ctx} jumbo={jumbo} /> : null}
-          {msg.edited_at ? <span className={s.edited} title={formatFull(msg.edited_at)}>{t("chat.messageItem.edited")}</span> : null}
-        </>
-      )}
-      {msg.payload?.sticker ? stickerOutside ? <span className={s.edited}>{msg.payload.sticker.name ? `:${msg.payload.sticker.name}:` : t("chat.messageItem.sticker")}</span> : <StickerView sticker={msg.payload.sticker} /> : null}
-      {msg.payload?.poll && !hook ? <PersonPoll msg={msg} poll={msg.payload.poll} pending={!!pending} /> : null}
-      {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} from={name} /> : null}
-      {embeds ? <Embeds list={embeds} onRemove={!pending && canRemoveEmbeds(msg) ? (ev) => confirmRemoveEmbeds(msg, ev.shiftKey) : undefined} /> : null}
-      {hook?.application_id ? (
-        // an app's buttons and menus do something, once it is really sent and known to the server
-        <AppMsgProvider msg={msg} interactive={!pending && !msg.local}>
+    <div id={id}>
+      {msg.payload?.fwd?.comment ? <Markdown source={msg.payload.fwd.comment} ctx={ctx} /> : null}
+      <div className={[s.content, jumbo ? s.jumbo : ""].join(" ")} data-forwarded={msg.payload?.fwd ? "" : undefined}>
+        {msg.payload?.fwd ? (
+          // passed on from another message (lib/forward.ts), with when that one was sent
+          <span className={s.forwarded} data-testid="forwarded">
+            <CornerUpRight size={13} aria-hidden="true" />
+            {t("forward.forwarded")}
+            <time dateTime={new Date(msg.payload.fwd.at).toISOString()} title={formatFull(msg.payload.fwd.at)}>{formatShortDate(msg.payload.fwd.at)}</time>
+          </span>
+        ) : null}
+        {msg.decryptError === "no_key" ? (
+          <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.waitingForTheEncryptionKey")}</span>
+        ) : msg.decryptError === "invalid" ? (
+          <span className={s.waiting} data-testid="message-invalid"><ShieldAlert size={14} /> {t("chat.messageItem.breaksLimits")}</span>
+        ) : msg.decryptError === "bad" ? (
+          <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.thisMessageCouldNotBeDecrypted")}</span>
+        ) : (
+          <>
+            {text ? <Markdown source={text} ctx={ctx} jumbo={jumbo} /> : null}
+            {msg.edited_at ? <span className={s.edited} title={formatFull(msg.edited_at)}>{t("chat.messageItem.edited")}</span> : null}
+          </>
+        )}
+        {msg.payload?.sticker ? stickerOutside ? <span className={s.edited}>{msg.payload.sticker.name ? `:${msg.payload.sticker.name}:` : t("chat.messageItem.sticker")}</span> : <StickerView sticker={msg.payload.sticker} /> : null}
+        {msg.payload?.poll && !hook ? <PersonPoll msg={msg} poll={msg.payload.poll} pending={!!pending} /> : null}
+        {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} from={name} /> : null}
+        {embeds ? <Embeds list={embeds} onRemove={!pending && canRemoveEmbeds(msg) ? (ev) => confirmRemoveEmbeds(msg, ev.shiftKey) : undefined} /> : null}
+        {hook?.application_id ? (
+          // an app's buttons and menus do something, once it is really sent and known to the server
+          <AppMsgProvider msg={msg} interactive={!pending && !msg.local}>
+            <HookBody msg={msg} from={name} />
+          </AppMsgProvider>
+        ) : hook ? (
           <HookBody msg={msg} from={name} />
-        </AppMsgProvider>
-      ) : hook ? (
-        <HookBody msg={msg} from={name} />
-      ) : null}
-      {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <InviteCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
-      {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <ProfileCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
-      {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <AppLinkCards nodes={nodes} />}
-      {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <NoteCards nodes={nodes} />}
-      {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <PackCards nodes={nodes} />}
-      {pending === "failed" ? (
-        <div className={s.failedRow}>
-          <span>{t("chat.messageItem.messageFailedToSend")}</span>
-          <button className={s.retry} onClick={() => void retryPending(msg.channel_id, msg.id)} data-testid="retry-send"><RotateCw size={13} /> {t("chat.messageItem.retry")}</button>
-          <button className={s.retry} data-danger="true" onClick={() => discardPending(msg.channel_id, msg.id)}>{t("chat.messageItem.delete")}</button>
-        </div>
-      ) : null}
+        ) : null}
+        {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <InviteCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
+        {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <ProfileCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
+        {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <AppLinkCards nodes={nodes} />}
+        {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <NoteCards nodes={nodes} />}
+        {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <PackCards nodes={nodes} />}
+        {pending === "failed" ? (
+          <div className={s.failedRow}>
+            <span>{t("chat.messageItem.messageFailedToSend")}</span>
+            <button className={s.retry} onClick={() => void retryPending(msg.channel_id, msg.id)} data-testid="retry-send"><RotateCw size={13} /> {t("chat.messageItem.retry")}</button>
+            <button className={s.retry} data-danger="true" onClick={() => discardPending(msg.channel_id, msg.id)}>{t("chat.messageItem.delete")}</button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -597,6 +601,7 @@ function PersonPoll({ msg, poll, pending }: { msg: DecryptedMessage; poll: NonNu
 
 /** A sticker in a message: 160 px, keeps its aspect; a click shows its name and, for a public pack, the pack. */
 function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker"]> }) {
+  useMediaAnimation();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const close = useCallback(() => setAnchor(null), []);
   // New messages carry the format; older ones are looked up in the packs on

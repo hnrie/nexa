@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { emojiUrl } from "@/api/users";
 import { Twemoji } from "@/components/common/Twemoji";
 
@@ -15,6 +16,7 @@ export function statusEmojiText(emoji: string): string {
 
 /** A status's emoji: a standard one drawn as Twemoji, a server's or a pack's own as its picture. */
 export function StatusEmoji({ emoji, className, title }: { emoji: string; className?: string; title?: string }) {
+  useMediaAnimation();
   const custom = statusCustomEmoji(emoji);
   if (custom) {
     const name = `:${custom.name}:`;

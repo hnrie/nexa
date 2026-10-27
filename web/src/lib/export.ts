@@ -192,7 +192,7 @@ export async function allMessages(channelId: string, onProgress: (n: number) => 
         created_at: new Date(m.created_at).toISOString(),
         edited_at: m.edited_at ? new Date(m.edited_at).toISOString() : null,
         reply_to_id: m.reply_to_id,
-        text: d.payload?.t ?? null,
+        text: [d.payload?.fwd?.comment, d.payload?.t].filter(Boolean).join("\n") || null,
         attachments: d.payload?.att?.map((a) => ({ name: a.name, type: a.type, size: a.size })) ?? [],
         sticker: d.payload?.sticker ?? null,
         embeds: d.payload?.embeds ?? [],

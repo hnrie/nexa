@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { ChevronRight, Copy, CornerUpLeft, Info, Lightbulb, MessageSquareWarning, OctagonAlert, TriangleAlert, type LucideIcon } from "lucide-react";
 import { createContext, Fragment, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from "react";
@@ -118,6 +119,7 @@ function nodeKey(node: Node, n: number): string {
 
 /** Renders an already parsed list of nodes. */
 export function RenderNodes(props: { nodes: Node[]; ctx: RenderCtx; jumbo?: boolean }): JSX.Element {
+  useMediaAnimation();
   const { nodes, ctx, jumbo } = props;
   return (
     <>

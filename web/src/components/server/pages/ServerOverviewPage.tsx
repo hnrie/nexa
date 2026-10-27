@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useRef, useState } from "react";
 import { servers as serversApi } from "@/api/servers";
 import { describeError } from "@/lib/errors";
@@ -18,6 +19,7 @@ import s from "../ServerSettings.module.css";
 import { t } from "@/i18n";
 import { isolate } from "../bidi";
 export default function ServerOverviewPage({ serverId }: { serverId: string }) {
+  useMediaAnimation();
   const server = useServers((x) => x.byId[serverId]?.server);
   const updateServer = useServers((x) => x.updateServer);
   const channels = useChannels((c) => c.byId);

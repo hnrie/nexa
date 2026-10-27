@@ -47,11 +47,11 @@ const (
 const MaxMediaBytes = 25 << 20
 
 // ProxyImageTypes are the image types the media proxy passes through. An image
-// link of any other type (SVG, HEIC, TIFF) would only show as a broken picture,
+// link of any other type (HEIC, TIFF) would only show as a broken picture,
 // so it gets no image preview.
 var ProxyImageTypes = map[string]bool{
 	"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true,
-	"image/avif": true, "image/bmp": true, "image/x-icon": true, "image/vnd.microsoft.icon": true,
+	"image/svg+xml": true, "image/avif": true, "image/bmp": true, "image/x-icon": true, "image/vnd.microsoft.icon": true,
 }
 
 // Result is a link preview.

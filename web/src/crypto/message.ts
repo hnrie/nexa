@@ -104,7 +104,7 @@ export interface MessagePayload {
   flags?: number;
   poll?: PollPayload;
   /** Forwarded from another message (lib/forward.ts): when that one was sent (Unix ms). Its files are the original's own. */
-  fwd?: { at: number };
+  fwd?: { at: number; comment?: string };
 }
 
 export function aadBytes(a: Aad): Uint8Array {
@@ -408,6 +408,7 @@ const runes = (v: string) => Array.from(v).length;
 /** The first limit a payload breaks, or null when it keeps to them all. */
 export function brokenLimit(p: Obj): string | null {
   const L = MESSAGE_LIMITS;
+  if (isObj(p["fwd"]) && "comment" in p["fwd"] && (typeof p["fwd"]["comment"] !== "string" || typedLength(p["fwd"]["comment"]) > L.text)) return "text";
   if ("t" in p && (typeof p["t"] !== "string" || typedLength(p["t"]) > L.text)) return "text";
   if ("att" in p) {
     const att = p["att"];
@@ -467,7 +468,7 @@ export function sanitizePayload(p: Obj): MessagePayload {
   const poll = sanitizePoll(p["poll"]);
   if (poll) out.poll = poll;
   const fwd = p["fwd"];
-  if (isObj(fwd) && isNum(fwd["at"])) out.fwd = { at: fwd["at"] };
+  if (isObj(fwd) && isNum(fwd["at"])) out.fwd = { at: fwd["at"], ...(typeof fwd["comment"] === "string" ? { comment: fwd["comment"] } : {}) };
   const hadContent = p["t"] !== undefined || p["att"] !== undefined || p["sticker"] !== undefined || p["embeds"] !== undefined || p["poll"] !== undefined;
   if (hadContent && out.t === undefined && !out.att && !out.sticker && !out.embeds && !out.poll) {
     throw new DecryptError("malformed message payload");

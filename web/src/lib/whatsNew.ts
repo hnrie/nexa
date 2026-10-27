@@ -26,6 +26,15 @@ export interface Release {
 /** Newest first. */
 export const RELEASES: Release[] = [
   {
+    id: "2026-10-27",
+    items: [
+      { icon: ScrollText, title: "whatsNew.r20261027.transcriptsTitle", body: "whatsNew.r20261027.transcriptsBody" },
+      { icon: CornerUpRight, title: "whatsNew.r20261027.forwardTitle", body: "whatsNew.r20261027.forwardBody" },
+      { icon: Mic, title: "whatsNew.r20261027.audioTitle", body: "whatsNew.r20261027.audioBody" },
+      { icon: ImagePlay, title: "whatsNew.r20261027.animationTitle", body: "whatsNew.r20261027.animationBody" },
+    ],
+  },
+  {
     id: "2026-10-26.7",
     items: [
       { icon: ShieldCheck, title: "whatsNew.r202610267.desktopSecurityTitle", body: "whatsNew.r202610267.desktopSecurityBody" },

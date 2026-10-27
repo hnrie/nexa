@@ -310,6 +310,7 @@ private fun ScopeTabs(scope: String, onScope: (String) -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MainDesigner(anchor: String?) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()

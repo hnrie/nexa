@@ -115,6 +115,7 @@ fun AccountPage(openPage: (String, String?) -> Unit) {
 /** The card at the top: banner, picture, names, and the two names' Edit buttons. */
 @Composable
 private fun AccountCard(me: MeUser, status: String, modifier: Modifier, editProfile: () -> Unit) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current
     SettingsCard(modifier) {

@@ -1,5 +1,6 @@
 package fish.nexa.ui.chat
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -198,15 +199,18 @@ private fun OwnName(text: String, own: NameStyle, style: TextStyle, modifier: Mo
             // the colour, a dark line round it and a shadow under it
             val line = lerp(Color(0xFF12060C), c1, 0.35f)
             Box(modifier) {
-                PlainName(text, style.copy(color = line, drawStyle = Stroke(width = em * 0.16f, join = StrokeJoin.Round), shadow = Shadow(line, Offset(em * 0.03f, em * 0.1f), 0f)), Modifier, maxLines)
+                PlainName(text, style.copy(color = line, drawStyle = Stroke(width = em * 0.08f, join = StrokeJoin.Round), shadow = Shadow(line, Offset(em * 0.03f, em * 0.1f), 0f)), Modifier, maxLines)
                 PlainName(text, style.copy(color = c1), Modifier, maxLines)
             }
         }
-        "pop" -> PlainName(
-            text,
-            style.copy(color = if (light) Color.White else lerp(Color.White, c1, 0.1f), shadow = Shadow(c1, Offset(em * 0.05f, em * 0.09f), 0f)),
-            modifier, maxLines,
-        )
+        "pop" -> {
+            val fill = if (light) Color.White else lerp(Color.White, c1, 0.1f)
+            Box(modifier) {
+                PlainName(text, style.copy(color = fill, shadow = Shadow(c1, Offset(em * 0.05f, em * 0.09f), 0f)), Modifier, maxLines)
+                // Match the web's dark edge so the white face stays legible on light themes.
+                if (light) PlainName(text, style.copy(color = fill, shadow = Shadow(lerp(Color.Black, c1, 0.7f), Offset.Zero, em * 0.04f)), Modifier, maxLines)
+            }
+        }
         "candy" -> {
             // hard stripes, leaning, like boiled sweets
             val band = em * 0.42f
@@ -323,6 +327,7 @@ private fun OwnName(text: String, own: NameStyle, style: TextStyle, modifier: Mo
 /** A role's picture beside a name, named for the role it stands for. */
 @Composable
 fun RoleIcon(icon: RoleIconInfo, size: Dp) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = LocalDensity.current.density
     Box(Modifier.size(size).semantics { contentDescription = icon.name }, contentAlignment = Alignment.Center) {
         when (icon) {

@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Activity, Cat, Clock, Flag, Leaf, Lightbulb, Pizza, Plane, Smile, Users } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Emoji, Sticker, StickerPack } from "@/api/types";
@@ -86,6 +87,7 @@ function unicodeSrc(text: string): string | undefined {
 }
 
 const CellButton = memo(function CellButton({ cell, tone, hover, onPick, pos }: { cell: Cell; tone: number; hover: HoverStore; onPick: (c: Cell) => void; pos: string }) {
+  useMediaAnimation();
   const enter = () => hover.set(cell);
   if (cell.kind === "unicode") {
     const text = withTone(cell.e, tone);
@@ -116,6 +118,7 @@ const CellButton = memo(function CellButton({ cell, tone, hover, onPick, pos }: 
 
 /** The strip under the grid naming whatever the pointer is on. */
 function Inspector({ hover, tone }: { hover: HoverStore; tone: number }) {
+  useMediaAnimation();
   const cell = useSyncExternalStore(hover.subscribe, hover.get, hover.get);
   if (!cell) return <div className={s.inspector}><span style={{ color: "var(--text-muted)" }}>{t("pickers.emojiPicker.pickAnEmoji")}</span></div>;
   if (cell.kind === "unicode") {
@@ -235,7 +238,8 @@ const NO_PACKS: Record<string, StickerPack> = {};
  * emoji packs: for something every member of that server sees, like a
  * channel's icon, where a picture from elsewhere would not be theirs to use.
  */
-export function EmojiPicker({ onPick, serverId, onlyServer = false }: { onPick: (e: EmojiPick) => void; serverId?: string | null | undefined; onlyServer?: boolean }) {
+export function EmojiPicker({ onPick, serverId, onlyServer = false, recentEmoji }: { onPick: (e: EmojiPick) => void; serverId?: string | null | undefined; onlyServer?: boolean; recentEmoji?: string[] }) {
+  useMediaAnimation();
   const [ready, setReady] = useState(emojiLoaded());
   const [loadFailed, setLoadFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -251,7 +255,8 @@ export function EmojiPicker({ onPick, serverId, onlyServer = false }: { onPick: 
   const allPacks = useExpressions((x) => x.packs);
   const packs = onlyServer ? NO_PACKS : allPacks;
   const tone = useSettings((st) => st.settings.skinTone);
-  const recent = useSettings((st) => st.settings.recentEmoji);
+  // Keep hit targets fixed until this picker is opened again, including Shift-clicks.
+  const [recent] = useState(() => (recentEmoji ?? useSettings.getState().settings.recentEmoji).slice());
   const patch = useSettings((st) => st.patch);
   const gridRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);

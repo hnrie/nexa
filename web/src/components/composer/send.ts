@@ -44,7 +44,7 @@ export interface SendOptions {
   /** Told the message as the server took it, once it is sent (the plugin API's messages.send). */
   onSent?: (message: DecryptedMessage) => void;
   /** Passes on another message (lib/forward.ts): its files go as they are, and nobody is pinged. */
-  forward?: { channelId: string; messageId: string; at: number };
+  forward?: { channelId: string; messageId: string; at: number; comment?: string };
 }
 
 /** The conversation whose keys encrypt a channel: the server tells us (itself for DMs and private channels, the server root otherwise). */
@@ -165,7 +165,7 @@ function written(channelId: string, rawText: string, opts: SendOptions): Written
   if (opts.poll) payload.poll = opts.poll;
   // someone else's words, passed on: they ping nobody
   if (opts.forward) {
-    payload.fwd = { at: opts.forward.at };
+    payload.fwd = { at: opts.forward.at, ...(opts.forward.comment ? { comment: opts.forward.comment } : {}) };
     return { payload, mentions: [], roles: [], everyone: false, raw: rawText };
   }
   return { payload, mentions, roles, everyone, raw: rawText };

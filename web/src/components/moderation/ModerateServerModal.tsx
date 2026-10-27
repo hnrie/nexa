@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Compass, X } from "lucide-react";
 import { useState } from "react";
 import { moderation as modApi, type ModServer, type Person, type ServerField, type StaffCase } from "@/api/moderation";
@@ -24,6 +25,7 @@ const FIELDS: ServerField[] = ["icon", "banner", "name", "description", "tag", "
  * they can answer in.
  */
 export function ModerateServerModal({ server, owner, preset, onClose, onDone }: { server: ModServer; owner: Person | undefined; preset?: ServerField[] | undefined; onClose: () => void; onDone: (c: StaffCase) => void }) {
+  useMediaAnimation();
   const toast = useUI((u) => u.toast);
   // Discover can only be taken from a server listed there and not hidden already
   const empty: Record<ServerField, boolean> = { icon: !server.icon_id, banner: !server.banner_id, name: false, description: !server.description, tag: !server.tag, discovery: !server.discoverable || !!server.discovery_hidden };

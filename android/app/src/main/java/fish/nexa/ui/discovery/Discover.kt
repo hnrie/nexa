@@ -1,5 +1,6 @@
 package fish.nexa.ui.discovery
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -347,6 +348,7 @@ private fun TagButton(tag: String, onClick: () -> Unit) {
 /** A server's colour where it has no banner: its own steady colour, deepened. */
 @Composable
 private fun Band(card: DiscoveryCard, modifier: Modifier) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = LocalDensity.current.density
     val tint = AvatarColor.of(card.id)
     Box(modifier.background(Brush.linearGradient(listOf(tint, mixOklab(tint, Color.Black, 0.45f))))) {
@@ -356,6 +358,7 @@ private fun Band(card: DiscoveryCard, modifier: Modifier) {
 
 @Composable
 private fun ServerIconTile(card: DiscoveryCard, size: androidx.compose.ui.unit.Dp, radius: androidx.compose.ui.unit.Dp, ring: Color) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = LocalDensity.current.density
     val shape = RoundedCornerShape(radius)
     Box(
@@ -435,6 +438,7 @@ private fun openServerSheet(card: DiscoveryCard) = fish.nexa.ui.dialogs.open("di
 
 @Composable
 private fun ServerSheet(layer: Layer, card: DiscoveryCard, close: () -> Unit) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current.density
     val detail by produceState<Detail?>(null, card.id) { value = runCatching { Nexa.api.get("/discovery/${card.id}", Detail.serializer()) }.getOrNull() }

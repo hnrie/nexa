@@ -105,6 +105,7 @@ private suspend fun fetchPack(id: String): StickerPack = Nexa.api.get("/stickers
 /** A sticker's or an emoji's picture, still (the server renders a moving one's first frame). */
 @Composable
 private fun ItemImage(s: Sticker, emoji: Boolean, size: Dp, modifier: Modifier = Modifier) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = LocalDensity.current.density
     val moving = s.animated || s.format == "tgs" || s.format == "webm"
     val url = if (emoji) Media.emojiUrl(s.blobId, size.value.toInt(), density, still = moving) else Media.stickerUrl(s.blobId, size.value.toInt(), density) + if (moving) "&still=1" else ""

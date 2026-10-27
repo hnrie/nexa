@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { emojiUrl } from "@/api/users";
@@ -18,6 +19,7 @@ export interface Choice {
 }
 
 export function ChoiceGlyph({ e, size = 18 }: { e: HookEmoji; size?: number }) {
+  useMediaAnimation();
   if (e.id) return <img className={s.glyph} style={{ width: size, height: size }} src={emojiUrl(e.id, !!e.animated, size)} alt={e.name ? `:${e.name}:` : ""} width={size} height={size} loading="lazy" draggable={false} />;
   return e.name ? <Twemoji text={e.name} className={s.glyph} /> : null;
 }

@@ -260,7 +260,7 @@ object Automod {
     /** The words of a message (with a poll's question and answers) and its files' names. */
     fun readable(p: MessagePayload?): Readable {
         if (p == null) return Readable("", emptyList())
-        val parts = arrayListOf(p.t ?: "")
+        val parts = arrayListOf(p.fwdComment ?: "", p.t ?: "")
         p.poll?.let { poll ->
             parts += poll.question
             for (a in poll.answers) parts += a.text

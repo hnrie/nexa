@@ -186,6 +186,7 @@ class ProfileLook(val theme: ProfileTheme.Theme?, val tint: Color?, val tokens: 
 
 @Composable
 fun rememberProfileLook(user: PublicUser): ProfileLook {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val theme = remember(user.accentColor, user.accentColor2) { ProfileTheme.of(user.accentColor, user.accentColor2) }
     val tint = ProfileTheme.rememberDominant(if (theme != null) null else Media.bannerUrl(user.bannerId, 64, 1f) ?: Media.avatarUrl(user.avatarId, 64, 1f))
@@ -232,6 +233,7 @@ private fun themedShadow(theme: ProfileTheme.Theme?): Shadow? = when (theme?.tex
 
 @Composable
 private fun Banner(user: PublicUser, theme: ProfileTheme.Theme?, css: Int, holeX: Dp, holeY: Dp, holeR: Dp, modifier: Modifier) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current.density
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl

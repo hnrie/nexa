@@ -450,8 +450,8 @@ describe("polls in the payload", () => {
 describe("a forwarded message in the payload", () => {
   it("keeps when the original was sent, and drops a mark that is not one", async () => {
     const att = [{ blob_id: "9", name: "a.png", type: "image/png", size: 10, key: b64.enc(randomBytes(32)) }];
-    const env = await encryptMessage(key, aad, { t: "hi", att, fwd: { at: 1761400000000 } });
-    expect(await decryptMessage(key, env, aad)).toEqual({ t: "hi", att, fwd: { at: 1761400000000 } });
+    const env = await encryptMessage(key, aad, { t: "hi", att, fwd: { at: 1761400000000, comment: "Here is the context" } });
+    expect(await decryptMessage(key, env, aad)).toEqual({ t: "hi", att, fwd: { at: 1761400000000, comment: "Here is the context" } });
     const odd = await encryptMessage(key, aad, { t: "hi", fwd: { at: "yesterday" } } as never);
     expect((await decryptMessage(key, odd, aad)).fwd).toBeUndefined();
   });

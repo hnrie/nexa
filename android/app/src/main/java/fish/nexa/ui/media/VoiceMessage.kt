@@ -9,6 +9,12 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import fish.nexa.data.Transcripts
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -78,9 +84,12 @@ internal fun voiceClock(ms: Long): String {
 @Composable
 fun VoiceAttachment(att: AttachmentMeta) {
     val load = rememberAttachmentLoad(att, true)
-    Box(Modifier.widthIn(max = 360.dp).fillMaxWidth().loadPriority(load, att.blobId)) {
+    Column(Modifier.widthIn(max = 360.dp).fillMaxWidth().loadPriority(load, att.blobId)) {
         if (load.error != null && load.file == null) LoadFailed(load.error!!, "audio") { load.retry() }
-        else VoiceMessage(load.file, att.duration, att.wave) { load.load() }
+        else {
+            VoiceMessage(load.file, att.duration, att.wave) { load.load() }
+            Transcript(load.file)
+        }
     }
 }
 
@@ -230,5 +239,33 @@ fun VoiceMessage(file: File?, durationHint: Double?, wave: String?, onLoad: () -
             }.padding(horizontal = 8.dp).semantics { contentDescription = t("chat.audioPlayer.playbackSpeed") },
             contentAlignment = Alignment.Center,
         ) { Txt("${if (speed == Math.floor(speed.toDouble()).toFloat()) speed.toInt().toString() else speed.toString()}×", style = Nx.type.hint.copy(fontWeight = FontWeight(700)), color = c.textSubtle) }
+    }
+}
+
+@Composable
+private fun Transcript(file: File?) {
+    val c = Nx.colors
+    val scope = rememberCoroutineScope()
+    var job by remember(file) { mutableStateOf<Job?>(null) }
+    var working by remember(file) { mutableStateOf(false) }
+    var text by remember(file) { mutableStateOf<String?>(null) }
+    var failed by remember(file) { mutableStateOf(false) }
+    DisposableEffect(file) { onDispose { job?.cancel() } }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+        fish.nexa.ui.components.NxButton(t(if (job != null) "voiceMessage.cancelTranscript" else "voiceMessage.transcribe"), {
+            if (job != null) { job?.cancel(); job = null }
+            else if (file != null) {
+                working = false; failed = false
+                job = scope.launch {
+                    try { text = Transcripts.transcribe(file) { working = true } }
+                    catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                    catch (_: Exception) { failed = true }
+                    finally { if (job == kotlinx.coroutines.currentCoroutineContext()[Job]) job = null }
+                }
+            }
+        }, kind = fish.nexa.ui.components.ButtonKind.GHOST, enabled = file != null)
+        Txt(t(if (job != null) (if (working) "voiceMessage.transcribing" else "voiceMessage.modelLoading") else "voiceMessage.localTranscript"), style = Nx.type.hint, color = c.textMuted)
+        if (failed) Txt(t("voiceMessage.transcriptFailed"), style = Nx.type.hint, color = c.textMuted)
+        text?.let { SelectionContainer { Txt(it.ifBlank { t("voiceMessage.noSpeech") }, style = Nx.type.body, color = c.text) } }
     }
 }

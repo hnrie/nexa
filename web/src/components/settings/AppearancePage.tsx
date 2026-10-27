@@ -1,3 +1,4 @@
+import { Toggle } from "@/components/common/Toggle";
 import { Check, Pipette } from "lucide-react";
 import { ColourInput } from "@/components/common/ColourInput";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -112,6 +113,8 @@ export default function AppearancePage() {
           <ColourInput value={accent ?? themeAccent} label={tr_("settings.appearance.custom")} onChange={(v) => patch({ accent: v })} />
         </label>
       </div>
+      <h3 className={s.h5}>{tr_("settings.appearance.animatedImages")}</h3>
+      {(["animateAvatars", "animateIcons", "animateBanners", "animateEmoji", "animateStickers"] as const).map((key) => <Toggle key={key} setting={key} checked={st[key]} onChange={(v) => patch({ [key]: v })} label={tr_(`settings.appearance.${key}`)} />)}
       <h3 className={s.h5} data-setting="font">{tr_("settings.appearance.font")}</h3>
       <div className={look.fonts} role="radiogroup" aria-label={tr_("settings.appearance.font")} data-testid="font-choice">
         {(["default", "classic"] as const).map((face) => (

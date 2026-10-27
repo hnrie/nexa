@@ -246,6 +246,7 @@ private sealed interface InviteState {
 /** The band across the top: the banner, or a strip in the colour of the icon (or of the place's initials). */
 @Composable
 private fun InviteBand(p: Invites.Preview?) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current.density
     val banner = p?.bannerId?.let { Media.bannerUrl(it, 440, density) }
@@ -276,6 +277,7 @@ private fun InviteTop(p: Invites.Preview?) {
 
 @Composable
 private fun InviteIcon(p: Invites.Preview?, modifier: Modifier) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current.density
     val url = p?.iconId?.let { Media.iconUrl(it, 80, density) }

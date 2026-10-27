@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Sparkles } from "lucide-react";
 import { useEffect, useState, type CSSProperties, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -105,6 +106,7 @@ function loadPreview(id: string, fresh = false): Promise<ServerTagPreview | null
  * join from its tag.
  */
 function ServerTagPopout({ serverId, tag, anchor, onClose }: { serverId: string; tag: Pick<WornTag, "text" | "badge" | "color">; anchor: HTMLElement; onClose: () => void }) {
+  useMediaAnimation();
   const nav = useNavigate();
   const toast = useUI((u) => u.toast);
   const me = useAuth((a) => a.me);

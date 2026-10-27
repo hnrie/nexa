@@ -216,6 +216,7 @@ private fun InviteCard(link: AppLink.Invite, sealedEmbed: Unfurl?) {
  */
 @Composable
 fun InviteCardView(target: InviteTarget, lead: (@Composable () -> Unit)?, action: (@Composable () -> Unit)?, inPopout: Boolean = false, extra: (@Composable () -> Unit)? = null) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current.density
     val surface = if (inPopout) c.bgFloating else c.embedBg
@@ -399,6 +400,7 @@ private fun ProfileLinkCard(username: String) {
  */
 @Composable
 private fun ProfileLinkCardView(user: PublicUser) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current.density
     val shape = Radii.Lg
@@ -531,6 +533,7 @@ private const val PACK_SHOWN = 8
 /** One of a pack's stickers or emoji, still: the card is a preview, not a place for them to play. */
 @Composable
 private fun PackItem(s: Sticker, emoji: Boolean, size: Dp, modifier: Modifier = Modifier) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = LocalDensity.current.density
     val moving = s.animated || s.format == "tgs" || s.format == "webm"
     val url = if (emoji) Media.emojiUrl(s.blobId, size.value.toInt(), density, still = moving) else Media.stickerUrl(s.blobId, size.value.toInt(), density) + if (moving) "&still=1" else ""

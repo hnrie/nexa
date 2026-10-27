@@ -96,7 +96,7 @@ function preview(e: unknown): LinkPreview | null {
 export function toDoc(m: DecryptedMessage): SearchDoc | null {
   if (m.type.startsWith("system_") || !m.payload) return null;
   const p = m.payload;
-  const doc: SearchDoc = { id: m.id, c: m.channel_id, a: m.author_id, ts: m.created_at, ed: m.edited_at ?? null, t: p.t ?? "", fl: m.flags ?? 0 };
+  const doc: SearchDoc = { id: m.id, c: m.channel_id, a: m.author_id, ts: m.created_at, ed: m.edited_at ?? null, t: [p.fwd?.comment, p.t].filter(Boolean).join("\n"), fl: m.flags ?? 0 };
   if (m.mentions?.length) doc.mn = [...m.mentions];
   if (m.mention_everyone) doc.ev = true;
   if (p.att?.length) doc.att = p.att.map((a) => ({ ...a }));

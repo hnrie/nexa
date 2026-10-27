@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Avatar } from "@/components/common/Avatar";
@@ -29,6 +30,7 @@ export function ReactorsPopover({ anchor, emoji, custom, label, count, ids, onCl
   ids: string[] | null;
   onClose: () => void;
 }) {
+  useMediaAnimation();
   const users = useUsers((u) => u.byId);
   const ref = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);

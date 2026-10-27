@@ -1,3 +1,5 @@
+import { withOwn } from "@/lib/useMemberLook";
+import { nameClass, nameStyle } from "@/lib/roleLook";
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Channel, GroupAddNotice } from "@/api/types";
@@ -883,10 +885,11 @@ export function MessageList({ channel }: { channel: Channel }) {
     if (channel.type === "dm") {
       const other = channel.recipient_ids.find((id) => id !== me?.id) ?? "";
       const u = users[other];
+      const look = withOwn(undefined, u?.name_style);
       return (
         <div className={s.empty}>
           <div className={s.emptyAvatar}><Avatar id={other} avatarId={u?.avatar_id ?? null} name={name} size={80} /></div>
-          <h2 className={s.emptyName}>{name}</h2>
+          <h2 className={[s.emptyName, nameClass(look)].join(" ")} style={nameStyle(look)}>{name}</h2>
           <div className={s.emptyUser}>{u?.username ?? ""}</div>
           <p className={s.emptyText}><Tr id="chat.messageList.dmStart" values={{ name: <b>{name}</b> }} /></p>
         </div>

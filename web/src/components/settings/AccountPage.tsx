@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useState } from "react";
 import { ApiError } from "@/api/client";
 import { bannerUrl, users as usersApi } from "@/api/users";
@@ -18,6 +19,7 @@ type Dialog = null | "username" | "displayName" | "password" | "recovery" | "del
 
 /** `onEditProfile` opens the Profiles page beside it, in the same settings. */
 export default function AccountPage({ onEditProfile }: { onEditProfile: () => void }) {
+  useMediaAnimation();
   const me = useAuth((a) => a.me);
   // the status the account actually shows, Do Not Disturb or Invisible included
   const myStatus = usePresence((p) => statusOf(me ? p.byUser[me.id] : undefined));

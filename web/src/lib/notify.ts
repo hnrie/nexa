@@ -134,7 +134,7 @@ function previewOf(m: Message, decrypted?: DecryptedMessage): string {
   const stored = decrypted ?? useMessages.getState().channels[m.channel_id]?.byId[m.id];
   const p = stored?.payload;
   if (!p) return stored?.decryptError ? t("chat.messageItem.encryptedMessage") : t("notify.newMessage");
-  if (p.t) return plainText(parse(p.t)).slice(0, 140);
+  if (p.fwd?.comment || p.t) return plainText(parse([p.fwd?.comment, p.t].filter(Boolean).join("\n"))).slice(0, 140);
   // a poll says it in its question and answers
   if (p.poll) return pollWords(p.poll).slice(0, 140);
   // a webhook's message often says it all in its embeds

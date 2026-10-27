@@ -151,6 +151,7 @@ internal fun IconPicker(currentUrl: String?, picked: Uri?, onPick: (Uri) -> Unit
 
 @Composable
 internal fun EditGroupSheet(layer: Layer, channelId: String, close: () -> Unit) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val channels by Nexa.channels.byId.collectAsState()
     val ch = channels[channelId]?.takeIf { it.type == "group_dm" } ?: return
     val density = LocalDensity.current.density

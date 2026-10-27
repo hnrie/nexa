@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { ExternalLink } from "lucide-react";
 import { useContext, useMemo, useState } from "react";
 import { emojiUrl } from "@/api/users";
@@ -127,6 +128,7 @@ function Container({ c, hook, from }: { c: HookComponent; hook: HookContent; fro
 }
 
 function EmojiGlyph({ e, size = 18 }: { e: HookEmoji; size?: number }) {
+  useMediaAnimation();
   if (e.id) return <img className={s.buttonEmoji} src={emojiUrl(e.id, !!e.animated, size)} alt={e.name ? `:${e.name}:` : ""} width={size} height={size} loading="lazy" draggable={false} />;
   return e.name ? <Twemoji text={e.name} className={s.buttonEmoji} /> : null;
 }

@@ -245,6 +245,7 @@ fun TypingEmoji(style: TypingStyle, size: Dp, big: Boolean) {
 
 @Composable
 private fun TypingGlyph(token: String, size: Dp) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = LocalDensity.current.density
     val image = TypingStyle.image(token)
     val custom = TypingStyle.custom(token)

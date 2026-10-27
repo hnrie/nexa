@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { ChevronDown, ChevronRight, Plus, Settings, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -45,6 +46,7 @@ export function menuPoint(e: MouseEvent): { x: number; y: number } {
 }
 
 export function ServerSidebar({ serverId }: { serverId: string }) {
+  useMediaAnimation();
   const nav = useNavigate();
   const loc = useLocation();
   const st = useServers((x) => x.byId[serverId]);

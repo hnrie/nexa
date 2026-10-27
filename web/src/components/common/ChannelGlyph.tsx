@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Hash, Lock, Megaphone, MessageSquareText, MessagesSquare, Volume2 } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import type { Channel } from "@/api/types";
@@ -25,6 +26,7 @@ interface Props {
  * Always decoration: the name beside it says which channel it is.
  */
 export function ChannelGlyph({ channel, size, locked = false, className }: Props) {
+  useMediaAnimation();
   const g = parseGlyph(channel.glyph);
   // only the channel's own server's emoji; one that has been deleted falls back to the default
   const custom = useExpressions((x) => (g?.kind === "custom" && channel.server_id ? x.emojis[channel.server_id]?.find((e) => e.id === g.id) : undefined));

@@ -657,10 +657,10 @@ private fun ConversationRow(ch: Channel, selected: Boolean, parentSelected: Bool
             ConversationAvatar(ch, 32.dp, status = other?.let { Nexa.presence.statusOf(it) }, showTyping = true)
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Txt(
-                        name,
+                    fish.nexa.ui.chat.RoleName(
+                        name, fish.nexa.ui.chat.RoleLooks.withOwn(null, other?.let { Nexa.users.byId.collectAsState().value[it]?.nameStyle }),
                         style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), fontWeight = FontWeight(550), lineHeight = Nx.type.sp(19.4f)),
-                        color = if (selected || unread || picked) c.textStrong else c.textChannel,
+                        fallback = if (selected || unread || picked) c.textStrong else c.textChannel,
                         maxLines = 1,
                         modifier = Modifier.weight(1f, fill = false),
                     )

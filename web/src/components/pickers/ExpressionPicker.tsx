@@ -1,3 +1,4 @@
+import { useSettings } from "@/stores/settings";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { attachSheetDrag, sheetsHere } from "@/lib/sheetDrag";
@@ -62,6 +63,7 @@ function openedOver(picker: HTMLElement, el: Element | null): boolean {
 export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, stickers, anchor = null, serverId, onlyServer, title }: Props) {
   // drawn in place over the message box, it tells the back gesture itself (a portalled one is seen anyway)
   useLayerPresence(!anchor);
+  const [recentEmoji] = useState(() => useSettings.getState().settings.recentEmoji.slice());
   const [active, setActive] = useState<PickerTab>(tab === "gif" && !gifs ? "emoji" : tab === "sticker" && !stickers ? "emoji" : tab);
   const ref = useRef<HTMLDivElement>(null);
   // Where focus came from. Escape used to drop it on `<body>` — and on touch
@@ -168,7 +170,7 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
         <button className={s.close} aria-label={t("pickers.expressionPicker.closePicker")} onClick={onClose}><X size={18} /></button>
       </div>
       )}
-      {active === "emoji" ? <EmojiPicker onPick={onEmoji} serverId={serverId} onlyServer={onlyServer} /> : active === "gif" ? gifs : stickers}
+      {active === "emoji" ? <EmojiPicker recentEmoji={recentEmoji} onPick={onEmoji} serverId={serverId} onlyServer={onlyServer} /> : active === "gif" ? gifs : stickers}
     </div>
   );
   return anchor ? createPortal(body, document.body) : body;

@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { copyBotIdItem } from "@/lib/copyId";
 import { Ban, CalendarDays, Check, Clock, Ellipsis, FolderOpen, Gavel, ListChecks, MessageSquareOff, Search, UserRoundCheck, UserRoundX, Users, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
@@ -421,6 +422,7 @@ interface UserCardProps {
 }
 
 function UserCard({ u, owner, onModerate, onCases, onProfile, onMenu, onAlts, picking, picked, onPick }: UserCardProps) {
+  useMediaAnimation();
   const live = usePresence((p) => p.byUser[u.id]);
   const st = modStatus(u, live);
   const banner = bannerUrl(u.banner_id, 320);

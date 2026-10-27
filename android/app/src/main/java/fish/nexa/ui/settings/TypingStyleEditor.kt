@@ -1,5 +1,6 @@
 package fish.nexa.ui.settings
 
+import androidx.compose.runtime.collectAsState
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -108,6 +109,7 @@ internal fun GroupLabel(text: String) {
 /** An emoji, a server's or pack's emoji, or a picture of one's own, as a typing style slot holds it. */
 @Composable
 private fun SlotGlyph(token: String) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val density = androidx.compose.ui.platform.LocalDensity.current.density
     val image = TypingStyle.image(token)
     val custom = TypingStyle.custom(token)

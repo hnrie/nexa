@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { SmilePlus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { messages as messagesApi } from "@/api/messages";
@@ -81,6 +82,7 @@ interface Props {
 }
 
 export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Props) {
+  useMediaAnimation();
   const users = useUsers((u) => u.byId);
   // reacting with another server's emoji takes Use External Emoji, as the server holds it
   const reactServer = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);

@@ -38,6 +38,8 @@ interface ViewProps {
 }
 
 export function StickerView({ format, src, alt, className, style, eager, draggable, play = true, renderer = "svg", onReady }: ViewProps) {
+  const animate = useSettings((s) => s.settings.animateStickers);
+  play = play && animate;
   if (format === "tgs") return <TgsView src={src} alt={alt} className={className} style={style} play={play} renderer={renderer} onReady={onReady} />;
   if (format === "webm") return <WebmView src={src} alt={alt} className={className} style={style} play={play} onReady={onReady} />;
   return <img data-sticker-media className={className} style={style} src={src} alt={alt} loading={eager ? "eager" : "lazy"} decoding="async" draggable={draggable} onLoad={onReady} />;

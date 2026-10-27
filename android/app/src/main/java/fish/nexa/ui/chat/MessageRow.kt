@@ -237,6 +237,7 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                 if (command != null && cm != null) fish.nexa.ui.apps.InteractionLine(cm, command, ctx)
                 else if (reply != null) ReplyLine(ctx, reply, cm?.m)
                 if (showHead) MessageHeader(item, ctx)
+                (cm?.payload ?: p?.payload)?.fwdComment?.let { fish.nexa.ui.markdown.MarkdownView(it, fish.nexa.ui.markdown.RenderCtx(serverId = ctx.server?.server?.id, surface = c.bgRaised)) }
                 val fwdAt = (cm?.payload ?: p?.payload)?.fwdAt
                 if (fwdAt != null) Forwarded(fwdAt) { MessageBody(item, ctx, failed) }
                 else MessageBody(item, ctx, failed)

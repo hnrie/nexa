@@ -204,6 +204,7 @@ fun Modifier.modCard(c: NexaColors, state: String? = null): Modifier {
 /** `.cardBanner`: a banner picture, or the colours standing in for one, dimming towards the card. */
 @Composable
 fun CardBanner(bannerId: String?, brush: Brush, height: Dp, modifier: Modifier = Modifier, highlight: Boolean = false) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current.density
     Box(modifier.fillMaxWidth().height(height).background(brush)) {

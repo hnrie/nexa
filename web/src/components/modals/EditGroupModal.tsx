@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useState } from "react";
 import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
@@ -18,6 +19,7 @@ import s from "./ServerModals.module.css";
 import { t } from "@/i18n";
 /** A group's name and icon. Anyone in it can rename it; its owner sets the icon. */
 export function EditGroupModal({ channelId, onClose }: { channelId: string; onClose: () => void }) {
+  useMediaAnimation();
   const ch = useChannels((c) => c.byId[channelId]);
   const users = useUsers((u) => u.byId);
   const meId = useAuth((a) => a.me?.id);

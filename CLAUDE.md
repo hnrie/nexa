@@ -511,6 +511,9 @@ person's default or reply message, Read Message History, unlocked), lets the new
 the source's files without owning them, so nothing is uploaded again and no allowance is spent,
 clears its mentions, sets flag 1 << 14 and limits forwards on their own (`limForward`). The
 payload's `fwd.at` is when the original was sent, drawn as Forwarded with a bar down its side.
+The forwarding sheet accepts an optional message, kept as `fwd.comment` inside the same encrypted
+payload and drawn above the forwarded block. Both clients enforce the ordinary 4000-character
+text limit on the comment and include it in search, copying, notifications and AutoMod checks.
 
 ### Voice messages
 
@@ -525,8 +528,24 @@ throws it away. At most ten minutes, under half a second is dropped. The web rec
 MediaRecorder from the microphone chosen in Voice & Video, AAC in MP4 where the browser makes it,
 else Opus in WebM or Ogg (`lib/voiceMessage.ts`, `composer/VoiceRecordBar.tsx`,
 `chat/VoiceMessage.tsx`, `Staged.voice` in `lib/attachments.ts`); Android records AAC in MP4 with
-MediaRecorder (`data/VoiceMessages`, `ui/chat/VoiceRecordBar.kt`, `ui/media/VoiceMessage.kt`,
+AudioRecord and MediaCodec (`data/VoiceMessages`, `ui/chat/VoiceRecordBar.kt`, `ui/media/VoiceMessage.kt`,
 `Staged.voice` in `data/Send.kt`).
+Recordings use 48 kHz mono and 128 kbit/s. The web's `voice/recordingInput.ts` applies the call's
+neural filter, a high-pass filter, peak compression and headroom, with capture AGC off and no input
+volume boost. Android uses AudioRecord with VOICE_RECOGNITION, optional platform echo cancellation,
+no AGC, a separate RNNoise state and peak control (`data/RecordingDsp`, `cpp/denoise_jni.cc`), then
+MediaCodec AAC and MediaMuxer. It never shares filter state with a call.
+
+Transcribe below a recording runs Whisper Tiny multilingual locally. The web and desktop use
+`lib/transcribe.ts` and a disposable `transcribe.worker.ts`, Transformers.js 4.3.1, quantized ONNX
+weights and a bundled single-threaded WASM runtime, without needing cross-origin isolation. A
+separate first-window language-token pass avoids the library's English default. Native Android
+uses `data/Transcripts`, MediaCodec decoding and whisper.cpp 1.9.5 through `cpp/whisper_jni.cc`.
+CMake pins its source archive by SHA-256. Its 77.7 MB Tiny weights download on first use into
+noBackupFilesDir and are verified by size and SHA-256 before an atomic rename. Browser weights
+use the library's model cache. Both paths show loading, working, failure and no-speech states,
+support cancellation and release inference resources. Audio and transcript stay on the device;
+transcripts are held only in the open message component's memory.
 
 ### Gateway (`internal/gateway`, `web/src/gateway`)
 
@@ -661,6 +680,10 @@ How each permission is held, as Discord holds it:
   uploaded; `?still=1` asks for the first frame. Sized avatar, banner and icon addresses carry
   `&v=2` (web `api/users.ts`, Android `Media.kt`) so caches drop the stills that large GIFs used to be. The kind in the address must match the stored one, and a picture the staff blocked
   is served to nobody.
+  Appearance has independent synced `animateAvatars`, `animateIcons` (servers, channels and groups),
+  `animateBanners`, `animateEmoji` and `animateStickers` settings, all on by default. Public URL
+  helpers request `?still=1` for disabled categories; the renderers subscribe to the preferences.
+  Lottie and WebM stickers pause locally too. These settings are independent of Reduce Motion.
 - Attachments are opaque encrypted blobs, served only to people in the conversation
   (`/media/attachments/{id}`). Files of bug reports and case threads are private to their people
   and the staff. Webhook files are plain.
@@ -700,6 +723,17 @@ The public-address guard also checks embedded IPv4 addresses in standard NAT64 a
 addresses, and refuses local-use translation, Teredo and IPv4-compatible ranges.
 
 ### Calls
+
+Enhanced noise suppression uses Xiph RNNoise commit
+`70f1d256acd4b34a572f999a05c87bf00b67730d` on web and Android, with the same newer model.
+The web loads `@shiguredo/rnnoise-wasm` 2025.1.5 in `voice/denoise.worklet.ts`; native CMake fetches
+both source and weights under verified SHA-256 hashes. The probability gate uses hysteresis,
+20 ms of look-behind, a 200 ms speech tail and smooth gain changes to suppress residual noise
+without cutting consonant onsets (`voice/speechGate.ts`, native `SpeechGate`). Failed worklet
+initialization falls back to browser suppression. Echo cancellation stays before neural filtering;
+Android selects WebRTC software AEC3 rather than the vendor hardware effect and keeps the
+existing per-track echo toggle. Noise suppression and echo cancellation remain independently
+controllable. Physical acoustic results still depend on the microphone, speakers and room.
 
 SFU requests serialize mutations per user. Publication binds its kind to the SDP media section
 and exact mid, refuses duplicate kinds/mids, and ICE restart reuses its recorded mid. Pulling the
@@ -1106,7 +1140,7 @@ This is a public website feature, with no corresponding native Android screen.
 - `search/`: a full-text index of what this device has decrypted, in a worker, sealed on disk;
   `lib/search.ts` reads the query and its filters.
 - `voice/`: calls (`session.ts` for the app, `engine.ts`, `transport.ts` with `mesh.ts` and
-  `sfu.ts`, `frameCrypto` and its worker, `playback.ts` per-person volume, `denoise.ts` RNNoise,
+  `sfu.ts`, `frameCrypto` and its worker, `playback.ts` per-person volume, `denoise.ts` modern RNNoise with speech-probability gating,
   `opus.ts`, `redundancy.ts`, `videoCap.ts`, `shareQuality.ts`, `shareAdapt.ts` (sizing a 60 fps
   share to the link), `stallWatch.ts` (a watched share stuck behind a lost frame), `callRecord.ts`
   for DM call lines).
@@ -1122,6 +1156,10 @@ This is a public website feature, with no corresponding native Android screen.
   filename alone. Audio previews carry type `audio` and `media_kind: audio`. Every file a
   preview loads goes through the signed media proxy, including audio. `unfurl.PlayableMediaType`
   keeps the proxy's accepted types aligned with previews; no reader fetches the original URL.
+  SVG previews, including extensionless endpoints such as BenchLM's `/api/og`, pass through the
+  signed media proxy as images. Its restrictive CSP sandbox remains, and SVG responses download
+  on direct navigation through Content-Disposition; the clients render them only as images,
+  with Coil's SVG decoder on Android. HEIC and TIFF remain unsupported by the browser renderer.
   Audio and video keep the original message link visible above the player on both apps;
   pictures and GIFs keep standing alone when the message is only their links.
 - `components/` by area: `shell` (app frame, tabs, banners, What's New, update dialog), `sidebar`,
@@ -1184,7 +1222,9 @@ This is a public website feature, with no corresponding native Android screen.
 - A message's menu starts with a row of quick reactions (`ContextMenuState.reactions`, filled by
   `quickReactions()` in `chat/messageMenu.ts`: the account's most used emoji, then the usual few):
   four in a square row beside a mouse, six round ones and a button for the picker in a phone's
-  sheet, as Android's `QuickReactions` in `ui/chat/MessageMenu.kt`. A picker that offers emoji
+  sheet, as Android's `QuickReactions` in `ui/chat/MessageMenu.kt`. Frequent emoji are snapshotted
+  once per open expression menu on both clients, including when changing tabs; picks still save
+  usage immediately but do not move hit targets until the menu is opened again. A picker that offers emoji
   alone shows a title (the reactions' "Add Reaction") in place of one tab, on both apps.
 - People's menus: a right click on someone's picture or name in a message, or the name a reply
   quotes, opens the menu the member list there opens (`chat/personMenu.ts`: `memberMenu` in a
@@ -1266,8 +1306,10 @@ This is a public website feature, with no corresponding native Android screen.
   look carries the person's own style as `own` (`useMemberLook` adds it, `withOwn` for lists): in a
   server a role's colour still colours the name and only the font stays. Settings, Profiles edits it
   with `components/settings/NameStyleEditor.tsx`, saved with the profile; the
-  staff can reset it (field `name_style`). Android: `data/NameStyle`, `ui/chat/RoleLook.kt`
+  staff can reset it (field `name_style`). DM sidebar names, headers and conversation introductions,
+  and group member panes, use the same renderer and observe profile updates on both clients. Android: `data/NameStyle`, `ui/chat/RoleLook.kt`
   (`RoleName`, `OwnName`), `ui/chat/NameFonts.kt` and `ui/settings/NameStyleSheet.kt`.
+  Android Ink uses the web’s 0.04em outline radius, and Pop keeps the web’s dark edge on light themes. The debug-only `NameStyleAuditActivity` draws every face at 14/16/28sp (`page` 0, 1 or 2), or every effect (`effects=true`), in `theme` dark/light, for screenshot comparisons.
 - The profile designer (Settings, Profiles, `components/settings/ProfilePage.tsx`): every part of the
   profile is a row in a panel, grouped as Your Name, Pictures & Colours and About You, each row
   showing what the part holds now. With room (`PANEL_BESIDE`, measured on the designer) the panel
@@ -1430,7 +1472,8 @@ Native Kotlin and Jetpack Compose (package `fish.nexa`, minSdk 26, targetSdk 36;
 changes. Libraries: OkHttp, kotlinx.serialization, Coil 3, Media3 ExoPlayer, Lottie, BouncyCastle,
 argon2kt, ZXing and webrtc-sdk. Native code: `app/src/main/cpp` (call frame crypto and H.264 in
 `frame/`, RNNoise) through CMake, and `android/ydoc` (yrs, the Rust Yjs, built with cargo-ndk) for
-notes.
+notes. CMake also fetches pinned Xiph RNNoise source and weights matching rnnoise-wasm
+2025.1.5, plus whisper.cpp 1.9.5 for local transcripts.
 
 - `Nexa.kt` is the object graph; `data/State.kt` keeps each store as an immutable snapshot in a
   StateFlow, mirroring the web's zustand stores; `data/Session.kt` handles the gateway's events.

@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { expressions } from "@/api/expressions";
@@ -52,6 +53,7 @@ function place(anchor: DOMRect, box: DOMRect): { left: number; top: number } {
  * sticker stays just the name and picture the message already has.
  */
 export function StickerPopout({ sticker, anchor, onClose }: { sticker: MessageSticker; anchor: HTMLElement; onClose: () => void }) {
+  useMediaAnimation();
   const card = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
   const [info, setInfo] = useState<StickerInfo | null | undefined>(undefined);

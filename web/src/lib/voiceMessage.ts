@@ -5,7 +5,7 @@
  * downloading it first. Android records the same (data/VoiceMessages.kt).
  */
 
-import { getMic } from "@/voice/media";
+import { recordingInput } from "@/voice/recordingInput";
 import { useSettings } from "@/stores/settings";
 
 /** How many bars a voice message's shape has. */
@@ -93,17 +93,18 @@ export interface Recorder {
 
 /**
  * Starts recording from the microphone chosen in Voice & Video, with the
- * browser's noise suppression and echo cancellation. `onLimit` is called when
+ * call's Enhanced noise suppression and echo cancellation, without capture gain boosts. `onLimit` is called when
  * the recording reaches MAX_SECONDS and has stopped by itself.
  */
 export async function startRecording(onLimit: () => void): Promise<Recorder> {
-  const stream = await getMic(useSettings.getState().settings.voice, { browserNoise: true });
+  const input = await recordingInput(useSettings.getState().settings.voice);
+  const { stream } = input;
   const type = recordType();
   let rec: MediaRecorder;
   try {
-    rec = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 48_000 });
+    rec = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 128_000 });
   } catch (err) {
-    stream.getTracks().forEach((t) => t.stop());
+    input.release();
     throw err;
   }
   const chunks: Blob[] = [];
@@ -111,8 +112,7 @@ export async function startRecording(onLimit: () => void): Promise<Recorder> {
     if (e.data.size) chunks.push(e.data);
   };
   // the loudness, read from the same stream: what the bars show is what is being kept
-  const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  const ctx = Ctx ? new Ctx() : null;
+  const ctx = input.ctx;
   const analyser = ctx?.createAnalyser() ?? null;
   if (ctx && analyser) {
     analyser.fftSize = 1024;
@@ -141,8 +141,7 @@ export async function startRecording(onLimit: () => void): Promise<Recorder> {
   const release = () => {
     clearInterval(tick);
     ended ||= performance.now();
-    stream.getTracks().forEach((t) => t.stop());
-    void ctx?.close().catch(() => undefined);
+    input.release();
   };
   rec.start(1000);
   return {

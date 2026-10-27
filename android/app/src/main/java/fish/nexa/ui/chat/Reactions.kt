@@ -1,5 +1,6 @@
 package fish.nexa.ui.chat
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -69,6 +70,7 @@ fun customOf(key: String): CustomEmoji? {
 /** An emoji wherever it is drawn: a server's own picture, or Twemoji artwork for a standard one. */
 @Composable
 fun EmojiGlyph(key: String, size: Dp, modifier: Modifier = Modifier, source: Int = 48) {
+    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val custom = customOf(key)
     if (custom != null) {
         val density = LocalDensity.current.density

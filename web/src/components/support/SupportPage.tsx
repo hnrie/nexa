@@ -1,3 +1,4 @@
+import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Check, Copy, Gift, Heart, Link2, Rocket, X } from "lucide-react";
@@ -275,6 +276,7 @@ function None() {
 
 /** A Pro account's two boosts: where they are, and putting one on a server. */
 function Boosts() {
+  useMediaAnimation();
   const billing = useBilling((b) => b.billing);
   const load = useBilling((b) => b.load);
   const servers = useServers((st) => st.byId);
