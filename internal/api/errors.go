@@ -43,6 +43,8 @@ func WriteError(w http.ResponseWriter, err error) {
 		apiErr = E(http.StatusConflict, "username_taken", "That username is already taken.")
 	case errors.Is(err, store.ErrConflict):
 		apiErr = E(http.StatusConflict, "conflict", "The resource changed underneath you; reload and retry.")
+	case errors.Is(err, store.ErrStaleEpoch):
+		apiErr = E(http.StatusConflict, "stale_epoch", "This conversation's key just changed. Try again in a moment.")
 	case errors.Is(err, store.ErrAlreadyExists):
 		apiErr = E(http.StatusConflict, "already_exists", "That already exists.")
 	// These three are caught at each of their call sites today, so nothing is

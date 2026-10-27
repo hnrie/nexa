@@ -100,7 +100,7 @@ func TestTURNCacheIsPerServerAndSwept(t *testing.T) {
 	}
 	// an entry older than the reuse window is dropped the next time one is kept
 	a.turnMu.Lock()
-	a.turnCreds[id] = turnCred{time.Now().Add(-2 * turnReuse), []map[string]any{{"urls": "turn:old"}}}
+	a.turnCreds[id] = turnCred{at: time.Now().Add(-2 * turnReuse), servers: []map[string]any{{"urls": "turn:old"}}, until: time.Now().Add(-turnReuse)}
 	a.turnMu.Unlock()
 	a.rememberTURN(ids.ID(2), nil)
 	a.turnMu.Lock()

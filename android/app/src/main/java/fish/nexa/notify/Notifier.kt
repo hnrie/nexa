@@ -33,6 +33,10 @@ import fish.nexa.net.Relationship
 import fish.nexa.ui.shell.Names
 import fish.nexa.ui.t
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -67,6 +71,36 @@ object Notifier {
 
     /** The lines each conversation's notification shows, newest last, until it is read. */
     private val history = HashMap<String, ArrayDeque<Line>>()
+    private var accountGeneration = 0L // guarded by history
+    private fun accountVersion() = synchronized(history) { accountGeneration }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun publish(tag: String, notification: android.app.Notification, version: Long) {
+        synchronized(history) {
+            if (version != accountGeneration || Nexa.users.meId == null) return
+            runCatching { nm().notify(tag, 1, notification) }
+        }
+    }
+
+    // Avatar loads can finish after sign-out; cancel those notification jobs
+    // as well as removing notifications already posted to the system.
+    private val posts by lazy { CoroutineScope(Nexa.scope.coroutineContext + SupervisorJob(Nexa.scope.coroutineContext[Job])) }
+
+    fun clearAccount() {
+        synchronized(history) {
+            accountGeneration++
+            posts.coroutineContext.cancelChildren()
+            history.clear()
+            runCatching {
+                val manager = nm()
+                for (notification in manager.activeNotifications) {
+                    // The connection service's untagged foreground notification
+                    // belongs to the running service, not a person's message.
+                    if (notification.tag != null) manager.cancel(notification.tag, notification.id)
+                }
+            }
+        }
+    }
 
     private fun nm() = NotificationManagerCompat.from(Nexa.app)
 
@@ -118,6 +152,7 @@ object Notifier {
 
     /** notify.ts onMessage, step for step. */
     fun onMessage(m: Message, mine: Boolean, dec: ChatMessage) {
+        val version = accountVersion()
         if (mine || m.type.startsWith("system_")) return
         if (m.flags and Message.MSG_FLAG_SUPPRESS_NOTIFICATIONS != 0L) return
         if (Nexa.session.isQuiet(dec)) return
@@ -147,11 +182,12 @@ object Notifier {
         val author = hookName ?: Names.display(Nexa.users.get(m.authorId))
         val line = Line(m.authorId, author, if (hookName != null) null else Nexa.users.get(m.authorId)?.avatarId, previewOf(dec), m.createdAt)
         synchronized(history) {
+            if (version != accountGeneration) return
             val list = history.getOrPut(m.channelId) { ArrayDeque() }
             list.addLast(line)
             while (list.size > 6) list.removeFirst()
         }
-        Nexa.scope.launch { postConversation(m.channelId, chan, kind, path) }
+        posts.launch { postConversation(m.channelId, chan, kind, path, version) }
     }
 
     /** What a notification may say about a message (notify.ts previewOf). */
@@ -220,9 +256,9 @@ object Notifier {
 
     /** One notification per conversation (tag ec-<channel>), as a conversation with its latest lines. */
     @android.annotation.SuppressLint("MissingPermission")
-    private suspend fun postConversation(channelId: String, chan: Channel?, kind: String, path: String) {
+    private suspend fun postConversation(channelId: String, chan: Channel?, kind: String, path: String, version: Long) {
         if (!enabled()) return
-        val lines = synchronized(history) { history[channelId]?.toList() } ?: return
+        val lines = synchronized(history) { if (version == accountGeneration) history[channelId]?.toList() else null } ?: return
         if (lines.isEmpty()) return
         val pv = preview()
         val tag = "ec-$channelId"
@@ -302,13 +338,15 @@ object Notifier {
                     .build(),
             )
         }
-        runCatching { nm().notify(tag, 1, b.build()) }
+        publish(tag, b.build(), version)
     }
 
     /** After answering from the notification: the reply joins it, so the system stops waiting. */
     fun addOwnReply(channelId: String, text: String) {
+        val version = accountVersion()
         val me = Nexa.users.me.value ?: return
         synchronized(history) {
+            if (version != accountGeneration) return
             val list = history.getOrPut(channelId) { ArrayDeque() }
             list.addLast(Line(me.id, me.name, me.avatarId, text, System.currentTimeMillis()))
             while (list.size > 6) list.removeFirst()
@@ -316,7 +354,7 @@ object Notifier {
         val chan = Nexa.channels.get(channelId)
         val kind = if (chan?.serverId == null) CH_DIRECT else CH_SERVERS
         val path = if (chan?.serverId != null) "/channels/${chan.serverId}/$channelId" else "/channels/@me/$channelId"
-        Nexa.scope.launch { postConversation(channelId, chan, kind, path) }
+        posts.launch { postConversation(channelId, chan, kind, path, version) }
     }
 
     /** Opening or reading a conversation takes its notification away. */
@@ -328,12 +366,13 @@ object Notifier {
     /** notify.ts onFriendRequest: the friend sound even on screen; a notification only when away. */
     @android.annotation.SuppressLint("MissingPermission")
     fun onFriendRequest(r: Relationship) {
+        val version = accountVersion()
         if (Nexa.users.me.value == null || doNotDisturb()) return
         if (soundsOn()) playSound("friend")
         if (onScreen() || !enabled()) return
         val tag = "ec-friend-${r.user.id}"
         val name = Names.display(r.user)
-        Nexa.scope.launch {
+        posts.launch {
             val b = NotificationCompat.Builder(Nexa.app, CH_REQUESTS)
                 .setSmallIcon(R.drawable.ic_notify)
                 .setColor(0xFF8000FF.toInt())
@@ -346,19 +385,20 @@ object Notifier {
                 b.setContentTitle(t("notify.friendRequest")).setContentText(t("notify.sentYouAFriendRequest", "name" to name))
                 b.setLargeIcon(avatar(r.user.id, name, r.user.avatarId).toIcon(Nexa.app))
             }
-            runCatching { nm().notify(tag, 1, b.build()) }
+            publish(tag, b.build(), version)
         }
     }
 
     /** notify.ts onNoteInvite: someone asking to share a note sounds like a friend request, and notifies while away. */
     @android.annotation.SuppressLint("MissingPermission")
     fun onNoteInvite(inv: fish.nexa.notes.NoteInviteRow) {
+        val version = accountVersion()
         if (Nexa.users.me.value == null || doNotDisturb()) return
         if (soundsOn()) playSound("friend")
         if (onScreen() || !enabled()) return
         val tag = "ec-note-${inv.id}"
         val name = Names.display(inv.from)
-        Nexa.scope.launch {
+        posts.launch {
             val b = NotificationCompat.Builder(Nexa.app, CH_REQUESTS)
                 .setSmallIcon(R.drawable.ic_notify)
                 .setColor(0xFF8000FF.toInt())
@@ -371,13 +411,14 @@ object Notifier {
                 b.setContentTitle(t("notify.noteInvite")).setContentText(t("notify.sharedANote", "name" to name))
                 b.setLargeIcon(avatar(inv.from.id, name, inv.from.avatarId).toIcon(Nexa.app))
             }
-            runCatching { nm().notify(tag, 1, b.build()) }
+            publish(tag, b.build(), version)
         }
     }
 
     /** Other alerts (note requests, Nexa notices, bug replies): a sound and, when away, a plain notification. */
     @android.annotation.SuppressLint("MissingPermission")
     fun simple(tag: String, kind: String, sound: String?, title: String, body: String, path: String, viewingPath: Boolean = false) {
+        val version = accountVersion()
         if (Nexa.users.me.value == null || doNotDisturb()) return
         val screen = onScreen()
         if (screen && viewingPath) return
@@ -393,7 +434,7 @@ object Notifier {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(openIntent(path, null))
             .build()
-        runCatching { nm().notify(tag, 1, n) }
+        publish(tag, n, version)
     }
 
     /** Wires the session's alerts to this, once. */

@@ -354,7 +354,7 @@ object Send {
                 afterSend = verdict?.afterSend
             }
             val conv = Nexa.channels.convFor(channelId)
-            val (epoch, _) = Nexa.keys.ensureConvKey(conv) ?: throw IllegalStateException("waiting_for_key")
+            val (epoch, _) = Nexa.keys.ensureConvKey(conv, current = true) ?: throw IllegalStateException("waiting_for_key")
             val chanKey = Nexa.keys.channelKey(conv, epoch, channelId) ?: throw IllegalStateException("waiting_for_key")
             val env = withContext(Dispatchers.Default) { MessageCrypto.encrypt(chanKey, Aad(conv, epoch, channelId, meId), payload) }
             val replyTo = opts.replyTo
@@ -475,14 +475,9 @@ object Send {
             }
             afterEdit = verdict?.afterSend
         }
-        val conv = existing.m.keyConvId ?: Nexa.channels.convFor(channelId)
-        var epoch = existing.m.keyEpoch ?: 0
-        var chanKey = Nexa.keys.channelKey(conv, epoch, channelId)
-        if (chanKey == null) {
-            val latest = Nexa.keys.ensureConvKey(conv) ?: throw IllegalStateException("waiting_for_key")
-            epoch = latest.first
-            chanKey = Nexa.keys.channelKey(conv, epoch, channelId)
-        }
+        val conv = Nexa.channels.convFor(channelId)
+        val (epoch, _) = Nexa.keys.ensureConvKey(conv, current = true) ?: throw IllegalStateException("waiting_for_key")
+        val chanKey = Nexa.keys.channelKey(conv, epoch, channelId)
         if (chanKey == null) throw IllegalStateException("waiting_for_key")
         val env = withContext(Dispatchers.Default) { MessageCrypto.encrypt(chanKey, Aad(conv, epoch, channelId, me.id), payload) }
         val body = buildJsonObject {

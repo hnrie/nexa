@@ -187,28 +187,14 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	// Nexa's first account runs it, and so may the account the
-	// operator named — but only to set Nexa up. Once anyone has been
-	// an admin, the configured name is just a name: otherwise, the moment it
-	// was freed (a rename, a deletion) anyone could register it and walk in.
+	// This count only exempts initial setup from the signup limit. Bootstrap
+	// privileges are decided inside CreateRegisteredUser's insert transaction.
 	first := count == 0
-	named := false
-	if !first && s.Cfg.AdminUsername != "" && req.Username == s.Cfg.AdminUsername {
-		admins, err := s.Store.CountAdminsEver(ctx)
-		if err != nil {
-			WriteError(w, err)
-			return
-		}
-		named = admins == 0
-	}
-	if first || named {
-		u.Flags |= store.FlagAdmin
-	}
 	// at most two new accounts a day from one IP address, spent
 	// only once the request has passed every check above. Nexa's first
 	// account is never held back.
 	if !first {
-		if ok, retry := s.limSignup.Allow(auth.ClientIP(r)); !ok {
+		if ok, retry := s.limSignup.Allow(auth.RateKey(r)); !ok {
 			w.Header().Set("Retry-After", retryAfter(retry))
 			WriteError(w, E(http.StatusTooManyRequests, "too_many_signups", "Two accounts have already been made from this IP address today. Try again tomorrow."))
 			return
@@ -224,7 +210,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := s.Store.CreateUser(ctx, u); err != nil {
+	if err := s.Store.CreateRegisteredUser(ctx, u, s.Cfg.AdminUsername); err != nil {
 		if signupInvite != "" {
 			_ = s.Store.UnuseInvite(context.WithoutCancel(ctx), signupInvite)
 		}
@@ -237,15 +223,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 			s.Log.Warn("record signup invite", "user", u.ID.String(), "err", err)
 		}
 	}
-	// Two first sign-ups at once both counted nobody before them; the older
-	// of the two keeps Nexa, and the other becomes an ordinary account.
-	if first {
-		if oldest, err := s.Store.OldestAccountID(ctx); err == nil && oldest != u.ID {
-			if flags, err := s.Store.ChangeUserFlags(ctx, u.ID, 0, store.FlagAdmin); err == nil {
-				u.Flags = flags
-			}
-		}
-	}
+
 	token, err := s.newSession(r, u.ID)
 	if err != nil {
 		WriteError(w, err)
@@ -262,7 +240,7 @@ func (s *Server) fakeSalt(username string) []byte {
 
 func (s *Server) handleKDF(w http.ResponseWriter, r *http.Request) {
 	username := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("username")))
-	if username == "" {
+	if username == "" || len(username) > 32 {
 		WriteError(w, E(http.StatusBadRequest, "missing_username", "username is required"))
 		return
 	}
@@ -298,6 +276,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
+	if len(req.Username) > 32 {
+		fail()
+		return
+	}
 	if ok, retry := s.limAuthUsr.Allow("login:" + req.Username); !ok {
 		w.Header().Set("Retry-After", retryAfter(retry))
 		WriteError(w, ErrRateLimited)
@@ -368,6 +350,13 @@ func itoa(n int) string {
 func (s *Server) verifyRecovery(w http.ResponseWriter, r *http.Request, username string, key []byte) (*store.User, bool) {
 	start := time.Now()
 	username = strings.ToLower(strings.TrimSpace(username))
+	if len(username) > 32 {
+		if d := time.Since(start); d < minLoginTime {
+			time.Sleep(minLoginTime - d)
+		}
+		WriteError(w, E(http.StatusUnauthorized, "invalid_credentials", "Username or recovery key is wrong."))
+		return nil, false
+	}
 	if ok, retry := s.limAuthUsr.Allow("recover:" + username); !ok {
 		w.Header().Set("Retry-After", retryAfter(retry))
 		WriteError(w, ErrRateLimited)

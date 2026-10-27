@@ -6,7 +6,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, nativeImage, powerMonitor,
 import fs from "node:fs";
 import path from "node:path";
 import { IPC, type DesktopSettings, type Identity, type WindowState } from "../shared/bridge";
-import { BASE, ORIGIN, isAppUrl } from "./config";
+import { BASE, ORIGIN, isAppUrl, testHook } from "./config";
 import { chooseDisplaySource, handleDisplayMedia, lockPermissions, openScreenSettings, resetScreenAccess, restartApp, screenAccess, shareAudioFailed } from "./permissions";
 import { RpcService } from "./rpc/service";
 import { PasteGate } from "./pasteGate";
@@ -19,7 +19,8 @@ import { nativeStrings, setNativeStrings, stringsDiffer } from "./strings";
 import { applicationMenu, createMainWindow, resourcePath } from "./window";
 
 // tests run the app with a profile of their own
-if (process.env.EVILION_USER_DATA) app.setPath("userData", process.env.EVILION_USER_DATA);
+const testProfile = testHook("EVILION_USER_DATA");
+if (testProfile) app.setPath("userData", testProfile);
 const settings = new SettingsStore(path.join(app.getPath("userData"), "settings.json"));
 if (!settings.get("hardwareAcceleration")) app.disableHardwareAcceleration();
 if (process.platform === "linux") app.commandLine.appendSwitch("enable-features", "WebRTCPipeWireCapturer");
@@ -316,7 +317,7 @@ function desktopSettings(): DesktopSettings {
 
 function applyLoginItem(on: boolean): void {
   // a development build, or one under test, must not put itself in the login items
-  if (!app.isPackaged || process.env.EVILION_NO_LOGIN_ITEM) return;
+  if (!app.isPackaged || testHook("EVILION_NO_LOGIN_ITEM")) return;
   if (process.platform === "linux") {
     linuxAutostart(on);
     return;

@@ -209,6 +209,9 @@ func budget(frames, w, h int) error {
 // gifFrames puts each frame of a GIF together on its canvas: drawn over what
 // the frame before left, then cleared or put back as that frame says.
 func gifFrames(data []byte, emit sink) (int, error) {
+	if err := checkGIFWork(bytes.NewReader(data), maxCropFrames, maxCropPixels); err != nil {
+		return 0, err
+	}
 	g, err := gif.DecodeAll(bytes.NewReader(data))
 	if err != nil || len(g.Image) == 0 {
 		return 0, ErrUnsupported

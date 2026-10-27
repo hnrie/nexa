@@ -12,11 +12,20 @@ import {
   type MessagePayload,
   brokenLimit,
   typedLength,
+  sanitizeAttachment,
 } from "./message";
 
 const root = newRootKey();
 const key = channelKey(root, "chan-1");
 const aad: Aad = { conv: "conv-1", epoch: 2, channelId: "chan-1", authorId: "user-1" };
+
+it("rejects attachment IDs that could become paths or URLs", () => {
+  const attachment = { blob_id: "123", name: "file.png", type: "image/png", size: 10, key: "key" };
+  expect(sanitizeAttachment(attachment)).toEqual(attachment);
+  for (const blob_id of ["../private/case-1", "../../files/secret", "/tmp/file", "123/../../api/v1/users/@me", "%2e%2e%2ffile", "1?x=2", "1#x", "1\\file", "", "1".repeat(21), "1\n"]) {
+    expect(sanitizeAttachment({ ...attachment, blob_id }), blob_id).toBeNull();
+  }
+});
 
 /** Encrypt arbitrary bytes under the real key and AAD, bypassing the JSON layer. */
 async function forgeEnvelope(plaintext: Uint8Array, a: Aad = aad): Promise<Envelope> {
@@ -59,8 +68,8 @@ describe("encryptMessage / decryptMessage", () => {
 
   it("round trips attachments, stickers, embeds and flags", async () => {
     const att: AttachmentMeta[] = [
-      { blob_id: "b1", name: "cat.png", type: "image/png", size: 12345, w: 800, h: 600, key: b64.enc(randomBytes(32)) },
-      { blob_id: "b2", name: "clip.mp4", type: "video/mp4", size: 99, key: b64.enc(randomBytes(32)), spoiler: true, duration: 4.5 },
+      { blob_id: "1", name: "cat.png", type: "image/png", size: 12345, w: 800, h: 600, key: b64.enc(randomBytes(32)) },
+      { blob_id: "2", name: "clip.mp4", type: "video/mp4", size: 99, key: b64.enc(randomBytes(32)), spoiler: true, duration: 4.5 },
     ];
     const payload: MessagePayload = { t: "look", att, sticker: { id: "s1" }, embeds: [{ url: "https://example.com" }], flags: 3 };
     const env = await encryptMessage(key, aad, payload);
@@ -157,10 +166,10 @@ describe("encryptMessage / decryptMessage", () => {
   });
 
   it("drops fields that are not the message's and keeps the rest, but refuses a file or a card that is not one", async () => {
-    const good = { blob_id: "b1", name: "a.png", type: "image/png", size: 10, key: "k", w: 5 };
+    const good = { blob_id: "1", name: "a.png", type: "image/png", size: 10, key: "k", w: 5 };
     const forged = {
       t: "hi",
-      att: [good, { ...good, size: -1 }, { ...good, name: 7 }, null, { ...good, blob_id: "b2", w: "wide", spoiler: "yes" }],
+      att: [good, { ...good, size: -1 }, { ...good, name: 7 }, null, { ...good, blob_id: "2", w: "wide", spoiler: "yes" }],
       sticker: { id: "s", w: "x", name: {} },
       embeds: [null, 3, { url: "https://e.x", title: { bad: true }, image_w: "9", type: "link" }],
       flags: "3",
@@ -170,10 +179,10 @@ describe("encryptMessage / decryptMessage", () => {
     // a broken file or card is something no app sends: the whole message is refused
     await expect(decryptMessage(key, env, aad)).rejects.toThrow("over_limits");
     // what is merely mistyped or not a message's at all is let go
-    const odd = await forgeEnvelope(utf8.enc(JSON.stringify({ t: "hi", att: [good, { ...good, blob_id: "b2", w: "wide", spoiler: "yes" }], sticker: { id: "s", w: "x", name: {} }, embeds: [{ url: "https://e.x", title: { bad: true }, image_w: "9", type: "link" }], flags: "3", extra: 1 })));
+    const odd = await forgeEnvelope(utf8.enc(JSON.stringify({ t: "hi", att: [good, { ...good, blob_id: "2", w: "wide", spoiler: "yes" }], sticker: { id: "s", w: "x", name: {} }, embeds: [{ url: "https://e.x", title: { bad: true }, image_w: "9", type: "link" }], flags: "3", extra: 1 })));
     expect(await decryptMessage(key, odd, aad)).toEqual({
       t: "hi",
-      att: [good, { blob_id: "b2", name: "a.png", type: "image/png", size: 10, key: "k" }],
+      att: [good, { blob_id: "2", name: "a.png", type: "image/png", size: 10, key: "k" }],
       sticker: { id: "s" },
       embeds: [{ url: "https://e.x", type: "link" }],
     });
@@ -181,18 +190,18 @@ describe("encryptMessage / decryptMessage", () => {
 
   it("keeps a picture's small copy only when it is one", async () => {
     const copy = { blob_id: "77", key: "ck", size: 9000, type: "image/webp", w: 1280, h: 960 };
-    const pic = { blob_id: "b1", name: "a.jpg", type: "image/jpeg", size: 4_000_000, key: "k" };
+    const pic = { blob_id: "1", name: "a.jpg", type: "image/jpeg", size: 4_000_000, key: "k" };
     const forged = {
       att: [
         { ...pic, preview: copy },
         // fetched by its address, so the address is a number and nothing else
-        { ...pic, blob_id: "b2", preview: { ...copy, blob_id: "../../api/v1/users/@me" } },
+        { ...pic, blob_id: "2", preview: { ...copy, blob_id: "../../api/v1/users/@me" } },
         // shown by its type, so the type is a picture's
-        { ...pic, blob_id: "b3", preview: { ...copy, type: "text/html" } },
-        { ...pic, blob_id: "b4", preview: { ...copy, size: 50 * 1024 * 1024 } },
-        { ...pic, blob_id: "b5", preview: { ...copy, w: 0 } },
+        { ...pic, blob_id: "3", preview: { ...copy, type: "text/html" } },
+        { ...pic, blob_id: "4", preview: { ...copy, size: 50 * 1024 * 1024 } },
+        { ...pic, blob_id: "5", preview: { ...copy, w: 0 } },
         // only a picture has a copy
-        { ...pic, blob_id: "b6", type: "application/zip", preview: copy },
+        { ...pic, blob_id: "6", type: "application/zip", preview: copy },
       ],
     };
     const env = await forgeEnvelope(utf8.enc(JSON.stringify(forged)));

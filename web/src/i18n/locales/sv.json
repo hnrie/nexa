@@ -7152,5 +7152,8 @@
   "whatsNew.r202610265.demoTitle": "Prova Nexa Innan du Registrerar dig",
   "whatsNew.r202610265.demoBody": "Utforska den riktiga appen från startsidan, från början. Ändringarna stannar i demon och försvinner vid omladdning.",
   "whatsNew.r202610266.openSourceBody": "Utforska koden och bidra på GitHub. Du hittar kodförrådet på startsidan, i Inställningar och i Om Nexa.",
-  "whatsNew.r202610266.openSourceTitle": "Nexa Har Öppen Källkod"
+  "whatsNew.r202610266.openSourceTitle": "Nexa Har Öppen Källkod",
+  "shell.requiredUpdate.manualRequired": "Ladda ned och installera den nya skrivbordsappen och öppna sedan Nexa igen för att fortsätta. Behåll dina befintliga appdata.",
+  "whatsNew.r202610267.desktopSecurityTitle": "Säkerhetsuppdatering för skrivbordsappen",
+  "whatsNew.r202610267.desktopSecurityBody": "Installera den nya skrivbordsappen en gång. Framtida uppdateringar kontrollerar att de kommer från Nexa."
 }

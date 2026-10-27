@@ -79,3 +79,13 @@ export function formatClock(ms: number): string {
   const s = String(total % 60).padStart(2, "0");
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
 }
+
+/** An activity is supplied by someone else; never hand arbitrary schemes to the OS. */
+export function activityDestination(raw?: string): { href: string; host: string } | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null;
+    return { href: url.href, host: url.host };
+  } catch { return null; }
+}

@@ -122,6 +122,29 @@ describe("key manager", () => {
     };
   });
 
+  it("asks for an exact unopenable grant to be replaced", async () => {
+    await useKeys.getState().init("A", alice);
+    const request = vi.spyOn(api, "request").mockResolvedValue(undefined);
+    const grant = { conv_id: "conv1", epoch: 0, user_id: "A", wrapped_key: b64.enc(new Uint8Array([1, 2, 3])), wrapped_by: "B", created_at: 0 };
+    await useKeys.getState().ingestGrants([grant]);
+    expect(request).toHaveBeenCalledWith("POST", "/keys/request", { conv_id: "conv1", bad_epoch: 0, bad_wrapped_key: grant.wrapped_key });
+    expect(ring.get("conv1", 0)).toBeUndefined();
+  });
+
+  it("never selects an old cached root for a new send after rotation", async () => {
+    await useKeys.getState().init("A", alice);
+    ring.set("conv1", 0, newRootKey());
+    api.request = vi.fn(async (_method, path) => {
+      if (path === "/keys/epochs") return { epochs: [{ epoch: 0 }, { epoch: 1 }], flags: { needs_rotation: false } };
+      if (path === "/keys/grants") return [];
+      throw new Error(`unexpected ${path}`);
+    }) as typeof api.request;
+    expect(await useKeys.getState().ensureConvKey("conv1", true)).toBeNull();
+    const current = newRootKey();
+    ring.set("conv1", 1, current);
+    expect(await useKeys.getState().ensureConvKey("conv1", true)).toEqual({ epoch: 1, root: current });
+  });
+
   it("creates an epoch, grants everyone, and the recipient can unwrap it", async () => {
     await useKeys.getState().init("A", alice);
     const got = await useKeys.getState().ensureConvKey("conv1");

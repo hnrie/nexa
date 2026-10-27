@@ -102,8 +102,8 @@ func TestRates(t *testing.T) {
 	if RateFor(KindAudio, 0) != AudioBps || RateFor(KindScreenAudio, 0) != StreamAudioBps || RateFor(KindVideo, 0) != CameraBps {
 		t.Error("audio and camera rates")
 	}
-	if RateFor(KindScreen, 0) != DefaultScreenBps || RateFor(KindScreen, 100) != minScreenBps || RateFor(KindScreen, 50_000_000) != maxScreenBps || RateFor(KindScreen, 8_000_000) != 8_000_000 {
-		t.Error("screen rates are the declared bitrate, bounded")
+	if RateFor(KindScreen, 0) != maxScreenBps || RateFor(KindScreen, 100) != maxScreenBps || RateFor(KindScreen, 50_000_000) != maxScreenBps || RateFor(KindScreen, 8_000_000) != maxScreenBps {
+		t.Error("screen rates must not trust the client declaration")
 	}
 	if !ValidKind("screen_audio") || ValidKind("data") || !IsVideo(KindScreen) || IsVideo(KindScreenAudio) {
 		t.Error("kinds")
@@ -154,5 +154,26 @@ func TestMeterChargesATrackOncePerSession(t *testing.T) {
 	*now = now.Add(time.Hour)
 	if got := m.Used(ctx); got != before {
 		t.Errorf("a track whose publisher left is still charged: %d then %d", before, got)
+	}
+}
+
+func TestConfirmedSourceClosureStopsAllItsPulls(t *testing.T) {
+	ctx := context.Background()
+	m, _, now := newTestMeter(1000, time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC))
+	source := Source("publisher", KindAudio)
+	m.Start("a", "0", source, AudioBps)
+	m.Start("b", "1", source, AudioBps)
+	if mid, exists := m.ActiveMid("a", source); !exists || mid != "0" {
+		t.Fatal("subscription not reusable")
+	}
+	*now = now.Add(time.Second)
+	m.StopSource(source)
+	used := m.Used(ctx)
+	*now = now.Add(time.Minute)
+	if m.Used(ctx) != used {
+		t.Fatal("confirmed closed publication kept charging")
+	}
+	if _, exists := m.ActiveMid("a", source); exists {
+		t.Fatal("closed subscription reused")
 	}
 }

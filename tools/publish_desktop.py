@@ -9,13 +9,14 @@ which /api/v1/desktop/latest serves to the download page and banner. Files of
 older releases are left in place, so updates already downloading can finish;
 the update manifests always name the newest.
 
-The Mac manifest is published as latest-mac-2.yml, the feed the Mac app reads
-from 1.1.0 on (desktop/src/main/update/mac.ts). latest-mac.yml belongs to the
-copies before that, which cannot update themselves to this version; it and the
-files it names stay as they are, and the page offers those copies the new
-version as a download instead (web/src/lib/macReplacement.ts).
+Manifests are signed before any artifacts are published, with private local key
+material from ~/.local/share/nexa-signing/update-key.pem (or
+NEXA_DESKTOP_SIGNING_KEY). The public half is pinned in the desktop source.
+Dedicated signed-latest*.yml feeds leave every legacy latest*.yml feed intact;
+clients before 1.2.8 must install the new trust anchor manually once.
+
 """
-import argparse, hashlib, json, os, re, shutil, sys, time
+import argparse, hashlib, json, os, re, shutil, subprocess, sys, tempfile, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -25,8 +26,8 @@ PATTERN = re.compile(r"^nexa-(?:Setup-)?(?P<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.
 KIND = {"exe": "installer", "dmg": "installer", "zip": "zip", "AppImage": "appimage", "deb": "deb"}
 OS = {"win": "windows", "mac": "mac", "linux": "linux"}
 # electron-builder's name for a feed, and the name it is published under
-FEEDS = {"latest.yml": "latest.yml", "latest-linux.yml": "latest-linux.yml", "latest-mac.yml": "latest-mac-2.yml"}
-OLD_MAC_FEED = "latest-mac.yml"
+FEEDS = {"latest.yml": "signed-latest.yml", "latest-linux.yml": "signed-latest-linux.yml", "latest-mac.yml": "signed-latest-mac.yml"}
+LEGACY_FEEDS = ("latest.yml", "latest-linux.yml", "latest-mac.yml", "latest-mac-2.yml")
 ARCH = {"x64": "x64", "x86_64": "x64", "amd64": "x64", "arm64": "arm64", "aarch64": "arm64"}
 
 
@@ -66,9 +67,12 @@ def prune(dest: Path, keep: int) -> None:
     old = sorted(by_version, key=version_key, reverse=True)[keep:]
     if not old:
         return
-    # what latest-mac.yml names stays: copies older than its release still update to it
-    feed = dest / OLD_MAC_FEED
-    named = set(re.findall(r"nexa-[^\s'\"]+", feed.read_text())) if feed.is_file() else set()
+    # Legacy clients keep their existing feed and its named artifacts until replaced.
+    named = set()
+    for name in LEGACY_FEEDS:
+        feed = dest / name
+        if feed.is_file():
+            named.update(re.findall(r"nexa-[^\s'\"]+", feed.read_text()))
     freed = 0
     for v in old:
         for p in by_version[v]:
@@ -77,6 +81,20 @@ def prune(dest: Path, keep: int) -> None:
             freed += p.stat().st_size
             p.unlink()
     print(f"removed {', '.join(sorted(old, key=version_key))} ({freed / (1 << 30):.1f} GB); kept the newest {keep}")
+
+
+def atomic_copy(source: Path, target: Path) -> None:
+    """Expose a complete artifact only after copying it successfully."""
+    fd, name = tempfile.mkstemp(dir=target.parent, prefix="." + target.name + "-", suffix=".tmp")
+    os.close(fd)
+    temporary = Path(name)
+    try:
+        shutil.copy2(source, temporary)
+        with temporary.open("rb") as copied:
+            os.fsync(copied.fileno())
+        temporary.replace(target)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def main() -> int:
@@ -126,20 +144,40 @@ def main() -> int:
         print(f"update manifests this script does not know where to publish: {', '.join(unknown)}", file=sys.stderr)
         return 1
 
+    # A stale platform feed can survive even when all installers name one
+    # version. Refuse it before writing any part of the release.
+    for feed in manifests:
+        match = re.search(r"(?m)^version:\s*['\"]?([^\s'\"]+)", feed.read_text())
+        if match is None or match[1] != version:
+            print(f"{feed.name} does not name build {version}", file=sys.stderr)
+            return 1
+
+    # Sign all exact published feed names before exposing any release files.
+    # Missing or mismatched signing material refuses publication.
+    with tempfile.TemporaryDirectory(prefix="nexa-signed-feeds-") as directory:
+        signed = Path(directory)
+        for feed in manifests:
+            shutil.copy2(feed, signed / FEEDS[feed.name])
+        result = subprocess.run(["node", str(ROOT / "desktop/scripts/sign-release.mjs"), str(signed)])
+        if result.returncode:
+            return 1
+        signed_feeds = {name: (signed / name).read_bytes() for feed in manifests
+                        for name in (FEEDS[feed.name], FEEDS[feed.name] + ".sig")}
+
     dest.mkdir(parents=True, exist_ok=True)
     files = []
     for p, m in found:
-        shutil.copy2(p, dest / p.name)
+        atomic_copy(p, dest / p.name)
         blockmap = p.with_name(p.name + ".blockmap")
         if blockmap.exists():
-            shutil.copy2(blockmap, dest / blockmap.name)
+            atomic_copy(blockmap, dest / blockmap.name)
         files.append({"os": OS[m["os"]], "arch": ARCH[m["arch"]], "kind": KIND[m["ext"]], "name": p.name, "size": p.stat().st_size, "sha256": sha256(p)})
         print(f"  {p.name} ({p.stat().st_size / 1048576:.1f} MB)")
     # the update manifests go last, once everything they name is in place
-    for y in manifests:
-        tmp = dest / (FEEDS[y.name] + ".tmp")
-        shutil.copy2(y, tmp)
-        tmp.replace(dest / FEEDS[y.name])
+    for name, body in signed_feeds.items():
+        tmp = dest / (name + ".tmp")
+        tmp.write_bytes(body)
+        tmp.replace(dest / name)
     manifest = {"version": version, "released_at": int(time.time() * 1000), "files": files}
     tmp = dest / "manifest.json.tmp"
     tmp.write_text(json.dumps(manifest, indent=2))

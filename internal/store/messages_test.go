@@ -19,6 +19,37 @@ func mkMsg(t *testing.T, s *Store, ch, author ids.ID, text string) *Message {
 	return m
 }
 
+func TestEncryptedMessageWritesRecheckTheCurrentEpoch(t *testing.T) {
+	s := newStore(t)
+	ctx := t.Context()
+	a, b := mkUser(t, s, "a"), mkUser(t, s, "b")
+	dm, _, err := s.CreateDM(ctx, a.ID, b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	epoch := 0
+	if err := s.CreateEpoch(ctx, &KeyEpoch{ConvID: dm.ID, Epoch: 0, CreatedBy: a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	m := &Message{ChannelID: dm.ID, AuthorID: a.ID, KeyConvID: &dm.ID, KeyEpoch: &epoch, Ciphertext: json.RawMessage(`{"v":1}`)}
+	if err := s.InsertEncryptedMessage(ctx, m); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateEpoch(ctx, &KeyEpoch{ConvID: dm.ID, Epoch: 1, CreatedBy: a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	stale := &Message{ChannelID: dm.ID, AuthorID: a.ID, KeyConvID: &dm.ID, KeyEpoch: &epoch, Ciphertext: json.RawMessage(`{"v":1}`)}
+	if err := s.InsertEncryptedMessage(ctx, stale); !errors.Is(err, ErrStaleEpoch) {
+		t.Fatalf("stale insert: %v", err)
+	}
+	if err := s.UpdateEncryptedMessage(ctx, m.ID, json.RawMessage(`{"v":1}`), dm.ID, 0, nil, nil, false, 1); !errors.Is(err, ErrStaleEpoch) {
+		t.Fatalf("stale edit: %v", err)
+	}
+	if err := s.UpdateEncryptedMessage(ctx, m.ID, json.RawMessage(`{"v":1}`), dm.ID, 1, nil, nil, false, 1); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMessagesPaginationAndCRUD(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()

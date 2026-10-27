@@ -12,7 +12,111 @@ import (
 	"time"
 
 	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/store"
 )
+
+func TestAnArrivingBodyAlreadySpendsUploadQuota(t *testing.T) {
+	srv, ts := newTestServer(t)
+	token, user := register(t, ts, "alice")
+	_, bob := register(t, ts, "bob")
+	channel := dmBetween(t, ts, token, bob)
+	uid, _ := ids.Parse(user)
+	// Leave eight bytes of monthly quota without allocating a large file.
+	blob := &store.Blob{SHA256: "quota-test", Size: srv.planLimitsFor("").MonthUploadMax - 8,
+		Kind: "attachment", Encrypted: true, OwnerID: &uid}
+	if err := srv.Store.InsertBlob(t.Context(), blob); err != nil {
+		t.Fatal(err)
+	}
+	pr, pw := io.Pipe()
+	defer pw.CloseWithError(io.ErrUnexpectedEOF)
+	firstDone := make(chan int, 1)
+	go func() {
+		req, _ := http.NewRequest("POST", ts.URL+"/api/v1/channels/"+channel+"/attachments", pr)
+		req.ContentLength = 8
+		req.Header.Set("Authorization", "Bearer "+token)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			firstDone <- 0
+			return
+		}
+		res.Body.Close()
+		firstDone <- res.StatusCode
+	}()
+	if _, err := pw.Write([]byte("a")); err != nil {
+		t.Fatal(err)
+	}
+	// A pipe write can finish in the HTTP transport before the handler runs.
+	waitFor(t, "the first upload's admission", func() bool {
+		srv.uploads.Lock()
+		defer srv.uploads.Unlock()
+		return srv.uploads.users[uid].open == 1
+	})
+	req, _ := http.NewRequest("POST", ts.URL+"/api/v1/channels/"+channel+"/attachments", bytes.NewBufferString("abcdefgh"))
+	req.Header.Set("Authorization", "Bearer "+token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		pw.CloseWithError(err)
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusInsufficientStorage {
+		t.Errorf("second body bypassed the monthly quota: %d", res.StatusCode)
+	}
+	_, _ = pw.Write([]byte("bcdefgh"))
+	_ = pw.Close()
+	if code := <-firstDone; code != http.StatusCreated {
+		t.Errorf("admitted upload: %d", code)
+	}
+	// Completion releases the reservation; the stored blob now counts once.
+	srv.uploads.Lock()
+	defer srv.uploads.Unlock()
+	if len(srv.uploads.users) != 0 || srv.uploads.bytes != 0 {
+		t.Errorf("upload reservations leaked: %+v", srv.uploads.users)
+	}
+}
+
+func TestDuplicateChunkBodiesAreBoundedBeforeReading(t *testing.T) {
+	srv, ts := newTestServer(t)
+	token, _ := register(t, ts, "alice")
+	_, created := do(t, ts, "POST", "/api/v1/uploads", token, map[string]any{"size": 8})
+	id := created["id"].(string)
+	var writers []*io.PipeWriter
+	var completions []chan struct{}
+	defer func() {
+		for _, w := range writers {
+			_ = w.CloseWithError(io.ErrUnexpectedEOF)
+		}
+		for _, done := range completions {
+			<-done
+		}
+	}()
+	for i := 0; i < maxChunkStagesPerUpload; i++ {
+		pr, pw := io.Pipe()
+		writers = append(writers, pw)
+		done := make(chan struct{})
+		completions = append(completions, done)
+		go func() {
+			defer close(done)
+			req, _ := http.NewRequest("PATCH", ts.URL+"/api/v1/uploads/"+id, pr)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Upload-Offset", "0")
+			if res, err := http.DefaultClient.Do(req); err == nil {
+				res.Body.Close()
+			}
+		}()
+		if _, err := pw.Write([]byte("a")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	waitFor(t, "both stalled chunks' admission", func() bool {
+		srv.uploads.Lock()
+		defer srv.uploads.Unlock()
+		return srv.uploads.stageCount == maxChunkStagesPerUpload
+	})
+	if res, body := sendChunk(t, ts, token, id, 0, []byte("abcdefgh")); res.StatusCode != 429 || errCode(body) != "too_many_uploads" {
+		t.Errorf("unbounded duplicate chunk: %d %v", res.StatusCode, body)
+	}
+}
 
 // downloadAttachment fetches a blob's bytes as token.
 func downloadAttachment(t *testing.T, ts *httptest.Server, token, blobID string) []byte {

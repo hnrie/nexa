@@ -182,6 +182,7 @@ func (s *Server) snapshotVisibility(ctx context.Context, serverID ids.ID) (visib
 // the server changed, and channel_update for the changed channels to those who
 // still see it. It also flags conversations whose viewer set shrank.
 func (s *Server) syncVisibility(ctx context.Context, serverID ids.ID, before visibility, changed ...ids.ID) {
+	defer s.recheckSFUServer(ctx, serverID)
 	// A snapshot that failed comes back nil, which is not the same as a server
 	// nobody can see anything in. Diffing against nil makes every channel look
 	// newly visible to every member, which is one channel_create per pair —

@@ -248,6 +248,12 @@ func (s *Server) handleBotGateway(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "the gateway is not running", http.StatusServiceUnavailable)
 		return
 	}
+	release, err := s.hub.AdmitWaiting(auth.RateKey(r))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	defer release()
 	q := r.URL.Query()
 	enc, ok := botproto.ParseEncoding(q.Get("encoding"))
 	if v := q.Get("v"); v != "" {
@@ -269,11 +275,11 @@ func (s *Server) handleBotGateway(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sock.send(op(botproto.OpHello, map[string]any{"heartbeat_interval": botHeartbeatInterval.Milliseconds(), "_trace": []string{"[\"nexa-gateway\"]"}}))
-	s.runBotSocket(r, sock)
+	s.runBotSocket(r, sock, release)
 }
 
 // runBotSocket reads a socket's frames until it closes.
-func (s *Server) runBotSocket(r *http.Request, sock *botSocket) {
+func (s *Server) runBotSocket(r *http.Request, sock *botSocket, releaseWaiting func()) {
 	ctx := r.Context()
 	ip := auth.RateKey(r)
 	var sess *botSession
@@ -348,6 +354,7 @@ func (s *Server) runBotSocket(r *http.Request, sock *botSocket) {
 				return
 			}
 			sock.identified.Store(true)
+			releaseWaiting()
 		case botproto.OpResume:
 			if sess != nil {
 				sock.close(botproto.CloseAlreadyAuthenticated, "Already authenticated.")
@@ -358,6 +365,7 @@ func (s *Server) runBotSocket(r *http.Request, sock *botSocket) {
 				return
 			}
 			sock.identified.Store(true)
+			releaseWaiting()
 		default:
 			if sess == nil {
 				sock.close(botproto.CloseNotAuthenticated, "Not authenticated.")

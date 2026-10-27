@@ -587,6 +587,10 @@ class Session(private val nx: Nexa) {
         nx.expressions.clear()
         nx.misc.clear()
         synchronized(failedAcks) { failedAcks.clear() }
+        fish.nexa.notify.Notifier.clearAccount()
+        fish.nexa.ui.layers.Layers.clear()
+        fish.nexa.ui.nav.Nav.reset()
+        fish.nexa.media.Media.clear()
     }
 
     companion object {

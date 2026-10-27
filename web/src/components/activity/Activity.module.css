@@ -60,3 +60,7 @@ a.title:hover, a.line:hover { text-decoration: underline; }
 /* the emoji sits in the line of words: images are block by default here,
    which put it on a line of its own and broke the status in two */
 .statusEmoji { display: inline-block; width: 1.15em; height: 1.15em; margin-inline-end: 5px; vertical-align: -0.22em; object-fit: contain; }
+
+/* A custom label never hides its destination from a touch-screen reader. */
+.destination { display: block; font-size: 11px; font-weight: 400; line-height: 15px; color: var(--text-muted); overflow-wrap: anywhere; white-space: normal; unicode-bidi: isolate; }
+.button { flex-direction: column; min-height: 48px; white-space: normal; }

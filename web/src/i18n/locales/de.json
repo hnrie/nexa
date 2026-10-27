@@ -7152,5 +7152,8 @@
   "whatsNew.r202610265.demoTitle": "Nexa vor der Anmeldung Ausprobieren",
   "whatsNew.r202610265.demoBody": "Erkunde die echte App direkt auf der Startseite, von Anfang an. Änderungen bleiben in der Demo und verschwinden beim Neuladen.",
   "whatsNew.r202610266.openSourceBody": "Entdecke den Code und trage auf GitHub bei. Du findest das Repository auf der Startseite, in den Einstellungen und unter „Über Nexa“.",
-  "whatsNew.r202610266.openSourceTitle": "Nexa Ist Open Source"
+  "whatsNew.r202610266.openSourceTitle": "Nexa Ist Open Source",
+  "shell.requiredUpdate.manualRequired": "Lade die neue Desktop-App herunter, installiere sie und öffne Nexa erneut. Behalte deine vorhandenen App-Daten.",
+  "whatsNew.r202610267.desktopSecurityTitle": "Sicherheitsupdate für die Desktop-App",
+  "whatsNew.r202610267.desktopSecurityBody": "Installiere die neue Desktop-App einmal. Künftige Desktop-Updates prüfen, ob sie von Nexa stammen."
 }

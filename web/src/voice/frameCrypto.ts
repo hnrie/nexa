@@ -85,23 +85,32 @@ export async function sealFrame(key: CryptoKey, index: number, iv: Uint8Array, d
   return out;
 }
 
+/** Full epochs stay distinct locally even when their legacy low-byte wire
+ * indexes collide. At most the existing eight retained epochs are tried. */
+function candidates(keys: ReadonlyMap<number, CryptoKey>, index: number): CryptoKey[] {
+  return [...keys].filter(([epoch]) => (epoch & 0xff) === index).slice(-8).reverse().map(([, key]) => key);
+}
+
 /** The frame as it was sealed, or null when no key opens it or it was altered. */
 export async function openFrame(keys: ReadonlyMap<number, CryptoKey>, data: Uint8Array, clear: number): Promise<Uint8Array | null> {
   if (data.length < TRAILER + TAG_BYTES) return null;
-  const key = keys.get(data[data.length - 1]!);
-  if (!key) return null;
+  const possible = candidates(keys, data[data.length - 1]!);
+  if (possible.length === 0) return null;
   const body = data.length - TRAILER;
   const n = Math.min(clear, body - TAG_BYTES);
   const iv = data.slice(body, body + IV_BYTES);
-  try {
-    const plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: data.subarray(0, n) as BufferSource }, key, data.subarray(n, body) as BufferSource));
-    const out = new Uint8Array(n + plain.length);
-    out.set(data.subarray(0, n), 0);
-    out.set(plain, n);
-    return out;
-  } catch {
-    return null;
+  for (const key of possible) {
+    try {
+      const plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: data.subarray(0, n) as BufferSource }, key, data.subarray(n, body) as BufferSource));
+      const out = new Uint8Array(n + plain.length);
+      out.set(data.subarray(0, n), 0);
+      out.set(plain, n);
+      return out;
+    } catch {
+      // Another retained epoch can share this wire index.
+    }
   }
+  return null;
 }
 
 /** What sealing adds after an H.264 frame's last NAL unit: the tag, the iv and the key index. */
@@ -184,8 +193,8 @@ export async function sealH264Frame(key: CryptoKey, index: number, iv: Uint8Arra
 /** An H.264 frame as it was sealed, or null when no key opens it or it was altered. */
 export async function openH264Frame(keys: ReadonlyMap<number, CryptoKey>, data: Uint8Array): Promise<Uint8Array | null> {
   if (data.length < H264_TRAILER + START_CODE.length + 1) return null;
-  const key = keys.get(data[data.length - 1]!);
-  if (!key) return null;
+  const possible = candidates(keys, data[data.length - 1]!);
+  if (possible.length === 0) return null;
   const bodyLen = data.length - H264_TRAILER;
   const body = data.subarray(0, bodyLen);
   const layout = h264Layout(body);
@@ -194,17 +203,22 @@ export async function openH264Frame(keys: ReadonlyMap<number, CryptoKey>, data: 
   const { aad, secret } = h264Parts(body, nalus, clear, TAG_BYTES);
   secret.set(data.subarray(bodyLen, bodyLen + TAG_BYTES), secret.length - TAG_BYTES);
   const iv = data.slice(bodyLen + TAG_BYTES, bodyLen + TAG_BYTES + IV_BYTES);
-  let plain: Uint8Array;
-  try {
-    plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: aad as BufferSource }, key, secret as BufferSource));
-  } catch {
-    return null;
+  let plain: Uint8Array | null = null;
+  for (const key of possible) {
+    try {
+      plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: aad as BufferSource }, key, secret as BufferSource));
+      break;
+    } catch {
+      // Another retained epoch can share this wire index.
+    }
   }
+  if (plain === null) return null;
+  const opened = plain;
   const out = body.slice();
   let c = 0;
   nalus.forEach((n, i) => {
     const mid = n.payload + clear[i]!;
-    out.set(plain.subarray(c, c + n.end - mid), mid);
+    out.set(opened.subarray(c, c + n.end - mid), mid);
     c += n.end - mid;
   });
   return out;

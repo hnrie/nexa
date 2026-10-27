@@ -294,10 +294,10 @@ scope.onmessage = (e) => {
   if (msg.type === "keys") {
     keysReady = keysReady.then(async () => {
       const next = new Map<number, CryptoKey>();
-      for (const k of msg.keys) next.set(k.index & 0xff, await importFrameKey(k.raw));
+      for (const k of msg.keys) next.set(k.index, await importFrameKey(k.raw));
       keys.clear();
       for (const [index, key] of next) keys.set(index, key);
-      sendIndex = msg.send & 0xff;
+      sendIndex = msg.send;
     });
   } else if (msg.type === "redundancy") {
     redundancy = Math.max(0, Math.min(2, msg.depth | 0));

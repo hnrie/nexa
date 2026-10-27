@@ -29,6 +29,19 @@ class MessageLimitsTest {
         assertEquals("file", broken("""{"att":[${file("n".repeat(256))}]}"""))
     }
 
+    @Test fun attachmentIdsCannotReadOutsideTheMediaCache() {
+        for (id in listOf("../private/case-1", "../../files/secret", "/tmp/file", "123/../../api/v1/users/@me", "%2e%2e%2ffile", "1?x=2", "1#x", "1\\file", "", "1".repeat(21), "1\n")) {
+            val payload = kotlinx.serialization.json.buildJsonObject {
+                put("blob_id", kotlinx.serialization.json.JsonPrimitive(id))
+                put("name", kotlinx.serialization.json.JsonPrimitive("file.png"))
+                put("type", kotlinx.serialization.json.JsonPrimitive("image/png"))
+                put("size", kotlinx.serialization.json.JsonPrimitive(10))
+                put("key", kotlinx.serialization.json.JsonPrimitive("key"))
+            }
+            assertNull(id, MessageCrypto.sanitizeAttachment(payload))
+        }
+    }
+
     @Test fun previewsStickersAndPolls() {
         assertNull(broken("""{"embeds":[${List(5) { card() }.joinToString(",")}]}"""))
         assertEquals("embeds", broken("""{"embeds":[${List(6) { card() }.joinToString(",")}]}"""))

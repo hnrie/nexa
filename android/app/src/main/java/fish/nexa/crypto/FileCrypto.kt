@@ -95,7 +95,8 @@ object FileCrypto {
      * each chunk authenticates. Throws [DecryptError] on anything altered or
      * cut short; whatever was written before that must be thrown away.
      */
-    fun decryptStream(input: InputStream, key: ByteArray, output: OutputStream, onProgress: ((Long) -> Unit)? = null): Long {
+    fun decryptStream(input: InputStream, key: ByteArray, output: OutputStream, expectedSize: Long? = null, onProgress: ((Long) -> Unit)? = null): Long {
+        if (expectedSize != null && expectedSize < 0) throw DecryptError("file: invalid size")
         val din = DataInputStream(input)
         val header = ByteArray(HEADER_LEN)
         try {
@@ -130,12 +131,16 @@ object FileCrypto {
             } catch (_: DecryptError) {
                 throw DecryptError("file: chunk failed to authenticate")
             }
+            if (expectedSize != null && pt.size.toLong() != minOf(CHUNK.toLong(), expectedSize - done)) {
+                throw DecryptError("file: unexpected chunk size")
+            }
             output.write(pt)
             done += pt.size
             onProgress?.invoke(done)
             i++
         }
         if (i == 0) throw DecryptError("file: no chunks")
+        if (expectedSize != null && (done != expectedSize || i != chunkCount(expectedSize))) throw DecryptError("file: truncated file")
         return done
     }
 

@@ -48,6 +48,17 @@ func (m *Store) animatedVariant(ctx context.Context, b *store.Blob, size int) (s
 	if err != nil {
 		return "", err
 	}
+	if err := checkGIFWork(bufio.NewReader(src), maxCropFrames, maxAnimatedWork); err != nil {
+		src.Close()
+		if errors.Is(err, ErrTooManyFrames) {
+			return "", errTooMuchAnimation
+		}
+		return "", err
+	}
+	if _, err := src.Seek(0, 0); err != nil {
+		src.Close()
+		return "", err
+	}
 	g, err := gif.DecodeAll(bufio.NewReader(src))
 	src.Close()
 	if err != nil {

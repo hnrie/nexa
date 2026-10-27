@@ -15,6 +15,7 @@
 import { app, BrowserWindow } from "electron";
 import { execFile } from "node:child_process";
 import os from "node:os";
+import { testHook } from "./config";
 
 type Log = (msg: string, extra?: Record<string, unknown>) => void;
 
@@ -23,8 +24,8 @@ export const WINDOWS_PROCESS_LOOPBACK_BUILD = 19041;
 
 /** Whether this computer can share one program's sound: Windows 10 2004 and later, macOS 14.2 and later. */
 export function windowAudioSupported(): boolean {
-  if (process.env.EVILION_WINDOW_AUDIO === "0") return false;
-  if (process.env.EVILION_WINDOW_AUDIO === "1") return true;
+  if (testHook("EVILION_WINDOW_AUDIO") === "0") return false;
+  if (testHook("EVILION_WINDOW_AUDIO") === "1") return true;
   const [major = 0, minor = 0, build = 0] = os.release().split(".").map(Number);
   if (process.platform === "win32") return build >= WINDOWS_PROCESS_LOOPBACK_BUILD;
   // Darwin 23.2 is macOS 14.2, where Chromium captures loopback through Core Audio taps.
@@ -202,7 +203,8 @@ export async function windowAudioDevice(sourceId: string, log: Log): Promise<str
   // the program is looked up even where its sound alone cannot be captured, to keep a voice changer out
   const supported = windowAudioSupported();
   // tests of the fallback ask for a device that cannot start
-  if (supported && process.env.EVILION_TEST_PROGRAM_AUDIO_DEVICE) return process.env.EVILION_TEST_PROGRAM_AUDIO_DEVICE;
+  const testDevice = testHook("EVILION_TEST_PROGRAM_AUDIO_DEVICE");
+  if (supported && testDevice) return testDevice;
   try {
     if (process.platform === "win32") return windowsDevice(id, supported, log);
     if (process.platform === "darwin") return await macDevice(id, supported, log);

@@ -143,7 +143,11 @@ func TestClientIP(t *testing.T) {
 	r.RemoteAddr = "127.0.0.1:1"
 	r.Header.Del("CF-Connecting-IP")
 	r.Header.Set("X-Forwarded-For", "10.1.1.1, 127.0.0.1")
-	if ClientIP(r) != "10.1.1.1" {
-		t.Error("xff first hop")
+	if ClientIP(r) != "127.0.0.1" {
+		t.Error("untrusted XFF must not choose the visitor's rate-limit key")
+	}
+	r.Header.Set("CF-Connecting-IP", "invalid-client-address")
+	if ClientIP(r) != "127.0.0.1" {
+		t.Error("invalid proxy address must fall back to the peer")
 	}
 }

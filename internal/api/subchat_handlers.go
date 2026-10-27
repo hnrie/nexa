@@ -242,6 +242,10 @@ func (s *Server) handleSubchatDelete(w http.ResponseWriter, r *http.Request, ch 
 		WriteError(w, E(http.StatusForbidden, "not_allowed", "Only whoever opened this subchat can delete it."))
 		return
 	}
+	if !s.unlocked(r, ch) {
+		WriteError(w, E(http.StatusForbidden, "locked", "This subchat asks for its password first."))
+		return
+	}
 	// it takes the room away from everyone in it, which a muted account cannot
 	if mutedFor(w, r) {
 		return

@@ -327,10 +327,9 @@ func (s *Server) dmBlocked(w http.ResponseWriter, r *http.Request, ch *store.Cha
 }
 
 // checkEnvelope validates the ciphertext against the channel's conversation.
-// An edit may instead keep the conversation its message was first sealed for,
-// passed as alt: a channel that later got its own key still has older
-// messages under the server's.
-func (s *Server) checkEnvelope(w http.ResponseWriter, r *http.Request, ch *store.Channel, body *messageBody, alt *ids.ID) (*envelope, bool) {
+// Edits use the channel's current conversation too: its old server key may
+// belong to people who can no longer read a channel that became private.
+func (s *Server) checkEnvelope(w http.ResponseWriter, r *http.Request, ch *store.Channel, body *messageBody) (*envelope, bool) {
 	// told apart from a malformed envelope, so the sender can say what to do
 	if len(body.Ciphertext) > maxEnvelopeBytes {
 		WriteError(w, errMessageTooLong)
@@ -346,9 +345,6 @@ func (s *Server) checkEnvelope(w http.ResponseWriter, r *http.Request, ch *store
 		WriteError(w, err)
 		return nil, false
 	}
-	if alt != nil && !alt.IsZero() && env.Conv == *alt {
-		conv = *alt
-	}
 	if env.Conv != conv || body.KeyConvID != conv || env.Epoch != body.KeyEpoch {
 		WriteError(w, E(http.StatusBadRequest, "wrong_conversation", "The message is encrypted for a different conversation."))
 		return nil, false
@@ -360,6 +356,10 @@ func (s *Server) checkEnvelope(w http.ResponseWriter, r *http.Request, ch *store
 	}
 	if !exists || env.Epoch > latest {
 		WriteError(w, E(http.StatusBadRequest, "unknown_epoch", "That key epoch does not exist yet."))
+		return nil, false
+	}
+	if env.Epoch < latest {
+		WriteError(w, store.ErrStaleEpoch)
 		return nil, false
 	}
 	return env, true
@@ -507,7 +507,7 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 	if !s.mayTalkYet(w, r, ch, me) {
 		return
 	}
-	env, ok := s.checkEnvelope(w, r, ch, &body, nil)
+	env, ok := s.checkEnvelope(w, r, ch, &body)
 	if !ok {
 		return
 	}
@@ -633,7 +633,7 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		m.Attachments = append(m.Attachments, store.Attachment{BlobID: a.BlobID, Size: b.Size})
 	}
-	if err := s.Store.InsertMessage(ctx, m); err != nil {
+	if err := s.Store.InsertEncryptedMessage(ctx, m); err != nil {
 		if errors.Is(err, store.ErrAlreadyExists) {
 			if existing, err := s.Store.MessageByNonce(ctx, ch.ID, me.ID, body.Nonce, me.ID); err == nil {
 				WriteJSON(w, http.StatusOK, existing)
@@ -736,7 +736,7 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 		if s.dmBlocked(w, r, ch, me) {
 			return
 		}
-		env, ok := s.checkEnvelope(w, r, ch, &body, m.KeyConvID)
+		env, ok := s.checkEnvelope(w, r, ch, &body)
 		if !ok {
 			return
 		}
@@ -759,7 +759,7 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, err)
 			return
 		}
-		if err := s.Store.UpdateMessage(r.Context(), mid, body.Ciphertext, env.Conv, env.Epoch, dedupeIDs(body.Mentions, maxMentions), s.allowedRoleMentions(r.Context(), me, ch, body.MentionRoles), body.MentionEveryone, time.Now().UnixMilli()); err != nil {
+		if err := s.Store.UpdateEncryptedMessage(r.Context(), mid, body.Ciphertext, env.Conv, env.Epoch, dedupeIDs(body.Mentions, maxMentions), s.allowedRoleMentions(r.Context(), me, ch, body.MentionRoles), body.MentionEveryone, time.Now().UnixMilli()); err != nil {
 			WriteError(w, err)
 			return
 		}

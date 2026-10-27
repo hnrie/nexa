@@ -11,7 +11,7 @@
 
 import { hkdf } from "@noble/hashes/hkdf";
 import { sha256 } from "@noble/hashes/sha256";
-import { b64, randomBytes, utf8 } from "@/crypto/bytes";
+import { b64, equal, randomBytes, utf8 } from "@/crypto/bytes";
 import { deriveEncKey, deriveMaster, type KdfParams } from "@/crypto/kdf";
 import type { AppLockPolicy } from "@/stores/settings";
 import { unwrapPrivateKey, wrapPrivateKey, type Identity } from "@/crypto/keys";
@@ -218,7 +218,7 @@ export async function adoptPolicy(userId: string, identity: Identity, passcode: 
   // branch for a device that has no wrapped key yet, so there is none to throw
   // away and the tries the message used to promise were never enforced. It
   // read "9 tries left" however many times the passcode was got wrong.
-  if (verifierOf(key) !== policy.verifier) throw new WrongPasscode(null);
+  if (!equal(utf8.enc(verifierOf(key)), utf8.enc(policy.verifier))) throw new WrongPasscode(null);
   const wrapped = await wrapPrivateKey(identity.privateKey, key);
   const next: LockConfig = {
     v: 1,

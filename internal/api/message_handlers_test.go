@@ -87,8 +87,8 @@ func TestBlockClosesAnExistingDM(t *testing.T) {
 	_ = idA
 }
 
-// An edit sealed under another epoch, or under the conversation the message
-// was first sent in, is stored with the key that opens it.
+// An edit uses the current epoch and conversation, including after a channel
+// becomes private: the old server key belongs to people now excluded.
 func TestEditKeepsTheKeyThatOpensIt(t *testing.T) {
 	_, ts := newTestServer(t)
 	tokA, _ := register(t, ts, "alice")
@@ -110,7 +110,7 @@ func TestEditKeepsTheKeyThatOpensIt(t *testing.T) {
 		t.Errorf("stored epoch: %v", body)
 	}
 
-	// a channel that gets its own key keeps older messages editable under the server's
+	// A private channel must not publish new edits under the old server key.
 	view := createServer(t, ts, tokA, "Keys")
 	sid := view["id"].(string)
 	createEpoch(t, ts, tokA, sid)
@@ -126,8 +126,8 @@ func TestEditKeepsTheKeyThatOpensIt(t *testing.T) {
 	}
 	createEpoch(t, ts, tokA, staff)
 	res, body = do(t, ts, "PATCH", "/api/v1/channels/"+staff+"/messages/"+old, tokA, map[string]any{"ciphertext": envelopeFor(sid, 0, "fixed"), "key_conv_id": sid, "key_epoch": 0})
-	if res.StatusCode != 200 || body["key_conv_id"] != sid {
-		t.Errorf("edit under the message's own conversation: %d %v", res.StatusCode, body)
+	if res.StatusCode != 400 || errCode(body) != "wrong_conversation" {
+		t.Errorf("edit disclosed under the old shared conversation: %d %v", res.StatusCode, body)
 	}
 	res, body = do(t, ts, "PATCH", "/api/v1/channels/"+staff+"/messages/"+old, tokA, map[string]any{"ciphertext": envelopeFor(staff, 0, "moved"), "key_conv_id": staff, "key_epoch": 0})
 	if res.StatusCode != 200 || body["key_conv_id"] != staff {
@@ -135,6 +135,26 @@ func TestEditKeepsTheKeyThatOpensIt(t *testing.T) {
 	}
 	if res, body = do(t, ts, "PATCH", "/api/v1/channels/"+staff+"/messages/"+old, tokA, map[string]any{"ciphertext": envelopeFor(dm, 0, "elsewhere"), "key_conv_id": dm, "key_epoch": 0}); res.StatusCode != 400 || errCode(body) != "wrong_conversation" {
 		t.Errorf("edit under an unrelated conversation: %d %v", res.StatusCode, body)
+	}
+}
+
+func TestNewMessagesAndEditsRefuseAnOldEpoch(t *testing.T) {
+	_, ts := newTestServer(t)
+	token, _ := register(t, ts, "alice")
+	_, bob := register(t, ts, "bob")
+	ch := dmBetween(t, ts, token, bob)
+	createEpoch(t, ts, token, ch)
+	_, original := sendMsg(t, ts, token, ch, ch, 0, "before rotation", "before", nil)
+	id := original["id"].(string)
+	createEpoch(t, ts, token, ch)
+	if res, body := sendMsg(t, ts, token, ch, ch, 0, "stale new text", "stale", nil); res.StatusCode != 409 || errCode(body) != "stale_epoch" {
+		t.Fatalf("new message with removed members' old key: %d %v", res.StatusCode, body)
+	}
+	if res, body := do(t, ts, "PATCH", "/api/v1/channels/"+ch+"/messages/"+id, token, map[string]any{"ciphertext": envelopeFor(ch, 0, "stale edit"), "key_conv_id": ch, "key_epoch": 0}); res.StatusCode != 409 || errCode(body) != "stale_epoch" {
+		t.Fatalf("edit with removed members' old key: %d %v", res.StatusCode, body)
+	}
+	if res, body := sendMsg(t, ts, token, ch, ch, 1, "current key", "current", nil); res.StatusCode != 201 {
+		t.Fatalf("current epoch rejected: %d %v", res.StatusCode, body)
 	}
 }
 

@@ -1,9 +1,57 @@
 package api
 
 import (
+	"bytes"
 	"testing"
 	"time"
+
+	"evilion.xyz/chat/internal/ids"
 )
+
+func TestARecipientCanRejectOnlyItsExactUnusableGrant(t *testing.T) {
+	srv, ts := newTestServer(t)
+	a, idA := register(t, ts, "alice")
+	b, idB := register(t, ts, "bob")
+	conv := dmBetween(t, ts, a, idB)
+	// The usual fixture also grants everyone; create the epoch alone so the
+	// poisoned wrapper really is the first stored for this recipient.
+	if res, body := do(t, ts, "POST", "/api/v1/keys/epochs", a, map[string]any{"conv_id": conv}); res.StatusCode != 201 {
+		t.Fatalf("epoch: %d %v", res.StatusCode, body)
+	}
+	bad := []byte("unopenable grant")
+	for _, target := range []string{idA, idB} {
+		if res, body := do(t, ts, "POST", "/api/v1/keys/grants", a, []map[string]any{{"conv_id": conv, "epoch": 0, "user_id": target, "wrapped_key": b64(bad)}}); res.StatusCode != 200 {
+			t.Fatalf("grant: %d %v", res.StatusCode, body)
+		}
+	}
+	cid, _ := ids.Parse(conv)
+	bob, _ := ids.Parse(idB)
+	// A stale report cannot remove a different wrapper that replaced it.
+	if res, _ := do(t, ts, "POST", "/api/v1/keys/request", b, map[string]any{"conv_id": conv, "bad_epoch": 0, "bad_wrapped_key": b64([]byte("different"))}); res.StatusCode != 204 {
+		t.Fatal(res.StatusCode)
+	}
+	if _, err := srv.Store.Grant(t.Context(), cid, 0, bob); err != nil {
+		t.Fatal("different wrapper was deleted", err)
+	}
+	if res, _ := do(t, ts, "POST", "/api/v1/keys/request", b, map[string]any{"conv_id": conv, "bad_epoch": 0, "bad_wrapped_key": b64(bad)}); res.StatusCode != 204 {
+		t.Fatal(res.StatusCode)
+	}
+	if got, err := srv.Store.Grant(t.Context(), cid, 0, bob); err == nil {
+		t.Fatalf("unusable grant still prevents a replacement: %q (expected %q)", got.WrappedKey, bad)
+	}
+	good := []byte("replacement grant")
+	if res, body := do(t, ts, "POST", "/api/v1/keys/grants", a, []map[string]any{{"conv_id": conv, "epoch": 0, "user_id": idB, "wrapped_key": b64(good)}}); res.StatusCode != 200 {
+		t.Fatalf("replacement: %d %v", res.StatusCode, body)
+	}
+	grant, err := srv.Store.Grant(t.Context(), cid, 0, bob)
+	if err != nil || !bytes.Equal(grant.WrappedKey, good) {
+		t.Fatalf("replacement not stored: %v", err)
+	}
+	alice, _ := ids.Parse(idA)
+	if _, err := srv.Store.Grant(t.Context(), cid, 0, alice); err != nil {
+		t.Fatal("recipient deleted someone else's grant", err)
+	}
+}
 
 func TestKeyGrantsAndNeeds(t *testing.T) {
 	_, ts := newTestServer(t)

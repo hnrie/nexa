@@ -18,12 +18,12 @@ import (
 
 // dialFrom opens a socket that looks as though it came from ip. The test
 // server listens on loopback, which ClientIP treats as "the proxy did not say"
-// and so reads the forwarded header — which is also how the real deployment
+// and so reads Cloudflare's visitor header, as the real deployment
 // behind cloudflared sees an address.
 func (e *testEnv) dialFrom(t *testing.T, ip string) (*websocket.Conn, error) {
 	t.Helper()
 	ws, _, err := websocket.Dial(context.Background(), "ws"+strings.TrimPrefix(e.ts.URL, "http"),
-		&websocket.DialOptions{HTTPHeader: http.Header{"Origin": {"http://localhost"}, "X-Forwarded-For": {ip}}})
+		&websocket.DialOptions{HTTPHeader: http.Header{"Origin": {"http://localhost"}, "CF-Connecting-IP": {ip}}})
 	if err == nil {
 		t.Cleanup(func() { ws.Close(websocket.StatusNormalClosure, "") })
 	}

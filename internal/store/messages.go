@@ -15,6 +15,8 @@ import (
 // ErrLimit is returned when a per-object cap is reached.
 var ErrLimit = errors.New("limit reached")
 
+var ErrStaleEpoch = errors.New("message key epoch is no longer current")
+
 // MaxReactionEmoji caps distinct emoji per message.
 const MaxReactionEmoji = 20
 
@@ -116,6 +118,16 @@ func scanMessage(r rowScanner) (*Message, error) {
 // message and references attachment blobs. A duplicate nonce returns
 // ErrAlreadyExists.
 func (s *Store) InsertMessage(ctx context.Context, m *Message) error {
+	return s.insertMessage(ctx, m, false)
+}
+
+// InsertEncryptedMessage checks the current epoch under the same transaction
+// lock as epoch creation, so a rotation cannot race the message's admission.
+func (s *Store) InsertEncryptedMessage(ctx context.Context, m *Message) error {
+	return s.insertMessage(ctx, m, true)
+}
+
+func (s *Store) insertMessage(ctx context.Context, m *Message, currentKey bool) error {
 	if m.ID.IsZero() {
 		m.ID = ids.New()
 	}
@@ -152,6 +164,14 @@ func (s *Store) InsertMessage(ctx context.Context, m *Message) error {
 		plain = string(b)
 	}
 	return s.Tx(ctx, func(tx *db.Tx) error {
+		if currentKey {
+			if m.KeyConvID == nil || m.KeyEpoch == nil {
+				return ErrStaleEpoch
+			}
+			if err := requireCurrentEpoch(ctx, tx, *m.KeyConvID, *m.KeyEpoch); err != nil {
+				return err
+			}
+		}
 		res, err := tx.ExecContext(ctx, `INSERT INTO messages (`+messageInsertCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(channel_id, author_id, nonce) WHERE nonce IS NOT NULL DO NOTHING`,
 			int64(m.ID), int64(m.ChannelID), int64(m.AuthorID), m.Type, ct, nullID(m.KeyConvID), epoch, nullID(m.ReplyToID), idsJSON(m.Mentions), idsJSON(m.MentionRoles), boolInt(m.MentionEveryone), m.Flags, nonce, nullInt64(m.EditedAt), m.CreatedAt, nullID(m.WebhookID), plain, boolInt(len(m.Attachments) > 0))
 		if err != nil {
@@ -403,19 +423,49 @@ func (s *Store) hydrate(ctx context.Context, msgs []*Message, forUser ids.ID) er
 
 // UpdateMessage replaces the ciphertext and mention metadata.
 func (s *Store) UpdateMessage(ctx context.Context, id ids.ID, ciphertext json.RawMessage, keyConv ids.ID, keyEpoch int, mentions, roles []ids.ID, everyone bool, editedAt int64) error {
+	return s.updateMessage(ctx, id, ciphertext, keyConv, keyEpoch, mentions, roles, everyone, editedAt, false)
+}
+
+// UpdateEncryptedMessage applies the same epoch rule to edits as new sends.
+func (s *Store) UpdateEncryptedMessage(ctx context.Context, id ids.ID, ciphertext json.RawMessage, keyConv ids.ID, keyEpoch int, mentions, roles []ids.ID, everyone bool, editedAt int64) error {
+	return s.updateMessage(ctx, id, ciphertext, keyConv, keyEpoch, mentions, roles, everyone, editedAt, true)
+}
+
+func requireCurrentEpoch(ctx context.Context, tx *db.Tx, conv ids.ID, epoch int) error {
+	if err := tx.Serialise(ctx, "epoch", int64(conv)); err != nil {
+		return err
+	}
+	var latest sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `SELECT max(epoch) FROM key_epochs WHERE conv_id = ?`, int64(conv)).Scan(&latest); err != nil {
+		return err
+	}
+	if !latest.Valid || latest.Int64 != int64(epoch) {
+		return ErrStaleEpoch
+	}
+	return nil
+}
+
+func (s *Store) updateMessage(ctx context.Context, id ids.ID, ciphertext json.RawMessage, keyConv ids.ID, keyEpoch int, mentions, roles []ids.ID, everyone bool, editedAt int64, currentKey bool) error {
 	// written the way InsertMessage writes it: no conversation is NULL, not 0
 	var conv *ids.ID
 	if !keyConv.IsZero() {
 		conv = &keyConv
 	}
-	res, err := s.db.W.ExecContext(ctx, `UPDATE messages SET ciphertext = ?, key_conv_id = ?, key_epoch = ?, mentions = ?, mention_roles = ?, mention_everyone = ?, edited_at = ? WHERE id = ?`, string(ciphertext), nullID(conv), keyEpoch, idsJSON(mentions), idsJSON(roles), boolInt(everyone), editedAt, int64(id))
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return s.Tx(ctx, func(tx *db.Tx) error {
+		if currentKey {
+			if err := requireCurrentEpoch(ctx, tx, keyConv, keyEpoch); err != nil {
+				return err
+			}
+		}
+		res, err := tx.ExecContext(ctx, `UPDATE messages SET ciphertext = ?, key_conv_id = ?, key_epoch = ?, mentions = ?, mention_roles = ?, mention_everyone = ?, edited_at = ? WHERE id = ?`, string(ciphertext), nullID(conv), keyEpoch, idsJSON(mentions), idsJSON(roles), boolInt(everyone), editedAt, int64(id))
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNotFound
+		}
+		return nil
+	})
 }
 
 // SetMessageFlags overwrites the flags bitfield.

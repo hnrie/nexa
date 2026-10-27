@@ -17,11 +17,13 @@
  * on, so a newer release published meanwhile replaces it instead of being
  * installed old and then updated again straight after.
  */
-import { app, net } from "electron";
+import { app } from "electron";
 import { EventEmitter } from "node:events";
 import type { UpdateState } from "../../shared/bridge";
 import { compareVersions, parseManifest } from "./manifest";
 import { MAC_FEED, canReplace, installMacUpdate, stageMacUpdate, type MacUpdate } from "./mac";
+import { testHook } from "../config";
+import { fetchRelease } from "./releaseSignature";
 
 const FIRST_CHECK_MS = 10_000;
 const EVERY_MS = 60_000;
@@ -71,7 +73,7 @@ export class Updater extends EventEmitter {
   }
 
   start(): void {
-    if (!app.isPackaged && !process.env.EVILION_UPDATE_TEST) return;
+    if (!app.isPackaged && !testHook("EVILION_UPDATE_TEST")) return;
     setTimeout(() => void this.check({ quiet: true }), FIRST_CHECK_MS);
     this.timer = setInterval(() => {
       if (this.busy && Date.now() - this.activity > STALL_MS) this.giveUp();
@@ -154,17 +156,16 @@ export class Updater extends EventEmitter {
 
   /** The newest version published for this build. */
   private async published(): Promise<string | null> {
-    const feed = this.kind === "mac" ? MAC_FEED : process.platform === "win32" ? "latest.yml" : "latest-linux.yml";
-    const res = await net.fetch(new URL(feed, this.feed).toString(), { cache: "no-store", signal: AbortSignal.timeout(60_000) });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`update server answered ${res.status}`);
-    return parseManifest(await res.text()).version || null;
+    const feed = this.kind === "mac" ? MAC_FEED : process.platform === "win32" ? "signed-latest.yml" : "signed-latest-linux.yml";
+    const body = await fetchRelease(this.feed, feed);
+    return body === null ? null : parseManifest(body).version || null;
   }
 
   private async checkAuto(run: number): Promise<void> {
     if (!this.auto) {
       const { autoUpdater } = await import("electron-updater");
-      autoUpdater.setFeedURL({ provider: "generic", url: this.feed });
+      const { SignedReleaseProvider } = await import("./provider");
+      autoUpdater.setFeedURL({ provider: "custom", updateProvider: SignedReleaseProvider, url: this.feed });
       autoUpdater.autoDownload = true;
       autoUpdater.autoInstallOnAppQuit = false;
       autoUpdater.logger = null;
@@ -218,15 +219,14 @@ export class Updater extends EventEmitter {
   }
 
   private async checkManual(): Promise<void> {
-    const newer = await this.newerThanRunning("latest-linux.yml");
+    const newer = await this.newerThanRunning("signed-latest-linux.yml");
     this.set(newer ? { status: "manual", version: newer, downloadUrl: this.downloadPage, lastCheck: Date.now() } : { status: "idle", lastCheck: Date.now() });
   }
 
   private async newerThanRunning(manifest: string): Promise<string | null> {
-    const res = await net.fetch(new URL(manifest, this.feed).toString(), { cache: "no-store", signal: AbortSignal.timeout(60_000) });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`update server answered ${res.status}`);
-    const m = parseManifest(await res.text());
+    const body = await fetchRelease(this.feed, manifest);
+    if (body === null) return null;
+    const m = parseManifest(body);
     return m.version && compareVersions(m.version, app.getVersion()) > 0 ? m.version : null;
   }
 

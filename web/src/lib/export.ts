@@ -222,7 +222,10 @@ export async function exportMyData(onProgress: (text: string) => void): Promise<
   onProgress(t("export.readingProfile"));
   const me = await usersApi.me();
   entries.push({ name: "profile.json", data: json(me) });
-  entries.push({ name: "settings.json", data: json(useSettings.getState().settings) });
+  // The synchronized lock policy contains a passcode verifier and its KDF
+  // parameters. A plaintext export must not become an offline guessing kit.
+  const { appLock: _lockPolicy, ...settings } = useSettings.getState().settings;
+  entries.push({ name: "settings.json", data: json(settings) });
   onProgress(t("export.readingFriends"));
   entries.push({ name: "relationships.json", data: json(await relationshipsApi.list()) });
   const dms: Channel[] = await channelsApi.listDMs();

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import { allMessages, buildZip, crc32, exportMyData, type Pace } from "./export";
+import { useSettings } from "@/stores/settings";
 
 // A channel of 250 messages with ids 1…250, served the way the server does:
 // newest page first, each page sorted oldest first.
@@ -102,6 +103,24 @@ describe("zip writer", () => {
 describe("channel history export", () => {
   afterEach(() => {
     server.list = null;
+  });
+
+  it("omits the app-lock passcode verifier from plaintext exports", async () => {
+    const previous = useSettings.getState().settings;
+    useSettings.setState({ settings: { ...previous, appLock: { salt: "private-lock-salt", params: { m: 65536, t: 6, p: 1, v: 1 }, verifier: "private-lock-verifier", autoLockMs: 300000, lockOnBlur: false, blurDelayMs: 0 } } });
+    server.list = async () => [];
+    try {
+      const zip = await exportMyData(() => undefined);
+      const settings = JSON.parse(fileIn(zip, "settings.json"));
+      expect(settings).not.toHaveProperty("appLock");
+      expect(settings.theme).toBe(previous.theme);
+      const contents = new TextDecoder().decode(zip);
+      expect(contents).not.toContain("private-lock-verifier");
+      expect(contents).not.toContain("private-lock-salt");
+      expect(useSettings.getState().settings.appLock?.verifier).toBe("private-lock-verifier");
+    } finally {
+      useSettings.setState({ settings: previous });
+    }
   });
 
   it("keeps messages oldest first across pages", async () => {

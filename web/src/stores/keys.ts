@@ -23,7 +23,7 @@ interface KeysState {
   waiting: Record<string, true>;
   init: (userId: string, identity: Identity) => Promise<void>;
   ingestGrants: (grants: KeyGrant[]) => Promise<string[]>;
-  ensureConvKey: (conv: string) => Promise<{ epoch: number; root: Uint8Array } | null>;
+  ensureConvKey: (conv: string, current?: boolean) => Promise<{ epoch: number; root: Uint8Array } | null>;
   grantTo: (conv: string, epoch: number, userIds: string[]) => Promise<void>;
   reconcile: () => Promise<void>;
   rotate: (conv: string, reason?: string) => Promise<void>;
@@ -268,7 +268,13 @@ export const useKeys = create<KeysState>()((set, get) => ({
       if (get().identity !== identity) return [];
       for (const [j, root] of roots.entries()) {
         const g = batch[j]!;
-        if (!root || ring.get(g.conv_id, g.epoch)) continue;
+        if (!root || root.length !== 32) {
+          // A row already present used to prevent every honest holder from
+          // replacing an unopenable grant, however often we asked again.
+          await keysApi.request(g.conv_id, g).catch(() => undefined);
+          continue;
+        }
+        if (ring.get(g.conv_id, g.epoch)) continue;
         // In memory the key works at once, whether or not the disk takes it: a
         // dead database handle (iOS after a long time in the background) must
         // not leave messages saying "waiting for key" with the key right here.
@@ -297,7 +303,28 @@ export const useKeys = create<KeysState>()((set, get) => ({
     }
     return changed;
   },
-  ensureConvKey: async (conv) => {
+  ensureConvKey: async (conv, current = false) => {
+    // A sleeping device can hold an old root indefinitely. Before sealing new
+    // text, ask which epoch is current rather than using the newest we hold.
+    if (current) {
+      let info = await keysApi.epochs(conv);
+      if (info.flags.needs_rotation) {
+        await get().rotate(conv, "membership change");
+        info = await keysApi.epochs(conv);
+        if (info.flags.needs_rotation) { get().markWaiting(conv); return null; }
+      }
+      const epoch = info.epochs.at(-1)?.epoch;
+      if (epoch !== undefined) {
+        let root = ring.get(conv, epoch);
+        if (!root) {
+          await get().ingestGrants((await keysApi.grants()).filter((g) => g.conv_id === conv));
+          root = ring.get(conv, epoch);
+        }
+        if (root) return { epoch, root };
+        get().markWaiting(conv);
+        return null;
+      }
+    }
     const latest = ring.latest(conv);
     if (latest) return latest;
     const inflight = pendingEnsure.get(conv);

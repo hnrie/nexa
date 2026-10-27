@@ -54,7 +54,8 @@ type voiceStatePayload struct {
 	CallSince int64 `json:"call_since,omitempty"`
 	// Media maps the kinds this participant publishes through the SFU to a
 	// tag that changes whenever that track is published again.
-	Media map[string]string `json:"media,omitempty"`
+	Media         map[string]string `json:"media,omitempty"`
+	SFUGeneration uint64            `json:"sfu_generation,omitempty"`
 	// Codecs are the video codecs besides VP8 the participant's device can
 	// watch, so a phone knows when it may share its screen in H.264.
 	Codecs []string `json:"codecs,omitempty"`
@@ -83,7 +84,7 @@ type guestMark struct {
 
 func statePayload(st voice.State) voiceStatePayload {
 	ch := st.ChannelID
-	out := voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, Suppress: st.Suppress, JoinedAt: st.JoinedAt, CallSince: st.CallSince, Media: st.Tracks.Tags(), Codecs: st.Codecs, PrioritySpeaker: st.Priority,
+	out := voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, Suppress: st.Suppress, JoinedAt: st.JoinedAt, CallSince: st.CallSince, Media: st.Tracks.Tags(), SFUGeneration: st.SFUGeneration, Codecs: st.Codecs, PrioritySpeaker: st.Priority,
 		User: &callUser{ID: st.UserID, DisplayName: st.Name, AvatarID: st.AvatarID}}
 	if st.Guest {
 		out.User.Flags = store.FlagGuest
@@ -357,7 +358,13 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 					}); ok {
 						st = fresh
 					}
-					c.Send(gateway.EvVoiceResumed, map[string]any{"channel_id": ch.ID, "kept": true})
+					fresh, valid := s.recheckSFUState(ctx, st)
+					if !valid {
+						c.Send(gateway.EvVoiceResumed, map[string]any{"channel_id": ch.ID, "kept": false})
+						return
+					}
+					st = fresh
+					c.Send(gateway.EvVoiceResumed, map[string]any{"channel_id": ch.ID, "kept": st.SFUSession == req.SFUSession})
 					s.sfuSyncLive(st)
 					s.Bcast.EmitUsers(s.voiceAudience(ctx, ch), "voice_state", statePayload(st))
 					return
@@ -396,6 +403,13 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 		if !ok {
 			// they hung up between the join and this read; the leave that
 			// overtook us has already told everyone
+			return
+		}
+		if st.ChannelID != ch.ID || st.ConnID != c.ID() || st.SessionID != c.SessionID() {
+			return
+		}
+		st, valid := s.recheckSFUState(ctx, st)
+		if !valid {
 			return
 		}
 		s.sfuSyncLive(st)
@@ -574,6 +588,7 @@ const (
 type turnCred struct {
 	at      time.Time
 	servers []map[string]any
+	until   time.Time
 }
 
 // rememberTURN keeps a credential for reuse and forgets the ones that have
@@ -581,26 +596,33 @@ type turnCred struct {
 // account that had ever fetched an ICE config kept an entry for the life of
 // the process, deleted accounts included — and two Servers in one process, as
 // the tests make, handed each other's credentials out.
-func (s *Server) rememberTURN(uid ids.ID, servers []map[string]any) {
+func (s *Server) rememberTURN(uid ids.ID, servers []map[string]any, lifetime ...time.Duration) {
 	now := time.Now()
+	reuse := turnReuse
+	if len(lifetime) != 0 {
+		reuse = min(reuse, lifetime[0]-time.Minute)
+	}
+	if reuse <= 0 {
+		return
+	}
 	s.turnMu.Lock()
 	defer s.turnMu.Unlock()
 	if s.turnCreds == nil {
 		s.turnCreds = map[ids.ID]turnCred{}
 	}
 	for id, hit := range s.turnCreds {
-		if now.Sub(hit.at) >= turnReuse {
+		if now.Sub(hit.at) >= turnReuse || !now.Before(hit.until) {
 			delete(s.turnCreds, id)
 		}
 	}
-	s.turnCreds[uid] = turnCred{now, servers}
+	s.turnCreds[uid] = turnCred{at: now, servers: servers, until: now.Add(reuse)}
 }
 
 // reuseTURN returns a credential minted recently enough to hand out again.
 func (s *Server) reuseTURN(uid ids.ID) []map[string]any {
 	s.turnMu.Lock()
 	defer s.turnMu.Unlock()
-	if hit, ok := s.turnCreds[uid]; ok && time.Since(hit.at) < turnReuse {
+	if hit, ok := s.turnCreds[uid]; ok && time.Since(hit.at) < turnReuse && time.Now().Before(hit.until) {
 		return hit.servers
 	}
 	return nil
@@ -613,6 +635,20 @@ var turnClient = &http.Client{Timeout: 6 * time.Second}
 // key never leaves this server. Returns nil when TURN is not configured or
 // the request fails: a call without a relay is better than no call at all.
 func (s *Server) cloudflareTURN(r *http.Request) []map[string]any {
+	me := auth.UserFrom(r.Context())
+	if me == nil {
+		return nil
+	}
+	// Parallel ICE requests share one mint, including on the first request
+	// from a guest before a cached credential exists.
+	value, _, _ := s.turnMint.Do(me.ID.String(), func() (any, error) {
+		return s.mintTURN(r), nil
+	})
+	servers, _ := value.([]map[string]any)
+	return servers
+}
+
+func (s *Server) mintTURN(r *http.Request) []map[string]any {
 	if s.Cfg.TurnKeyID == "" || s.Cfg.TurnAPIToken == "" {
 		return nil
 	}
@@ -623,7 +659,8 @@ func (s *Server) cloudflareTURN(r *http.Request) []map[string]any {
 	ttl := turnTTL
 	guest := auth.GuestFrom(r.Context())
 	if guest != nil {
-		// a guest's relay lasts no longer than the guest may stay, and is minted fresh rather than handed out again
+		// A guest's relay lasts no longer than the guest may stay. Its cache
+		// deadline also stops reuse a minute before that credential expires.
 		ttl = time.Until(time.UnixMilli(guest.ExpiresAt))
 		if ttl > turnTTL {
 			ttl = turnTTL
@@ -631,7 +668,8 @@ func (s *Server) cloudflareTURN(r *http.Request) []map[string]any {
 		if ttl < time.Minute {
 			return nil
 		}
-	} else if servers := s.reuseTURN(me.ID); servers != nil {
+	}
+	if servers := s.reuseTURN(me.ID); servers != nil {
 		return servers
 	}
 
@@ -669,9 +707,7 @@ func (s *Server) cloudflareTURN(r *http.Request) []map[string]any {
 		}
 		list = []map[string]any{one}
 	}
-	if guest == nil {
-		s.rememberTURN(me.ID, list)
-	}
+	s.rememberTURN(me.ID, list, ttl)
 	return list
 }
 
@@ -744,7 +780,7 @@ func (s *Server) handleCallSummary(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusForbidden, "not_caller", "Only whoever started the call can say how it went."))
 		return
 	}
-	env, ok := s.checkEnvelope(w, r, ch, &body, nil)
+	env, ok := s.checkEnvelope(w, r, ch, &body)
 	if !ok {
 		return
 	}
@@ -912,14 +948,19 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		// "0"; clients add that participant and nothing ever removes it,
 		// because no leave for id 0 will arrive.
 		if updated, ok := s.Voice.Update(uid, func(x *voice.State) {
+			if x.ChannelID != st.ChannelID || x.ConnID != st.ConnID {
+				return
+			}
 			if mute != nil {
 				x.ServerMute = *mute
 			}
 			if deaf != nil {
 				x.ServerDeaf = *deaf
 			}
-		}); ok {
-			s.Bcast.EmitUsers(s.voiceAudience(r.Context(), cur), "voice_state", statePayload(updated))
+		}); ok && updated.ChannelID == st.ChannelID && updated.ConnID == st.ConnID {
+			if fresh, valid := s.recheckSFUState(r.Context(), updated); valid {
+				s.Bcast.EmitUsers(s.voiceAudience(r.Context(), cur), "voice_state", statePayload(fresh))
+			}
 		}
 	}
 	if disconnect {

@@ -326,6 +326,8 @@ func (s *Server) postFirstMessage(r *http.Request, th *store.Channel, me *store.
 		return nil, err
 	} else if !exists || env.Epoch > latest {
 		return nil, E(http.StatusBadRequest, "unknown_epoch", "That key epoch does not exist yet.")
+	} else if env.Epoch < latest {
+		return nil, store.ErrStaleEpoch
 	}
 	m := &store.Message{ChannelID: th.ID, AuthorID: me.ID, Type: "default", Ciphertext: body.Ciphertext, KeyConvID: &env.Conv, KeyEpoch: &env.Epoch,
 		Mentions: dedupeIDs(body.Mentions, maxMentions), MentionRoles: s.allowedRoleMentions(ctx, me, th, body.MentionRoles), Nonce: body.Nonce, Flags: s.embedFlags(ctx, me, th, body.Flags&store.MsgFlagSuppressEmbeds)}
@@ -349,7 +351,7 @@ func (s *Server) postFirstMessage(r *http.Request, th *store.Channel, me *store.
 			return nil, E(http.StatusForbidden, "missing_permission", "You cannot attach files here.")
 		}
 	}
-	if err := s.Store.InsertMessage(ctx, m); err != nil {
+	if err := s.Store.InsertEncryptedMessage(ctx, m); err != nil {
 		return nil, err
 	}
 	full, err := s.Store.MessageByID(ctx, m.ID, me.ID)

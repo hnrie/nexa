@@ -54,7 +54,7 @@ async function scanChunks(blob: Blob): Promise<ChunkSpan[]> {
     if (off + LEN_PREFIX > blob.size) throw new DecryptError("file: truncated chunk header");
     const len = readU32be(new Uint8Array(await blob.slice(off, off + LEN_PREFIX).arrayBuffer()), 0);
     off += LEN_PREFIX;
-    if (len < TAG_LEN || off + len > blob.size) throw new DecryptError("file: truncated chunk");
+    if (len < TAG_LEN || len > CHUNK + TAG_LEN || off + len > blob.size) throw new DecryptError("file: truncated chunk");
     spans.push({ start: off, len });
     off += len;
   }
@@ -66,6 +66,7 @@ export async function decryptFile(
   blob: Blob,
   key: Uint8Array,
   onProgress?: (done: number, total: number) => void,
+  expectedSize?: number,
 ): Promise<Blob> {
   if (blob.size < HEADER_LEN) throw new DecryptError("file: truncated header");
   const header = new Uint8Array(await blob.slice(0, HEADER_LEN).arrayBuffer());
@@ -74,6 +75,8 @@ export async function decryptFile(
 
   const spans = await scanChunks(blob);
   const total = spans.reduce((n, s) => n + s.len - TAG_LEN, 0);
+  if (expectedSize !== undefined && (!Number.isSafeInteger(expectedSize) || expectedSize < 0 || total !== expectedSize || spans.length !== chunkCount(expectedSize))) throw new DecryptError("file: truncated file");
+  if (expectedSize !== undefined && spans.some((span, i) => span.len - TAG_LEN !== Math.min(CHUNK, expectedSize - i * CHUNK))) throw new DecryptError("file: unexpected chunk size");
 
   let acc = new Blob([]);
   let batch: BlobPart[] = [];

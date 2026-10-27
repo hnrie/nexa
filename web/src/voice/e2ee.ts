@@ -61,8 +61,8 @@ export function voiceKeysFor(channelId: string): VoiceKeys | null {
   const epochs = callEpochs(conv);
   const newest = epochs[epochs.length - 1];
   if (newest === undefined) return null;
-  const keys = epochs.map((epoch) => ({ index: epoch & 0xff, raw: voiceFrameKey(ring.get(conv, epoch)!, channelId) }));
-  return { keys, send: newest & 0xff, version: `${conv}:${epochs.join(",")}` };
+  const keys = epochs.map((epoch) => ({ index: epoch, raw: voiceFrameKey(ring.get(conv, epoch)!, channelId) }));
+  return { keys, send: newest, version: `${conv}:${epochs.join(",")}` };
 }
 
 export class FrameCrypto {

@@ -15,6 +15,12 @@ const rootOf = (e: number) => roots.get(e);
 afterEach(clearGuestKeys);
 
 describe("guest call keys", () => {
+  it("keeps full epochs when legacy frame indexes collide", () => {
+    setGuestKey(channel, 7, randomBytes(32));
+    setGuestKey(channel, 263, randomBytes(32));
+    expect(guestVoiceKeys(channel)?.keys.map((k) => k.index)).toEqual([7, 263]);
+    expect(guestVoiceKeys(channel)?.send).toBe(263);
+  });
   it("seal with the newest key held, indexed like the conversation's", () => {
     expect(guestVoiceKeys(channel)).toBeNull();
     setGuestKey(channel, 3, voiceFrameKey(roots.get(3)!, channel));

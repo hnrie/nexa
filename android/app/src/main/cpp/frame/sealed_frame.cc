@@ -36,7 +36,7 @@ bool FitsVideoCap(int width, int height) {
 size_t SealFrame(const AesGcm& cipher, int key_index, const uint8_t iv[kIvLen], bool video,
                  const uint8_t* data, size_t len, uint8_t* out) {
   const size_t clear = std::min(ClearBytes(video, video && IsVp8KeyFrame(data, len)), len);
-  cipher.Seal(iv, kIvLen, data, clear, data + clear, len - clear, out + clear);
+  if (!cipher.Seal(iv, kIvLen, data, clear, data + clear, len - clear, out + clear)) return 0;
   memmove(out, data, clear);
   const size_t body = len + kTagLen;
   memcpy(out + body, iv, kIvLen);
@@ -103,7 +103,7 @@ size_t SealH264Frame(const AesGcm& cipher, int key_index, const uint8_t iv[kIvLe
   std::vector<uint8_t> aad, secret;
   JoinParts(data, l, &aad, &secret);
   std::vector<uint8_t> sealed(secret.size() + kTagLen);
-  cipher.Seal(iv, kIvLen, aad.data(), aad.size(), secret.data(), secret.size(), sealed.data());
+  if (!cipher.Seal(iv, kIvLen, aad.data(), aad.size(), secret.data(), secret.size(), sealed.data())) return 0;
   size_t o = 0;
   size_t c = 0;
   for (size_t i = 0; i < l.nalus.size(); i++) {

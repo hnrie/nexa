@@ -51,7 +51,8 @@ func RateFor(kind string, screenBps int64) int64 {
 	case KindVideo:
 		return CameraBps
 	case KindScreen:
-		return ClampScreenBps(screenBps)
+		// An untrusted sender can understate its configured bitrate.
+		return maxScreenBps
 	case KindScreenAudio:
 		return StreamAudioBps
 	default:
@@ -138,6 +139,39 @@ func (m *Meter) Start(session, mid, source string, bps int64) {
 		}
 	}
 	byMid[mid] = pull{source: source, bps: bps, since: now}
+}
+
+// ActiveMid reuses an existing provider subscription. Allocating a duplicate
+// while merely deduplicating its meter entry would leave real egress uncharged.
+func (m *Meter) ActiveMid(session, source string) (string, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for mid, p := range m.pulls[session] {
+		if p.source == source {
+			return mid, true
+		}
+	}
+	return "", false
+}
+
+// StopSource follows a confirmed publication closure, which also stops all its
+// subscriptions at the provider.
+func (m *Meter) StopSource(source string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := m.now()
+	for session, byMid := range m.pulls {
+		for mid, p := range byMid {
+			if p.source == source {
+				m.unflushed += m.charge(p, now)
+				delete(byMid, mid)
+			}
+		}
+		if len(byMid) == 0 {
+			delete(m.pulls, session)
+		}
+	}
+	delete(m.off, source)
 }
 
 // Stop ends charging one pulled track.

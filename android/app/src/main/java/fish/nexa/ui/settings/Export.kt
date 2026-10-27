@@ -38,6 +38,8 @@ import java.util.zip.ZipOutputStream
  * chose rather than held in memory.
  */
 object DataExport {
+    /** The passcode verifier belongs in the sealed settings, never a plain export. */
+    internal fun publicSettings(settings: JsonObject): JsonObject = JsonObject(settings.filterKeys { it != "appLock" })
     private const val REQUEST_GAP_MS = 200L
     private const val PAGE = 100
     private const val MAX_PAGES = 10_000
@@ -148,7 +150,7 @@ object DataExport {
             val zip = Zip(stream)
             withContext(Dispatchers.Main) { status(t("export.readingProfile")) }
             zip.json("profile.json", paced("/users/@me"))
-            zip.json("settings.json", Nexa.settings.doc.value)
+            zip.json("settings.json", publicSettings(Nexa.settings.doc.value))
             withContext(Dispatchers.Main) { status(t("export.readingFriends")) }
             zip.json("relationships.json", paced("/users/@me/relationships"))
             val servers = Nexa.servers.byId.value.values.toList()

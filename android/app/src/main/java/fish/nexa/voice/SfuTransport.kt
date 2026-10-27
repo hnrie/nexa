@@ -102,6 +102,7 @@ class SfuTransport(
     private val published = HashSet<PubKind>()
 
     private var roster = mapOf<String, VoiceState>()
+    private var policyGeneration: Long? = null
     private val peers = LinkedHashSet<String>()
     private val watching = HashSet<String>()
     private val pulled = HashMap<String, Pulled>()
@@ -323,7 +324,11 @@ class SfuTransport(
         crypto.set(k)
     }
 
-    override fun joined(state: VoiceState) = connect()
+    override fun joined(state: VoiceState) {
+        roster = roster + (meId to state)
+        policyGeneration = state.sfuGeneration
+        connect()
+    }
 
     override fun reconnected() = reset()
 
@@ -539,9 +544,14 @@ class SfuTransport(
 
     private fun videoPaused() = System.currentTimeMillis() < videoPausedUntil
 
+    private fun mayPublish(kind: PubKind): Boolean {
+        val me = roster[meId]
+        return (kind != PubKind.AUDIO && kind != PubKind.SCREEN_AUDIO) || !(me?.serverMute == true || me?.serverDeaf == true || me?.suppress == true)
+    }
+
     private fun wantedKinds(): List<PubKind> {
         val kinds = ArrayList<PubKind>()
-        if (audioTrack != null) kinds += PubKind.AUDIO
+        if (audioTrack != null && mayPublish(PubKind.AUDIO)) kinds += PubKind.AUDIO
         if (!videoPaused()) {
             if (videoTrack != null) kinds += PubKind.VIDEO
             if (screenTrack != null) kinds += PubKind.SCREEN
@@ -561,7 +571,7 @@ class SfuTransport(
     private suspend fun publishNow(kinds: List<PubKind>) {
         val session = sessionId ?: return
         val of = pc
-        val fresh = kinds.filter { it !in published }
+        val fresh = kinds.filter { it !in published && mayPublish(it) }
         if (fresh.isEmpty()) return
         val added = ArrayList<PubKind>()
         for (kind in fresh) {
@@ -670,7 +680,7 @@ class SfuTransport(
     override fun setLocalVideo(track: VideoTrack?) {
         videoTrack = track
         val tr = senders[PubKind.VIDEO]
-        // turned off, the sender stays published and sends nothing; the server stops charging for it
+        if (track == null && tr != null) { enqueue { unpublishNow(PubKind.VIDEO); if (videoTrack != null) publishNow(listOf(PubKind.VIDEO)) }; return }
         if (tr != null) runCatching { tr.sender.setTrack(track, false) }
         else if (track != null) publish(listOf(PubKind.VIDEO))
     }
@@ -681,6 +691,7 @@ class SfuTransport(
         if (fps > 0) screenFps = fps
         if (track != null) shareAdapter = ShareAdapter(screenFps, smooth)
         val tr = senders[PubKind.SCREEN]
+        if (track == null && tr != null) { enqueue { unpublishNow(PubKind.SCREEN); if (screenTrack != null) publishNow(listOf(PubKind.SCREEN)) }; return }
         // a share starting on a transceiver of the other codec is published again in the one the call can watch
         if (tr != null && track != null && wantsH264() != screenH264) {
             republishScreen()
@@ -733,6 +744,10 @@ class SfuTransport(
 
     override fun setRoster(states: List<VoiceState>) {
         roster = states.filter { it.channelId == channelId }.associateBy { it.userId }
+        val policy = roster[meId]?.sfuGeneration ?: 0L
+        val changed = policyGeneration != null && policyGeneration != policy
+        policyGeneration = policy
+        if (changed && sessionId != null) rebuild()
         // someone who cannot watch H.264 came in, or the last of them left: the share changes codec
         if (screenTrack != null && senders[PubKind.SCREEN] != null && wantsH264() != screenH264) republishScreen()
         // a camera turned on or off shows at once: its track stays pulled either way
@@ -775,11 +790,11 @@ class SfuTransport(
                 val tag = st.media?.get(kind.wire)
                 if (!tag.isNullOrEmpty()) out[slot(userId, kind)] = Want(userId, kind, tag)
             }
-            add(PubKind.AUDIO)
+            if (roster[meId]?.serverDeaf != true && !st.serverMute && !st.serverDeaf && !st.suppress) add(PubKind.AUDIO)
             if (pictures) add(PubKind.VIDEO)
             if (st.streaming && userId in watching) {
                 if (pictures) add(PubKind.SCREEN)
-                add(PubKind.SCREEN_AUDIO)
+                if (roster[meId]?.serverDeaf != true && !st.serverMute && !st.serverDeaf && !st.suppress) add(PubKind.SCREEN_AUDIO)
             }
         }
         return out

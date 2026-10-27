@@ -32,9 +32,11 @@ func (s *Server) keyRoutes(mux *http.ServeMux) {
 func (s *Server) handleKeyRequest(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())
 	var req struct {
-		ConvID ids.ID `json:"conv_id"`
+		ConvID        ids.ID `json:"conv_id"`
+		BadEpoch      *int   `json:"bad_epoch"`
+		BadWrappedKey []byte `json:"bad_wrapped_key"`
 	}
-	if err := ReadJSON(w, r, &req, 1<<10); err != nil {
+	if err := ReadJSON(w, r, &req, 8<<10); err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -47,6 +49,16 @@ func (s *Server) handleKeyRequest(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Retry-After", retryAfter(retry))
 		WriteError(w, ErrRateLimited)
 		return
+	}
+	if req.BadEpoch != nil {
+		if *req.BadEpoch < 0 || len(req.BadWrappedKey) == 0 || len(req.BadWrappedKey) > 4096 {
+			WriteError(w, ErrBadJSON)
+			return
+		}
+		if err := s.Store.RejectGrant(r.Context(), req.ConvID, *req.BadEpoch, me.ID, req.BadWrappedKey); err != nil {
+			WriteError(w, err)
+			return
+		}
 	}
 	s.Bcast.KeysMaybeNeeded(req.ConvID)
 	w.WriteHeader(http.StatusNoContent)

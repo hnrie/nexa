@@ -99,7 +99,7 @@ func (s *Server) handleDesktopFile(w http.ResponseWriter, r *http.Request) {
 		h.Set("Content-Type", "application/octet-stream")
 	}
 	switch ext {
-	case ".yml", ".json":
+	case ".yml", ".json", ".sig":
 		// what is current changes with every release
 		h.Set("Cache-Control", "no-cache")
 	default:

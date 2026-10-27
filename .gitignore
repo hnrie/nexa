@@ -56,3 +56,5 @@ __pycache__/
 # the published Android app: each server builds its own (make build, tools/android_release.py)
 /downloads/android/*.apk
 /downloads/android/manifest.json
+# Private desktop update signing material, including the original legacy path.
+desktop/update-key.pem

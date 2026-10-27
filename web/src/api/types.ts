@@ -523,6 +523,8 @@ export interface GifPage {
 }
 
 export interface VoiceState {
+  /** Provider sessions are retired when moderation or channel permissions change. */
+  sfu_generation?: number;
   user_id: Snowflake;
   /** Null when the user left; old_channel_id then says where from. */
   channel_id: Snowflake | null;

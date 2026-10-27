@@ -9,9 +9,11 @@ describe("requiredUpdate", () => {
   it("holds a copy older than the required version once a release reaches it", () => {
     expect(requiredUpdate("1.2.5", rel(REQUIRED_DESKTOP), file, "https://nexa.test")).toEqual({
       running: "1.2.5",
+      manual: true,
       version: REQUIRED_DESKTOP,
       url: "https://nexa.test/desktop/nexa-Setup-1.2.6-win-x64.exe",
     });
+    expect(requiredUpdate("1.2.7", rel(REQUIRED_DESKTOP), file, "https://nexa.test")?.manual).toBe(true);
     expect(requiredUpdate("1.0.0", rel("9.0.0"), null, "https://nexa.test")?.url).toBeNull();
   });
 

@@ -192,7 +192,7 @@ const WAVE = /^[A-Za-z0-9+/]{1,128}={0,2}$/;
 export function sanitizeAttachment(x: unknown): AttachmentMeta | null {
   if (!isObj(x)) return null;
   const { blob_id, name, type, key, size, w, h, duration, spoiler } = x;
-  if (typeof blob_id !== "string" || typeof name !== "string" || typeof type !== "string" || typeof key !== "string") return null;
+  if (typeof blob_id !== "string" || !/^[0-9]{1,20}$/.test(blob_id) || typeof name !== "string" || typeof type !== "string" || typeof key !== "string") return null;
   if (typeof size !== "number" || !Number.isSafeInteger(size) || size < 0) return null;
   const a: AttachmentMeta = { blob_id, name, type, size, key };
   if (isNum(w)) a.w = w;

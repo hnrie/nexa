@@ -22,6 +22,7 @@
 #include <shared_mutex>
 
 #include "aes_gcm.h"
+#include "key_set.h"
 #include "h264.h"
 #include "sealed_frame.h"
 #include "webrtc_abi.h"
@@ -131,47 +132,6 @@ int32_t OffsetFrom(const int32_t* point, F fn) {
 // the destructors' slots only need somewhere harmless to go.
 void FacadeNoDelete(Facade*) {}
 
-// The keys of one call: the newest epochs this device holds, and which one seals.
-class KeySet {
- public:
-  void Set(const std::map<int, std::array<uint8_t, 32>>& keys, int send_index) {
-    std::unique_lock<std::shared_mutex> lock(mu_);
-    ciphers_.clear();
-    for (const auto& [index, raw] : keys) ciphers_[index & 0xff].Init(raw.data());
-    send_index_ = send_index;
-  }
-
-  // Runs `fn` with the cipher for `index`, if there is one.
-  template <typename F>
-  bool With(int index, F&& fn) {
-    std::shared_lock<std::shared_mutex> lock(mu_);
-    auto it = ciphers_.find(index);
-    if (it == ciphers_.end()) return false;
-    fn(it->second);
-    return true;
-  }
-
-  template <typename F>
-  bool WithSending(F&& fn) {
-    std::shared_lock<std::shared_mutex> lock(mu_);
-    if (send_index_ < 0) return false;
-    auto it = ciphers_.find(send_index_ & 0xff);
-    if (it == ciphers_.end()) return false;
-    fn(it->second, send_index_ & 0xff);
-    return true;
-  }
-
-  std::atomic<int64_t> sealed{0};
-  std::atomic<int64_t> opened{0};
-  std::atomic<int64_t> dropped{0};
-  std::atomic<int64_t> oversize{0};
-
- private:
-  // Rekeying is rare and sealing is not, so readers never queue behind each other.
-  std::shared_mutex mu_;
-  std::map<int, AesGcm> ciphers_;
-  int send_index_ = -1;
-};
 
 using KeySetPtr = std::shared_ptr<KeySet>;
 
@@ -307,6 +267,7 @@ class Decryptor final : public RefCounted<webrtc::FrameDecryptorInterface> {
     const bool h264 = video && IsAnnexB(data, len);
     const bool held = keys_->With(index, [&](const AesGcm& cipher) {
       written = h264 ? OpenH264Frame(cipher, data, len, frame.data()) : OpenFrame(cipher, video, data, len, frame.data());
+      return written > 0;
     });
     if (written <= 0) return Fail(len, index, held);
 
@@ -512,8 +473,8 @@ JNIEXPORT void JNICALL Java_fish_nexa_voice_FrameCryptoNative_nativeSetKeys(
   for (jsize i = 0; i < count; i++) {
     auto raw = reinterpret_cast<jbyteArray>(env->GetObjectArrayElement(j_keys, i));
     if (raw == nullptr) continue;
-    // in ascending epoch order: when two epochs share a low byte the newer wins
-    if (env->GetArrayLength(raw) == 32) keys[indices[i] & 0xff] = nexa::KeyFrom(env, raw);
+    // Keep full epochs here; only the trailer uses their low byte.
+    if (env->GetArrayLength(raw) == 32) keys[indices[i]] = nexa::KeyFrom(env, raw);
     env->DeleteLocalRef(raw);
   }
   env->ReleaseIntArrayElements(j_indices, indices, JNI_ABORT);

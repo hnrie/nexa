@@ -11,17 +11,72 @@ import (
 	"testing"
 	"time"
 
+	"evilion.xyz/chat/internal/perms"
 	"evilion.xyz/chat/internal/realtime"
 	"evilion.xyz/chat/internal/voice"
 )
 
+func TestGuestSFUVideoChecksPermissionsOnPublishAndRestart(t *testing.T) {
+	srv, ts := newTestServer(t)
+	_, cf := newRealtimeStandIn(t)
+	srv.Realtime = realtime.New("app", "secret")
+	srv.Realtime.Base = cf.URL
+	srv.Meter = realtime.NewMeter(srv.Store, 1000)
+	owner, _ := register(t, ts, "owner")
+	view := createServer(t, ts, owner, "Guest video")
+	sid := view["id"].(string)
+	channel := channelNamed(view, "General")["id"].(string)
+	epoch := createEpoch(t, ts, owner, sid)
+	guest, _ := guestJoin(t, ts, guestLink(t, ts, owner, channel, epoch), "Guest")
+	g := connectGW(t, ts, guest)
+	g.op(t, "voice_state", map[string]any{"channel_id": channel, "sfu": true})
+	if g.next("voice_state", 3*time.Second) == nil {
+		t.Fatal("guest did not join")
+	}
+	res, body := do(t, ts, "POST", "/api/v1/voice/sfu/session", guest, nil)
+	if res.StatusCode != 200 {
+		t.Fatalf("guest SFU session: %d %v", res.StatusCode, body)
+	}
+	session := body["session_id"].(string)
+	publish := map[string]any{"session_id": session, "offer": offerSDP, "tracks": []map[string]any{{"mid": "1", "kind": "video"}}}
+	if res, body := do(t, ts, "POST", "/api/v1/voice/sfu/publish", guest, publish); res.StatusCode != 200 {
+		t.Fatalf("allowed video: %d %v", res.StatusCode, body)
+	}
+	if res, body := do(t, ts, "PUT", "/api/v1/channels/"+channel+"/permissions/"+sid, owner,
+		map[string]any{"type": "role", "allow": "0", "deny": strconv.FormatUint(uint64(perms.Stream), 10)}); res.StatusCode != 200 {
+		t.Fatalf("deny video: %d %v", res.StatusCode, body)
+	}
+	for path, request := range map[string]any{
+		"/api/v1/voice/sfu/publish": publish,
+		"/api/v1/voice/sfu/restart": map[string]any{"session_id": session, "offer": offerSDP, "mid": "1", "kind": "video"},
+	} {
+		method := "POST"
+		if strings.HasSuffix(path, "/restart") {
+			method = "PUT"
+		}
+		res, body := do(t, ts, method, path, guest, request)
+		if res.StatusCode != 409 || errCode(body) != "sfu_session_gone" {
+			t.Errorf("guest bypassed video denial at %s: %d %v", path, res.StatusCode, body)
+		}
+	}
+	_, body = do(t, ts, "POST", "/api/v1/voice/sfu/session", guest, nil)
+	publish["session_id"] = body["session_id"]
+	if res, body := do(t, ts, "POST", "/api/v1/voice/sfu/publish", guest, publish); res.StatusCode != 403 {
+		t.Fatalf("fresh session bypassed Video denial: %d %v", res.StatusCode, body)
+	}
+
+}
+
 // realtimeStandIn answers like Cloudflare Realtime and remembers what it was asked.
 type realtimeStandIn struct {
-	mu       sync.Mutex
-	sessions int
-	mids     int
-	closed   map[string]bool // sessions whose tracks were force-closed
-	pulled   []string        // track names pulled
+	mu              sync.Mutex
+	sessions        int
+	mids            int
+	closed          map[string]bool // sessions whose tracks were force-closed
+	pulled          []string        // track names pulled
+	refuseClose     bool
+	refuseCloses    int
+	beforeRemoteAdd func()
 }
 
 func newRealtimeStandIn(t *testing.T) (*realtimeStandIn, *httptest.Server) {
@@ -50,6 +105,9 @@ func newRealtimeStandIn(t *testing.T) (*realtimeStandIn, *httptest.Server) {
 					rt.mids++
 				}
 				if t["location"] == "remote" {
+					if rt.beforeRemoteAdd != nil {
+						rt.beforeRemoteAdd()
+					}
 					rt.pulled = append(rt.pulled, t["trackName"].(string))
 				}
 				tracks = append(tracks, map[string]any{"mid": mid, "trackName": t["trackName"], "sessionId": t["sessionId"]})
@@ -62,6 +120,11 @@ func newRealtimeStandIn(t *testing.T) (*realtimeStandIn, *httptest.Server) {
 		case strings.HasSuffix(path, "/renegotiate"):
 			_ = json.NewEncoder(w).Encode(map[string]any{"sessionDescription": map[string]any{"type": "answer", "sdp": "v=0 answer"}})
 		case strings.HasSuffix(path, "/tracks/close"):
+			if rt.refuseClose || rt.refuseCloses > 0 {
+				rt.refuseCloses--
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
 			if body["force"] == true {
 				rt.closed[strings.TrimSuffix(path, "/tracks/close")] = true
 			}
@@ -89,7 +152,7 @@ func (rt *realtimeStandIn) wasClosed(session string) bool {
 	return false
 }
 
-var offerSDP = map[string]any{"type": "offer", "sdp": "v=0 client offer"}
+var offerSDP = map[string]any{"type": "offer", "sdp": "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\na=mid:0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=mid:1\r\n"}
 
 // nextVoiceState waits for a voice_state that matches, skipping earlier ones.
 func nextVoiceState(g *gw, match func(map[string]any) bool) map[string]any {
@@ -297,6 +360,10 @@ func TestSFUIceRestart(t *testing.T) {
 	if code, body := restart(sess, "0", "audio"); code != 200 || body["answer"] == nil {
 		t.Errorf("restart: %d %v", code, body)
 	}
+	if code, _ := restart(sess, "1", "audio"); code != 409 {
+		t.Errorf("restart republished a different mid: %d", code)
+	}
+
 	if code, body := restart("another", "0", "audio"); code != 409 || errCode(body) != "sfu_session_gone" {
 		t.Errorf("restart of another session: %d %v", code, body)
 	}

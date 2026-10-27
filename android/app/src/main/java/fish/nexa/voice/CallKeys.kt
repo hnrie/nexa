@@ -14,7 +14,8 @@ class VoiceKeys(val keys: List<Pair<Int, ByteArray>>, val send: Int, val version
 /**
  * The keys a call's frames are sealed with (web/src/voice/e2ee.ts): for the
  * newest few epochs of the channel's conversation, HKDF(root, "voice:" +
- * channel id), indexed by the epoch's low byte, sealing with the newest.
+ * channel id), indexed locally by the full epoch, sealing with the newest.
+ * Only the frame trailer carries the low byte.
  */
 object CallKeys {
     /**
@@ -38,9 +39,9 @@ object CallKeys {
         val conv = Nexa.channels.convFor(channelId)
         val epochs = callEpochs(conv)
         val newest = epochs.lastOrNull() ?: return null
-        val keys = epochs.mapNotNull { epoch -> Nexa.keys.ring.get(conv, epoch)?.let { (epoch and 0xff) to Conv.voiceFrameKey(it, channelId) } }
+        val keys = epochs.mapNotNull { epoch -> Nexa.keys.ring.get(conv, epoch)?.let { epoch to Conv.voiceFrameKey(it, channelId) } }
         if (keys.isEmpty()) return null
-        return VoiceKeys(keys, newest and 0xff, "$conv:${epochs.joinToString(",")}")
+        return VoiceKeys(keys, newest, "$conv:${epochs.joinToString(",")}")
     }
 
     // --- guests (web/src/voice/guestKeys.ts) -------------------------------

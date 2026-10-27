@@ -6915,5 +6915,8 @@
   "whatsNew.r202610265.demoTitle": "注册前先体验 Nexa",
   "whatsNew.r202610265.demoBody": "从首页探索真正的应用，从全新状态开始。更改仅保留在演示中，重新加载后就会消失。",
   "whatsNew.r202610266.openSourceBody": "在 GitHub 上探索代码并参与贡献。你可以在主页、设置和关于页面找到代码仓库链接。",
-  "whatsNew.r202610266.openSourceTitle": "Nexa 已开源"
+  "whatsNew.r202610266.openSourceTitle": "Nexa 已开源",
+  "shell.requiredUpdate.manualRequired": "下载并安装新的桌面应用，然后重新打开 Nexa 以继续使用。请保留现有的应用数据。",
+  "whatsNew.r202610267.desktopSecurityTitle": "桌面安全更新",
+  "whatsNew.r202610267.desktopSecurityBody": "请手动安装一次新的桌面应用。之后的桌面更新会验证其是否由 Nexa 发布。"
 }

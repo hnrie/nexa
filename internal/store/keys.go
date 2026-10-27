@@ -118,6 +118,14 @@ func (s *Store) PutGrants(ctx context.Context, grants []KeyGrant) (int, error) {
 	return inserted, err
 }
 
+// RejectGrant lets only the recipient discard the exact wrapper it could not
+// open. Matching the bytes avoids deleting a replacement another device has
+// already obtained while this request was in flight.
+func (s *Store) RejectGrant(ctx context.Context, conv ids.ID, epoch int, recipient ids.ID, wrapped []byte) error {
+	_, err := s.db.W.ExecContext(ctx, `DELETE FROM key_grants WHERE conv_id = ? AND epoch = ? AND user_id = ? AND wrapped_key = ?`, int64(conv), epoch, int64(recipient), wrapped)
+	return err
+}
+
 func isFKError(err error) bool {
 	if err == nil {
 		return false

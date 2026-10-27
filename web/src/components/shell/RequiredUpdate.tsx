@@ -7,9 +7,10 @@ import { t, useLocale } from "@/i18n";
 import s from "./RequiredUpdate.module.css";
 
 /** What the desktop app says about its own update, kept current. */
-function useAppUpdateState(): UpdateState | null {
+function useAppUpdateState(enabled: boolean): UpdateState | null {
   const [state, setState] = useState<UpdateState | null>(null);
   useEffect(() => {
+    if (!enabled) return;
     const updates = desktopBridge()?.updates;
     if (!updates) return;
     void updates.getState().then(setState, () => undefined);
@@ -17,8 +18,8 @@ function useAppUpdateState(): UpdateState | null {
     // look at once rather than at the app's next minute
     void updates.check().catch(() => undefined);
     return off;
-  }, []);
-  return state;
+  }, [enabled]);
+  return enabled ? state : null;
 }
 
 function percent(value: number, locale: string): string {
@@ -36,16 +37,16 @@ function percent(value: number, locale: string): string {
  */
 export function RequiredUpdate({ need }: { need: Need }) {
   const locale = useLocale();
-  const state = useAppUpdateState();
+  const state = useAppUpdateState(!need.manual);
   const status = state?.status;
   const ready = status === "ready";
   const downloading = status === "downloading";
   const fill = ready ? 1 : downloading ? Math.max(0, Math.min(1, state?.progress ?? 0)) : 0;
   const download = () => {
-    if (need.url) window.open(need.url, "_blank", "noopener");
+    window.open(need.url ?? new URL("/download", window.location.origin).toString(), "_blank", "noopener,noreferrer");
   };
 
-  const line = ready
+  const line = need.manual ? t("shell.requiredUpdate.manualRequired") : ready
     ? t("shell.requiredUpdate.ready")
     : downloading
       ? t("shell.requiredUpdate.downloading", { percent: percent(fill, locale) })
@@ -69,7 +70,7 @@ export function RequiredUpdate({ need }: { need: Need }) {
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(fill * 100)}
-            data-state={ready ? "ready" : downloading ? "downloading" : "waiting"}
+            data-state={need.manual ? "manual" : ready ? "ready" : downloading ? "downloading" : "waiting"}
           >
             <div className={s.fill} style={{ width: `${fill * 100}%` }} />
           </div>
@@ -78,7 +79,9 @@ export function RequiredUpdate({ need }: { need: Need }) {
         <p className={s.status} aria-live="polite">{line}</p>
 
         <div className={s.actions}>
-          {ready ? (
+          {need.manual ? (
+            <Button onClick={download} data-testid="required-update-download">{t("shell.requiredUpdate.download")}</Button>
+          ) : ready ? (
             <Button onClick={() => void desktopBridge()?.updates.restart()} data-testid="required-update-restart">{t("settings.desktop.restartToUpdate")}</Button>
           ) : downloading ? null : (
             <>

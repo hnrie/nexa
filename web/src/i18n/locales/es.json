@@ -7265,5 +7265,8 @@
   "whatsNew.r202610265.demoTitle": "Prueba Nexa antes de Registrarte",
   "whatsNew.r202610265.demoBody": "Explora la aplicación real desde la página de inicio, empezando de cero. Los cambios se quedan en la demo y desaparecen al recargar.",
   "whatsNew.r202610266.openSourceBody": "Explora el código y contribuye en GitHub. Encontrarás el repositorio en la página de inicio, en Ajustes y en Acerca de.",
-  "whatsNew.r202610266.openSourceTitle": "Nexa Es de Código Abierto"
+  "whatsNew.r202610266.openSourceTitle": "Nexa Es de Código Abierto",
+  "shell.requiredUpdate.manualRequired": "Descarga e instala la nueva aplicación de escritorio y vuelve a abrir Nexa para continuar. Conserva los datos actuales de la aplicación.",
+  "whatsNew.r202610267.desktopSecurityTitle": "Actualización de seguridad para escritorio",
+  "whatsNew.r202610267.desktopSecurityBody": "Instala la nueva aplicación de escritorio una vez. Las futuras actualizaciones comprobarán que provienen de Nexa."
 }

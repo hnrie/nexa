@@ -49,7 +49,7 @@ export default function App() {
     </Suspense>
   ) : null;
   const inCall = useVoice((v) => !!v.mine);
-  if (required && !inCall) {
+  if (required && (required.manual || !inCall)) {
     return (
       <ErrorBoundary>
         <I18nProvider locale={locale}>

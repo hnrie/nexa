@@ -210,9 +210,17 @@ func (c *Client) CloseSession(ctx context.Context, session string) error {
 	if len(mids) == 0 {
 		return nil
 	}
-	_, err = c.CloseTracks(ctx, session, mids, nil, true)
+	res, err := c.CloseTracks(ctx, session, mids, nil, true)
 	if errors.Is(err, ErrSessionGone) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	for _, track := range res.Tracks {
+		if track.ErrorCode != "" {
+			return fmt.Errorf("realtime: track close refused: %s", track.ErrorCode)
+		}
+	}
+	return nil
 }

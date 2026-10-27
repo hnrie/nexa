@@ -8,7 +8,7 @@
  * text for is a notice we are failing to reproduce, and a build tool that sneaks
  * into the list is a claim about what ships that is not true.
  */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import catalogue from "@/data/licenses.json";
 import LicensesPage from "./LicensesPage";
@@ -102,7 +102,10 @@ describe("LicensesPage", () => {
     render(<LicensesPage />);
     const open = (name: string) => fireEvent.click(rows().find((r) => r.dataset["package"] === name)!);
     open("react");
-    expect(screen.getByText(/Permission is hereby granted/)).toBeTruthy();
+    // Nexa's own MIT notice is always visible; check the opened package's
+    // notice without confusing it with the application's licence.
+    const detail = rows().find((r) => r.dataset["package"] === "react")!.parentElement!;
+    expect(within(detail).getByText(/Permission is hereby granted/)).toBeTruthy();
     expect(screen.getByText(/Copyright \(c\) Facebook/)).toBeTruthy();
     open("zustand");
     expect(screen.queryByText(/Copyright \(c\) Facebook/)).toBeNull();

@@ -72,7 +72,14 @@ fun openLink(url: String) {
     }
 }
 
-private fun Modifier.linked(url: String?): Modifier = if (url.isNullOrEmpty()) this else this.pressable(MutableInteractionSource()) { openLink(url) }
+private fun openActivityLink(raw: String) {
+    val target = Activities.destination(raw) ?: return
+    fish.nexa.ui.shell.confirm(t("textMenu.openLink"), target.href, t("textMenu.openLink"), danger = false) { openLink(target.href) }
+}
+
+private fun activityHost(url: String?): String? = Activities.destination(url)?.host
+
+private fun Modifier.linked(url: String?): Modifier = if (activityHost(url) == null) this else this.pressable(MutableInteractionSource()) { openActivityLink(url!!) }
 
 /**
  * ActivityCard: what someone is playing, hearing, watching or streaming, on
@@ -156,7 +163,11 @@ private fun ActivityCardBody(a: Activity) {
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     ScrollingText(AnnotatedString(title), Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(18f), color = c.textStrong), Modifier.linked(if (media) a.detailsUrl else null))
-                    for (l in lines) ScrollingText(AnnotatedString(l.text), Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(18f), color = if (l.muted) c.textMuted else c.text), Modifier.linked(l.href))
+                    if (media) activityHost(a.detailsUrl)?.let { Txt(it, style = Nx.type.hint.copy(fontSize = Nx.type.sp(11f)), color = c.textMuted) }
+                    for (l in lines) Column(Modifier.linked(l.href)) {
+                        ScrollingText(AnnotatedString(l.text), Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(18f), color = if (l.muted) c.textMuted else c.text))
+                        activityHost(l.href)?.let { Txt(it, style = Nx.type.hint.copy(fontSize = Nx.type.sp(11f)), color = c.textMuted) }
+                    }
                     when (clock) {
                         is Activities.Clock.Remaining -> Txt(t("activity.activityCard.timeLeft", "time" to Activities.clock(clock.remaining)), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), fontFeatureSettings = "tnum"), color = c.textMuted)
                         is Activities.Clock.Elapsed -> Txt(t("activity.activityCard.timeElapsed", "time" to Activities.clock(clock.elapsed)), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), fontFeatureSettings = "tnum"), color = c.textMuted)
@@ -190,14 +201,17 @@ private fun ActivityCardBody(a: Activity) {
                     for (b in buttons) Box(
                         Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 40.dp)
+                            .heightIn(min = 48.dp)
                             .clip(RoundedCornerShape(999.dp))
                             .background(c.bgSurface)
                             .border(1.dp, c.border, RoundedCornerShape(999.dp))
-                            .pressable(remember { MutableInteractionSource() }) { openLink(b.url) }
+                            .pressable(remember { MutableInteractionSource() }) { openActivityLink(b.url) }
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                         contentAlignment = Alignment.Center,
-                    ) { Txt(b.label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.text, maxLines = 1) }
+                    ) { Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Txt(b.label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.text, maxLines = 1)
+                        activityHost(b.url)?.let { Txt(it, style = Nx.type.hint.copy(fontSize = Nx.type.sp(11f)), color = c.textMuted) }
+                    } }
                 }
             }
         }

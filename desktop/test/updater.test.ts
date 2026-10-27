@@ -16,6 +16,9 @@ vi.mock("electron", () => ({
   net: { fetch: vi.fn(async () => new Response(`version: ${published}\n`)) },
 }));
 vi.mock("electron-updater", () => ({ autoUpdater: fake }));
+vi.mock("../src/main/update/releaseSignature", () => ({
+  fetchRelease: vi.fn(async () => `version: ${published}\n`),
+}));
 
 const { Updater } = await import("../src/main/update");
 

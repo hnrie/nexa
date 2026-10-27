@@ -524,6 +524,7 @@ data class GuestEpoch(val epoch: Int = 0)
 
 @Serializable
 data class VoiceState(
+    @SerialName("sfu_generation") val sfuGeneration: Long = 0,
     @SerialName("user_id") val userId: Snowflake,
     @SerialName("channel_id") val channelId: Snowflake? = null,
     @SerialName("old_channel_id") val oldChannelId: Snowflake? = null,

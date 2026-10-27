@@ -58,6 +58,9 @@ object Presences {
 
 /** lib/activity.ts: how an activity is named and timed. */
 object Activities {
+    /** Canonical web links only, with credentials refused before handing them to the OS. */
+    fun destination(raw: String?): fish.nexa.ui.markdown.WebUrl? = raw?.let { fish.nexa.ui.markdown.WebUrl.parse(it) }?.takeIf { it.username.isEmpty() && it.password.isEmpty() }
+
     fun isSpotify(a: Activity) = a.type == 2 && a.name.trim().lowercase() == "spotify"
 
     /** The name a status line shows: the state or details when the activity asks for them. */

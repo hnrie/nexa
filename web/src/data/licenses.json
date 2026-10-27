@@ -5,7 +5,10 @@
   "server",
   "assets"
  ],
- "self": null,
+ "self": {
+  "name": "Nexa",
+  "text": "MIT License\n\nCopyright (c) 2026 terrydavisthe2nd / Nexa\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+ },
  "licenses": {
   "Apache-2.0": {
    "name": "Apache License 2.0",
@@ -344,14 +347,6 @@
   },
   {
    "part": "web",
-   "name": "@remix-run/router",
-   "version": "1.23.4",
-   "license": "MIT",
-   "url": "https://www.npmjs.com/package/@remix-run/router",
-   "copyright": "Copyright (c) React Training LLC 2015-2019\nCopyright (c) Remix Software Inc. 2020-2021\nCopyright (c) Shopify Inc. 2022-2023"
-  },
-  {
-   "part": "web",
    "name": "@sapphi-red/web-noise-suppressor",
    "version": "0.4.1",
    "license": "MIT",
@@ -373,6 +368,14 @@
    "license": "MIT",
    "url": "https://tanstack.com/virtual",
    "copyright": "Copyright (c) 2021-present Tanner Linsley"
+  },
+  {
+   "part": "web",
+   "name": "cookie",
+   "version": "1.1.1",
+   "license": "MIT",
+   "url": "https://www.npmjs.com/package/cookie",
+   "copyright": "Copyright (c) 2012-2014 Roman Shtylman <shtylman@gmail.com>\nCopyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com>"
   },
   {
    "part": "web",
@@ -510,7 +513,7 @@
   {
    "part": "web",
    "name": "react-router",
-   "version": "6.30.6",
+   "version": "7.18.4",
    "license": "MIT",
    "url": "https://www.npmjs.com/package/react-router",
    "copyright": "Copyright (c) React Training LLC 2015-2019\nCopyright (c) Remix Software Inc. 2020-2021\nCopyright (c) Shopify Inc. 2022-2023"
@@ -518,7 +521,7 @@
   {
    "part": "web",
    "name": "react-router-dom",
-   "version": "6.30.6",
+   "version": "7.18.4",
    "license": "MIT",
    "url": "https://www.npmjs.com/package/react-router-dom",
    "copyright": "Copyright (c) React Training LLC 2015-2019\nCopyright (c) Remix Software Inc. 2020-2021\nCopyright (c) Shopify Inc. 2022-2023"
@@ -530,6 +533,14 @@
    "license": "MIT",
    "url": "https://reactjs.org/",
    "copyright": "Copyright (c) Facebook, Inc. and its affiliates."
+  },
+  {
+   "part": "web",
+   "name": "set-cookie-parser",
+   "version": "2.7.3",
+   "license": "MIT",
+   "url": "https://github.com/nfriedly/set-cookie-parser",
+   "copyright": "Copyright (c) 2015 Nathan Friedly <nathan@nfriedly.com> (http://nfriedly.com/)"
   },
   {
    "part": "web",
@@ -715,7 +726,7 @@
   {
    "part": "desktop",
    "name": "electron",
-   "version": "44.3.0",
+   "version": "44.9.3",
    "license": "MIT",
    "url": "https://www.npmjs.com/package/electron",
    "copyright": "Copyright (c) Electron contributors\nCopyright (c) 2013-2020 GitHub Inc."
@@ -856,7 +867,7 @@
   {
    "part": "desktop",
    "name": "undici",
-   "version": "7.29.1",
+   "version": "7.30.1",
    "license": "MIT",
    "url": "https://undici.nodejs.org",
    "copyright": "Copyright (c) Matteo Collina and Undici contributors"
@@ -1008,7 +1019,7 @@
   {
    "part": "server",
    "name": "golang.org/x/net",
-   "version": "v0.59.0",
+   "version": "v0.60.0",
    "license": "BSD-3-Clause",
    "url": "https://pkg.go.dev/golang.org/x/net",
    "copyright": "Copyright 2009 The Go Authors."

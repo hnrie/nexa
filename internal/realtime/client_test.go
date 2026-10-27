@@ -122,6 +122,23 @@ func TestClientErrors(t *testing.T) {
 	}
 }
 
+func TestCloseSessionRefusesPerTrackErrors(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			_, _ = io.WriteString(w, `{"tracks":[{"mid":"0","location":"local"}]}`)
+		} else {
+			_, _ = io.WriteString(w, `{"tracks":[{"mid":"0","errorCode":"temporarily_unavailable"}]}`)
+		}
+	}))
+	defer server.Close()
+	client := New("app", "secret")
+	client.Base = server.URL
+	if err := client.CloseSession(context.Background(), "session"); err == nil {
+		t.Fatal("a per-track refusal was treated as confirmed closure")
+	}
+}
+
 // TestLiveSession runs against Cloudflare itself when REALTIME_LIVE=1 and the
 // app's keys are in the environment; it opens and closes an empty session.
 func TestLiveSession(t *testing.T) {

@@ -7266,5 +7266,8 @@
   "whatsNew.r202610265.demoTitle": "Experimente o Nexa antes de se Cadastrar",
   "whatsNew.r202610265.demoBody": "Explore o aplicativo real pela página inicial, começando do zero. As alterações ficam na demonstração e desaparecem ao recarregar.",
   "whatsNew.r202610266.openSourceBody": "Explore o código e contribua no GitHub. O repositório está na página inicial, nas Configurações e em Sobre.",
-  "whatsNew.r202610266.openSourceTitle": "O Nexa É de Código Aberto"
+  "whatsNew.r202610266.openSourceTitle": "O Nexa É de Código Aberto",
+  "shell.requiredUpdate.manualRequired": "Baixe e instale o novo aplicativo para computador e abra o Nexa novamente para continuar. Mantenha os dados atuais do aplicativo.",
+  "whatsNew.r202610267.desktopSecurityTitle": "Atualização de segurança para computador",
+  "whatsNew.r202610267.desktopSecurityBody": "Instale o novo aplicativo para computador uma vez. As próximas atualizações verificarão se vieram do Nexa."
 }

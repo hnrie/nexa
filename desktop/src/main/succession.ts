@@ -25,6 +25,7 @@ import path from "node:path";
 import type { SettingsStore } from "./settings";
 import { nativeStrings } from "./strings";
 import { compareVersions } from "./update/manifest";
+import { testHook } from "./config";
 
 type Log = (msg: string, extra?: Record<string, unknown>) => void;
 
@@ -145,7 +146,7 @@ export async function offerMoveToApplications(settings: SettingsStore, win: Brow
   };
   const parent = win && !win.isDestroyed() && win.isVisible() ? win : null;
   // a test of the move answers for the person (EVILION_MOVE_ANSWER=move or not-now)
-  const answer = process.env.EVILION_MOVE_ANSWER;
+  const answer = testHook("EVILION_MOVE_ANSWER");
   const { response } = answer ? { response: answer === "move" ? 0 : 1 } : parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
   if (response !== 0) {
     settings.set({ declinedMove: here }, { now: true });

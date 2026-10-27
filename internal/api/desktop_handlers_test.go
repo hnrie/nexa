@@ -23,6 +23,7 @@ func TestDesktopReleasesAreServed(t *testing.T) {
 	for name, body := range map[string]string{
 		"manifest.json":            manifest,
 		"latest.yml":               "version: 1.2.3\n",
+		"signed-latest.yml.sig":    "public-signature-fixture",
 		"nexa-Setup-1.2.3-x64.exe": "hello world",
 		"nexa-1.2.3-arm64.dmg":     "12345",
 	} {
@@ -63,6 +64,9 @@ func TestDesktopReleasesAreServed(t *testing.T) {
 	}
 	if r, _ := get("/desktop/latest.yml", ""); r.StatusCode != 200 || r.Header.Get("Cache-Control") != "no-cache" {
 		t.Errorf("update manifest must not be cached: %d %v", r.StatusCode, r.Header)
+	}
+	if r, _ := get("/desktop/signed-latest.yml.sig", ""); r.StatusCode != 200 || r.Header.Get("Cache-Control") != "no-cache" {
+		t.Errorf("rotating signature must not be cached: %d %v", r.StatusCode, r.Header)
 	}
 	for _, bad := range []string{"/desktop/missing.exe", "/desktop/..%2Fchat.db", "/desktop/.hidden", "/desktop/"} {
 		if r, _ := get(bad, ""); r.StatusCode != 404 {

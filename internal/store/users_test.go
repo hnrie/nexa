@@ -11,6 +11,23 @@ import (
 	"evilion.xyz/chat/internal/ids"
 )
 
+func TestRegistrationRechecksStaleBootstrapCandidates(t *testing.T) {
+	s := newStore(t)
+	ctx := t.Context()
+	// Each candidate models a request that observed the empty instance. Only
+	// the first insert may retain bootstrap privileges, even with a stale flag.
+	for i, name := range []string{"candidatea", "candidateb", "candidatec"} {
+		u := &User{Username: name, DisplayName: name, AuthHash: "hash", KDFSalt: []byte{1},
+			KDFParams: "{}", PublicKey: []byte{1}, EncPrivateKey: []byte{1}, Flags: FlagAdmin}
+		if err := s.CreateRegisteredUser(ctx, u, ""); err != nil {
+			t.Fatal(err)
+		}
+		if (u.Flags&FlagAdmin != 0) != (i == 0) {
+			t.Errorf("candidate %d retained incorrect bootstrap privileges: %d", i, u.Flags)
+		}
+	}
+}
+
 func TestUsersCRUD(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()

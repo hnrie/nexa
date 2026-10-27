@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { IPC, type DisplaySourceRequest } from "../shared/bridge";
 import { NO_SOUND, WINDOWS_PROCESS_LOOPBACK_BUILD, windowAudioDevice } from "./appAudio";
-import { isAppUrl, originOf, ORIGIN } from "./config";
+import { isAppUrl, originOf, ORIGIN, testHook } from "./config";
 import { askForDisplaySource } from "./displayPicker";
 
 type Log = (msg: string, extra?: Record<string, unknown>) => void;
@@ -323,7 +323,7 @@ export function handleDisplayMedia(getWindow: () => BrowserWindow | null, log: L
 export type ShareAudioMode = "own" | "all" | "none";
 
 export function shareAudioMode(): ShareAudioMode {
-  const forced = process.env.EVILION_SHARE_AUDIO_MODE;
+  const forced = testHook("EVILION_SHARE_AUDIO_MODE");
   if (forced === "own" || forced === "all" || forced === "none") return forced;
   const [major = 0, , build = 0] = os.release().split(".").map(Number);
   if (process.platform === "win32") return build >= WINDOWS_PROCESS_LOOPBACK_BUILD ? "own" : "all";

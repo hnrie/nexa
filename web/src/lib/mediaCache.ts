@@ -115,7 +115,7 @@ export function attachmentObjectURL(att: AttachmentMeta, signal?: AbortSignal, p
   const ticket = queue.add(priority, async (stop) => {
     // a webhook's file came unencrypted and downloads as it is
     const body = await channelsApi.downloadAttachment(att.blob_id, stop, att.plain ? att.size : encryptedSize(att.size));
-    const plain = att.plain ? body : await decryptFile(body, b64.dec(att.key));
+    const plain = att.plain ? body : await decryptFile(body, b64.dec(att.key), undefined, att.size);
     // Signed out or locked while it was on its way: the file belonged to that
     // session, and caching it now would hand it to whoever comes next.
     if (gen !== generation) throw new DOMException("Aborted", "AbortError");

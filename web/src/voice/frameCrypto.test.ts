@@ -41,6 +41,17 @@ describe("frame encryption", () => {
     expect(await openFrame(new Map([[0, key]]), sealed, 10)).toEqual(tiny);
   });
 
+  it("opens retained epochs sharing a legacy wire index without overwriting either", async () => {
+    const older = await importFrameKey(raw(1)), newer = await importFrameKey(raw(2));
+    const keys = new Map([[7, older], [263, newer]]);
+    const plain = frame(80), iv = frameIv(new Uint8Array(8).fill(1), 42);
+    for (const [epoch, key] of keys) {
+      const sealed = await sealFrame(key, epoch, iv, plain, 1);
+      expect(sealed[sealed.length - 1]).toBe(7);
+      expect(await openFrame(keys, sealed, 1)).toEqual(plain);
+    }
+  });
+
   it("never repeats an IV and keeps the salt", () => {
     const salt = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
     const a = frameIv(salt, 1);

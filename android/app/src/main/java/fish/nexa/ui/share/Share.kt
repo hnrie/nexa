@@ -54,6 +54,13 @@ import kotlinx.coroutines.launch
 object Share {
     data class Incoming(val text: String?, val uris: List<Uri>)
 
+    /** An exported share target must not open its own private files for a caller. */
+    internal fun acceptsUri(scheme: String?, authority: String?, packageName: String): Boolean {
+        // Android strips a user-id prefix before looking up the provider.
+        val provider = authority?.substringAfterLast('@')
+        return scheme == "content" && !provider.isNullOrEmpty() && provider != "$packageName.files"
+    }
+
     /** Reads a share intent; null when it is not one. */
     fun from(intent: Intent?): Incoming? {
         intent ?: return null
@@ -69,8 +76,9 @@ object Share {
             val list = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java) else intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
             if (list != null) uris += list
         }
-        if (text == null && uris.isEmpty()) return null
-        return Incoming(text, uris)
+        val safeUris = uris.filter { acceptsUri(it.scheme, it.authority, Nexa.app.packageName) }.take(Staging.MAX_FILES)
+        if (text == null && safeUris.isEmpty()) return null
+        return Incoming(text, safeUris)
     }
 
     /** A direct share target (a conversation shortcut in the system's share sheet) names its channel. */

@@ -78,6 +78,7 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
       preload: opts.preload,
       contextIsolation: true,
       sandbox: true,
+      devTools: !app.isPackaged,
       nodeIntegration: false,
       webSecurity: true,
       spellcheck: true,

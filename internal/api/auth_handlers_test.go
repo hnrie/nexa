@@ -6,11 +6,60 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ratelimit"
 )
+
+func TestConcurrentRegistrationCreatesOnlyOneAdministrator(t *testing.T) {
+	srv, ts := newTestServer(t)
+	// Hold the writer while all requests can read the empty instance. The
+	// administrator decision must be made in the inserting transaction.
+	locked, release, unlocked := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	var releaseOnce sync.Once
+	releaseWriter := func() { releaseOnce.Do(func() { close(release) }) }
+	defer releaseWriter()
+	waits := srv.Store.DB().W.SQL().Stats().WaitCount
+	go func() {
+		unlocked <- srv.Store.Tx(t.Context(), func(_ *db.Tx) error {
+			close(locked)
+			<-release
+			return nil
+		})
+	}()
+	<-locked
+	var wg sync.WaitGroup
+	for _, name := range []string{"firsta", "firstb", "firstc", "firstd"} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			res, body := do(t, ts, "POST", "/api/v1/auth/register", "", registerBody(name))
+			if res.StatusCode != http.StatusCreated {
+				t.Errorf("register %s: %d %v", name, res.StatusCode, body)
+			}
+		}()
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for srv.Store.DB().W.SQL().Stats().WaitCount < waits+4 {
+		if time.Now().After(deadline) {
+			releaseWriter()
+			wg.Wait()
+			t.Fatal("registration requests did not reach the writer")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	releaseWriter()
+	if err := <-unlocked; err != nil {
+		t.Fatal(err)
+	}
+	wg.Wait()
+	if n, err := srv.Store.CountAdminsEver(t.Context()); err != nil || n != 1 {
+		t.Fatalf("concurrent signups created %d administrators, want 1 (err %v)", n, err)
+	}
+}
 
 var (
 	key32   = bytes.Repeat([]byte{7}, 32)
@@ -376,5 +425,28 @@ func TestTwoAccountsADayFromOneAddress(t *testing.T) {
 	res, body := do(t, ts, "POST", "/api/v1/auth/register", "", registerBody("fourth"))
 	if res.StatusCode != 429 || errCode(body) != "too_many_signups" || res.Header.Get("Retry-After") == "" {
 		t.Fatalf("a third account today: %d %v", res.StatusCode, body)
+	}
+}
+
+func TestSignupAllowanceCountsAnIPv6Prefix(t *testing.T) {
+	srv, ts := newTestServer(t)
+	register(t, ts, "first")
+	srv.limSignup = ratelimit.New(ratelimit.Every(2, 24*time.Hour), 2, 25*time.Hour)
+	for i, ip := range []string{"2001:4860:1234:5678::1", "2001:4860:1234:5678::2", "2001:4860:1234:5678::3"} {
+		raw, _ := json.Marshal(registerBody([]string{"ipv6a", "ipv6b", "ipv6c"}[i]))
+		req, _ := http.NewRequest("POST", ts.URL+"/api/v1/auth/register", bytes.NewReader(raw))
+		req.Header.Set("CF-Connecting-IP", ip)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		want := http.StatusCreated
+		if i == 2 {
+			want = http.StatusTooManyRequests
+		}
+		if res.StatusCode != want {
+			t.Errorf("signup from %s: got %d, want %d", ip, res.StatusCode, want)
+		}
 	}
 }

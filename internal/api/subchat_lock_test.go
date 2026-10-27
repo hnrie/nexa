@@ -46,6 +46,9 @@ func TestSubchatPasswordGatesReading(t *testing.T) {
 	if res, body = do(t, ts, "GET", msgs, tokB, nil); res.StatusCode != http.StatusForbidden || errCode(body) != "locked" {
 		t.Fatalf("locked read: %d %v", res.StatusCode, body)
 	}
+	if res, body = do(t, ts, "DELETE", "/api/v1/channels/"+sub, tokB, nil); res.StatusCode != http.StatusForbidden || errCode(body) != "locked" {
+		t.Fatalf("locked deletion: %d %v", res.StatusCode, body)
+	}
 	// he is told how to stretch it, and nothing about the password itself
 	res, body = do(t, ts, "GET", "/api/v1/channels/"+sub+"/lock", tokB, nil)
 	if res.StatusCode != http.StatusOK || body["locked"] != true {

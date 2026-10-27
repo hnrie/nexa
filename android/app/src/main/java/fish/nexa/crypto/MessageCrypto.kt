@@ -226,6 +226,7 @@ object MessageCrypto {
     fun sanitizeAttachment(x: JsonElement?): AttachmentMeta? {
         val o = x as? JsonObject ?: return null
         val blobId = o.str("blob_id") ?: return null
+        if (!BLOB_ID.matches(blobId)) return null
         val name = o.str("name") ?: return null
         val type = o.str("type") ?: return null
         val key = o.str("key") ?: return null

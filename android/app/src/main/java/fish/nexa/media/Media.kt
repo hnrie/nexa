@@ -71,6 +71,16 @@ object Media {
 
     private lateinit var cacheDir: File
 
+    private val BLOB_ID = Regex("[0-9]{1,20}")
+
+    /** Message metadata must never become a path outside the attachment cache. */
+    private fun cacheFile(blobId: String, plain: Boolean = false): File {
+        require(BLOB_ID.matches(blobId)) { "Invalid attachment id" }
+        val owner = checkNotNull(Nexa.users.meId) { "No account is open" }
+        require(BLOB_ID.matches(owner)) { "Invalid account id" }
+        return File(cacheDir, "$owner-${if (plain) "plain-" else ""}$blobId")
+    }
+
     @OptIn(ExperimentalCoilApi::class)
     fun init(context: Context) {
         cacheDir = File(context.cacheDir, "decrypted").apply { mkdirs() }
@@ -99,11 +109,11 @@ object Media {
      * download must be exactly its encrypted size, or it is refused unopened.
      */
     suspend fun decrypted(blobId: String, keyB64: String, plainSize: Long?, onProgress: ((Long, Long) -> Unit)? = null): File {
-        val out = File(cacheDir, blobId)
-        if (out.exists() && out.length() > 0) return out
+        val out = cacheFile(blobId)
+        if (out.exists() && out.length() > 0 && (plainSize == null || out.length() == plainSize)) return out
         val lock = locks.getOrPut(blobId) { Mutex() }
         return lock.withLock {
-            if (out.exists() && out.length() > 0) return@withLock out
+            if (out.exists() && out.length() > 0 && (plainSize == null || out.length() == plainSize)) return@withLock out
             withContext(Dispatchers.IO) {
                 val key = Bytes.unb64(keyB64)
                 val req = Nexa.api.requestBuilder("/media/attachments/$blobId").get().build()
@@ -114,10 +124,10 @@ object Media {
                     if (plainSize != null && len >= 0 && r.header("Content-Encoding") == null && len != FileCrypto.encryptedSize(plainSize)) {
                         throw DecryptError("file: the server sent a file of another size")
                     }
-                    val tmp = File(cacheDir, "$blobId.part")
+                    val tmp = File(cacheDir, "${out.name}.part")
                     try {
                         tmp.outputStream().buffered(1 shl 16).use { os ->
-                            FileCrypto.decryptStream(r.body.byteStream().buffered(1 shl 16), key, os) { done -> onProgress?.invoke(done, plainSize ?: len) }
+                            FileCrypto.decryptStream(r.body.byteStream().buffered(1 shl 16), key, os, expectedSize = plainSize) { done -> onProgress?.invoke(done, plainSize ?: len) }
                         }
                         if (!tmp.renameTo(out)) throw java.io.IOException("could not keep the file")
                     } finally {
@@ -132,7 +142,7 @@ object Media {
 
     /** A file already opened on this device, or null; touching it keeps it in the cache longer. */
     fun cached(blobId: String, plain: Boolean = false): File? {
-        val f = File(cacheDir, if (plain) "plain-$blobId" else blobId)
+        val f = cacheFile(blobId, plain)
         if (!f.exists() || f.length() == 0L) return null
         f.setLastModified(System.currentTimeMillis())
         return f
@@ -155,13 +165,13 @@ object Media {
 
     /** A webhook's plain file: fetched with the token and kept as it is. */
     suspend fun plain(blobId: String): File {
-        val out = File(cacheDir, "plain-$blobId")
+        val out = cacheFile(blobId, plain = true)
         if (out.exists() && out.length() > 0) return out
         return withContext(Dispatchers.IO) {
             val req = Nexa.api.requestBuilder("/media/attachments/$blobId").get().build()
             Nexa.api.await(Nexa.api.transfer.newCall(req)).use { r ->
                 if (!r.isSuccessful) throw ApiError(r.code, "http_${r.code}", "The file could not be downloaded.")
-                val tmp = File(cacheDir, "plain-$blobId.part")
+                val tmp = File(cacheDir, "${out.name}.part")
                 tmp.outputStream().use { r.body.byteStream().copyTo(it) }
                 tmp.renameTo(out)
             }
@@ -171,18 +181,18 @@ object Media {
 
     /** Seeds the cache with a file this device just sent, so it shows without downloading it back. */
     fun seed(blobId: String, plainFile: File) {
-        val out = File(cacheDir, blobId)
+        val out = cacheFile(blobId)
         if (!out.exists()) plainFile.copyTo(out, overwrite = true)
     }
 
     /** The same, from bytes in memory (a picture's small copy). */
     fun seedBytes(blobId: String, bytes: ByteArray) {
-        val out = File(cacheDir, blobId)
+        val out = cacheFile(blobId)
         if (!out.exists()) out.writeBytes(bytes)
     }
 
     fun clear() {
-        cacheDir.listFiles()?.forEach { it.delete() }
+        if (::cacheDir.isInitialized) cacheDir.listFiles()?.forEach { it.delete() }
         try {
             loader.memoryCache?.clear()
         } catch (_: Exception) {

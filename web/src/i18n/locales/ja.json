@@ -6915,5 +6915,8 @@
   "whatsNew.r202610265.demoTitle": "登録前に Nexa を体験",
   "whatsNew.r202610265.demoBody": "ホームページから実際のアプリを新しい状態で体験できます。変更はデモ内だけに保存され、再読み込みすると消えます。",
   "whatsNew.r202610266.openSourceBody": "GitHubでコードを見て開発に参加できます。リポジトリのリンクはホームページ、設定、Nexaについてにあります。",
-  "whatsNew.r202610266.openSourceTitle": "Nexaがオープンソースに"
+  "whatsNew.r202610266.openSourceTitle": "Nexaがオープンソースに",
+  "shell.requiredUpdate.manualRequired": "新しいデスクトップアプリをダウンロードしてインストールし、Nexaを開き直してください。既存のアプリデータは残してください。",
+  "whatsNew.r202610267.desktopSecurityTitle": "デスクトップのセキュリティ更新",
+  "whatsNew.r202610267.desktopSecurityBody": "新しいデスクトップアプリを一度インストールしてください。今後の更新では、Nexaが配信したものか確認します。"
 }

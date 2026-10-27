@@ -474,6 +474,8 @@ func (s *Server) guestVoicePerms(ctx context.Context, ch *store.Channel) perms.P
 				p = ro.Permissions
 			}
 		}
+	} else {
+		return 0
 	}
 	if p.Has(perms.Administrator) {
 		return guestPerms
@@ -484,6 +486,8 @@ func (s *Server) guestVoicePerms(ctx context.Context, ch *store.Channel) perms.P
 				p = p&^ow.Deny | ow.Allow
 			}
 		}
+	} else {
+		return 0
 	}
 	return (p | perms.ViewChannel | perms.Connect) & guestPerms
 }

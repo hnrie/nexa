@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/config"
 	"evilion.xyz/chat/internal/discordsync"
@@ -75,6 +77,9 @@ type Server struct {
 	// QR sign-ins waiting for a phone, and passkey challenges already answered
 	qr           qrLogins
 	spentPasskey spentChallenges
+	// Uploads admitted but not yet represented in the database, and staged
+	// chunks not yet applied to their resumable transfer.
+	uploads uploadReservations
 	// the plans' prices from Stripe, kept for a while (billing.go)
 	priceCache priceCache
 
@@ -181,7 +186,9 @@ type Server struct {
 	// discordAPI points the Discord service at a fake Discord, in tests.
 	discordAPI string
 	// Voice tracks who is in which voice channel (set by WireVoice).
-	Voice *voice.Registry
+	Voice      *voice.Registry
+	sfuLocks   [64]sync.Mutex // serialize provider mutations per call without a growing lock map
+	sfuClosing sync.Map       // coalesce concurrent attempts to retire the same provider session
 	// hub is the gateway, for whether a guest is still connected (set by WireVoice).
 	hub *gateway.Hub
 	// modHub is the gateway, for the presence the moderation panel shows (set by WireModeration).
@@ -196,6 +203,7 @@ type Server struct {
 	// enough to be worth minting another.
 	turnMu    sync.Mutex
 	turnCreds map[ids.ID]turnCred
+	turnMint  singleflight.Group
 	// serverCounts holds the member and online counts the public invite pages
 	// show, so replaying a shared code cannot drive the work behind them.
 	countsMu     sync.Mutex
@@ -428,7 +436,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusNotFound, "not_found", "No such API route."))
 	})
-	return Chain(mux, RequestID, Recover, SecurityHeaders, Logging(s.Log))
+	return Chain(mux, RequestID, Recover, SecurityHeaders, Logging(s.Log), BodyReadDeadline)
 }
 
 // routes registers the versioned API. Domain files add their groups here.

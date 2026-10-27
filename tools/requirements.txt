@@ -1,6 +1,8 @@
 playwright>=1.50
 # tools/twemoji_font.py
 fonttools[woff]>=4.50
+# The WOFF font decoder must include the fixed Brotli decoder.
+brotli>=1.2.1
 picosvg>=0.22
 skia-pathops>=0.8
 # tools/ios_sim.py

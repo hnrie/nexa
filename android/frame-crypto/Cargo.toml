@@ -1,0 +1,17 @@
+[package]
+name = "nexa_frame_crypto"
+version = "1.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+aes-gcm = { version = "=0.11.1", default-features = false, features = ["aes", "zeroize"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

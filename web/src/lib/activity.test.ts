@@ -1,5 +1,5 @@
 import type { Activity } from "@/api/types";
-import { activityLine, activityParts, activityProgress, formatClock, activityHeading } from "./activity";
+import { activityLine, activityParts, activityProgress, formatClock, activityHeading, activityDestination } from "./activity";
 
 const song: Activity = { name: "Music Player", type: 2, details: "Never Gonna Give You Up", state: "Rick Astley", created_at: 0, timestamps: { start: 1_000_000, end: 1_213_000 } };
 
@@ -64,4 +64,10 @@ describe("activity time", () => {
     expect(formatClock(61_999)).toBe("1:01");
     expect(formatClock(3_600_000 + 5_000)).toBe("1:00:05");
   });
+});
+
+
+it("canonicalizes activity destinations and refuses non-web schemes or credentials", () => {
+  for (const raw of ["javascript:alert(1)", "intent://example.com", "file:///private", "https://nexa.fish@evil.example/", "not a url"]) expect(activityDestination(raw)).toBeNull();
+  expect(activityDestination("https://EVIL.example:8443/account")).toEqual({ href: "https://evil.example:8443/account", host: "evil.example:8443" });
 });

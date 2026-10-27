@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"evilion.xyz/chat/internal/auth"
@@ -40,8 +41,89 @@ const (
 	// pendingAllowance is what one account may hold in files not sent yet,
 	// beyond the largest single file: room for a few files on their way
 	// while the big one finishes.
-	pendingAllowance = 4 << 30
+	pendingAllowance        = 4 << 30
+	maxChunkStages          = 16
+	maxChunkStagesPerUpload = 2 // a stalled request must still allow its retry
 )
+
+type uploadReservation struct {
+	bytes int64
+	open  int
+}
+
+type uploadReservations struct {
+	sync.Mutex
+	users      map[ids.ID]uploadReservation
+	bytes      int64
+	stages     map[ids.ID]int
+	stageCount int
+	stageBytes int64
+}
+
+// reserveUpload makes quota checks and admission atomic, and counts bodies
+// still arriving. Counting only committed blobs lets concurrent requests each
+// spend the same remaining allowance before any of them creates its blob.
+func (s *Server) reserveUpload(ctx context.Context, uid ids.ID, size int64, session bool) (func(), error) {
+	s.uploads.Lock()
+	defer s.uploads.Unlock()
+	if err := s.uploadRoomLocked(ctx, uid, size, session); err != nil {
+		return nil, err
+	}
+	if s.uploads.users == nil {
+		s.uploads.users = make(map[ids.ID]uploadReservation)
+	}
+	r := s.uploads.users[uid]
+	r.bytes += size
+	r.open++
+	s.uploads.users[uid] = r
+	s.uploads.bytes += size
+	return func() {
+		s.uploads.Lock()
+		defer s.uploads.Unlock()
+		r := s.uploads.users[uid]
+		r.bytes -= size
+		r.open--
+		if r.open == 0 {
+			delete(s.uploads.users, uid)
+		} else {
+			s.uploads.users[uid] = r
+		}
+		s.uploads.bytes -= size
+	}, nil
+}
+
+// reserveChunk bounds temporary copies, including duplicate offsets, before
+// reading a body. The upload row reserves only one copy of the final file.
+func (s *Server) reserveChunk(id ids.ID, size int64) (func(), error) {
+	s.uploads.Lock()
+	defer s.uploads.Unlock()
+	if s.uploads.stageCount >= maxChunkStages || s.uploads.stages[id] >= maxChunkStagesPerUpload {
+		return nil, E(http.StatusTooManyRequests, "too_many_uploads", "Too many upload pieces are arriving at once. Try again in a moment.")
+	}
+	// The staged piece and its copy into the spool may coexist.
+	reserved := 2 * size
+	if free, err := freeSpace(s.Media.Dir); err != nil {
+		return nil, err
+	} else if free-s.uploads.bytes-s.uploads.stageBytes < reserved+diskHeadroom/2 {
+		return nil, errNoSpace
+	}
+	if s.uploads.stages == nil {
+		s.uploads.stages = make(map[ids.ID]int)
+	}
+	s.uploads.stages[id]++
+	s.uploads.stageCount++
+	s.uploads.stageBytes += reserved
+	return func() {
+		s.uploads.Lock()
+		defer s.uploads.Unlock()
+		s.uploads.stages[id]--
+		if s.uploads.stages[id] == 0 {
+			delete(s.uploads.stages, id)
+		}
+		s.uploads.stageCount--
+		s.uploads.stageBytes -= reserved
+	}, nil
+}
 
 var errNoSpace = E(http.StatusInsufficientStorage, "no_space", "This server does not have room for a file that size right now.")
 
@@ -55,24 +137,33 @@ var errNoSpace = E(http.StatusInsufficientStorage, "no_space", "This server does
 // in 30 days than its plan allows. session says a resumable transfer is
 // being opened, which counts against the open-transfer cap.
 func (s *Server) roomForUpload(ctx context.Context, uid ids.ID, size int64, session bool) error {
+	s.uploads.Lock()
+	defer s.uploads.Unlock()
+	return s.uploadRoomLocked(ctx, uid, size, session)
+}
+
+func (s *Server) uploadRoomLocked(ctx context.Context, uid ids.ID, size int64, session bool) error {
 	room, err := s.Store.UploadRoomFor(ctx, uid)
 	if err != nil {
 		return err
 	}
-	if session && room.UserOpen >= maxOpenUploads {
+	inflight := s.uploads.users[uid]
+	if inflight.open >= maxOpenUploads || (session && room.UserOpen+inflight.open >= maxOpenUploads) {
 		return E(http.StatusTooManyRequests, "too_many_uploads", "You have too many uploads going at once. Let some finish first.")
 	}
 	limits := s.planLimitsFor(planOf(ctx))
-	if room.UserPending+size > limits.FileMax+pendingAllowance {
+	if room.UserPending+inflight.bytes+size > limits.FileMax+pendingAllowance {
 		return E(http.StatusInsufficientStorage, "upload_quota", "You have too much uploaded that has not been sent yet. Send or cancel some of it first.")
 	}
 	// what is on its way counts too; files not sent yet are blobs already
 	if used, _, err := s.monthUsed(ctx, uid); err != nil {
 		return err
-	} else if used+room.UserDeclared+size > limits.MonthUploadMax {
+	} else if used+room.UserDeclared+inflight.bytes+size > limits.MonthUploadMax {
 		return errMonthFull
 	}
-	if free, err := freeSpace(s.Media.Dir); err == nil && free-room.AllRemaining < size+diskHeadroom {
+	if free, err := freeSpace(s.Media.Dir); err != nil {
+		return err
+	} else if free-room.AllRemaining-s.uploads.bytes-s.uploads.stageBytes < size+diskHeadroom {
 		return errNoSpace
 	}
 	return nil
@@ -135,10 +226,12 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrRateLimited)
 		return
 	}
-	if err := s.roomForUpload(r.Context(), me.ID, req.Size, true); err != nil {
+	release, err := s.reserveUpload(r.Context(), me.ID, req.Size, true)
+	if err != nil {
 		WriteError(w, err)
 		return
 	}
+	defer release()
 	up, err := s.Store.CreateUpload(r.Context(), me.ID, req.Size)
 	if err != nil {
 		WriteError(w, err)
@@ -188,10 +281,13 @@ func (s *Server) handleUploadChunk(w http.ResponseWriter, r *http.Request) {
 	}
 	// what this piece brings was set aside when the transfer began, but the
 	// disk is shared with everything else the server writes
-	if free, err := freeSpace(s.Media.Dir); err == nil && free < limit+diskHeadroom/2 {
-		WriteError(w, errNoSpace)
+	release, err := s.reserveChunk(up.ID, limit)
+	if err != nil {
+		w.Header().Set("Retry-After", "1")
+		WriteError(w, err)
 		return
 	}
+	defer release()
 	r.Body = http.MaxBytesReader(w, r.Body, limit+1)
 	// The body lands in a file of its own first: a request stuck on its body
 	// must not be able to touch the spool once a retry has taken over.

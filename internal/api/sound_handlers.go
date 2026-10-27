@@ -56,10 +56,12 @@ func (s *Server) handleSoundUpload(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, errTooManySounds)
 		return
 	}
-	if err := s.roomForUpload(r.Context(), me.ID, size, false); err != nil {
+	release, err := s.reserveUpload(r.Context(), me.ID, size, false)
+	if err != nil {
 		WriteError(w, err)
 		return
 	}
+	defer release()
 	r.Body = http.MaxBytesReader(w, r.Body, limit+1)
 	b, err := s.Media.PutEncrypted(r.Context(), r.Body, limit, me.ID)
 	if err != nil {

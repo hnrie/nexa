@@ -17,6 +17,7 @@ import json
 import os
 import re
 import sys
+import subprocess
 import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -143,6 +144,7 @@ def main():
         lic, url = read_pom(group, artifact, version)
         ident = spdx(*lic[0]) if lic else "Unknown"
         packages.append({"part": "android", "name": name, "version": version, "license": ident, "url": url or ""})
+    packages += rust_packages()
     packages += [p for p in web["packages"] if p["part"] == "server"]
     packages += [dict(a, part="assets") for a in ASSETS]
     packages += [p for p in web["packages"] if p["part"] == "assets" and (p["name"] == "Twemoji" or rnnoise_bundled())]
@@ -157,6 +159,21 @@ def main():
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
     unknown = [p["name"] for p in packages if p["license"] == "Unknown"]
     print(f"{len(packages)} packages written ({len(coords)} from Gradle); unknown licence: {', '.join(unknown) or 'none'}")
+
+
+def rust_packages():
+    """The native frame backend's exact locked production dependency closure."""
+    cargo = os.path.expanduser("~/.cargo/bin/cargo")
+    manifest = os.path.join(ROOT, "android", "frame-crypto", "Cargo.toml")
+    metadata = json.loads(subprocess.check_output([cargo, "metadata", "--format-version", "1", "--locked", "--manifest-path", manifest]))
+    out = []
+    for package in metadata["packages"]:
+        if package["source"] is None:
+            continue
+        terms = package.get("license") or ""
+        ident = "Apache-2.0" if "Apache-2.0" in terms else "MIT" if "MIT" in terms else terms
+        out.append({"part": "android", "name": "Rust: " + package["name"], "version": package["version"], "license": ident, "url": package.get("repository") or "https://crates.io/crates/" + package["name"]})
+    return out
 
 
 def rnnoise_bundled():

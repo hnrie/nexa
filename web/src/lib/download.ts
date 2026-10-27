@@ -211,7 +211,7 @@ async function saveInPage(att: AttachmentMeta, onProgress?: DownloadProgress): P
     : undefined;
   let plain: Blob;
   try {
-    plain = att.plain ? cipher : await decryptFile(cipher, b64.dec(att.key), decrypted);
+    plain = att.plain ? cipher : await decryptFile(cipher, b64.dec(att.key), decrypted, att.size);
   } catch (err) {
     if (err instanceof DecryptError) throw new Error(t("download.thisFileCouldNotBeDecrypted"));
     throw err;

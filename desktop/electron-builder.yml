@@ -32,7 +32,7 @@ mac:
   # signs nothing itself and sign-mac.cjs signs ad hoc instead. Without that
   # macOS calls the downloaded app damaged, since Electron's binaries carry only
   # the linker's stub signatures. Updates are checked against the release's
-  # checksum (src/main/update/mac.ts). On Linux, tools/mac_package.py checks the
+  # authenticated manifest checksum (src/main/update/mac.ts). On Linux, tools/mac_package.py checks the
   # signatures and makes the zips and disk images.
   identity: null
   hardenedRuntime: false

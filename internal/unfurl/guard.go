@@ -3,6 +3,7 @@
 package unfurl
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -20,12 +21,17 @@ var (
 
 var blockedNets []*net.IPNet
 
+var nat64Prefix = net.ParseIP("64:ff9b::")[:12]
+
 func init() {
 	for _, cidr := range []string{
 		"0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12",
 		"192.0.0.0/24", "192.0.2.0/24", "192.168.0.0/16", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24",
 		"224.0.0.0/4", "240.0.0.0/4", "255.255.255.255/32",
 		"::/128", "::1/128", "fc00::/7", "fe80::/10", "ff00::/8", "2001:db8::/32",
+		// IPv4-compatible addresses, local-use translation, and Teredo must
+		// not turn a public-looking IPv6 address into an internal IPv4 hop.
+		"::/96", "64:ff9b:1::/48", "2001::/32",
 	} {
 		_, n, err := net.ParseCIDR(cidr)
 		if err != nil {
@@ -42,6 +48,15 @@ func IsPublicIP(ip net.IP) bool {
 	}
 	if v4 := ip.To4(); v4 != nil {
 		ip = v4 // an IPv4-mapped IPv6 address is judged by its IPv4 rules
+	}
+	if len(ip) == net.IPv6len {
+		if bytes.Equal(ip[:12], nat64Prefix) && !IsPublicIP(ip[12:]) {
+			return false
+		}
+		// 6to4 routes through the IPv4 address in its second and third words.
+		if ip[0] == 0x20 && ip[1] == 0x02 && !IsPublicIP(ip[2:6]) {
+			return false
+		}
 	}
 	if ip.IsUnspecified() || ip.IsLoopback() || ip.IsMulticast() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsPrivate() || ip.IsInterfaceLocalMulticast() {
 		return false
@@ -68,6 +83,11 @@ func checkURL(u *url.URL) error {
 		return ErrBlocked
 	}
 	if u.User != nil {
+		return ErrBlocked
+	}
+	// Preview/proxy fetching is a web fetcher, not a public-port scanner.
+	// Apply this before DNS and again to every redirect.
+	if port := u.Port(); port != "" && !((u.Scheme == "http" && port == "80") || (u.Scheme == "https" && port == "443")) {
 		return ErrBlocked
 	}
 	host := strings.ToLower(u.Hostname())
@@ -115,7 +135,7 @@ func (f *Fetcher) resolvePublic(ctx context.Context, host string) ([]net.IP, err
 // cannot slip a private address past the pre-check.
 func (f *Fetcher) guardedDial(ctx context.Context, network, addr string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
+	if err != nil || (port != "80" && port != "443") {
 		return nil, ErrBlocked
 	}
 	ips, err := f.resolvePublic(ctx, host)

@@ -157,12 +157,13 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
     const chosen = !touch && card && active && active !== card && card.contains(active);
     if (!chosen && card) {
       const field = touch ? null : shown([...card.querySelectorAll<HTMLElement>(TEXT_FIELD)])[0];
-      field?.focus();
-      if (!field || document.activeElement !== field) card.focus();
+      // A dialog in the homepage preview must not scroll its embedding page.
+      field?.focus({ preventScroll: true });
+      if (!field || document.activeElement !== field) card.focus({ preventScroll: true });
     }
     return () => {
       document.removeEventListener("keydown", onKey);
-      if (prev && prev.isConnected) prev.focus?.();
+      if (prev && prev.isConnected) prev.focus?.({ preventScroll: true });
     };
     // the opener is read once, as the dialog is first drawn
     // eslint-disable-next-line react-hooks/exhaustive-deps

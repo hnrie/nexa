@@ -43,9 +43,12 @@ type State struct {
 	// SFUSession is this device's Cloudflare Realtime session when calls go
 	// through the SFU, Tracks what it publishes there, and ScreenBps the
 	// bitrate its screen share declared.
-	SFUSession string `json:"-"`
-	Tracks     Tracks `json:"-"`
-	ScreenBps  int64  `json:"-"`
+	SFUSession    string `json:"-"`
+	SFUGeneration uint64 `json:"-"`
+	SFUPolicy     uint8  `json:"-"`
+	TrackMids     Tracks `json:"-"`
+	Tracks        Tracks `json:"-"`
+	ScreenBps     int64  `json:"-"`
 	// Detached counts the times this call lost its connection. A grace
 	// timer ends the call only if it is still detached from the drop that
 	// set it, not from a later one it would cut short.
@@ -230,6 +233,7 @@ func (r *Registry) Join(st State, keepModeration bool) (old *State, started bool
 		// device starts afresh, and the caller closes the old session.
 		if prev.ChannelID == st.ChannelID && prev.ConnID == st.ConnID {
 			st.SFUSession, st.Tracks, st.ScreenBps = prev.SFUSession, prev.Tracks, prev.ScreenBps
+			st.TrackMids, st.SFUGeneration, st.SFUPolicy = prev.TrackMids, prev.SFUGeneration, prev.SFUPolicy
 		}
 	}
 	if st.JoinedAt == 0 {
@@ -262,13 +266,17 @@ func (r *Registry) SetSFU(uid, channelID, connID ids.ID, session string) (string
 		return "", false
 	}
 	old := st.SFUSession
-	st.SFUSession, st.Tracks, st.ScreenBps = session, Tracks{}, 0
+	st.SFUSession, st.Tracks, st.TrackMids, st.ScreenBps = session, Tracks{}, Tracks{}, 0
 	return old, true
 }
 
 // SetTrack records a track published by the call's SFU session. It does
 // nothing once the session was replaced or the user left.
 func (r *Registry) SetTrack(uid ids.ID, session, kind, name string, screenBps int64) (State, bool) {
+	return r.SetPublishedTrack(uid, session, kind, name, "", screenBps)
+}
+
+func (r *Registry) SetPublishedTrack(uid ids.ID, session, kind, name, mid string, screenBps int64) (State, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	st, ok := r.byUser[uid]
@@ -276,6 +284,7 @@ func (r *Registry) SetTrack(uid ids.ID, session, kind, name string, screenBps in
 		return State{}, false
 	}
 	st.Tracks = st.Tracks.With(kind, name)
+	st.TrackMids = st.TrackMids.With(kind, mid)
 	if kind == "screen" {
 		st.ScreenBps = screenBps
 	}

@@ -25,7 +25,7 @@ export const keys = {
     return api.request("GET", "/keys/epochs", undefined, { query: { conv_id } });
   },
   /** Asks the members holding a conversation's keys, who are online, to hand them over again. */
-  request(conv_id: Snowflake): Promise<void> {
-    return api.request("POST", "/keys/request", { conv_id });
+  request(conv_id: Snowflake, rejected?: Pick<KeyGrant, "epoch" | "wrapped_key">): Promise<void> {
+    return api.request("POST", "/keys/request", { conv_id, ...(rejected ? { bad_epoch: rejected.epoch, bad_wrapped_key: rejected.wrapped_key } : {}) });
   },
 };

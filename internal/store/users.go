@@ -57,6 +57,17 @@ func scanUser(r rowScanner) (*User, error) {
 
 // CreateUser inserts u (ID and CreatedAt are filled in when zero).
 func (s *Store) CreateUser(ctx context.Context, u *User) error {
+	return s.createUser(ctx, u, false, "")
+}
+
+// CreateRegisteredUser inserts a person's account and decides bootstrap
+// privileges under the same lock as the insert. Concurrent requests must not
+// each turn an earlier observation of an empty instance into an administrator.
+func (s *Store) CreateRegisteredUser(ctx context.Context, u *User, adminUsername string) error {
+	return s.createUser(ctx, u, true, adminUsername)
+}
+
+func (s *Store) createUser(ctx context.Context, u *User, registration bool, adminUsername string) error {
 	if u.ID.IsZero() {
 		u.ID = ids.New()
 	}
@@ -74,11 +85,33 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 	if u.RecoveryAuthHash != "" {
 		recovery = u.RecoveryAuthHash
 	}
-	if u.Flags&FlagAdmin != 0 {
-		// a new admin holds every right in every server they join
-		defer s.everythingChanged()
-	}
+	defer func() {
+		if u.Flags&FlagAdmin != 0 {
+			s.everythingChanged()
+		}
+	}()
 	return s.Tx(ctx, func(tx *db.Tx) error {
+		if registration {
+			if err := tx.Serialise(ctx, "registration-bootstrap"); err != nil {
+				return err
+			}
+			u.Flags = 0
+			var count int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE flags & ? = 0`, NotPeople).Scan(&count); err != nil {
+				return err
+			}
+			if count == 0 {
+				u.Flags = FlagAdmin
+			} else if adminUsername != "" && u.Username == adminUsername {
+				var admins int
+				if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE flags & ? != 0 AND flags & ? = 0`, FlagAdmin, NotPeople).Scan(&admins); err != nil {
+					return err
+				}
+				if admins == 0 {
+					u.Flags = FlagAdmin
+				}
+			}
+		}
 		// a name a moderator took off an account is still that account's
 		if held, err := usernameHeldTx(ctx, tx, u.Username); err != nil || held {
 			if err == nil {

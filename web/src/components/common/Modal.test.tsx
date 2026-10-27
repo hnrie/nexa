@@ -11,6 +11,20 @@ function tab(shift = false) {
 }
 
 describe("Modal", () => {
+  it("opens and restores focus without scrolling an embedding homepage", () => {
+    render(<button data-testid="preview-opener">Preview action</button>);
+    const opener = screen.getByTestId("preview-opener");
+    opener.focus();
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    const { unmount } = render(<Modal open onClose={() => {}} title="Create an Account to Continue"><p>Keep exploring</p></Modal>);
+    expect(document.activeElement).toBe(screen.getByRole("dialog"));
+    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+    unmount();
+    expect(document.activeElement).toBe(opener);
+    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+    focus.mockRestore();
+  });
+
   it("keeps Tab inside the dialog, forwards and backwards", () => {
     render(
       <>

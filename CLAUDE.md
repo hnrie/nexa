@@ -158,14 +158,18 @@ Building without deploying, into a scratch directory `$S`:
 go build -o $S/chatd ./cmd/chatd
 ```
 
-Android (publishes nothing). On this server the JDK and SDK live in `~/android` and are not on the
-PATH, and the Bash tool keeps no variables between calls, so set them in every command:
+Android (publishes nothing). On the deployment server the JDK and SDK live in `~/android` and are
+not on the PATH. Set their locations in every command:
 
 ```
 export JAVA_HOME=$HOME/android/jdk ANDROID_HOME=$HOME/android/sdk
 (cd android && ./gradlew :app:assembleDebug)   # -PserverUrl=http://127.0.0.1:$PORT points it at a local chatd
 (cd android && ./gradlew :app:testDebugUnitTest)
 ```
+
+On this Mac, Homebrew's `android-commandlinetools` also contains the installed SDK, NDK and emulator.
+Use `JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home` and
+`ANDROID_HOME=/opt/homebrew/share/android-commandlinetools` for the same Gradle commands.
 
 Work that goes with certain changes:
 
@@ -177,6 +181,8 @@ Work that goes with certain changes:
   Keep that claim true.
 - The web's markdown, search, themes, formatting editor or webhook messages changed: regenerate the
   Android test vectors (`android/tools/*_vectors.ts`) and make the Kotlin port pass them.
+  URL oracle entries depend on Node/ICU: verify a changed expectation against current Chromium
+  as well before updating it, and never weaken host checks solely to match a stale vector.
 - lucide-react upgraded: `python3 android/tools/lucide_assets.py`. emojibase-data or `@twemoji/svg`
   upgraded: `node android/tools/emoji_assets.mjs`, `tools/twemoji_sprites.py`, `tools/twemoji_font.py`
   and then `tools/twemoji_font_check.py`.
@@ -288,7 +294,8 @@ tools/              test drivers, release scripts, i18n and asset generators (be
 docs/               design spec and plans, STATUS.md, legal/ (the Terms and Privacy Policy the apps
                     show word for word), plugins.md (the plugin API), bots.md (making apps and
                     pointing bot libraries at Nexa), design/reference captures
-audit/              two rounds of code audits: findings, triage and progress per area
+audit/              code audits: findings, triage and progress per area; security-2026-10-26.md and
+                    history-2026-10-26.md record current fixes, historical dispositions and limits
 run.sh, backup.sh   what the service starts (bin/chatd -env chatd.env); the backup of data/
 ```
 
@@ -296,6 +303,9 @@ Not in git: `data/` (database, media, server secret), `logs/`, `bin/` (chatd and
 `backup/`, `chatd.env`, `web/dist`, `web/node_modules`, `tools/.venv`, `tools/out`, `.claude/`.
 
 ## Server (Go)
+
+The minimum Go version in `go.mod` is 1.27.3, including the standard library's current
+certificate and HTTP security fixes. Build checks use that minimum or a newer toolchain.
 
 ### Startup
 
@@ -344,7 +354,10 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
 - Everything is JSON under `/api/v1` with `Authorization: Bearer <token>`. Errors are
   `{"error": {"code", "message"}}`, built with `E(status, code, message)` and `WriteError`;
   `WriteJSON` and `ReadJSON(w, r, dst, maxBytes)` do the rest. `Handler()` chains `RequestID`,
-  `Recover`, `SecurityHeaders` and `Logging`; `GET /api/health` answers `{ok, version}`.
+  `Recover`, `SecurityHeaders`, `BodyReadDeadline` and `Logging`; `GET /api/health` answers `{ok, version}`.
+- `BodyReadDeadline` bounds JSON bodies to 30 seconds and other bodies to fifteen minutes,
+  including net/http post-handler draining. `SecurityHeaders` gives JSON/error responses a
+  restrictive default CSP; document handlers replace it with their explicit page policy.
 - Route groups are listed in `groups.go` (`routeGroups`); each file registers its own with
   `mux.Handle("METHOD /path", ...)`. A new group goes in that list.
 - Wrappers: `authed` (token, the generic per-user limit, and the mute/ban gate), `callAuthed`
@@ -358,7 +371,7 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   below), `user_handlers` (me, encrypted settings, keys, search,
   profiles, deletion), `relationship_handlers`, `channel_handlers` (DMs, groups, icons, recipients,
   typing, attachments, pins), `group_handlers`, `subchat_handlers` (sub-conversations of a DM, with an
-  optional password), `message_handlers` (history, send, edit, delete, bulk delete, ack, reactions),
+  optional password required for protected operations, including deletion), `message_handlers` (history, send, edit, delete, bulk delete, ack, reactions),
   `poll_handlers`, `key_handlers` (grants, needs, epochs, asking again), `server_handlers` and `discord_templates` (servers, Discord server template preview and import, channels,
   overwrites, roles, members, bans, invites, audit log), `member_admin` (member search, prune, bulk
   ban, server profiles, role icons), `threads` (threads and forum posts), `follows` (announcement
@@ -374,9 +387,14 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   `media_handlers`, `upload_handlers` (resumable uploads), `proxy_handlers` (the signed media proxy),
   `youtube_proxy`, `unfurl_handlers`,
   `static` (the SPA).
-- Sign-up is limited to two new accounts a day per IP address (`limSignup`, spent only once every
+- Sign-up is limited to two new accounts a day per IPv4 address or IPv6 /64 (`limSignup`, spent only once every
   other check passed, never for the first account; `too_many_signups`), on top of `limReg`'s ten
-  attempts an hour.
+  attempts an hour. `Store.CreateRegisteredUser` decides the first account's Developer flag,
+  and the initial `ADMIN_USERNAME` exception, inside the inserting transaction under a shared
+  bootstrap lock, so concurrent sign-ups cannot each become the first administrator.
+  KDF, login and recovery refuse normalized usernames longer than 32 bytes before lookup or
+  username-keyed limiter admission. Visitor limits trust only valid `CF-Connecting-IP` from a
+  loopback proxy, never `X-Forwarded-For`; other requests use their socket peer.
 - What a script would turn on other people or on paid services has a limit of its own, on top of
   the generic 600 a minute: reactions (`limReact`), messages and edits across every channel
   (`limMsgAll`, apps excepted, beside `limMsg` per channel), searching people, GIFs and games and
@@ -523,6 +541,9 @@ MediaRecorder (`data/VoiceMessages`, `ui/chat/VoiceRecordBar.kt`, `ui/media/Voic
   Rich Presence), `away`, `note_cursor`. The server also pings every 12 s at the protocol level.
 - Close codes: 4001 session revoked (the client signs out), 4003 banned, 4008 rate limited,
   4009 too many connections. A connection may send 20 ops a second, in bursts of 100.
+- Both gateways reserve unidentified connections through the hub's admission budget before
+  upgrading. The bot gateway releases its reservation after identify or resume, or on failure;
+  it cannot bypass the main gateway's waiting, address and total connection limits.
 - Events are the `Ev*` constants in `protocol.go`: messages, reactions, typing, channels and their
   positions, servers, members, roles, presence, users, relationships, read states, voice and calls,
   keys (`key_grant`, `keys_needed`, `key_rotation_needed`), emoji and stickers, pins, bans, invites,
@@ -655,7 +676,16 @@ How each permission is held, as Discord holds it:
   uploads at once (Upload Picture, cropped square) and edits the picture as the value `picture`.
 - Small files go up in one request (`POST /channels/{id}/attachments`); big ones through
   `/api/v1/uploads` in pieces (Cloudflare caps a request at 100 MB), with disk headroom and
-  per-account caps (`roomForUpload`).
+  per-account caps (`roomForUpload`). `reserveUpload` serializes admission and counts bodies still
+  arriving against quota until their database records exist. Temporary chunks have their own
+  disk reservations, at most sixteen staged together and two per transfer, so a stalled request
+  can be retried without allowing unlimited copies of the same offset. These reservations live
+  in one chatd process, as the deployment model requires.
+- Before a GIF is decoded in full for cropping or an animated variant, `gif_budget.go` walks its
+  compressed blocks and checks frame count and canvas work. Limits checked after `gif.DecodeAll`
+  would let a small compressed file exhaust memory before it was refused. Cropping keeps the
+  existing 600-frame and 150 Mi-pixel budgets; resizing also caps frames at 600 and falls back to
+  the uploaded animation when it exceeds the resizing budget.
 
 ### Outbound requests
 
@@ -665,8 +695,22 @@ which puts the preview inside the encrypted message), the media proxy (only addr
 signed; `POST /proxy/refresh` re-signs old ones), the YouTube player (`/yt/...`), IGDB, Deezer,
 Discord's Rich Presence apps and Discord server templates (`GET /servers/templates/discord/{code}`
 and `POST /servers/import/discord`). Discord's gateway, Cloudflare Realtime and the tunnel go out directly.
+Public guarded fetches allow only HTTP port 80 and HTTPS port 443, checked again at dialing.
+The public-address guard also checks embedded IPv4 addresses in standard NAT64 and 6to4
+addresses, and refuses local-use translation, Teredo and IPv4-compatible ranges.
 
 ### Calls
+
+SFU requests serialize mutations per user. Publication binds its kind to the SDP media section
+and exact mid, refuses duplicate kinds/mids, and ICE restart reuses its recorded mid. Pulling the
+same source again reuses its existing subscription. Mute/deafen/Speak/Video restrictions retire
+existing provider sessions; `sfu_policy.go` rechecks after upstream negotiations and permission
+changes. Voice states carry `sfu_generation`, which both new call clients use to rebuild permitted
+media after policy changes. Older clients may need to rejoin. Camera/share off closes publication.
+Accounting follows actual tracks and confirmed provider closures; failed closures stay charged.
+Session closure retries transient failures, logging exhausted retries as errors. Provider outages
+can delay moderation, and the monthly meter is an estimate rather than a hard billing cap.
+
 
 `internal/voice` tracks who is in each call. Without Realtime keys calls are peer to peer (a mesh,
 signalled over the gateway's `voice_signal`); with `REALTIME_APP_ID`/`REALTIME_APP_SECRET` every call
@@ -674,6 +718,10 @@ goes through Cloudflare's SFU, with chatd as its signalling proxy (`/api/v1/voic
 who may pull which track. The usage meter pauses video near `REALTIME_MONTHLY_GB` and stops calls
 just short of it. A call through the SFU outlives a dropped socket for `voiceGrace`. Guest links let
 someone without an account into one call. Frames are encrypted in the apps.
+SFU video checks use a guest's channel permissions as well as a member's, including when an ICE
+restart republishes an existing track. A guest link grants entry, not an exception to Video.
+Guest TURN credentials are reused until a minute before expiry, at most the normal reuse period.
+Concurrent requests from one identity share one credential mint.
 
 A server's voice channel has a chat of its own: the server never refused messages there, and the
 apps show it as the channel's messages and box (web `components/voice/VoiceRoom.tsx`, reusing
@@ -925,9 +973,27 @@ deliver: author, channel, mentions, reactions, sizes.
   (`crypto/fileChunks.ts`: "ECF1", a base IV, then length-prefixed chunks), each file with its own
   key inside the message; pictures also send a small copy of their own. Downloads and video play
   decrypt as they stream, in `download-sw.ts`.
+- Attachment blob ids in decrypted message metadata must be 1 to 20 ASCII digits on both clients.
+  Android also validates the id at its media-cache file boundary before reading a cached file.
+- New messages and edits use the channel's current conversation and current epoch. Both clients
+  ask for the current epoch before sealing, fetching a missing grant instead of using an old root.
+  The API rejects stale epochs, and `InsertEncryptedMessage`/`UpdateEncryptedMessage` repeat the
+  epoch check inside the writing transaction under the epoch lock. Edits after a channel becomes
+  private must use its private key, not its old server key.
+- `POST /keys/request` can include `bad_epoch` and `bad_wrapped_key` to discard the caller's exact
+  unusable wrapper before asking holders for a replacement. Both clients do this after a wrapper
+  fails to open; another recipient's row or a wrapper already replaced is never removed.
+- File readers check the plaintext size authenticated by the message as well as each chunk's tag.
+  Dropping whole valid chunks is refused even if HTTP gives no Content-Length. Plain data exports
+  on both clients omit `appLock`, whose salt, KDF parameters and verifier would enable offline guesses.
 - Call frames are sealed again with a key derived from the conversation's (`voice/frameCrypto.ts`;
   Android in native code, `cpp/frame`), because the SFU ends the transport encryption. Guest links
-  carry the call key in their fragment.
+  carry the call key in their fragment. Native Android uses RustCrypto AES-GCM through
+  `android/frame-crypto`, built by cargo-ndk from CMake. The wire format is unchanged.
+  Both clients retain full epoch numbers locally and try at most eight matching keys under
+  GCM authentication when legacy low-byte frame indexes collide. `node tools/check_frame_crypto.mjs`
+  builds in a throwaway directory and checks native/WebCrypto audio, VP8 and H.264 compatibility,
+  tampering, and native epoch-collision recovery. Rust unit tests include NIST vectors.
 - Notes have a key of their own, sealed to each member; a share link carries a second key in its
   fragment. Announcement follows are sealed to the follow's key. The settings blob, sound packs and
   the search index on the device are sealed too.
@@ -947,6 +1013,10 @@ deliver: author, channel, mentions, reactions, sizes.
 - Not end-to-end encrypted: webhook and app messages (`messages.plain`; the app marks them),
   interactions, Nexa's case threads, poll and AutoMod notices the server writes, and everything
   public (profiles, avatars, server names, emoji and stickers).
+
+Activity links in profile cards show their actual canonical host below custom labels/buttons.
+Both clients require a full-URL review before opening them. Only HTTP/HTTPS without userinfo is
+actionable. The browser also intercepts middle-clicks. Android uses its existing confirm sheet.
 
 ## Web app (`web/src`)
 
@@ -1001,6 +1071,9 @@ same-origin framing in its response CSP; every other HTML page still forbids fra
 entry also carries a stricter CSP. Reset replaces the iframe; reload drops its entire realm.
 Full Screen uses a fixed page overlay on every device, including iOS, with a visible exit button,
 Escape, a motion-preference-aware expansion/return animation, and the same iframe kept mounted.
+Dialogs take and restore focus with `preventScroll`, so opening the account gate inside the
+homepage preview cannot scroll the surrounding page.
+
 This is a public website feature, with no corresponding native Android screen.
 
 ### State and data flow
@@ -1262,6 +1335,22 @@ This is a public website feature, with no corresponding native Android screen.
 
 ## Desktop app (`desktop/`)
 
+From 1.2.8, every desktop updater verifies platform-bound Ed25519 signatures over exact manifest
+bytes before parsing checksums. Windows/AppImage use `SignedReleaseProvider`; macOS uses the same
+`fetchRelease` verification. `releaseKey.ts` holds only the public trust anchor. The owner authorized
+its new key after the original was unavailable. Private matching copies are stored on the Mac and
+build server at `~/.local/share/nexa-signing/update-key.pem`, mode 0600 in a 0700 directory. Never
+commit, replace or regenerate that key as part of building. `NEXA_DESKTOP_SIGNING_KEY` can select
+another private path, but its public key must match the pinned anchor. Signing never rewrites it.
+
+`tools/publish_desktop.py` signs staged manifests before exposing any artifacts, then publishes
+`signed-latest.yml`, `signed-latest-linux.yml` and `signed-latest-mac.yml` with `.sig` sidecars.
+Legacy `latest*.yml` feeds are preserved for the manual migration; their named artifacts survive
+pruning. Sidecars and manifests use no-cache. The first installer establishing this anchor is a
+manual trusted download. Signed-feed readers have no unsigned fallback. Mac archive reads also enforce the signed byte
+count while streaming, with idle/total deadlines and partial-file cleanup.
+
+
 Electron (version in `desktop/package.json`, bumped for every release). `src/main/index.ts` opens one
 window on the live site (`config.ts`: https://nexa.fish, or `EVILION_URL` in an unpackaged app
 while developing; `npm start` builds and runs it), with a tray, system-wide keybinds (`shortcuts.ts`), the screen picker
@@ -1319,13 +1408,20 @@ progress for three minutes is given up (the download cancelled) and tried again 
 backoff, where it used to leave the updater busy for good. A page holding unsaved edits
 (`beforeunload`) no longer cancels a quit (`will-prevent-unload` in `index.ts`).
 
-A desktop app older than `REQUIRED_DESKTOP` (`web/src/lib/requiredDesktop.ts`, now 1.2.6) shows
-nothing but `components/shell/RequiredUpdate.tsx` in place of the app: its version and the new
-one with the download filling the way between them, Restart to Update once the update is ready,
-and otherwise the installer for that computer and Check for Updates. It holds only once
-`/api/v1/desktop/latest` publishes that version or newer, so it is raised together with a release,
-and one found while the app is open waits for a call to end. App loads the check and the screen
-lazily, and only inside the desktop app.
+Development overrides pass through `config.testHook`, which ignores them in packaged apps,
+including profile paths, capture device overrides, simulated move decisions and update-test switches.
+`EVILION_DEBUG` remains an intentional logging switch. Desktop publishing checks every platform
+manifest's version and copies installers/blockmaps into temporary files before an atomic rename.
+`python3 -m unittest discover -s tools -p test_publish_desktop.py` checks interrupted copies and stale feeds.
+
+A desktop app older than `REQUIRED_DESKTOP` (`web/src/lib/requiredDesktop.ts`, now 1.2.8) shows
+`components/shell/RequiredUpdate.tsx` once a release at least that new is published. Copies below
+`MANUAL_SIGNATURE_VERSION` (1.2.8) must download and install it manually, with no Later, automatic
+restart or Check for Updates shortcut through the old unsigned updater. The manual gate applies
+even during a call and ignores a staged old-updater result. App data stays in the existing profile.
+Newer clients use signed updates normally. A future automatic required update waits for a call
+to end. The gate loads only inside the desktop app and only affects clients loading the current
+web build; already loaded/offline old code cannot be remotely made to enforce a new trust anchor.
 
 ## Android app (`android/`)
 
@@ -1382,6 +1478,14 @@ notes.
   (the web's `threadLast`), and `KeyManager` asks the holders again (`/keys/request`) while it waits.
 - There is no push service: `notify/ConnectionService` keeps the connection open in the background
   (on unless turned off) and `Notifier` raises alerts on the device.
+- The exported share target accepts only external `content:` URIs, at most ten files. `file:`
+  URIs and Nexa's own FileProvider authority are refused before staging, so another application
+  cannot ask Nexa to open and share files with its private filesystem permissions.
+- Session reset cancels pending notification posts, removes tagged personal notifications and their
+  history. Notification publication checks the same account generation under the reset lock, so a
+  finishing avatar load cannot repost an earlier account's alert. Reset also clears floating layers
+  and navigation, and deletes decrypted media. Cache filenames also
+  include the numeric account id, so one account never reads another account's cached attachment.
 - Updates (`ui/AppUpdate`) work the way the desktop app's do: a look at `/api/v1/android/latest` ten
   seconds after the app opens and every minute while it is in front (failures back off to fifteen
   minutes), then the build for the phone's processor downloads in the background, resuming a broken
@@ -1428,6 +1532,8 @@ notes.
   `sfu_call.py`, `sfu_guest.py`, `call_quality.py` and `share_quality.py` with `netsim/`, `ios_sim.py`
   with `ios/`, `app_size.py`, `desktop_idle.py` with `desktop_idle/`.
 - Fonts: `android/tools/name_fonts.py` (the name style fonts for Android, from the web's Fontsource files).
+- `requirements.txt` requires Brotli 1.2.1 or newer for the WOFF font tooling's decoder.
+  `advert-video` overrides Remotion's pinned Zod with 4.6.7 for its collection-validation fix.
 - i18n: `i18n_check.py`, `i18n_keys_used.py`, `i18n_apply.py` (write or merge a language's
   values), `i18n_extract.py` (pull hardcoded English into keys); `android/tools/add_strings.py`.
 - Releases: `android_release.py`, `desktop_release.py`, `mac_package.py`, `publish_desktop.py`,

@@ -39,9 +39,9 @@ export function hasGuestKeys(channelId: string): boolean {
 export function guestVoiceKeys(channelId: string): VoiceKeys | null {
   const keys = held.get(channelId);
   if (!keys || keys.size === 0) return null;
-  const epochs = [...keys.keys()].sort((a, b) => a - b);
+  const epochs = [...keys.keys()].sort((a, b) => a - b).slice(-RELAY_NEWEST);
   const newest = epochs[epochs.length - 1]!;
-  return { keys: epochs.map((epoch) => ({ index: epoch & 0xff, raw: keys.get(epoch)! })), send: newest & 0xff, version: `guest:${channelId}:${epochs.join(",")}` };
+  return { keys: epochs.map((epoch) => ({ index: epoch, raw: keys.get(epoch)! })), send: newest, version: `guest:${channelId}:${epochs.join(",")}` };
 }
 
 /** Relayed keys are sealed with a key derived from the link's call key, never with a key that seals frames. */

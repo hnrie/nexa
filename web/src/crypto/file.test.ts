@@ -6,6 +6,14 @@ const HEADER = 4 + 8;
 const TAG = 16;
 const LEN_PREFIX = 4;
 
+it("rejects truncation at a whole authenticated chunk when the message declares a larger file", async () => {
+  const source = new Blob([new Uint8Array(CHUNK + 1)]);
+  const { key, blob } = await encryptFile(source);
+  const prefix = blob.slice(0, encryptedSize(CHUNK));
+  await expect(decryptFile(prefix, key, undefined, source.size)).rejects.toBeInstanceOf(DecryptError);
+  expect((await decryptFile(blob, key, undefined, source.size)).size).toBe(source.size);
+});
+
 /** Deterministic filler whose value varies per byte, so a misplaced chunk would show up. */
 function pattern(n: number): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(n);

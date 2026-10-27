@@ -55,10 +55,12 @@ func (s *Server) handleCaseUpload(w http.ResponseWriter, r *http.Request) {
 	if r.ContentLength > 0 {
 		size = r.ContentLength
 	}
-	if err := s.roomForUpload(r.Context(), me.ID, size, false); err != nil {
+	release, err := s.reserveUpload(r.Context(), me.ID, size, false)
+	if err != nil {
 		WriteError(w, err)
 		return
 	}
+	defer release()
 	r.Body = http.MaxBytesReader(w, r.Body, limit+1)
 	b, err := s.Media.PutPrivate(r.Context(), store.CaseBlobKind, r.Body, bugLimits(), me.ID)
 	if err != nil {

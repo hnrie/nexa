@@ -235,12 +235,8 @@ func ClientIP(r *http.Request) string {
 	ip := net.ParseIP(host)
 	if ip != nil && ip.IsLoopback() {
 		if v := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); v != "" {
-			return v
-		}
-		if v := r.Header.Get("X-Forwarded-For"); v != "" {
-			first, _, _ := strings.Cut(v, ",")
-			if first = strings.TrimSpace(first); first != "" {
-				return first
+			if addr, err := netip.ParseAddr(v); err == nil {
+				return addr.Unmap().String()
 			}
 		}
 	}

@@ -226,6 +226,7 @@ export class SfuTransport implements VoiceTransport {
   private hiddenTimer: ReturnType<typeof setTimeout> | null = null;
 
   private roster = new Map<string, VoiceState>();
+  private policyGeneration: number | undefined;
   private peers = new Set<string>();
   private watching = new Set<string>();
   /** One pull per person and kind. */
@@ -404,7 +405,11 @@ export class SfuTransport implements VoiceTransport {
   }
 
   /** The server acknowledged this device in the call: open the session if there is none. */
-  joined(_state?: VoiceState): void {
+  joined(state?: VoiceState): void {
+    if (state) {
+      this.roster.set(this.meId, state);
+      this.policyGeneration = state.sfu_generation ?? 0;
+    }
     this.connect();
   }
 
@@ -615,9 +620,14 @@ export class SfuTransport implements VoiceTransport {
   }
 
   /** What has something to send just now; video is left out while the server has it paused. */
+  private mayPublish(kind: PubKind): boolean {
+    const me = this.roster.get(this.meId);
+    return kind !== "audio" && kind !== "screen_audio" || !(me?.server_mute || me?.server_deaf || me?.suppress);
+  }
+
   private wantedKinds(): PubKind[] {
     const kinds: PubKind[] = [];
-    if (this.audioTrack) kinds.push("audio");
+    if (this.audioTrack && this.mayPublish("audio")) kinds.push("audio");
     if (!this.videoPaused()) {
       if (this.videoTrack) kinds.push("video");
       if (this.screen?.getVideoTracks()[0]) {
@@ -640,7 +650,7 @@ export class SfuTransport implements VoiceTransport {
   private async publishNow(kinds: PubKind[]): Promise<void> {
     const session = this.sessionId;
     const pc = this.pc;
-    const fresh = kinds.filter((k) => !this.published.has(k));
+    const fresh = kinds.filter((k) => !this.published.has(k) && this.mayPublish(k));
     if (!session || fresh.length === 0) return;
     const added: PubKind[] = [];
     for (const kind of fresh) {
@@ -775,7 +785,7 @@ export class SfuTransport implements VoiceTransport {
   setLocalVideo(track: MediaStreamTrack | null): void {
     this.videoTrack = track;
     const tr = this.senders.video;
-    // turned off, the sender stays published and sends nothing; the server stops charging for it
+    if (!track && tr) { void this.enqueue(async () => { await this.unpublishNow("video"); if (this.videoTrack) await this.publishNow(["video"]); }); return; }
     if (tr) void tr.sender.replaceTrack(track).catch(() => {});
     else if (track) this.publish(["video"]);
   }
@@ -785,6 +795,10 @@ export class SfuTransport implements VoiceTransport {
     // the server charges pulls of the share at this rate and holds it to the same bounds
     this.screenBitrate = clampBitrate(bitrate, MIN_SHARE_BPS, MAX_SHARE_BPS, 6_000_000);
     if (stream) this.shareAdapter = new ShareAdapter(fps, smooth);
+    if (!stream) {
+      void this.enqueue(async () => { await this.unpublishNow("screen_audio"); await this.unpublishNow("screen"); await this.publishNow(this.wantedKinds()); });
+      return;
+    }
     // a share starting on a transceiver of the other codec is published again in the one the call can watch
     if (this.senders.screen && stream?.getVideoTracks()[0] && this.wantsH264() !== this.screenH264) {
       if (this.senders.screen_audio) void this.senders.screen_audio.sender.replaceTrack(this.trackFor("screen_audio")).catch(() => {});
@@ -917,6 +931,10 @@ export class SfuTransport implements VoiceTransport {
 
   setRoster(states: VoiceState[]): void {
     this.roster = new Map(states.filter((s) => s.channel_id === this.channelId).map((s) => [s.user_id, s]));
+    const policy = this.roster.get(this.meId)?.sfu_generation ?? 0;
+    const changed = this.policyGeneration !== undefined && policy !== this.policyGeneration;
+    this.policyGeneration = policy;
+    if (changed && this.sessionId) this.rebuild();
     // someone who cannot watch H.264 came in, or the last of them left: the share changes codec
     this.checkShareCodec();
     // a camera turned on or off shows at once: its track stays pulled either way
@@ -963,11 +981,11 @@ export class SfuTransport implements VoiceTransport {
         const tag = st.media?.[kind];
         if (tag) out.set(slot(userId, kind), { userId, kind, tag });
       };
-      add("audio");
+      if (!this.roster.get(this.meId)?.server_deaf && !st.server_mute && !st.server_deaf && !st.suppress) add("audio");
       if (pictures) add("video");
       if (st.streaming && this.watching.has(userId)) {
         if (pictures) add("screen");
-        add("screen_audio");
+        if (!this.roster.get(this.meId)?.server_deaf && !st.server_mute && !st.server_deaf && !st.suppress) add("screen_audio");
       }
     }
     return out;

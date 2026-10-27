@@ -93,6 +93,7 @@ func SecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Permissions-Policy", "camera=(self), microphone=(self), display-capture=(self), geolocation=()")
@@ -135,4 +136,29 @@ func Chain(h http.Handler, mws ...func(http.Handler) http.Handler) http.Handler 
 		h = mws[i](h)
 	}
 	return h
+}
+
+// BodyReadDeadline bounds stalled bodies independently of connection idle/header
+// timeouts. ResponseController scopes this to the HTTP/2 stream as well.
+func BodyReadDeadline(next http.Handler) http.Handler {
+	return bodyReadDeadline(next, 30*time.Second, 15*time.Minute)
+}
+
+func bodyReadDeadline(next http.Handler, jsonBudget, uploadBudget time.Duration) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body == nil || r.Body == http.NoBody || r.ContentLength == 0 {
+			next.ServeHTTP(w, r)
+			return
+		}
+		budget := uploadBudget
+		if strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
+			budget = jsonBudget
+		}
+		controller := http.NewResponseController(w)
+		_ = controller.SetReadDeadline(time.Now().Add(budget))
+		// Leave it in place while net/http finishes/drains this body. Clearing
+		// here would let that drain hang forever after a timed-out handler.
+		// net/http resets the connection deadline for its next request.
+		next.ServeHTTP(w, r)
+	})
 }

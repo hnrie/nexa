@@ -5,13 +5,18 @@
  */
 import { app } from "electron";
 
+/** Development and test overrides never change an installed app. */
+export function testHook(name: string): string | undefined {
+  return app.isPackaged ? undefined : process.env[name];
+}
+
 function baseUrl(): URL {
   // Only while developing. A packaged app that honoured this would let
   // anything able to set an environment variable point it at a page of its
   // choosing — and that page would get the bridge, plus the camera,
   // microphone and screen-recording grants macOS has already given this
   // bundle by name.
-  const raw = app.isPackaged ? "" : process.env.EVILION_URL?.trim();
+  const raw = testHook("EVILION_URL")?.trim();
   if (raw) {
     try {
       const u = new URL(raw);

@@ -26,12 +26,24 @@ const maxSDPBytes = 256 << 10
 
 func (s *Server) sfuRoutes(mux *http.ServeMux) {
 	// guests in a call run it through these too
-	mux.Handle("POST /api/v1/voice/sfu/session", s.callAuthed(s.handleSFUSession))
-	mux.Handle("POST /api/v1/voice/sfu/publish", s.callAuthed(s.handleSFUPublish))
-	mux.Handle("POST /api/v1/voice/sfu/subscribe", s.callAuthed(s.handleSFUSubscribe))
-	mux.Handle("PUT /api/v1/voice/sfu/renegotiate", s.callAuthed(s.handleSFURenegotiate))
-	mux.Handle("PUT /api/v1/voice/sfu/close", s.callAuthed(s.handleSFUClose))
-	mux.Handle("PUT /api/v1/voice/sfu/restart", s.callAuthed(s.handleSFURestart))
+	mux.Handle("POST /api/v1/voice/sfu/session", s.sfuAuthed(s.handleSFUSession))
+	mux.Handle("POST /api/v1/voice/sfu/publish", s.sfuAuthed(s.handleSFUPublish))
+	mux.Handle("POST /api/v1/voice/sfu/subscribe", s.sfuAuthed(s.handleSFUSubscribe))
+	mux.Handle("PUT /api/v1/voice/sfu/renegotiate", s.sfuAuthed(s.handleSFURenegotiate))
+	mux.Handle("PUT /api/v1/voice/sfu/close", s.sfuAuthed(s.handleSFUClose))
+	mux.Handle("PUT /api/v1/voice/sfu/restart", s.sfuAuthed(s.handleSFURestart))
+}
+
+// Cloudflare requires mutations of a session to be serialized. The bounded
+// stripes also prevent parallel publication from evading the per-kind cap.
+func (s *Server) sfuAuthed(h http.HandlerFunc) http.Handler {
+	return s.callAuthed(func(w http.ResponseWriter, r *http.Request) {
+		uid := auth.UserFrom(r.Context()).ID
+		lock := &s.sfuLocks[uint64(uid)%uint64(len(s.sfuLocks))]
+		lock.Lock()
+		defer lock.Unlock()
+		h(w, r)
+	})
 }
 
 // sfuCaller returns the caller and their call on this device, answering the
@@ -54,20 +66,25 @@ func (s *Server) sfuCaller(w http.ResponseWriter, r *http.Request) (*store.User,
 		WriteError(w, E(http.StatusConflict, "not_in_voice", "Join the call first."))
 		return nil, voice.State{}, false
 	}
-	return me, st, true
+	fresh, err := s.sfuPolicyLocked(r.Context(), st)
+	if err != nil {
+		WriteError(w, err)
+		return nil, voice.State{}, false
+	}
+	return me, fresh, true
 }
 
 // mayStream reports whether someone in a call may send a camera or a screen
-// share there: Video (Stream) in a server's channel, always in a DM call or
-// through a guest link. Asked again at every publish and pull, so a role
+// share there: Video (Stream) in a server's channel, including @everyone's
+// permissions for guests, and always in a DM call. Asked again at every publish and pull, so a role
 // that loses it mid-call stops being seen.
 func (s *Server) mayStream(ctx context.Context, st voice.State) bool {
-	if st.Guest {
-		return guestPerms.Has(perms.Stream)
-	}
 	ch, err := s.Store.ChannelByID(ctx, st.ChannelID)
 	if err != nil {
 		return false
+	}
+	if st.Guest {
+		return s.guestVoicePerms(ctx, ch).Has(perms.Stream)
 	}
 	if ch.ServerID == nil {
 		return true
@@ -153,14 +170,35 @@ func (s *Server) handleSFUPublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	seen := map[string]bool{}
+	seenMids := map[string]bool{}
+	media, validMedia := sfuMediaTypes(req.Offer.SDP)
+	if !validMedia {
+		WriteError(w, E(http.StatusBadRequest, "bad_request", "The offer needs unambiguous media sections."))
+		return
+	}
 	tracks := make([]realtime.Track, 0, len(req.Tracks))
 	names := map[string]string{}
 	for _, t := range req.Tracks {
-		if !realtime.ValidKind(t.Kind) || seen[t.Kind] || t.Mid == "" || len(t.Mid) > 16 {
+		if !realtime.ValidKind(t.Kind) || seen[t.Kind] || seenMids[t.Mid] || t.Mid == "" || len(t.Mid) > 16 || !sfuMediaMatches(media, t.Mid, t.Kind) {
 			WriteError(w, E(http.StatusBadRequest, "bad_request", "Each track needs a mid and a kind of its own."))
 			return
 		}
 		seen[t.Kind] = true
+		seenMids[t.Mid] = true
+		for _, kind := range []string{realtime.KindAudio, realtime.KindVideo, realtime.KindScreen, realtime.KindScreenAudio} {
+			if st.TrackMids.Get(kind) == t.Mid {
+				WriteError(w, E(http.StatusConflict, "already_published", "Close the existing track before reusing its mid."))
+				return
+			}
+		}
+		if st.Tracks.Get(t.Kind) != "" {
+			WriteError(w, E(http.StatusConflict, "already_published", "Close the existing track before publishing another of this kind."))
+			return
+		}
+		if (t.Kind == realtime.KindAudio || t.Kind == realtime.KindScreenAudio) && (st.ServerMute || st.ServerDeaf || st.Suppress) {
+			WriteError(w, ErrForbidden)
+			return
+		}
 		if t.Kind != realtime.KindAudio && !s.mayStream(r.Context(), st) {
 			WriteError(w, E(http.StatusForbidden, "missing_permission", "You cannot share video in this channel."))
 			return
@@ -195,11 +233,18 @@ func (s *Server) handleSFUPublish(w http.ResponseWriter, r *http.Request) {
 		if t.Kind == realtime.KindScreen {
 			bps = realtime.ClampScreenBps(t.Bitrate)
 		}
-		if next, ok := s.Voice.SetTrack(me.ID, req.SessionID, t.Kind, names[t.Mid], bps); ok {
+		if next, ok := s.Voice.SetPublishedTrack(me.ID, req.SessionID, t.Kind, names[t.Mid], t.Mid, bps); ok {
 			latest, published = next, true
 		}
 	}
+	fresh, err := s.sfuPolicyLocked(r.Context(), st)
+	if err != nil || fresh.SFUSession != req.SessionID {
+		s.closeSFUSession(req.SessionID)
+		WriteError(w, E(http.StatusConflict, "sfu_session_gone", "That call session has ended. Start it again."))
+		return
+	}
 	if published {
+		latest = fresh
 		s.sfuSyncLive(latest)
 		if ch, err := s.Store.ChannelByID(r.Context(), latest.ChannelID); err == nil {
 			s.Bcast.EmitUsers(s.voiceAudience(r.Context(), ch), "voice_state", statePayload(latest))
@@ -273,6 +318,10 @@ func (s *Server) handleSFUSubscribe(w http.ResponseWriter, r *http.Request) {
 			p.Error = "duplicate"
 		case !realtime.ValidKind(t.Kind):
 			p.Error = "bad_kind"
+		case (t.Kind == realtime.KindAudio || t.Kind == realtime.KindScreenAudio) && st.ServerDeaf:
+			p.Error = "server_deaf"
+		case (t.Kind == realtime.KindAudio || t.Kind == realtime.KindScreenAudio) && (target.ServerMute || target.ServerDeaf || target.Suppress):
+			p.Error = "server_mute"
 		case t.UserID == me.ID || !ok || target.ChannelID != st.ChannelID || target.SFUSession == "":
 			// only people in the same call, and never yourself
 			p.Error = "not_in_call"
@@ -291,6 +340,11 @@ func (s *Server) handleSFUSubscribe(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			asked[key] = true
+			if mid, exists := s.Meter.ActiveMid(req.SessionID, realtime.Source(target.SFUSession, t.Kind)); exists {
+				p.Mid, p.Tag = mid, voice.TrackTag(target.Tracks.Get(t.Kind))
+				out = append(out, p)
+				continue
+			}
 			wants = append(wants, want{target: target, kind: t.Kind, name: target.Tracks.Get(t.Kind)})
 			continue
 		}
@@ -310,6 +364,30 @@ func (s *Server) handleSFUSubscribe(w http.ResponseWriter, r *http.Request) {
 		s.Log.Warn("sfu subscribe", "err", err)
 		sfuUnavailable(w, err)
 		return
+	}
+	// Moderation can change while the provider is negotiating. Do not return
+	// that offer or start accounting against a stale authorization snapshot.
+	fresh, err := s.sfuPolicyLocked(r.Context(), st)
+	if err != nil || fresh.SFUSession != req.SessionID {
+		s.closeSFUSession(req.SessionID)
+		WriteError(w, E(http.StatusConflict, "sfu_session_gone", "That call session has ended. Start it again."))
+		return
+	}
+	for _, x := range wants {
+		target, exists := s.Voice.Get(x.target.UserID)
+		audio := x.kind == realtime.KindAudio || x.kind == realtime.KindScreenAudio
+		allowed := exists && target.ChannelID == fresh.ChannelID && target.SFUSession == x.target.SFUSession && target.Tracks.Get(x.kind) == x.name
+		if audio && (fresh.ServerDeaf || target.ServerMute || target.ServerDeaf || target.Suppress) {
+			allowed = false
+		}
+		if x.kind != realtime.KindAudio && !s.mayStream(r.Context(), target) {
+			allowed = false
+		}
+		if !allowed {
+			s.retireSFUStateLocked(r.Context(), fresh)
+			WriteError(w, E(http.StatusConflict, "sfu_session_gone", "That call session has ended. Start it again."))
+			return
+		}
 	}
 	byName := map[string]realtime.Track{}
 	for _, t := range res.Tracks {
@@ -399,14 +477,32 @@ func (s *Server) handleSFURestart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := st.Tracks.Get(req.Kind)
-	if name == "" {
+	if name == "" || req.Mid != st.TrackMids.Get(req.Kind) {
 		WriteError(w, E(http.StatusConflict, "not_published", "That track is not published."))
+		return
+	}
+	media, validMedia := sfuMediaTypes(req.Offer.SDP)
+	if !validMedia || !sfuMediaMatches(media, req.Mid, req.Kind) {
+		WriteError(w, E(http.StatusBadRequest, "bad_request", "The offer must match the published media type."))
+		return
+	}
+	if (req.Kind == realtime.KindAudio || req.Kind == realtime.KindScreenAudio) && (st.ServerMute || st.ServerDeaf || st.Suppress) {
+		WriteError(w, ErrForbidden)
+		return
+	}
+	if req.Kind != realtime.KindAudio && !s.mayStream(r.Context(), st) {
+		WriteError(w, E(http.StatusForbidden, "missing_permission", "You cannot share video in this channel."))
 		return
 	}
 	res, err := s.Realtime.AddTracks(r.Context(), req.SessionID, req.Offer, []realtime.Track{{Location: "local", Mid: req.Mid, TrackName: name}})
 	if err != nil {
 		s.Log.Warn("sfu restart", "err", err)
 		sfuUnavailable(w, err)
+		return
+	}
+	if fresh, err := s.sfuPolicyLocked(r.Context(), st); err != nil || fresh.SFUSession != req.SessionID {
+		s.closeSFUSession(req.SessionID)
+		WriteError(w, E(http.StatusConflict, "sfu_session_gone", "That call session has ended. Start it again."))
 		return
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"answer": res.Description})
@@ -437,43 +533,96 @@ func (s *Server) handleSFUClose(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "bad_request", "Closing needs one to 64 mids and, optionally, an offer."))
 		return
 	}
-	for _, mid := range req.Mids {
-		s.Meter.Stop(req.SessionID, mid)
-	}
 	res, err := s.Realtime.CloseTracks(r.Context(), req.SessionID, req.Mids, req.Offer, req.Offer == nil)
 	if err != nil {
 		s.Log.Warn("sfu close", "err", err)
 		sfuUnavailable(w, err)
 		return
 	}
+	failed := map[string]bool{}
+	for _, track := range res.Tracks {
+		if track.ErrorCode != "" {
+			failed[track.Mid] = true
+		}
+	}
+	for _, mid := range req.Mids {
+		if !failed[mid] {
+			s.Meter.Stop(req.SessionID, mid)
+		}
+	}
+	changed := false
+	latest, _ := s.Voice.Update(st.UserID, func(current *voice.State) {
+		if current.SFUSession != req.SessionID {
+			return
+		}
+		for _, kind := range []string{realtime.KindAudio, realtime.KindVideo, realtime.KindScreen, realtime.KindScreenAudio} {
+			mid := current.TrackMids.Get(kind)
+			for _, closed := range req.Mids {
+				if mid != "" && mid == closed && !failed[mid] {
+					current.Tracks = current.Tracks.With(kind, "")
+					current.TrackMids = current.TrackMids.With(kind, "")
+					changed = true
+				}
+			}
+		}
+	})
+	if changed {
+		for _, kind := range []string{realtime.KindAudio, realtime.KindVideo, realtime.KindScreen, realtime.KindScreenAudio} {
+			if st.Tracks.Get(kind) != "" && latest.Tracks.Get(kind) == "" {
+				s.Meter.StopSource(realtime.Source(req.SessionID, kind))
+			}
+		}
+		if ch, err := s.Store.ChannelByID(r.Context(), st.ChannelID); err == nil {
+			s.Bcast.EmitUsers(s.voiceAudience(r.Context(), ch), "voice_state", statePayload(latest))
+		}
+	}
+	if len(failed) > 0 {
+		WriteError(w, E(http.StatusBadGateway, "sfu_refused", "The call service could not close every track."))
+		return
+	}
 	WriteJSON(w, http.StatusOK, map[string]any{"answer": res.Description, "renegotiate": res.Renegotiate})
 }
 
-// closeSFUSession stops charging a session and force-closes it at the SFU in
-// the background, so a device that left or was removed is cut off at once.
+// closeSFUSession force-closes a retired session in the background. Accounting
+// ends only after confirmed closure. Retry transient failures; an unavailable
+// provider cannot guarantee immediate moderation, so exhausted retries are errors.
 func (s *Server) closeSFUSession(session string) {
 	if session == "" || s.Realtime == nil {
 		return
 	}
-	s.Meter.StopSession(session)
+	if _, loaded := s.sfuClosing.LoadOrStore(session, true); loaded {
+		return
+	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := s.Realtime.CloseSession(ctx, session); err != nil {
-			s.Log.Warn("sfu close session", "err", err)
+		defer s.sfuClosing.Delete(session)
+		var last error
+		for attempt := 0; attempt < 3; attempt++ {
+			if attempt > 0 {
+				time.Sleep(time.Duration(attempt*attempt) * 250 * time.Millisecond)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			last = s.Realtime.CloseSession(ctx, session)
+			cancel()
+			if last == nil {
+				if s.Meter != nil {
+					s.Meter.StopSession(session)
+				}
+				return
+			}
 		}
+		s.Log.Error("sfu session could not be retired after retries", "session", session, "err", last)
 	}()
 }
 
-// sfuSyncLive tells the meter which of a call's published tracks are sending:
-// a camera that is off, or a share that ended, costs nothing to pull.
+// sfuSyncLive follows actual publication state, never self-reported camera or
+// screen flags. An untrusted endpoint may send media while claiming it is off.
 func (s *Server) sfuSyncLive(st voice.State) {
 	if s.Meter == nil || st.SFUSession == "" {
 		return
 	}
-	s.Meter.SetSourceLive(realtime.Source(st.SFUSession, realtime.KindVideo), st.Video)
-	s.Meter.SetSourceLive(realtime.Source(st.SFUSession, realtime.KindScreen), st.Streaming)
-	s.Meter.SetSourceLive(realtime.Source(st.SFUSession, realtime.KindScreenAudio), st.Streaming)
+	s.Meter.SetSourceLive(realtime.Source(st.SFUSession, realtime.KindVideo), st.Tracks.Video != "")
+	s.Meter.SetSourceLive(realtime.Source(st.SFUSession, realtime.KindScreen), st.Tracks.Screen != "")
+	s.Meter.SetSourceLive(realtime.Source(st.SFUSession, realtime.KindScreenAudio), st.Tracks.ScreenAudio != "")
 }
 
 func randomHex(n int) string {

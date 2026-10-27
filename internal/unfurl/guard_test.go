@@ -55,6 +55,16 @@ func TestIsPublicIP(t *testing.T) {
 		{"fd12::1", false},
 		{"::ffff:127.0.0.1", false},
 		{"::ffff:8.8.8.8", true},
+		{"64:ff9b::127.0.0.1", false},
+		{"64:ff9b::169.254.169.254", false},
+		{"64:ff9b::10.0.0.1", false},
+		{"64:ff9b::8.8.8.8", true},
+		{"64:ff9b:1::a00:1", false},
+		{"2002:7f00:1::", false},
+		{"2002:a00:1::", false},
+		{"2002:808:808::", true},
+		{"2001:0:4136:e378:8000:63bf:3fff:fdd2", false},
+		{"::127.0.0.1", false},
 		{"2001:db8::1", false},
 		{"2606:4700::1111", true},
 		{"192.0.2.1", false},
@@ -103,6 +113,10 @@ func TestFetchBlockedURLs(t *testing.T) {
 		{"non-http scheme", "ftp://a.b"},
 		{"file scheme", "file:///etc/passwd"},
 		{"userinfo", "http://user:pw@example.com"},
+		{"public ssh port", "http://8.8.8.8:22/"},
+		{"public alternate http port", "http://example.test:8080/"},
+		{"public alternate https port", "https://example.test:8443/"},
+		{"wrong scheme default", "https://example.test:80/"},
 		{"empty host", "http:///x"},
 		{"ip literal loopback", "http://127.0.0.1/x"},
 		{"ip literal private", "http://10.1.2.3/x"},
@@ -160,6 +174,16 @@ func TestGuardedDialRejectsPrivateAnswer(t *testing.T) {
 func TestGuardedDialRejectsEmptyAnswer(t *testing.T) {
 	f := &Fetcher{Resolver: fakeResolver{"void.test": {}}}
 	if _, err := f.guardedDial(context.Background(), "tcp", "void.test:80"); !errors.Is(err, ErrBlocked) {
+		t.Fatalf("guardedDial err = %v, want ErrBlocked", err)
+	}
+}
+
+func TestGuardedDialRejectsPublicNonWebPorts(t *testing.T) {
+	f := &Fetcher{Resolver: fakeResolver{"public.test": {"8.8.8.8"}}, Dial: func(context.Context, string, string) (net.Conn, error) {
+		t.Fatal("non-web port reached the dialer")
+		return nil, nil
+	}}
+	if _, err := f.guardedDial(context.Background(), "tcp", "public.test:6379"); !errors.Is(err, ErrBlocked) {
 		t.Fatalf("guardedDial err = %v, want ErrBlocked", err)
 	}
 }

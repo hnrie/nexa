@@ -7,10 +7,25 @@ import { ScrollGroup, ScrollingText } from "@/components/common/ScrollingText";
 import s from "./Activity.module.css";
 
 import { t } from "@/i18n";
+import { useUI } from "@/stores/ui";
+import { activityDestination } from "@/lib/activity";
 /** Text that opens its link in a new tab when the activity gives one. */
 function Linked({ href, className, title, children }: { href?: string | undefined; className?: string | undefined; title?: string | undefined; children: React.ReactNode }) {
-  return href ? (
-    <a className={className} href={href} target="_blank" rel="noopener noreferrer" title={title}>{children}</a>
+  const destination = activityDestination(href);
+  const review = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!destination || (event.type === "auxclick" && event.button !== 1)) return;
+    event.preventDefault();
+    useUI.getState().openModal("confirm", {
+      title: t("textMenu.openLink"),
+      body: <span dir="ltr" style={{ overflowWrap: "anywhere", unicodeBidi: "isolate" }}>{destination.href}</span>,
+      confirmLabel: t("textMenu.openLink"),
+      onConfirm: () => { window.open(destination.href, "_blank", "noopener,noreferrer"); },
+    });
+  };
+  return destination ? (
+    <a className={className} href={destination.href} target="_blank" rel="noopener noreferrer" title={destination.href} onClick={review} onAuxClick={review}>
+      {children}{className ? <span className={s.destination} dir="ltr">{destination.host}</span> : null}
+    </a>
   ) : (
     <span className={className} title={title}>{children}</span>
   );
@@ -99,7 +114,7 @@ export function ActivityCard({ activity: a }: { activity: Activity }) {
       {a.buttons?.length ? (
         <div className={s.buttons}>
           {a.buttons.map((b) => (
-            <a key={b.url + b.label} className={s.button} href={b.url} target="_blank" rel="noopener noreferrer">{b.label}</a>
+            <Linked key={b.url + b.label} className={s.button} href={b.url}>{b.label}</Linked>
           ))}
         </div>
       ) : null}

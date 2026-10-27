@@ -444,7 +444,7 @@ async function deliver(channelId: string, meId: string, w: Written, tmp: string,
       afterSend = verdict?.afterSend;
     }
     const conv = convForChannel(channelId);
-    const key = await useKeys.getState().ensureConvKey(conv);
+    const key = await useKeys.getState().ensureConvKey(conv, true);
     if (!key) throw new Error("waiting_for_key");
     const chanKey = channelKeyFor(conv, key.epoch, channelId);
     if (!chanKey) throw new Error("waiting_for_key");
@@ -568,16 +568,11 @@ export async function editMessage(channelId: string, messageId: string, rawText:
     if (verdict?.stopped) throw new AutomodStop(verdict.stopped);
     afterEdit = verdict?.afterSend;
   }
-  const conv = existing.key_conv_id ?? convForChannel(channelId);
-  const epoch = existing.key_epoch ?? 0;
-  let chanKey = channelKeyFor(conv, epoch, channelId);
-  let useEpoch = epoch;
-  if (!chanKey) {
-    const latest = await useKeys.getState().ensureConvKey(conv);
-    if (!latest) throw new Error("waiting_for_key");
-    useEpoch = latest.epoch;
-    chanKey = channelKeyFor(conv, latest.epoch, channelId);
-  }
+  const conv = convForChannel(channelId);
+  const latest = await useKeys.getState().ensureConvKey(conv, true);
+  if (!latest) throw new Error("waiting_for_key");
+  const useEpoch = latest.epoch;
+  const chanKey = channelKeyFor(conv, useEpoch, channelId);
   if (!chanKey) throw new Error("waiting_for_key");
   const ciphertext = await encryptMessage(chanKey, { conv, epoch: useEpoch, channelId, authorId: me.id }, payload);
   const edit: Partial<SendMessageRequest> = { ciphertext, key_conv_id: conv, key_epoch: useEpoch, mentions, mention_roles: roles, mention_everyone: everyone };

@@ -12,11 +12,14 @@ import { desktopBridge } from "./desktopBridge";
 import { compareVersions } from "./macReplacement";
 import { currentPlatform, pickDownload, type DesktopTarget } from "./platform";
 
-export const REQUIRED_DESKTOP = "1.2.6";
+export const MANUAL_SIGNATURE_VERSION = "1.2.8";
+export const REQUIRED_DESKTOP = MANUAL_SIGNATURE_VERSION;
 
 export interface RequiredUpdate {
   /** The version this copy is. */
   running: string;
+  /** The trust-anchor transition requires an installer, never the old updater. */
+  manual: boolean;
   /** The version published, which it has to move to. */
   version: string;
   /** The installer for this computer, as an address the browser can open. */
@@ -27,7 +30,7 @@ export interface RequiredUpdate {
 export function requiredUpdate(running: string | null, rel: DesktopRelease | null, file: DesktopFile | null, origin: string): RequiredUpdate | null {
   if (!running || !rel) return null;
   if (compareVersions(running, REQUIRED_DESKTOP) >= 0 || compareVersions(rel.version, REQUIRED_DESKTOP) < 0) return null;
-  return { running, version: rel.version, url: file ? new URL(desktop.fileUrl(file.name), origin).toString() : null };
+  return { running, manual: compareVersions(running, MANUAL_SIGNATURE_VERSION) < 0, version: rel.version, url: file ? new URL(desktop.fileUrl(file.name), origin).toString() : null };
 }
 
 const OS: Record<string, DesktopTarget["os"]> = { win32: "windows", darwin: "mac", linux: "linux" };

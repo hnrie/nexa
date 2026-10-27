@@ -342,7 +342,17 @@ class KeyManager(
                 if (identity !== id) return@withContext
                 for ((j, root) in roots.withIndex()) {
                     val g = batch[j]
-                    if (root == null || root.size != 32 || ring.get(g.convId, g.epoch) != null) continue
+                    if (root == null || root.size != 32) {
+                        runCatching {
+                            api.request("POST", "/keys/request", buildJsonObject {
+                                put("conv_id", g.convId)
+                                put("bad_epoch", g.epoch)
+                                put("bad_wrapped_key", g.wrappedKey)
+                            })
+                        }
+                        continue
+                    }
+                    if (ring.get(g.convId, g.epoch) != null) continue
                     ring.set(g.convId, g.epoch, root)
                     changed += g.convId
                 }
@@ -479,7 +489,27 @@ class KeyManager(
     }
 
     /** The latest key for a conversation, creating epoch 0 when nobody has made one. */
-    suspend fun ensureConvKey(conv: String): Pair<Int, ByteArray>? {
+    suspend fun ensureConvKey(conv: String, current: Boolean = false): Pair<Int, ByteArray>? {
+        if (current) {
+            suspend fun info() = api.request("GET", "/keys/epochs?conv_id=$conv").jsonObject
+            fun needsRotation(value: JsonObject) = (value["flags"] as? JsonObject)?.get("needs_rotation")?.jsonPrimitive?.content == "true"
+            var state = info()
+            if (needsRotation(state)) {
+                rotate(conv, "membership change")
+                state = info()
+                if (needsRotation(state)) { markWaiting(conv); return null }
+            }
+            val epoch = (state["epochs"] as? JsonArray)?.lastOrNull()?.jsonObject?.get("epoch")?.jsonPrimitive?.int
+            if (epoch != null) {
+                if (ring.get(conv, epoch) == null) {
+                    val mine = api.get("/keys/grants", ListSerializer(KeyGrant.serializer()))
+                    ingest(mine.filter { it.convId == conv })
+                }
+                ring.get(conv, epoch)?.let { return epoch to it }
+                markWaiting(conv)
+                return null
+            }
+        }
         ring.latest(conv)?.let { return it }
         val uid = userId ?: return null
         val job = synchronized(pendingEnsure) {

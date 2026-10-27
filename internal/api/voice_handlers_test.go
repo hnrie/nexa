@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -265,6 +267,51 @@ func TestCloudflareTURNCredentials(t *testing.T) {
 	do(t, ts, "GET", "/api/v1/voice/ice", token, nil)
 	if calls != 1 {
 		t.Errorf("credentials should be reused, minted %d times", calls)
+	}
+}
+
+func TestGuestTURNRequestsShareABoundedCredential(t *testing.T) {
+	var calls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"iceServers":{"urls":["turn:relay.example:3478"],"username":"guest","credential":"test"}}`))
+	}))
+	defer upstream.Close()
+	previous := turnClient.Transport
+	turnClient.Transport = &redirectTransport{to: upstream.Listener.Addr().String()}
+	defer func() { turnClient.Transport = previous }()
+	srv, ts := newTestServer(t)
+	srv.Cfg.GuestLinksP2P = true
+	srv.Cfg.TurnKeyID, srv.Cfg.TurnAPIToken = "test-key", "test-token"
+	owner, _ := register(t, ts, "owner")
+	view := createServer(t, ts, owner, "Guest relay")
+	channel := channelNamed(view, "General")["id"].(string)
+	epoch := createEpoch(t, ts, owner, view["id"].(string))
+	guest, id := guestJoin(t, ts, guestLink(t, ts, owner, channel, epoch), "Guest")
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Go(func() {
+			res, _ := do(t, ts, "GET", "/api/v1/voice/ice", guest, nil)
+			if res.StatusCode != 200 {
+				t.Errorf("guest ICE: %d", res.StatusCode)
+			}
+		})
+	}
+	wg.Wait()
+	do(t, ts, "GET", "/api/v1/voice/ice", guest, nil)
+	if calls.Load() != 1 {
+		t.Fatalf("guest minted %d credentials", calls.Load())
+	}
+	uid, _ := ids.Parse(id)
+	srv.turnMu.Lock()
+	hit := srv.turnCreds[uid]
+	hit.until = time.Now().Add(-time.Second)
+	srv.turnCreds[uid] = hit
+	srv.turnMu.Unlock()
+	do(t, ts, "GET", "/api/v1/voice/ice", guest, nil)
+	if calls.Load() != 2 {
+		t.Fatalf("expired guest credential was reused: %d mints", calls.Load())
 	}
 }
 

@@ -203,9 +203,18 @@ const (
 	tooManyForInstance = errTooMany("the server is at its connection limit")
 )
 
+// AdmitWaiting lets another gateway share the same pre-authentication
+// connection budget. The returned release function is safe to call twice.
+func (h *Hub) AdmitWaiting(ip string) (func(), error) {
+	if err := h.admitWaiting(ip); err != nil {
+		return nil, err
+	}
+	var once sync.Once
+	return func() { once.Do(func() { h.releaseWaiting(ip) }) }, nil
+}
+
 // admitWaiting reserves room for a socket that has not identified yet. The
-// caller releases it with releaseWaiting once the socket has either been
-// registered or given up.
+// caller releases it once the socket has either registered or given up.
 func (h *Hub) admitWaiting(ip string) error {
 	// An address the proxy in front did not tell us about arrives as loopback,
 	// and then every visitor shares one bucket; counting them together would
