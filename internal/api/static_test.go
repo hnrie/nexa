@@ -255,6 +255,20 @@ func TestStaticWorkerPolicy(t *testing.T) {
 			if got := rec.Header().Get("Content-Security-Policy"); got != CSP {
 				t.Fatalf("worker policy = %q, want app policy %q", got, CSP)
 			}
+			if strings.HasPrefix(path, "/assets/transcribe.worker-") {
+				if got := rec.Header().Get("Cache-Control"); got != "no-cache, must-revalidate" {
+					t.Errorf("transcription worker cache policy = %q", got)
+				}
+				if got := rec.Header().Get("CDN-Cache-Control"); got != "no-store" {
+					t.Errorf("transcription worker CDN cache policy = %q", got)
+				}
+			} else if path == "/sw.js" {
+				if got := rec.Header().Get("Cache-Control"); got != "no-cache" {
+					t.Errorf("service worker cache policy = %q", got)
+				}
+			} else if got := rec.Header().Get("Cache-Control"); got != "public, max-age=31536000, immutable" {
+				t.Errorf("runtime asset cache policy = %q", got)
+			}
 		})
 	}
 }

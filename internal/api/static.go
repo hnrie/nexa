@@ -233,6 +233,12 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, fp, urlPath string,
 	// they never change under the same URL.
 	if strings.HasPrefix(urlPath, "/assets/") || strings.HasPrefix(urlPath, "/twemoji/") {
 		h.Set("Cache-Control", "public, max-age=31536000, immutable")
+		// The worker response carries the CSP that governs its fetches. A CDN
+		// may otherwise retain an old policy under an unchanged asset URL.
+		if strings.HasPrefix(filepath.Base(fp), "transcribe.worker-") {
+			h.Set("Cache-Control", "no-cache, must-revalidate")
+			h.Set("CDN-Cache-Control", "no-store")
+		}
 	} else if urlPath == "/version.json" {
 		// Names the build being served, which open pages ask for to learn of
 		// a deploy (web/src/lib/appUpdate.ts): a copy kept anywhere, a CDN's

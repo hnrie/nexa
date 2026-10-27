@@ -2,8 +2,12 @@ import { env, pipeline, Tensor } from "@huggingface/transformers";
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.wasm?url";
 import runtimeUrl from "onnxruntime-web/ort-wasm-simd-threaded.mjs?url";
 
+// The response CSP is set by the server, not hashed with this source. Keep
+// changing this worker's content hash when that policy changes so immutable
+// CDN entries cannot keep an obsolete CSP attached to the same URL.
 // A single thread works without cross-origin isolation, including Electron and mobile browsers.
 env.allowLocalModels = false;
+env.allowRemoteModels = true;
 env.backends.onnx.wasm!.numThreads = 1;
 env.backends.onnx.wasm!.proxy = false;
 env.backends.onnx.wasm!.wasmPaths = { wasm: wasmUrl, mjs: runtimeUrl };
