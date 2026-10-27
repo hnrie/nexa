@@ -33,7 +33,6 @@
 .title { font-weight: 700; color: var(--text-strong); font-size: 14.5px; }
 .title, .line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .muted { color: var(--text-muted); }
-a.title:hover, a.line:hover { text-decoration: underline; }
 .clock { font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .progress { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .bar { height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--text-strong) 14%, transparent); overflow: hidden; }

@@ -52,14 +52,14 @@ export function ActivityCard({ activity: a }: { activity: Activity }) {
   // music, video and streams lead with the track or title; games with their name
   const media = a.type === 1 || a.type === 2 || a.type === 3;
   const title = media ? a.details || a.name : a.name;
-  const lines: { text: string; href?: string | undefined; muted?: boolean }[] = [];
+  const lines: { text: string; muted?: boolean }[] = [];
   if (media) {
-    if (a.state) lines.push({ text: a.type === 2 ? t("activity.activityCard.byArtist", { name: a.state }) : a.state, href: a.state_url });
-    if (a.assets?.large_text) lines.push({ text: a.type === 2 ? t("activity.activityCard.onAlbum", { name: a.assets.large_text }) : a.assets.large_text, href: a.assets.large_url, muted: true });
+    if (a.state) lines.push({ text: a.type === 2 ? t("activity.activityCard.byArtist", { name: a.state }) : a.state });
+    if (a.assets?.large_text) lines.push({ text: a.type === 2 ? t("activity.activityCard.onAlbum", { name: a.assets.large_text }) : a.assets.large_text, muted: true });
   } else {
-    if (a.details) lines.push({ text: a.details, href: a.details_url });
+    if (a.details) lines.push({ text: a.details });
     const party = a.party?.size ? t("activity.activityCard.partySize", { count: a.party.size[0], max: a.party.size[1] }) : "";
-    if (a.state || party) lines.push({ text: [a.state ?? "", party].filter(Boolean).join(" "), href: a.state_url });
+    if (a.state || party) lines.push({ text: [a.state ?? "", party].filter(Boolean).join(" ") });
   }
   const KindIcon = kindIcon(a.type);
   // the art, blurred far out behind the card, tints it with whatever is playing
@@ -94,9 +94,9 @@ export function ActivityCard({ activity: a }: { activity: Activity }) {
           ) : null}
         </div>
         <div className={s.text}>
-          <Linked href={media ? a.details_url : undefined} className={s.title} title={title}><ScrollingText>{title}</ScrollingText></Linked>
+          <span className={s.title} title={title}><ScrollingText>{title}</ScrollingText></span>
           {lines.map((l, i) => (
-            <Linked key={i} href={l.href} className={[s.line, l.muted ? s.muted : ""].join(" ")} title={l.text}><ScrollingText>{l.text}</ScrollingText></Linked>
+            <span key={i} className={[s.line, l.muted ? s.muted : ""].join(" ")} title={l.text}><ScrollingText>{l.text}</ScrollingText></span>
           ))}
           {clock?.kind === "remaining" ? <span className={s.clock}>{t("activity.activityCard.timeLeft", { time: formatClock(clock.remaining) })}</span> : null}
           {clock?.kind === "elapsed" ? <span className={s.clock}>{t("activity.activityCard.timeElapsed", { time: formatClock(clock.elapsed) })}</span> : null}

@@ -103,17 +103,17 @@ private fun ActivityCardBody(a: Activity) {
     val large = a.assets?.largeImage ?: a.iconUrl
     val media = a.type == 1 || a.type == 2 || a.type == 3
     val title = if (media) a.details?.ifEmpty { null } ?: a.name else a.name
-    data class Line(val text: String, val href: String?, val muted: Boolean = false)
+    data class Line(val text: String, val muted: Boolean = false)
     val lines = ArrayList<Line>()
     if (media) {
-        a.state?.takeIf { it.isNotEmpty() }?.let { lines += Line(if (a.type == 2) t("activity.activityCard.byArtist", "name" to it) else it, a.stateUrl) }
-        a.assets?.largeText?.takeIf { it.isNotEmpty() }?.let { lines += Line(if (a.type == 2) t("activity.activityCard.onAlbum", "name" to it) else it, a.assets.largeUrl, muted = true) }
+        a.state?.takeIf { it.isNotEmpty() }?.let { lines += Line(if (a.type == 2) t("activity.activityCard.byArtist", "name" to it) else it) }
+        a.assets?.largeText?.takeIf { it.isNotEmpty() }?.let { lines += Line(if (a.type == 2) t("activity.activityCard.onAlbum", "name" to it) else it, muted = true) }
     } else {
-        a.details?.takeIf { it.isNotEmpty() }?.let { lines += Line(it, a.detailsUrl) }
+        a.details?.takeIf { it.isNotEmpty() }?.let { lines += Line(it) }
         val size = a.party?.size
         val party = if (size != null && size.size >= 2) t("activity.activityCard.partySize", "count" to size[0], "max" to size[1]) else ""
         val state = listOf(a.state ?: "", party).filter { it.isNotEmpty() }.joinToString(" ")
-        if (state.isNotEmpty()) lines += Line(state, a.stateUrl)
+        if (state.isNotEmpty()) lines += Line(state)
     }
     val green = Activities.green(c.isLight)
     val shape = Radii.Md
@@ -162,11 +162,9 @@ private fun ActivityCardBody(a: Activity) {
                     }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    ScrollingText(AnnotatedString(title), Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(18f), color = c.textStrong), Modifier.linked(if (media) a.detailsUrl else null))
-                    if (media) activityHost(a.detailsUrl)?.let { Txt(it, style = Nx.type.hint.copy(fontSize = Nx.type.sp(11f)), color = c.textMuted) }
-                    for (l in lines) Column(Modifier.linked(l.href)) {
+                    ScrollingText(AnnotatedString(title), Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(18f), color = c.textStrong))
+                    for (l in lines) Column {
                         ScrollingText(AnnotatedString(l.text), Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(18f), color = if (l.muted) c.textMuted else c.text))
-                        activityHost(l.href)?.let { Txt(it, style = Nx.type.hint.copy(fontSize = Nx.type.sp(11f)), color = c.textMuted) }
                     }
                     when (clock) {
                         is Activities.Clock.Remaining -> Txt(t("activity.activityCard.timeLeft", "time" to Activities.clock(clock.remaining)), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), fontFeatureSettings = "tnum"), color = c.textMuted)

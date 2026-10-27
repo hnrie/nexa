@@ -23,3 +23,19 @@ it("does not turn an unsafe activity scheme into a link", () => {
   render(<ActivityCard activity={{ name: "A game", type: 0, created_at: 1, buttons: [{ label: "Open", url: "javascript:alert(1)" }] }} />);
   expect(screen.queryByRole("link")).toBeNull();
 });
+it("shows Rich Presence song details without destination links or host labels", () => {
+  render(<ActivityCard activity={{
+    name: "Apple Music",
+    type: 2,
+    details: "Zero Day",
+    details_url: "https://music.apple.com/album/zero-day",
+    state: "Ghostemane",
+    state_url: "https://music.apple.com/artist/ghostemane",
+    assets: { large_text: "Zero Day", large_url: "https://music.apple.com/album/zero-day" },
+    created_at: 1,
+  }} />);
+  expect(screen.getByText("Zero Day")).toBeTruthy();
+  expect(screen.getByText("by Ghostemane")).toBeTruthy();
+  expect(screen.queryByText("music.apple.com")).toBeNull();
+  expect(screen.queryByRole("link")).toBeNull();
+});
