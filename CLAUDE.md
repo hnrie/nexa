@@ -542,8 +542,15 @@ weights and a bundled single-threaded WASM runtime, without needing cross-origin
 separate first-window language-token pass avoids the library's English default. Native Android
 uses `data/Transcripts`, MediaCodec decoding and whisper.cpp 1.9.5 through `cpp/whisper_jni.cc`.
 CMake pins its source archive by SHA-256. Its 77.7 MB Tiny weights download on first use into
-noBackupFilesDir and are verified by size and SHA-256 before an atomic rename. Browser weights
-use the library's model cache. Trusted static JavaScript and module responses carry the app's
+noBackupFilesDir and are verified by size and SHA-256 before an atomic rename. The model files
+are committed directly in `web/public/models/whisper-tiny/` (no Git LFS).
+Vite copies them into the web build, served at `/models/whisper-tiny/`; Android downloads
+`ggml-tiny.bin` from its configured Nexa server and the browser uses the library's model cache.
+The web worker sets `localModelPath` to `/models/` and disables remote models, so a missing
+file fails without falling back to Hugging Face. Missing `/models/` files return 404, never
+the SPA page. `manifest.json` records pinned upstream URLs, sizes and SHA-256 hashes;
+`LICENSE` preserves the Whisper MIT notice. Trusted static JavaScript and module responses carry
+the app's
 CSP, because a worker enforces its own script response policy and the default deny policy
 blocks its model download. Both clients show download percentages only after Transcribe is
 chosen, then working, failure and no-speech states; there is no idle transcription hint. They

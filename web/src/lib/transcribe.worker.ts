@@ -6,14 +6,16 @@ import runtimeUrl from "onnxruntime-web/ort-wasm-simd-threaded.mjs?url";
 // changing this worker's content hash when that policy changes so immutable
 // CDN entries cannot keep an obsolete CSP attached to the same URL.
 // A single thread works without cross-origin isolation, including Electron and mobile browsers.
-env.allowLocalModels = false;
-env.allowRemoteModels = true;
+// Models are committed in public/models and served by Nexa. Never fall back to the Hub.
+env.allowLocalModels = true;
+env.localModelPath = "/models/";
+env.allowRemoteModels = false;
 env.backends.onnx.wasm!.numThreads = 1;
 env.backends.onnx.wasm!.proxy = false;
 env.backends.onnx.wasm!.wasmPaths = { wasm: wasmUrl, mjs: runtimeUrl };
 self.onmessage = async ({ data }: MessageEvent<Float32Array>) => {
   try {
-    const model = await pipeline("automatic-speech-recognition", "onnx-community/whisper-tiny", { dtype: "q8", device: "wasm", progress_callback: (info) => {
+    const model = await pipeline("automatic-speech-recognition", "whisper-tiny", { dtype: "q8", device: "wasm", progress_callback: (info) => {
       if (info.status === "progress_total") self.postMessage({ phase: "loading", progress: Math.min(100, Math.max(0, Math.floor(info.progress))) });
     } });
     self.postMessage({ phase: "working" });

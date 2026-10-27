@@ -63,7 +63,7 @@ func TestStaticServing(t *testing.T) {
 	}
 	// a file from a build that has been replaced must 404, never fall back to
 	// the page: a cache would then keep that page at the script's address
-	for _, missing := range []string{"/assets/gone-deadbeef.js", "/twemoji/9999.svg", "/download-sw.js", "/__download/0123456789abcdef0123456789abcdef"} {
+	for _, missing := range []string{"/models/whisper-tiny/missing.json", "/assets/gone-deadbeef.js", "/twemoji/9999.svg", "/download-sw.js", "/__download/0123456789abcdef0123456789abcdef"} {
 		res, body = get(missing)
 		if res.StatusCode != 404 || strings.Contains(body, "Nexa") || res.Header.Get("Cache-Control") != "no-store" {
 			t.Errorf("missing %s: %d %q %v", missing, res.StatusCode, body, res.Header.Get("Cache-Control"))

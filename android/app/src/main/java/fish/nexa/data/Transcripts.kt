@@ -38,7 +38,7 @@ object Transcripts {
             if (target.length() == MODEL_SIZE) return@withLock target
             val part = File(target.path + ".part")
             try {
-                client.newCall(Request.Builder().url("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin").build()).execute().use { response ->
+                client.newCall(Request.Builder().url("${Nexa.api.baseUrl.trimEnd('/')}/models/whisper-tiny/ggml-tiny.bin").build()).execute().use { response ->
                     check(response.isSuccessful)
                     val hash = MessageDigest.getInstance("SHA-256")
                     var total = 0L
