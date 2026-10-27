@@ -30,6 +30,7 @@ import { installSearchIndex } from "@/search/indexer";
 import { installBackLayers } from "./backLayers";
 import s from "./AppShell.module.css";
 import { t } from "@/i18n";
+import { isDemo } from "@/lib/demoMode";
 
 /** The plan offers and the once-per-release Support Nexa prompt, loaded after the app opens (components/support/Upsell.tsx). */
 const Plans = lazyPage(() =>
@@ -128,6 +129,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [params, setParams, openModal]);
 
   useEffect(() => {
+    if (isDemo) return;
     installVoice();
     installAway();
     installDiscord();
@@ -289,10 +291,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         ) : connection !== "open" && connection !== "idle" ? (
           <div className={s.connection} data-state={connection} role="status">{connectionNote ?? (connection === "connecting" ? t("shell.requireAuth.connecting") : t("shell.appShell.disconnectedReconnecting"))}</div>
         ) : null}
-        <UpdatePrompt />
+        {!isDemo && <UpdatePrompt />}
         <RpcBanner />
         <DiscordBanner />
-        <DownloadBanner />
+        {!isDemo && <DownloadBanner />}
         <Tabs />
         {/* the page takes what the banner leaves */}
         <div className={s.page} {...(tabbed ? { role: "tabpanel", id: TAB_PANEL_ID, "aria-labelledby": `tab-${tabId}` } : {})}>

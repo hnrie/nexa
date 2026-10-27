@@ -961,6 +961,29 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
 `@discover`, `@me/:channelId[/:messageId]` (DMs), `:serverId[/:channelId[/:messageId]]`, then
 `/:handle` (a profile link, `/@name`).
 
+### Homepage demo
+
+The homepage's `HomeDemo.tsx` embeds `demo.html`, a second Vite entry, in a sandboxed iframe.
+It runs the real app routes and shell from `demo/DemoApp.tsx` with a fresh, empty visitor account,
+no fictional people or prefilled servers. `demo/environment.ts` runs before any app imports:
+localStorage and sessionStorage are fresh maps, IndexedDB is a fresh in-memory fake-indexeddb
+factory, Cache Storage and the desktop bridge are unavailable. Fetch permits only same-origin
+bundled assets without credentials; sockets, XHR, workers, media devices and native navigation are
+blocked. No real token is read or issued. `demo/runtime.ts` replaces the API with memory-only
+profile, settings, server, channel, message and note operations. Unknown routes fail closed and
+show Create an Account to Continue, as do people, invites, calls, uploads, payments and security
+actions. New app endpoints must never fall through to a real transport in the demo.
+
+`lib/demoMode.ts` is true only in that entry. RequireAuth skips the gateway there, AppShell skips
+live effects and update/download prompts, and joining voice asks for an account before opening
+any audio device. The desktop bridge is also refused by `desktopBridge()`, and LookEffect
+allows local CSS while plugin execution asks for an account. All other visitors keep the normal app behavior. Only `/demo.html` allows
+same-origin framing in its response CSP; every other HTML page still forbids framing. The demo
+entry also carries a stricter CSP. Reset replaces the iframe; reload drops its entire realm.
+Full Screen uses a fixed page overlay on every device, including iOS, with a visible exit button,
+Escape, a motion-preference-aware expansion/return animation, and the same iframe kept mounted.
+This is a public website feature, with no corresponding native Android screen.
+
 ### State and data flow
 
 - `api/` is the typed REST client (`api/client.ts` adds the token, a timeout and the error

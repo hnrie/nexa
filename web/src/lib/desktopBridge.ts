@@ -1,3 +1,4 @@
+import { isDemo } from "./demoMode";
 /**
  * The desktop app's side of the page: what its preload script puts on
  * `window.evilionDesktop`. In a browser there is none, and everything that
@@ -213,7 +214,7 @@ export interface EvilionDesktop {
 }
 
 export function desktopBridge(): EvilionDesktop | null {
-  if (typeof window === "undefined") return null;
+  if (isDemo || typeof window === "undefined") return null;
   return (window as Window & { evilionDesktop?: EvilionDesktop }).evilionDesktop ?? null;
 }
 

@@ -6893,5 +6893,17 @@
   "whatsNew.r202610263.ranksBody": "Nexa のスタッフにランクができました。オーナー、開発者、管理者、モデレーターで、それぞれのバッジがプロフィールやメンバー一覧に表示されます。",
   "whatsNew.r202610263.ranksTitle": "スタッフのランク",
   "whatsNew.r202610264.mediaLinksBody": "音声や動画ファイルのリンクを送ると、チャット内で再生できます。メディアはNexaのプロキシ経由で読み込まれます。",
-  "whatsNew.r202610264.mediaLinksTitle": "メディアリンクを再生"
+  "whatsNew.r202610264.mediaLinksTitle": "メディアリンクを再生",
+  "home.demo.title": "Nexa を体験",
+  "home.demo.ephemeral": "再読み込みでリセット",
+  "home.demo.reset": "デモをリセット",
+  "home.demo.expand": "全画面表示",
+  "home.demo.collapse": "全画面表示を終了",
+  "home.demo.try": "試してみる",
+  "home.demo.hint": "新しいアカウントはここから始まります。サーバーを作成したり、ノートを書いたり、外観を変えてみましょう。再読み込みするとすべて消えます。",
+  "home.demo.accountTitle": "続行するにはアカウントを作成",
+  "home.demo.accountBody": "プライベートなデモを体験中です。友達の追加やサーバーへの参加、実際の Nexa の利用には無料のアカウントを作成してください。",
+  "home.demo.keepExploring": "体験を続ける",
+  "whatsNew.r202610265.demoTitle": "登録前に Nexa を体験",
+  "whatsNew.r202610265.demoBody": "ホームページから実際のアプリを新しい状態で体験できます。変更はデモ内だけに保存され、再読み込みすると消えます。"
 }

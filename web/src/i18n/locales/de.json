@@ -7130,5 +7130,17 @@
   "whatsNew.r202610263.ranksBody": "Das Team von Nexa hat jetzt Ränge, Eigentümer, Entwickler, Admin und Mod, jeder mit eigenem Abzeichen in Profilen und Mitgliederlisten.",
   "whatsNew.r202610263.ranksTitle": "Team-Ränge",
   "whatsNew.r202610264.mediaLinksBody": "Sende einen Link zu einer Audio- oder Videodatei, um sie im Chat abzuspielen. Medien werden über den Proxy von Nexa geladen.",
-  "whatsNew.r202610264.mediaLinksTitle": "Medienlinks abspielen"
+  "whatsNew.r202610264.mediaLinksTitle": "Medienlinks abspielen",
+  "home.demo.title": "Nexa Erkunden",
+  "home.demo.ephemeral": "Wird beim Neuladen zurückgesetzt",
+  "home.demo.reset": "Demo Zurücksetzen",
+  "home.demo.expand": "Vollbild",
+  "home.demo.collapse": "Vollbild Verlassen",
+  "home.demo.try": "Ausprobieren",
+  "home.demo.hint": "So beginnt ein neues Konto. Erstelle einen Server, schreibe eine Notiz oder ändere dein Design. Beim Neuladen verschwindet alles.",
+  "home.demo.accountTitle": "Erstelle ein Konto, um Fortzufahren",
+  "home.demo.accountBody": "Du erkundest eine private Demo. Erstelle ein kostenloses Konto, um Leute hinzuzufügen, Servern beizutreten und Nexa wirklich zu nutzen.",
+  "home.demo.keepExploring": "Weiter Erkunden",
+  "whatsNew.r202610265.demoTitle": "Nexa vor der Anmeldung Ausprobieren",
+  "whatsNew.r202610265.demoBody": "Erkunde die echte App direkt auf der Startseite, von Anfang an. Änderungen bleiben in der Demo und verschwinden beim Neuladen."
 }

@@ -243,7 +243,12 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, fp, urlPath string,
 		h.Set("Cache-Control", "no-cache")
 	}
 	if strings.HasSuffix(fp, ".html") {
-		h.Set("Content-Security-Policy", CSP)
+		policy := CSP
+		if urlPath == "/demo.html" {
+			// Only the isolated demo may be embedded by our own homepage.
+			policy = strings.Replace(policy, "frame-ancestors 'none'", "frame-ancestors 'self'", 1)
+		}
+		h.Set("Content-Security-Policy", policy)
 	}
 	if filepath.Base(fp) == "sw.js" {
 		h.Set("Service-Worker-Allowed", "/")

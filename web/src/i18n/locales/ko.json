@@ -6893,5 +6893,17 @@
   "whatsNew.r202610263.ranksBody": "이제 Nexa 스태프에게 소유자, 개발자, 관리자, 모더레이터 등급이 있으며, 각각 프로필과 멤버 목록에 배지가 표시됩니다.",
   "whatsNew.r202610263.ranksTitle": "스태프 등급",
   "whatsNew.r202610264.mediaLinksBody": "오디오나 동영상 파일 링크를 보내 채팅에서 재생하세요. 미디어는 Nexa 프록시를 통해 로드됩니다.",
-  "whatsNew.r202610264.mediaLinksTitle": "미디어 링크 재생"
+  "whatsNew.r202610264.mediaLinksTitle": "미디어 링크 재생",
+  "home.demo.title": "Nexa 둘러보기",
+  "home.demo.ephemeral": "새로고침하면 초기화됩니다",
+  "home.demo.reset": "데모 초기화",
+  "home.demo.expand": "전체 화면",
+  "home.demo.collapse": "전체 화면 종료",
+  "home.demo.try": "체험하기",
+  "home.demo.hint": "새 계정은 이렇게 시작합니다. 서버를 만들고, 노트를 쓰거나, 테마를 바꿔 보세요. 새로고침하면 모두 사라집니다.",
+  "home.demo.accountTitle": "계속하려면 계정을 만드세요",
+  "home.demo.accountBody": "비공개 데모를 둘러보고 있습니다. 사람을 추가하고 서버에 참여하며 실제 Nexa를 사용하려면 무료 계정을 만드세요.",
+  "home.demo.keepExploring": "계속 둘러보기",
+  "whatsNew.r202610265.demoTitle": "가입 전에 Nexa 체험하기",
+  "whatsNew.r202610265.demoBody": "홈페이지에서 실제 앱을 새로 시작한 상태로 둘러보세요. 변경 사항은 데모에만 남으며 새로고침하면 사라집니다."
 }

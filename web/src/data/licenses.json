@@ -398,6 +398,14 @@
   },
   {
    "part": "web",
+   "name": "fake-indexeddb",
+   "version": "6.2.5",
+   "license": "Apache-2.0",
+   "url": "https://github.com/dumbmatter/fakeIndexedDB",
+   "copyright": "Copyright 2017 Jeremy Scheff"
+  },
+  {
+   "part": "web",
    "name": "hash-wasm",
    "version": "4.12.0",
    "license": "MIT",

@@ -7130,5 +7130,17 @@
   "whatsNew.r202610263.ranksBody": "Nexa's staff now have ranks, Owner, Developer, Admin and Mod, each with its own badge on profiles and in member lists.",
   "whatsNew.r202610263.ranksTitle": "Staff Ranks",
   "whatsNew.r202610264.mediaLinksBody": "Send a link to an audio or video file to play it in chat. Media loads through Nexa’s proxy.",
-  "whatsNew.r202610264.mediaLinksTitle": "Play Media Links"
+  "whatsNew.r202610264.mediaLinksTitle": "Play Media Links",
+  "home.demo.title": "Explore Nexa",
+  "home.demo.ephemeral": "Resets on reload",
+  "home.demo.reset": "Reset Demo",
+  "home.demo.expand": "Full Screen",
+  "home.demo.collapse": "Exit Full Screen",
+  "home.demo.try": "Try It",
+  "home.demo.hint": "This is how a new account starts. Create a server, write a note or change your look. Everything here disappears when you reload.",
+  "home.demo.accountTitle": "Create an Account to Continue",
+  "home.demo.accountBody": "You’re exploring a private demo. Create a free account to add people, join servers and use the real Nexa.",
+  "home.demo.keepExploring": "Keep Exploring",
+  "whatsNew.r202610265.demoTitle": "Try Nexa Before Signing Up",
+  "whatsNew.r202610265.demoBody": "Explore the real app from the homepage, starting fresh. Changes stay in the demo and disappear on reload."
 }

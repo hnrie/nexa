@@ -6893,5 +6893,17 @@
   "whatsNew.r202610263.ranksBody": "Nexa 的工作人员现在有了等级：所有者、开发者、管理员和版主，每个等级在个人资料和成员列表中都有自己的徽章。",
   "whatsNew.r202610263.ranksTitle": "工作人员等级",
   "whatsNew.r202610264.mediaLinksBody": "发送音频或视频文件链接，即可在聊天中播放。媒体通过 Nexa 的代理加载。",
-  "whatsNew.r202610264.mediaLinksTitle": "播放媒体链接"
+  "whatsNew.r202610264.mediaLinksTitle": "播放媒体链接",
+  "home.demo.title": "探索 Nexa",
+  "home.demo.ephemeral": "重新加载后重置",
+  "home.demo.reset": "重置演示",
+  "home.demo.expand": "全屏",
+  "home.demo.collapse": "退出全屏",
+  "home.demo.try": "试试看",
+  "home.demo.hint": "新账号就是这样开始的。创建服务器、写笔记或更改外观。重新加载后，这里的一切都会消失。",
+  "home.demo.accountTitle": "创建账号以继续",
+  "home.demo.accountBody": "你正在体验私人演示。创建免费账号，即可添加好友、加入服务器并使用真正的 Nexa。",
+  "home.demo.keepExploring": "继续探索",
+  "whatsNew.r202610265.demoTitle": "注册前先体验 Nexa",
+  "whatsNew.r202610265.demoBody": "从首页探索真正的应用，从全新状态开始。更改仅保留在演示中，重新加载后就会消失。"
 }

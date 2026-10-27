@@ -3,11 +3,33 @@ package api
 import (
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
+
+// Embedding is limited to the standalone demo, never a live account page.
+func TestDemoFramePolicy(t *testing.T) {
+	dist := t.TempDir()
+	for _, name := range []string{"demo.html", "index.html"} {
+		if err := os.WriteFile(filepath.Join(dist, name), []byte("<!doctype html><title>Nexa</title>"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, check := range []struct{ path, ancestor string }{{"/demo.html", "'self'"}, {"/index.html", "'none'"}} {
+		req := httptest.NewRequest(http.MethodGet, check.path, nil)
+		recorder := httptest.NewRecorder()
+		file := filepath.Join(dist, strings.TrimPrefix(check.path, "/"))
+		serveStaticFile(recorder, req, file, check.path, time.Now())
+		policy := recorder.Header().Get("Content-Security-Policy")
+		if !strings.Contains(policy, "frame-ancestors "+check.ancestor) {
+			t.Errorf("%s: %s", check.path, policy)
+		}
+	}
+}
 
 func TestStaticServing(t *testing.T) {
 	srv, ts := newTestServer(t)

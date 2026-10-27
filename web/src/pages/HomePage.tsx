@@ -1,25 +1,7 @@
-/**
- * The front page: what Nexa is, shown before it is said.
- *
- * It is laid out the way the app is: a dark canvas with the accent's glow in
- * its corner, a rail down the side (here, one tile for each part of the page,
- * lit for the part being read), and lit panels floating on the canvas for
- * what is really the app: one conversation drawn twice, as the people in it
- * read it and as the server holds it, with a line between the two that
- * anyone can move; pictures and loops of the app running; and what the server
- * can and cannot read. The words stay on the canvas.
- *
- * Straight after the opening come four promises, set as type alone, each with
- * the things that keep it: what someone weighing Nexa up most wants to know,
- * before the tour of the app that follows.
- *
- * One thing moves by itself, once: as the page opens the conversation's
- * window lifts in and the line sweeps across it, sealing what it passes.
- * Everything else moves only when someone does something to it.
- */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+/** The public homepage, with an isolated, temporary copy of the real app to explore. */
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Archive, AudioLines, ChevronsLeftRight, CornerUpLeft, Eye, EyeOff, FileUp, Hash, Headphones, HeartHandshake, KeyRound, Lock, LockKeyhole, MailX, MessagesSquare, MonitorUp, NotebookPen, Palette, Pause, PhoneCall, Play, Puzzle, QrCode, Search, ShieldCheck, Smile, Sparkles, Users, Zap, type LucideIcon } from "lucide-react";
+import { Archive, AudioLines, Eye, EyeOff, FileUp, Headphones, HeartHandshake, KeyRound, Lock, LockKeyhole, MailX, MessagesSquare, MonitorUp, NotebookPen, Palette, Pause, Play, Puzzle, QrCode, Search, ShieldCheck, Smile, Sparkles, Users, Zap, type LucideIcon } from "lucide-react";
 import { NexaTile, NexaWordmark } from "@/components/common/Brand";
 import { hasSavedSession, useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
@@ -34,6 +16,7 @@ import { t, translator } from "@/i18n";
 import "@fontsource/noto-sans/800.css";
 import { seal } from "./homeSeal";
 import s from "./Home.module.css";
+import HomeDemo from "./HomeDemo";
 
 /**
  * The most the app takes to load, gzipped: the script and styles every page
@@ -43,9 +26,9 @@ import s from "./Home.module.css";
  * it was 321 kB when it became 330, about half of it the English strings,
  * 330.3 kB when it became 335, 337 kB when it became 340, 342.4 kB when
  * it became 345, with apps' strings, and 345.1 kB when it became 350, with
- * the person menu in conversations.)
+ * the person menu in conversations. It became 365 with the translated homepage demo.)
  */
-export const LOAD_KB_LIMIT = 360;
+export const LOAD_KB_LIMIT = 365;
 
 /** Whether this visitor has asked for less movement, by either route. */
 function useStillness(): boolean {
@@ -98,258 +81,6 @@ function useScrolled(): boolean {
     return () => window.removeEventListener("scroll", look);
   }, []);
   return scrolled;
-}
-
-/* ------------------------------------------------------------------------ */
-/* The two sides of one conversation                                          */
-/* ------------------------------------------------------------------------ */
-
-type Who = "alice" | "bob" | "carol";
-const PEOPLE: Record<Who, { name: string; colour: string; ink: string }> = {
-  // the same two colours Alice and Bob have in the call loop further down
-  alice: { name: "Alice", colour: "#d6336c", ink: "#fff" },
-  bob: { name: "Bob", colour: "#f0a202", ink: "#2b1b00" },
-  carol: { name: "Carol", colour: "#1b7a57", ink: "#fff" },
-};
-
-interface Line {
-  who: Who;
-  /** Minutes past 21:00, shown in the reader's own clock. */
-  at: number;
-  text: string;
-  reply?: { who: Who; text: string };
-}
-
-function conversation(): Line[] {
-  const m2 = t("home.duo.m2");
-  return [
-    { who: "carol", at: 12, text: t("home.duo.m1") },
-    { who: "bob", at: 14, text: m2 },
-    { who: "alice", at: 15, text: t("home.duo.m3"), reply: { who: "bob", text: m2 } },
-    { who: "carol", at: 17, text: t("home.duo.m4") },
-  ];
-}
-
-function clock(minutes: number): string {
-  const when = new Date(2026, 0, 3, 21, minutes);
-  try {
-    return new Intl.DateTimeFormat(translator().locale, { hour: "numeric", minute: "2-digit" }).format(when);
-  } catch {
-    return `21:${String(minutes).padStart(2, "0")}`;
-  }
-}
-
-/**
- * Where the line rests, as a share of the width from the reading side: on a
- * phone further over, where a message has fewer words to spare.
- */
-const restingPlace = (): number => (typeof window !== "undefined" && window.innerWidth < 600 ? 64 : 58);
-/** How close to either edge it may go: the handle stays whole inside the frame. */
-const EDGE = 4;
-
-function Avatar({ who }: { who: Who }) {
-  const p = PEOPLE[who];
-  return (
-    <span className={s.avatar} style={{ background: p.colour, color: p.ink }} aria-hidden="true">
-      {p.name[0]}
-    </span>
-  );
-}
-
-/**
- * A message's words. On the server's side they are kept, unseen, to hold the
- * same space, and the ciphertext is laid over them: the two drawings then
- * line up exactly, name for name and line for line.
- */
-function Words({ text, sealed, className }: { text: string; sealed?: string | undefined; className?: string | undefined }) {
-  if (sealed === undefined) return <span className={className} dir="auto">{text}</span>;
-  return (
-    <span className={[className, s.sealedWords].join(" ")}>
-      <span className={s.unseen}>{text}</span>
-      <span className={s.cipher} dir="ltr">{sealed}</span>
-    </span>
-  );
-}
-
-function Conversation({ lines, sealed, server }: { lines: Line[]; sealed: string[] | null; server?: boolean }) {
-  // the server's drawing seals every text; a reply's quote is a text as well
-  let n = 0;
-  const next = () => (server ? (sealed?.[n++] ?? "") : undefined);
-  return (
-    <div className={s.convo} data-side={server ? "server" : "you"} aria-hidden={server || undefined}>
-      <div className={s.convoTop}>
-        <Hash size={18} aria-hidden="true" />
-        <span>{t("home.duo.channel")}</span>
-      </div>
-      <ol className={s.convoLines}>
-        {lines.map((line, i) => (
-          <li key={i} className={s.line}>
-            {line.reply ? (
-              <div className={s.replyTo}>
-                <CornerUpLeft size={14} aria-hidden="true" />
-                <span className={s.replyName}>{PEOPLE[line.reply.who].name}</span>
-                <Words text={line.reply.text} sealed={next()} className={s.replyText} />
-              </div>
-            ) : null}
-            <div className={s.lineRow}>
-              <Avatar who={line.who} />
-              <div className={s.lineMain}>
-                <div className={s.lineHead}>
-                  <span className={s.name}>{PEOPLE[line.who].name}</span>
-                  <time className={s.time}>{clock(line.at)}</time>
-                </div>
-                <Words text={line.text} sealed={next()} className={s.text} />
-              </div>
-            </div>
-          </li>
-        ))}
-        <li className={s.event}>
-          <PhoneCall size={16} aria-hidden="true" />
-          <span>{t("home.duo.call", { name: PEOPLE.bob.name })}</span>
-          <time className={s.time}>{clock(18)}</time>
-        </li>
-      </ol>
-    </div>
-  );
-}
-
-/**
- * The same conversation twice, as its people read it and as the server holds
- * it, with a line between them. The line comes in from the far side once, the
- * first time the whole thing is in view, and then goes wherever it is dragged
- * (or moved with the arrow keys: the slider under it is a real one).
- */
-function Duo({ still }: { still: boolean }) {
-  const lines = useMemo(conversation, []);
-  const texts = useMemo(() => lines.flatMap((l) => (l.reply ? [l.reply.text, l.text] : [l.text])), [lines]);
-  const [sealed, setSealed] = useState<string[] | null>(null);
-  const [seam, setSeam] = useState(() => (still ? restingPlace() : 100));
-  const [dragging, setDragging] = useState(false);
-  // the line has finished its sweep: its glow dies down and the handle catches the light once
-  const [settled, setSettled] = useState(still);
-  const stage = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let alive = true;
-    void seal(texts).then((out) => alive && setSealed(out));
-    return () => {
-      alive = false;
-    };
-  }, [texts]);
-
-  // The sweep ends when the line's transition does; a browser that cannot
-  // animate the line jumps it, and the timer stands in for the end.
-  useEffect(() => {
-    if (settled || seam === 100) return;
-    const el = stage.current;
-    const done = () => setSettled(true);
-    const onEnd = (e: TransitionEvent) => e.propertyName === "--seam" && done();
-    el?.addEventListener("transitionend", onEnd);
-    const timer = window.setTimeout(done, 2600);
-    return () => {
-      el?.removeEventListener("transitionend", onEnd);
-      window.clearTimeout(timer);
-    };
-  }, [seam, settled]);
-
-  // The one moment the page moves on its own: once, when it can be seen.
-  useEffect(() => {
-    const settle = () => setSeam((v) => (v === 100 ? restingPlace() : v));
-    const el = stage.current;
-    if (still || !el || typeof IntersectionObserver === "undefined") {
-      settle();
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          io.disconnect();
-          settle();
-        }
-      },
-      { threshold: 0.6 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [still]);
-
-  /** The share of the width between the reading edge and the pointer. */
-  const at = (clientX: number): number => {
-    const el = stage.current;
-    if (!el) return restingPlace();
-    const box = el.getBoundingClientRect();
-    const rtl = getComputedStyle(el).direction === "rtl";
-    const from = rtl ? box.right - clientX : clientX - box.left;
-    return Math.max(EDGE, Math.min(100 - EDGE, (from / box.width) * 100));
-  };
-
-  const grab = (e: React.PointerEvent<HTMLElement>, jump: boolean) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setDragging(true);
-    if (jump) setSeam(at(e.clientX));
-  };
-  const drag = (e: React.PointerEvent<HTMLElement>) => {
-    // a mouse whose button came up somewhere this never heard of has stopped dragging
-    if (dragging && e.pointerType === "mouse" && !(e.buttons & 1)) setDragging(false);
-    else if (dragging) setSeam(at(e.clientX));
-  };
-  const drop = () => setDragging(false);
-
-  const style = { "--seam": `${seam}%` } as CSSProperties;
-  return (
-    <figure className={s.duo}>
-      <div className={s.duoLegend} aria-hidden="true">
-        <span className={s.duoLegendYou}>{t("home.duo.you")}</span>
-        <span className={s.duoLegendServer}><Lock size={13} aria-hidden="true" />{t("home.duo.server")}</span>
-      </div>
-      <div
-        ref={stage}
-        className={s.stage}
-        style={style}
-        data-dragging={dragging || undefined}
-        data-still={still || undefined}
-        data-settled={settled || undefined}
-        // With a mouse, a press anywhere moves the line there. A finger only
-        // moves it from the handle, so a thumb scrolling past never does.
-        onPointerDown={(e) => e.pointerType === "mouse" && grab(e, true)}
-        onPointerMove={drag}
-        onPointerUp={drop}
-        onPointerCancel={drop}
-        onLostPointerCapture={drop}
-      >
-        <Conversation lines={lines} sealed={sealed} />
-        <div className={s.serverSide}>
-          <Conversation lines={lines} sealed={sealed} server />
-        </div>
-        <input
-          className={s.seamInput}
-          type="range"
-          min={EDGE}
-          max={100 - EDGE}
-          step={1}
-          value={Math.round(Math.min(seam, 100 - EDGE))}
-          onChange={(e) => setSeam(Number(e.target.value))}
-          aria-label={t("home.duo.slider")}
-          aria-valuetext={t("home.duo.sliderValue", { percent: Math.round(100 - seam) })}
-        />
-        <div className={s.seam} aria-hidden="true">
-          <span
-            className={s.knob}
-            onPointerDown={(e) => {
-              // the frame under it would take this press as a jump as well
-              e.stopPropagation();
-              grab(e, false);
-            }}
-          >
-            <ChevronsLeftRight size={20} />
-          </span>
-        </div>
-      </div>
-      <figcaption className={s.duoCaption}>{t("home.duo.caption")}</figcaption>
-    </figure>
-  );
 }
 
 /* ------------------------------------------------------------------------ */
@@ -723,13 +454,10 @@ export default function HomePage() {
       <div className={s.body}>
         <PageRail still={still} />
         <main className={s.main}>
-          {/* In one column (a phone, a tablet held upright) the conversation
-              comes straight after the headline, so the first screen shows what
-              the page is about rather than a paragraph describing it; the
-              header keeps Get Started in reach meanwhile. */}
+          {/* The full app window stays wide enough to use its real responsive layout. */}
           <section className={s.hero} id="home-top" aria-labelledby="home-title">
             <h1 id="home-title" className={s.h1}>{t("home.hero.title")}</h1>
-            <Duo still={still} />
+            <HomeDemo />
             <div className={s.heroText}>
               <p className={s.lede}>{t("home.hero.lede")}</p>
               <div className={s.actions}>

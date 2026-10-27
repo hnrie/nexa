@@ -175,6 +175,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        demo: fileURLToPath(new URL("./demo.html", import.meta.url)),
         sw: fileURLToPath(new URL("./src/sw.ts", import.meta.url)),
         "download-sw": fileURLToPath(new URL("./src/download-sw.ts", import.meta.url)),
       },

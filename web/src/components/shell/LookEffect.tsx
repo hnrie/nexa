@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/common/Button";
 import { t } from "@/i18n";
+import { isDemo } from "@/lib/demoMode";
 import { lookCache } from "@/lib/look/cache";
 import { forgetLinks, loadLink, refreshLink, useCssLinks } from "@/lib/look/cssLinks";
 import { useLookDraft } from "@/lib/look/draft";
@@ -20,6 +21,10 @@ type Runtime = typeof import("@/lib/look/plugins/runtime");
 let runtime: Promise<Runtime> | null = null;
 /** The plugin engine, fetched only by an account that has plugins. */
 export function loadRuntime(): Promise<Runtime> {
+  if (isDemo) {
+    window.dispatchEvent(new Event("nexa-demo-account"));
+    return Promise.reject(new Error(t("home.demo.accountTitle")));
+  }
   runtime ??= import("@/lib/look/plugins/runtime").catch((err: unknown) => {
     runtime = null;
     throw err;

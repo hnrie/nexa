@@ -1,3 +1,4 @@
+import { isDemo } from "@/lib/demoMode";
 /**
  * Calls, as the rest of the app sees them: joining and leaving, incoming calls
  * ringing, the calling tone and what came of a call, and the voice states
@@ -247,6 +248,7 @@ export function pushToTalkButton(): boolean {
 
 /** Join a voice channel (or DM call). Leaves the current one first. */
 export async function joinVoice(channelId: string): Promise<void> {
+  if (isDemo) { window.dispatchEvent(new Event("nexa-demo-account")); return; }
   const myId = me();
   if (!myId) return;
   // A muted account is in no call; the server refuses the join as well, but

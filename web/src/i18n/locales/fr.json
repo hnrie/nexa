@@ -7243,5 +7243,17 @@
   "whatsNew.r202610263.ranksBody": "L'équipe de Nexa a maintenant des rangs, Propriétaire, Développeur, Admin et Modo, chacun avec son badge sur les profils et dans les listes de membres.",
   "whatsNew.r202610263.ranksTitle": "Rangs de l'Équipe",
   "whatsNew.r202610264.mediaLinksBody": "Envoyez un lien vers un fichier audio ou vidéo pour le lire dans le chat. Les fichiers sont chargés via le proxy de Nexa.",
-  "whatsNew.r202610264.mediaLinksTitle": "Lire les liens multimédias"
+  "whatsNew.r202610264.mediaLinksTitle": "Lire les liens multimédias",
+  "home.demo.title": "Explorer Nexa",
+  "home.demo.ephemeral": "Réinitialisé au rechargement",
+  "home.demo.reset": "Réinitialiser la Démo",
+  "home.demo.expand": "Plein Écran",
+  "home.demo.collapse": "Quitter le Plein Écran",
+  "home.demo.try": "Essayer",
+  "home.demo.hint": "Voici comment débute un nouveau compte. Créez un serveur, écrivez une note ou changez le thème. Tout disparaît au rechargement.",
+  "home.demo.accountTitle": "Créez un Compte pour Continuer",
+  "home.demo.accountBody": "Vous explorez une démo privée. Créez un compte gratuit pour ajouter des personnes, rejoindre des serveurs et utiliser le vrai Nexa.",
+  "home.demo.keepExploring": "Continuer à Explorer",
+  "whatsNew.r202610265.demoTitle": "Essayez Nexa avant de Vous Inscrire",
+  "whatsNew.r202610265.demoBody": "Explorez la véritable application depuis la page d’accueil, en partant de zéro. Les modifications restent dans la démo et disparaissent au rechargement."
 }

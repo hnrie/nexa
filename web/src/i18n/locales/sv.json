@@ -7130,5 +7130,17 @@
   "whatsNew.r202610263.ranksBody": "Nexas personal har nu rang, Ägare, Utvecklare, Admin och Mod, var och en med sitt eget märke på profiler och i medlemslistor.",
   "whatsNew.r202610263.ranksTitle": "Personalens Rang",
   "whatsNew.r202610264.mediaLinksBody": "Skicka en länk till en ljud- eller videofil för att spela upp den i chatten. Media laddas via Nexas proxy.",
-  "whatsNew.r202610264.mediaLinksTitle": "Spela upp medielänkar"
+  "whatsNew.r202610264.mediaLinksTitle": "Spela upp medielänkar",
+  "home.demo.title": "Utforska Nexa",
+  "home.demo.ephemeral": "Återställs vid omladdning",
+  "home.demo.reset": "Återställ Demon",
+  "home.demo.expand": "Helskärm",
+  "home.demo.collapse": "Lämna Helskärm",
+  "home.demo.try": "Prova",
+  "home.demo.hint": "Så här börjar ett nytt konto. Skapa en server, skriv en anteckning eller ändra utseendet. Allt försvinner när du laddar om.",
+  "home.demo.accountTitle": "Skapa ett Konto för att Fortsätta",
+  "home.demo.accountBody": "Du utforskar en privat demo. Skapa ett gratis konto för att lägga till personer, gå med i servrar och använda riktiga Nexa.",
+  "home.demo.keepExploring": "Fortsätt Utforska",
+  "whatsNew.r202610265.demoTitle": "Prova Nexa Innan du Registrerar dig",
+  "whatsNew.r202610265.demoBody": "Utforska den riktiga appen från startsidan, från början. Ändringarna stannar i demon och försvinner vid omladdning."
 }

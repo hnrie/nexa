@@ -45,7 +45,7 @@ describe("HomePage", () => {
     expect(document.body.textContent).not.toMatch(/discord/i);
     expect(document.body.textContent).not.toContain("—");
     // the load size it names is the one tools/app_size.py holds the build to
-    expect(document.body.textContent).toContain("under 360 kB");
+    expect(document.body.textContent).toContain("under 365 kB");
   });
 
   it("makes four promises before the tour, naming the server's own upload limit", async () => {
@@ -65,19 +65,21 @@ describe("HomePage", () => {
     expect(screen.getByRole("heading", { level: 4, name: "Big Files" })).toBeTruthy();
   });
 
-  it("moves the line through the conversation with its slider, and says how far", async () => {
+  it("embeds the isolated app and preserves it when expanded", async () => {
     motion(false);
     await open();
-    const slider = screen.getByRole("slider", { name: "Move the line between what you see and what the server sees" });
-    fireEvent.change(slider, { target: { value: "30" } });
-    const stage = slider.parentElement!;
-    expect(stage.style.getPropertyValue("--seam")).toBe("30%");
-    expect(slider.getAttribute("aria-valuetext")).toBe("70% shown as the server sees it");
-    // the server's side is drawn for the eye only, and its words are ciphertext
-    const serverSide = stage.querySelector("[data-side=server]")!;
-    expect(serverSide.getAttribute("aria-hidden")).toBe("true");
-    const cipher = serverSide.querySelector(".cipher")!.textContent!;
-    expect(cipher).toMatch(/^[A-Za-z0-9+/]{20,}=*$/);
+    const frame = screen.getByTitle("Explore Nexa");
+    expect(frame.getAttribute("src")).toBe("/demo.html?locale=en");
+    expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-same-origin");
+    expect(frame.getAttribute("allow")).toContain("microphone 'none'");
+    fireEvent.click(screen.getByRole("button", { name: "Full Screen" }));
+    expect(screen.getByRole("dialog", { name: "Explore Nexa" })).toBeTruthy();
+    expect(screen.getByTitle("Explore Nexa")).toBe(frame);
+    fireEvent.click(screen.getByRole("button", { name: "Exit Full Screen" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByTitle("Explore Nexa")).toBe(frame);
+    fireEvent.click(screen.getByRole("button", { name: "Reset Demo" }));
+    expect(screen.getByTitle("Explore Nexa")).not.toBe(frame);
   });
 
   it("plays the loops, which can be paused", async () => {
@@ -99,13 +101,12 @@ describe("HomePage", () => {
     expect(screen.getAllByRole("button", { name: "Play" })).toHaveLength(1);
   });
 
-  it("shows stills rather than loops, and the line at rest, to anyone who asked for less movement", async () => {
+  it("shows stills rather than loops to anyone who asked for less movement", async () => {
     motion(true);
     await open();
     expect(document.querySelectorAll("video")).toHaveLength(0);
     const stills = [...document.querySelectorAll("img")].map((i) => i.getAttribute("src"));
     expect(stills).toEqual(expect.arrayContaining(["/home/call-loop.png", "/home/notes.png", "/home/themes.png", "/home/speed.png"]));
-    expect(screen.getByRole("slider").getAttribute("value")).not.toBe("96");
   });
 
   it("scrolls the document while it is open, takes over from the server's first paint, and gives both back", async () => {

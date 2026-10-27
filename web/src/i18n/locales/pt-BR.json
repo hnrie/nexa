@@ -7244,5 +7244,17 @@
   "whatsNew.r202610263.ranksBody": "A equipe do Nexa agora tem cargos, Dono, Desenvolvedor, Admin e Mod, cada um com seu emblema nos perfis e nas listas de membros.",
   "whatsNew.r202610263.ranksTitle": "Cargos da Equipe",
   "whatsNew.r202610264.mediaLinksBody": "Envie um link para um arquivo de áudio ou vídeo para reproduzi-lo no chat. A mídia é carregada pelo proxy do Nexa.",
-  "whatsNew.r202610264.mediaLinksTitle": "Reproduzir Links de Mídia"
+  "whatsNew.r202610264.mediaLinksTitle": "Reproduzir Links de Mídia",
+  "home.demo.title": "Explorar o Nexa",
+  "home.demo.ephemeral": "Reinicia ao recarregar",
+  "home.demo.reset": "Reiniciar Demonstração",
+  "home.demo.expand": "Tela Cheia",
+  "home.demo.collapse": "Sair da Tela Cheia",
+  "home.demo.try": "Experimente",
+  "home.demo.hint": "É assim que uma conta nova começa. Crie um servidor, escreva uma nota ou mude o visual. Tudo desaparece ao recarregar.",
+  "home.demo.accountTitle": "Crie uma Conta para Continuar",
+  "home.demo.accountBody": "Você está explorando uma demonstração privada. Crie uma conta gratuita para adicionar pessoas, entrar em servidores e usar o Nexa de verdade.",
+  "home.demo.keepExploring": "Continuar Explorando",
+  "whatsNew.r202610265.demoTitle": "Experimente o Nexa antes de se Cadastrar",
+  "whatsNew.r202610265.demoBody": "Explore o aplicativo real pela página inicial, começando do zero. As alterações ficam na demonstração e desaparecem ao recarregar."
 }

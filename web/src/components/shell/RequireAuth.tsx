@@ -9,6 +9,7 @@ import { useAuth } from "@/stores/auth";
 import { useBan } from "@/stores/nexa";
 
 import { t } from "@/i18n";
+import { isDemo } from "@/lib/demoMode";
 
 // only a banned account ever needs it
 const BannedPage = lazyPage(() => import("@/pages/BannedPage"));
@@ -34,7 +35,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   useEffect(() => {
     // A banned account has no live connection: the server turns it away, and
     // the ban screen asks for what it needs. When the ban ends, it connects.
-    if (status === "ready" && !banned) void session().then((m) => m.startSession());
+    if (status === "ready" && !banned && !isDemo) void session().then((m) => m.startSession());
     // Locking is the session's own business (gateway/session.ts), wherever the
     // app is when it happens, and a call can outlast it. A session that never
     // started has nothing to stop.
