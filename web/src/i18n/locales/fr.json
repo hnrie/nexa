@@ -7278,6 +7278,7 @@
   "forward.comment": "Ajouter un message (facultatif)",
   "voiceMessage.transcribe": "Transcrire",
   "voiceMessage.cancelTranscript": "Annuler la transcription",
+  "voiceMessage.downloading": "Téléchargement… {percent}%",
   "voiceMessage.modelLoading": "Chargement du modèle vocal…",
   "voiceMessage.transcribing": "Transcription sur cet appareil…",
   "voiceMessage.localTranscript": "Transcription privée sur l’appareil. La première utilisation télécharge un petit modèle vocal.",

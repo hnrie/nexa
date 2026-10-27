@@ -6928,6 +6928,7 @@
   "forward.comment": "添加消息（可选）",
   "voiceMessage.transcribe": "转为文字",
   "voiceMessage.cancelTranscript": "取消转写",
+  "voiceMessage.downloading": "正在下载… {percent}%",
   "voiceMessage.modelLoading": "正在加载语音模型…",
   "voiceMessage.transcribing": "正在此设备上转写…",
   "voiceMessage.localTranscript": "在设备上私密转写。首次使用会下载一个小型语音模型。",

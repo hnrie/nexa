@@ -7165,6 +7165,7 @@
   "forward.comment": "Lägg till ett meddelande (valfritt)",
   "voiceMessage.transcribe": "Transkribera",
   "voiceMessage.cancelTranscript": "Avbryt transkribering",
+  "voiceMessage.downloading": "Laddar ned… {percent}%",
   "voiceMessage.modelLoading": "Laddar talmodellen…",
   "voiceMessage.transcribing": "Transkriberar på den här enheten…",
   "voiceMessage.localTranscript": "Privat transkribering på enheten. Första gången laddas en liten talmodell ned.",

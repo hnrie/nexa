@@ -238,3 +238,23 @@ func TestNoteLinkPreview(t *testing.T) {
 		t.Errorf("note link preview has an em dash: %q", body)
 	}
 }
+
+// Workers use the policy on their own response, not the page's. A blanket
+// default-src 'none' stops transcription from fetching its model and WASM.
+func TestStaticWorkerPolicy(t *testing.T) {
+	for _, path := range []string{"/assets/transcribe.worker-abc.js", "/assets/ort-runtime-abc.mjs", "/sw.js"} {
+		t.Run(path, func(t *testing.T) {
+			dir := t.TempDir()
+			file := filepath.Join(dir, filepath.Base(path))
+			if err := os.WriteFile(file, []byte("self.ready = true;"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			h := SecurityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { serveStaticFile(w, r, file, path, time.Now()) }))
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+			if got := rec.Header().Get("Content-Security-Policy"); got != CSP {
+				t.Fatalf("worker policy = %q, want app policy %q", got, CSP)
+			}
+		})
+	}
+}

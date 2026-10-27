@@ -7612,6 +7612,7 @@
   "forward.comment": "Добавить сообщение (необязательно)",
   "voiceMessage.transcribe": "Расшифровать",
   "voiceMessage.cancelTranscript": "Отменить расшифровку",
+  "voiceMessage.downloading": "Загрузка… {percent}%",
   "voiceMessage.modelLoading": "Загрузка речевой модели…",
   "voiceMessage.transcribing": "Расшифровка на этом устройстве…",
   "voiceMessage.localTranscript": "Приватная расшифровка на устройстве. При первом использовании загружается небольшая речевая модель.",

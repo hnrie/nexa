@@ -7165,6 +7165,7 @@
   "forward.comment": "Add a Message (Optional)",
   "voiceMessage.transcribe": "Transcribe",
   "voiceMessage.cancelTranscript": "Cancel Transcription",
+  "voiceMessage.downloading": "Downloading… {percent}%",
   "voiceMessage.modelLoading": "Loading the speech model…",
   "voiceMessage.transcribing": "Transcribing on this device…",
   "voiceMessage.localTranscript": "Private, on-device transcript. The first use downloads a small speech model.",

@@ -9,7 +9,9 @@ env.backends.onnx.wasm!.proxy = false;
 env.backends.onnx.wasm!.wasmPaths = { wasm: wasmUrl, mjs: runtimeUrl };
 self.onmessage = async ({ data }: MessageEvent<Float32Array>) => {
   try {
-    const model = await pipeline("automatic-speech-recognition", "onnx-community/whisper-tiny", { dtype: "q8", device: "wasm" });
+    const model = await pipeline("automatic-speech-recognition", "onnx-community/whisper-tiny", { dtype: "q8", device: "wasm", progress_callback: (info) => {
+      if (info.status === "progress_total") self.postMessage({ phase: "loading", progress: Math.min(100, Math.max(0, Math.floor(info.progress))) });
+    } });
     self.postMessage({ phase: "working" });
     try {
       // Whisper predicts a language token from the first window. The JS pipeline
@@ -27,5 +29,5 @@ self.onmessage = async ({ data }: MessageEvent<Float32Array>) => {
       const result = await model(data, { language, chunk_length_s: 30, stride_length_s: 5, task: "transcribe" });
       self.postMessage({ text: Array.isArray(result) ? result.map((r) => r.text).join(" ") : result.text });
     } finally { await model.dispose(); }
-  } catch { self.postMessage({ error: true }); }
+  } catch (error) { self.postMessage({ error: error instanceof Error ? error.message : String(error) }); }
 };

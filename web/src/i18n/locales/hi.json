@@ -7165,6 +7165,7 @@
   "forward.comment": "संदेश जोड़ें (वैकल्पिक)",
   "voiceMessage.transcribe": "लिप्यंतरण करें",
   "voiceMessage.cancelTranscript": "लिप्यंतरण रद्द करें",
+  "voiceMessage.downloading": "डाउनलोड हो रहा है… {percent}%",
   "voiceMessage.modelLoading": "वॉइस मॉडल लोड हो रहा है…",
   "voiceMessage.transcribing": "इस डिवाइस पर लिप्यंतरण हो रहा है…",
   "voiceMessage.localTranscript": "डिवाइस पर निजी लिप्यंतरण। पहली बार एक छोटा वॉइस मॉडल डाउनलोड होता है।",

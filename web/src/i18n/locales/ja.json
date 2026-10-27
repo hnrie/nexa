@@ -6928,6 +6928,7 @@
   "forward.comment": "メッセージを追加（任意）",
   "voiceMessage.transcribe": "文字起こし",
   "voiceMessage.cancelTranscript": "文字起こしをキャンセル",
+  "voiceMessage.downloading": "ダウンロード中… {percent}%",
   "voiceMessage.modelLoading": "音声モデルを読み込み中…",
   "voiceMessage.transcribing": "このデバイスで文字起こし中…",
   "voiceMessage.localTranscript": "デバイス内で非公開の文字起こしを行います。初回は小さな音声モデルをダウンロードします。",

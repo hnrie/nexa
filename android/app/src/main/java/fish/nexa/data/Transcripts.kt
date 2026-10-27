@@ -32,7 +32,7 @@ object Transcripts {
     private val client = OkHttpClient.Builder().callTimeout(10, TimeUnit.MINUTES).build()
     private val native by lazy { System.loadLibrary("nexa_whisper_jni"); true }
 
-    private suspend fun model(): File = withContext(Dispatchers.IO) {
+    private suspend fun model(progress: (Int) -> Unit): File = withContext(Dispatchers.IO) {
         modelLock.withLock {
             val target = File(Nexa.app.noBackupFilesDir, "whisper-tiny-$MODEL_SHA.bin")
             if (target.length() == MODEL_SIZE) return@withLock target
@@ -42,6 +42,8 @@ object Transcripts {
                     check(response.isSuccessful)
                     val hash = MessageDigest.getInstance("SHA-256")
                     var total = 0L
+                    var percent = -1
+                    progress(0)
                     response.body.byteStream().use { input -> part.outputStream().use { output ->
                         val buffer = ByteArray(65536)
                         while (true) {
@@ -52,18 +54,21 @@ object Transcripts {
                             check(total <= MODEL_SIZE)
                             hash.update(buffer, 0, n)
                             output.write(buffer, 0, n)
+                            val next = ((total * 100 / MODEL_SIZE).toInt()).coerceIn(0, 99)
+                            if (next != percent) { percent = next; progress(next) }
                         }
                     } }
                     check(total == MODEL_SIZE && hash.digest().joinToString("") { "%02x".format(it) } == MODEL_SHA)
                     check(part.renameTo(target))
+                    progress(100)
                 }
             } finally { part.delete() }
             target
         }
     }
 
-    suspend fun transcribe(file: File, working: () -> Unit): String {
-        val model = model()
+    suspend fun transcribe(file: File, progress: (Int) -> Unit = {}, working: () -> Unit): String {
+        val model = model(progress)
         val samples = withContext(Dispatchers.IO) { decode(file) }
         currentCoroutineContext().ensureActive()
         working()

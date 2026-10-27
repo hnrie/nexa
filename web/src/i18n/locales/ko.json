@@ -6928,6 +6928,7 @@
   "forward.comment": "메시지 추가(선택 사항)",
   "voiceMessage.transcribe": "텍스트로 변환",
   "voiceMessage.cancelTranscript": "변환 취소",
+  "voiceMessage.downloading": "다운로드 중… {percent}%",
   "voiceMessage.modelLoading": "음성 모델 불러오는 중…",
   "voiceMessage.transcribing": "이 기기에서 텍스트로 변환 중…",
   "voiceMessage.localTranscript": "기기에서 비공개로 변환합니다. 처음 사용할 때 작은 음성 모델을 다운로드합니다.",

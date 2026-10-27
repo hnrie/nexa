@@ -1,7 +1,7 @@
 /** Whisper Tiny runs in a disposable worker. Only model files are downloaded; audio and text stay in memory. */
 export type TranscriptPhase = "loading" | "working";
-export async function transcribeVoice(src: string, phase: (value: TranscriptPhase) => void, signal: AbortSignal): Promise<string> {
-  phase("loading");
+export async function transcribeVoice(src: string, phase: (value: TranscriptPhase, progress?: number) => void, signal: AbortSignal): Promise<string> {
+  phase("loading", 0);
   signal.throwIfAborted();
   const response = await fetch(src, { signal });
   if (!response.ok) throw new Error("audio unavailable");
@@ -26,9 +26,9 @@ export async function transcribeVoice(src: string, phase: (value: TranscriptPhas
     const finish = () => { worker.terminate(); signal.removeEventListener("abort", abort); };
     const abort = () => { finish(); reject(new DOMException("Cancelled", "AbortError")); };
     signal.addEventListener("abort", abort, { once: true });
-    worker.onmessage = ({ data }: MessageEvent<{ phase?: TranscriptPhase; text?: string; error?: boolean }>) => {
-      if (data.phase) phase(data.phase);
-      else { finish(); if (data.error) reject(new Error("transcription failed")); else resolve(data.text?.trim() ?? ""); }
+    worker.onmessage = ({ data }: MessageEvent<{ phase?: TranscriptPhase; progress?: number; text?: string; error?: string }>) => {
+      if (data.phase) phase(data.phase, data.progress);
+      else { finish(); if (data.error) reject(new Error(data.error)); else resolve(data.text?.trim() ?? ""); }
     };
     worker.onerror = () => { finish(); reject(new Error("transcription worker failed")); };
     worker.postMessage(pcm, [pcm.buffer]);

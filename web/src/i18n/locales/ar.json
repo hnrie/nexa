@@ -8023,6 +8023,7 @@
   "forward.comment": "إضافة رسالة (اختياري)",
   "voiceMessage.transcribe": "تحويل إلى نص",
   "voiceMessage.cancelTranscript": "إلغاء التحويل إلى نص",
+  "voiceMessage.downloading": "جارٍ التنزيل… {percent}%",
   "voiceMessage.modelLoading": "جارٍ تحميل نموذج الكلام…",
   "voiceMessage.transcribing": "جارٍ التحويل إلى نص على هذا الجهاز…",
   "voiceMessage.localTranscript": "تحويل خاص على الجهاز. يُنزّل نموذج كلام صغير عند الاستخدام الأول.",

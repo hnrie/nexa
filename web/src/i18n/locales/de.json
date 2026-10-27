@@ -7165,6 +7165,7 @@
   "forward.comment": "Nachricht hinzufügen (optional)",
   "voiceMessage.transcribe": "Transkribieren",
   "voiceMessage.cancelTranscript": "Transkription abbrechen",
+  "voiceMessage.downloading": "Wird heruntergeladen… {percent}%",
   "voiceMessage.modelLoading": "Sprachmodell wird geladen…",
   "voiceMessage.transcribing": "Wird auf diesem Gerät transkribiert…",
   "voiceMessage.localTranscript": "Private Transkription auf dem Gerät. Bei der ersten Nutzung wird ein kleines Sprachmodell heruntergeladen.",

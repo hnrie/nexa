@@ -543,7 +543,10 @@ separate first-window language-token pass avoids the library's English default. 
 uses `data/Transcripts`, MediaCodec decoding and whisper.cpp 1.9.5 through `cpp/whisper_jni.cc`.
 CMake pins its source archive by SHA-256. Its 77.7 MB Tiny weights download on first use into
 noBackupFilesDir and are verified by size and SHA-256 before an atomic rename. Browser weights
-use the library's model cache. Both paths show loading, working, failure and no-speech states,
+use the library's model cache. Trusted static JavaScript and module responses carry the app's
+CSP, because a worker enforces its own script response policy and the default deny policy
+blocks its model download. Both clients show download percentages only after Transcribe is
+chosen, then working, failure and no-speech states; there is no idle transcription hint. They
 support cancellation and release inference resources. Audio and transcript stay on the device;
 transcripts are held only in the open message component's memory.
 

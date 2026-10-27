@@ -248,6 +248,7 @@ private fun Transcript(file: File?) {
     val scope = rememberCoroutineScope()
     var job by remember(file) { mutableStateOf<Job?>(null) }
     var working by remember(file) { mutableStateOf(false) }
+    var progress by remember(file) { mutableStateOf(0) }
     var text by remember(file) { mutableStateOf<String?>(null) }
     var failed by remember(file) { mutableStateOf(false) }
     DisposableEffect(file) { onDispose { job?.cancel() } }
@@ -255,16 +256,16 @@ private fun Transcript(file: File?) {
         fish.nexa.ui.components.NxButton(t(if (job != null) "voiceMessage.cancelTranscript" else "voiceMessage.transcribe"), {
             if (job != null) { job?.cancel(); job = null }
             else if (file != null) {
-                working = false; failed = false
+                working = false; failed = false; progress = 0
                 job = scope.launch {
-                    try { text = Transcripts.transcribe(file) { working = true } }
+                    try { text = Transcripts.transcribe(file, progress = { progress = it }) { working = true } }
                     catch (e: kotlinx.coroutines.CancellationException) { throw e }
                     catch (_: Exception) { failed = true }
                     finally { if (job == kotlinx.coroutines.currentCoroutineContext()[Job]) job = null }
                 }
             }
         }, kind = fish.nexa.ui.components.ButtonKind.GHOST, enabled = file != null)
-        Txt(t(if (job != null) (if (working) "voiceMessage.transcribing" else "voiceMessage.modelLoading") else "voiceMessage.localTranscript"), style = Nx.type.hint, color = c.textMuted)
+        if (job != null) Txt(if (working) t("voiceMessage.transcribing") else t("voiceMessage.downloading", "percent" to progress), style = Nx.type.hint, color = c.textMuted)
         if (failed) Txt(t("voiceMessage.transcriptFailed"), style = Nx.type.hint, color = c.textMuted)
         text?.let { SelectionContainer { Txt(it.ifBlank { t("voiceMessage.noSpeech") }, style = Nx.type.body, color = c.text) } }
     }

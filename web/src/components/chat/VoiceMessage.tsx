@@ -30,6 +30,7 @@ export function VoiceMessage({ src, duration: hinted, wave, loading, onLoad }: P
   const audio = useRef<HTMLAudioElement>(null);
   const transcription = useRef<AbortController | null>(null);
   const [phase, setPhase] = useState<TranscriptPhase | null>(null);
+  const [progress, setProgress] = useState(0);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [transcriptError, setTranscriptError] = useState(false);
   useEffect(() => {
@@ -39,12 +40,12 @@ export function VoiceMessage({ src, duration: hinted, wave, loading, onLoad }: P
   const transcribe = async () => {
     if (!src || transcription.current) return;
     const controller = new AbortController();
-    transcription.current = controller; setTranscriptError(false);
+    transcription.current = controller; setTranscriptError(false); setProgress(0); setPhase("loading");
     try {
       const { transcribeVoice } = await import("@/lib/transcribe");
-      const text = await transcribeVoice(src, setPhase, controller.signal);
+      const text = await transcribeVoice(src, (next, percent) => { setPhase(next); if (percent !== undefined) setProgress(percent); }, controller.signal);
       if (!controller.signal.aborted) setTranscript(text);
-    } catch { if (!controller.signal.aborted) setTranscriptError(true); }
+    } catch (error) { if (!controller.signal.aborted) { console.warn("Voice transcription failed", error); setTranscriptError(true); } }
     finally { if (transcription.current === controller) { transcription.current = null; setPhase(null); } }
   };
   const [playing, setPlaying] = useState(false);
@@ -193,7 +194,7 @@ export function VoiceMessage({ src, duration: hinted, wave, loading, onLoad }: P
       </div>
       <div className={s.transcription}>
         {phase ? <button className={s.transcribe} onClick={() => { transcription.current?.abort(); }}>{t("voiceMessage.cancelTranscript")}</button> : <button className={s.transcribe} disabled={!src} onClick={() => void transcribe()}>{t("voiceMessage.transcribe")}</button>}
-        <span className={s.transcriptHint} role="status">{phase ? t(phase === "loading" ? "voiceMessage.modelLoading" : "voiceMessage.transcribing") : t("voiceMessage.localTranscript")}</span>
+        {phase ? <span className={s.transcriptHint} role="status">{phase === "loading" ? t("voiceMessage.downloading", { percent: progress }) : t("voiceMessage.transcribing")}</span> : null}
         {transcriptError ? <p role="alert">{t("voiceMessage.transcriptFailed")}</p> : null}
         {transcript !== null ? <p className={s.transcript} dir="auto">{transcript || t("voiceMessage.noSpeech")}</p> : null}
       </div>

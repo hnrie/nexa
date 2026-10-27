@@ -242,7 +242,10 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, fp, urlPath string,
 	} else {
 		h.Set("Cache-Control", "no-cache")
 	}
-	if strings.HasSuffix(fp, ".html") {
+	// A worker enforces the policy on its script response. Trusted app scripts
+	// need the app's fetch and WASM permissions too; the default deny policy
+	// would prevent the transcription worker from downloading its model.
+	if ext := filepath.Ext(fp); ext == ".html" || ext == ".js" || ext == ".mjs" {
 		policy := CSP
 		if urlPath == "/demo.html" {
 			// Only the isolated demo may be embedded by our own homepage.
