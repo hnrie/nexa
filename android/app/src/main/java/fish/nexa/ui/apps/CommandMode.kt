@@ -653,7 +653,7 @@ fun CommandBox(cm: CommandMode, modifier: Modifier = Modifier) {
                             .padding(horizontal = 6.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Txt(picked, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(600)), color = c.mentionFg, maxLines = 1, modifier = Modifier.widthIn(max = 180.dp))
+                        fish.nexa.ui.chat.PersonName(slot.value?.contentOrNull?.takeIf { o.type == AppCommands.OPT_USER || (o.type == AppCommands.OPT_MENTIONABLE && Nexa.users.get(it) != null) }, picked, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(600)), color = c.mentionFg, maxLines = 1, modifier = Modifier.widthIn(max = 180.dp))
                     }
                     else -> BasicTextField(
                         value = slot.text,
@@ -796,7 +796,7 @@ fun CommandList(cm: CommandMode, modifier: Modifier = Modifier) {
                         s.channel != null -> Icon("Hash", c.textMuted, size = 18.dp)
                         s.emojiKey != null -> fish.nexa.ui.chat.EmojiGlyph(s.emojiKey, 22.dp)
                     }
-                    Txt(s.label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                    fish.nexa.ui.chat.PersonName(s.user?.id, s.label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     if (s.user != null) Txt(s.user.username, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
                 }
             }

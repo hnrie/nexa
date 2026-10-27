@@ -152,8 +152,8 @@ fun AppsSection(serverId: String) {
                                 Txt(t("apps.portal.readsEverything"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(11.5f), fontWeight = FontWeight(650)), color = c.textWarning, maxLines = 1)
                             }
                         }
-                        Txt(
-                            if (by != null) t("apps.server.addedBy", "name" to Names.display(by), "date" to Time.shortDate(app.installedAt)) else t("apps.server.addedOn", "date" to Time.shortDate(app.installedAt)),
+                        fish.nexa.ui.chat.PersonText(
+                            by?.id, if (by != null) t("apps.server.addedBy", "name" to fish.nexa.ui.chat.PERSON_SLOT, "date" to Time.shortDate(app.installedAt)) else t("apps.server.addedOn", "date" to Time.shortDate(app.installedAt)), Names.display(by),
                             style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1,
                         )
                     }

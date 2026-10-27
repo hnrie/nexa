@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
@@ -9,7 +10,7 @@ import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 import s from "./Block.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 
 /**
  * The one way to block someone, wherever Block was chosen: what it does, and
@@ -44,7 +45,7 @@ export function BlockDialog({ userId, onClose }: { userId: string; onClose: () =
     <Modal
       open
       onClose={onClose}
-      title={t("people.block.title", { name })}
+      title={<Tr id="people.block.title" values={{ name: <PersonName userId={userId} user={user}>{name}</PersonName> }} />}
       width={460}
       footer={
         <>

@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Compass, Users, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -10,7 +11,7 @@ import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { SearchBox } from "@/components/common/SearchBox";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { LANGUAGES } from "@/i18n/core";
 import { avatarColor, initials } from "@/lib/avatarColor";
 import { guarded } from "@/lib/captcha";
@@ -177,7 +178,7 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
             {emojis.map((e) => <img key={e.id} src={emojiUrl(e.blob_id, e.animated, 32)} alt={`:${e.name}:`} title={`:${e.name}:`} loading="lazy" />)}
           </div>
         ) : null}
-        {owner ? <div className={s.facts}>{t("discovery.ownedBy", { name: owner.display_name })}</div> : null}
+        {owner ? <div className={s.facts}>{<Tr id="discovery.ownedBy" values={{ name: <PersonName user={owner}>{owner.display_name}</PersonName> }} />}</div> : null}
         {card.joins_paused && !card.member ? <div className={s.facts}>{t("discovery.pausedLong")}</div> : null}
       </div>
     </Modal>

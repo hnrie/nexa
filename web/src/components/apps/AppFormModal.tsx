@@ -14,7 +14,7 @@ import { findMembers } from "@/lib/pickables";
 import { Markdown } from "@/markdown";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { displayName, useUsers } from "@/stores/users";
-import { entityChoices, entityKindOfComponent, entityLabel } from "./entityChoices";
+import { entityChoices, entityKindOfComponent, entityLabel, entityLabelNode } from "./entityChoices";
 import { ChoiceGlyph, SelectBox } from "./SelectBox";
 import s from "./AppForm.module.css";
 
@@ -235,6 +235,7 @@ function FormFieldView({ part, channelId, answer, onAnswer, error }: { part: For
             id={id}
             placeholder={f.placeholder || t("apps.select.placeholder")}
             picked={answer.values ?? []}
+            renderLabelOf={kind ? (v) => entityLabelNode(channelId, v, kind) : undefined}
             labelOf={(v) => (kind ? entityLabel(channelId, v) : (options.find((o) => o.value === v)?.label ?? v))}
             choicesFor={(q) =>
               kind

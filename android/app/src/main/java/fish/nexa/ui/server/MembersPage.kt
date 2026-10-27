@@ -183,7 +183,7 @@ private fun PlainMembers(serverId: String) {
                 Avatar(m.userId, name, m.avatarId ?: users[m.userId]?.avatarId, 40.dp)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(600)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                        fish.nexa.ui.chat.PersonName(m.userId, name, serverId = serverId, style = Nx.type.body.copy(fontWeight = FontWeight(600)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                         if (st.server.ownerId == m.userId && !NexaOwner.isOwner(m.userId)) Icon("Crown", c.warning, size = 14.dp, label = t("server.members.owner"))
                         fish.nexa.ui.shell.OwnerMarks(m.userId)
                         if (timedOut) Icon("Clock", c.danger, size = 14.dp, label = t("server.members.timedOut"))

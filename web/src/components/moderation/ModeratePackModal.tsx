@@ -1,3 +1,5 @@
+import { personText } from "@/lib/personText";
+import { PersonName } from "@/components/common/PersonName";
 import { X } from "lucide-react";
 import { useState } from "react";
 import { moderation as modApi, type ModPack, type ModServerRef, type PackField, type Person, type StaffCase } from "@/api/moderation";
@@ -8,7 +10,7 @@ import { Toggle } from "@/components/common/Toggle";
 import { describeError } from "@/lib/errors";
 import { packFieldLabel, personName, previewText } from "@/lib/moderation";
 import { useUI } from "@/stores/ui";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { PackCover, StickerThumbs } from "./ExpressionsTab";
 import m from "./Moderation.module.css";
 
@@ -58,7 +60,7 @@ export function ModeratePackModal({ pack, owner, server, preset, onClose, onDone
         ? { delete: true, block: block && takesPictures, reason: trimmed }
         : { stickers: withStickers ? stickers.map((s) => s.id) : [], fields: FIELDS.filter((f) => fields.includes(f)), block: block && takesPictures, reason: trimmed };
       const r = await modApi.actOnPack(pack.id, body);
-      toast(t("moderation.packs.done", { number: r.case.number, name: ownerName }), "success");
+      toast(personText("moderation.packs.done", owner?.id, ownerName, { number: r.case.number }), "success");
       onDone(r.case, whole ? pack.stickers.map((s) => s.id) : withStickers ? stickers.map((s) => s.id) : []);
       onClose();
     } catch (err) {
@@ -84,7 +86,7 @@ export function ModeratePackModal({ pack, owner, server, preset, onClose, onDone
             <h2 className={m.modalTitle}>{emoji ? t("moderation.packs.moderateEmojiPack") : t("moderation.packs.moderateTitle")}</h2>
             <div className={m.modalTarget}>
               <span dir="auto">{pack.name}</span>
-              <span>{server ? t("moderation.packs.inServer", { name: server.name }) : t("moderation.servers.ownedBy", { name: ownerName })}</span>
+              <span>{server ? t("moderation.packs.inServer", { name: server.name }) : <Tr id="moderation.servers.ownedBy" values={{ name: <PersonName user={owner}>{ownerName}</PersonName> }} />}</span>
             </div>
           </div>
           <button type="button" className={m.modalClose} onClick={onClose} aria-label={t("chat.attachments.close")}>
@@ -144,7 +146,7 @@ export function ModeratePackModal({ pack, owner, server, preset, onClose, onDone
               ))}
             </div>
             <div className={m.reasonMeta}>
-              <span>{t("moderation.servers.reasonVisible", { name: ownerName })}</span>
+              <span>{<Tr id="moderation.servers.reasonVisible" values={{ name: <PersonName user={owner}>{ownerName}</PersonName> }} />}</span>
               {[...reason.trim()].length < 3 ? <span data-short="">{t("moderation.form.reasonTooShort", { min: 3 })}</span> : <span>{[...reason].length}/{MAX_REASON}</span>}
             </div>
           </div>
@@ -156,7 +158,7 @@ export function ModeratePackModal({ pack, owner, server, preset, onClose, onDone
         </div>
 
         <div className={m.modalFoot}>
-          <span className={m.summary}>{server ? t("moderation.packs.notifiesServer", { name: ownerName, server: server.name }) : t("moderation.packs.notifies", { name: ownerName })}</span>
+          <span className={m.summary}>{server ? <Tr id="moderation.packs.notifiesServer" values={{ name: <PersonName user={owner}>{ownerName}</PersonName>, server: server.name }} /> : <Tr id="moderation.packs.notifies" values={{ name: <PersonName user={owner}>{ownerName}</PersonName> }} />}</span>
           <span className={m.grow} />
           <Button variant="ghost" onClick={onClose}>
             {t("moderation.cancel")}

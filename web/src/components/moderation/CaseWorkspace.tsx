@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { ChevronLeft, CircleCheck, FolderOpen, Gavel, Inbox, LockOpen, RotateCcw, UserRound } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -15,7 +16,7 @@ import { formatRelative } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { usePresence } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { atLeast, useMyRank } from "@/lib/staffRank";
 import { useAuth } from "@/stores/auth";
 import { ModerateModal } from "./ModerateModal";
@@ -44,12 +45,12 @@ function byActivity(a: StaffCase, b: StaffCase): number {
 }
 
 /** One line of the thread as a preview in a list: plain words, whatever formatting it had. */
-function preview(c: StaffCase, people: People): string {
+function preview(c: StaffCase, people: People): React.ReactNode {
   const last = c.last_message;
   if (!last) return previewText(c.reason);
   if (last.kind === "system") return systemLineText(last, people, c.action, "staff");
   const who = personName(people[last.author_id]) || c.target_display_name;
-  return `${who}: ${previewText(last.body, last.files?.length ?? 0)}`;
+  return <><PersonName userId={last.author_id} user={people[last.author_id]}>{who}</PersonName>: {previewText(last.body, last.files?.length ?? 0)}</>;
 }
 
 export function CaseList({ cases, people, selected, onPick, showTarget }: { cases: StaffCase[]; people: People; selected?: string; onPick: (id: string) => void; showTarget: boolean }) {
@@ -73,7 +74,7 @@ export function CaseList({ cases, people, selected, onPick, showTarget }: { case
               )}
               <span className={m.caseText}>
                 <span className={m.caseTop}>
-                  <span className={m.caseTitle}>{showTarget ? personName(target) || c.target_display_name : t("moderation.case.titled", { number: c.number, action: actionLabel(c.action) })}</span>
+                  <span className={m.caseTitle}>{showTarget ? <PersonName userId={c.user_id} user={target}>{personName(target) || c.target_display_name}</PersonName> : t("moderation.case.titled", { number: c.number, action: actionLabel(c.action) })}</span>
                   {fresh ? (
                     <span className={m.unreadDot}>
                       <span className="visually-hidden">{t("sidebar.serverSidebar.unread")}</span>
@@ -219,7 +220,7 @@ export function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: 
           {/* on the member's own page the way to it goes nowhere */}
           {!gone && showMember ? (
             <Button size="sm" variant="ghost" onClick={() => nav(`/channels/@admin/users/${c.user_id}`)} aria-label={t("moderation.case.openPerson", { name: personName(target) })} title={personName(target)}>
-              <UserRound size={15} aria-hidden="true" /> <span className={m.btnLabel}>{personName(target)}</span>
+              <UserRound size={15} aria-hidden="true" /> <PersonName userId={c.user_id} user={target} className={m.btnLabel}>{personName(target)}</PersonName>
             </Button>
           ) : null}
           {c.in_effect && handles ? (
@@ -246,7 +247,7 @@ export function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: 
         action={c.action}
         intro={
           <ThreadIntro avatar={<Avatar id={c.user_id} avatarId={target?.avatar_id ?? null} name={personName(target) || c.target_display_name} size={80} />} title={t("nexa.notice.caseNumber", { number: c.number })} sub={target && !target.deleted ? `@${target.username}` : c.target_username}>
-            {t("moderation.chat.caseStart", { name: personName(target) || c.target_display_name })}
+            {<Tr id="moderation.chat.caseStart" values={{ name: <PersonName userId={c.user_id} user={target}>{personName(target) || c.target_display_name}</PersonName> }} />}
           </ThreadIntro>
         }
         opener={{ from: "nexa", at: c.created_at, body: <NoticeCard c={c} people={data.people} perspective="staff" /> }}
@@ -261,7 +262,7 @@ export function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: 
         }
         upload={modApi.upload}
         placeholder={t("moderation.case.replyPlaceholder")}
-        note={gone || c.status === "closed" ? undefined : t("moderation.case.replyNote", { name: personName(target) })}
+        note={gone || c.status === "closed" ? undefined : <Tr id="moderation.case.replyNote" values={{ name: <PersonName userId={c.user_id} user={target}>{personName(target)}</PersonName> }} />}
         dropName={t("nexa.notice.caseNumber", { number: c.number })}
         onSeen={(lastId) => useModeration.getState().readThread("case", caseId, lastId)}
         locked={

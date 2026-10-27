@@ -55,79 +55,11 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
         "system_thread_remove" -> "ArrowLeftFromLine"
         else -> "ArrowRightToLine"
     }
-    val nameStyle = SpanStyle(color = c.textStrong, fontWeight = FontWeight(500))
-    val linkStyle = TextLinkStyles(SpanStyle(color = c.link))
-    // a closed poll's question and answers: from the list, or fetched when the list does not hold the poll (usePollOf.ts)
-    val personPoll = m.type == "system_poll_result" && m.webhookId == null
-    val held = if (personPoll) m.replyToId?.let {
-        (Nexa.messages.get(ctx.channel.id).byId[it] ?: (fish.nexa.data.ReplyTargets.byId.value[it] as? fish.nexa.data.ReplyTarget.Found)?.cm)?.payload?.poll
-    } else null
-    val fetched by produceState<PollPayload?>(null, m.replyToId, held == null) {
-        val id = m.replyToId
-        if (personPoll && held == null && id != null) value = FetchedPolls.load(ctx.channel.id, id)
-    }
-    val poll = held ?: fetched
-
-    /** Fills a translated sentence, putting a tappable name or link where each {placeholder} is. */
-    fun fill(template: String, parts: Map<String, AnnotatedString.Builder.() -> Unit>): AnnotatedString = buildAnnotatedString {
-        var i = 0
-        val rx = Regex("\\{(\\w+)\\}")
-        for (match in rx.findAll(template)) {
-            append(template.substring(i, match.range.first))
-            val fn = parts[match.groupValues[1]]
-            if (fn != null) fn() else append(match.value)
-            i = match.range.last + 1
-        }
-        append(template.substring(i))
-    }
-
-    fun person(id: String?): AnnotatedString.Builder.() -> Unit = {
-        if (id == null) append(t("chat.systemMessage.someone"))
-        else withLink(LinkAnnotation.Clickable("user-$id", styles = TextLinkStyles(nameStyle)) { openProfile(id) }) { append(Names.member(sid, id)) }
-    }
-
-    fun jumpLink(label: String, to: String?): AnnotatedString.Builder.() -> Unit = {
-        if (to == null) append(label)
-        else withLink(LinkAnnotation.Clickable("jump-$to", styles = linkStyle) { ChatUi.jumpTo(ctx.channel.id, to) }) { append(label) }
-    }
-
-    // a thread's name in its notice: the way into it
-    fun threadLink(threadId: String, name: String): AnnotatedString.Builder.() -> Unit = {
-        withLink(LinkAnnotation.Clickable("thread-$threadId", styles = linkStyle) { if (sid != null) Nav.go(Route.Server(sid, threadId)) }) { append(name) }
-    }
-
-    val self = target == null || target == actor
-    val text: AnnotatedString = when (m.type) {
-        "system_thread" -> {
-            val th = m.thread
-            val name = th?.let { Nexa.channels.get(it.id)?.name ?: it.name }
-            if (th != null && !name.isNullOrEmpty()) fill(t("chat.systemMessage.startedThread"), mapOf("actor" to person(actor), "thread" to threadLink(th.id, name)))
-            else fill(t("chat.systemMessage.startedThreadGone"), mapOf("actor" to person(actor)))
-        }
-        "system_thread_add" -> fill(t("chat.systemMessage.addedToThread"), mapOf("actor" to person(actor), "target" to person(target)))
-        "system_thread_remove" -> fill(t("chat.systemMessage.removedFromThread"), mapOf("actor" to person(actor), "target" to person(target)))
-        "system_member_add" -> if (self) fill(t("chat.systemMessage.joinedGroup"), mapOf("actor" to person(actor)))
-        else fill(t("chat.systemMessage.addedToGroup"), mapOf("actor" to person(actor), "target" to person(target)))
-        "system_member_remove" -> if (self) fill(t("chat.systemMessage.leftGroup"), mapOf("actor" to person(actor)))
-        else fill(t("chat.systemMessage.removedFromGroup"), mapOf("actor" to person(actor), "target" to person(target)))
-        "system_owner_change" -> if (self) fill(t("chat.systemMessage.tookOwnership"), mapOf("actor" to person(actor)))
-        else fill(t("chat.systemMessage.madeOwner"), mapOf("actor" to person(actor), "target" to person(target)))
-        "system_pin" -> fill(t("chat.systemMessage.pinned"), mapOf("actor" to person(actor), "message" to jumpLink(t("chat.systemMessage.aMessage"), m.replyToId)))
-        "system_join" -> fill(t("chat.systemMessage.joined"), mapOf("actor" to person(actor)))
-        // a poll's closing line speaks for whoever asked: the webhook that posted it, or the person
-        "system_poll_result" -> if (m.webhookId != null) {
-            val hook = fish.nexa.ui.markdown.Webhook.of(cm.hook)
-            hookPollResult(hook, ::fill, hook?.let { h -> { withStyle(nameStyle) { append(h.name) } } } ?: person(actor), jumpLink(t("chat.systemMessage.viewPoll"), m.replyToId))
-        } else pollResult(cm, poll, ::fill, person(actor), jumpLink(t("chat.systemMessage.viewPoll"), m.replyToId))
-        else -> fill(t("chat.systemMessage.didSomething"), mapOf("actor" to person(actor)))
-    }
-    val full = buildAnnotatedString {
-        append(text)
-        withStyle(SpanStyle(fontSize = Nx.type.sp(12f), color = c.textMuted)) { append("  " + Time.timestamp(m.createdAt)) }
-    }
     // Someone's own "joined the server" line is theirs to take down, and so is it
     // for whoever may delete messages there, as with any message in the channel.
     val removable = m.type == "system_join" && canDelete(m)
+    val inlineWidth = rememberInlineWidth()
+    val maxWidth = with(androidx.compose.ui.platform.LocalDensity.current) { inlineWidth.pixels.toDp() }
     Box(
         Modifier
             .fillMaxWidth()
@@ -138,10 +70,82 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
                 }) {} else Modifier,
             )
             .heightIn(min = 26.dp)
-            .padding(start = if (ctx.selecting) 98.dp else 64.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
+            .padding(start = if (ctx.selecting) 98.dp else 64.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)
+            .then(inlineWidth.modifier),
     ) {
+        val nameStyle = SpanStyle(color = c.textStrong, fontWeight = FontWeight(500))
+        val names = personInlines(Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(22f), fontWeight = FontWeight(500)), c.textStrong, maxWidth, sid)
+        val linkStyle = TextLinkStyles(SpanStyle(color = c.link))
+        // a closed poll's question and answers: from the list, or fetched when the list does not hold the poll (usePollOf.ts)
+        val personPoll = m.type == "system_poll_result" && m.webhookId == null
+        val held = if (personPoll) m.replyToId?.let {
+            (Nexa.messages.get(ctx.channel.id).byId[it] ?: (fish.nexa.data.ReplyTargets.byId.value[it] as? fish.nexa.data.ReplyTarget.Found)?.cm)?.payload?.poll
+        } else null
+        val fetched by produceState<PollPayload?>(null, m.replyToId, held == null) {
+            val id = m.replyToId
+            if (personPoll && held == null && id != null) value = FetchedPolls.load(ctx.channel.id, id)
+        }
+        val poll = held ?: fetched
+
+        /** Fills a translated sentence, putting a tappable name or link where each {placeholder} is. */
+        fun fill(template: String, parts: Map<String, AnnotatedString.Builder.() -> Unit>): AnnotatedString = buildAnnotatedString {
+            var i = 0
+            val rx = Regex("\\{(\\w+)\\}")
+            for (match in rx.findAll(template)) {
+                append(template.substring(i, match.range.first))
+                val fn = parts[match.groupValues[1]]
+                if (fn != null) fn() else append(match.value)
+                i = match.range.last + 1
+            }
+            append(template.substring(i))
+        }
+
+        fun person(id: String?): AnnotatedString.Builder.() -> Unit = {
+            if (id == null) append(t("chat.systemMessage.someone"))
+            else names.append(this, id, Names.member(sid, id)) { openProfile(id) }
+        }
+
+        fun jumpLink(label: String, to: String?): AnnotatedString.Builder.() -> Unit = {
+            if (to == null) append(label)
+            else withLink(LinkAnnotation.Clickable("jump-$to", styles = linkStyle) { ChatUi.jumpTo(ctx.channel.id, to) }) { append(label) }
+        }
+
+        // a thread's name in its notice: the way into it
+        fun threadLink(threadId: String, name: String): AnnotatedString.Builder.() -> Unit = {
+            withLink(LinkAnnotation.Clickable("thread-$threadId", styles = linkStyle) { if (sid != null) Nav.go(Route.Server(sid, threadId)) }) { append(name) }
+        }
+
+        val self = target == null || target == actor
+        val text: AnnotatedString = when (m.type) {
+            "system_thread" -> {
+                val th = m.thread
+                val name = th?.let { Nexa.channels.get(it.id)?.name ?: it.name }
+                if (th != null && !name.isNullOrEmpty()) fill(t("chat.systemMessage.startedThread"), mapOf("actor" to person(actor), "thread" to threadLink(th.id, name)))
+                else fill(t("chat.systemMessage.startedThreadGone"), mapOf("actor" to person(actor)))
+            }
+            "system_thread_add" -> fill(t("chat.systemMessage.addedToThread"), mapOf("actor" to person(actor), "target" to person(target)))
+            "system_thread_remove" -> fill(t("chat.systemMessage.removedFromThread"), mapOf("actor" to person(actor), "target" to person(target)))
+            "system_member_add" -> if (self) fill(t("chat.systemMessage.joinedGroup"), mapOf("actor" to person(actor)))
+            else fill(t("chat.systemMessage.addedToGroup"), mapOf("actor" to person(actor), "target" to person(target)))
+            "system_member_remove" -> if (self) fill(t("chat.systemMessage.leftGroup"), mapOf("actor" to person(actor)))
+            else fill(t("chat.systemMessage.removedFromGroup"), mapOf("actor" to person(actor), "target" to person(target)))
+            "system_owner_change" -> if (self) fill(t("chat.systemMessage.tookOwnership"), mapOf("actor" to person(actor)))
+            else fill(t("chat.systemMessage.madeOwner"), mapOf("actor" to person(actor), "target" to person(target)))
+            "system_pin" -> fill(t("chat.systemMessage.pinned"), mapOf("actor" to person(actor), "message" to jumpLink(t("chat.systemMessage.aMessage"), m.replyToId)))
+            "system_join" -> fill(t("chat.systemMessage.joined"), mapOf("actor" to person(actor)))
+            // a poll's closing line speaks for whoever asked: the webhook that posted it, or the person
+            "system_poll_result" -> if (m.webhookId != null) {
+                val hook = fish.nexa.ui.markdown.Webhook.of(cm.hook)
+                hookPollResult(hook, ::fill, hook?.let { h -> { withStyle(nameStyle) { append(h.name) } } } ?: person(actor), jumpLink(t("chat.systemMessage.viewPoll"), m.replyToId))
+            } else pollResult(cm, poll, ::fill, person(actor), jumpLink(t("chat.systemMessage.viewPoll"), m.replyToId))
+            else -> fill(t("chat.systemMessage.didSomething"), mapOf("actor" to person(actor)))
+        }
+        val full = buildAnnotatedString {
+            append(text)
+            withStyle(SpanStyle(fontSize = Nx.type.sp(12f), color = c.textMuted)) { append("  " + Time.timestamp(m.createdAt)) }
+        }
         Icon(icon, c.textMuted, size = 18.dp, modifier = Modifier.padding(top = 2.dp).offsetStart(if (ctx.selecting) -44 else -40))
-        BasicText(full, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(22f), color = c.textMuted))
+        BasicText(full, inlineContent = names.content, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(22f), color = c.textMuted))
     }
 }
 

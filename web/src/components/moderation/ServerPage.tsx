@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { CalendarDays, ChevronLeft, ChevronRight, Compass, Copy, Eraser, Eye, FolderOpen, Gavel, Hash, ImageOff, Smile, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -221,7 +222,7 @@ export function ServerPage() {
               <button type="button" className={p.serverRow} onClick={() => nav(`/channels/@admin/users/${server.owner_id}`)} data-testid="server-owner">
                 <Avatar id={server.owner_id} avatarId={owner?.avatar_id ?? null} name={personName(owner)} size={36} />
                 <span className={p.serverText}>
-                  <span className={p.serverName}>{personName(owner)}</span>
+                  <PersonName user={owner} className={p.serverName}>{personName(owner)}</PersonName>
                   <span className={p.serverMeta}>{owner ? `@${owner.username}` : ""}</span>
                 </span>
                 <ChevronRight size={18} className={p.flip} aria-hidden="true" />

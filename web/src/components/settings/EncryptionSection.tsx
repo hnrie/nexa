@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 /**
  * What this device knows about identity keys, in one place a person can read.
  *
@@ -24,16 +25,16 @@ import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 import k from "@/components/profile/KeyVerify.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 
-function describe(e: SecurityEvent, name: string): string {
+function describe(e: SecurityEvent, name: React.ReactNode): React.ReactNode {
   switch (e.kind) {
     case "key_changed":
-      return t("encryption.logKeyChanged", { name });
+      return <Tr id="encryption.logKeyChanged" values={{ name }} />;
     case "outsider_refused":
       return t("encryption.logOutsiderRefused", { count: e.count ?? 1 });
     case "grant_withheld":
-      return t("encryption.logGrantWithheld", { name });
+      return <Tr id="encryption.logGrantWithheld" values={{ name }} />;
     case "unchecked":
       return t("encryption.logUnchecked", { count: e.count ?? 0 });
   }
@@ -96,7 +97,7 @@ export function EncryptionSection() {
           <ul className={k.log}>
             {events.slice(0, 20).map((e) => (
               <li key={e.id} className={k.logRow}>
-                <span>{describe(e, e.userId ? displayName(users[e.userId]) : t("names.unknownUser"))}</span>
+                <span>{describe(e, e.userId ? <PersonName userId={e.userId}>{displayName(users[e.userId])}</PersonName> : t("names.unknownUser"))}</span>
                 <span className={k.logWhen}>{formatDateDivider(e.at)}</span>
               </li>
             ))}

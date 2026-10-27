@@ -1,3 +1,4 @@
+import { personText } from "@/lib/personText";
 import { Check, Gift, ShieldAlert } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -96,7 +97,7 @@ function Claim() {
     );
   }
   return (
-    <AuthLayout title={title} subtitle={t("support.giftLink.fromName", { name: gift.from_name || t("support.giftLink.someone") })} mark={mark(<Gift size={28} />)}>
+    <AuthLayout title={title} subtitle={personText("support.giftLink.fromName", gift.from_id, gift.from_name || t("support.giftLink.someone"))} mark={mark(<Gift size={28} />)}>
       <div className={s.form}>
         <Button block size="lg" loading={busy} onClick={() => void claim()} data-testid="gift-claim">{t("support.giftLink.claim")}</Button>
         {home}

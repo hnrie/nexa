@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Eye } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -10,7 +11,7 @@ import { Tr, t } from "@/i18n";
 import { dismiss, interact } from "@/lib/interactions";
 import { findMembers } from "@/lib/pickables";
 import { SelectBox } from "@/components/apps/SelectBox";
-import { entityChoices, entityKindOfComponent, entityLabel } from "@/components/apps/entityChoices";
+import { entityChoices, entityKindOfComponent, entityLabel, entityLabelNode } from "@/components/apps/entityChoices";
 import type { DecryptedMessage } from "@/lib/decrypt";
 import {
   BUTTON_DANGER,
@@ -103,7 +104,7 @@ export function InteractionLine({ msg, it }: { msg: DecryptedMessage; it: HookIn
           values={{
             name: (
               <button type="button" className={c.replyName} dir="auto" onClick={(e) => openProfilePopout(it.user_id, e.currentTarget, serverId)}>
-                {name}
+                <PersonName userId={it.user_id} serverId={serverId}>{name}</PersonName>
               </button>
             ),
             command:
@@ -233,6 +234,7 @@ export function AppSelect({ c: comp }: { c: HookComponent }) {
     <SelectBox
       placeholder={comp.placeholder || t("apps.select.placeholder")}
       picked={picked}
+      renderLabelOf={kind ? (v) => entityLabelNode(channelId, v, kind) : undefined}
       labelOf={(v) => (kind ? entityLabel(channelId, v) : (options.find((o) => o.value === v)?.label ?? v))}
       choicesFor={(q) =>
         kind

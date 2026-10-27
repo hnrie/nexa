@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { automod as automodApi } from "@/api/automod";
@@ -7,7 +8,7 @@ import { LoadError } from "@/components/common/LoadError";
 import { Spinner } from "@/components/common/Spinner";
 import { dispatchHooks } from "@/gateway/dispatch";
 import type { GatewayEvent } from "@/gateway/events";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { openCaught } from "@/lib/automod/rules";
 import { formatFull, formatTimestamp } from "@/lib/time";
 import { useChannels } from "@/stores/channels";
@@ -37,7 +38,7 @@ function EventRow({ serverId, ev, onPerson }: { serverId: string; ev: AutomodEve
     <article className={s.event} data-testid="automod-event">
       <span className={s.eventWho}><Avatar id={ev.user_id} avatarId={user?.avatar_id ?? null} name={name} size={36} /></span>
       <div className={s.eventHead}>
-        <button type="button" className={s.eventName} onClick={() => onPerson(ev.user_id)} dir="auto">{name}</button>
+        <button type="button" className={s.eventName} onClick={() => onPerson(ev.user_id)} dir="auto"><PersonName userId={ev.user_id} serverId={serverId}>{name}</PersonName></button>
         <span className={s.eventMeta} title={formatFull(ev.created_at)}>{formatTimestamp(ev.created_at)}</span>
       </div>
       <div className={s.eventHead}>
@@ -106,7 +107,7 @@ export function AutomodLog({ serverId }: { serverId: string }) {
     <>
       {person ? (
         <div className={s.logFilter}>
-          <span>{t("automod.log.onlyFor", { name: person_ ? displayName(person_) : "" })}</span>
+          <span>{<Tr id="automod.log.onlyFor" values={{ name: <PersonName user={person_}>{person_ ? displayName(person_) : ""}</PersonName> }} />}</span>
           <button type="button" className={s.pick} onClick={() => setPerson(null)}>
             {t("automod.log.everyone")} <X size={14} aria-hidden="true" />
           </button>

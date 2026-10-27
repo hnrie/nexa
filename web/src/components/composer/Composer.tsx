@@ -901,7 +901,7 @@ export function Composer({ channel }: { channel: Channel }) {
   return (
     <div className={s.wrap}>
       <DropOverlay name={name} hash={!!channel.server_id} onFiles={(list) => takeFiles.current?.(list)} disabled={!canSend || selecting} />
-      {cmd.active ? cmd.list : ac ? <Autocomplete docked kind={ac.kind} items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} heading={ac.frequent ? tr_("composer.autocomplete.frequentlyUsed") : undefined} /> : null}
+      {cmd.active ? cmd.list : ac ? <Autocomplete serverId={channel.server_id} docked kind={ac.kind} items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} heading={ac.frequent ? tr_("composer.autocomplete.frequentlyUsed") : undefined} /> : null}
       {formatting ? (
         <Suspense fallback={null}>
           <FormatEditor

@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { CalendarDays, Gavel, Hash, Search, Server, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,7 +14,7 @@ import { profileTheme } from "@/lib/avatarColor";
 import { personName, previewText } from "@/lib/moderation";
 import { formatShortDate } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { ModerateServerModal } from "./ModerateServerModal";
 import { ServerIcon } from "./ProfileSheet";
 import m from "./Moderation.module.css";
@@ -202,7 +203,7 @@ function ServerCard({ s, people, onModerate, onOpen, onOwner }: { s: ModServer; 
         </div>
         <button type="button" className={p.ownerChip} onClick={onOwner} data-testid="server-card-owner">
           <Avatar id={s.owner_id} avatarId={owner?.avatar_id ?? null} name={personName(owner)} size={18} />
-          <span>{t("moderation.servers.ownedBy", { name: personName(owner) })}</span>
+          <span>{<Tr id="moderation.servers.ownedBy" values={{ name: <PersonName user={owner}>{personName(owner)}</PersonName> }} />}</span>
         </button>
         <p className={m.cardAbout} data-empty={!s.description || undefined} dir="auto">
           {s.description ? previewText(s.description) : t("moderation.servers.noDescription")}

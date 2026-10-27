@@ -153,7 +153,7 @@ private fun AppCard(a: ModApp) {
                     Icon("Eye", c.textWarning, size = 13.dp)
                     Txt(t("moderation.bots.readsAll"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(12f), fontWeight = FontWeight(600)), color = c.textWarning, maxLines = 1)
                 }
-                OwnerChip(a.ownerId, t("moderation.servers.ownedBy", "name" to nameOf(owner))) { goPanel("users/${a.ownerId}") }
+                OwnerChip(a.ownerId, t("moderation.servers.ownedBy", "name" to fish.nexa.ui.chat.PERSON_SLOT), ownerName = nameOf(owner)) { goPanel("users/${a.ownerId}") }
                 Txt(
                     if (a.description.isNotEmpty()) previewText(a.description) else t("moderation.servers.noDescription"),
                     style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), lineHeight = Nx.type.sp(18.9f), fontStyle = if (a.description.isEmpty()) FontStyle.Italic else FontStyle.Normal),

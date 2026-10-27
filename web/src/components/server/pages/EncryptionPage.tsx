@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { KeyRound, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { servers as serversApi } from "@/api/servers";
@@ -14,7 +15,7 @@ import { displayName, useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import s from "../ServerSettings.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 export default function EncryptionPage({ serverId }: { serverId: string }) {
   const users = useUsers((u) => u.byId);
   const toast = useUI((u) => u.toast);
@@ -92,7 +93,7 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
             <div className={s.keyText}>
               <span className={s.keyName}>{c.name}</span>
               <span className={s.keySub}>
-                {latest ? `${t("server.encryption.keyEpochCreatedBy", { epoch: latest.epoch, when: formatFull(latest.created_at), who: displayName(users[latest.created_by]) })}${latest.reason ? ` (${latest.reason})` : ""}` : t("server.encryption.noKeyYet")}
+                {latest ? <><Tr id="server.encryption.keyEpochCreatedBy" values={{ epoch: latest.epoch, when: formatFull(latest.created_at), who: <PersonName userId={latest.created_by} serverId={serverId}>{displayName(users[latest.created_by])}</PersonName> }} />{latest.reason ? ` (${latest.reason})` : ""}</> : t("server.encryption.noKeyYet")}
                 {" · "}
                 {holdLatest ? t("server.encryption.youHoldTheCurrentKey") : held ? t("server.encryption.youHoldAnOlderKeyWaiting") : t("server.encryption.youDonTHoldThisKey")}
               </span>

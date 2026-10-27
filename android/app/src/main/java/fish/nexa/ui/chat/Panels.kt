@@ -242,7 +242,7 @@ private fun PinCard(cm: ChatMessage, ctx: ListCtx) {
                         fish.nexa.ui.media.HookTags({ fish.nexa.ui.media.openHookCard(hook, hookId) })
                     } else {
                         val color = ctx.server?.let { Nexa.servers.memberColor(it, cm.authorId) }?.let { Color(0xFF000000 or it) } ?: c.textStrong
-                        Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = color, maxLines = 1, modifier = Modifier.weight(1f, fill = false).pressable(remember { MutableInteractionSource() }) { openProfile(cm.authorId) })
+                        fish.nexa.ui.chat.PersonName(cm.authorId, name, serverId = sid, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = color, maxLines = 1, modifier = Modifier.weight(1f, fill = false).pressable(remember { MutableInteractionSource() }) { openProfile(cm.authorId) })
                     }
                     Txt(Time.timestamp(cm.m.createdAt), style = Nx.type.timestamp, color = c.textMuted, maxLines = 1)
                 }

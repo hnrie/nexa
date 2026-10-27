@@ -358,6 +358,8 @@ fun NxTextField(
     mono: Boolean = false,
     /** The monospace text's size; AutoMod's lists of words are a little smaller, as the web's are. */
     monoSize: Float = 15f,
+    labelContent: (@Composable () -> Unit)? = null,
+    hintContent: (@Composable () -> Unit)? = null,
 ) {
     val c = Nx.colors
     val type = Nx.type
@@ -374,7 +376,8 @@ fun NxTextField(
         tween(Nx.motion.fast), label = "edge",
     )
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (label != null) {
+        if (labelContent != null) labelContent()
+        else if (label != null) {
             BasicText(
                 buildAnnotatedString {
                     append(label)
@@ -439,6 +442,7 @@ fun NxTextField(
             if (leading != null) Box(Modifier.align(Alignment.CenterStart).padding(start = 10.dp)) { leading() }
         }
         if (error != null) Txt(error, style = type.hint.copy(fontWeight = FontWeight(500)), color = c.textDanger)
+        else if (hintContent != null) hintContent()
         else if (hint != null) Txt(hint, style = type.hint, color = c.textMuted)
     }
 }

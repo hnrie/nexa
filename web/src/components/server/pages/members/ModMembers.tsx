@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { ArrowDownUp, ChevronDown, Scissors } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
@@ -253,7 +254,7 @@ export function ModMembers({ serverId }: { serverId: string }) {
     m.join ? (
       <span className={s.method}>
         {joinMethodLabel(m.join.join_method)}
-        {m.join.join_code ? <span className={s.methodSub} dir="ltr">{m.join.join_code}</span> : m.join.invited_by ? <span className={s.methodSub}>{displayName(users[m.join.invited_by])}</span> : null}
+        {m.join.join_code ? <span className={s.methodSub} dir="ltr">{m.join.join_code}</span> : m.join.invited_by ? <PersonName userId={m.join.invited_by} className={s.methodSub}>{displayName(users[m.join.invited_by])}</PersonName> : null}
       </span>
     ) : null;
 
@@ -377,7 +378,7 @@ export function ModMembers({ serverId }: { serverId: string }) {
                     <span className={s.who}>
                       <Avatar id={m.user_id} avatarId={m.avatar_id ?? users[m.user_id]?.avatar_id ?? null} name={nameOf(m)} size={32} />
                       <span className={s.whoText}>
-                        <button type="button" className={s.name} dir="auto" onClick={(e) => { e.stopPropagation(); setViewing(m.user_id); }}>{nameOf(m)}</button>
+                        <button type="button" className={s.name} dir="auto" onClick={(e) => { e.stopPropagation(); setViewing(m.user_id); }}><PersonName userId={m.user_id} serverId={serverId}>{nameOf(m)}</PersonName></button>
                         <span className={s.handle}>@{users[m.user_id]?.username ?? ""}</span>
                       </span>
                     </span>

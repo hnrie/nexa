@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { X } from "lucide-react";
 import { useState } from "react";
 import { moderation as modApi, type ModServerRef, type Person, type StaffCase } from "@/api/moderation";
@@ -9,7 +10,7 @@ import { Toggle } from "@/components/common/Toggle";
 import { describeError } from "@/lib/errors";
 import { personName } from "@/lib/moderation";
 import { useUI } from "@/stores/ui";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { StickerThumbs } from "./ExpressionsTab";
 import { ServerIcon } from "./ProfileSheet";
 import m from "./Moderation.module.css";
@@ -57,7 +58,7 @@ export function ModerateEmojiModal({ server, owner, emojis, onClose, onDone }: {
             <h2 className={m.modalTitle}>{t("moderation.packs.moderateEmoji")}</h2>
             <div className={m.modalTarget}>
               <span dir="auto">{server.name}</span>
-              <span>{t("moderation.servers.ownedBy", { name: ownerName })}</span>
+              <span>{<Tr id="moderation.servers.ownedBy" values={{ name: <PersonName user={owner}>{ownerName}</PersonName> }} />}</span>
             </div>
           </div>
           <button type="button" className={m.modalClose} onClick={onClose} aria-label={t("chat.attachments.close")}>
@@ -87,7 +88,7 @@ export function ModerateEmojiModal({ server, owner, emojis, onClose, onDone }: {
               ))}
             </div>
             <div className={m.reasonMeta}>
-              <span>{t("moderation.servers.reasonVisible", { name: ownerName })}</span>
+              <span>{<Tr id="moderation.servers.reasonVisible" values={{ name: <PersonName user={owner}>{ownerName}</PersonName> }} />}</span>
               {[...reason.trim()].length < 3 ? <span data-short="">{t("moderation.form.reasonTooShort", { min: 3 })}</span> : <span>{[...reason].length}/{MAX_REASON}</span>}
             </div>
           </div>
@@ -99,7 +100,7 @@ export function ModerateEmojiModal({ server, owner, emojis, onClose, onDone }: {
         </div>
 
         <div className={m.modalFoot}>
-          <span className={m.summary}>{t("moderation.servers.notifies", { name: ownerName })}</span>
+          <span className={m.summary}>{<Tr id="moderation.servers.notifies" values={{ name: <PersonName user={owner}>{ownerName}</PersonName> }} />}</span>
           <span className={m.grow} />
           <Button variant="ghost" onClick={onClose}>
             {t("moderation.cancel")}

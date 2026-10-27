@@ -374,6 +374,7 @@ sealed interface MenuItem {
         val separatorAfter: Boolean = false,
         /** A small picture before the label: whose item it is, such as an app's for its commands. */
         val picture: (@Composable () -> Unit)? = null,
+        val personId: String? = null,
         val onClick: () -> Unit,
     ) : MenuItem
 
@@ -393,10 +394,11 @@ fun openMenu(
     header: (@Composable (close: () -> Unit) -> Unit)? = null,
     onClosed: (() -> Unit)? = null,
     haptic: Boolean = true,
+    titleWords: fish.nexa.ui.chat.PersonWords? = null,
 ) {
     if (items.isEmpty()) return
     lateinit var layer: Layer
-    layer = Layer("menu") { close -> MenuSheet(layer, items, title, header, onClosed, haptic, close) }
+    layer = Layer("menu") { close -> MenuSheet(layer, items, title, header, onClosed, haptic, titleWords, close) }
     Layers.open(layer)
 }
 
@@ -408,6 +410,7 @@ private fun MenuSheet(
     header: (@Composable (close: () -> Unit) -> Unit)?,
     onClosed: (() -> Unit)?,
     haptic: Boolean,
+    titleWords: fish.nexa.ui.chat.PersonWords?,
     close: () -> Unit,
 ) {
     val c = Nx.colors
@@ -423,7 +426,8 @@ private fun MenuSheet(
                 MenuRow(MenuItem.Action(t("contextMenu.back"), onClick = {}), back = true) { stackOfMenus = stackOfMenus.dropLast(1) }
                 MenuHeading(current.label)
             } else {
-                if (title != null) Txt(title, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = c.textMuted, maxLines = 1, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 8.dp))
+                if (titleWords != null) fish.nexa.ui.chat.PersonWordsText(titleWords, Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), c.textMuted, Modifier.padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 8.dp), maxLines = 1)
+                else if (title != null) Txt(title, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(600)), color = c.textMuted, maxLines = 1, modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 8.dp))
                 header?.invoke(close)
             }
             for (item in shown) {
@@ -482,7 +486,7 @@ private fun MenuRow(item: MenuItem.Action, back: Boolean = false, chevron: Boole
             item.strong || pressed -> c.textStrong
             else -> c.textSubtle
         }
-        Txt(item.label, style = Nx.type.body.copy(fontWeight = FontWeight(if (item.strong) 700 else 550)), color = color, maxLines = 1, modifier = Modifier.weight(1f))
+        fish.nexa.ui.chat.PersonName(item.personId, item.label, style = Nx.type.body.copy(fontWeight = FontWeight(if (item.strong) 700 else 550)), color = color, maxLines = 1, modifier = Modifier.weight(1f))
         if (item.warn) Icon("TriangleAlert", c.warning, size = 15.dp)
         if (chevron) Icon(if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) "ChevronLeft" else "ChevronRight", c.textMuted, size = 16.dp)
         item.checked?.let { on ->

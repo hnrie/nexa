@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -57,7 +58,7 @@ export function AutomodAlert({ msg }: { msg: DecryptedMessage }) {
   const name = user ? displayName(user) : t("chat.systemMessage.someone");
   const who = (
     <button type="button" className={s.sysName} dir="auto" onClick={(e) => openProfilePopout(msg.author_id, e.currentTarget, serverId ?? undefined)}>
-      {name}
+      <PersonName userId={msg.author_id} serverId={serverId}>{name}</PersonName>
     </button>
   );
   const chan = where ? (

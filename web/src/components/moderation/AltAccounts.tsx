@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Ban, Link2, MessageSquareOff, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -77,7 +78,7 @@ export function AltAccountsModal({ user, onClose }: { user: ModUser; onClose: ()
                     <Avatar id={a.user.id} avatarId={a.user.avatar_id} name={a.user.display_name} size={36} />
                     <span className={m.altWho}>
                       <span className={m.altName}>
-                        {a.user.display_name}
+                        <PersonName user={a.user}>{a.user.display_name}</PersonName>
                         {a.user.ban ? <Ban size={13} aria-label={t("moderation.state.banned")} className={m.altBan} /> : null}
                         {a.user.mute ? <MessageSquareOff size={13} aria-label={t("moderation.state.muted")} className={m.altMute} /> : null}
                       </span>

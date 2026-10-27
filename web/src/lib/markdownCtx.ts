@@ -79,6 +79,7 @@ function useBuiltCtx(enabled: boolean, serverId?: string | null): RenderCtx | nu
     if (!enabled) return null;
     return {
       users,
+      serverId,
       channels,
       roles,
       emojiUrl,

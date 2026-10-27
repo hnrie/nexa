@@ -1,3 +1,4 @@
+import { personText } from "@/lib/personText";
 import { Check, Copy, MessageSquare, MessageSquarePlus, MoreVertical, Phone, Plus, Search, UserPlus, Users, X } from "lucide-react";
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -6,6 +7,7 @@ import { relationships as relApi } from "@/api/relationships";
 import { acceptFriendRequest, addRequestNote, dropFriendRequest, requestError, unblockUser, useBusyWith } from "@/lib/friendship";
 import { REQUEST_NOTE_MAX, cleanRequestNote } from "@/lib/requestNote";
 import type { Relationship } from "@/api/types";
+import { PersonName } from "@/components/common/PersonName";
 import { Avatar, statusLabel } from "@/components/common/Avatar";
 import { StaffMark } from "@/components/common/OwnerBadge";
 import { rankOf } from "@/lib/staffRank";
@@ -334,7 +336,7 @@ function FriendRow({ rel, presenceUser, order, picking, picked }: { rel: Relatio
         <Avatar id={rel.user.id} avatarId={presenceUser.avatar_id} name={name} size={32} status={rel.type === "friend" ? status : null} />
         <span className={s.rowText}>
           <span className={s.rowName}>
-            <span className={s.rowDisplay} dir="auto">{name}</span>
+            <PersonName user={presenceUser} className={s.rowDisplay} dir="auto">{name}</PersonName>
             {/* Nexa's staff carry their rank's mark here as in every list */}
             {rankOf(rel.user.id, rel.user.flags) ? (
               <span className={s.rowBadge}><StaffMark rank={rankOf(rel.user.id, rel.user.flags)!} size={14} /></span>
@@ -375,7 +377,7 @@ function AddFriend() {
   const [note, setNote] = useState("");
   const [noteOpen, setNoteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: React.ReactNode } | null>(null);
   const setRel = useRelationships((r) => r.set);
   const formId = useId();
   const submit = async (e: FormEvent) => {
@@ -387,7 +389,7 @@ function AddFriend() {
     try {
       const res = await guarded("friend_request", (captcha) => relApi.request(username, captcha));
       setRel({ user: res.user, type: res.type as Relationship["type"], nickname: "", created_at: Date.now() });
-      setMsg({ ok: true, text: res.type === "friend" ? tr_("friends.youAreNowFriends", { name: res.user.display_name }) : tr_("friends.friendRequestSent", { name: res.user.display_name }) });
+      setMsg({ ok: true, text: res.type === "friend" ? personText("friends.youAreNowFriends", res.user.id, res.user.display_name) : personText("friends.friendRequestSent", res.user.id, res.user.display_name) });
       setValue("");
       // The note goes onto the request once there is one; if they had already
       // asked, this made you friends and there is no request left to carry it.

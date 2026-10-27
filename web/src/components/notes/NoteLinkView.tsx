@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { KeyRound, NotebookPen, RotateCw, Users } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -13,7 +14,7 @@ import { NOTE_PREVIEW_CHARS } from "@/lib/notes/model";
 import { joinNoteLink } from "@/lib/notes/share";
 import { useUI } from "@/stores/ui";
 import { displayName } from "@/stores/users";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { NoteFileThumb } from "./NoteFile";
 import { noteName } from "./NoteParts";
 import s from "./Notes.module.css";
@@ -122,7 +123,7 @@ export function NoteLinkView({ secret, variant, onDone, actions }: Props) {
           <NotebookPen size={variant === "card" ? 20 : 26} />
         </span>
         <div className={s.linkMain}>
-          <p className={s.linkLead}>{owner ? t("notes.link.sharedBy", { name: owner }) : t("notes.link.shared")}</p>
+          <p className={s.linkLead}>{owner ? <Tr id="notes.link.sharedBy" values={{ name: <PersonName user={view.owner}>{owner}</PersonName> }} /> : t("notes.link.shared")}</p>
           <p className={s.linkTitle} dir="auto" data-untitled={head.title.trim() ? undefined : ""}>
             {noteName(head.title)}
           </p>

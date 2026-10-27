@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 /**
  * Find or start a conversation (Ctrl+K): the one place to find anything.
  *
@@ -346,7 +347,7 @@ function Finder({ onClose }: { onClose: () => void }) {
         return (
           <>
             <PlaceIcon p={o.place} />
-            <span className={s.label} dir="auto">{o.place.kind === "channel" ? o.place.label : o.place.label}</span>
+            <span className={s.label} dir="auto">{o.place.kind === "friend" || o.place.kind === "dm" ? <PersonName userId={o.place.avatarKey}>{o.place.label}</PersonName> : o.place.label}</span>
             <span className={s.sub} dir="auto">
               {o.place.kind === "friend" ? (
                 <>

@@ -64,7 +64,7 @@ fun openAlts(u: ModUser) {
     openModSheet(
         "alts",
         top = { close ->
-            ModSheetTop(t("moderation.alts.title", "name" to u.displayName), close, leading = { Avatar(u.id, u.displayName, u.avatarId, 40.dp) }) {
+            ModSheetTop(t("moderation.alts.title", "name" to u.displayName), close, titleWords = fish.nexa.ui.chat.PersonWords(t("moderation.alts.title", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(u.id to u.displayName)), leading = { Avatar(u.id, u.displayName, u.avatarId, 40.dp) }) {
                 Txt("@" + u.username, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = Nx.colors.textMuted, maxLines = 1)
             }
         },
@@ -115,7 +115,7 @@ private fun AltRow(a: ModAlt, onClick: () -> Unit) {
         Avatar(a.user.id, a.user.displayName, a.user.avatarId, 36.dp)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Txt(a.user.displayName, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                fish.nexa.ui.chat.PersonName(a.user.id, a.user.displayName, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 if (a.user.ban != null) Icon("Ban", c.danger, size = 13.dp)
                 if (a.user.mute != null) Icon("MessageSquareOff", c.warning, size = 13.dp)
             }

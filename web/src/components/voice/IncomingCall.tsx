@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { BellOff, Phone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/common/Avatar";
@@ -39,7 +40,7 @@ export function IncomingCallHost() {
         <div className={s.ringAvatar}>
           <Avatar id={from} avatarId={caller?.avatar_id ?? null} name={displayName(caller)} size={80} />
         </div>
-        <div className={s.ringName}>{displayName(caller)}</div>
+        <div className={s.ringName}><PersonName userId={from} user={caller}>{displayName(caller)}</PersonName></div>
         <div className={s.ringSub}>{channel && channel.type === "group_dm" ? t("voice.incomingCall.inGroup", { name: channelDisplayName(channel, users, meId) }) : t("voice.incomingCall.incomingCall")}</div>
         <div className={s.ringBtns}>
           <button type="button" className={s.ringAction} onClick={() => void declineCall(channelId)} data-testid="decline-call">

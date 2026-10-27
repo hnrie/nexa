@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Check, CornerUpRight, Hash, Link2, Lock, MailOpen, Megaphone, MessageSquareText, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, ShieldAlert, SmilePlus, Trash2 } from "lucide-react";
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -169,7 +170,7 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
           e.stopPropagation();
         }}
       >
-        {name}
+        {byHook ? name : <PersonName userId={target.author_id} serverId={useChannels.getState().byId[msg.channel_id]?.server_id}>{name}</PersonName>}
       </button>
       <button type="button" className={s.replyText} dir="auto" title={t("chat.messageItem.goToOriginal")} onClick={(e) => { e.stopPropagation(); jump(); }}>
         <ReplyWords words={words} ctx={ctx} />

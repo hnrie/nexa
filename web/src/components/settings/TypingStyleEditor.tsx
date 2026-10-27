@@ -4,6 +4,7 @@ import { users as usersApi } from "@/api/users";
 import { Button } from "@/components/common/Button";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
 import { describeError } from "@/lib/errors";
+import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
 import { TextInput } from "@/components/common/TextInput";
 import { StyledTyping, TypingEmoji } from "@/components/chat/TypingLine";
@@ -37,6 +38,7 @@ const typingSlotMenu = defineMenu<{ filled: boolean; pickEmoji: () => void; useP
 ]);
 
 export function TypingStyleEditor({ value, onChange, name, preview = true }: { value: TypingStyle | null; onChange: (v: TypingStyle | null) => void; name: string; preview?: boolean }) {
+  const meId = useAuth((a) => a.me?.id);
   const toast = useUI((u) => u.toast);
   const [picker, setPicker] = useState<{ slot: number; at: DOMRect } | null>(null);
   const [crop, setCrop] = useState<{ file: File; slot: number } | null>(null);
@@ -107,7 +109,7 @@ export function TypingStyleEditor({ value, onChange, name, preview = true }: { v
             <span className={s.ghostLines}><i /><i /></span>
           </div>
           <div className={s.line}>
-            <StyledTyping style={value} name={name} />
+            <StyledTyping style={value} name={name} userId={meId} />
           </div>
           <div className={s.composer}>{t("typing.editor.composer")}</div>
         </div>

@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { MessageSquareOff, UserX } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { MemberCase, Restriction } from "@/api/moderation";
@@ -106,7 +107,7 @@ export function DeletedNotice() {
             </section>
             <footer className={s.noticeFoot}>
               <span className={s.credit}>
-                {t("nexa.notice.actionedBy")} <strong>{personName(moderator)}</strong>
+                {t("nexa.notice.actionedBy")} <strong><PersonName userId={moderator?.deleted ? null : c.moderator_id} user={moderator?.deleted ? null : moderator}>{personName(moderator)}</PersonName></strong>
                 {moderator && !moderator.deleted ? <span className={s.personUser}>@{moderator.username}</span> : null}
               </span>
               <span className={s.meta}>

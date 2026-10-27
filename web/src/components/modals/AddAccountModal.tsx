@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { KeyRound } from "lucide-react";
 import { useRef, useState } from "react";
 import { ApiError } from "@/api/client";
@@ -13,7 +14,7 @@ import { QrSignIn } from "@/pages/QrSignIn";
 import { passwordSignIn, useAuth, type PasswordStep, type SignedIn } from "@/stores/auth";
 import auth from "@/pages/Auth.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 
 type Finish = Extract<PasswordStep, { mfa: true }>["finish"];
 
@@ -120,7 +121,7 @@ export default function AddAccountModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal open onClose={onClose} title={t("accounts.addAnotherAccount")} width={wide && !finish ? 760 : 440} onSubmit={() => void (finish ? onCode() : onPassword())}>
-      <p className={auth.note} style={{ marginBottom: 20 }}>{t("accounts.addHint", { name: me?.display_name ?? "" })}</p>
+      <p className={auth.note} style={{ marginBottom: 20 }}>{<Tr id="accounts.addHint" values={{ name: <PersonName user={me}>{me?.display_name ?? ""}</PersonName> }} />}</p>
       {wide && !finish ? (
         <div className={auth.split}>
           {form}

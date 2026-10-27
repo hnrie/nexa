@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 /**
  * The question that has to be answered before a conversation key is sealed to a
  * changed identity key.
@@ -22,7 +23,7 @@ import { useKeys } from "@/stores/keys";
 import { displayName, useUsers } from "@/stores/users";
 import s from "@/components/profile/KeyVerify.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 
 export default function KeyChangeModal({ onClose }: { onClose: () => void }) {
   const pending = useKeyAlerts((k) => k.pending);
@@ -58,7 +59,7 @@ export default function KeyChangeModal({ onClose }: { onClose: () => void }) {
       open
       onClose={onReject}
       closeOnOverlay={false}
-      title={t("encryption.keyChangedTitle", { name })}
+      title={<Tr id="encryption.keyChangedTitle" values={{ name: <PersonName userId={change.userId}>{name}</PersonName> }} />}
       width={420}
       footer={
         <>
@@ -68,7 +69,7 @@ export default function KeyChangeModal({ onClose }: { onClose: () => void }) {
       }
     >
       <div className={s.panel} data-testid="key-change-modal">
-        <p className={s.warn}>{t("encryption.keyChangedWarning", { name })}</p>
+        <p className={s.warn}>{<Tr id="encryption.keyChangedWarning" values={{ name: <PersonName userId={change.userId}>{name}</PersonName> }} />}</p>
         <div className={s.pair}>
           <p className={s.pairLabel}>{t("encryption.keyChangedNewLabel")}</p>
           <SafetyNumber publicKey={change.offered} />
@@ -77,7 +78,7 @@ export default function KeyChangeModal({ onClose }: { onClose: () => void }) {
           <p className={s.pairLabel}>{t("encryption.keyChangedOldLabel")}</p>
           <SafetyNumber publicKey={change.pinned} qr={false} old />
         </div>
-        <p className={s.note}>{t("encryption.keyChangedMeaning", { name })}</p>
+        <p className={s.note}>{<Tr id="encryption.keyChangedMeaning" values={{ name: <PersonName userId={change.userId}>{name}</PersonName> }} />}</p>
         {list.length > 1 ? <p className={s.note}>{t("encryption.keyChangedMore", { count: list.length - 1 })}</p> : null}
       </div>
     </Modal>

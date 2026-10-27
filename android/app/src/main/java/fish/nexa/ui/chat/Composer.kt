@@ -837,17 +837,8 @@ private fun ReplyBar(channel: Channel, reply: ChatUi.Reply, shape: androidx.comp
             .padding(start = 16.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val line = buildAnnotatedString {
-            val s = t("composer.replyingTo", "name" to "\u0000")
-            val at = s.indexOf('\u0000')
-            if (at >= 0) {
-                append(s.substring(0, at))
-                withStyle(SpanStyle(color = c.text, fontWeight = FontWeight(600))) { append(name) }
-                append(s.substring(at + 1))
-            } else append(s)
-        }
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            androidx.compose.foundation.text.BasicText(line, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), color = c.textMuted), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            fish.nexa.ui.chat.PersonText(authorId.takeUnless { byHook }, t("composer.replyingTo", "name" to fish.nexa.ui.chat.PERSON_SLOT), name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1, serverId = channel.serverId)
             if (target != null) ReplyExcerpt(target, channel.serverId, Modifier.weight(1f, fill = false))
         }
         if (other) {
@@ -1051,7 +1042,7 @@ private fun PreviewBox(text: String, serverId: String?, onHide: () -> Unit) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Avatar(me.id, me.name, me.avatarId, 40.dp)
             Column(Modifier.weight(1f)) {
-                Txt(me.name, style = Nx.type.body.copy(fontWeight = FontWeight(500)), color = c.textStrong)
+                fish.nexa.ui.chat.PersonName(me.id, me.name, nameStyle = me.nameStyle, style = Nx.type.body.copy(fontWeight = FontWeight(500)), color = c.textStrong)
                 fish.nexa.ui.markdown.MarkdownView(text, fish.nexa.ui.markdown.RenderCtx(serverId = serverId, inert = true, surface = c.bgSurface))
             }
         }
@@ -1266,7 +1257,7 @@ internal fun AcRow(item: AcItem, selected: Boolean, onClick: () -> Unit) {
             "appCommand" -> item.app?.let { Avatar(it.id, it.name, it.bot?.avatarId, 24.dp) }
             "command" -> Unit
         }
-        Txt(item.title, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = roleTint ?: c.text, maxLines = 1, modifier = Modifier.widthIn(max = 220.dp))
+        fish.nexa.ui.chat.PersonName(item.user?.id, item.title, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = roleTint ?: c.text, maxLines = 1, modifier = Modifier.widthIn(max = 220.dp))
         // the options a command needs, named after it
         item.leaf?.options?.filter { it.required }?.take(3)?.forEach { o ->
             Txt(

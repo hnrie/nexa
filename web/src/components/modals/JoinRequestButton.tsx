@@ -1,3 +1,4 @@
+import { personText, personError } from "@/lib/personText";
 import { Check, Link, LoaderCircle } from "lucide-react";
 import { useCallback, useId, useRef, useState } from "react";
 import { Button } from "@/components/common/Button";
@@ -15,7 +16,7 @@ export type JoinRequestState = "idle" | "sending" | "sent";
  * and the one way to send one. `linkFor` gives the group's invite link, made
  * when the menu has none yet. A failure is said in a toast, with the reason.
  */
-export function useJoinRequests(groupId: string, linkFor: () => Promise<string>, onSent?: (name: string) => void) {
+export function useJoinRequests(groupId: string, linkFor: () => Promise<string>, onSent?: (name: string, userId: string) => void) {
   const [sending, setSending] = useState<string[]>([]);
   const [sent, setSent] = useState<string[]>([]);
   // a second press before the first has drawn "Sending…" must not send twice
@@ -29,10 +30,10 @@ export function useJoinRequests(groupId: string, linkFor: () => Promise<string>,
       await sendJoinRequest(groupId, userId, await linkFor());
       done.current.add(userId);
       setSent((l) => [...l, userId]);
-      onSent?.(name);
+      onSent?.(name, userId);
     } catch (err) {
       const why = joinRequestError(err, name);
-      if (why) useUI.getState().toast(why, "error");
+      if (why) useUI.getState().toast(personError(why, t("groupAdd.joinRequest.failed", { name }), personText("groupAdd.joinRequest.failed", userId, name)), "error");
     } finally {
       going.current.delete(userId);
       setSending((l) => l.filter((x) => x !== userId));

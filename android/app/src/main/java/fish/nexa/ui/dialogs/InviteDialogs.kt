@@ -405,8 +405,8 @@ internal fun OpenInviteSheet(layer: Layer, code: String, hash: String, close: ()
                         Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 24.dp)) {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 val inviter = p.inviter
-                                Txt(
-                                    if (inviter != null) t("invite.invitedYouToJoin", "name" to (inviter.displayName.ifBlank { inviter.username })) else t("invite.youveBeenInvited"),
+                                fish.nexa.ui.chat.PersonText(
+                                    inviter?.id, if (inviter != null) t("invite.invitedYouToJoin", "name" to fish.nexa.ui.chat.PERSON_SLOT) else t("invite.youveBeenInvited"), inviter?.let { it.displayName.ifBlank { it.username } } ?: "",
                                     style = Nx.type.bodySmall.copy(lineHeight = Nx.type.sp(18.9f)), color = c.textMuted,
                                 )
                                 Txt(p.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(24f), lineHeight = Nx.type.sp(28.8f), fontWeight = FontWeight(700), letterSpacing = (-0.01).em), color = c.textStrong, modifier = Modifier.semantics { heading() })

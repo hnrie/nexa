@@ -132,7 +132,7 @@ fun callWith(userId: String) = openDmWith(userId) { id ->
 
 fun confirmRemoveFriend(user: PublicUser) {
     val name = Names.display(user)
-    confirm(t("profile.profileCard.removeFriend"), t("friends.removeNameFromYourFriends", "name" to name), t("profile.profileCard.removeFriend")) {
+    confirm(t("profile.profileCard.removeFriend"), t("friends.removeNameFromYourFriends", "name" to name), t("profile.profileCard.removeFriend"), bodyWords = fish.nexa.ui.chat.PersonWords(t("friends.removeNameFromYourFriends", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(user.id to name))) {
         People.removeFriend(user.id)
     }
 }
@@ -141,14 +141,14 @@ private fun nameList(users: List<PublicUser>): String = Names.list(users.map { N
 
 fun confirmRemoveFriends(users: List<PublicUser>) {
     if (users.size == 1) return confirmRemoveFriend(users[0])
-    confirm(t("pick.removeFriendsTitle", "count" to users.size), t("pick.removeFriendsBody", "names" to nameList(users)), t("pick.removeFriends", "count" to users.size)) {
+    confirm(t("pick.removeFriendsTitle", "count" to users.size), t("pick.removeFriendsBody", "names" to nameList(users)), t("pick.removeFriends", "count" to users.size), bodyWords = fish.nexa.ui.chat.PersonWords(t("pick.removeFriendsBody", "names" to Names.list(users.indices.map { fish.nexa.ui.chat.personSlot(it) })), users.map { it.id to Names.display(it) })) {
         People.removeFriends(users)
     }
 }
 
 fun confirmBlockPeople(users: List<PublicUser>) {
     if (users.size == 1) return openBlockDialog(users[0].id)
-    confirm(t("pick.blockTitle", "count" to users.size), t("pick.blockBody", "names" to nameList(users)), t("pick.block", "count" to users.size)) {
+    confirm(t("pick.blockTitle", "count" to users.size), t("pick.blockBody", "names" to nameList(users)), t("pick.block", "count" to users.size), bodyWords = fish.nexa.ui.chat.PersonWords(t("pick.blockBody", "names" to Names.list(users.indices.map { fish.nexa.ui.chat.personSlot(it) })), users.map { it.id to Names.display(it) })) {
         People.blockMany(users)
     }
 }
@@ -193,7 +193,7 @@ private fun BlockSheet(layer: Layer, user: PublicUser, close: () -> Unit) {
     var hide by remember { mutableStateOf(Nexa.settings.hideBlockedMessages) }
     var replies by remember { mutableStateOf(Nexa.settings.hideBlockedReplies) }
     var busy by remember { mutableStateOf(false) }
-    Sheet(layer, title = t("people.block.title", "name" to Names.display(user)), maxWidth = 460.dp, footer = {
+    Sheet(layer, title = t("people.block.title", "name" to Names.display(user)), heading = { fish.nexa.ui.chat.PersonHeading(fish.nexa.ui.chat.PersonWords(t("people.block.title", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(user.id to Names.display(user)))) }, maxWidth = 460.dp, footer = {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
             NxButton(t("chat.editMessage.cancel"), close, kind = ButtonKind.GHOST)
             NxButton(t("profile.profileCard.block"), {

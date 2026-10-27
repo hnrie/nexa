@@ -40,7 +40,7 @@ import fish.nexa.ui.theme.topEdge
  * which opens the choices as a menu sheet with the current one marked.
  */
 @Composable
-fun <T> SelectField(label: String?, options: List<Pair<T, String>>, selected: T, modifier: Modifier = Modifier, enabled: Boolean = true, onSelect: (T) -> Unit) {
+fun <T> SelectField(label: String?, options: List<Pair<T, String>>, selected: T, modifier: Modifier = Modifier, enabled: Boolean = true, optionPersonId: ((T) -> String?)? = null, onSelect: (T) -> Unit) {
     val c = Nx.colors
     val shown = options.firstOrNull { it.first == selected }?.second ?: ""
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -54,14 +54,14 @@ fun <T> SelectField(label: String?, options: List<Pair<T, String>>, selected: T,
                 .border(1.dp, c.borderSubtle, Radii.Sm)
                 .clip(Radii.Sm)
                 .pressable(remember { MutableInteractionSource() }, enabled = enabled, role = Role.DropdownList) {
-                    fish.nexa.ui.layers.openMenu(options.map { (v, text) -> fish.nexa.ui.layers.MenuItem.Action(text, checked = v == selected) { onSelect(v) } }, title = label)
+                    fish.nexa.ui.layers.openMenu(options.map { (v, text) -> fish.nexa.ui.layers.MenuItem.Action(text, checked = v == selected, personId = optionPersonId?.invoke(v)) { onSelect(v) } }, title = label)
                 }
                 .semantics { contentDescription = if (label != null) "$label: $shown" else shown }
                 .padding(start = 12.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Txt(shown, style = Nx.type.input.copy(fontSize = Nx.type.sp(15f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f))
+            fish.nexa.ui.chat.PersonName(optionPersonId?.invoke(selected), shown, style = Nx.type.input.copy(fontSize = Nx.type.sp(15f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f))
             fish.nexa.ui.Icon("ChevronDown", c.textMuted, size = 18.dp)
         }
     }

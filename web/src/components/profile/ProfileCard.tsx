@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { touchFirst } from "@/lib/touch";
 import { NexaProfile } from "@/components/nexa/NexaProfile";
@@ -49,7 +50,7 @@ import { withOwn } from "@/lib/useMemberLook";
 import s from "./Profile.module.css";
 import { profileAddRoleMenu, profileMoreMenu } from "./profileMenus";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 // in the app's language, not the browser's (lib/time)
 const dateOf = formatShortDate;
 
@@ -747,7 +748,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
           {/* A nickname you gave hides their own name, so it is added here; a name the line already shows is not said twice. */}
           {friend && rel.nickname && user.display_name && user.display_name !== rel.nickname && user.display_name.toLowerCase() !== user.username.toLowerCase() ? (
             <>
-              <span>{user.display_name}</span>
+              <PersonName user={user}>{user.display_name}</PersonName>
               <span className={s.sep} aria-hidden="true">·</span>
             </>
           ) : null}
@@ -1009,13 +1010,13 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
           </div>
         ) : null}
         <ProfileWidgets widgets={shownWidgets} variant="modal" onAdd={design?.widgets ? design.widgets.add : isMe && buttons ? editWidgets : undefined} design={design?.widgets} />
-        {!shownWidgets.length && !design && !(isMe && buttons) ? <p className={s.emptyTab}>{t("profile.tabs.noWidgets", { name: shownName })}</p> : null}
+        {!shownWidgets.length && !design && !(isMe && buttons) ? <p className={s.emptyTab}>{<Tr id="profile.tabs.noWidgets" values={{ name: <PersonName user={user}>{shownName}</PersonName> }} />}</p> : null}
       </div>
     );
   } else if (tab === "activity") {
     content = (
       <div className={s.sheet} data-testid="profile-activity-tab">
-        {activities.length ? <ActivityList activities={activities} /> : <p className={s.emptyTab}>{isMe ? t("profile.tabs.noActivityOwn") : t("profile.tabs.noActivity", { name: shownName })}</p>}
+        {activities.length ? <ActivityList activities={activities} /> : <p className={s.emptyTab}>{isMe ? t("profile.tabs.noActivityOwn") : <Tr id="profile.tabs.noActivity" values={{ name: <PersonName user={user}>{shownName}</PersonName> }} />}</p>}
       </div>
     );
   } else {
@@ -1027,7 +1028,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
             {mutual.friends.map((id) => (
               <button key={id} className={s.listItem} onClick={() => openModal("profile", { userId: id })}>
                 <Avatar id={id} avatarId={users[id]?.avatar_id ?? null} name={displayName(users[id])} size={32} />
-                <span>{displayName(users[id])}</span>
+                <PersonName userId={id}>{displayName(users[id])}</PersonName>
               </button>
             ))}
           </div>

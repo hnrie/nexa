@@ -318,7 +318,7 @@ fun AuditLogPage(serverId: String) {
             Box(Modifier.weight(1f).widthIn(min = 160.dp)) {
                 SelectField(
                     listOf("" to t("server.auditLog.anyone"), AUTOMOD to t("automod.name")) + actors.filter { it != AUTOMOD }.map { it to Names.display(users[it]) },
-                    actor, { actor = it }, title = t("server.auditLog.filterByMember"),
+                    actor, { actor = it }, title = t("server.auditLog.filterByMember"), optionPersonId = { it.takeUnless { id -> id.isEmpty() || id == AUTOMOD } },
                 )
             }
             Box(Modifier.weight(1f).widthIn(min = 160.dp)) {
@@ -342,18 +342,19 @@ fun AuditLogPage(serverId: String) {
                 ) { fish.nexa.ui.Icon("ShieldCheck", c.textBrand, size = 18.dp) }
                 else Avatar(e.actorId, name, users[e.actorId]?.avatarId, 32.dp)
                 Column(Modifier.weight(1f)) {
-                    BasicText(
+                    fish.nexa.ui.chat.PersonLine(Nx.type.body.copy(fontSize = Nx.type.sp(15f), lineHeight = Nx.type.sp(21f)), c.text, serverId = serverId, nameTextStyle = Nx.type.body.copy(fontSize = Nx.type.sp(15f), lineHeight = Nx.type.sp(21f), fontWeight = FontWeight(600)), nameColor = c.textStrong) { names ->
                         buildAnnotatedString {
-                            withStyle(SpanStyle(color = c.textStrong, fontWeight = FontWeight(600))) { append(name) }
+                            if (e.actorId == AUTOMOD) withStyle(SpanStyle(color = c.textStrong, fontWeight = FontWeight(600))) { append(name) }
+                            else names.append(this, e.actorId, name)
                             append(" ")
                             append(verb(e.action))
                             if (target.isNotEmpty()) {
                                 append(" ")
-                                withStyle(SpanStyle(color = c.textStrong, fontWeight = FontWeight(600))) { append(target) }
+                                if (e.targetType == "user") names.append(this, e.targetId, target)
+                                else withStyle(SpanStyle(color = c.textStrong, fontWeight = FontWeight(600))) { append(target) }
                             }
-                        },
-                        style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), lineHeight = Nx.type.sp(21f), color = c.text),
-                    )
+                        }
+                    }
                     Txt(
                         Time.full(e.createdAt) + if (e.reason.isNotEmpty()) " · " + t("server.auditLog.reason", "reason" to e.reason) else "",
                         style = Nx.type.hint,
@@ -364,7 +365,33 @@ fun AuditLogPage(serverId: String) {
                     if (text.isNotEmpty()) {
                         val open = e.id in expanded
                         val long = text.length > 300
-                        Txt(if (long && !open) text.take(299) + "…" else text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, modifier = Modifier.padding(top = 4.dp))
+                        val detailStyle = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f))
+                        fish.nexa.ui.chat.PersonLine(detailStyle, c.textMuted, Modifier.padding(top = 4.dp), serverId = serverId) { detailNames ->
+                            buildAnnotatedString {
+                                val obj = e.changes as? JsonObject
+                                if (obj == null) append(text)
+                                else {
+                                    var remaining = if (long && !open) 299 else Int.MAX_VALUE
+                                    for ((k, v) in obj) {
+                                        val value = field(k, v, e, obj) ?: continue
+                                        val prefix = (if (length > 0) " · " else "") + value.first + ": "
+                                        if (prefix.length + value.second.length > remaining) {
+                                            append((prefix + value.second).take(remaining.coerceAtLeast(0)))
+                                            append("…")
+                                            break
+                                        }
+                                        append(prefix)
+                                        val id = when {
+                                            (k == "target_id" || k == "target") && str(obj["target_type"]) == "member" -> str(v)
+                                            k == "nick" && e.targetType == "user" && str(v)?.isNotEmpty() == true -> e.targetId
+                                            else -> null
+                                        }
+                                        if (id != null) detailNames.append(this, id, value.second) else append(value.second)
+                                        remaining -= prefix.length + value.second.length
+                                    }
+                                }
+                            }
+                        }
                         if (long) NxButton(
                             if (open) t("server.auditLog.showLess") else t("server.auditLog.showAll"),
                             { if (open) expanded.remove(e.id) else expanded.add(e.id) },

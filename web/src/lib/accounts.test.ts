@@ -20,6 +20,14 @@ describe("accounts signed in on this browser", () => {
     expect(JSON.parse(localStorage.getItem("ec.accounts") ?? "[]")).toHaveLength(2);
   });
 
+  it("persists the current name style for the account switcher and clears a reset", () => {
+    const user = { ...me("1"), name_style: { font: "comic", effect: "solid", colors: [] } };
+    rememberAccount(user, "t1");
+    expect(JSON.parse(localStorage.getItem("ec.accounts")!)[0].name_style).toEqual(user.name_style);
+    rememberAccount({ ...user, name_style: null }, "t1");
+    expect(useAccounts.getState().list[0]?.name_style).toBeNull();
+  });
+
   it("forgets the account whose token the server refused", () => {
     rememberAccount(me("1"), "t1");
     rememberAccount(me("2"), "t2");

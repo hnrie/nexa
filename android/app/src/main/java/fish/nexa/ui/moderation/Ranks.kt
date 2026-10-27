@@ -46,7 +46,7 @@ fun openRankSheet(u: ModUser, onDone: () -> Unit) {
     val held = StaffRanks.of(u.id, u.adminFlags, Moderation.ownerId.value?.ifEmpty { null }).takeIf { it != StaffRank.OWNER }
     var pick by mutableStateOf(held)
     var busy by mutableStateOf(false)
-    openSheet("staff-rank", title = t("staff.rankModal.title", "name" to u.displayName), footer = { close ->
+    openSheet("staff-rank", title = t("staff.rankModal.title", "name" to u.displayName), heading = { fish.nexa.ui.chat.PersonHeading(fish.nexa.ui.chat.PersonWords(t("staff.rankModal.title", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(u.id to u.displayName))) }, footer = { close ->
         val scope = rememberCoroutineScope()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
             NxButton(t("chat.editMessage.cancel"), { close() }, kind = ButtonKind.SECONDARY)

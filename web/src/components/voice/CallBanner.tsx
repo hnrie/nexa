@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Phone } from "lucide-react";
 import { Avatar } from "@/components/common/Avatar";
 import { useAuth } from "@/stores/auth";
@@ -29,7 +30,7 @@ export function CallBanner({ channelId }: { channelId: string }) {
           <span className={s.bannerHead}>{t("voice.callBanner.callInProgress")}</span>
           <CallTimer channelId={channelId} pill />
         </span>
-        <span className={s.bannerSub}>{participants.map((p) => displayName(users[p.user_id])).join(", ")}</span>
+        <span className={s.bannerSub}>{participants.map((p, i) => <span key={p.user_id}>{i > 0 ? ", " : ""}<PersonName userId={p.user_id}>{displayName(users[p.user_id])}</PersonName></span>)}</span>
       </div>
       <button className={s.bannerJoin} onClick={() => void joinVoice(channelId)} disabled={joining === channelId}>
         <Phone size={14} style={{ verticalAlign: -2, marginInlineEnd: 6 }} />

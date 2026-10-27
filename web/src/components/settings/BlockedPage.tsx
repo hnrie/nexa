@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMemo, useState } from "react";
 import type { Relationship } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
@@ -96,7 +97,7 @@ function BlockedRow({ rel }: { rel: Relationship }) {
       <button type="button" className={b.who} onClick={() => useUI.getState().openModal("profile", { userId: user.id })} aria-haspopup="dialog">
         <Avatar id={user.id} avatarId={user.avatar_id} name={name} size={32} />
         <span className={b.names}>
-          <span className={b.name} dir="auto">{name}</span>
+          <PersonName user={user} className={b.name} dir="auto">{name}</PersonName>
           <span className={b.username}>{user.username}</span>
         </span>
       </button>

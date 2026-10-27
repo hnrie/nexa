@@ -526,7 +526,7 @@ fun FieldValue(text: String, empty: Boolean = false, maxLines: Int = 2) {
 
 /** `.serverRow`: a server, a pack, a case or a person as a row that opens it. */
 @Composable
-fun OpenRow(name: String, meta: String?, onClick: () -> Unit, trailing: String? = null, leading: @Composable () -> Unit) {
+fun OpenRow(name: String, meta: String?, onClick: () -> Unit, trailing: String? = null, personId: String? = null, leading: @Composable () -> Unit) {
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -543,7 +543,7 @@ fun OpenRow(name: String, meta: String?, onClick: () -> Unit, trailing: String? 
     ) {
         leading()
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1)
+            fish.nexa.ui.chat.PersonName(personId, name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1)
             if (!meta.isNullOrEmpty()) Txt(meta, style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted, maxLines = 1)
         }
         if (trailing != null) Txt(trailing, style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted, maxLines = 1)
@@ -592,7 +592,7 @@ fun ServerIcon(id: String, iconId: String?, name: String, size: Dp) {
 
 /** `.userHeader`: who or what a page is about, with a way back and what can be done. */
 @Composable
-fun PageHead(back: String, onBack: () -> Unit, leading: @Composable () -> Unit, title: String, sub: String?, badge: (@Composable () -> Unit)? = null, below: (@Composable () -> Unit)? = null, actions: (@Composable RowScope.() -> Unit)? = null) {
+fun PageHead(back: String, onBack: () -> Unit, leading: @Composable () -> Unit, title: String, sub: String?, badge: (@Composable () -> Unit)? = null, below: (@Composable () -> Unit)? = null, actions: (@Composable RowScope.() -> Unit)? = null, titlePersonId: String? = null) {
     val c = Nx.colors
     Column(
         Modifier
@@ -608,7 +608,7 @@ fun PageHead(back: String, onBack: () -> Unit, leading: @Composable () -> Unit, 
             leading()
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Txt(title, style = Nx.type.name.copy(fontSize = Nx.type.sp(20f), lineHeight = Nx.type.sp(25f), fontWeight = FontWeight(690)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                    fish.nexa.ui.chat.PersonName(titlePersonId, title, style = Nx.type.name.copy(fontSize = Nx.type.sp(20f), lineHeight = Nx.type.sp(25f), fontWeight = FontWeight(690)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     badge?.invoke()
                 }
                 if (!sub.isNullOrEmpty()) Txt(sub, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), lineHeight = Nx.type.sp(18f)), color = c.textMuted)
@@ -726,7 +726,7 @@ const val MAX_REASON = 1000
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ReasonSection(reason: String, onChange: (String) -> Unit, placeholder: String, visible: String, quick: List<String>) {
+fun ReasonSection(reason: String, onChange: (String) -> Unit, placeholder: String, visible: String, quick: List<String>, personId: String? = null, personName: String = "") {
     val c = Nx.colors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionLabel(t("moderation.form.reason"))
@@ -749,7 +749,7 @@ fun ReasonSection(reason: String, onChange: (String) -> Unit, placeholder: Strin
         val length = reason.codePointCount(0, reason.length)
         val trimmed = reason.trim()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Txt(visible, style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted, modifier = Modifier.weight(1f))
+            fish.nexa.ui.chat.PersonText(personId, visible, personName, style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted, modifier = Modifier.weight(1f))
             // Submit waits for three characters, and says so
             if (trimmed.codePointCount(0, trimmed.length) < 3) Txt(t("moderation.form.reasonTooShort", "min" to 3), style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f)), color = c.textWarning)
             else Txt("$length/$MAX_REASON", style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f), fontFeatureSettings = "tnum"), color = if (length > MAX_REASON) c.textDanger else c.textMuted)

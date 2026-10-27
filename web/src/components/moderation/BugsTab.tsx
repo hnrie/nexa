@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Bug, ChevronDown, ChevronLeft, CircleCheck, Inbox, Paperclip, RotateCcw, UserRound } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -20,7 +21,7 @@ import { formatRelative } from "@/lib/time";
 import { parse, plainText } from "@/markdown";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { useUI } from "@/stores/ui";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { button, defineMenu } from "@/lib/contextMenus/registry";
 
 /** A bug report's status, set by the staff. */
@@ -56,12 +57,12 @@ function order(sort: BugSort): (a: StaffBug, z: StaffBug) => number {
 }
 
 /** The newest line of a report's thread, as the list previews it. */
-function preview(r: StaffBug, people: People): string {
+function preview(r: StaffBug, people: People): React.ReactNode {
   const last = r.last_message;
   if (!last) return plainText(parse(r.description));
   if (last.kind === "system") return systemLineText(last, people, undefined, "staff");
   const who = personName(people[last.author_id]) || r.reporter_display_name;
-  return `${who}: ${plainText(parse(last.body))}`;
+  return <><PersonName userId={last.author_id} user={people[last.author_id]}>{who}</PersonName>: {plainText(parse(last.body))}</>;
 }
 
 /**
@@ -262,7 +263,7 @@ function BugRow({ r, people, selected, onPick }: { r: StaffBug; people: People; 
       </button>
       <span className={b.rowWho}>
         <button type="button" className={b.reporter} onClick={openProfile} disabled={gone} dir="auto" title={t("nexa.viewProfile")}>
-          {name}
+          <PersonName userId={gone ? null : r.user_id} user={gone ? null : who}>{name}</PersonName>
         </button>
         {r.awaiting === "staff" ? (
           <span className={m.tag} data-tone="danger">
@@ -396,7 +397,7 @@ function StaffBugPane({ reportId, onBack, onChanged }: { reportId: string; onBac
           )}
           {!gone ? (
             <Button size="sm" variant="ghost" onClick={() => nav(`/channels/@admin/users/${r.user_id}`)} title={t("bugs.staff.openMember")} aria-label={t("moderation.case.openPerson", { name: personName(reporter) })}>
-              <UserRound size={15} aria-hidden="true" /> <span className={m.btnLabel}>{personName(reporter)}</span>
+              <UserRound size={15} aria-hidden="true" /> <PersonName userId={r.user_id} user={reporter} className={m.btnLabel}>{personName(reporter)}</PersonName>
             </Button>
           ) : null}
         </span>
@@ -408,7 +409,7 @@ function StaffBugPane({ reportId, onBack, onChanged }: { reportId: string; onBac
         fileKind="bugs"
         intro={
           <ThreadIntro avatar={<Avatar id={r.user_id} avatarId={reporter?.avatar_id ?? null} name={personName(reporter) || r.reporter_display_name} size={80} />} title={t("bugs.page.title", { number: bugNumber(r.number) })} sub={r.subject}>
-            {t("moderation.chat.reportStart", { name: personName(reporter) || r.reporter_display_name || r.reporter_username })}
+            {<Tr id="moderation.chat.reportStart" values={{ name: <PersonName userId={r.user_id} user={reporter}>{personName(reporter) || r.reporter_display_name || r.reporter_username}</PersonName> }} />}
           </ThreadIntro>
         }
         opener={{ from: r.user_id, at: r.created_at, body: <ReportOpener report={r} /> }}
@@ -422,7 +423,7 @@ function StaffBugPane({ reportId, onBack, onChanged }: { reportId: string; onBac
         }
         upload={staffBugs.upload}
         placeholder={t("bugs.thread.staffPlaceholder")}
-        note={gone || finished ? undefined : t("moderation.case.replyNote", { name: personName(reporter) })}
+        note={gone || finished ? undefined : <Tr id="moderation.case.replyNote" values={{ name: <PersonName userId={r.user_id} user={reporter}>{personName(reporter)}</PersonName> }} />}
         dropName={t("bugs.page.title", { number: bugNumber(r.number) })}
         onSeen={(lastId) => useModeration.getState().readThread("bug", reportId, lastId)}
         locked={

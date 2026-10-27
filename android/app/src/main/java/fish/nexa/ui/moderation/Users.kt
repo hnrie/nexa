@@ -310,14 +310,14 @@ fun userMenu(u: ModUser, onChanged: () -> Unit) {
         // disabling sign-in takes a developer, and the owner for staff
         if (mine.atLeast(if (u.isStaff) StaffRank.OWNER else StaffRank.DEVELOPER)) items += MenuItem.Action(if (disabled) t("moderation.menu.enable") else t("moderation.menu.disable"), danger = !disabled) {
             if (disabled) set(disabledTo = false)
-            else confirm(t("moderation.menu.disableTitle", "name" to u.displayName), t("moderation.menu.disableBody"), t("moderation.menu.disable")) {
+            else confirm(t("moderation.menu.disableTitle", "name" to u.displayName), t("moderation.menu.disableBody"), t("moderation.menu.disable"), titleWords = fish.nexa.ui.chat.PersonWords(t("moderation.menu.disableTitle", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(u.id to u.displayName))) {
                 Moderation.access(u.id, disabled = true)
                 onChanged()
                 Nexa.ui.toast(t("moderation.accessChanged"), "success")
             }
         }
     }
-    openMenu(items, title = u.displayName)
+    openMenu(items, title = u.displayName, titleWords = fish.nexa.ui.chat.PersonWords(fish.nexa.ui.chat.PERSON_SLOT, listOf(u.id to u.displayName)))
 }
 
 /** `.card`: an account, from its banner to what can be done about it. */
@@ -339,7 +339,7 @@ private fun UserCard(u: ModUser, picking: Boolean, picked: Boolean, onPick: (() 
             CardBanner(u.bannerId, profileBrush(u.accentColor, u.accentColor2, u.id), 88.dp)
             Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 44.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Txt(u.displayName, style = Nx.type.name.copy(fontSize = Nx.type.sp(17.5f), fontWeight = FontWeight(690)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                    fish.nexa.ui.chat.PersonName(u.id, u.displayName, style = Nx.type.name.copy(fontSize = Nx.type.sp(17.5f), fontWeight = FontWeight(690)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     RankBadge(u.id, u.adminFlags)
                     if (u.awaitingCases > 0) AwaitingDot(t("moderation.awaitingTip", "count" to u.awaitingCases))
                 }

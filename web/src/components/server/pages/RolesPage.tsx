@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Plus, SmilePlus, Trash2 } from "lucide-react";
 import { ColourInput } from "@/components/common/ColourInput";
 import { useEffect, useId, useMemo, useRef, useState, type DragEvent } from "react";
@@ -445,7 +446,7 @@ function MembersTab({ role, serverId, editable }: { role: Role; serverId: string
         <div key={m.user_id} className={s.memberRow}>
           <Avatar id={m.user_id} avatarId={m.avatar_id ?? users[m.user_id]?.avatar_id ?? null} name={name} size={32} />
           <div className={s.memberText}>
-            <span className={s.memberName}>{name}</span>
+            <PersonName userId={m.user_id} serverId={serverId} className={s.memberName}>{name}</PersonName>
             <span className={s.memberSub}><bdi>@{username}</bdi></span>
           </div>
           <Button size="sm" variant={has ? "secondary" : "primary"} disabled={!editable || busy === m.user_id} onClick={() => void toggle(m.user_id, !has)}>{has ? t("server.packEditor.remove") : t("server.roles.addMember")}</Button>

@@ -1,3 +1,5 @@
+import { personText, personError } from "@/lib/personText";
+import { PersonName } from "@/components/common/PersonName";
 import { Check, ChevronDown, Copy, KeyRound, Link2, Plus, Trash2, UserPlus } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -19,7 +21,7 @@ import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { noteLinkRoleMenu, noteMemberRoleMenu } from "./noteMenu";
 import { displayName, useUsers } from "@/stores/users";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { noteName } from "./NoteParts";
 import s from "./Notes.module.css";
 
@@ -169,10 +171,10 @@ function InvitePeople({ noteId, sharing, onDone }: { noteId: string; sharing: No
     try {
       await inviteToNote(noteId, u, role);
       setSent((list) => [...list, u.id]);
-      toast(t("notes.share.invited", { name: displayName(u) }), "success");
+      toast(personText("notes.share.invited", u.id, displayName(u)), "success");
       onDone();
     } catch (err) {
-      toast(noteError(err, t("notes.share.couldNotInvite", { name: displayName(u) })), "error");
+      toast(personError(noteError(err, t("notes.share.couldNotInvite", { name: displayName(u) })), t("notes.share.couldNotInvite", { name: displayName(u) }), personText("notes.share.couldNotInvite", u.id, displayName(u))), "error");
     } finally {
       setBusy(null);
     }
@@ -202,7 +204,7 @@ function InvitePeople({ noteId, sharing, onDone }: { noteId: string; sharing: No
               <li key={u.id} className={s.person} data-testid="note-invite-row" data-user={u.username}>
                 <Avatar id={u.id} avatarId={u.avatar_id ?? null} name={name} size={32} />
                 <span className={s.personText}>
-                  <span className={s.personName} dir="auto">{name}</span>
+                  <PersonName user={u} className={s.personName} dir="auto">{name}</PersonName>
                   <span className={s.personUser}>{u.username}</span>
                 </span>
                 <Button size="sm" variant={done ? "secondary" : "primary"} disabled={done} loading={busy === u.id} onClick={() => void invite(u)} aria-label={done ? t("notes.share.invitedShort") : t("notes.share.inviteNamed", { name })}>
@@ -256,9 +258,7 @@ function PeopleWithAccess({ noteId, sharing, owner, meId, onDone }: { noteId: st
             <li key={m.user.id} className={s.person} data-testid="note-member" data-user={m.user.username}>
               <Avatar id={m.user.id} avatarId={m.user.avatar_id ?? null} name={name} size={32} />
               <span className={s.personText}>
-                <span className={s.personName} dir="auto">
-                  {mine ? t("notes.share.you", { name }) : name}
-                </span>
+                <span className={s.personName} dir="auto">{mine ? <Tr id="notes.share.you" values={{ name: <PersonName user={m.user}>{name}</PersonName> }} /> : <PersonName user={m.user}>{name}</PersonName>}</span>
                 <span className={s.personUser}>{m.user.username}</span>
               </span>
               {owner && m.role !== NOTE_OWNER ? (
@@ -293,7 +293,7 @@ function PeopleWithAccess({ noteId, sharing, owner, meId, onDone }: { noteId: st
             <li key={inv.id} className={s.person} data-waiting="" data-testid="note-invited" data-user={inv.user.username}>
               <Avatar id={inv.user.id} avatarId={inv.user.avatar_id ?? null} name={name} size={32} />
               <span className={s.personText}>
-                <span className={s.personName} dir="auto">{name}</span>
+                <PersonName user={inv.user} className={s.personName} dir="auto">{name}</PersonName>
                 <span className={s.personUser}>{t("notes.share.waiting", { role: roleName(inv.role) })}</span>
               </span>
               {owner ? (

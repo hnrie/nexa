@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { ArrowDown, ChevronUp, CircleCheck, CircleDot, CirclePlus, Clock, FileIcon, History, Lock, LockOpen, RotateCcw, SendHorizontal, ShieldAlert, Smile, Trash2, Type, type LucideIcon } from "lucide-react";
 import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import type { UploadOptions } from "@/api/client";
@@ -292,7 +293,7 @@ function Row({ m, people, perspective, grouped, fileKind }: { m: ThreadLine; peo
           </button>
           <div className={chat.headerRow}>
             <button type="button" className={chat.author} onClick={(e) => profile(e)} dir="auto">
-              {name}
+              {asNexa ? name : <PersonName userId={person?.deleted ? null : m.author_id} user={person?.deleted ? null : person}>{name}</PersonName>}
             </button>
             {asNexa ? (
               <>
@@ -300,7 +301,7 @@ function Row({ m, people, perspective, grouped, fileKind }: { m: ThreadLine; peo
                 <span className={s.staffCredit}>
                   {t("nexa.thread.sentBy")}{" "}
                   <button type="button" className={s.inlineLink} onClick={(e) => profile(e, m.author_id)}>
-                    {personName(person)}
+                    <PersonName userId={person?.deleted ? null : m.author_id} user={person?.deleted ? null : person}>{personName(person)}</PersonName>
                   </button>
                 </span>
               </>

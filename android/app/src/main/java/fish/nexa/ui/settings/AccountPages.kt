@@ -146,7 +146,7 @@ private fun AccountCard(me: MeUser, status: String, modifier: Modifier, editProf
                     .padding(6.dp),
             ) { Avatar(me.id, me.name, me.avatarId, 80.dp, status = status) }
             Column(Modifier.weight(1f).padding(bottom = 2.dp)) {
-                Txt(me.name, style = Nx.type.heading.copy(fontSize = Nx.type.sp(18f), fontWeight = FontWeight(700)), color = c.textStrong, maxLines = 1)
+                fish.nexa.ui.chat.PersonName(me.id, me.name, nameStyle = me.nameStyle, style = Nx.type.heading.copy(fontSize = Nx.type.sp(18f), fontWeight = FontWeight(700)), color = c.textStrong, maxLines = 1)
                 Txt(me.username, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, maxLines = 1)
             }
         }
@@ -161,7 +161,7 @@ private fun AccountCard(me: MeUser, status: String, modifier: Modifier, editProf
                 .ring(Radii.Md, c.borderSubtle)
                 .padding(horizontal = 14.dp, vertical = 4.dp),
         ) {
-            FieldRow(t("settings.account.displayName"), me.displayName.ifEmpty { me.username }, Modifier.padding(vertical = 10.dp)) {
+            FieldRow(t("settings.account.displayName"), me.displayName.ifEmpty { me.username }, Modifier.padding(vertical = 10.dp), personId = me.id) {
                 NxButton(t("pickers.stickerPicker.edit"), { openNameSheet(username = false) }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM)
             }
             Box(Modifier.fillMaxWidth().size(1.dp).background(c.borderSubtle))

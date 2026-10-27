@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { FileUp, LockOpen, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { apps as appsApi, type CommandApp, type CommandChoice, type CommandOption, type InteractionFile } from "@/api/apps";
@@ -527,7 +528,7 @@ export function useCommandMode(channel: Channel, opts: { onLeave: (text: string)
               </button>
             ) : picked !== undefined ? (
               <span className={s.slotValue}>
-                <span dir="auto">{picked}</span>
+                <span dir="auto">{o.type === OPT_USER && slot.value ? <PersonName userId={String(slot.value)} serverId={channel.server_id}>{picked}</PersonName> : picked}</span>
                 <input
                   ref={(el) => {
                     if (el) inputs.current[i] = el;
@@ -621,7 +622,7 @@ export function useCommandMode(channel: Channel, opts: { onLeave: (text: string)
   ) : null;
   const list: ReactNode = mode ? (
     ac ? (
-      <Autocomplete docked kind="command" items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={(i) => { const it = ac.items[i]; if (it) pick(mode.focus, it); }} tone={opts.tone} heading={focused ? `${optionName(focused.opt)}: ${optionDescription(focused.opt)}` : undefined} />
+      <Autocomplete serverId={channel.server_id} docked kind="command" items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={(i) => { const it = ac.items[i]; if (it) pick(mode.focus, it); }} tone={opts.tone} heading={focused ? `${optionName(focused.opt)}: ${optionDescription(focused.opt)}` : undefined} />
     ) : (
       <div className={[s.cmdBar, s.docked].join(" ")} data-invalid={focused?.error ? true : undefined}>
         {hint}

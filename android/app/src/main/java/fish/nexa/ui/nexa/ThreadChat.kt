@@ -165,8 +165,8 @@ fun rememberPerson(id: String): NexaPerson? {
 }
 
 /** What a system line says happened (systemLineText); a staff member reopening says who, a member writing does not. */
-fun systemLineText(line: ThreadLine, action: String?, staff: Boolean): String {
-    val who = personName(threadPerson(line.authorId))
+fun systemLineText(line: ThreadLine, action: String?, staff: Boolean, whoName: String? = null): String {
+    val who = whoName ?: personName(threadPerson(line.authorId))
     val what = if (action == "ban") t("nexa.thread.theBan") else t("nexa.thread.theMute")
     return when (line.event) {
         "status" -> t("bugs.thread.statusChanged", "who" to who, "status" to bugStatusLabel(line.body))
@@ -365,7 +365,7 @@ private fun OpenerRow(opener: ThreadOpener) {
         RowAvatar(open) { if (nexa) NexaAvatar(40.dp) else Avatar(opener.from, name, person?.avatarId, 40.dp) }
         Column(Modifier.fillMaxWidth().padding(start = 64.dp, end = 16.dp, top = 2.dp, bottom = 2.dp)) {
             Row(Modifier.heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false).then(if (open != null) Modifier.pressable(remember { MutableInteractionSource() }, onClick = open) else Modifier))
+                fish.nexa.ui.chat.PersonName(opener.from.takeIf { !nexa && person?.deleted != true }, name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false).then(if (open != null) Modifier.pressable(remember { MutableInteractionSource() }, onClick = open) else Modifier))
                 if (nexa) OfficialBadge(compact = true)
                 LineTime(opener.at)
             }
@@ -401,7 +401,7 @@ private fun LineRow(m: ThreadLine, grouped: Boolean, staffView: Boolean, fileKin
         }
         Column(Modifier.fillMaxWidth().padding(start = 64.dp, end = 16.dp, top = 2.dp, bottom = 2.dp).heightIn(min = 22.dp)) {
             if (!grouped) Row(Modifier.heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false).then(if (openShown != null) Modifier.pressable(remember { MutableInteractionSource() }, onClick = openShown) else Modifier))
+                fish.nexa.ui.chat.PersonName(m.authorId.takeIf { !asNexa && person?.deleted != true }, name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false).then(if (openShown != null) Modifier.pressable(remember { MutableInteractionSource() }, onClick = openShown) else Modifier))
                 if (asNexa) {
                     OfficialBadge(compact = true)
                     Txt(
@@ -437,17 +437,21 @@ private fun SystemLine(line: ThreadLine, action: String?, staff: Boolean) {
         line.event == "status" && line.body == "open" -> c.textBrand
         else -> c.textMuted
     }
-    rememberPerson(line.authorId)
-    val full = buildAnnotatedString {
-        append(systemLineText(line, action, staff))
-        withStyle(SpanStyle(fontSize = Nx.type.sp(12f), color = c.textMuted)) { append("  " + Time.timestamp(line.createdAt)) }
-    }
+    val person = rememberPerson(line.authorId)
     Box(Modifier.fillMaxWidth().padding(top = 17.dp).heightIn(min = 26.dp).padding(start = 64.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)) {
         Icon(systemIcon(line.event), tint, size = 18.dp, modifier = Modifier.padding(top = 2.dp).layout { measurable, constraints ->
             val p = measurable.measure(constraints)
             layout(0, p.height) { p.placeRelative((-40 * density).toInt(), 0) }
         })
-        BasicText(full, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(22f), color = c.textMuted))
+        fish.nexa.ui.chat.PersonLine(Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(22f)), c.textMuted) { names ->
+            buildAnnotatedString {
+                systemLineText(line, action, staff, fish.nexa.ui.chat.PERSON_SLOT).split(fish.nexa.ui.chat.PERSON_SLOT).forEachIndexed { i, part ->
+                    if (i > 0) names.append(this, line.authorId.takeIf { person?.deleted != true }, personName(person))
+                    append(part)
+                }
+                withStyle(SpanStyle(fontSize = Nx.type.sp(12f), color = c.textMuted)) { append("  " + Time.timestamp(line.createdAt)) }
+            }
+        }
     }
 }
 

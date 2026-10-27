@@ -1,3 +1,5 @@
+import { personText, personError } from "@/lib/personText";
+import { PersonName } from "@/components/common/PersonName";
 import { Check } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
@@ -31,9 +33,9 @@ export function GroupFriendAdder({ channelId, joinLink }: { channelId: string; j
   const [q, setQ] = useState("");
   const [added, setAdded] = useState<string[]>([]);
   const [busy, setBusy] = useState<string[]>([]);
-  const [said, setSaid] = useState<{ n: number; text: string } | null>(null);
-  const say = (text: string) => setSaid((cur) => ({ n: (cur?.n ?? 0) + 1, text }));
-  const requests = useJoinRequests(channelId, joinLink, (name) => say(t("groupAdd.joinRequest.sentTo", { name })));
+  const [said, setSaid] = useState<{ n: number; text: React.ReactNode } | null>(null);
+  const say = (text: React.ReactNode) => setSaid((cur) => ({ n: (cur?.n ?? 0) + 1, text }));
+  const requests = useJoinRequests(channelId, joinLink, (name, id) => say(personText("groupAdd.joinRequest.sentTo", id, name)));
   // whoever was sent the link and has joined with it since stays too, marked Sent
   const kept = useMemo(() => [...added, ...requests.sent], [added, requests.sent]);
   const memberIds = useMemo(() => (members ?? []).filter((id) => !kept.includes(id)), [members, kept]);
@@ -47,9 +49,9 @@ export function GroupFriendAdder({ channelId, joinLink }: { channelId: string; j
     try {
       await addFriendToGroup(channelId, id);
       setAdded((a) => [...a, id]);
-      say(t("modals.groupInvite.nowInGroup", { name }));
+      say(personText("modals.groupInvite.nowInGroup", id, name));
     } catch (err) {
-      toast(dmOpenError(err, t("modals.groupInvite.couldNotAddName", { name })), "error");
+      toast(personError(dmOpenError(err, t("modals.groupInvite.couldNotAddName", { name })), t("modals.groupInvite.couldNotAddName", { name }), personText("modals.groupInvite.couldNotAddName", id, name)), "error");
     } finally {
       setBusy((b) => b.filter((x) => x !== id));
     }
@@ -73,9 +75,9 @@ export function GroupFriendAdder({ channelId, joinLink }: { channelId: string; j
               <li key={id} className={s.row} data-testid="group-add-row" data-user={c.user.username}>
                 <Avatar id={id} avatarId={c.user.avatar_id} name={name} size={32} />
                 <span className={s.text}>
-                  <span className={s.name} dir="auto">
+                  <PersonName user={c.user} className={s.name} dir="auto">
                     {name}
-                  </span>
+                  </PersonName>
                   <span className={s.user}>{c.user.username}</span>
                 </span>
                 {(c.linkOnly || requests.stateOf(id) === "sent") && !done ? (

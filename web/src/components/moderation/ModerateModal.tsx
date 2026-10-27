@@ -1,3 +1,5 @@
+import { personText } from "@/lib/personText";
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { ArrowLeft, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -21,7 +23,7 @@ import { widgetTitle } from "@/components/profile/Widgets";
 import { formatBytes } from "@/lib/time";
 import { usePresence } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { modStatus } from "./ModStatus";
 import { atLeast, MOD_MAX_MS, useMyRank, type StaffRank } from "@/lib/staffRank";
 import m from "./Moderation.module.css";
@@ -297,7 +299,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers,
     if (action === "delete") body.confirm = user.username;
     try {
       const r = await modApi.act(user.id, body);
-      toast(t("moderation.done", { number: r.case.number, name: user.display_name }), "success");
+      toast(personText("moderation.done", user.id, user.display_name, { number: r.case.number }), "success");
       onDone(r.case);
       onClose();
     } catch (err) {
@@ -326,7 +328,7 @@ export function ModerateModal({ user, onClose, onDone, initial, preset, servers,
             <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={40} status={presence.status} />
           )}
           <div style={{ minWidth: 0 }}>
-            <h2 className={m.modalTitle}>{action ? actionTitle(action) : many ? t("moderation.bulk.title", { count: many.length }) : t("moderation.moderateNamed", { name: user.display_name })}</h2>
+            <h2 className={m.modalTitle}>{action ? actionTitle(action) : many ? t("moderation.bulk.title", { count: many.length }) : <Tr id="moderation.moderateNamed" values={{ name: <PersonName user={user}>{user.display_name}</PersonName> }} />}</h2>
             {many ? (
               <div className={m.modalTarget}>
                 <span className={m.bulkNames}>{many.map((u) => `@${u.username}`).join(", ")}</span>

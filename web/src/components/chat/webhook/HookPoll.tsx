@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Check } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -225,7 +226,7 @@ function Voters({ channelId, messageId, answer, anchor, onClose }: { channelId: 
         ids.map((id) => (
           <div key={id} className={s.voter}>
             <Avatar id={id} avatarId={users[id]?.avatar_id ?? null} name={displayName(users[id])} size={24} />
-            <span dir="auto">{displayName(users[id])}</span>
+            <PersonName userId={id} dir="auto">{displayName(users[id])}</PersonName>
           </div>
         ))
       )}

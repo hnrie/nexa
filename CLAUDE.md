@@ -1309,8 +1309,18 @@ This is a public website feature, with no corresponding native Android screen.
   look carries the person's own style as `own` (`useMemberLook` adds it, `withOwn` for lists): in a
   server a role's colour still colours the name and only the font stays. Settings, Profiles edits it
   with `components/settings/NameStyleEditor.tsx`, saved with the profile; the
-  staff can reset it (field `name_style`). DM sidebar names, headers and conversation introductions,
-  and group member panes, use the same renderer and observe profile updates on both clients. Android: `data/NameStyle`, `ui/chat/RoleLook.kt`
+  staff can reset it (field `name_style`). Identity labels use
+  `components/common/PersonName.tsx` on web and `PersonName` in Android's
+  `ui/chat/RoleLook.kt`: preserve the caller's nickname/text, observe live user styles and the
+  current account's profile, and fetch missing profiles when a list only supplies IDs. A canonical
+  null style overrides stale list snapshots. Saved web accounts retain their style too. Use these
+  for friends, the account panel, pickers, voice, notes, moderation and other identity labels;
+  translated prose takes web `<Tr>`/`lib/personText.tsx` name nodes or Android
+  `PersonText`/`PersonInlines`/`PersonWords`, so only
+  the identity fragment receives the effect. Mentions and collaborative cursor labels use the same
+  renderer. Inline mentions are bounded by the available line width and ellipsize long names.
+  The font class outranks local row/heading typography. Server role colours override personal
+  effects while retaining the chosen font. Android: `data/NameStyle`, `ui/chat/RoleLook.kt`
   (`RoleName`, `OwnName`), `ui/chat/NameFonts.kt` and `ui/settings/NameStyleSheet.kt`.
   Android Ink uses the web’s 0.04em outline radius, and Pop keeps the web’s dark edge on light themes. The debug-only `NameStyleAuditActivity` draws every face at 14/16/28sp (`page` 0, 1 or 2), or every effect (`effects=true`), in `theme` dark/light, for screenshot comparisons.
 - The profile designer (Settings, Profiles, `components/settings/ProfilePage.tsx`): every part of the

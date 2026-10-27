@@ -1,3 +1,5 @@
+import { personText } from "@/lib/personText";
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -341,7 +343,7 @@ function GiftsGot() {
         {gifts.map((g) => (
           <li key={`${g.from_id}-${g.starts_at}`} className={s.boost} data-plan={g.plan}>
             <span className={s.giftIcon} aria-hidden="true"><Gift size={16} /></span>
-            <span className={s.boostName}>{t("support.gift.from", { plan: planName(g.plan), name: g.from_name })}</span>
+            <span className={s.boostName}>{personText("support.gift.from", g.from_id, g.from_name, { plan: planName(g.plan) })}</span>
             <span className={s.meterText}>{t("support.gift.until", { date: formatShortDate(g.ends_at) })}</span>
           </li>
         ))}
@@ -373,7 +375,7 @@ function GiftLinksMade() {
             <span className={s.giftIcon} aria-hidden="true">{l.claimed ? <Check size={16} /> : <Link2 size={16} />}</span>
             <span className={s.names}>
               <span className={s.boostName}>{giftTitle(l.plan, l.days)}</span>
-              <span className={s.giftState}>{l.claimed ? t("support.giftLink.claimedBy", { name: l.claimed_name || t("support.giftLink.someone") }) : t("support.giftLink.waiting")}</span>
+              <span className={s.giftState}>{l.claimed ? personText("support.giftLink.claimedBy", l.claimed_by, l.claimed_name || t("support.giftLink.someone")) : t("support.giftLink.waiting")}</span>
             </span>
             {l.claimed ? null : (
               <Button variant="secondary" size="sm" onClick={() => void copyText(giftLinkUrl(l.code), t("support.giftLink.copied"))} data-testid="gift-link-copy">
@@ -462,7 +464,7 @@ function GiveAPlan() {
         <div className={s.giftTo}>
           <Avatar id={picked.id} avatarId={picked.avatar_id} name={displayName(picked)} size={32} />
           <span className={s.names}>
-            <span className={s.boostName}>{displayName(picked)}</span>
+            <PersonName user={picked} className={s.boostName}>{displayName(picked)}</PersonName>
             <span className={s.meterText}>@{picked.username}</span>
           </span>
           <Button variant="ghost" size="sm" onClick={() => setTo(null)}>{t("support.gift.change")}</Button>
@@ -475,7 +477,7 @@ function GiveAPlan() {
             {found.map((u) => (
               <button key={u.id} role="radio" aria-checked={false} className={s.person} onClick={() => setTo(u.id)} data-testid={`gift-to-${u.username}`}>
                 <Avatar id={u.id} avatarId={u.avatar_id} name={displayName(u)} size={28} />
-                <span className={s.boostName}>{displayName(u)}</span>
+                <PersonName user={u} className={s.boostName}>{displayName(u)}</PersonName>
               </button>
             ))}
           </div>

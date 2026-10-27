@@ -1,3 +1,5 @@
+import { personNode } from "@/lib/personText";
+import { PersonName } from "@/components/common/PersonName";
 import { HeadphoneOff, Megaphone, MicOff, MonitorUp, Video } from "lucide-react";
 import type { KeyboardEvent, MouseEvent } from "react";
 import { Avatar } from "@/components/common/Avatar";
@@ -67,11 +69,11 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
             }}
             onContextMenu={(e) => {
               e.preventDefault();
-              callParticipantMenu.open({ serverId, channelId, vs: p, openModal }, { x: e.clientX, y: e.clientY, label: name });
+              callParticipantMenu.open({ serverId, channelId, vs: p, openModal }, { x: e.clientX, y: e.clientY, label: name, labelNode: personNode(p.user_id, name, serverId) });
             }}
           >
             <Avatar id={p.user_id} avatarId={users[p.user_id]?.avatar_id ?? null} name={name} size={24} className={s.pAvatar} />
-            <span className={s.pName}>{name}</span>
+            <PersonName userId={p.user_id} serverId={serverId} className={s.pName}>{name}</PersonName>
             {guest ? <span className={s.pGuest}>{t("voice.voiceParticipants.guest")}</span> : <UserTag userId={p.user_id} size="sm" />}
             <span className={s.pIcons}>
               {p.priority_speaker ? <Megaphone size={14} aria-label={t("perms.prioritySpeaker")} data-testid="priority-speaker" /> : null}

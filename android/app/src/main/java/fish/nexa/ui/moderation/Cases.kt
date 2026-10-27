@@ -79,10 +79,10 @@ private fun inView(c: StaffCase, view: String) = when (view) {
 private val byActivity = Comparator<StaffCase> { a, b -> if (b.lastActivityAt != a.lastActivityAt) b.lastActivityAt.compareTo(a.lastActivityAt) else Ids.compare(b.id, a.id) }
 
 /** One line of the thread as a preview in a list: plain words, whatever formatting it had. */
-private fun preview(c: StaffCase): String {
+private fun preview(c: StaffCase, whoName: String? = null): String {
     val last = c.lastMessage ?: return previewText(c.reason)
-    if (last.kind == "system") return systemLineText(last.line(), c.action, staff = true)
-    val who = nameOf(fish.nexa.data.NexaInbox.people.value[last.authorId]).takeIf { fish.nexa.data.NexaInbox.people.value[last.authorId] != null } ?: c.targetDisplayName
+    if (last.kind == "system") return systemLineText(last.line(), c.action, staff = true, whoName = whoName)
+    val who = whoName ?: nameOf(fish.nexa.data.NexaInbox.people.value[last.authorId]).takeIf { fish.nexa.data.NexaInbox.people.value[last.authorId] != null } ?: c.targetDisplayName
     return "$who: " + previewText(last.body, last.files.size)
 }
 
@@ -113,8 +113,8 @@ private fun CaseRow(cs: StaffCase, selected: Boolean, showTarget: Boolean, onCli
         else CaseIcon(cs.action)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Txt(
-                    if (showTarget) (target?.let { nameOf(it) } ?: cs.targetDisplayName) else caseTitle(cs),
+                fish.nexa.ui.chat.PersonName(
+                    cs.userId.takeIf { showTarget && target?.deleted != true }, if (showTarget) (target?.let { nameOf(it) } ?: cs.targetDisplayName) else caseTitle(cs),
                     style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(if (fresh) 750 else 600)), color = c.textStrong, maxLines = 1,
                     modifier = Modifier.weight(1f),
                 )
@@ -122,7 +122,7 @@ private fun CaseRow(cs: StaffCase, selected: Boolean, showTarget: Boolean, onCli
                 Txt(Time.relative(cs.lastActivityAt), style = Nx.type.hint, color = c.textMuted, maxLines = 1)
             }
             if (showTarget) Txt(caseTitle(cs), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
-            Txt(preview(cs), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textSubtle, maxLines = 1)
+            fish.nexa.ui.chat.PersonText(cs.lastMessage?.authorId, preview(cs, fish.nexa.ui.chat.PERSON_SLOT), cs.lastMessage?.authorId?.let { fish.nexa.ui.nexa.personName(fish.nexa.ui.nexa.threadPerson(it)) } ?: "", style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textSubtle, maxLines = 1)
             FlowRow(Modifier.padding(top = 3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (cs.status == "open" && cs.awaiting == "staff") Tag(t("moderation.case.needsReply"), "danger")
                 caseStanding(cs.asMember())?.let { (label, tone) -> Tag(label, tone) }
@@ -369,7 +369,7 @@ fun StaffCasePane(caseId: String, showMember: Boolean, onBack: () -> Unit, onCha
                 }))
             }),
             note = {
-                Txt(t("moderation.case.replyNote", "name" to nameOf(target)), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(17.5f)), color = c.textMuted)
+                fish.nexa.ui.chat.PersonText(cs.userId, t("moderation.case.replyNote", "name" to fish.nexa.ui.chat.PERSON_SLOT), nameOf(target), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(17.5f)), color = c.textMuted)
             },
             onSeen = { last -> Moderation.readThread("case", caseId, last) },
         )

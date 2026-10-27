@@ -507,6 +507,7 @@ internal fun CustomStatusSheet(layer: Layer, close: () -> Unit) {
                 text, { text = it.take(128) },
                 modifier = Modifier.weight(1f),
                 label = t("modals.customStatus.whatSCookin", "name" to (me?.displayName ?: "")),
+                labelContent = { fish.nexa.ui.chat.PersonText(me?.id, t("modals.customStatus.whatSCookin", "name" to fish.nexa.ui.chat.PERSON_SLOT), me?.displayName ?: "", Nx.type.label, c.textSubtle) },
                 placeholder = t("modals.customStatus.supportHasArrived"),
                 imeAction = ImeAction.Done,
                 onIme = ::save,

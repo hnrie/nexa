@@ -27,8 +27,8 @@ import kotlinx.coroutines.launch
  * ConfirmModal: a question, what it does, and the one button that does it
  * (red when it cannot be undone), with Cancel beside it.
  */
-fun confirm(title: String, body: String, confirmLabel: String, danger: Boolean = true, onConfirm: suspend () -> Unit) {
-    openSheet("confirm", title = title, footer = { close ->
+fun confirm(title: String, body: String, confirmLabel: String, danger: Boolean = true, titleWords: fish.nexa.ui.chat.PersonWords? = null, bodyWords: fish.nexa.ui.chat.PersonWords? = null, onConfirm: suspend () -> Unit) {
+    openSheet("confirm", title = title, heading = titleWords?.let { words -> { fish.nexa.ui.chat.PersonHeading(words) } }, footer = { close ->
         var busy by remember { mutableStateOf(false) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, androidx.compose.ui.Alignment.End)) {
             NxButton(t("chat.editMessage.cancel"), close, kind = ButtonKind.GHOST)
@@ -47,7 +47,8 @@ fun confirm(title: String, body: String, confirmLabel: String, danger: Boolean =
             }, kind = if (danger) ButtonKind.DANGER else ButtonKind.PRIMARY, loading = busy)
         }
     }) {
-        Txt(body, style = Nx.type.body.copy(lineHeight = Nx.type.sp(23f)), color = Nx.colors.text)
+        if (bodyWords != null) fish.nexa.ui.chat.PersonWordsText(bodyWords, Nx.type.body.copy(lineHeight = Nx.type.sp(23f)), Nx.colors.text)
+        else Txt(body, style = Nx.type.body.copy(lineHeight = Nx.type.sp(23f)), color = Nx.colors.text)
     }
 }
 

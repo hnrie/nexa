@@ -243,7 +243,7 @@ private fun PlaceRow(p: Place, active: Boolean) {
             p.kind == "server" -> if (p.avatarId != null) ServerIcon(p.avatarKey, p.label, p.avatarId, 28.dp, radius = 9.dp) else Glyph("Server")
             else -> Avatar(p.avatarKey, p.label, p.avatarId, 28.dp, icon = p.kind == "group")
         }
-        Txt(p.label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(500)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f))
+        fish.nexa.ui.chat.PersonName(p.avatarKey.takeIf { p.kind == "dm" || p.kind == "friend" }, p.label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(500)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f))
         Row(Modifier.widthIn(max = 180.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (p.kind == "friend") {
                 Icon("UserPlus", c.textMuted, size = 14.dp)

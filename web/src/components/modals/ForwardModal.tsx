@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { CornerUpRight, Hash, Paperclip, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
@@ -101,7 +102,7 @@ export function ForwardModal({ msg, onClose }: { msg: DecryptedMessage; onClose:
                 <Avatar id={r.other ?? r.ch.id} avatarId={r.other ? (users[r.other]?.avatar_id ?? null) : r.ch.icon_id} name={r.name} size={32} kind={r.other ? "avatar" : "icon"} />
               )}
               <span className={s.names}>
-                <span className={s.name}>{r.name}</span>
+                <span className={s.name}>{r.other ? <PersonName userId={r.other}>{r.name}</PersonName> : r.name}</span>
                 <span className={s.sub}>{r.sub}</span>
               </span>
               <input type="radio" name="forward-to" checked={on} onChange={() => setPicked(r.ch.id)} data-testid={`forward-to-${r.ch.id}`} />

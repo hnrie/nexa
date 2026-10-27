@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { SmilePlus, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { StatusEmoji } from "@/components/activity/StatusEmoji";
@@ -11,7 +12,7 @@ import { formatTimestamp } from "@/lib/time";
 import { usePresence } from "@/stores/presence";
 import s from "./CustomStatusModal.module.css";
 
-import { t as tr_ } from "@/i18n";
+import { t as tr_, Tr } from "@/i18n";
 function clearChoices(): { label: string; ms: number | null }[] {
   return [
   { label: tr_("modals.customStatus.donTClear"), ms: null },
@@ -81,7 +82,7 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
               ) : null}
             </div>
           </Field>
-          <Field label={tr_("modals.customStatus.whatSCookin", { name: me?.display_name ?? "" })} className={s.textField}>
+          <Field label={<Tr id="modals.customStatus.whatSCookin" values={{ name: <PersonName user={me}>{me?.display_name ?? ""}</PersonName> }} />} className={s.textField}>
             <TextInput value={text} onChange={(e) => setText(e.target.value)} placeholder={tr_("modals.customStatus.supportHasArrived")} maxLength={128} autoFocus enterKeyHint="done" />
           </Field>
         </div>

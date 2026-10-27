@@ -172,6 +172,7 @@ private fun MemberActionSheet(layer: Layer, serverId: String, userId: String, ki
             Sheet(
                 layer,
                 title = if (timedOut) t("server.memberAction.removeTimeoutFrom", "name" to name) else t("server.memberAction.timeOutNamed", "name" to name),
+                heading = { fish.nexa.ui.chat.PersonHeading(fish.nexa.ui.chat.PersonWords(if (timedOut) t("server.memberAction.removeTimeoutFrom", "name" to fish.nexa.ui.chat.PERSON_SLOT) else t("server.memberAction.timeOutNamed", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(userId to name), serverId)) },
                 maxWidth = 440.dp,
                 footer = {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
@@ -197,6 +198,7 @@ private fun MemberActionSheet(layer: Layer, serverId: String, userId: String, ki
             Sheet(
                 layer,
                 title = if (ban) t("server.memberAction.banNamed", "name" to name) else t("server.memberAction.kickNamed", "name" to name),
+                heading = { fish.nexa.ui.chat.PersonHeading(fish.nexa.ui.chat.PersonWords(if (ban) t("server.memberAction.banNamed", "name" to fish.nexa.ui.chat.PERSON_SLOT) else t("server.memberAction.kickNamed", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(userId to name), serverId)) },
                 maxWidth = 440.dp,
                 footer = {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {

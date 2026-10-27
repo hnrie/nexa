@@ -1,3 +1,4 @@
+import { personNode } from "@/lib/personText";
 import { Crown } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -95,7 +96,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
               }
               if (pick.list === pickList && !pick.mode && pick.ids.length) pick.clear();
               // the menu key or Shift+F10 has no pointer: the menu opens by the row
-              groupMemberMenu.open({ channelId: channel.id, userId: row.id, nav, openModal, select: pickList }, { ...menuPoint(e), label: row.name });
+              groupMemberMenu.open({ channelId: channel.id, userId: row.id, nav, openModal, select: pickList }, { ...menuPoint(e), label: row.name, labelNode: personNode(row.id, row.name) });
             }}
             data-picked={picked.includes(row.id) || undefined}
             aria-pressed={isPicking ? picked.includes(row.id) : undefined}

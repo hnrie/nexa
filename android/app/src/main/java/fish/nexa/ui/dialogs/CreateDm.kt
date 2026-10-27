@@ -164,7 +164,7 @@ private fun CreateDmSheet(layer: Layer, initial: List<String>, groupId: String?,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Avatar(u.id, n, u.avatarId, 16.dp)
-                        Txt(n, style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.text, maxLines = 1)
+                        fish.nexa.ui.chat.PersonName(u.id, n, nameStyle = u.nameStyle, style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.text, maxLines = 1)
                         Icon("X", c.textMuted, size = 12.dp)
                     }
                 }
@@ -178,7 +178,7 @@ private fun CreateDmSheet(layer: Layer, initial: List<String>, groupId: String?,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon("Link", c.warning, size = 16.dp, modifier = Modifier.padding(top = 1.dp))
-                Txt(t("modals.createDM.linkOnlyInGroup", "name" to Names.display(linkOnly.first())), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18.2f)), color = c.text)
+                fish.nexa.ui.chat.PersonText(linkOnly.first().id, t("modals.createDM.linkOnlyInGroup", "name" to fish.nexa.ui.chat.PERSON_SLOT), Names.display(linkOnly.first()), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18.2f)), color = c.text)
             }
             if (picked.size >= 2 && !adding) NxTextField(name, { name = it.take(100) }, placeholder = t("modals.createDM.groupNameOptional"), capitalize = true)
             Column(Modifier.fillMaxWidth().padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -222,7 +222,7 @@ private fun FriendPickRow(u: PublicUser, checked: Boolean, linkOnly: Boolean, ad
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Avatar(u.id, n, u.avatarId, 32.dp)
-        Txt(n, style = Nx.type.body.copy(fontWeight = FontWeight(500)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f))
+        fish.nexa.ui.chat.PersonName(u.id, n, nameStyle = u.nameStyle, style = Nx.type.body.copy(fontWeight = FontWeight(500)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f))
         when {
             linkOnly && adding -> JoinRequestButton(n, joinState, onJoinRequest)
             linkOnly -> LinkOnlyTag(n)

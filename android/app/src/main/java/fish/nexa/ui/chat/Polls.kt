@@ -312,7 +312,7 @@ private fun openVoters(channelId: String, messageId: String, a: PollShape.Answer
                     Row(Modifier.fillMaxWidth().heightIn(min = 36.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         val name = Names.shown(id)
                         Avatar(id, name, users[id]?.avatarId, 24.dp)
-                        Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text, maxLines = 1)
+                        fish.nexa.ui.chat.PersonName(id, name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text, maxLines = 1)
                     }
                 }
             }

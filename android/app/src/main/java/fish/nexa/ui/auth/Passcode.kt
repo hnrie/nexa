@@ -110,8 +110,9 @@ fun PasscodeScreen(state: AuthState.PinLocked) {
     val name = state.me.displayName.ifBlank { state.me.username }.ifBlank { t("passcode.you") }
     AuthLayout(
         if (state.adopting) t("passcode.thisAccountHasAPasscode") else t("passcode.locked"),
-        if (state.adopting) t("passcode.enterItToFinishSettingThis") else t("passcode.enterYourPasscodeToUnlock", "name" to name),
+        if (state.adopting) t("passcode.enterItToFinishSettingThis") else t("passcode.enterYourPasscodeToUnlock", "name" to fish.nexa.ui.chat.PERSON_SLOT),
         maxWidth = 420,
+        subtitlePersonId = state.me.id, subtitleName = name, subtitleNameStyle = state.me.nameStyle,
     ) {
         if (inCall) CallStillOn {
             AppLock.leaveCall()

@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { CalendarDays, ChevronLeft, ChevronRight, Copy, Download, Eraser, EyeOff, FolderOpen, Gavel, LockOpen, Smile, Sticker as StickerIcon } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -12,7 +13,7 @@ import { actionIcon, actionLabel, expressionSummary, fullDate, packFieldLabel, p
 import { formatRelative, formatShortDate } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { useUI } from "@/stores/ui";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { ExpressionPic, PackCover, PackMosaic, packBlockedText } from "./ExpressionsTab";
 import { ModeratePackModal, type PackPreset } from "./ModeratePackModal";
 import { ServerIcon } from "./ProfileSheet";
@@ -169,7 +170,7 @@ export function PackPage() {
             <div className={`${p.faceBody} ${x.faceBody}`}>
               <div className={p.faceNames}>
                 <span className={p.faceName} dir="auto">{pack.name}</span>
-                <span className={p.faceHandle}>{server ? t("moderation.packs.inServer", { name: server.name }) : t("moderation.servers.ownedBy", { name: personName(owner) })}</span>
+                <span className={p.faceHandle}>{server ? t("moderation.packs.inServer", { name: server.name }) : <Tr id="moderation.servers.ownedBy" values={{ name: <PersonName user={owner}>{personName(owner)}</PersonName> }} />}</span>
               </div>
               <div className={p.faceSection}>
                 <h4 className={p.faceLabel}>{t("moderation.servers.description")}</h4>
@@ -232,7 +233,7 @@ export function PackPage() {
                   <ServerIcon id={server.id} iconId={server.icon_id} name={server.name} size={36} />
                   <span className={p.serverText}>
                     <span className={p.serverName}>{server.name}</span>
-                    <span className={p.serverMeta}>{t("moderation.servers.ownedBy", { name: personName(owner) })}</span>
+                    <span className={p.serverMeta}>{<Tr id="moderation.servers.ownedBy" values={{ name: <PersonName user={owner}>{personName(owner)}</PersonName> }} />}</span>
                   </span>
                   <ChevronRight size={18} className={p.flip} aria-hidden="true" />
                 </button>
@@ -240,7 +241,7 @@ export function PackPage() {
               <button type="button" className={p.serverRow} onClick={() => nav(`/channels/@admin/users/${pack.owner_id}`)} data-testid="pack-owner">
                 <Avatar id={pack.owner_id} avatarId={owner?.avatar_id ?? null} name={personName(owner)} size={36} />
                 <span className={p.serverText}>
-                  <span className={p.serverName}>{personName(owner)}</span>
+                  <PersonName user={owner} className={p.serverName}>{personName(owner)}</PersonName>
                   <span className={p.serverMeta}>{owner ? `@${owner.username}` : ""}</span>
                 </span>
                 <ChevronRight size={18} className={p.flip} aria-hidden="true" />

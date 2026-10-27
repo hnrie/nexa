@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Ban, Clock, Crown, Shield, UserMinus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { servers as serversApi } from "@/api/servers";
@@ -125,7 +126,7 @@ function PlainMembers({ serverId }: { serverId: string }) {
             <Avatar id={m.user_id} avatarId={m.avatar_id ?? users[m.user_id]?.avatar_id ?? null} name={name} size={40} />
             <div className={s.memberText}>
               <span className={s.memberName}>
-                {name}
+                <PersonName userId={m.user_id} serverId={serverId}>{name}</PersonName>
                 {server.server.owner_id === m.user_id && !isOwner(m.user_id) ? <Crown size={14} style={{ color: "var(--warning)" }} aria-label={t("server.members.owner")} /> : null}
                 <RankMark userId={m.user_id} />
                 {timedOut ? <Clock size={14} style={{ color: "var(--danger)" }} aria-label={t("server.members.timedOut")} /> : null}

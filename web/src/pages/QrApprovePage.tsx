@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Laptop, ShieldAlert, Smartphone } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -11,7 +12,7 @@ import { useAuth } from "@/stores/auth";
 import { AuthLayout, usePageTitle } from "./AuthLayout";
 import s from "./Auth.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 
 /**
  * What a phone opens from a login page's QR code (`/login/qr#<id>.<key>`):
@@ -108,7 +109,7 @@ function Approve() {
   return (
     <AuthLayout
       title={t("qrLogin.logInOnDevice", { device: step.device })}
-      subtitle={t("qrLogin.asName", { name: me?.display_name ?? "" })}
+      subtitle={<Tr id="qrLogin.asName" values={{ name: <PersonName user={me}>{me?.display_name ?? ""}</PersonName> }} />}
       mark={<div className={s.mark}>{step.phone ? <Smartphone size={28} /> : <Laptop size={28} />}</div>}
     >
       <div className={s.warn}>{t("qrLogin.onlyIfYouOpenedIt")}</div>

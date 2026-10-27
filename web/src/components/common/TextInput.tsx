@@ -5,7 +5,7 @@ import { Select } from "./Select";
 import s from "./TextInput.module.css";
 
 interface FieldProps {
-  label?: string;
+  label?: ReactNode;
   error?: string | null;
   hint?: ReactNode;
   required?: boolean;

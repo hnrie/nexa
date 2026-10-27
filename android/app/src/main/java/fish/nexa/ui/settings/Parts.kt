@@ -297,7 +297,7 @@ fun DangerBox(title: String?, body: String?, button: String, onClick: () -> Unit
 
 /** A box of words in a dialog: red for what cannot be undone, amber to warn, green for good news. */
 @Composable
-fun NoticeBox(text: String, tone: Color, modifier: Modifier = Modifier, icon: String? = null) {
+fun NoticeBox(text: String, tone: Color, modifier: Modifier = Modifier, icon: String? = null, personId: String? = null, personName: String = "") {
     val c = Nx.colors
     Row(
         modifier
@@ -308,7 +308,7 @@ fun NoticeBox(text: String, tone: Color, modifier: Modifier = Modifier, icon: St
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (icon != null) Icon(icon, tone, size = 18.dp)
-        Txt(text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20.3f)), color = c.text, modifier = Modifier.weight(1f))
+        fish.nexa.ui.chat.PersonText(personId, text, personName, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20.3f)), color = c.text, modifier = Modifier.weight(1f))
     }
 }
 
@@ -397,6 +397,7 @@ fun <T> SelectRow(
  */
 class SheetCtl(title: String?) {
     var title by mutableStateOf(title)
+    var titleWords by mutableStateOf<fish.nexa.ui.chat.PersonWords?>(null)
     var closable by mutableStateOf(true)
     var footer by mutableStateOf(true)
     internal var closeFn: () -> Unit = {}
@@ -420,6 +421,7 @@ fun openSettingsSheet(
         fish.nexa.ui.layers.Sheet(
             layer,
             title = ctl.title,
+            heading = ctl.titleWords?.let { words -> { fish.nexa.ui.chat.PersonHeading(words) } },
             closeButton = ctl.closable,
             footer = if (footer != null && ctl.footer) {
                 { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) { footer(ctl) } }
@@ -511,12 +513,12 @@ fun SettingsCard(modifier: Modifier = Modifier, content: @Composable ColumnScope
 
 /** `.rows` inside a card: a well holding label/value pairs. */
 @Composable
-fun FieldRow(label: String, value: String, modifier: Modifier = Modifier, action: (@Composable () -> Unit)? = null) {
+fun FieldRow(label: String, value: String, modifier: Modifier = Modifier, personId: String? = null, action: (@Composable () -> Unit)? = null) {
     val c = Nx.colors
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f)) {
             Txt(label, style = Nx.type.label.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(700)), color = c.textMuted)
-            Txt(value, style = Nx.type.body, color = c.text, modifier = Modifier.padding(top = 2.dp))
+            fish.nexa.ui.chat.PersonName(personId, value, style = Nx.type.body, color = c.text, modifier = Modifier.padding(top = 2.dp), maxLines = Int.MAX_VALUE)
         }
         action?.invoke()
     }

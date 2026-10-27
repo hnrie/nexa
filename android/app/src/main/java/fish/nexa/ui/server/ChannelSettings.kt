@@ -701,7 +701,7 @@ private fun ChannelPermissionsPage(ch: Channel, serverId: String) {
             if (candidateMembers.isEmpty()) PickerEmpty(if (q.isNotEmpty()) t("friends.nobodyHereMatches", "query" to query.trim()) else t("server.channelSettings.nobodyLeftToAdd"))
             for ((id, n, u) in candidateMembers) PickerRow({ Holds.unlessUnsaved { add(id, "member") } }) {
                 Avatar(id, n, users[id]?.avatarId, 20.dp)
-                Txt(n, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                fish.nexa.ui.chat.PersonName(id, n, serverId = serverId, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 Txt("@$u", style = Nx.type.hint, color = c.textMuted, maxLines = 1)
             }
         }
@@ -762,7 +762,7 @@ private fun TargetRow(x: Target, on: Boolean, removable: Boolean, busy: Boolean,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (x.type == "role") ColorDot(x.color) else Avatar(x.id, x.name, avatarId, 20.dp)
-            Txt(x.name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(500)), color = if (on) c.textStrong else c.textChannel, maxLines = 1)
+            fish.nexa.ui.chat.PersonName(x.id.takeIf { x.type == "member" }, x.name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(500)), color = if (on) c.textStrong else c.textChannel, maxLines = 1)
         }
         if (removable) RowIconButton("X", t("server.channelSettings.removeOverwrite"), onRemove, danger = true, enabled = !busy, size = 44.dp)
     }

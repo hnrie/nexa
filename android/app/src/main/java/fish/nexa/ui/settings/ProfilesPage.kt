@@ -475,7 +475,7 @@ private fun MainDesigner(anchor: String?) {
     val valueStyle = Nx.type.body.copy(fontSize = Nx.type.sp(14f))
     val groups = listOf(
         t("designer.group.name") to listOf(
-            PartRow("name", t("settings.account.displayName"), null) { Txt(shown, style = valueStyle, color = c.textMuted, maxLines = 1) },
+            PartRow("name", t("settings.account.displayName"), null) { fish.nexa.ui.chat.RoleName(shown, ownLook, style = valueStyle, fallback = c.textMuted, maxLines = 1) },
             PartRow("nameStyle", t("nameStyle.title"), "nameStyle") {
                 if (ownLook != null) fish.nexa.ui.chat.RoleName(shown, ownLook, valueStyle.copy(fontWeight = FontWeight(600)), c.textMuted)
                 else Txt(t("designer.value.plain"), style = valueStyle, color = c.textMuted, maxLines = 1)

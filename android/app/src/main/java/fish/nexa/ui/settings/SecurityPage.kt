@@ -666,13 +666,13 @@ private fun EncryptionSection() {
                 if (i > 0) Box(Modifier.fillMaxWidth().size(1.dp).background(c.borderSubtle))
                 val name = e.userId?.let { users[it]?.name } ?: t("names.unknownUser")
                 val sentence = when (e.kind) {
-                    "key_changed" -> t("encryption.logKeyChanged", "name" to name)
+                    "key_changed" -> t("encryption.logKeyChanged", "name" to fish.nexa.ui.chat.PERSON_SLOT)
                     "outsider_refused" -> t("encryption.logOutsiderRefused", "count" to (e.count ?: 1))
-                    "grant_withheld" -> t("encryption.logGrantWithheld", "name" to name)
+                    "grant_withheld" -> t("encryption.logGrantWithheld", "name" to fish.nexa.ui.chat.PERSON_SLOT)
                     else -> t("encryption.logUnchecked", "count" to (e.count ?: 1))
                 }
                 Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-                    Txt(sentence, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text)
+                    fish.nexa.ui.chat.PersonText(e.userId, sentence, name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text)
                     Txt(Time.dateDivider(e.at), style = Nx.type.hint, color = c.textMuted)
                 }
             }
@@ -684,7 +684,7 @@ private fun EncryptionSection() {
 private fun openKeyChangeSheet() {
     val first = Nexa.alerts.pending.value.values.minByOrNull { it.firstSeen } ?: return
     val name = Nexa.users.get(first.userId)?.name ?: t("names.unknownUser")
-    val ctl = SheetCtl(t("encryption.keyChangedTitle", "name" to name))
+    val ctl = SheetCtl(t("encryption.keyChangedTitle", "name" to name)).apply { titleWords = fish.nexa.ui.chat.PersonWords(t("encryption.keyChangedTitle", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(first.userId to name)) }
     openSettingsSheet("key-change", ctl, footer = {
         NxButton(t("encryption.keyChangedNotNow"), {
             Nexa.alerts.reject(first.userId)
@@ -697,12 +697,12 @@ private fun openKeyChangeSheet() {
         }, kind = ButtonKind.DANGER)
     }) {
         val c = Nx.colors
-        NoticeBox(t("encryption.keyChangedWarning", "name" to name), c.warning)
+        NoticeBox(t("encryption.keyChangedWarning", "name" to fish.nexa.ui.chat.PERSON_SLOT), c.warning, personId = first.userId, personName = name)
         Txt(t("encryption.keyChangedNewLabel"), style = Nx.type.label, color = c.textSubtle)
         MonoBox(safetyNumber(first.offered) ?: "…", center = true)
         Txt(t("encryption.keyChangedOldLabel"), style = Nx.type.label, color = c.textSubtle)
         MonoBox(safetyNumber(first.pinned) ?: "…", center = true)
-        Txt(t("encryption.keyChangedMeaning", "name" to name), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
+        fish.nexa.ui.chat.PersonText(first.userId, t("encryption.keyChangedMeaning", "name" to fish.nexa.ui.chat.PERSON_SLOT), name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
         val more = Nexa.alerts.pending.value.size - 1
         if (more > 0) Txt(t("encryption.keyChangedMore", "count" to more), style = Nx.type.bodySmall, color = c.textMuted)
     }

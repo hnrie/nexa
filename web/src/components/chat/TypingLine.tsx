@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import type { CSSProperties } from "react";
 import { emojiUrl } from "@/api/users";
@@ -29,7 +30,7 @@ function ownWords(words: string): string {
  * Someone typing, drawn their way: their emoji moving as they chose and the
  * words they picked, or the plain dots and "is typing…" for no style at all.
  */
-export function StyledTyping({ style, name, size = "line" }: { style: TypingStyle | null; name: string; size?: "line" | "big" }) {
+export function StyledTyping({ style, name, userId, serverId, size = "line" }: { style: TypingStyle | null; name: string; userId?: string | null; serverId?: string | null; size?: "line" | "big" }) {
   const { key, words } = typingWordsKey(style);
   return (
     <span className={s.styled} data-size={size}>
@@ -45,7 +46,7 @@ export function StyledTyping({ style, name, size = "line" }: { style: TypingStyl
         <span className={c.dots} aria-hidden="true"><i /><i /><i /></span>
       )}
       <span className={s.words}>
-        <Tr id={key} values={{ a: <b dir="auto">{name}</b>, ...(words ? { words: <span dir="auto">{ownWords(words)}</span> } : {}) }} />
+        <Tr id={key} values={{ a: <b dir="auto"><PersonName userId={userId} serverId={serverId}>{name}</PersonName></b>, ...(words ? { words: <span dir="auto">{ownWords(words)}</span> } : {}) }} />
       </span>
     </span>
   );
@@ -55,13 +56,13 @@ export function StyledTyping({ style, name, size = "line" }: { style: TypingStyl
  * What a press on someone's typing line opens: their style shown off, larger,
  * with the way to make one's own.
  */
-export function TypingCard({ anchor, style, name, onClose }: { anchor: HTMLElement; style: TypingStyle; name: string; onClose: () => void }) {
+export function TypingCard({ anchor, style, name, userId, serverId, onClose }: { anchor: HTMLElement; style: TypingStyle; name: string; userId?: string | null; serverId?: string | null; onClose: () => void }) {
   const openModal = useUI((u) => u.openModal);
   return (
     <Popout anchor={anchor} onClose={onClose} label={t("typing.card.label", { name })} testId="typing-card">
       <div className={s.card}>
         <div className={s.stage}>
-          <StyledTyping style={style} name={name} size="big" />
+          <StyledTyping style={style} name={name} userId={userId} serverId={serverId} size="big" />
         </div>
         <p className={s.cardText}>{t("typing.card.body")}</p>
         <Button

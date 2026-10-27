@@ -7,7 +7,7 @@ import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
 interface Props {
   onClose: () => void;
-  title: string;
+  title: React.ReactNode;
   body: React.ReactNode;
   confirmLabel?: string;
   /** The cancel button's words, where something other than Cancel fits better. */

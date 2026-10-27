@@ -397,7 +397,7 @@ private fun openMemberMenu(serverId: String, userId: String, name: String, list:
     fish.nexa.ui.apps.withApps(items, fish.nexa.ui.apps.userAppsItem(here, userId))
     items[items.lastIndex] = items.last().withSeparator()
     items += MenuItem.Action(t("pick.select")) { Pick.start(list, userId) }
-    openMenu(items, name)
+    openMenu(items, name, titleWords = fish.nexa.ui.chat.PersonWords(fish.nexa.ui.chat.PERSON_SLOT, listOf(userId to name)))
 }
 
 // ---------------------------------------------------------------------------
@@ -426,7 +426,7 @@ private fun removeAll(serverId: String, ids: List<String>, ban: Boolean) {
     val names = Names.list(usersOf(ids).map { Names.display(it) })
     promptFields(
         title = if (ban) t("pick.banTitle", "count" to ids.size) else t("pick.kickTitle", "count" to ids.size),
-        fields = listOf(PromptField(key = "reason", label = t("server.memberAction.reasonOptional"), maxLength = 512, hint = names)),
+        fields = listOf(PromptField(key = "reason", label = t("server.memberAction.reasonOptional"), maxLength = 512, hint = names, hintWords = fish.nexa.ui.chat.PersonWords(Names.list(usersOf(ids).indices.map { fish.nexa.ui.chat.personSlot(it) }), usersOf(ids).map { it.id to Names.display(it) }, serverId))),
         confirmLabel = if (ban) t("pick.ban", "count" to ids.size) else t("pick.kick", "count" to ids.size),
         allowEmpty = true,
     ) { values ->
@@ -599,6 +599,11 @@ fun groupMemberMenuItems(channelId: String, userId: String): List<MenuItem.Actio
                 },
                 label,
                 danger = false,
+                bodyWords = fish.nexa.ui.chat.PersonWords(when {
+                    self -> t("chat.groupMemberMenu.youBecomeTheOwnerInPlaceOf", "owner" to "\u0002")
+                    ch.ownerId == me.id -> t("chat.groupMemberMenu.theyBecomeTheOwnerAndYouAMember", "name" to fish.nexa.ui.chat.PERSON_SLOT)
+                    else -> t("chat.groupMemberMenu.theyBecomeTheOwnerInPlaceOf", "name" to fish.nexa.ui.chat.PERSON_SLOT, "owner" to "\u0002")
+                }, listOf(userId to name, ch.ownerId to owner)),
             ) {
                 val res = Nexa.api.request("PATCH", "/channels/$channelId", buildJsonObject { put("owner_id", userId) })
                 runCatching { wireJson.decodeFromJsonElement(Channel.serializer(), res) }.getOrNull()?.let { Nexa.channels.upsert(listOf(it)) }
@@ -607,7 +612,7 @@ fun groupMemberMenuItems(channelId: String, userId: String): List<MenuItem.Actio
     }
     if (manage && !self && !isOwner) {
         items += MenuItem.Action(t("chat.groupMemberMenu.removeFromGroup"), danger = true) {
-            confirm(t("chat.groupMemberMenu.removeNamed", "name" to name), t("chat.groupMemberMenu.theyAreRemovedFromTheGroup", "name" to name, "group" to group), t("composer.composer.remove")) {
+            confirm(t("chat.groupMemberMenu.removeNamed", "name" to name), t("chat.groupMemberMenu.theyAreRemovedFromTheGroup", "name" to name, "group" to group), t("composer.composer.remove"), titleWords = fish.nexa.ui.chat.PersonWords(t("chat.groupMemberMenu.removeNamed", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(userId to name)), bodyWords = fish.nexa.ui.chat.PersonWords(t("chat.groupMemberMenu.theyAreRemovedFromTheGroup", "name" to fish.nexa.ui.chat.PERSON_SLOT, "group" to group), listOf(userId to name))) {
                 Nexa.api.request("DELETE", "/channels/$channelId/recipients/$userId")
             }
         }
@@ -648,7 +653,7 @@ fun openPersonMenu(channelId: String, userId: String): Boolean {
     if (items.isEmpty()) return false
     // what apps can do with someone, used in this conversation
     fish.nexa.ui.apps.withApps(items, fish.nexa.ui.apps.userAppsItem(channelId, userId))
-    openMenu(items, Names.member(sid, userId))
+    openMenu(items, Names.member(sid, userId), titleWords = fish.nexa.ui.chat.PersonWords(fish.nexa.ui.chat.PERSON_SLOT, listOf(userId to Names.member(sid, userId)), sid))
     return true
 }
 
@@ -664,7 +669,7 @@ private fun openGroupMemberMenu(channelId: String, userId: String, name: String,
     fish.nexa.ui.apps.withApps(items, fish.nexa.ui.apps.userAppsItem(channelId, userId))
     items[items.lastIndex] = items.last().withSeparator()
     items += MenuItem.Action(t("pick.select")) { Pick.start(list, userId) }
-    openMenu(items, name)
+    openMenu(items, name, titleWords = fish.nexa.ui.chat.PersonWords(fish.nexa.ui.chat.PERSON_SLOT, listOf(userId to name)))
 }
 
 /** What can be done to several people in a group at once: remove them (for whoever manages it), block them. */
@@ -678,7 +683,7 @@ private fun groupMemberBulk(channelId: String, ids: List<String>): Bulk {
     if (ch != null && DmArrange.managesGroup(ch) && others.isNotEmpty()) {
         val label = t("pick.removeFromGroup", "count" to others.size)
         val remove = {
-            confirm(t("pick.removeFromGroupTitle", "count" to others.size), t("pick.removeFromGroupBody", "names" to Names.list(usersOf(others).map { Names.display(it) })), label) {
+            confirm(t("pick.removeFromGroupTitle", "count" to others.size), t("pick.removeFromGroupBody", "names" to Names.list(usersOf(others).map { Names.display(it) })), label, bodyWords = fish.nexa.ui.chat.PersonWords(t("pick.removeFromGroupBody", "names" to Names.list(usersOf(others).indices.map { fish.nexa.ui.chat.personSlot(it) })), usersOf(others).map { it.id to Names.display(it) })) {
                 Pick.clear()
                 each(others, { id -> Nexa.api.request("DELETE", "/channels/$channelId/recipients/$id") }) { count -> t("pick.removedFromGroup", "count" to count) }
             }

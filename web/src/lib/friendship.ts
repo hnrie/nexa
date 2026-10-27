@@ -1,3 +1,4 @@
+import { personText, personList } from "@/lib/personText";
 /**
  * What can be done about someone: ask to be friends, answer or take back a
  * request, stop being friends, block and unblock.
@@ -168,7 +169,7 @@ export function confirmRemoveFriend(user: PublicUser): void {
   const name = displayName(user);
   useUI.getState().openModal("confirm", {
     title: t("profile.profileCard.removeFriend"),
-    body: t("friends.removeNameFromYourFriends", { name }),
+    body: personText("friends.removeNameFromYourFriends", user.id, name),
     confirmLabel: t("profile.profileCard.removeFriend"),
     danger: true,
     // the dialog says what went wrong and stays open if this throws
@@ -289,7 +290,7 @@ export function confirmRemoveFriends(users: PublicUser[]): void {
   if (users.length === 1) return confirmRemoveFriend(users[0]!);
   useUI.getState().openModal("confirm", {
     title: t("pick.removeFriendsTitle", { count: users.length }),
-    body: t("pick.removeFriendsBody", { names: nameList(users) }),
+    body: personText("pick.removeFriendsBody", null, null, { names: personList(users) }),
     confirmLabel: t("pick.removeFriends", { count: users.length }),
     danger: true,
     onConfirm: () =>
@@ -310,7 +311,7 @@ export function confirmBlockPeople(users: PublicUser[]): void {
   if (users.length === 1) return openBlockDialog(users[0]!.id);
   useUI.getState().openModal("confirm", {
     title: t("pick.blockTitle", { count: users.length }),
-    body: t("pick.blockBody", { names: nameList(users) }),
+    body: personText("pick.blockBody", null, null, { names: personList(users) }),
     confirmLabel: t("pick.block", { count: users.length }),
     danger: true,
     onConfirm: () =>

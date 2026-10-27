@@ -1184,19 +1184,18 @@ private fun TabsBar(tabs: List<ProfileTab>, tab: ProfileTab, mutuals: Int, theme
 }
 
 @Composable
-private fun EmptyTab(text: String) {
-    Txt(
-        text,
-        style = Nx.type.bodySmall.copy(lineHeight = Nx.type.sp(20.3f)),
+private fun EmptyTab(text: String, personId: String? = null, personName: String = "") {
+    fish.nexa.ui.chat.PersonText(personId,
+        text, personName,
+        style = Nx.type.bodySmall.copy(lineHeight = Nx.type.sp(20.3f), textAlign = androidx.compose.ui.text.style.TextAlign.Center),
         color = Nx.colors.textMuted,
-        align = androidx.compose.ui.text.style.TextAlign.Center,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 32.dp),
     )
 }
 
 /** A person or a server in the Mutuals tab. */
 @Composable
-private fun ListItem(onClick: () -> Unit, picture: @Composable () -> Unit, name: String) {
+private fun ListItem(onClick: () -> Unit, picture: @Composable () -> Unit, name: String, personId: String? = null) {
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -1212,7 +1211,7 @@ private fun ListItem(onClick: () -> Unit, picture: @Composable () -> Unit, name:
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         picture()
-        Txt(name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(550)), color = c.textStrong, maxLines = 1)
+        fish.nexa.ui.chat.PersonName(personId, name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(550)), color = c.textStrong, maxLines = 1)
     }
 }
 
@@ -1350,16 +1349,16 @@ fun FullProfileCard(
                         }
                         val tools = design?.widgets
                         ProfileWidgets(widgets, onAdd = tools?.add ?: if (isMe && !preview) ({ editWidgets() }) else null, design = tools)
-                        if (widgets.isEmpty() && !isMe) EmptyTab(t("profile.tabs.noWidgets", "name" to shownName))
+                        if (widgets.isEmpty() && !isMe) EmptyTab(t("profile.tabs.noWidgets", "name" to fish.nexa.ui.chat.PERSON_SLOT), user.id, shownName)
                     }
                     ProfileTab.ACTIVITY -> {
                         if (activities.isNotEmpty()) ActivityList(activities)
-                        else EmptyTab(if (isMe) t("profile.tabs.noActivityOwn") else t("profile.tabs.noActivity", "name" to shownName))
+                        else EmptyTab(if (isMe) t("profile.tabs.noActivityOwn") else t("profile.tabs.noActivity", "name" to fish.nexa.ui.chat.PERSON_SLOT), user.id, shownName)
                     }
                     ProfileTab.MUTUALS -> {
                         if (extras.mutualFriends.isNotEmpty()) Column {
                             SectionTitle(t("profile.profileCard.mutualFriendsCount", "count" to extras.mutualFriends.size))
-                            for (id in extras.mutualFriends) ListItem({ Profiles.openFull(id) }, { Avatar(id, Names.display(users[id]), users[id]?.avatarId, 32.dp) }, Names.display(users[id]))
+                            for (id in extras.mutualFriends) ListItem({ Profiles.openFull(id) }, { Avatar(id, Names.display(users[id]), users[id]?.avatarId, 32.dp) }, Names.display(users[id]), personId = id)
                         }
                         if (mutualServers.isNotEmpty()) Column {
                             SectionTitle(t("profile.profileCard.mutualServersCount", "count" to mutualServers.size))

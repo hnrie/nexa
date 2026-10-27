@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { AtSign, Hash, SquareSlash } from "lucide-react";
 import type { Channel, Emoji, PublicUser, Role } from "@/api/types";
@@ -77,11 +78,11 @@ function roleStyle(role: Role): CSSProperties | undefined {
  * as mentions there, not as commands. `heading` names the whole list in place
  * of its groups, as the emoji used most do.
  */
-export function Autocomplete({ kind, items, index, onHover, onPick, tone, heading: title, style, docked }: { kind: string; items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number; heading?: string | undefined; style?: CSSProperties | undefined; docked?: boolean }) {
+export function Autocomplete({ kind, items, index, onHover, onPick, tone, heading: title, style, docked, serverId }: { kind: string; items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number; heading?: string | undefined; style?: CSSProperties | undefined; docked?: boolean; serverId?: string | null }) {
   // a slash typed at the start: every command there is, by app, with a rail to jump between apps
   const slash = kind === "command" && items.length > 0 && items.every((it) => it.kind === "appCommand" || it.kind === "command");
   if (slash) return <CommandPicker items={items} index={index} onHover={onHover} onPick={onPick} docked={docked} />;
-  return <SuggestionList kind={kind} items={items} index={index} onHover={onHover} onPick={onPick} tone={tone} heading={title} style={style} docked={docked} />;
+  return <SuggestionList serverId={serverId} kind={kind} items={items} index={index} onHover={onHover} onPick={onPick} tone={tone} heading={title} style={style} docked={docked} />;
 }
 
 /** Keeps the highlighted row of a list that scrolls in view. Only the list itself scrolls: scrollIntoView would also shift the app's clipped containers. */
@@ -175,7 +176,7 @@ function CommandPicker({ items, index, onHover, onPick, docked }: { items: AcIte
   );
 }
 
-function SuggestionList({ kind, items, index, onHover, onPick, tone, heading: title, style, docked }: { kind: string; items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number; heading?: string | undefined; style?: CSSProperties | undefined; docked?: boolean | undefined }) {
+function SuggestionList({ kind, items, index, onHover, onPick, tone, heading: title, style, docked, serverId }: { kind: string; items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number; heading?: string | undefined; style?: CSSProperties | undefined; docked?: boolean | undefined; serverId?: string | null }) {
   useMediaAnimation();
   const listRef = useRef<HTMLDivElement>(null);
   // the list scrolls when it is taller than the room above the keyboard
@@ -195,7 +196,7 @@ function SuggestionList({ kind, items, index, onHover, onPick, tone, heading: ti
               {it.kind === "user" ? (
                 <>
                   <Avatar id={it.user.id} avatarId={it.user.avatar_id} name={it.user.display_name} size={24} />
-                  <span className={s.acName}>{it.user.display_name}</span>
+                  <PersonName user={it.user} serverId={serverId} className={s.acName}>{it.user.display_name}</PersonName>
                   <span className={s.acSub}>{it.user.username}</span>
                 </>
               ) : it.kind === "role" ? (

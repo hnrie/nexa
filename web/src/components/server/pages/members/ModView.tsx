@@ -1,3 +1,5 @@
+import { personText } from "@/lib/personText";
+import { PersonName } from "@/components/common/PersonName";
 import { CalendarClock, Clock, MailWarning, ShieldAlert, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -11,7 +13,7 @@ import { isTopLayer } from "@/components/common/Modal";
 import { Spinner } from "@/components/common/Spinner";
 import { useFocusTrap } from "@/components/common/useFocusTrap";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { formatSpan } from "@/lib/moderation";
 import { memberName } from "@/lib/names";
 import { P } from "@/lib/perms";
@@ -123,7 +125,7 @@ export function ModView({ serverId, userId, onClose, onChanged }: { serverId: st
     setBusy(true);
     try {
       await serversApi.patchMember(serverId, userId, { quarantined: false });
-      useUI.getState().toast(t("members.mod.letOutDone", { name }), "success");
+      useUI.getState().toast(personText("members.mod.letOutDone", userId, name, {}, serverId), "success");
       onChanged();
       void load();
     } catch (err) {
@@ -145,7 +147,7 @@ export function ModView({ serverId, userId, onClose, onChanged }: { serverId: st
           <div className={s.person}>
             <Avatar id={userId} avatarId={detail?.avatar_id ?? user?.avatar_id ?? null} name={name} size={64} />
             <div className={s.personText}>
-              <span className={s.personName} dir="auto">{name}</span>
+              <PersonName userId={userId} user={user} serverId={serverId} className={s.personName} dir="auto">{name}</PersonName>
               {user ? <span className={s.handle}>@{user.username}</span> : null}
             </div>
           </div>
@@ -175,7 +177,7 @@ export function ModView({ serverId, userId, onClose, onChanged }: { serverId: st
                     <dd>
                       {joinMethodLabel(detail.join.join_method)}
                       {detail.join.join_code ? <> <code dir="ltr">{detail.join.join_code}</code></> : null}
-                      {detail.join.invited_by ? <span className={s.methodSub}>{t("members.mod.invitedBy", { name: displayName(users[detail.join.invited_by]) })}</span> : null}
+                      {detail.join.invited_by ? <span className={s.methodSub}>{<Tr id="members.mod.invitedBy" values={{ name: <PersonName userId={detail.join.invited_by}>{displayName(users[detail.join.invited_by])}</PersonName> }} />}</span> : null}
                     </dd>
                   </>
                 ) : null}
@@ -232,7 +234,7 @@ export function ModView({ serverId, userId, onClose, onChanged }: { serverId: st
                     {audit.map((e) => (
                       <li key={e.id}>
                         <time dateTime={new Date(e.created_at).toISOString()}>{formatFull(e.created_at)}</time>
-                        {t("members.mod.historyLine", { who: e.actor_id === "0" ? t("automod.name") : displayName(users[e.actor_id]), what: t(`server.auditLog.verb.${e.action}`), target: displayName(user) })}
+                        {<Tr id="members.mod.historyLine" values={{ who: e.actor_id === "0" ? t("automod.name") : <PersonName userId={e.actor_id} serverId={serverId}>{displayName(users[e.actor_id])}</PersonName>, what: t(`server.auditLog.verb.${e.action}`), target: <PersonName user={user} serverId={serverId}>{displayName(user)}</PersonName> }} />}
                         {e.reason ? <span className={s.methodSub}>{t("server.auditLog.reason", { reason: e.reason })}</span> : null}
                       </li>
                     ))}

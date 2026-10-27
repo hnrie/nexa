@@ -194,7 +194,7 @@ export function ChatPreview({ name, avatarId, userId, typing, channel = "general
         </div>
       </div>
       <div className={d.chatTyping}>
-        <StyledTyping style={typing} name={name} />
+        <StyledTyping style={typing} name={name} userId={userId} />
       </div>
       <div className={d.chatComposer} aria-hidden="true">{t("typing.editor.composer")}</div>
     </div>

@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useRef, useState, type FormEvent } from "react";
 import { ApiError } from "@/api/client";
 import { WeakKdfError } from "@/crypto/kdf";
@@ -8,7 +9,7 @@ import { useAuth } from "@/stores/auth";
 import { AuthLayout, usePageTitle } from "./AuthLayout";
 import s from "./Auth.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 /** Shown when a session token exists but the encryption keys are not on this device. */
 export default function LockPage() {
   const me = useAuth((a) => a.me);
@@ -45,7 +46,7 @@ export default function LockPage() {
   };
 
   return (
-    <AuthLayout title={t("lock.unlockYourMessages")} subtitle={t("lock.welcomeBackEnterYourPassword", { name: me?.display_name ?? me?.username ?? "" })}>
+    <AuthLayout title={t("lock.unlockYourMessages")} subtitle={<Tr id="lock.welcomeBackEnterYourPassword" values={{ name: <PersonName user={me}>{me?.display_name ?? me?.username ?? ""}</PersonName> }} />}>
       <form className={s.form} onSubmit={(e) => void onSubmit(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
         {/* the account's name rides along, hidden, so a password manager knows which password this is */}

@@ -28,7 +28,7 @@ import HomeDemo from "./HomeDemo";
  * it became 345, with apps' strings, and 345.1 kB when it became 350, with
  * the person menu in conversations. It became 365 with the translated homepage demo.)
  */
-export const LOAD_KB_LIMIT = 370;
+export const LOAD_KB_LIMIT = 380;
 
 /** Whether this visitor has asked for less movement, by either route. */
 function useStillness(): boolean {

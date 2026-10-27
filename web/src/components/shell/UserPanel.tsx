@@ -20,6 +20,7 @@ import { bindText, keybindsOf } from "@/lib/keybinds";
 import { useSettings } from "@/stores/settings";
 import { useMediaQuery } from "@/hooks/useIsMobile";
 
+import { PersonName } from "@/components/common/PersonName";
 import { t } from "@/i18n";
 import { confirmLogout } from "@/lib/confirmLogout";
 function statusOptions(): { value: "online" | "idle" | "dnd" | "invisible"; label: string; sub?: string }[] {
@@ -120,7 +121,7 @@ export function UserPanel() {
       <button ref={trigger} className={s.me} onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} data-testid="user-panel">
         <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={32} status={status} className={s.avatar} data-speaking={speaking} />
         <span className={s.text}>
-          <span className={s.name}>{me.display_name}</span>
+          <PersonName user={me} className={s.name}>{me.display_name}</PersonName>
           {custom || activity ? (
             <StatusLine className={s.sub} status={custom} activity={activity} more={Math.max(0, activities.length - 1)} />
           ) : (
@@ -178,7 +179,7 @@ export function UserPanel() {
           <div className={s.popHead} role="presentation">
             <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={40} status={status} />
             <div>
-              <div className={s.popName}>{me.display_name}</div>
+              <div className={s.popName}><PersonName user={me}>{me.display_name}</PersonName></div>
               <div className={s.popUser}>@{me.username}</div>
             </div>
           </div>

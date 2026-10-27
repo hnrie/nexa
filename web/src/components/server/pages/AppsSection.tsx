@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { ChevronDown, ChevronRight, Hash, Trash2, TriangleAlert, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apps as appsApi, type CommandPermission, type IntegrationCommands, type ServerApp } from "@/api/apps";
@@ -12,7 +13,7 @@ import { LoadError } from "@/components/common/LoadError";
 import { Spinner } from "@/components/common/Spinner";
 import { dispatchHooks } from "@/gateway/dispatch";
 import type { GatewayEvent } from "@/gateway/events";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { commandName } from "@/lib/apps";
 import { describeError } from "@/lib/errors";
 import { findMembers } from "@/lib/pickables";
@@ -102,7 +103,7 @@ export function AppsSection({ serverId }: { serverId: string }) {
                       </span>
                     ) : null}
                   </span>
-                  <span className={s.meta}>{by ? t("apps.server.addedBy", { name: displayName(by), date: formatShortDate(app.installed_at) }) : t("apps.server.addedOn", { date: formatShortDate(app.installed_at) })}</span>
+                  <span className={s.meta}>{by ? <Tr id="apps.server.addedBy" values={{ name: <PersonName user={by}>{displayName(by)}</PersonName>, date: formatShortDate(app.installed_at) }} /> : t("apps.server.addedOn", { date: formatShortDate(app.installed_at) })}</span>
                 </span>
                 {expanded ? <ChevronDown size={18} aria-hidden="true" /> : <ChevronRight size={18} aria-hidden="true" />}
               </button>

@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { dispatchHooks } from "@/gateway/dispatch";
@@ -7,6 +8,7 @@ import type { AuditEntry } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { Select } from "@/components/common/Select";
+import { SelectBox } from "@/components/apps/SelectBox";
 import { LoadError } from "@/components/common/LoadError";
 import { Spinner } from "@/components/common/Spinner";
 import { formatSpan } from "@/lib/moderation";
@@ -399,6 +401,26 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
     }
     return parts.join(" · ");
   };
+  const changesNodes = (e: AuditEntry, limit: number) => {
+    if (!e.changes || typeof e.changes !== "object" || Array.isArray(e.changes)) return changesText(e).slice(0, limit);
+    const obj = e.changes as Record<string, unknown>;
+    let left = limit;
+    let first = true;
+    return Object.entries(obj).map(([key, value]) => {
+      const shown = field(key, value, e, obj);
+      if (!shown || left <= 0) return null;
+      const prefix = `${first ? "" : " · "}${shown[0]}: `;
+      first = false;
+      const head = prefix.slice(0, left);
+      left -= head.length;
+      const text = shown[1].slice(0, left);
+      left -= text.length;
+      const id = typeof value === "string" && (
+        key === "author_id" || ((key === "target_id" || key === "target") && (obj["target_type"] === "member" || (!roleName(value) && !!userName(value))))
+      ) ? value : null;
+      return <span key={key}>{head}{id ? <PersonName userId={id} serverId={serverId}>{text}</PersonName> : text}</span>;
+    });
+  };
   // A long bulk change is cut, with a way to read the rest: the cut used to
   // drop its tail with no sign there was one.
   const LONG = 300;
@@ -409,7 +431,7 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
     const long = text.length > LONG;
     return (
       <div className={s.auditChanges}>
-        {long && !open ? `${text.slice(0, LONG - 1)}…` : text}
+        {changesNodes(e, long && !open ? LONG - 1 : text.length)}{long && !open ? "…" : null}
         {long ? (
           <button type="button" className={s.auditMore} aria-expanded={open} onClick={() => setExpanded((cur) => { const next = new Set(cur); if (open) next.delete(e.id); else next.add(e.id); return next; })}>
             {open ? t("server.auditLog.showLess") : t("server.auditLog.showAll")}
@@ -436,11 +458,21 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
       <div style={{ height: 16 }} />
       {(entries && entries.length > 0) || filtering ? (
         <div className={s.auditFilters}>
-          <Select value={actor} onChange={(e) => setActor(e.target.value)} aria-label={t("server.auditLog.filterByMember")} data-testid="audit-actor">
-            <option value="">{t("server.auditLog.anyone")}</option>
-            <option value={AUTOMOD}>{t("automod.name")}</option>
-            {actors.filter((id) => id !== AUTOMOD).map((id) => <option key={id} value={id}>{displayName(users[id])}</option>)}
-          </Select>
+          <SelectBox
+            placeholder={t("server.auditLog.filterByMember")}
+            ariaLabel={`${t("server.auditLog.filterByMember")}: ${actor ? actorName(actor) : t("server.auditLog.anyone")}`}
+            testId="audit-actor"
+            picked={[actor]}
+            labelOf={(id) => id ? actorName(id) : t("server.auditLog.anyone")}
+            renderLabelOf={(id) => !id ? t("server.auditLog.anyone") : id === AUTOMOD ? actorName(id) : <PersonName userId={id} serverId={serverId}>{actorName(id)}</PersonName>}
+            choicesFor={(query) => [
+              { value: "", label: t("server.auditLog.anyone") },
+              { value: AUTOMOD, label: t("automod.name") },
+              ...actors.filter((id) => id !== AUTOMOD).map((id) => ({ value: id, label: actorName(id), labelNode: <PersonName userId={id} serverId={serverId}>{actorName(id)}</PersonName> })),
+            ].filter((choice) => !query || choice.label.toLocaleLowerCase().includes(query.toLocaleLowerCase()))}
+            searchable
+            onCommit={(values) => setActor(values[0] ?? "")}
+          />
           <Select value={action} onChange={(e) => setAction(e.target.value)} aria-label={t("server.auditLog.filterByAction")} data-testid="audit-action">
             <option value="">{t("server.auditLog.anyAction")}</option>
             {actions.map((a) => <option key={a} value={a}>{allVerbs[a]}</option>)}
@@ -458,7 +490,7 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
             <Avatar id={e.actor_id} avatarId={users[e.actor_id]?.avatar_id ?? null} name={displayName(users[e.actor_id])} size={32} />
           )}
           <div className={s.auditText}>
-            <b>{actorName(e.actor_id)}</b> {allVerbs[e.action] ?? e.action} {targetName(e) ? <b>{targetName(e)}</b> : null}
+            <b>{e.actor_id === AUTOMOD ? actorName(e.actor_id) : <PersonName userId={e.actor_id} serverId={serverId}>{actorName(e.actor_id)}</PersonName>}</b> {allVerbs[e.action] ?? e.action} {targetName(e) ? <b>{e.target_type === "user" ? <PersonName userId={e.target_id} serverId={serverId}>{targetName(e)}</PersonName> : targetName(e)}</b> : null}
             <div className={s.auditMeta}>{formatFull(e.created_at)}{e.reason ? ` · ${t("server.auditLog.reason", { reason: e.reason })}` : ""}</div>
             {changesView(e)}
           </div>

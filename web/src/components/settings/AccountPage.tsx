@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useState } from "react";
 import { ApiError } from "@/api/client";
@@ -97,14 +98,14 @@ export default function AccountPage({ onEditProfile }: { onEditProfile: () => vo
         <div className={s.cardHead}>
           <div className={s.cardAvatar}><Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={80} status={myStatus} /></div>
           <div className={s.cardText}>
-            <div className={s.cardName}>{me.display_name}</div>
+            <div className={s.cardName}><PersonName user={me}>{me.display_name}</PersonName></div>
             <div className={s.cardUser}>{me.username}</div>
           </div>
           <Button size="sm" onClick={onEditProfile}>{t("settings.account.editUserProfile")}</Button>
         </div>
         <div className={s.rows}>
           <div className={s.row}>
-            <div><div className={s.rowLabel}>{t("settings.account.displayName")}</div><div className={s.rowValue}>{me.display_name}</div></div>
+            <div><div className={s.rowLabel}>{t("settings.account.displayName")}</div><div className={s.rowValue}><PersonName user={me}>{me.display_name}</PersonName></div></div>
             <Button size="sm" variant="secondary" onClick={() => open("displayName", me.display_name)}>{t("pickers.stickerPicker.edit")}</Button>
           </div>
           <div className={s.row}>

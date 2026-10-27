@@ -299,7 +299,7 @@ fun ServerTagPage(serverId: String) {
                         Avatar(u?.id ?: "", name, u?.avatarId, 36.dp)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Txt(name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                                fish.nexa.ui.chat.PersonName(u?.id, name, nameStyle = u?.nameStyle, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                                 TagChip(chipText, draft.badge, draft.color, TagSize.MD)
                             }
                             Txt(t("serverTag.page.previewMessage"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(19.6f)), color = c.text)
@@ -311,7 +311,7 @@ fun ServerTagPage(serverId: String) {
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Avatar(u?.id ?: "", name, u?.avatarId, 32.dp, status = "online")
-                        Txt(name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(550)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                        fish.nexa.ui.chat.PersonName(u?.id, name, nameStyle = u?.nameStyle, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(550)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                         TagChip(chipText, draft.badge, draft.color, TagSize.SM)
                     }
                     Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))

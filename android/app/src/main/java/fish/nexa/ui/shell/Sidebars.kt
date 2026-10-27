@@ -471,7 +471,7 @@ private fun VoiceParticipantRow(serverId: String, v: fish.nexa.net.VoiceState) {
         Avatar(v.userId, name, v.user?.avatarId ?: Nexa.users.get(v.userId)?.avatarId, 24.dp, speaking = speaking)
         // the name, then their server tag right after it, then the state icons at the end
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textChannel, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+            fish.nexa.ui.chat.PersonName(if (guest) null else v.userId, name, serverId = serverId, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textChannel, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
             if (guest) Box(Modifier.background(c.bgActive, RoundedCornerShape(3.dp)).padding(horizontal = 4.dp)) {
                 Txt(t("voice.voiceParticipants.guest").uppercase(), style = Nx.type.hint.copy(fontSize = Nx.type.sp(10f), fontWeight = FontWeight(700)), color = c.textMuted)
             }

@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+import { createElement, type ReactNode } from "react";
+import { render } from "@testing-library/react";
 import type { Channel, PublicUser } from "@/api/types";
 
 const api = vi.hoisted(() => ({ patch: vi.fn(), removeRecipient: vi.fn() }));
@@ -8,6 +11,13 @@ import { useChannels } from "@/stores/channels";
 import { useRelationships } from "@/stores/relationships";
 import { useUsers } from "@/stores/users";
 import { groupMemberMenu } from "./groupMemberMenu";
+
+function textOf(node: ReactNode): string {
+  const view = render(createElement("div", null, node));
+  const text = view.container.textContent ?? "";
+  view.unmount();
+  return text;
+}
 
 const ADMIN = 1;
 const group = { id: "g", type: "group_dm", parent_id: null, owner_id: "owner", name: "Crew", recipient_ids: ["owner", "me", "bob"] } as unknown as Channel;
@@ -59,7 +69,8 @@ describe("groupMemberMenuItems", () => {
     signIn(ADMIN);
     const openModal = vi.fn();
     groupMemberMenu.items({ channelId: "g", userId: "bob", nav: vi.fn(), openModal }).find((i) => i.id === "remove")!.onSelect!();
-    expect(openModal).toHaveBeenCalledWith("confirm", expect.objectContaining({ title: "Remove Bob?", danger: true }));
+    expect(openModal).toHaveBeenCalledWith("confirm", expect.objectContaining({ danger: true }));
+    expect(textOf(openModal.mock.calls[0]![1].title)).toBe("Remove Bob?");
   });
 
   it("asks the owner before handing the group on, naming who gets it, and makes them the owner", async () => {
@@ -71,10 +82,10 @@ describe("groupMemberMenuItems", () => {
     expect(owner.label).toBe("Transfer Ownership");
     expect(owner.danger).toBeFalsy();
     owner.onSelect!();
-    const [kind, props] = openModal.mock.calls[0]! as [string, { title: string; body: string; confirmLabel: string; onConfirm: () => Promise<unknown> }];
+    const [kind, props] = openModal.mock.calls[0]! as [string, { title: ReactNode; body: ReactNode; confirmLabel: string; onConfirm: () => Promise<unknown> }];
     expect(kind).toBe("confirm");
-    expect(props.title).toBe("Transfer Ownership of “Crew”?");
-    expect(props.body).toBe("Bob becomes the group's owner, able to remove people and delete the group, and you become a member like everyone else.");
+    expect(textOf(props.title)).toBe("Transfer Ownership of “Crew”?");
+    expect(textOf(props.body)).toBe("Bob becomes the group's owner, able to remove people and delete the group, and you become a member like everyone else.");
     expect(props.confirmLabel).toBe("Transfer Ownership");
     await props.onConfirm();
     expect(api.patch).toHaveBeenCalledWith("g", { owner_id: "bob" });
@@ -88,9 +99,9 @@ describe("groupMemberMenuItems", () => {
     const remove = items[items.length - 1]!;
     expect([remove.id, remove.label, remove.danger]).toEqual(["remove", "Remove from Group", true]);
     remove.onSelect!();
-    const props = openModal.mock.calls[0]![1] as { title: string; body: string; danger: boolean; onConfirm: () => Promise<unknown> };
-    expect(props.title).toBe("Remove Bob?");
-    expect(props.body).toBe("Bob will be removed from “Crew” and stop getting its messages. They'll need a new invite to come back.");
+    const props = openModal.mock.calls[0]![1] as { title: ReactNode; body: ReactNode; danger: boolean; onConfirm: () => Promise<unknown> };
+    expect(textOf(props.title)).toBe("Remove Bob?");
+    expect(textOf(props.body)).toBe("Bob will be removed from “Crew” and stop getting its messages. They'll need a new invite to come back.");
     await props.onConfirm();
     expect(api.removeRecipient).toHaveBeenCalledWith("g", "bob");
   });

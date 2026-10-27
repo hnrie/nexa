@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { AudioLines, AudioWaveform, MonitorUp, PhoneOutgoing, Signal, Video } from "lucide-react";
 import type { MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -19,7 +20,7 @@ import { HangUp } from "./HangUp";
 import s from "./Voice.module.css";
 import { noiseMenu, openDeviceMenu } from "./deviceMenus";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 /** The "Voice Connected" block that sits above the user panel while in a call. */
 export function VoiceStatus() {
   const nav = useNavigate();
@@ -50,7 +51,7 @@ export function VoiceStatus() {
     ? t("voice.voice.connecting")
     : calling
       ? calledId
-        ? t("voice.call.callingName", { name: displayName(users[calledId]) })
+        ? <Tr id="voice.call.callingName" values={{ name: <PersonName userId={calledId}>{displayName(users[calledId])}</PersonName> }} />
         : t("voice.call.callingGroup")
       : reconnecting
         ? t("voice.voice.reconnecting")
@@ -70,7 +71,7 @@ export function VoiceStatus() {
             {/* nobody has picked up while it rings, so there is nothing to count yet */}
             {mine?.channel_id && !calling ? <CallTimer channelId={mine.channel_id} className={s.statusTimer} /> : null}
           </span>
-          <span className={s.statusSub} onClick={go} title={where}>{where}</span>
+          <span className={s.statusSub} onClick={go} title={where}>{channel?.type === "dm" ? <PersonName userId={calledId}>{where}</PersonName> : where}</span>
         </div>
         <NoiseButton />
         <Tooltip text={t("voice.voiceStatus.disconnect")} side="top">

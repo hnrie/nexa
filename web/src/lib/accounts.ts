@@ -27,6 +27,7 @@ export interface SavedAccount {
   username: string;
   display_name: string;
   avatar_id: string | null;
+  name_style?: unknown;
   token: string;
 }
 
@@ -50,7 +51,7 @@ export const useAccounts = create<{ list: SavedAccount[] }>()(() => ({ list: rea
 /** Keeps the account signed in now in the list, with its name and picture as they are. */
 export function rememberAccount(me: MeUser, token: string): void {
   const list = read();
-  const entry: SavedAccount = { id: me.id, username: me.username, display_name: me.display_name, avatar_id: me.avatar_id ?? null, token };
+  const entry: SavedAccount = { id: me.id, username: me.username, display_name: me.display_name, avatar_id: me.avatar_id ?? null, name_style: me.name_style ?? null, token };
   const at = list.findIndex((a) => a.id === me.id);
   if (at >= 0) list[at] = entry;
   else list.push(entry);

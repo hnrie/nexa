@@ -12,7 +12,7 @@ export interface PromptField {
   initial?: string;
   placeholder?: string;
   maxLength?: number;
-  hint?: string;
+  hint?: React.ReactNode;
 }
 
 interface PromptOptions {

@@ -64,7 +64,7 @@ fun openAccountsSheet() {
                     close()
                     switchAccount(a.id)
                 }, onRemove = {
-                    confirm(t("accounts.removeTitle", "name" to a.name), t("accounts.removeBody"), t("accounts.remove")) { Nexa.auth.removeAccount(a.id) }
+                    confirm(t("accounts.removeTitle", "name" to a.name), t("accounts.removeBody"), t("accounts.remove"), titleWords = fish.nexa.ui.chat.PersonWords(t("accounts.removeTitle", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(a.id to a.name))) { Nexa.auth.removeAccount(a.id) }
                 })
             }
             if (accounts.isNotEmpty()) MenuSep()
@@ -105,7 +105,7 @@ private fun AccountOption(a: Accounts.Saved, current: Boolean, onSwitch: () -> U
     ) {
         Avatar(a.id, a.name, a.avatarId, 24.dp)
         Column(Modifier.weight(1f).padding(vertical = if (current) 10.dp else 0.dp)) {
-            Txt(a.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(550)), color = if (pressed) c.textStrong else c.textSubtle, maxLines = 1)
+            fish.nexa.ui.chat.PersonName(a.id, a.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(550)), color = if (pressed) c.textStrong else c.textSubtle, maxLines = 1)
             Txt("@${a.username}", style = Nx.type.hint, color = c.textMuted, maxLines = 1)
         }
         if (current) Icon("Check", c.statusOnline, size = 16.dp, label = t("accounts.current"))
@@ -180,7 +180,7 @@ fun openAddAccountSheet() {
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Txt(t("accounts.addHint", "name" to (Nexa.users.me.value?.name ?: "")), style = Nx.type.bodySmall, color = c.textMuted)
+            fish.nexa.ui.chat.PersonText(Nexa.users.meId, t("accounts.addHint", "name" to fish.nexa.ui.chat.PERSON_SLOT), (Nexa.users.me.value?.name ?: ""), style = Nx.type.bodySmall, color = c.textMuted)
             error?.let { ErrorBox(it) }
             val n = needs
             if (n != null) {

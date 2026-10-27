@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing } from "lucide-react";
 import type { ReactNode } from "react";
 import chat from "@/components/chat/Chat.module.css";
@@ -41,7 +42,7 @@ export function CallLine({ msg }: { msg: DecryptedMessage }) {
   const summary = msg.call;
   const person = (id: string) => (
     <button type="button" className={chat.sysName} dir="auto" onClick={(e) => openProfilePopout(id, e.currentTarget, channel?.server_id ?? undefined)}>
-      {displayName(users[id])}
+      <PersonName userId={id} serverId={channel?.server_id}>{displayName(users[id])}</PersonName>
     </button>
   );
   const A = person(caller);

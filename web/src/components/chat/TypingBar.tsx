@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -57,14 +58,14 @@ export function TypingBar({ channelId }: { channelId: string }) {
   if (style && solo) {
     text = (
       <button type="button" className={ty.lineBtn} onClick={(e) => setCard(card ? null : e.currentTarget)} aria-haspopup="dialog" aria-expanded={!!card} data-testid="typing-styled">
-        <StyledTyping style={style} name={who[0]!} />
+        <StyledTyping style={style} name={who[0]!} userId={solo} serverId={serverId} />
       </button>
     );
   } else if (who.length > 0) {
     const line =
-      who.length === 1 ? <Tr id="chat.typingBar.oneTyping" values={{ a: <b dir="auto">{who[0]}</b> }} /> :
-      who.length === 2 ? <Tr id="chat.typingBar.twoTyping" values={{ a: <b dir="auto">{who[0]}</b>, b: <b dir="auto">{who[1]}</b> }} /> :
-      who.length === 3 ? <Tr id="chat.typingBar.threeTyping" values={{ a: <b dir="auto">{who[0]}</b>, b: <b dir="auto">{who[1]}</b>, c: <b dir="auto">{who[2]}</b> }} /> :
+      who.length === 1 ? <Tr id="chat.typingBar.oneTyping" values={{ a: <b dir="auto"><PersonName userId={ids[0]} serverId={serverId}>{who[0]}</PersonName></b> }} /> :
+      who.length === 2 ? <Tr id="chat.typingBar.twoTyping" values={{ a: <b dir="auto"><PersonName userId={ids[0]} serverId={serverId}>{who[0]}</PersonName></b>, b: <b dir="auto"><PersonName userId={ids[1]} serverId={serverId}>{who[1]}</PersonName></b> }} /> :
+      who.length === 3 ? <Tr id="chat.typingBar.threeTyping" values={{ a: <b dir="auto"><PersonName userId={ids[0]} serverId={serverId}>{who[0]}</PersonName></b>, b: <b dir="auto"><PersonName userId={ids[1]} serverId={serverId}>{who[1]}</PersonName></b>, c: <b dir="auto"><PersonName userId={ids[2]} serverId={serverId}>{who[2]}</PersonName></b> }} /> :
       <>{tr_("chat.typingBar.severalPeopleAreTyping")}</>;
     text = (
       <>
@@ -79,7 +80,7 @@ export function TypingBar({ channelId }: { channelId: string }) {
   return (
     <div className={s.typing} aria-live="polite" data-testid="typing-bar">
       {text}
-      {card && style ? <TypingCard anchor={card} style={style} name={who[0]!} onClose={() => setCard(null)} /> : null}
+      {card && style ? <TypingCard anchor={card} style={style} name={who[0]!} userId={solo} serverId={serverId} onClose={() => setCard(null)} /> : null}
     </div>
   );
 }

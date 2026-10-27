@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Check, Eye, Plus, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -21,7 +22,7 @@ import { useAuth } from "@/stores/auth";
 import { peopleHere, sortedNotes, useNotes, type NoteInviteItem, type NoteItem } from "@/stores/notes";
 import { useUI } from "@/stores/ui";
 import { displayName, fetchMissingUsers, useUsers } from "@/stores/users";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { noteMenu } from "./noteMenu";
 import { noteName, useMinuteClock } from "./NoteParts";
 import s from "./Notes.module.css";
@@ -205,7 +206,7 @@ function Request({ invite }: { invite: NoteInviteItem }) {
         <p className={s.requestTitle} dir="auto">
           {invite.head ? noteName(invite.head.title) : t("notes.card.locked")}
         </p>
-        <p className={s.requestLead}>{invite.role === NOTE_EDITOR ? t("notes.requests.toEdit", { name: from }) : t("notes.requests.toView", { name: from })}</p>
+        <p className={s.requestLead}>{invite.role === NOTE_EDITOR ? <Tr id="notes.requests.toEdit" values={{ name: <PersonName user={invite.from}>{from}</PersonName> }} /> : <Tr id="notes.requests.toView" values={{ name: <PersonName user={invite.from}>{from}</PersonName> }} />}</p>
       </div>
       <div className={s.requestActs}>
         <button type="button" className={s.act} data-kind="yes" onClick={() => void accept()} disabled={busy !== null} aria-label={t("notes.requests.accept")} title={t("notes.requests.accept")} data-testid="note-request-accept">

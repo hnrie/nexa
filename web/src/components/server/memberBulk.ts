@@ -1,3 +1,4 @@
+import { personText, personList } from "@/lib/personText";
 import { Ban, DoorOpen, ShieldOff } from "lucide-react";
 import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
@@ -6,7 +7,7 @@ import type { PublicUser } from "@/api/types";
 import type { PickAction } from "@/components/common/Pick";
 import { promptFields } from "@/components/modals/PromptModal";
 import { managesGroup } from "@/components/sidebar/dmMenu";
-import { confirmBlockPeople, nameList } from "@/lib/friendship";
+import { confirmBlockPeople } from "@/lib/friendship";
 import { canManageRole, P } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -47,7 +48,7 @@ async function removeAll(serverId: string, ids: string[], ban: boolean): Promise
   const people = usersOf(ids);
   const values = await promptFields({
     title: ban ? t("pick.banTitle", { count: ids.length }) : t("pick.kickTitle", { count: ids.length }),
-    fields: [{ key: "reason", label: t("server.memberAction.reasonOptional"), maxLength: 512, hint: nameList(people) }],
+    fields: [{ key: "reason", label: t("server.memberAction.reasonOptional"), maxLength: 512, hint: personList(people, serverId) }],
     confirmLabel: ban ? t("pick.ban", { count: ids.length }) : t("pick.kick", { count: ids.length }),
     allowEmpty: true,
   });
@@ -151,7 +152,7 @@ function groupPlan(channelId: string, ids: string[]) {
 function removeFromGroup(channelId: string, others: string[]): void {
   useUI.getState().openModal("confirm", {
     title: t("pick.removeFromGroupTitle", { count: others.length }),
-    body: t("pick.removeFromGroupBody", { names: nameList(usersOf(others)) }),
+    body: personText("pick.removeFromGroupBody", null, null, { names: personList(usersOf(others)) }),
     confirmLabel: t("pick.removeFromGroup", { count: others.length }),
     danger: true,
     onConfirm: async () => {

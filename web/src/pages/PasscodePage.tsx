@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
@@ -8,7 +9,7 @@ import { describeError } from "@/lib/errors";
 import { AuthLayout, usePageTitle } from "./AuthLayout";
 import s from "./Auth.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 /** The passcode screen: shown whenever this device's app lock is on. */
 export default function PasscodePage() {
   const me = useAuth((a) => a.me);
@@ -68,7 +69,7 @@ export default function PasscodePage() {
       subtitle={
         adopting
           ? t("passcode.enterItToFinishSettingThis")
-          : t("passcode.enterYourPasscodeToUnlock", { name: me?.display_name ?? me?.username ?? t("passcode.you") })
+          : <Tr id="passcode.enterYourPasscodeToUnlock" values={{ name: <PersonName user={me}>{me?.display_name ?? me?.username ?? t("passcode.you")}</PersonName> }} />
       }
       width={420}
     >

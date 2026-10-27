@@ -1,3 +1,5 @@
+import { personText } from "@/lib/personText";
+import { PersonName } from "@/components/common/PersonName";
 import { UserRound } from "lucide-react";
 import { useState } from "react";
 import { moderation as modApi } from "@/api/moderation";
@@ -6,7 +8,7 @@ import { Modal } from "@/components/common/Modal";
 import { describeError } from "@/lib/errors";
 import { RANK_ICON, rankName, rankPowers, type GrantableRank, type StaffRank } from "@/lib/staffRank";
 import { useUI } from "@/stores/ui";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import r from "./RankModal.module.css";
 
 /** The ranks from the top of the ladder down, then none. */
@@ -25,7 +27,7 @@ export function RankModal({ user, current, onClose, onDone }: { user: { id: stri
     setBusy(true);
     try {
       await modApi.access(user.id, { rank: pick ?? "" });
-      toast(t("staff.rankModal.done", { name: user.display_name, rank: pick ? rankName(pick) : t("staff.rankModal.none") }), "success");
+      toast(personText("staff.rankModal.done", user.id, user.display_name, { rank: pick ? rankName(pick) : t("staff.rankModal.none") }), "success");
       onDone();
       onClose();
     } catch (err) {
@@ -38,7 +40,7 @@ export function RankModal({ user, current, onClose, onDone }: { user: { id: stri
     <Modal
       open
       onClose={onClose}
-      title={t("staff.rankModal.title", { name: user.display_name })}
+      title={<Tr id="staff.rankModal.title" values={{ name: <PersonName user={user}>{user.display_name}</PersonName> }} />}
       width={460}
       footer={
         <>

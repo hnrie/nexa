@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 /**
  * Showing an identity key to a person.
  *
@@ -25,7 +26,7 @@ import { useKeyAlerts } from "@/stores/keyAlerts";
 import { useUsers } from "@/stores/users";
 import s from "./KeyVerify.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 
 /**
  * What this device can say about a key without asking the server anything.
@@ -127,21 +128,21 @@ export function KeyVerifyBody({ userId, name }: { userId: string; name: string }
   }
   return (
     <div className={s.panel}>
-      <p className={s.compare}>{t("encryption.compareInstruction", { name })}</p>
+      <p className={s.compare}>{<Tr id="encryption.compareInstruction" values={{ name: <PersonName userId={userId}>{name}</PersonName> }} />}</p>
       <div className={s.pair}>
         <p className={s.pairLabel}>{t("encryption.yourKeyLabel")}</p>
         {myKey ? <SafetyNumber publicKey={myKey} /> : <p className={s.note}>{t("encryption.noKeyToShow")}</p>}
       </div>
       <div className={s.pair}>
-        <p className={s.pairLabel}>{t("encryption.contactKeyLabel", { name })}</p>
+        <p className={s.pairLabel}>{<Tr id="encryption.contactKeyLabel" values={{ name: <PersonName userId={userId}>{name}</PersonName> }} />}</p>
         {contactKey ? <SafetyNumber publicKey={contactKey} /> : <p className={s.note}>{t("encryption.noKeyToShow")}</p>}
       </div>
       {verdict === "same" ? (
-        <p className={s.note}>{t("encryption.noteSameSinceFirstSeen", { name })}</p>
+        <p className={s.note}>{<Tr id="encryption.noteSameSinceFirstSeen" values={{ name: <PersonName userId={userId}>{name}</PersonName> }} />}</p>
       ) : verdict === "first" ? (
-        <p className={s.note}>{startedWithNoPins() ? t("encryption.noteNoMemoryYet") : t("encryption.noteFirstSeenNow", { name })}</p>
+        <p className={s.note}>{startedWithNoPins() ? t("encryption.noteNoMemoryYet") : <Tr id="encryption.noteFirstSeenNow" values={{ name: <PersonName userId={userId}>{name}</PersonName> }} />}</p>
       ) : verdict === "changed" ? (
-        <p className={s.warn}>{t("encryption.noteChanged", { name })}</p>
+        <p className={s.warn}>{<Tr id="encryption.noteChanged" values={{ name: <PersonName userId={userId}>{name}</PersonName> }} />}</p>
       ) : null}
       <p className={s.note}>
         <KeyRound size={13} aria-hidden /> {t("encryption.noteWhatThisProves")}

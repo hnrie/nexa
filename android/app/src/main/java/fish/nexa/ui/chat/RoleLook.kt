@@ -1,6 +1,7 @@
 package fish.nexa.ui.chat
 
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -134,9 +135,7 @@ object RoleLooks {
 @Composable
 fun RoleName(text: String, look: RoleLook?, style: TextStyle, fallback: Color, modifier: Modifier = Modifier, maxLines: Int = 1) {
     val own = look?.own
-    val family = own?.font?.takeIf { it.isNotEmpty() }?.let { NameFonts.family(it) }
-    val scale = own?.font?.let { f -> NameStyle.FONTS.firstOrNull { it.id == f }?.scale } ?: 1f
-    val styled = if (family != null) style.copy(fontFamily = family, fontSize = style.fontSize * scale, letterSpacing = 0.sp) else style
+    val styled = nameTextStyle(style, own)
     if (look?.color == null && own != null && own.colors.isNotEmpty()) {
         OwnName(text, own, styled, modifier, maxLines)
         return
@@ -163,6 +162,44 @@ fun RoleName(text: String, look: RoleLook?, style: TextStyle, fallback: Color, m
         }
     }
     PlainName(text, styled.copy(brush = brush), modifier, maxLines)
+}
+
+/** The same font metrics for a name renderer and an inline name's measured slot. */
+fun nameTextStyle(style: TextStyle, own: NameStyle?): TextStyle {
+    val family = own?.font?.takeIf { it.isNotEmpty() }?.let { NameFonts.family(it) }
+    val scale = own?.font?.let { f -> NameStyle.FONTS.firstOrNull { it.id == f }?.scale } ?: 1f
+    return if (family != null) style.copy(fontFamily = family, fontSize = style.fontSize * scale, letterSpacing = 0.sp) else style
+}
+
+/** A person's identity label, observing profile and role changes wherever it is shown. */
+@Composable
+fun PersonName(
+    userId: String?,
+    text: String,
+    style: TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier,
+    maxLines: Int = 1,
+    serverId: String? = null,
+    nameStyle: JsonElement? = null,
+) {
+    if (userId == null && nameStyle == null) {
+        RoleName(text, null, style, color, modifier, maxLines)
+        return
+    }
+    val users by Nexa.users.byId.collectAsState()
+    val me by Nexa.users.me.collectAsState()
+    val servers by Nexa.servers.byId.collectAsState()
+    val own = when {
+        userId != null && userId == me?.id -> me?.nameStyle
+        users.containsKey(userId) -> users[userId]?.nameStyle
+        else -> nameStyle
+    }
+    LaunchedEffect(userId) {
+        if (userId != null && userId != me?.id) Nexa.session.ensureUsers(listOf(userId))
+    }
+    val role = if (userId != null && serverId != null) RoleLooks.of(servers[serverId], userId) else null
+    RoleName(text, RoleLooks.withOwn(role, own), style, color, modifier, maxLines)
 }
 
 /** Drawn here rather than with Txt, whose colour would take a brush's place. */

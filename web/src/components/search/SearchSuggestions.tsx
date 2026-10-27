@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 /**
  * The suggestions under a search box (search/suggest.ts decides what they
  * are). They are worked from the box itself: ↓ and ↑ move through them, Enter
@@ -163,7 +164,7 @@ export function SuggestionRow({ item, names, onDate }: { item: Suggestion; names
       return (
         <>
           <Avatar id={item.userId ?? ""} avatarId={u?.avatar_id ?? null} name={names.person(item.userId ?? "")} size={24} />
-          <span className={s.optMain} dir="auto">{me ? t("search.suggest.me") : names.person(item.userId ?? "")}</span>
+          <span className={s.optMain} dir="auto">{me ? t("search.suggest.me") : <PersonName userId={item.userId}>{names.person(item.userId ?? "")}</PersonName>}</span>
           <span className={s.optSub} dir="ltr">@{u?.username ?? item.value}</span>
         </>
       );
@@ -181,7 +182,7 @@ export function SuggestionRow({ item, names, onDate }: { item: Suggestion; names
       return (
         <>
           <ChannelGlyph ch={ch} names={names} />
-          <span className={s.optMain} dir="auto">{names.channel(ch).replace(/^#/, "")}</span>
+          <span className={s.optMain} dir="auto">{ch.type === "dm" ? <PersonName userId={ch.recipient_ids.find((id) => id !== names.meId)}>{names.channel(ch).replace(/^#/, "")}</PersonName> : names.channel(ch).replace(/^#/, "")}</span>
           {where ? <span className={s.optSub} dir="auto">{where}</span> : null}
         </>
       );

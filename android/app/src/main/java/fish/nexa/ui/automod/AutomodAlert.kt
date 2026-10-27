@@ -134,7 +134,7 @@ fun AutomodAlertRow(cm: ChatMessage, ctx: ListCtx) {
                 for (part in Regex("[\u0001\u0002]|[^\u0001\u0002]+").findAll(line).map { it.value }) when (part) {
                     "\u0001" -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Avatar(who, name, Nexa.users.get(who)?.avatarId, 20.dp)
-                        Txt(name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1, modifier = Modifier.pressable(remember { MutableInteractionSource() }) { openProfile(who) })
+                        fish.nexa.ui.chat.PersonName(who, name, serverId = sid, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1, modifier = Modifier.pressable(remember { MutableInteractionSource() }) { openProfile(who) })
                     }
                     "\u0002" -> if (where != null && sid != null) Row(
                         Modifier.clip(RoundedCornerShape(4.dp)).pressable(remember { MutableInteractionSource() }) { Nav.go(Route.Server(sid, where.id)) }.padding(horizontal = 2.dp),

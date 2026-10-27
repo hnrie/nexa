@@ -494,8 +494,8 @@ private fun ReplyLine(ctx: ListCtx, replyId: String, msg: fish.nexa.net.Message?
                 val who = if (hook != null && hookId != null) hook.name else Names.member(ctx.server?.server?.id, original.authorId)
                 if (hook != null && hookId != null) fish.nexa.ui.media.HookAvatar(hook, hookId, 16.dp)
                 else Avatar(original.authorId, who, Nexa.users.get(original.authorId)?.avatarId, 16.dp)
-                Txt(
-                    who, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)), color = c.text, maxLines = 1,
+                PersonName(
+                    original.authorId.takeIf { hookId == null }, who, serverId = ctx.server?.server?.id, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)), color = c.text, maxLines = 1,
                     // a webhook has no profile; its message is where to go
                     // the person a reply quotes has the same menu as the one who wrote it
                     modifier = Modifier.widthIn(max = 160.dp).claimsPerson(original.authorId.takeIf { hookId == null }).pressable(remember { MutableInteractionSource() }) {

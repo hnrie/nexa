@@ -1,3 +1,5 @@
+import { personText } from "@/lib/personText";
+import { PersonName } from "@/components/common/PersonName";
 import { Check, Plus, X } from "lucide-react";
 import type { RefObject } from "react";
 import { Avatar } from "@/components/common/Avatar";
@@ -22,7 +24,7 @@ export default function AccountsFlyout({ meId, flyoutRef, closeMenu, back }: { m
   const askRemove = (id: string, name: string) => {
     closeMenu();
     openModal("confirm", {
-      title: t("accounts.removeTitle", { name }),
+      title: personText("accounts.removeTitle", id, name),
       body: t("accounts.removeBody"),
       confirmLabel: t("accounts.remove"),
       danger: true,
@@ -51,7 +53,7 @@ export default function AccountsFlyout({ meId, flyoutRef, closeMenu, back }: { m
             <div className={[s.opt, f.accountOpt, f.accountHere].join(" ")}>
               <Avatar id={a.id} avatarId={a.avatar_id} name={a.display_name} size={24} />
               <span className={s.optText} style={{ flex: 1 }}>
-                <span>{a.display_name}</span>
+                <PersonName user={a}>{a.display_name}</PersonName>
                 <span className={s.optSub}>@{a.username}</span>
               </span>
               <Check size={16} aria-label={t("accounts.current")} />
@@ -61,7 +63,7 @@ export default function AccountsFlyout({ meId, flyoutRef, closeMenu, back }: { m
               <button className={[s.opt, f.accountOpt].join(" ")} role="menuitem" onClick={() => { closeMenu(); void switchAccount(a.id); }} data-testid="menu-account">
                 <Avatar id={a.id} avatarId={a.avatar_id} name={a.display_name} size={24} />
                 <span className={s.optText}>
-                  <span>{a.display_name}</span>
+                  <PersonName user={a}>{a.display_name}</PersonName>
                   <span className={s.optSub}>@{a.username}</span>
                 </span>
               </button>

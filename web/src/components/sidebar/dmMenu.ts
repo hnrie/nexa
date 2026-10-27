@@ -1,3 +1,4 @@
+import { personText } from "@/lib/personText";
 import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import type { Channel } from "@/api/types";
@@ -180,7 +181,7 @@ export const dmMenu = defineMenu<DMMenuRowCtx>("dm", [
         danger: true,
         onSelect: () =>
           openModal("confirm", {
-            title: group ? t("sidebar.dmMenu.deleteNamed", { name }) : t("sidebar.dmMenu.deleteYourConversationWith", { name }),
+            title: group ? t("sidebar.dmMenu.deleteNamed", { name }) : personText("sidebar.dmMenu.deleteYourConversationWith", ch.recipient_ids.find((id) => id !== useAuth.getState().me?.id), name),
             body: group ? t("sidebar.dmMenu.theGroupAndEveryMessageIn") : t("sidebar.dmMenu.everyMessageIsRemovedForBoth"),
             confirmLabel: group ? t("sidebar.dmMenu.deleteGroup") : t("sidebar.dmMenu.deleteForEveryone"),
             danger: true,

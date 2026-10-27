@@ -325,7 +325,7 @@ function MainDesigner({ anchor }: { anchor?: string | null | undefined }) {
     {
       title: t("designer.group.name"),
       rows: [
-        { id: "name", label: t("settings.account.displayName"), value: <span>{shownName}</span> },
+        { id: "name", label: t("settings.account.displayName"), value: <span className={nameClass(nameLookShown)} style={nameStyle(nameLookShown)}>{shownName}</span> },
         { id: "nameStyle", label: t("nameStyle.title"), value: nameLook ? <span className={nameClass(nameLookShown)} style={nameStyle(nameLookShown)}>{shownName}</span> : t("designer.value.plain"), setting: "nameStyle" },
         { id: "pronouns", label: t("settings.profile.pronouns"), value: pronouns ? <span>{pronouns}</span> : null },
       ],

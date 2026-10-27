@@ -435,7 +435,7 @@ private fun FriendRow(rel: Relationship, picking: Boolean) {
         Avatar(user.id, name, user.avatarId, 32.dp, status = if (rel.type == "friend") status else null)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(650), lineHeight = Nx.type.sp(20f)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                fish.nexa.ui.chat.PersonName(user.id, name, nameStyle = user.nameStyle, style = Nx.type.body.copy(fontWeight = FontWeight(650), lineHeight = Nx.type.sp(20f)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 OwnerMarks(user.id)
                 user.serverTag?.takeIf { it.text.isNotEmpty() }?.let { fish.nexa.ui.chat.ServerTagChip(it, small = true) }
             }

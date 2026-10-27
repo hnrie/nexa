@@ -350,7 +350,7 @@ private fun GroupFriendAdder(ch: Channel, requests: JoinRequests) {
                 val done = u.id in added
                 Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Avatar(u.id, name, u.avatarId, 32.dp)
-                    Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(500)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f))
+                    fish.nexa.ui.chat.PersonName(u.id, name, nameStyle = u.nameStyle, style = Nx.type.body.copy(fontWeight = FontWeight(500)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f))
                     if ((u.groupLinkOnly || requests.stateOf(u.id) == "sent") && !done) JoinRequestButton(name, requests.stateOf(u.id)) { requests.send(u.id, name) }
                     else NxButton(
                         if (done) t("modals.groupInvite.added") else t("modals.groupInvite.add"),

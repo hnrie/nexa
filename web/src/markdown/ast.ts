@@ -49,7 +49,8 @@ export type Node =
 
 /** Everything the renderer needs to turn ids into human-readable content. */
 export interface RenderCtx {
-  users: Record<string, { display_name: string; username: string }>;
+  users: Record<string, { display_name: string; username: string; name_style?: unknown }>;
+  serverId?: string | null;
   channels: Record<string, { name: string }>;
   roles?: Record<string, { name: string; color: number }>;
   /** `css`, when given, is how many pixels across the emoji is drawn. */

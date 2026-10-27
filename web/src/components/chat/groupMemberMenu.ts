@@ -1,3 +1,4 @@
+import { personText, personNode } from "@/lib/personText";
 import { dmOpenError } from "@/lib/errors";
 import { channels as channelsApi } from "@/api/channels";
 import { closeDM, managesGroup } from "@/components/sidebar/dmMenu";
@@ -96,10 +97,10 @@ export const groupMemberMenu = defineMenu<GroupMemberMenuRowCtx>("groupMember", 
           openModal("confirm", {
             title: self ? t("chat.groupMemberMenu.takeOwnershipOf", { group }) : t("chat.groupMemberMenu.transferOwnershipOf", { group }),
             body: self
-              ? t("chat.groupMemberMenu.youBecomeTheOwnerInPlaceOf", { owner })
+              ? personText("chat.groupMemberMenu.youBecomeTheOwnerInPlaceOf", null, null, { owner: personNode(ch.owner_id, owner) })
               : ch.owner_id === me.id
-                ? t("chat.groupMemberMenu.theyBecomeTheOwnerAndYouAMember", { name })
-                : t("chat.groupMemberMenu.theyBecomeTheOwnerInPlaceOf", { name, owner }),
+                ? personText("chat.groupMemberMenu.theyBecomeTheOwnerAndYouAMember", userId, name)
+                : personText("chat.groupMemberMenu.theyBecomeTheOwnerInPlaceOf", userId, name, { owner: personNode(ch.owner_id, owner) }),
             confirmLabel: self ? t("chat.groupMemberMenu.takeOwnership") : t("chat.groupMemberMenu.transferOwnership"),
             onConfirm: () => channelsApi.patch(channelId, { owner_id: userId }),
           }),
@@ -114,8 +115,8 @@ export const groupMemberMenu = defineMenu<GroupMemberMenuRowCtx>("groupMember", 
         danger: true,
         onSelect: () =>
           openModal("confirm", {
-            title: t("chat.groupMemberMenu.removeNamed", { name: a.name }),
-            body: t("chat.groupMemberMenu.theyAreRemovedFromTheGroup", { name: a.name, group: a.group }),
+            title: personText("chat.groupMemberMenu.removeNamed", userId, a.name),
+            body: personText("chat.groupMemberMenu.theyAreRemovedFromTheGroup", userId, a.name, { group: a.group }),
             confirmLabel: t("composer.composer.remove"),
             danger: true,
             onConfirm: () => channelsApi.removeRecipient(channelId, userId),

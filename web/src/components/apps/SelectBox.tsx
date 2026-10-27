@@ -12,6 +12,7 @@ import s from "./SelectBox.module.css";
 export interface Choice {
   value: string;
   label: string;
+  labelNode?: ReactNode;
   description?: string;
   emoji?: HookEmoji;
   /** A person's picture or a role's colour, drawn before the label. */
@@ -34,8 +35,10 @@ export function ChoiceGlyph({ e, size = 18 }: { e: HookEmoji; size?: number }) {
  */
 export function SelectBox({
   placeholder,
+  ariaLabel,
   picked,
   labelOf,
+  renderLabelOf,
   choicesFor,
   min = 1,
   max = 1,
@@ -49,9 +52,11 @@ export function SelectBox({
   testId,
 }: {
   placeholder: string;
+  ariaLabel?: string;
   picked: readonly string[];
   /** The words a picked value shows with, once the list is closed. */
   labelOf: (value: string) => string;
+  renderLabelOf?: (value: string) => ReactNode;
   /** What the list offers for what is typed into its search. */
   choicesFor: (query: string) => Choice[];
   min?: number;
@@ -94,7 +99,9 @@ export function SelectBox({
     }
     setDraft((cur) => (cur.includes(value) ? cur.filter((v) => v !== value) : cur.length >= max ? cur : [...cur, value]));
   };
-  const shown = (anchor && multi ? draft : picked).map(labelOf).join(", ");
+  const selected = anchor && multi ? draft : picked;
+  const shown = selected.map(labelOf).join(", ");
+  const shownNodes = renderLabelOf ? selected.map((v, i) => <span key={v}>{i ? ", " : ""}{renderLabelOf(v)}</span>) : shown;
   const keys = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -113,6 +120,7 @@ export function SelectBox({
         type="button"
         id={id}
         className={s.select}
+        aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={!!anchor}
         aria-invalid={invalid || undefined}
@@ -124,7 +132,7 @@ export function SelectBox({
         }}
         data-testid={testId}
       >
-        <span className={[s.text, shown ? "" : s.placeholder].join(" ")} dir="auto">{shown || placeholder}</span>
+        <span className={[s.text, shown ? "" : s.placeholder].join(" ")} dir="auto">{shown ? shownNodes : placeholder}</span>
         {busy ? (
           <span className={s.dots} aria-hidden="true"><i /><i /><i /></span>
         ) : (
@@ -158,7 +166,7 @@ export function SelectBox({
                   <button key={o.value} type="button" role="option" aria-selected={on} className={s.option} data-active={i === active || undefined} onMouseEnter={() => setActive(i)} onClick={() => pick(o.value)}>
                     {o.picture ?? (o.emoji ? <ChoiceGlyph e={o.emoji} size={22} /> : null)}
                     <span className={s.optText}>
-                      <span className={s.optLabel} dir="auto">{o.label}</span>
+                      <span className={s.optLabel} dir="auto">{o.labelNode ?? o.label}</span>
                       {o.description ? <span className={s.optDesc} dir="auto">{o.description}</span> : null}
                     </span>
                     {multi ? (

@@ -513,7 +513,7 @@ private fun Meter(share: Float, full: Boolean, label: String) {
 }
 
 @Composable
-private fun ListRow(icon: @Composable () -> Unit, name: String, trailing: @Composable () -> Unit = {}) {
+private fun ListRow(icon: @Composable () -> Unit, name: String, personId: String? = null, trailing: @Composable () -> Unit = {}) {
     val c = Nx.colors
     Row(
         Modifier.fillMaxWidth().background(c.bgSurface, Radii.Sm).padding(horizontal = 10.dp, vertical = 8.dp),
@@ -521,7 +521,7 @@ private fun ListRow(icon: @Composable () -> Unit, name: String, trailing: @Compo
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         icon()
-        Txt(name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f))
+        fish.nexa.ui.chat.PersonName(personId, name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f))
         trailing()
     }
 }
@@ -730,7 +730,7 @@ private fun GiveAPlan() {
         if (asLink) {
             Hint(t("support.giftLink.about"))
         } else if (picked != null) {
-            ListRow({ Avatar(picked.id, nameOf(picked), picked.avatarId, 32.dp) }, nameOf(picked)) {
+            ListRow({ Avatar(picked.id, nameOf(picked), picked.avatarId, 32.dp) }, nameOf(picked), personId = picked.id) {
                 NxButton(t("support.gift.change"), { to = null }, kind = ButtonKind.GHOST, size = ButtonSize.TOUCH)
             }
         } else {
@@ -751,7 +751,7 @@ private fun GiveAPlan() {
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Avatar(u.id, nameOf(u), u.avatarId, 28.dp)
-                        Txt(nameOf(u), style = Nx.type.bodySmall.copy(fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
+                        fish.nexa.ui.chat.PersonName(u.id, nameOf(u), style = Nx.type.bodySmall.copy(fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
                     }
                 }
             }

@@ -268,7 +268,14 @@ fun CallBanner(channelId: String, modifier: Modifier = Modifier) {
                     Txt(t("voice.callBanner.callInProgress"), Modifier.weight(1f, fill = false), style = Nx.type.bodySmall.copy(fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
                     CallTimer(channelId, pill = true)
                 }
-                Txt(others.joinToString(", ") { callName(it.userId, channelId) }, style = Nx.type.hint, color = c.textMuted, maxLines = 1)
+                fish.nexa.ui.chat.PersonLine(Nx.type.hint, c.textMuted, maxLines = 1, serverId = Nexa.channels.get(channelId)?.serverId) { names ->
+                    androidx.compose.ui.text.buildAnnotatedString {
+                        others.forEachIndexed { i, p ->
+                            if (i > 0) append(", ")
+                            names.append(this, p.userId.takeUnless { isGuestUser(it) }, callName(p.userId, channelId))
+                        }
+                    }
+                }
             }
             val interaction = remember { MutableInteractionSource() }
             val pressed by interaction.collectIsPressedAsState()
@@ -413,7 +420,7 @@ fun CallLine(cm: ChatMessage, modifier: Modifier = Modifier) {
                 parts.getOrNull(0)?.takeIf { it.isNotEmpty() }?.let { Txt(it, style = words, color = c.text) }
                 if (parts.size > 1) {
                     val interaction = remember { MutableInteractionSource() }
-                    Txt(fish.nexa.ui.shell.Names.display(Nexa.users.get(person)), Modifier.pressable(interaction) { openProfile(person) }, style = words.copy(fontWeight = FontWeight(500)), color = c.textStrong)
+                    fish.nexa.ui.chat.PersonName(person, fish.nexa.ui.shell.Names.display(Nexa.users.get(person)), modifier = Modifier.pressable(interaction) { openProfile(person) }, style = words.copy(fontWeight = FontWeight(500)), color = c.textStrong)
                 }
                 parts.getOrNull(1)?.takeIf { it.isNotEmpty() }?.let { Txt(it, style = words, color = c.text) }
             }

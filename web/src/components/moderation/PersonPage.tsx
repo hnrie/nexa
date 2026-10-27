@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { ChevronLeft, FolderOpen, Gavel, IdCard, ShieldCheck, UserRound } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -129,7 +130,7 @@ export function PersonPage() {
           <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={48} status={deleted ? null : st.status} />
           <div className={m.userNames}>
             <span className={m.userName}>
-              <span>{deleted ? t("nexa.deletedUser") : user.display_name}</span>
+              <PersonName userId={deleted ? null : user.id} user={deleted ? null : user}>{deleted ? t("nexa.deletedUser") : user.display_name}</PersonName>
               {atLeast(mine, "admin") ? <AltBadge user={user} onOpen={() => setAltsOpen(true)} /> : null}
               {rank ? <RankPill rank={rank} /> : null}
             </span>

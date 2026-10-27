@@ -26,6 +26,7 @@ data class PromptField(
     val placeholder: String? = null,
     val maxLength: Int? = null,
     val hint: String? = null,
+    val hintWords: fish.nexa.ui.chat.PersonWords? = null,
 )
 
 /**
@@ -91,6 +92,7 @@ private fun PromptSheet(
                 label = f.label,
                 placeholder = f.placeholder,
                 hint = f.hint,
+                hintContent = f.hintWords?.let { words -> { fish.nexa.ui.chat.PersonWordsText(words, fish.nexa.ui.theme.Nx.type.hint, fish.nexa.ui.theme.Nx.colors.textMuted) } },
                 imeAction = if (i == fields.lastIndex) ImeAction.Done else ImeAction.Next,
                 onIme = if (i == fields.lastIndex) ({ submit() }) else null,
                 capitalize = true,

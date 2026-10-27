@@ -58,6 +58,8 @@ export interface ContextMenuState {
   reactions?: { emoji: string[]; mine: string[]; pick: (emoji: string) => void; more: () => void };
   /** What the menu is called, for anyone who cannot see what it opened from. */
   label?: string;
+  /** Rich visible menu title; label remains the searchable/accessibility text. */
+  labelNode?: ReactNode;
   /** Opens upwards, its bottom edge at y: for a button along the bottom of the screen. */
   above?: boolean;
   /**
@@ -78,7 +80,7 @@ export interface ContextMenuState {
 
 export interface Toast {
   id: number;
-  text: string;
+  text: ReactNode;
   kind: "info" | "error" | "success" | "warning";
 }
 
@@ -130,7 +132,7 @@ interface UIState {
   endEdit: (channelId: string, messageId: string) => void;
   setJumpTo: (j: UIState["jumpTo"]) => void;
   /** `duration` in milliseconds, for a plugin's toast (from 1 to 15 seconds); the app's own toasts go by their kind. */
-  toast: (text: string, kind?: Toast["kind"], duration?: number) => void;
+  toast: (text: ReactNode, kind?: Toast["kind"], duration?: number) => void;
   dismissToast: (id: number) => void;
   holdToasts: (held: boolean) => void;
   setFocused: (v: boolean) => void;

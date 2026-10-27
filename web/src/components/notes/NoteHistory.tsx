@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { ArrowLeft, RotateCcw } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
@@ -13,7 +14,7 @@ import { NOTE_MAX_CHARS, type NoteDoc } from "@/lib/notes/model";
 import { formatDateDivider, formatExact, formatTime, sameDay } from "@/lib/time";
 import { displayName, fetchMissingUsers, useUsers } from "@/stores/users";
 import { useUI } from "@/stores/ui";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { NoteFile, NoteFileLine } from "./NoteFile";
 import { noteName } from "./NoteParts";
 import s from "./Notes.module.css";
@@ -126,7 +127,7 @@ export function NoteHistory({ noteId, current, canRestore, narrow, onClose, onRe
               <span className={s.versionWhen}>{formatTime(v.savedAt)}</span>
               <span className={s.versionWho}>
                 {v.editedBy ? <Avatar id={v.editedBy} avatarId={users[v.editedBy]?.avatar_id ?? null} name={who(v)} size={18} /> : null}
-                {who(v)}
+                <PersonName userId={v.editedBy}>{who(v)}</PersonName>
               </span>
               {v.head && v.head.title !== now.title ? (
                 <span className={s.versionTitle} dir="auto">
@@ -153,7 +154,7 @@ export function NoteHistory({ noteId, current, canRestore, narrow, onClose, onRe
           <LoadError message={noteError(shown.error, t("notes.history.couldNotOpen"))} />
         </div>
       ) : (
-        <VersionView doc={shown.doc} note={version ? t("notes.history.savedBy", { name: who(version), when: formatExact(version.savedAt) }) : t("notes.history.currentNote")} />
+        <VersionView doc={shown.doc} note={version ? <Tr id="notes.history.savedBy" values={{ name: <PersonName userId={version.editedBy}>{who(version)}</PersonName>, when: formatExact(version.savedAt) }} /> : t("notes.history.currentNote")} />
       )}
     </div>
   );
@@ -187,7 +188,7 @@ export function NoteHistory({ noteId, current, canRestore, narrow, onClose, onRe
 }
 
 /** One version of a note, as it read then. */
-function VersionView({ doc, note }: { doc: NoteDoc; note: string }) {
+function VersionView({ doc, note }: { doc: NoteDoc; note: React.ReactNode }) {
   const base = useRenderCtx();
   const ctx = useMemo<RenderCtx>(() => ({ ...base, renderFile: (id, name, width, align) => <NoteFileLine width={width} align={align}><NoteFile meta={doc.files[id]} name={name} width={width} align={align} /></NoteFileLine> }), [base, doc.files]);
   return (

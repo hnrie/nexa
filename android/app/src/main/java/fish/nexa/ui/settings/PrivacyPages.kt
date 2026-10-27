@@ -197,7 +197,7 @@ fun BlockedPage() {
                 ) {
                     Avatar(u.id, u.name, u.avatarId, 32.dp)
                     Column(Modifier.weight(1f)) {
-                        Txt(u.name, style = Nx.type.body.copy(fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
+                        fish.nexa.ui.chat.PersonName(u.id, u.name, nameStyle = u.nameStyle, style = Nx.type.body.copy(fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
                         Txt(u.username, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
                     }
                 }

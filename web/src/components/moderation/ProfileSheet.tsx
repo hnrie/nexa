@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { CalendarDays, ChevronRight, Clock, Copy, Eraser, ImageOff, ShieldCheck, UserRoundX } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -106,7 +107,7 @@ export function ProfileSheet({ user, servers, owner, onModerate, onOpenServer, p
       run: () => onModerate({ action: "avatar_remove", preset: { images: { avatar: false, banner: true } } }),
       testid: "sheet-banner",
     },
-    { part: "display_name", label: fieldLabel("display_name"), value: <bdi>{user.display_name}</bdi>, empty: false, action: t("moderation.sheet.reset"), icon: <Eraser size={15} aria-hidden="true" />, run: () => reset("display_name"), testid: "sheet-display_name" },
+    { part: "display_name", label: fieldLabel("display_name"), value: <PersonName user={user}>{user.display_name}</PersonName>, empty: false, action: t("moderation.sheet.reset"), icon: <Eraser size={15} aria-hidden="true" />, run: () => reset("display_name"), testid: "sheet-display_name" },
     { part: "username", label: fieldLabel("username"), value: <bdi>@{user.username}</bdi>, empty: false, action: t("moderation.sheet.reset"), icon: <Eraser size={15} aria-hidden="true" />, run: () => reset("username"), testid: "sheet-username" },
     { part: "pronouns", label: fieldLabel("pronouns"), value: user.pronouns ? <bdi>{user.pronouns}</bdi> : t("moderation.sheet.notSet"), empty: !user.pronouns, action: t("moderation.sheet.reset"), icon: <Eraser size={15} aria-hidden="true" />, run: () => reset("pronouns"), testid: "sheet-pronouns" },
     {
@@ -365,7 +366,7 @@ function PublicFace({ user, hl }: { user: ModUser; hl: Part }) {
           <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={84} status={st.status} />
         </div>
         <div className={p.faceNames}>
-          <span className={p.faceName} data-hl={hl === "display_name" || undefined} dir="auto">{user.display_name}</span>
+          <PersonName user={user} className={p.faceName} data-hl={hl === "display_name" || undefined} dir="auto">{user.display_name}</PersonName>
           <span className={p.faceHandle}>
             <span data-hl={hl === "username" || undefined}>@{user.username}</span>
             {user.pronouns ? (

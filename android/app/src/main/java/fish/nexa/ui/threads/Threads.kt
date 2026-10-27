@@ -302,14 +302,13 @@ fun ThreadChip(serverId: String, summary: ThreadSummary, spineFrom: androidx.com
 @Composable
 private fun LastLine(serverId: String, threadId: String, last: fish.nexa.data.ThreadLast.Last) {
     val c = Nx.colors
-    val st = Nexa.servers.get(serverId)
+    val st = Nexa.servers.byId.collectAsState().value[serverId]
     val name = fish.nexa.ui.shell.Names.member(serverId, last.authorId)
     val own = st?.members?.get(last.authorId)?.avatarId
-    val look = fish.nexa.ui.chat.RoleLooks.withOwn(st?.let { fish.nexa.ui.chat.RoleLooks.of(it, last.authorId) }, Nexa.users.get(last.authorId)?.nameStyle)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         fish.nexa.ui.components.Avatar(last.authorId, name, own ?: Nexa.users.get(last.authorId)?.avatarId, 16.dp)
         Box(Modifier.widthIn(max = 120.dp)) {
-            fish.nexa.ui.chat.RoleName(name, look, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20f), fontWeight = FontWeight(600)), fallback = c.textStrong)
+            fish.nexa.ui.chat.PersonName(last.authorId, name, serverId = serverId, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20f), fontWeight = FontWeight(600)), color = c.textStrong)
         }
         Txt(last.text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
         Txt(fish.nexa.ui.Time.relative(last.createdAt), style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted, maxLines = 1)
@@ -538,7 +537,7 @@ private fun StarterCard(serverId: String, parentId: String, messageId: String) {
                 val name = Names.member(serverId, cm.authorId)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Avatar(cm.authorId, name, Nexa.users.get(cm.authorId)?.avatarId, 20.dp)
-                    Txt(name, style = Nx.type.bodySmall.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                    fish.nexa.ui.chat.PersonName(cm.authorId, name, serverId = serverId, style = Nx.type.bodySmall.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     Txt(Time.timestamp(cm.m.createdAt), style = Nx.type.timestamp, color = c.textMuted, maxLines = 1)
                 }
                 if (Nexa.relationships.isBlocked(cm.authorId)) Txt(t("people.blocked.replyPreview"), style = Nx.type.bodySmall, color = c.textMuted)
@@ -787,7 +786,7 @@ private fun ThreadListRow(serverId: String?, th: ThreadListing) {
         Column(Modifier.weight(1f)) {
             Txt(ch.name, style = Nx.type.body.copy(fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ch.ownerId?.let { Txt(t("threads.panel.startedBy", "name" to Names.member(serverId, it)), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1, modifier = Modifier.weight(1f, fill = false)) }
+                ch.ownerId?.let { fish.nexa.ui.chat.PersonText(it, t("threads.panel.startedBy", "name" to fish.nexa.ui.chat.PERSON_SLOT), Names.member(serverId, it), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1, modifier = Modifier.weight(1f, fill = false)) }
                 val count = ch.thread?.messageCount ?: 0
                 Txt(if (count == 0) t("threads.chip.noMessages") else t("threads.chip.messages", "count" to count), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
             }

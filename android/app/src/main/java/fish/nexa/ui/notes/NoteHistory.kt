@@ -181,7 +181,7 @@ fun NoteHistoryView(noteId: String, current: () -> NoteDoc, canRestore: Boolean,
                         Txt(Time.time(v.savedAt), style = Nx.type.body.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(700), fontFeatureSettings = "tnum"), color = c.textStrong)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             v.editedBy?.let { id -> Avatar(id, who(v), users[id]?.avatarId, 18.dp) }
-                            Txt(who(v), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textSubtle, maxLines = 1)
+                            fish.nexa.ui.chat.PersonName(v.editedBy, who(v), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textSubtle, maxLines = 1)
                         }
                         when {
                             v.head == null -> Txt(t("notes.history.unreadable"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted, maxLines = 1)

@@ -623,7 +623,8 @@ private fun NameBar(
             t.me -> t("voice.voice.yourScreen")
             else -> t("voice.voice.theirScreen", "name" to name)
         }
-        Txt(label, Modifier.weight(1f, fill = false), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(fs), fontWeight = FontWeight(600)), color = roleColor ?: c.textStrong, maxLines = 1)
+        if (t.kind == Tile.Kind.SCREEN) Txt(label, Modifier.weight(1f, fill = false), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(fs), fontWeight = FontWeight(600)), color = roleColor ?: c.textStrong, maxLines = 1)
+        else fish.nexa.ui.chat.PersonName(t.userId.takeUnless { isGuestUser(it) }, label, modifier = Modifier.weight(1f, fill = false), serverId = (vs?.channelId ?: state.mine?.channelId)?.let { Nexa.channels.get(it)?.serverId }, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(fs), fontWeight = FontWeight(600)), color = roleColor ?: c.textStrong)
         val guest = isGuestUser(t.userId)
         if (t.kind != Tile.Kind.SCREEN && guest) Tag(t("voice.voiceParticipants.guest"), c.bgActive, c.textStrong)
         // their server tag, as beside their name everywhere else

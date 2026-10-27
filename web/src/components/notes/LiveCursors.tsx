@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import type { CursorMark, FormatSurface } from "@/components/composer/format/surface";
 import { b64url, openNoteCursor, sealNoteCursor } from "@/crypto/notes";
@@ -25,6 +26,7 @@ interface Remote {
 
 interface Drawn {
   key: string;
+  userId: string;
   hue: string;
   name: string;
   moved: number;
@@ -92,6 +94,7 @@ export function useLiveCursors({ noteId, note, ctl, page }: Options): LiveCursor
         const at = c.cursorRects(r.mark);
         out.push({
           key,
+          userId: r.userId,
           hue: personHue(noteId, r.userId),
           name: displayName(names.current[r.userId]),
           moved: r.moved,
@@ -217,7 +220,7 @@ export function useLiveCursors({ noteId, note, ctl, page }: Options): LiveCursor
           {d.caret ? (
             <span className={s.theirCaret} style={{ left: d.caret.left, top: d.caret.top, height: d.caret.height, "--who": d.hue } as CSSProperties} data-testid="note-their-caret">
               <span key={d.moved} className={s.theirName}>
-                {d.name}
+                <PersonName userId={d.userId}>{d.name}</PersonName>
               </span>
             </span>
           ) : null}

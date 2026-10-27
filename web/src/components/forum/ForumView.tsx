@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Archive, ChevronDown, ChevronUp, LayoutGrid, LayoutList, MessageSquare, MessagesSquare, Pin, Plus, SlidersHorizontal, Tag as TagIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -123,7 +124,7 @@ function PostCard({ post, tags, layout, pinned, onOpen }: { post: Post; tags: Fo
             <span className={s.held}>{t("chat.messageItem.waitingForTheEncryptionKey")}</span>
           ) : (
             <>
-              <span className={s.postAuthor}>{shown}</span>
+              <PersonName userId={author} serverId={th.server_id} className={s.postAuthor}>{shown}</PersonName>
               {words ? <span className={s.postSep} aria-hidden="true">{": "}</span> : null}
               {words}
             </>

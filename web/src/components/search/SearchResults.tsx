@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 /**
  * Search results, one look for both search boxes: tabs for messages, media,
  * links and files, each with how many matched; a sort; and the results
@@ -131,7 +132,8 @@ function MediaThumb({ item, className }: { item: MediaItem; className?: string |
 
 /** One message found: a button of its own, or the inside of an option in the global search's list. */
 export const MessageHit = memo(function MessageHit({ doc, needles, names, showWhere, dated, onJump, asOption = false }: { doc: SearchDoc; needles: string[]; names: Names; showWhere: boolean; dated: boolean; onJump: (d: SearchDoc) => void; asOption?: boolean }) {
-  const renderCtx = useRenderCtx();
+  const serverId = useChannels((c) => c.byId[doc.c]?.server_id);
+  const renderCtx = useRenderCtx(serverId);
   const where = useWhere(names)(doc.c);
   const imagePreviews = useSettings((st) => st.settings.imagePreviews);
   // a webhook's message may say everything in its embeds
@@ -146,7 +148,7 @@ export const MessageHit = memo(function MessageHit({ doc, needles, names, showWh
       <Avatar id={doc.a} avatarId={author?.avatar_id ?? null} name={name} size={32} />
       <span className={s.hitMain}>
         <span className={s.hitHead}>
-          <span className={s.hitName} dir="auto">{name}</span>
+          <span className={s.hitName} dir="auto">{doc.hn ? name : <PersonName userId={doc.a} serverId={serverId}>{name}</PersonName>}</span>
           {showWhere && where.label ? (
             <span className={s.hitWhere} dir="auto">
               {/* a group has no # or @ to say what it is */}

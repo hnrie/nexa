@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useEffect, useState } from "react";
 import type { PublicUser } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
@@ -8,7 +9,7 @@ import { ReadableError } from "@/lib/readableError";
 import type { SignedIn } from "@/stores/auth";
 import s from "./Auth.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 
 /**
  * The login page's QR code: a phone where the account is signed in scans it
@@ -48,7 +49,7 @@ export function QrSignIn({ onSignedIn, onError, className }: { onSignedIn: (out:
             <Avatar id={scanned.id} avatarId={scanned.avatar_id} name={scanned.display_name} size={96} />
           </div>
           <h2 className={s.qrTitle}>{t("qrLogin.checkYourPhone")}</h2>
-          <p className={s.qrText}>{t("qrLogin.approveAs", { name: scanned.display_name })}</p>
+          <p className={s.qrText}>{<Tr id="qrLogin.approveAs" values={{ name: <PersonName user={scanned}>{scanned.display_name}</PersonName> }} />}</p>
         </>
       ) : (
         <>

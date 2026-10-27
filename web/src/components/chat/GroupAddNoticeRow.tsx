@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Eye } from "lucide-react";
 import { useId } from "react";
 import type { GroupAddNotice } from "@/api/types";
@@ -58,7 +59,7 @@ export function GroupAddNoticeRow({ notice }: { notice: GroupAddNotice }) {
           values={{
             name: (
               <button type="button" className={n.link} dir="auto" onClick={() => openModal("profile", { userId: notice.added_by })} data-testid="group-add-notice-name">
-                {name}
+                <PersonName userId={notice.added_by}>{name}</PersonName>
               </button>
             ),
             setting: t("settings.privacy.letFriendsAddMe"),

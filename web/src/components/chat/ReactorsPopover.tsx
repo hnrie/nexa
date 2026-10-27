@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -99,7 +100,7 @@ export function ReactorsPopover({ anchor, emoji, custom, label, count, ids, onCl
           {ids.map((id) => (
             <li key={id} className={s.person}>
               <Avatar id={id} avatarId={users[id]?.avatar_id ?? null} name={displayName(users[id])} size={24} />
-              <span className={s.name} dir="auto">{displayName(users[id])}</span>
+              <PersonName userId={id} className={s.name} dir="auto">{displayName(users[id])}</PersonName>
             </li>
           ))}
           {more > 0 ? <li className={s.more}>{t("chat.reactions.andMore", { count: more })}</li> : null}

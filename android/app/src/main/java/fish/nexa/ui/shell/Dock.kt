@@ -92,7 +92,7 @@ fun UserPanel() {
         ) {
             Avatar(user.id, user.name, user.avatarId, 32.dp, status = status, speaking = fish.nexa.voice.Speaking.isSpeaking(user.id))
             Column(Modifier.weight(1f)) {
-                Txt(user.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1)
+                fish.nexa.ui.chat.PersonName(user.id, user.name, nameStyle = user.nameStyle, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14.5f), fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1)
                 // UserPanel.tsx: what they wrote or are doing, with its emoji drawn, else where they are
                 val sub = Nx.type.hint.copy(lineHeight = Nx.type.sp(14.4f))
                 if (hasStatusLine(user.id)) StatusLine(user.id, sub, c.textMuted)
@@ -157,7 +157,7 @@ fun openStatusSheet() {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(4.dp)) {
                 Avatar(me.id, me.name, me.avatarId, 40.dp, status = status)
                 Column {
-                    Txt(me.name, style = Nx.type.sheetTitle, color = c.textStrong, maxLines = 1)
+                    fish.nexa.ui.chat.PersonName(me.id, me.name, nameStyle = me.nameStyle, style = Nx.type.sheetTitle, color = c.textStrong, maxLines = 1)
                     Txt("@${me.username}", style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
                 }
             }

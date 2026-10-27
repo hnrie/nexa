@@ -473,7 +473,7 @@ private fun MemberCard(serverId: String, m: MemberRow, name: String, user: Publi
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Avatar(m.userId, name, m.avatarId ?: user?.avatarId, 36.dp)
                 Column(Modifier.weight(1f)) {
-                    Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1)
+                    fish.nexa.ui.chat.PersonName(m.userId, name, serverId = serverId, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1)
                     Txt("@" + (user?.username ?: ""), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f)), color = c.textMuted, maxLines = 1)
                 }
                 if (m.signals.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) { for (sig in m.signals) SignalBadge(sig) }
@@ -728,7 +728,7 @@ private fun ModViewSheet(layer: Layer, serverId: String, userId: String, onChang
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Avatar(userId, name, d?.avatarId ?: user?.avatarId, 64.dp)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Txt(name, style = Nx.type.title.copy(fontSize = Nx.type.sp(20f), lineHeight = Nx.type.sp(25f), fontWeight = FontWeight(700)), color = c.textStrong)
+                    fish.nexa.ui.chat.PersonName(userId, name, serverId = serverId, style = Nx.type.title.copy(fontSize = Nx.type.sp(20f), lineHeight = Nx.type.sp(25f), fontWeight = FontWeight(700)), color = c.textStrong)
                     if (user != null) Txt("@" + user.username, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted)
                 }
             }
@@ -755,6 +755,7 @@ private fun ModViewSheet(layer: Layer, serverId: String, userId: String, onChang
                             joinMethodLabel(j.joinMethod),
                             j.invitedBy?.let { t("members.mod.invitedBy", "name" to Names.display(users[it])) },
                             code = j.joinCode.ifEmpty { null },
+                            subWords = j.invitedBy?.let { fish.nexa.ui.chat.PersonWords(t("members.mod.invitedBy", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(it to Names.display(users[it]))) },
                         )
                     }
                     Fact(t("members.mod.messages"), d.messageCount.toString())
@@ -784,6 +785,10 @@ private fun ModViewSheet(layer: Layer, serverId: String, userId: String, onChang
                             "target" to Names.display(user),
                         ),
                         e.reason.ifEmpty { null }?.let { t("server.auditLog.reason", "reason" to it) },
+                        words = fish.nexa.ui.chat.PersonWords(t("members.mod.historyLine",
+                            "who" to (if (e.actorId == "0") t("automod.name") else fish.nexa.ui.chat.PERSON_SLOT),
+                            "what" to t("server.auditLog.verb.${e.action}"), "target" to "\u0002"),
+                            listOf(e.actorId.takeUnless { it == "0" } to Names.display(users[e.actorId]), userId to Names.display(user)), serverId),
                     )
                 }
             }
@@ -801,7 +806,7 @@ private fun Block(head: String, content: @Composable () -> Unit) {
 
 /** One fact about the member: what it is on the left, the answer beside it (with an invite's code in code type). */
 @Composable
-private fun Fact(label: String, value: String, sub: String? = null, last: Boolean = false, code: String? = null) {
+private fun Fact(label: String, value: String, sub: String? = null, last: Boolean = false, code: String? = null, subWords: fish.nexa.ui.chat.PersonWords? = null) {
     val c = Nx.colors
     Column {
         Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -816,7 +821,8 @@ private fun Fact(label: String, value: String, sub: String? = null, last: Boolea
                     },
                     style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), color = c.text),
                 )
-                if (sub != null) Txt(sub, style = Nx.type.hint, color = c.textMuted)
+                if (subWords != null) fish.nexa.ui.chat.PersonWordsText(subWords, Nx.type.hint, c.textMuted)
+                else if (sub != null) Txt(sub, style = Nx.type.hint, color = c.textMuted)
             }
         }
         if (!last) Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
@@ -824,14 +830,15 @@ private fun Fact(label: String, value: String, sub: String? = null, last: Boolea
 }
 
 @Composable
-private fun HistoryLine(time: String, text: String, sub: String?) {
+private fun HistoryLine(time: String, text: String, sub: String?, words: fish.nexa.ui.chat.PersonWords? = null) {
     val c = Nx.colors
     Column(
         Modifier.fillMaxWidth().background(c.bgSurface, Radii.Sm).padding(horizontal = 12.dp, vertical = 9.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Txt(time, style = Nx.type.hint, color = c.textMuted)
-        Txt(text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = c.text)
+        if (words != null) fish.nexa.ui.chat.PersonWordsText(words, Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), c.text)
+        else Txt(text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = c.text)
         if (sub != null) Txt(sub, style = Nx.type.hint, color = c.textMuted)
     }
 }

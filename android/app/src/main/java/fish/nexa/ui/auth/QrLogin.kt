@@ -93,7 +93,7 @@ fun openQrApprove(text: String) {
                     Icon(if (device.icon.contains("Smartphone") || device.icon.contains("Tablet")) "Smartphone" else "Laptop", c.textBrand, size = 28.dp)
                 }
                 Txt(t("qrLogin.logInOnDevice", "device" to device.label), style = Nx.type.title.copy(fontSize = Nx.type.sp(22f)), color = c.textStrong, align = TextAlign.Center)
-                Txt(t("qrLogin.asName", "name" to (Nexa.users.me.value?.name ?: "")), style = Nx.type.body, color = c.textMuted, align = TextAlign.Center)
+                fish.nexa.ui.chat.PersonText(Nexa.users.meId, t("qrLogin.asName", "name" to fish.nexa.ui.chat.PERSON_SLOT), (Nexa.users.me.value?.name ?: ""), style = Nx.type.body.copy(textAlign = TextAlign.Center), color = c.textMuted)
                 Txt(
                     t("qrLogin.onlyIfYouOpenedIt"), style = Nx.type.bodySmall, color = c.text,
                     modifier = Modifier.fillMaxWidth().background(c.warning.copy(alpha = 0.12f), Radii.Sm).border(1.dp, c.warning.copy(alpha = 0.5f), Radii.Sm).padding(horizontal = 14.dp, vertical = 12.dp),
@@ -222,12 +222,12 @@ fun QrSignInPanel(modifier: Modifier = Modifier, onError: (String) -> Unit) {
                 Avatar(who.id, who.name, who.avatarId, 96.dp)
             }
             Txt(t("qrLogin.checkYourPhone"), style = Nx.type.heading.copy(fontSize = Nx.type.sp(19f)), color = c.textStrong, align = TextAlign.Center)
-            Txt(t("qrLogin.approveAs", "name" to who.name), style = Nx.type.bodySmall, color = c.textMuted, align = TextAlign.Center)
+            fish.nexa.ui.chat.PersonText(who.id, t("qrLogin.approveAs", "name" to fish.nexa.ui.chat.PERSON_SLOT), who.name, style = Nx.type.bodySmall.copy(textAlign = TextAlign.Center), color = c.textMuted)
         } else {
             val l = link
             if (l != null) QrCode(l, 200.dp, t("qrLogin.title")) else Box(Modifier.size(200.dp).background(Color.White, Radii.Lg))
             Txt(t("qrLogin.title"), style = Nx.type.heading.copy(fontSize = Nx.type.sp(19f)), color = c.textStrong, align = TextAlign.Center)
-            Txt(t("qrLogin.hint"), style = Nx.type.bodySmall, color = c.textMuted, align = TextAlign.Center)
+            Txt(t("qrLogin.hint"), style = Nx.type.bodySmall.copy(textAlign = TextAlign.Center), color = c.textMuted)
         }
     }
 }

@@ -226,7 +226,7 @@ private fun ServerCard(s: ModServer, onModerate: () -> Unit) {
             CardBanner(s.bannerId, profileBrush(null, null, s.id), 88.dp)
             Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 44.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 Txt(s.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(17.5f), fontWeight = FontWeight(690)), color = c.textStrong, maxLines = 1)
-                OwnerChip(s.ownerId, t("moderation.servers.ownedBy", "name" to nameOf(owner))) { goPanel("users/${s.ownerId}") }
+                OwnerChip(s.ownerId, t("moderation.servers.ownedBy", "name" to fish.nexa.ui.chat.PERSON_SLOT), ownerName = nameOf(owner)) { goPanel("users/${s.ownerId}") }
                 Txt(
                     if (s.description.isNotEmpty()) previewText(s.description) else t("moderation.servers.noDescription"),
                     style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), lineHeight = Nx.type.sp(18.9f), fontStyle = if (s.description.isEmpty()) FontStyle.Italic else FontStyle.Normal),
@@ -251,7 +251,7 @@ private fun ServerCard(s: ModServer, onModerate: () -> Unit) {
 
 /** `.ownerChip` and `.whose`: whose something is, as a chip that opens them. */
 @Composable
-fun OwnerChip(userId: String, text: String, onClick: () -> Unit) {
+fun OwnerChip(userId: String, text: String, ownerName: String? = null, onClick: () -> Unit) {
     val c = Nx.colors
     val p = person(userId)
     val interaction = remember { MutableInteractionSource() }
@@ -269,7 +269,7 @@ fun OwnerChip(userId: String, text: String, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Avatar(userId, nameOf(p), p?.avatarId, 18.dp)
-        Txt(text, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = if (pressed) c.textStrong else c.textSubtle, maxLines = 1)
+        fish.nexa.ui.chat.PersonText(userId, text, ownerName ?: nameOf(p), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = if (pressed) c.textStrong else c.textSubtle, maxLines = 1)
     }
 }
 
@@ -388,7 +388,7 @@ fun StaffServerPage(serverId: String) {
                 }
                 item("owner") {
                     SheetPanel(t("moderation.servers.ownerTitle")) {
-                        OpenRow(nameOf(owner), owner?.let { "@" + it.username }, { goPanel("users/${server.ownerId}") }) { Avatar(server.ownerId, nameOf(owner), owner?.avatarId, 36.dp) }
+                        OpenRow(nameOf(owner), owner?.let { "@" + it.username }, { goPanel("users/${server.ownerId}") }, personId = server.ownerId) { Avatar(server.ownerId, nameOf(owner), owner?.avatarId, 36.dp) }
                     }
                 }
                 item("emoji") {
@@ -560,11 +560,11 @@ fun openModerateServer(server: ModServer, preset: List<String>?, onDone: (StaffC
         top = { close ->
             val owner = ownerName(server.ownerId)
             ModSheetTop(t("moderation.servers.moderateTitle"), close, leading = { ServerIcon(server.id, server.iconId, server.name, 40.dp) }) {
-                Txt(server.name + " · " + t("moderation.servers.ownedBy", "name" to owner), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = Nx.colors.textMuted, maxLines = 1)
+                fish.nexa.ui.chat.PersonText(server.ownerId, server.name + " · " + t("moderation.servers.ownedBy", "name" to fish.nexa.ui.chat.PERSON_SLOT), owner, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = Nx.colors.textMuted, maxLines = 1)
             }
         },
         foot = { close ->
-            ModSheetFoot(t("moderation.servers.notifies", "name" to ownerName(server.ownerId)), close) {
+            ModSheetFoot(t("moderation.servers.notifies", "name" to fish.nexa.ui.chat.PERSON_SLOT), close, personId = server.ownerId, personName = ownerName(server.ownerId)) {
                 NxButton(t("moderation.servers.submit", "count" to maxOf(1, s.fields.size)), { submit(close) }, enabled = ready(), loading = s.busy)
             }
         },
@@ -599,7 +599,7 @@ fun openModerateServer(server: ModServer, preset: List<String>?, onDone: (StaffC
             NoteBox(t("moderation.servers.takeNote"))
             if ("discovery" in s.fields) NoteBox(t("moderation.servers.discoveryNote"))
         }
-        ReasonSection(s.reason, { s.reason = it }, t("moderation.servers.reasonPlaceholder"), t("moderation.servers.reasonVisible", "name" to ownerName(server.ownerId)), quickReasons(t("moderation.servers.quickScam")))
+        ReasonSection(s.reason, { s.reason = it }, t("moderation.servers.reasonPlaceholder"), t("moderation.servers.reasonVisible", "name" to fish.nexa.ui.chat.PERSON_SLOT), quickReasons(t("moderation.servers.quickScam")), personId = server.ownerId, personName = ownerName(server.ownerId))
         s.error?.let { e -> DangerBox { Txt(e, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text) } }
     }
 }
@@ -653,11 +653,11 @@ fun openModerateEmoji(server: ModServerRef, emojis: List<Emoji>, onDone: (StaffC
         "moderate-emoji",
         top = { close ->
             ModSheetTop(t("moderation.packs.moderateEmoji"), close, leading = { ServerIcon(server.id, server.iconId, server.name, 40.dp) }) {
-                Txt(server.name + " · " + t("moderation.servers.ownedBy", "name" to ownerName(server.ownerId)), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = Nx.colors.textMuted, maxLines = 1)
+                fish.nexa.ui.chat.PersonText(server.ownerId, server.name + " · " + t("moderation.servers.ownedBy", "name" to fish.nexa.ui.chat.PERSON_SLOT), ownerName(server.ownerId), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = Nx.colors.textMuted, maxLines = 1)
             }
         },
         foot = { close ->
-            ModSheetFoot(t("moderation.servers.notifies", "name" to ownerName(server.ownerId)), close) {
+            ModSheetFoot(t("moderation.servers.notifies", "name" to fish.nexa.ui.chat.PERSON_SLOT), close, personId = server.ownerId, personName = ownerName(server.ownerId)) {
                 NxButton(t("moderation.packs.submitEmoji", "count" to emojis.size), { submit(close) }, enabled = ready(), loading = s.busy)
             }
         },
@@ -670,7 +670,7 @@ fun openModerateEmoji(server: ModServerRef, emojis: List<Emoji>, onDone: (StaffC
             NoteBox(t("moderation.packs.emojiNote"))
         }
         ToggleRow(s.block, { s.block = it }, t("moderation.packs.blockPictures"), t("moderation.packs.blockPicturesHint"), rule = false)
-        ReasonSection(s.reason, { s.reason = it }, t("moderation.packs.reasonPlaceholder"), t("moderation.servers.reasonVisible", "name" to ownerName(server.ownerId)), listOf(t("moderation.quick.hateful"), t("moderation.quick.explicit"), t("moderation.quick.harassment"), t("moderation.quick.impersonation"), t("moderation.packs.quickCopyright")))
+        ReasonSection(s.reason, { s.reason = it }, t("moderation.packs.reasonPlaceholder"), t("moderation.servers.reasonVisible", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(t("moderation.quick.hateful"), t("moderation.quick.explicit"), t("moderation.quick.harassment"), t("moderation.quick.impersonation"), t("moderation.packs.quickCopyright")), personId = server.ownerId, personName = ownerName(server.ownerId))
         s.error?.let { e -> DangerBox { Txt(e, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text) } }
     }
 }

@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { FollowedChannels } from "@/components/follows/FollowedChannels";
 import { ChevronDown, ChevronRight, Copy, LockOpen, Plus, Trash2, Webhook as WebhookIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -26,7 +27,7 @@ import { SaveBar } from "../SettingsLayer";
 import s from "./Integrations.module.css";
 import { AppsSection } from "./AppsSection";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 
 /** What someone changed on one webhook and has not saved. */
 interface Draft {
@@ -224,7 +225,7 @@ export default function IntegrationsPage({ serverId, channelId }: { serverId: st
                       <span className={s.name} dir="auto">{name}</span>
                       <span className={s.meta}>
                         {channels[w.channel_id] ? <bdi>#{channels[w.channel_id]!.name}</bdi> : null}
-                        {creator ? <> · {t("integrations.createdBy", { date: formatShortDate(w.created_at), name: creator })}</> : <> · {t("integrations.createdOn", { date: formatShortDate(w.created_at) })}</>}
+                        {creator ? <> · {<Tr id="integrations.createdBy" values={{ name: <PersonName user={w.user}>{creator}</PersonName>, date: formatShortDate(w.created_at) }} />}</> : <> · {t("integrations.createdOn", { date: formatShortDate(w.created_at) })}</>}
                       </span>
                     </span>
                     {expanded ? <ChevronDown size={18} aria-hidden="true" /> : <ChevronRight size={18} aria-hidden="true" />}

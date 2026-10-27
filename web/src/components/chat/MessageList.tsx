@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { withOwn } from "@/lib/useMemberLook";
 import { nameClass, nameStyle } from "@/lib/roleLook";
 import { ArrowDown } from "lucide-react";
@@ -891,7 +892,7 @@ export function MessageList({ channel }: { channel: Channel }) {
           <div className={s.emptyAvatar}><Avatar id={other} avatarId={u?.avatar_id ?? null} name={name} size={80} /></div>
           <h2 className={[s.emptyName, nameClass(look)].join(" ")} style={nameStyle(look)}>{name}</h2>
           <div className={s.emptyUser}>{u?.username ?? ""}</div>
-          <p className={s.emptyText}><Tr id="chat.messageList.dmStart" values={{ name: <b>{name}</b> }} /></p>
+          <p className={s.emptyText}><Tr id="chat.messageList.dmStart" values={{ name: <b><PersonName userId={other} user={u}>{name}</PersonName></b> }} /></p>
         </div>
       );
     }

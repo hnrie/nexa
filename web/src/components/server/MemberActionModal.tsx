@@ -1,3 +1,5 @@
+import { personText } from "@/lib/personText";
+import { PersonName } from "@/components/common/PersonName";
 import { useState } from "react";
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
@@ -62,7 +64,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
     <div className={s.serverRow}>
       <Avatar id={userId} avatarId={member?.avatar_id ?? user?.avatar_id ?? null} name={name} size={40} />
       <div>
-        <div className={s.typeLabel}>{name}</div>
+        <div className={s.typeLabel}><PersonName userId={userId} user={user} serverId={serverId}>{name}</PersonName></div>
         <div className={s.typeDesc}><bdi>@{user?.username ?? userId}</bdi></div>
       </div>
     </div>
@@ -113,7 +115,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
       <Modal
         open
         onClose={onClose}
-        title={timedOut ? t("server.memberAction.removeTimeoutFrom", { name }) : t("server.memberAction.timeOutNamed", { name })}
+        title={timedOut ? personText("server.memberAction.removeTimeoutFrom", userId, name, {}, serverId) : personText("server.memberAction.timeOutNamed", userId, name, {}, serverId)}
         width={440}
         footer={
           <>
@@ -156,7 +158,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
     <Modal
       open
       onClose={onClose}
-      title={ban ? t("server.memberAction.banNamed", { name }) : t("server.memberAction.kickNamed", { name })}
+      title={ban ? personText("server.memberAction.banNamed", userId, name, {}, serverId) : personText("server.memberAction.kickNamed", userId, name, {}, serverId)}
       width={440}
       footer={
         <>
@@ -179,7 +181,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
     >
       <div className={s.form}>
         {head}
-        <p className={s.hint}>{ban ? t("server.memberAction.confirmBan", { name }) : t("server.memberAction.confirmKick", { name })}</p>
+        <p className={s.hint}>{ban ? personText("server.memberAction.confirmBan", userId, name, {}, serverId) : personText("server.memberAction.confirmKick", userId, name, {}, serverId)}</p>
         <p className={s.fine}>{t("server.memberAction.theServerSEncryptionKeysRotate")}</p>
         <Field label={t("server.memberAction.reasonOptional")}>
           <TextInput value={reason} onChange={(e) => setReason(e.target.value)} maxLength={512} autoFocus />

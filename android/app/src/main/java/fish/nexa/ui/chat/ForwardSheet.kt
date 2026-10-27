@@ -117,7 +117,7 @@ fun openForward(msg: ChatMessage) {
                         else -> Box(Modifier.size(32.dp).background(c.bgActive, CircleShape), contentAlignment = Alignment.Center) { Icon("Users", c.icon, size = 18.dp) }
                     }
                     Column(Modifier.weight(1f)) {
-                        Txt(p.name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(500)), color = c.text, maxLines = 1)
+                        fish.nexa.ui.chat.PersonName(p.other, p.name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(500)), color = c.text, maxLines = 1)
                         if (p.sub.isNotEmpty()) Txt(p.sub, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12f)), color = c.textMuted, maxLines = 1)
                     }
                     // the radio's ring, filled with the accent once picked

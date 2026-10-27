@@ -189,7 +189,7 @@ private fun PersonRow(user: PublicUser, label: String, sub: String, trailing: @C
     ) {
         Avatar(user.id, nameOf(user), user.avatarId, 32.dp)
         Column(Modifier.weight(1f)) {
-            Txt(label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), fontWeight = FontWeight(600), lineHeight = Nx.type.sp(19.4f)), color = Nx.colors.text, maxLines = 1)
+            fish.nexa.ui.chat.PersonName(user.id, label, nameStyle = user.nameStyle, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), fontWeight = FontWeight(600), lineHeight = Nx.type.sp(19.4f)), color = Nx.colors.text, maxLines = 1)
             Txt(sub, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(16.25f)), color = Nx.colors.textMuted, maxLines = 1)
         }
         trailing()
@@ -359,6 +359,7 @@ private fun PeopleWithAccess(noteId: String, sharing: NoteSharing, owner: Boolea
                                             },
                                         ),
                                         title = t("notes.share.roleOf", "name" to name),
+                                        titleWords = fish.nexa.ui.chat.PersonWords(t("notes.share.roleOf", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(m.user.id to name)),
                                     )
                                 }
                                 .padding(start = 11.dp, end = 8.dp)

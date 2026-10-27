@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { ArrowLeftFromLine, ArrowRightToLine, ChartBar, Crown, MessageSquareText, Pin, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useChannels } from "@/stores/channels";
@@ -22,14 +23,15 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
 
 function PlainSystemMessage({ msg }: { msg: DecryptedMessage }) {
   const users = useUsers((u) => u.byId);
+  const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id);
   const setJumpTo = useUI((u) => u.setJumpTo);
   const thread = useChannels((c) => (msg.thread ? c.byId[msg.thread.id] : undefined));
   // a poll's closing line speaks for whoever asked: the webhook that posted it, or the person
   const actor = msg.hook?.name ?? displayName(users[msg.author_id]);
   const target = msg.mentions[0] ? displayName(users[msg.mentions[0]]) : t("chat.systemMessage.someone");
   // names that open a profile, and the link to a pinned message, are real buttons
-  const A = <button type="button" className={s.sysName} dir="auto" onClick={(e) => openProfilePopout(msg.author_id, e.currentTarget)}>{actor}</button>;
-  const T = msg.mentions[0] ? <button type="button" className={s.sysName} dir="auto" onClick={(e) => openProfilePopout(msg.mentions[0]!, e.currentTarget)}>{target}</button> : <b className={s.sysName}>{target}</b>;
+  const A = <button type="button" className={s.sysName} dir="auto" onClick={(e) => openProfilePopout(msg.author_id, e.currentTarget)}>{msg.webhook_id ? actor : <PersonName userId={msg.author_id} serverId={serverId}>{actor}</PersonName>}</button>;
+  const T = msg.mentions[0] ? <button type="button" className={s.sysName} dir="auto" onClick={(e) => openProfilePopout(msg.mentions[0]!, e.currentTarget)}><PersonName userId={msg.mentions[0]} serverId={serverId}>{target}</PersonName></button> : <b className={s.sysName}>{target}</b>;
   let icon = <ArrowRightToLine size={18} />;
   let body: React.ReactNode;
   switch (msg.type) {
@@ -96,7 +98,7 @@ function PlainSystemMessage({ msg }: { msg: DecryptedMessage }) {
       icon = <ChartBar size={18} />;
       body = !msg.webhook_id
         ? <PersonPollResult msg={msg} actor={A} onView={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })} />
-        : <PollResult msg={msg} actor={<b className={s.sysName} dir="auto">{actor}</b>} onView={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })} />;
+        : <PollResult msg={msg} actor={<b className={s.sysName} dir="auto">{msg.webhook_id ? actor : <PersonName userId={msg.author_id} serverId={serverId}>{actor}</PersonName>}</b>} onView={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })} />;
       break;
     default:
       body = <Tr id="chat.systemMessage.didSomething" values={{ actor: A }} />;

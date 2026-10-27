@@ -591,7 +591,7 @@ private fun ConversationStart(channel: Channel) {
                 StartAvatar { Avatar(other, name, Nexa.users.get(other)?.avatarId, 80.dp) }
                 RoleName(name, RoleLooks.withOwn(null, Nexa.users.byId.collectAsState().value[other]?.nameStyle), Nx.type.title.copy(fontSize = Nx.type.sp(28f), lineHeight = Nx.type.sp(30.8f), fontWeight = FontWeight(700)), c.textStrong)
                 Txt(Nexa.users.get(other)?.username ?: "", style = Nx.type.body.copy(fontSize = Nx.type.sp(18f), fontWeight = FontWeight(500)), color = c.textSubtle, modifier = Modifier.padding(top = 6.dp, bottom = 12.dp))
-                StartText(boldIn("chat.messageList.dmStart", "name", name))
+                PersonText(other, t("chat.messageList.dmStart", "name" to PERSON_SLOT), name, Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(23.25f)), c.textMuted, Modifier.widthIn(max = 560.dp), nameTextStyle = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(23.25f), fontWeight = FontWeight(700)))
             }
             channel.type == "group_dm" -> {
                 val name = Names.channel(channel)

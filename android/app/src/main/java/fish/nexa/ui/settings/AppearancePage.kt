@@ -186,7 +186,7 @@ fun AppearancePage() {
         Avatar(me?.id ?: "0", name, me?.avatarId, 40.dp)
         Column {
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Txt(name, style = Nx.type.name, color = c.textStrong)
+                fish.nexa.ui.chat.PersonName(me?.id, name, nameStyle = me?.nameStyle, style = Nx.type.name, color = c.textStrong)
                 Txt(t("settings.appearance.todayAt420Pm"), style = Nx.type.timestamp, color = c.textMuted, modifier = Modifier.padding(bottom = 2.dp))
             }
             Txt(t("settings.appearance.lookAtMeIMA"), style = Nx.type.body, color = c.text)

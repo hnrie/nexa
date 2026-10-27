@@ -123,6 +123,7 @@ fun PersonPage(userId: String, cases: Boolean, caseId: String?) {
             onBack = { goPanel("users", replace = true) },
             leading = { Avatar(user.id, user.displayName, user.avatarId, 48.dp, status = if (deleted) null else st.status) },
             title = if (deleted) t("nexa.deletedUser") else user.displayName,
+            titlePersonId = user.id.takeUnless { deleted },
             sub = listOf(if (deleted) t("moderation.user.deleted") else "@${user.username}", t("moderation.casesCount", "count" to d.cases.size)).plus(standing).joinToString(" · "),
             badge = {
                 AltBadge(user)
@@ -293,7 +294,7 @@ private fun PublicFace(user: ModUser) {
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Txt(user.displayName, style = Nx.type.name.copy(fontSize = Nx.type.sp(21f), lineHeight = Nx.type.sp(25.2f), fontWeight = FontWeight(700)), color = c.textStrong)
+                        fish.nexa.ui.chat.PersonName(user.id, user.displayName, style = Nx.type.name.copy(fontSize = Nx.type.sp(21f), lineHeight = Nx.type.sp(25.2f), fontWeight = FontWeight(700)), color = c.textStrong)
                         Txt("@" + user.username + if (user.pronouns.isNotEmpty()) " · " + user.pronouns else "", style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
                     }
                     if (status.isNotEmpty()) Row(

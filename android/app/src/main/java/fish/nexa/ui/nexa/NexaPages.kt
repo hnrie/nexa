@@ -130,7 +130,7 @@ fun PersonChip(id: String, size: Dp = 20.dp, withUsername: Boolean = false) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (p != null && p.flags and 16L != 0L) NexaAvatar(size) else Avatar(id, name, p?.avatarId, size)
-        Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
+        fish.nexa.ui.chat.PersonName(id.takeIf { p != null && !p.deleted && p.flags and 16L == 0L }, name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 1)
         if (withUsername && p != null && !p.deleted && p.username.isNotEmpty()) Txt("@" + p.username, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
     }
 }

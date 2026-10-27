@@ -785,7 +785,7 @@ private fun AutomodLog(serverId: String) {
     }
     person?.let { p ->
         Row(Modifier.padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Txt(t("automod.log.onlyFor", "name" to Names.display(Nexa.users.get(p))), style = Nx.type.bodySmall, color = c.text, modifier = Modifier.weight(1f))
+            fish.nexa.ui.chat.PersonText(p, t("automod.log.onlyFor", "name" to fish.nexa.ui.chat.PERSON_SLOT), Names.display(Nexa.users.get(p)), style = Nx.type.bodySmall, color = c.text, modifier = Modifier.weight(1f))
             NxButton(t("automod.log.everyone"), { person = null }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "X")
         }
     }
@@ -819,7 +819,7 @@ private fun EventRow(serverId: String, ev: AutomodEvent, onPerson: (String) -> U
     Column(Modifier.fillMaxWidth().surfaceCard(c, Radii.Md).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Avatar(ev.userId, name, user?.avatarId, 32.dp)
-            Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f).pressable(remember { MutableInteractionSource() }) { onPerson(ev.userId) })
+            fish.nexa.ui.chat.PersonName(ev.userId, name, serverId = serverId, style = Nx.type.body.copy(fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 1, modifier = Modifier.weight(1f).pressable(remember { MutableInteractionSource() }) { onPerson(ev.userId) })
             Txt(Time.timestamp(ev.createdAt), style = Nx.type.timestamp, color = c.textMuted, maxLines = 1)
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {

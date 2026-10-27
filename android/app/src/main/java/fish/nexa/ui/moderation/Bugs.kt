@@ -102,11 +102,11 @@ private fun order(sort: String): Comparator<StaffBug> = when (sort) {
 }
 
 /** The newest line of a report's thread, as the list previews it. */
-private fun preview(r: StaffBug): String {
+private fun preview(r: StaffBug, whoName: String? = null): String {
     val last = r.lastMessage ?: return Markdown.plainText(Markdown.parse(r.description), fish.nexa.ui.chat.AppNames)
-    if (last.kind == "system") return systemLineText(last.line(), null, staff = true)
+    if (last.kind == "system") return systemLineText(last.line(), null, staff = true, whoName = whoName)
     val p = fish.nexa.data.NexaInbox.people.value[last.authorId]
-    val who = if (p != null) nameOf(p) else r.reporterDisplayName
+    val who = whoName ?: if (p != null) nameOf(p) else r.reporterDisplayName
     return "$who: " + Markdown.plainText(Markdown.parse(last.body), fish.nexa.ui.chat.AppNames)
 }
 
@@ -258,14 +258,14 @@ private fun BugRow(r: StaffBug, onPick: () -> Unit) {
                 Txt(Time.relative(r.lastActivityAt), style = Nx.type.hint, color = c.textMuted, maxLines = 1)
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-                Txt(
-                    name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(500)), color = c.textSubtle, maxLines = 1,
+                fish.nexa.ui.chat.PersonName(
+                    r.userId.takeUnless { gone }, name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), fontWeight = FontWeight(500)), color = c.textSubtle, maxLines = 1,
                     modifier = Modifier.clip(Radii.Xs).pressable(remember { MutableInteractionSource() }, enabled = !gone) { openProfile(r.userId) }.semantics { contentDescription = t("nexa.viewProfile") + ", " + name },
                 )
                 if (r.awaiting == "staff") Tag(t("bugs.staff.waiting"), "danger")
                 BugStatusChip(r.status, small = true)
             }
-            Txt(preview(r), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18.2f)), color = c.textSubtle, maxLines = 2)
+            fish.nexa.ui.chat.PersonText(r.lastMessage?.authorId, preview(r, fish.nexa.ui.chat.PERSON_SLOT), r.lastMessage?.authorId?.let { fish.nexa.ui.nexa.personName(fish.nexa.ui.nexa.threadPerson(it)) } ?: "", style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18.2f)), color = c.textSubtle, maxLines = 2)
             if (r.attachments.isNotEmpty()) Box(Modifier.padding(top = 4.dp)) { ThumbStrip(r.attachments) }
         }
     }
@@ -414,7 +414,7 @@ private fun StaffBugPane(reportId: String, onBack: () -> Unit, onChanged: (Staff
                 }
             }),
             note = {
-                Txt(t("moderation.case.replyNote", "name" to nameOf(reporter)), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(17.5f)), color = c.textMuted)
+                fish.nexa.ui.chat.PersonText(r.userId, t("moderation.case.replyNote", "name" to fish.nexa.ui.chat.PERSON_SLOT), nameOf(reporter), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(17.5f)), color = c.textMuted)
             },
             onSeen = { last -> Moderation.readThread("bug", reportId, last) },
         )

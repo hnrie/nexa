@@ -1,3 +1,5 @@
+import { personText } from "@/lib/personText";
+import { PersonName } from "@/components/common/PersonName";
 import { Link, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -17,7 +19,7 @@ import { LinkOnlyTag } from "./LinkOnlyTag";
 import g from "./GroupAdd.module.css";
 import s from "./CreateDMModal.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 // only the create call is batched; a group grows without limit after that
 const MAX = 49;
 
@@ -32,12 +34,12 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
   const [q, setQ] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [said, setSaid] = useState<{ n: number; text: string } | null>(null);
+  const [said, setSaid] = useState<{ n: number; text: React.ReactNode } | null>(null);
   // Adding to a group that exists, a Link Only friend is sent its link in a
   // direct message instead (one link, made on the first request). A group
   // still being put together has no link yet: they are marked Link Only.
   const joinLink = useLazyGroupLink(groupId ?? "");
-  const requests = useJoinRequests(groupId ?? "", joinLink, (name) => setSaid((cur) => ({ n: (cur?.n ?? 0) + 1, text: t("groupAdd.joinRequest.sentTo", { name }) })));
+  const requests = useJoinRequests(groupId ?? "", joinLink, (name, id) => setSaid((cur) => ({ n: (cur?.n ?? 0) + 1, text: personText("groupAdd.joinRequest.sentTo", id, name) })));
   const friends = useMemo(
     // whoever was sent the link and has joined with it since stays, marked Sent
     () => Object.values(rels).filter((r) => r.type === "friend" && (!(group?.recipient_ids ?? []).includes(r.user.id) || requests.sent.includes(r.user.id))).sort((a, b) => a.user.display_name.localeCompare(b.user.display_name)),
@@ -97,7 +99,7 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
             return (
               <button key={id} type="button" className={s.chip} onClick={() => toggle(id)} aria-label={t("modals.createDM.removeName", { name: shownName })} title={t("modals.createDM.removeName", { name: shownName })}>
                 <Avatar id={id} avatarId={u?.avatar_id ?? null} name={shownName} size={16} />
-                <span className={s.chipName}>{shownName}</span>
+                <PersonName userId={id} user={u} className={s.chipName}>{shownName}</PersonName>
                 <X size={12} aria-hidden="true" />
               </button>
             );
@@ -107,7 +109,7 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
       {heldBy ? (
         <p className={g.warn} role="alert" data-testid="link-only-held">
           <Link size={16} aria-hidden="true" />
-          <span>{t("modals.createDM.linkOnlyInGroup", { name: heldName })}</span>
+          <span>{<Tr id="modals.createDM.linkOnlyInGroup" values={{ name: <PersonName userId={heldBy}>{heldName}</PersonName> }} />}</span>
         </p>
       ) : null}
       {!group && picked.length > 1 ? <TextInput className={s.name} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modals.createDM.groupNameOptional")} aria-label={t("modals.createDM.groupNameOptional")} maxLength={100} /> : null}
@@ -118,7 +120,7 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
             <>
               <Avatar id={r.user.id} avatarId={r.user.avatar_id} name={r.user.display_name} size={32} />
               <span className={s.text}>
-                <span className={s.rowName}>{r.user.display_name}</span>
+                <PersonName user={r.user} className={s.rowName}>{r.user.display_name}</PersonName>
                 <span className={s.rowUser}>{r.user.username}</span>
               </span>
             </>

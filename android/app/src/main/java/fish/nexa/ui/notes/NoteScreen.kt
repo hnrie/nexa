@@ -740,12 +740,11 @@ private fun NoteEditor(noteId: String, note: OpenNote, bridge: NoteBridge, narro
         val places = remember { fish.nexa.ui.format.BlockPlaces() }
         Box(Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { sheetArea[0] = it }) {
             Column(Modifier.fillMaxSize().verticalScroll(sheetScroll)) {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                Box(Modifier.fillMaxWidth().then(cursors.modifier), contentAlignment = Alignment.TopCenter) {
                     Column(
                         Modifier
                             .widthIn(max = SHEET_MAX)
                             .fillMaxWidth()
-                            .then(cursors)
                             .padding(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 128.dp),
                     ) {
                         val titleStyle = Nx.type.title.copy(
@@ -812,6 +811,7 @@ private fun NoteEditor(noteId: String, note: OpenNote, bridge: NoteBridge, narro
                                 .pressable(remember { MutableInteractionSource() }) { surface.focusEnd() },
                         )
                     }
+                    cursors.labels(Modifier.matchParentSize())
                 }
             }
             // typing @ offers the people who have the note

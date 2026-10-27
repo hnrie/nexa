@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { KeyRound, Lock } from "lucide-react";
 import { useEffect } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -132,7 +133,7 @@ export default function InvitePage() {
       <InviteView
         target={target}
         variant="page"
-        lead={inviter ? <Tr id="invite.invitedYouToJoin" values={{ name: <bdi>{inviter.display_name || inviter.username}</bdi> }} /> : t("invite.youveBeenInvited")}
+        lead={inviter ? <Tr id="invite.invitedYouToJoin" values={{ name: <PersonName user={inviter}>{inviter.display_name || inviter.username}</PersonName> }} /> : t("invite.youveBeenInvited")}
         actions={actions}
       >
         {!member && fragment.includes("k=") ? <p className={v.note}><KeyRound size={14} aria-hidden="true" />{t("invite.thisLinkCarriesTheEncryptionKey")}</p> : null}

@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { KeyRound, Lock, X } from "lucide-react";
 import { useId } from "react";
 import { Button } from "@/components/common/Button";
@@ -54,7 +55,7 @@ export function InviteDialog({ onClose, code, hash }: { onClose: () => void; cod
         target={target}
         variant="dialog"
         headingId={headingId}
-        lead={inviter ? <Tr id="invite.invitedYouToJoin" values={{ name: <bdi>{inviter.display_name || inviter.username}</bdi> }} /> : t("invite.youveBeenInvited")}
+        lead={inviter ? <Tr id="invite.invitedYouToJoin" values={{ name: <PersonName user={inviter}>{inviter.display_name || inviter.username}</PersonName> }} /> : t("invite.youveBeenInvited")}
         actions={
           <>
             {member ? (

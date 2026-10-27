@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { NotebookPen, Plus } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -116,7 +117,7 @@ function FirstNote({ onNew, making }: { onNew: () => void; making: boolean }) {
           <span className={s.sampleLine} style={{ width: "92%" }} />
           <span className={s.sampleLine} data-typing="" style={{ "--who": PERSON_HUES[2] } as CSSProperties}>
             <span className={s.sampleCaret}>
-              <span className={s.sampleName}>{name}</span>
+              <PersonName user={friend} className={s.sampleName}>{name}</PersonName>
             </span>
           </span>
           <span className={s.sampleLine} style={{ width: "78%" }} />

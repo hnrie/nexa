@@ -131,13 +131,13 @@ fun EncryptionPage(serverId: String) {
             val latest = k.epochs.lastOrNull()
             val held = Nexa.keys.ring.latest(k.convId)
             val holdLatest = held != null && latest != null && held.first == latest.epoch
-            val sub = (if (latest != null) t("server.encryption.keyEpochCreatedBy", "epoch" to latest.epoch, "when" to Time.full(latest.createdAt), "who" to Names.display(users[latest.createdBy])) + (if (latest.reason.isNotEmpty()) " (${latest.reason})" else "")
+            val sub = (if (latest != null) t("server.encryption.keyEpochCreatedBy", "epoch" to latest.epoch, "when" to Time.full(latest.createdAt), "who" to fish.nexa.ui.chat.PERSON_SLOT) + (if (latest.reason.isNotEmpty()) " (${latest.reason})" else "")
             else t("server.encryption.noKeyYet")) + " · " + when {
                 holdLatest -> t("server.encryption.youHoldTheCurrentKey")
                 held != null -> t("server.encryption.youHoldAnOlderKeyWaiting")
                 else -> t("server.encryption.youDonTHoldThisKey")
             }
-            KeyCard("KeyRound", if (k.flags?.needsRotation == true) c.warning else c.positive, k.name, sub) {
+            KeyCard("KeyRound", if (k.flags?.needsRotation == true) c.warning else c.positive, k.name, sub, subWords = latest?.let { fish.nexa.ui.chat.PersonWords(sub, listOf(it.createdBy to Names.display(users[it.createdBy]))) }) {
                 NxButton(
                     t("server.encryption.rotate"), { rotate(k.convId) },
                     kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "RefreshCw",
@@ -155,14 +155,15 @@ fun EncryptionPage(serverId: String) {
 
 /** `.keyCard`: an icon, a name and a line about it, and its button; the button drops under on a narrow phone. */
 @Composable
-private fun KeyCard(icon: String, tint: androidx.compose.ui.graphics.Color, name: String, sub: String, action: @Composable () -> Unit) {
+private fun KeyCard(icon: String, tint: androidx.compose.ui.graphics.Color, name: String, sub: String, subWords: fish.nexa.ui.chat.PersonWords? = null, action: @Composable () -> Unit) {
     val c = Nx.colors
     Wrap(Modifier.fillMaxWidth().padding(bottom = 8.dp).surfaceCard(c).padding(horizontal = 16.dp, vertical = 14.dp), gap = 12.dp) {
         Row(Modifier.weight(1f).widthIn(min = 200.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, tint, size = 22.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(600)), color = c.text)
-                Txt(sub, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted)
+                if (subWords != null) fish.nexa.ui.chat.PersonWordsText(subWords, Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), c.textMuted)
+                else Txt(sub, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted)
             }
         }
         action()
@@ -292,7 +293,7 @@ fun InvitesPage(serverId: String) {
         // a card per invite, each value under its column's name (the web's table on a phone)
         for (i in invites.orEmpty()) key(i.code) {
             Column(Modifier.fillMaxWidth().padding(bottom = 8.dp).surfaceCard(c).padding(horizontal = 12.dp, vertical = 8.dp)) {
-                Cell(t("server.invites.inviter"), Names.display(users[i.inviterId]))
+                Cell(t("server.invites.inviter"), Names.display(users[i.inviterId]), personId = i.inviterId)
                 Cell(t("server.invites.code"), i.code, mono = true)
                 Cell(t("server.invites.channel"), i.channelId?.let { channels[it] }?.let { "#${it.name}" } ?: t("settings.profile.none"))
                 Cell(t("server.invites.uses"), i.uses.toString() + if (i.maxUses > 0) " / ${i.maxUses}" else "")
@@ -314,15 +315,15 @@ fun inviteLink(serverId: String, code: String): String {
 
 /** One value under its label, as a phone draws a table row (`.stack td`). */
 @Composable
-private fun Cell(label: String, value: String, mono: Boolean = false) {
+private fun Cell(label: String, value: String, mono: Boolean = false, personId: String? = null) {
     val c = Nx.colors
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Txt(label, style = Nx.type.label.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(700)), color = c.textMuted)
-        Txt(
-            value,
-            style = if (mono) Nx.type.code.copy(fontSize = Nx.type.sp(13f)) else Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)),
+        fish.nexa.ui.chat.PersonName(
+            personId, value,
+            style = (if (mono) Nx.type.code.copy(fontSize = Nx.type.sp(13f)) else Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f))).copy(textAlign = androidx.compose.ui.text.style.TextAlign.End),
             color = c.text,
-            align = androidx.compose.ui.text.style.TextAlign.End,
+            maxLines = Int.MAX_VALUE,
             modifier = Modifier.weight(1f),
         )
     }
@@ -391,9 +392,9 @@ fun BansPage(serverId: String) {
                 Row(Modifier.weight(1f).widthIn(min = 200.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Avatar(b.userId, name, u?.avatarId, 40.dp)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Txt(name, style = Nx.type.body.copy(fontWeight = FontWeight(600)), color = c.text, maxLines = 1)
-                        Txt(
-                            "@" + (u?.username ?: b.userId) + " · " + t("server.bans.bannedByOn", "when" to Time.full(b.createdAt), "who" to Names.display(users[b.bannedBy])) + (if (b.reason.isNotEmpty()) " · ${b.reason}" else ""),
+                        fish.nexa.ui.chat.PersonName(b.userId, name, style = Nx.type.body.copy(fontWeight = FontWeight(600)), color = c.text, maxLines = 1)
+                        fish.nexa.ui.chat.PersonText(
+                            b.bannedBy, "@" + (u?.username ?: b.userId) + " · " + t("server.bans.bannedByOn", "when" to Time.full(b.createdAt), "who" to fish.nexa.ui.chat.PERSON_SLOT) + (if (b.reason.isNotEmpty()) " · ${b.reason}" else ""), Names.display(users[b.bannedBy]),
                             style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)),
                             color = c.textMuted,
                         )

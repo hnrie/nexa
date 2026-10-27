@@ -619,7 +619,7 @@ fun Modifier.surfaceCard(c: fish.nexa.ui.theme.NexaColors, shape: androidx.compo
  * the choices open as a menu with the current one marked.
  */
 @Composable
-fun <T> SelectField(options: List<Pair<T, String>>, value: T, onChange: (T) -> Unit, modifier: Modifier = Modifier, title: String? = null, enabled: Boolean = true) {
+fun <T> SelectField(options: List<Pair<T, String>>, value: T, onChange: (T) -> Unit, modifier: Modifier = Modifier, title: String? = null, enabled: Boolean = true, optionPersonId: ((T) -> String?)? = null) {
     val c = Nx.colors
     val shape = Radii.Sm
     val current = options.firstOrNull { it.first == value }?.second ?: ""
@@ -632,13 +632,13 @@ fun <T> SelectField(options: List<Pair<T, String>>, value: T, onChange: (T) -> U
             .border(1.dp, c.borderSubtle, shape)
             .clip(shape)
             .pressable(remember { MutableInteractionSource() }, enabled = enabled) {
-                openMenu(options.map { (v, label) -> MenuItem.Action(label, checked = v == value) { onChange(v) } }, title = title, haptic = false)
+                openMenu(options.map { (v, label) -> MenuItem.Action(label, checked = v == value, personId = optionPersonId?.invoke(v)) { onChange(v) } }, title = title, haptic = false)
             }
             .semantics { if (title != null) contentDescription = title }
             .padding(start = 12.dp, end = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Txt(current, style = Nx.type.input, color = c.text, maxLines = 1, modifier = Modifier.weight(1f))
+        fish.nexa.ui.chat.PersonName(optionPersonId?.invoke(value), current, style = Nx.type.input, color = c.text, maxLines = 1, modifier = Modifier.weight(1f))
         Icon("ChevronDown", c.textMuted, size = 18.dp)
     }
 }

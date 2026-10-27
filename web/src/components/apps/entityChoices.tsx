@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Hash } from "lucide-react";
 import { Avatar } from "@/components/common/Avatar";
 import { channelsFor, peopleFor, rolesFor } from "@/lib/pickables";
@@ -13,7 +14,7 @@ export type EntityKind = "user" | "role" | "mentionable" | "channel";
 export function entityChoices(kind: EntityKind, channelId: string, query: string, channelTypes?: readonly number[]): Choice[] {
   const out: Choice[] = [];
   if (kind === "user" || kind === "mentionable") {
-    for (const u of peopleFor(channelId, query)) out.push({ value: u.id, label: displayName(u), description: u.username, picture: <Avatar id={u.id} avatarId={u.avatar_id} name={displayName(u)} size={24} /> });
+    for (const u of peopleFor(channelId, query)) out.push({ value: u.id, label: displayName(u), labelNode: <PersonName user={u} serverId={useChannels.getState().byId[channelId]?.server_id}>{displayName(u)}</PersonName>, description: u.username, picture: <Avatar id={u.id} avatarId={u.avatar_id} name={displayName(u)} size={24} /> });
   }
   if (kind === "role" || kind === "mentionable") {
     for (const r of rolesFor(channelId, query)) {
@@ -40,4 +41,17 @@ export function entityLabel(channelId: string, value: string): string {
 /** The kind of entity a select component (5 to 8) or a command option (6 to 9) asks for. */
 export function entityKindOfComponent(type: number): EntityKind | null {
   return type === 5 ? "user" : type === 6 ? "role" : type === 7 ? "mentionable" : type === 8 ? "channel" : null;
+}
+
+/** Rich identity labels, keeping entityLabel's string for search and accessibility. */
+export function entityLabelNode(channelId: string, value: string, kind: EntityKind) {
+  return <EntityPersonLabel channelId={channelId} value={value} kind={kind} />;
+}
+
+/** Selected people follow a fetched profile or rename without requiring their app form to render. */
+function EntityPersonLabel({ channelId, value, kind }: { channelId: string; value: string; kind: EntityKind }) {
+  const user = useUsers((u) => u.byId[value]);
+  const serverId = useChannels((c) => c.byId[channelId]?.server_id);
+  const text = user ? displayName(user) : entityLabel(channelId, value);
+  return kind === "user" || user ? <PersonName userId={value} user={user} serverId={serverId}>{text}</PersonName> : text;
 }

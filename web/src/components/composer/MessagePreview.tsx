@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Eye, X } from "lucide-react";
 import { useMemo } from "react";
 import { Avatar } from "@/components/common/Avatar";
@@ -5,6 +6,7 @@ import { useShownName } from "@/components/chat/useShownName";
 import c from "@/components/chat/Chat.module.css";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { Markdown, isEmojiOnly, parse } from "@/markdown";
+import { useChannels } from "@/stores/channels";
 import { useAuth } from "@/stores/auth";
 import { useUsers } from "@/stores/users";
 import { extractMentions } from "./mentions";
@@ -21,6 +23,7 @@ import { t } from "@/i18n";
  */
 export function MessagePreview({ text, channelId, onClose }: { text: string; channelId: string; onClose: () => void }) {
   const me = useAuth((a) => a.me);
+  const serverId = useChannels((c) => c.byId[channelId]?.server_id);
   const avatarId = useUsers((u) => (me ? (u.byId[me.id]?.avatar_id ?? me.avatar_id) : null));
   const users = useUsers((u) => u.byId);
   const name = useShownName(channelId, me?.id);
@@ -40,7 +43,7 @@ export function MessagePreview({ text, channelId, onClose }: { text: string; cha
       <div className={s.previewMsg}>
         <Avatar id={me.id} avatarId={avatarId} name={name} size={40} />
         <div className={s.previewBody}>
-          <div className={s.previewName} dir="auto">{name}</div>
+          <div className={s.previewName} dir="auto"><PersonName user={me} serverId={serverId}>{name}</PersonName></div>
           <div className={[c.content, jumbo ? c.jumbo : ""].join(" ")}>
             <Markdown source={source} ctx={ctx} jumbo={jumbo} />
           </div>

@@ -156,7 +156,7 @@ fun PackWhose(pack: ModPack, servers: Map<String, ModServerRef>) {
             Txt(t("moderation.packs.inServer", "name" to (srv?.name ?: t("moderation.packs.unknownServer"))), style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(600)), color = c.textSubtle, maxLines = 1)
         } else {
             fish.nexa.ui.components.Avatar(pack.ownerId, nameOf(owner), owner?.avatarId, 18.dp)
-            Txt(t("moderation.servers.ownedBy", "name" to nameOf(owner)), style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(600)), color = c.textSubtle, maxLines = 1)
+            fish.nexa.ui.chat.PersonText(pack.ownerId, t("moderation.servers.ownedBy", "name" to fish.nexa.ui.chat.PERSON_SLOT), nameOf(owner), style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(600)), color = c.textSubtle, maxLines = 1)
         }
     }
 }
@@ -538,7 +538,7 @@ fun PackPage(packId: String) {
                         Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Txt(pack.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(21f), fontWeight = FontWeight(700)), color = c.textStrong)
-                                Txt(if (server != null) t("moderation.packs.inServer", "name" to server.name) else t("moderation.servers.ownedBy", "name" to nameOf(owner)), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
+                                fish.nexa.ui.chat.PersonText(pack.ownerId, if (server != null) t("moderation.packs.inServer", "name" to server.name) else t("moderation.servers.ownedBy", "name" to fish.nexa.ui.chat.PERSON_SLOT), nameOf(owner), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
                             }
                             FaceSection(t("moderation.servers.description")) {
                                 if (pack.description.isNotEmpty()) Txt(pack.description, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20.3f)), color = c.text)
@@ -578,7 +578,7 @@ fun PackPage(packId: String) {
             item("owner") {
                 SheetPanel(if (server != null) t("moderation.packs.serverTitle") else t("moderation.servers.ownerTitle")) {
                     if (server != null) OpenRow(server.name, t("moderation.servers.ownedBy", "name" to nameOf(owner)), { goPanel("servers/${server.id}") }) { ServerIcon(server.id, server.iconId, server.name, 36.dp) }
-                    OpenRow(nameOf(owner), owner?.let { "@" + it.username }, { goPanel("users/${pack.ownerId}") }) { fish.nexa.ui.components.Avatar(pack.ownerId, nameOf(owner), owner?.avatarId, 36.dp) }
+                    OpenRow(nameOf(owner), owner?.let { "@" + it.username }, { goPanel("users/${pack.ownerId}") }, personId = pack.ownerId) { fish.nexa.ui.components.Avatar(pack.ownerId, nameOf(owner), owner?.avatarId, 36.dp) }
                 }
             }
             item("cases") {
@@ -652,12 +652,12 @@ fun openModeratePack(pack: ModPack, server: ModServerRef?, preset: PackPreset?, 
         "moderate-pack",
         top = { close ->
             ModSheetTop(if (pack.emoji) t("moderation.packs.moderateEmojiPack") else t("moderation.packs.moderateTitle"), close, leading = { PackCover(pack, big = false) }) {
-                Txt(pack.name + " · " + if (server != null) t("moderation.packs.inServer", "name" to server.name) else t("moderation.servers.ownedBy", "name" to ownerName(pack.ownerId)), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = Nx.colors.textMuted, maxLines = 1)
+                fish.nexa.ui.chat.PersonText(pack.ownerId, pack.name + " · " + if (server != null) t("moderation.packs.inServer", "name" to server.name) else t("moderation.servers.ownedBy", "name" to fish.nexa.ui.chat.PERSON_SLOT), ownerName(pack.ownerId), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = Nx.colors.textMuted, maxLines = 1)
             }
         },
         foot = { close ->
             val owner = ownerName(pack.ownerId)
-            ModSheetFoot(if (server != null) t("moderation.packs.notifiesServer", "name" to owner, "server" to server.name) else t("moderation.packs.notifies", "name" to owner), close) {
+            ModSheetFoot(if (server != null) t("moderation.packs.notifiesServer", "name" to fish.nexa.ui.chat.PERSON_SLOT, "server" to server.name) else t("moderation.packs.notifies", "name" to fish.nexa.ui.chat.PERSON_SLOT), close, personId = pack.ownerId, personName = owner) {
                 NxButton(
                     if (s.whole) (if (pack.emoji) t("moderation.packs.removeEmojiPack") else t("moderation.packs.removePack")) else t("moderation.packs.submit"),
                     { submit(close, owner) }, kind = if (s.whole) ButtonKind.DANGER else ButtonKind.PRIMARY, enabled = ready(), loading = s.busy,
@@ -694,7 +694,7 @@ fun openModeratePack(pack: ModPack, server: ModServerRef?, preset: PackPreset?, 
             NoteBox(t("moderation.packs.takeNote"))
         }
         if (takesPictures()) ToggleRow(s.block, { s.block = it }, t("moderation.packs.blockPictures"), t("moderation.packs.blockPicturesHint"), rule = false)
-        ReasonSection(s.reason, { s.reason = it }, t("moderation.packs.reasonPlaceholder"), t("moderation.servers.reasonVisible", "name" to ownerName(pack.ownerId)), listOf(t("moderation.quick.hateful"), t("moderation.quick.explicit"), t("moderation.quick.harassment"), t("moderation.quick.impersonation"), t("moderation.quick.spam"), t("moderation.packs.quickCopyright")))
+        ReasonSection(s.reason, { s.reason = it }, t("moderation.packs.reasonPlaceholder"), t("moderation.servers.reasonVisible", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(t("moderation.quick.hateful"), t("moderation.quick.explicit"), t("moderation.quick.harassment"), t("moderation.quick.impersonation"), t("moderation.quick.spam"), t("moderation.packs.quickCopyright")), personId = pack.ownerId, personName = ownerName(pack.ownerId))
         s.error?.let { e -> DangerBox { Txt(e, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text) } }
     }
 }

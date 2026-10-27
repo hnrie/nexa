@@ -1,3 +1,5 @@
+import { personText, personNode } from "@/lib/personText";
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { copyBotIdItem } from "@/lib/copyId";
 import { Ban, CalendarDays, Check, Clock, Ellipsis, FolderOpen, Gavel, ListChecks, MessageSquareOff, Search, UserRoundCheck, UserRoundX, Users, X } from "lucide-react";
@@ -59,7 +61,7 @@ const userGridMenu = defineMenu<UserGridMenuCtx>("userGrid", [
           disabled
             ? void setAccess({ disabled: false })
             : openModal("confirm", {
-                title: t("moderation.menu.disableTitle", { name: u.display_name }),
+                title: personText("moderation.menu.disableTitle", u.id, u.display_name),
                 body: t("moderation.menu.disableBody"),
                 confirmLabel: t("moderation.menu.disable"),
                 danger: true,
@@ -216,6 +218,7 @@ export function UserGrid() {
         x: e.type === "contextmenu" ? e.clientX : document.documentElement.dir === "rtl" ? r.right : r.left,
         y: e.type === "contextmenu" ? e.clientY : r.bottom + 4,
         label: u.display_name,
+        labelNode: personNode(u.id, u.display_name),
       },
     );
   };
@@ -473,7 +476,7 @@ function UserCard({ u, owner, onModerate, onCases, onProfile, onMenu, onAlts, pi
       <div className={m.cardBody}>
         <div className={m.cardName}>
           <button type="button" className={[m.cardNameText, m.cardNameLink].join(" ")} onClick={onProfile} data-testid="card-profile">
-            {u.display_name}
+            <PersonName user={u}>{u.display_name}</PersonName>
           </button>
           {rank ? <RankPill rank={rank} /> : null}
           {u.awaiting_cases > 0 ? (

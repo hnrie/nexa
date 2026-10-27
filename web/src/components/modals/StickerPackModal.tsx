@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { Check } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ApiError } from "@/api/client";
@@ -74,7 +75,7 @@ export function StickerPackModal({ onClose, info, stickerId }: { onClose: () => 
           <div className={s.creator}>
             {t("modals.stickerPack.createdBy")}{" "}
             {creator ? (
-              <button className={s.creatorLink} onClick={() => openModal("profile", { userId: creator.id })}>{displayName(creator)}</button>
+              <button className={s.creatorLink} onClick={() => openModal("profile", { userId: creator.id })}><PersonName user={creator}>{displayName(creator)}</PersonName></button>
             ) : (
               t("modals.stickerPack.someoneNoLongerHere")
             )}

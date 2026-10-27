@@ -26,6 +26,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -64,6 +65,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -284,6 +286,8 @@ private class Builder(
     val openUser: (String) -> Unit,
     val openEmoji: (Node, Rect) -> Unit,
     val context: android.content.Context,
+    val nameStyle: TextStyle,
+    val measureName: (String, String?) -> Pair<TextUnit, TextUnit>,
 ) {
     val content = HashMap<String, InlineTextContent>()
     val chips = ArrayList<Chip>()
@@ -459,7 +463,15 @@ private class Builder(
         chip(fill, 5.dp, 3f / 16f) {
             val style = SpanStyle(color = fg, fontWeight = FontWeight(600))
             val a = action
-            if (a != null && !ctx.inert && !covered) withLink(LinkAnnotation.Clickable("mention:${n.kind}:${n.id}") { a() }) { withStyle(style) { append(unbroken) } }
+            if (n.kind == MentionKind.USER && n.id != null && !covered) {
+                val key = "person:${content.size}"
+                val (width, height) = measureName(unbroken, n.id)
+                content[key] = InlineTextContent(Placeholder(width, height, PlaceholderVerticalAlign.TextCenter)) {
+                    val modifier = if (ctx.inert || a == null) Modifier else Modifier.pressable(remember { MutableInteractionSource() }, onClick = a)
+                    fish.nexa.ui.chat.PersonName(n.id, unbroken, nameStyle, fg, modifier, serverId = ctx.serverId)
+                }
+                appendInlineContent(key, unbroken)
+            } else if (a != null && !ctx.inert && !covered) withLink(LinkAnnotation.Clickable("mention:${n.kind}:${n.id}") { a() }) { withStyle(style) { append(unbroken) } }
             else withStyle(style) { append(unbroken) }
         }
     }
@@ -498,17 +510,29 @@ private fun InlineText(
     maxLines: Int = Int.MAX_VALUE,
     edited: String? = null,
 ) {
+    val inlineWidth = fish.nexa.ui.chat.rememberInlineWidth()
     val c = Nx.colors
     var revealed by remember(nodes) { mutableStateOf(emptySet<Int>()) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val context = LocalContext.current
     val underline = Nexa.settings.underlineLinks
-    val built = remember(nodes, revealed, now, c, edited, ctx, underline) {
+    val users by Nexa.users.byId.collectAsState()
+    val me by Nexa.users.me.collectAsState()
+    val measurer = rememberTextMeasurer()
+    val nameDensity = LocalDensity.current
+    val mentionStyle = style.copy(fontWeight = FontWeight(600))
+    val built = remember(nodes, revealed, now, c, edited, ctx, underline, users, me, mentionStyle, measurer, nameDensity, inlineWidth.pixels) {
         Builder(
             ctx, revealed, { revealed = revealed + it }, jumbo, now, c, underline,
             openUser = { id -> fish.nexa.ui.shell.openProfile(id) },
             openEmoji = { n, at -> openEmojiDetails(n, at) },
             context = context,
+            nameStyle = mentionStyle,
+            measureName = { text, id ->
+                val own = fish.nexa.data.NameStyle.read(if (id == me?.id) me?.nameStyle else users[id]?.nameStyle)
+                val measured = measurer.measure(text, fish.nexa.ui.chat.nameTextStyle(mentionStyle, own), maxLines = 1, overflow = TextOverflow.Ellipsis, constraints = Constraints(maxWidth = (inlineWidth.pixels - with(nameDensity) { mentionStyle.fontSize.toPx() * (6f / 16f) }.toInt()).coerceAtLeast(1)))
+                with(nameDensity) { measured.size.width.toSp() to measured.size.height.toSp() }
+            },
         ).build(nodes, edited)
     }
     // relative times keep counting
@@ -520,7 +544,7 @@ private fun InlineText(
     val density = LocalDensity.current
     BasicText(
         built.text,
-        modifier = modifier.drawBehind {
+        modifier = modifier.then(inlineWidth.modifier).drawBehind {
             val l = layout ?: return@drawBehind
             for (chip in built.chips) for (r in boxes(l, chip.start, chip.end)) {
                 val inset = with(density) { chip.inset.toPx() }

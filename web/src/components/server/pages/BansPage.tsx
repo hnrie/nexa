@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useEffect, useState } from "react";
 import { servers as serversApi } from "@/api/servers";
 import type { Ban } from "@/api/types";
@@ -16,7 +17,7 @@ import { displayName, useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import s from "../ServerSettings.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 export default function BansPage({ serverId }: { serverId: string }) {
   const users = useUsers((u) => u.byId);
   const upsertUsers = useUsers((u) => u.upsert);
@@ -85,8 +86,8 @@ export default function BansPage({ serverId }: { serverId: string }) {
         <div key={b.user_id} className={s.memberRow}>
           <Avatar id={b.user_id} avatarId={users[b.user_id]?.avatar_id ?? null} name={displayName(users[b.user_id])} size={40} />
           <div className={s.memberText}>
-            <span className={s.memberName}>{displayName(users[b.user_id])}</span>
-            <span className={s.memberSub}><bdi>@{users[b.user_id]?.username ?? b.user_id}</bdi> · {t("server.bans.bannedByOn", { when: formatFull(b.created_at), who: displayName(users[b.banned_by]) })}{b.reason ? ` · ${b.reason}` : ""}</span>
+            <PersonName userId={b.user_id} className={s.memberName}>{displayName(users[b.user_id])}</PersonName>
+            <span className={s.memberSub}><bdi>@{users[b.user_id]?.username ?? b.user_id}</bdi> · {<Tr id="server.bans.bannedByOn" values={{ when: formatFull(b.created_at), who: <PersonName userId={b.banned_by} serverId={serverId}>{displayName(users[b.banned_by])}</PersonName> }} />}{b.reason ? ` · ${b.reason}` : ""}</span>
           </div>
           <Button size="sm" variant="secondary" loading={busy === b.user_id} onClick={() => void revoke(b.user_id)}>{t("server.bans.revokeBan")}</Button>
         </div>

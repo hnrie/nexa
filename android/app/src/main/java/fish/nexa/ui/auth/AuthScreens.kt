@@ -82,7 +82,7 @@ import androidx.compose.ui.text.input.KeyboardType
  * with its glow thrown down, and a frosted card that rises in after it.
  */
 @Composable
-fun AuthLayout(title: String, subtitle: String? = null, maxWidth: Int = 480, mark: (@Composable () -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+fun AuthLayout(title: String, subtitle: String? = null, maxWidth: Int = 480, mark: (@Composable () -> Unit)? = null, subtitlePersonId: String? = null, subtitleName: String? = null, subtitleNameStyle: kotlinx.serialization.json.JsonElement? = null, content: @Composable ColumnScope.() -> Unit) {
     val c = Nx.colors
     val reduced = Nx.motion.reduced
     val rise = remember { Animatable(if (reduced) 1f else 0f) }
@@ -130,7 +130,12 @@ fun AuthLayout(title: String, subtitle: String? = null, maxWidth: Int = 480, mar
             ) {
                 mark?.invoke()
                 Txt(title, style = Nx.type.title.copy(fontSize = Nx.type.sp(25f), lineHeight = Nx.type.sp(27.5f)), color = c.textStrong, align = TextAlign.Center, modifier = Modifier.fillMaxWidth().semantics { heading() })
-                if (subtitle != null) Txt(subtitle, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(22.5f)), color = c.textMuted, align = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 0.dp).graphicsLayer { translationY = -10.dp.toPx() })
+                if (subtitle != null) {
+                    val subtitleStyle = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(22.5f), textAlign = TextAlign.Center)
+                    val subtitleModifier = Modifier.fillMaxWidth().padding(top = 0.dp).graphicsLayer { translationY = -10.dp.toPx() }
+                    if (subtitleName != null) fish.nexa.ui.chat.PersonText(subtitlePersonId, subtitle, subtitleName, subtitleStyle, c.textMuted, subtitleModifier, nameStyle = subtitleNameStyle)
+                    else Txt(subtitle, style = subtitleStyle, color = c.textMuted, modifier = subtitleModifier)
+                }
                 content()
             }
         }
@@ -603,7 +608,7 @@ fun LockScreen(state: AuthState.Locked) {
             }
         }
     }
-    AuthLayout(t("lock.unlockYourMessages"), t("lock.welcomeBackEnterYourPassword", "name" to state.me.name)) {
+    AuthLayout(t("lock.unlockYourMessages"), t("lock.welcomeBackEnterYourPassword", "name" to fish.nexa.ui.chat.PERSON_SLOT), subtitlePersonId = state.me.id, subtitleName = state.me.name, subtitleNameStyle = state.me.nameStyle) {
         error?.let { ErrorBox(it) }
         NxTextField(password, { password = it; wrong = null }, label = t("chat.lockedChannel.password"), required = true, password = true, error = wrong, imeAction = ImeAction.Go, onIme = { submit() })
         NxButton(t("lock.unlock"), { submit() }, size = ButtonSize.LG, block = true, loading = busy)

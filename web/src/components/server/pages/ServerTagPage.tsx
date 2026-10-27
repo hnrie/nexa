@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { ImagePlus, Trash2 } from "lucide-react";
 import { ColourInput } from "@/components/common/ColourInput";
 import { useRef, useState, type CSSProperties } from "react";
@@ -223,7 +224,7 @@ export default function ServerTagPage({ serverId }: { serverId: string }) {
               <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={36} />
               <div className={s.msgText}>
                 <div className={s.msgHead}>
-                  <span className={s.msgName}>{me.display_name}</span>
+                  <PersonName user={me} className={s.msgName}>{me.display_name}</PersonName>
                   <ServerTagChip tag={tag} open={false} />
                 </div>
                 <p className={s.msgBody}>{t("serverTag.page.previewMessage")}</p>
@@ -231,7 +232,7 @@ export default function ServerTagPage({ serverId }: { serverId: string }) {
             </div>
             <div className={s.member}>
               <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={32} status="online" />
-              <span className={s.memberName}>{me.display_name}</span>
+              <PersonName user={me} className={s.memberName}>{me.display_name}</PersonName>
               <ServerTagChip tag={tag} size="sm" open={false} />
             </div>
             <div className={s.big}>

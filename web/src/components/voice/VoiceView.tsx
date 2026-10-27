@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import {
   ChevronUp,
   Eye,
@@ -46,7 +47,7 @@ import { storage } from "@/lib/storage";
 import { containedSize, pinchView, type Size, type View } from "@/lib/zoomPan";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
-import { canI, memberColor, useServers } from "@/stores/servers";
+import { canI, useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
@@ -59,7 +60,7 @@ import { safeAspect } from "@/voice/videoCap";
 import { callViewOpen } from "@/voice/videoShown";
 import s from "./Voice.module.css";
 
-import { t as tr_, translator } from "@/i18n";
+import { t as tr_, translator, Tr } from "@/i18n";
 
 /** A round trip in the reader's language: "12 ms", "١٢ ملي ث". */
 function formatRtt(ms: number): string {
@@ -717,7 +718,6 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const renderTile = (t: Tile, place: "grid" | "focus" | "strip") => {
     const vs = byChannel[channel.id]?.[t.userId];
     const isSpeaking = !!speaking[t.userId] && t.kind !== "screen";
-    const color = serverState ? memberColor(serverState, t.userId) : undefined;
     const peerState = t.me || t.kind === "ringing" ? "connected" : (peers[t.userId] ?? "new");
     const live = isLive(t);
     // a picture over the size cap is never decoded here: the tile says so rather than wait for it
@@ -753,7 +753,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
         ) : oversized ? (
           <div className={s.offer} data-testid="picture-too-large">
             {place === "strip" || tileH < 150 ? null : <Avatar id={t.userId} avatarId={users[t.userId]?.avatar_id ?? null} name={nameOf(t.userId)} size={tileH < 220 ? 40 : 56} />}
-            {place !== "strip" && tileH >= 120 ? <div className={s.offerNote}>{t.kind === "screen" ? tr_("voice.voice.screenTooLarge", { name: nameOf(t.userId) }) : tr_("voice.voice.cameraTooLarge", { name: nameOf(t.userId) })}</div> : null}
+            {place !== "strip" && tileH >= 120 ? <div className={s.offerNote}>{t.kind === "screen" ? <Tr id="voice.voice.screenTooLarge" values={{ name: <PersonName userId={t.userId} serverId={channel.server_id}>{nameOf(t.userId)}</PersonName> }} /> : <Tr id="voice.voice.cameraTooLarge" values={{ name: <PersonName userId={t.userId} serverId={channel.server_id}>{nameOf(t.userId)}</PersonName> }} />}</div> : null}
             {live ? (
               <button
                 className={s.watchBtn}
@@ -772,7 +772,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
             {place === "strip" || tileH < 150 ? null : <Avatar id={t.userId} avatarId={users[t.userId]?.avatar_id ?? null} name={nameOf(t.userId)} size={tileH < 220 ? 40 : 56} />}
             {watching[t.userId] ? (
               <>
-                {place !== "strip" && tileH >= 190 ? <div className={s.offerText}>{tr_("voice.voice.connectingToScreen", { name: nameOf(t.userId) })}</div> : null}
+                {place !== "strip" && tileH >= 190 ? <div className={s.offerText}>{<Tr id="voice.voice.connectingToScreen" values={{ name: <PersonName userId={t.userId} serverId={channel.server_id}>{nameOf(t.userId)}</PersonName> }} />}</div> : null}
                 <button
                   className={s.watchBtn}
                   data-testid="stop-watching"
@@ -786,7 +786,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
               </>
             ) : (
               <>
-                {place !== "strip" && tileH >= 190 ? <div className={s.offerText}>{tr_("voice.voice.isSharingTheirScreen", { name: nameOf(t.userId) })}</div> : null}
+                {place !== "strip" && tileH >= 190 ? <div className={s.offerText}>{<Tr id="voice.voice.isSharingTheirScreen" values={{ name: <PersonName userId={t.userId} serverId={channel.server_id}>{nameOf(t.userId)}</PersonName> }} />}</div> : null}
                 <button
                   className={s.watchBtn}
                   data-testid="watch-stream"
@@ -809,8 +809,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
         )}
         <div className={s.tileBar}>
           {t.kind === "screen" ? <span className={s.live}>{tr_("voice.voice.live")}</span> : null}
-          <span className={s.tileName} style={color ? { color } : undefined}>
-            {t.kind === "screen" ? (t.me ? tr_("voice.voice.yourScreen") : tr_("voice.voice.theirScreen", { name: nameOf(t.userId) })) : nameOf(t.userId)}
+          <span className={s.tileName}>
+            {t.kind === "screen" ? (t.me ? tr_("voice.voice.yourScreen") : <Tr id="voice.voice.theirScreen" values={{ name: <PersonName userId={t.userId} serverId={channel.server_id}>{nameOf(t.userId)}</PersonName> }} />) : <PersonName userId={t.userId} serverId={channel.server_id}>{nameOf(t.userId)}</PersonName>}
           </span>
           {t.kind !== "screen" && isGuest(users[t.userId]) ? <span className={s.guestTag}>{tr_("voice.voiceParticipants.guest")}</span> : null}
           {/* their server tag, as beside their name everywhere else (none on a guest's page, which knows nobody) */}
@@ -910,12 +910,12 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           {participants.length > 10 && !callThroughSfu() ? <div className={s.stageNote}>{tr_("voice.voice.largeRoomsStrainPeerToPeer")}</div> : null}
           {calling ? (
             <div className={s.stageNote} role="status" data-testid="calling">
-              {calledId ? tr_("voice.call.callingName", { name: displayName(users[calledId]) }) : tr_("voice.call.callingGroup")}
+              {calledId ? <Tr id="voice.call.callingName" values={{ name: <PersonName userId={calledId}>{displayName(users[calledId])}</PersonName> }} /> : tr_("voice.call.callingGroup")}
             </div>
           ) : null}
           {leftAlone ? (
             <div className={s.stageNote} role="status" data-testid="left-alone">
-              {calledId ? tr_("voice.call.leftName", { name: displayName(users[calledId]) }) : tr_("voice.call.everyoneLeft")}
+              {calledId ? <Tr id="voice.call.leftName" values={{ name: <PersonName userId={calledId}>{displayName(users[calledId])}</PersonName> }} /> : tr_("voice.call.everyoneLeft")}
             </div>
           ) : null}
         </div>

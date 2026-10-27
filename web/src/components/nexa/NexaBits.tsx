@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { BadgeCheck } from "lucide-react";
 import type { Person } from "@/api/moderation";
 import { Avatar } from "@/components/common/Avatar";
@@ -37,7 +38,7 @@ export function PersonChip({ person, id, size = 20, withUsername = false }: { pe
   const body = (
     <>
       <Avatar id={id} avatarId={person?.avatar_id ?? null} name={name} size={size} />
-      <span className={s.personName}>{name}</span>
+      <PersonName userId={gone ? null : id} user={gone ? null : person} className={s.personName}>{name}</PersonName>
       {withUsername && person && !person.deleted ? <span className={s.personUser}>@{person.username}</span> : null}
     </>
   );

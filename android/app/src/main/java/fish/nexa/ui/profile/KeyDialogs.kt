@@ -178,19 +178,19 @@ fun SafetyNumber(publicKey: String, qr: Boolean = true, old: Boolean = false) {
 }
 
 @Composable
-private fun KeyNote(text: String, icon: Boolean = false) {
+private fun KeyNote(text: String, icon: Boolean = false, personId: String? = null, personName: String = "") {
     val c = Nx.colors
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (icon) Icon("KeyRound", c.textMuted, size = 13.dp, modifier = Modifier.padding(top = 2.5.dp))
-        Txt(text, style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18f)), color = c.textMuted)
+        fish.nexa.ui.chat.PersonText(personId, text, personName, style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18f)), color = c.textMuted)
     }
 }
 
 @Composable
-private fun KeyWarn(text: String) {
+private fun KeyWarn(text: String, personId: String? = null, personName: String = "") {
     val c = Nx.colors
-    Txt(
-        text,
+    fish.nexa.ui.chat.PersonText(
+        personId, text, personName,
         style = Nx.type.bodySmall.copy(lineHeight = Nx.type.sp(20f)),
         color = c.text,
         modifier = Modifier.fillMaxWidth().background(c.danger.copy(alpha = 0.12f), Radii.Md).padding(horizontal = 12.dp, vertical = 10.dp),
@@ -198,10 +198,10 @@ private fun KeyWarn(text: String) {
 }
 
 @Composable
-private fun KeyPair(label: String, content: @Composable () -> Unit) {
+private fun KeyPair(label: String, personId: String? = null, personName: String = "", content: @Composable () -> Unit) {
     val c = Nx.colors
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Txt(label, style = Nx.type.hint.copy(fontWeight = FontWeight(600)), color = c.textStrong)
+        fish.nexa.ui.chat.PersonText(personId, label, personName, style = Nx.type.hint.copy(fontWeight = FontWeight(600)), color = c.textStrong)
         content()
     }
 }
@@ -223,13 +223,13 @@ private fun KeyVerifyBody(userId: String, name: String) {
     }
     val theirs = users[userId]?.publicKey?.ifEmpty { null }
     val verdict = if (pending.containsKey(userId)) KeyPins.Verdict.CHANGED else KeyDialogs.verdict(userId, theirs)
-    Txt(t("encryption.compareInstruction", "name" to name), style = compare, color = c.text)
+    fish.nexa.ui.chat.PersonText(userId, t("encryption.compareInstruction", "name" to fish.nexa.ui.chat.PERSON_SLOT), name, style = compare, color = c.text)
     KeyPair(t("encryption.yourKeyLabel")) { if (mine != null) SafetyNumber(mine) else KeyNote(t("encryption.noKeyToShow")) }
-    KeyPair(t("encryption.contactKeyLabel", "name" to name)) { if (theirs != null) SafetyNumber(theirs) else KeyNote(t("encryption.noKeyToShow")) }
+    KeyPair(t("encryption.contactKeyLabel", "name" to fish.nexa.ui.chat.PERSON_SLOT), personId = userId, personName = name) { if (theirs != null) SafetyNumber(theirs) else KeyNote(t("encryption.noKeyToShow")) }
     when (verdict) {
-        KeyPins.Verdict.SAME -> KeyNote(t("encryption.noteSameSinceFirstSeen", "name" to name))
-        KeyPins.Verdict.FIRST -> KeyNote(if (Nexa.pins.startedBlank) t("encryption.noteNoMemoryYet") else t("encryption.noteFirstSeenNow", "name" to name))
-        KeyPins.Verdict.CHANGED -> KeyWarn(t("encryption.noteChanged", "name" to name))
+        KeyPins.Verdict.SAME -> KeyNote(t("encryption.noteSameSinceFirstSeen", "name" to fish.nexa.ui.chat.PERSON_SLOT), personId = userId, personName = name)
+        KeyPins.Verdict.FIRST -> KeyNote(if (Nexa.pins.startedBlank) t("encryption.noteNoMemoryYet") else t("encryption.noteFirstSeenNow", "name" to fish.nexa.ui.chat.PERSON_SLOT), personId = userId, personName = name)
+        KeyPins.Verdict.CHANGED -> KeyWarn(t("encryption.noteChanged", "name" to fish.nexa.ui.chat.PERSON_SLOT), personId = userId, personName = name)
         else -> Unit
     }
     KeyNote(t("encryption.noteWhatThisProves"), icon = true)
@@ -259,7 +259,7 @@ private fun KeyChangeSheet(layer: Layer, close: () -> Unit) {
         return
     }
     val name = Names.display(users[change.userId])
-    Sheet(layer, title = t("encryption.keyChangedTitle", "name" to name), maxWidth = 420.dp, closeButton = false, footer = {
+    Sheet(layer, title = t("encryption.keyChangedTitle", "name" to name), heading = { fish.nexa.ui.chat.PersonHeading(fish.nexa.ui.chat.PersonWords(t("encryption.keyChangedTitle", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(change.userId to name))) }, maxWidth = 420.dp, closeButton = false, footer = {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
             NxButton(t("encryption.keyChangedNotNow"), {
                 Nexa.alerts.reject(change.userId)
@@ -280,10 +280,10 @@ private fun KeyChangeSheet(layer: Layer, close: () -> Unit) {
             }, kind = ButtonKind.DANGER, loading = busy)
         }
     }) {
-        KeyWarn(t("encryption.keyChangedWarning", "name" to name))
+        KeyWarn(t("encryption.keyChangedWarning", "name" to fish.nexa.ui.chat.PERSON_SLOT), personId = change.userId, personName = name)
         KeyPair(t("encryption.keyChangedNewLabel")) { SafetyNumber(change.offered) }
         KeyPair(t("encryption.keyChangedOldLabel")) { SafetyNumber(change.pinned, qr = false, old = true) }
-        KeyNote(t("encryption.keyChangedMeaning", "name" to name))
+        KeyNote(t("encryption.keyChangedMeaning", "name" to fish.nexa.ui.chat.PERSON_SLOT), personId = change.userId, personName = name)
         if (pending.size > 1) KeyNote(t("encryption.keyChangedMore", "count" to pending.size - 1))
     }
 }

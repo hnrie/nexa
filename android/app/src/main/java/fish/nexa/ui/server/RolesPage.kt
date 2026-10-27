@@ -700,7 +700,7 @@ private fun MembersTab(role: NexaRole, serverId: String, editable: Boolean, head
                 ) {
                     Avatar(x.m.userId, x.name, x.m.avatarId ?: users[x.m.userId]?.avatarId, 32.dp)
                     Column(Modifier.weight(1f)) {
-                        Txt(x.name, style = Nx.type.body.copy(fontWeight = FontWeight(600)), color = c.text, maxLines = 1)
+                        fish.nexa.ui.chat.PersonName(x.m.userId, x.name, serverId = serverId, style = Nx.type.body.copy(fontWeight = FontWeight(600)), color = c.text, maxLines = 1)
                         Txt("@" + x.username, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
                     }
                     NxButton(

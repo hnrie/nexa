@@ -114,7 +114,7 @@ fun openModSheet(key: String, top: @Composable (close: () -> Unit) -> Unit, foot
 
 /** `.modalTop`: what the dialog acts on, its title, and the close button (and a way back, in the Moderate dialog). */
 @Composable
-fun ModSheetTop(title: String, close: () -> Unit, onBack: (() -> Unit)? = null, leading: @Composable () -> Unit, target: @Composable () -> Unit) {
+fun ModSheetTop(title: String, close: () -> Unit, onBack: (() -> Unit)? = null, leading: @Composable () -> Unit, titleWords: fish.nexa.ui.chat.PersonWords? = null, target: @Composable () -> Unit) {
     val c = Nx.colors
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Row(
@@ -128,7 +128,8 @@ fun ModSheetTop(title: String, close: () -> Unit, onBack: (() -> Unit)? = null, 
         if (onBack != null) IconButton("ArrowLeft", t("moderation.back"), onBack, Modifier.graphicsLayer { scaleX = if (rtl) -1f else 1f }, tint = c.textMuted, size = 40.dp, iconSize = 20.dp)
         leading()
         Column(Modifier.weight(1f)) {
-            Txt(title, style = Nx.type.name.copy(fontSize = Nx.type.sp(19f), fontWeight = FontWeight(690)), color = c.textStrong, maxLines = 2, modifier = Modifier.semantics { heading() })
+            if (titleWords != null) fish.nexa.ui.chat.PersonWordsText(titleWords, Nx.type.name.copy(fontSize = Nx.type.sp(19f), fontWeight = FontWeight(690)), c.textStrong, Modifier.semantics { heading() }, maxLines = 2)
+            else Txt(title, style = Nx.type.name.copy(fontSize = Nx.type.sp(19f), fontWeight = FontWeight(690)), color = c.textStrong, maxLines = 2, modifier = Modifier.semantics { heading() })
             target()
         }
         IconButton("X", t("chat.attachments.close"), close, tint = c.textMuted, size = 44.dp, iconSize = 20.dp)
@@ -137,10 +138,10 @@ fun ModSheetTop(title: String, close: () -> Unit, onBack: (() -> Unit)? = null, 
 
 /** `.modalFoot`: what the action does, on a line of its own on a phone, then Cancel and the button. */
 @Composable
-fun ModSheetFoot(summary: String, close: () -> Unit, submit: @Composable () -> Unit) {
+fun ModSheetFoot(summary: String, close: () -> Unit, personId: String? = null, personName: String = "", submit: @Composable () -> Unit) {
     val c = Nx.colors
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Txt(summary, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted)
+        fish.nexa.ui.chat.PersonText(personId, summary, personName, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
             NxButton(t("moderation.cancel"), close, kind = ButtonKind.GHOST)
             submit()
@@ -419,6 +420,7 @@ fun openModerate(u: ModUser, servers: List<ModMembership>?, initial: String? = n
                 s.action?.let { actionTitle(it) } ?: if (many != null) t("moderation.bulk.title", "count" to many.size) else t("moderation.moderateNamed", "name" to u.displayName),
                 close,
                 onBack = if (s.action != null && initial == null) ({ s.action = null; s.error = null }) else null,
+                titleWords = if (s.action == null && many == null) fish.nexa.ui.chat.PersonWords(t("moderation.moderateNamed", "name" to fish.nexa.ui.chat.PERSON_SLOT), listOf(u.id to u.displayName)) else null,
                 leading = { if (many != null) AvatarStack(many) else Avatar(u.id, u.displayName, u.avatarId, 40.dp, status = modStatus(u).status) },
             ) {
                 if (many != null) Txt(many.joinToString(", ") { "@" + it.username }, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f)), color = Nx.colors.textMuted, maxLines = 1)

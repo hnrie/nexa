@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { AlertTriangle, CloudOff, Eye } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Avatar } from "@/components/common/Avatar";
@@ -14,7 +15,7 @@ import { formatRelative } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { peopleHere, useNotes } from "@/stores/notes";
 import { displayName, fetchMissingUsers, useUsers } from "@/stores/users";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import type { NoteBridge } from "./NoteEditor";
 import { NoteFile, NoteFileLine, NoteFileThumb } from "./NoteFile";
 import s from "./Notes.module.css";
@@ -54,7 +55,7 @@ export function Byline({ noteId }: { noteId: string }) {
           <Avatar id={face.id} avatarId={face.avatar_id ?? null} name={displayName(face)} size={20} />
         </span>
       ) : null}
-      <span>{!item.editedBy ? t("notes.page.edited", { when }) : item.editedBy === meId ? t("notes.page.editedByYou", { when }) : t("notes.page.editedBy", { name: displayName(who), when })}</span>
+      <span>{!item.editedBy ? t("notes.page.edited", { when }) : item.editedBy === meId ? t("notes.page.editedByYou", { when }) : <Tr id="notes.page.editedBy" values={{ name: <PersonName userId={item.editedBy}>{displayName(who)}</PersonName>, when }} />}</span>
     </p>
   );
 }

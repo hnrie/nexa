@@ -202,7 +202,7 @@ private fun openReactors(cm: ChatMessage, emoji: String, count: Int, ref: Anchor
                         ) {
                             val name = Names.shown(id)
                             Avatar(id, name, Nexa.users.get(id)?.avatarId, 24.dp)
-                            Txt(name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)), color = c.text, maxLines = 1)
+                            fish.nexa.ui.chat.PersonName(id, name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(500)), color = c.text, maxLines = 1)
                         }
                     }
                     if (count > list.size) Txt(

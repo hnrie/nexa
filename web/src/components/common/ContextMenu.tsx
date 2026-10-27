@@ -550,7 +550,7 @@ export function ContextMenuHost() {
       >
         {sheet ? <span className={s.grip} aria-hidden="true" /> : null}
         {/* on a phone the menu says what it is for, far from the finger that opened it */}
-        {sheet && menu.label && !drilled && !menu.items.some((it) => it.note && it.label === menu.label) ? <div className={s.sheetTitle} aria-hidden="true" dir="auto">{menu.label}</div> : null}
+        {sheet && menu.label && !drilled && !menu.items.some((it) => it.note && it.label === menu.label) ? <div className={s.sheetTitle} aria-hidden="true" dir="auto">{menu.labelNode ?? menu.label}</div> : null}
         {menu.reactions && !drilled ? (
           <div className={s.quick} role="none">
             {(sheet ? menu.reactions.emoji : menu.reactions.emoji.slice(0, 4)).map((e) => (

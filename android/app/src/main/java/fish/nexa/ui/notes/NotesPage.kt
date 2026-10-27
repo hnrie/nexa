@@ -203,7 +203,7 @@ private fun FirstNote() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
         ) {
-            SampleCard(name)
+            SampleCard(name, friend?.id)
             Txt(
                 t("notes.first.title"),
                 style = Nx.type.title.copy(fontSize = Nx.type.sp(26f), lineHeight = Nx.type.sp(29.1f), fontWeight = FontWeight(740), letterSpacing = (-0.02).em),
@@ -229,7 +229,7 @@ private fun FirstNote() {
  * this page's own caret blinking at the end of the last.
  */
 @Composable
-private fun SampleCard(name: String) {
+private fun SampleCard(name: String, friendId: String?) {
     val c = Nx.colors
     val reduced = Nx.motion.reduced
     val who = Color(fish.nexa.notes.NoteHues.HUES[2])
@@ -272,8 +272,8 @@ private fun SampleCard(name: String) {
                 Box(Modifier.align(Alignment.TopEnd).pinned(1.dp, (-5).dp).size(2.dp, 17.dp).background(who, RoundedCornerShape(1.dp)))
                 // the square on its head, and the flag with their name over it
                 Box(Modifier.align(Alignment.TopEnd).pinned((-1).dp, (-7).dp).size(6.dp).background(who, RoundedCornerShape(1.5.dp)))
-                Txt(
-                    name,
+                fish.nexa.ui.chat.PersonName(
+                    friendId, name,
                     style = Nx.type.label.copy(fontSize = Nx.type.sp(12f), lineHeight = Nx.type.sp(16f), fontWeight = FontWeight(650)),
                     color = Color.White,
                     maxLines = 1,
@@ -583,8 +583,8 @@ private fun RequestCard(invite: NoteInviteItem) {
                 color = c.textStrong,
                 maxLines = 1,
             )
-            Txt(
-                if (invite.role == NoteRole.EDITOR) t("notes.requests.toEdit", "name" to from) else t("notes.requests.toView", "name" to from),
+            fish.nexa.ui.chat.PersonText(
+                invite.from.id, if (invite.role == NoteRole.EDITOR) t("notes.requests.toEdit", "name" to fish.nexa.ui.chat.PERSON_SLOT) else t("notes.requests.toView", "name" to fish.nexa.ui.chat.PERSON_SLOT), from,
                 style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f), lineHeight = Nx.type.sp(16.9f)),
                 color = c.textMuted,
                 modifier = Modifier.padding(top = 1.dp),

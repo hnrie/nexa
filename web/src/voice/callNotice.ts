@@ -1,3 +1,4 @@
+import { personText } from "@/lib/personText";
 /**
  * The system notifications of an incoming call: "Incoming call" for someone
  * away from the app (a background tab, a minimised window, a phone in a
@@ -59,7 +60,7 @@ export function closeRingNotice(channelId: string): void {
 export function missedNotice(channelId: string, from: string): void {
   if (appOnScreen()) {
     closeRingNotice(channelId);
-    useUI.getState().toast(t("voice.callLine.missedFrom", { name: displayName(useUsers.getState().byId[from]) }), "info");
+    useUI.getState().toast(personText("voice.callLine.missedFrom", from, displayName(useUsers.getState().byId[from])), "info");
     return;
   }
   const group = groupName(channelId);

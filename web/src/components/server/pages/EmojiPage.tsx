@@ -1,3 +1,4 @@
+import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { touchFirst } from "@/lib/touch";
 import { Pencil, Trash2, Upload } from "lucide-react";
@@ -118,7 +119,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
                 <tr key={e.id} data-emoji-id={e.id}>
                   <td><img src={emojiUrl(e.blob_id, e.animated, 32)} alt={`:${e.name}:`} width={32} height={32} style={{ objectFit: "contain" }} /></td>
                   <td className={s.code}>:{e.name}:</td>
-                  <td>{displayName(users[e.creator_id])}</td>
+                  <td><PersonName userId={e.creator_id}>{displayName(users[e.creator_id])}</PersonName></td>
                   {manage ? (
                     <td style={{ textAlign: "end" }}>
                       {/* side by side: the sticker grid's round overlay buttons, borrowed here, stacked one over the other */}
