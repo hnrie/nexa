@@ -276,9 +276,6 @@ func (s *Server) handleAppCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "invalid_name", fmt.Sprintf("Names are %d to %d characters.", appMinName, appMaxName)))
 		return
 	}
-	if !s.requireCaptcha(w, r, "app_create") {
-		return
-	}
 	ctx := r.Context()
 	pub, priv, err := newBotIdentity()
 	if err != nil {
