@@ -1,150 +1,133 @@
 # Nexa
 
-A self-hosted chat app where messages, files and calls are end-to-end encrypted: the
-server keeps what it needs to deliver them and can read none of it. Servers with text and
-voice channels, direct messages and group chats, calls with screen sharing, and emoji and
-sticker packs anyone can make and share. Every account gets animated avatars and banners,
-a long "about me", display names with plain unique usernames, and big uploads. It is served
-at `https://nexa.fish` (and `https://mathtest.lol`) through the Cloudflare tunnel that already
-fronts this box. `https://chat.evilion.xyz`, its address before, still answers: the desktop
-apps installed from there and old webhooks keep working, and a browser that opens it is
-sent on to the same page at nexa.fish, where it signs in again (`ALT_URLS`, `MOVED_FROM` in
-`chatd.env.example`).
+Nexa is a self-hosted chat app for communities and private conversations. It has a web
+app, desktop apps for Windows, macOS and Linux, and a native Android app.
 
+Try [Nexa in your browser](https://nexa.fish) or [download an app](https://nexa.fish/download).
+
+## Features
+
+- Direct messages, group chats, friends and custom status.
+- Servers with text channels, voice channels, forums, threads, roles and permissions.
+- Voice and video calls, screen sharing and guest call links.
+- Formatted messages, replies, reactions, polls, search and file sharing.
+- Shared notes with live editing and version history.
+- Custom emoji, sticker packs, profiles and themes.
+- Bots, webhooks and a plugin API.
+- Data export and moderation tools.
+- An interactive homepage demo that resets when you reload.
+
+## Privacy
+
+Personal messages, attachments, shared notes and calls use end-to-end encryption.
+The server stores encrypted content along with the metadata needed to deliver it.
+
+Webhook and app content, bug reports and moderation conversations are not end-to-end
+encrypted. Account details, public profiles and server membership are also visible to
+the server. Peer-to-peer calls reveal participants' IP addresses to each other; calls
+through the optional Cloudflare Realtime service avoid this.
+
+See the [privacy policy](docs/legal/PRIVACY_POLICY.txt) for details and the
+[design specification](docs/superpowers/specs/2026-09-11-chat-design.md#6-end-to-end-encryption)
+for the encryption design.
+
+## Run Locally
+
+You need Git, the Go version listed in [go.mod](go.mod), Node.js 22 or later with
+npm, and Python 3 for the check scripts.
+
+Clone the repository:
+
+```sh
+git clone https://github.com/terrydavisthe2nd/nexa.git
+cd nexa
 ```
-chat/
-├── cmd/chatd/        the Go server: REST API, WebSocket gateway, media, and the built web app
-├── internal/         config, ids, db (SQLite or Postgres + migrations), store, auth, api, gateway,
-│                     perms, media, unfurl, voice, realtime (the SFU client and usage meter), cache,
-│                     ratelimit, rpcapps, telegram, textutil, totp
-├── web/              the React/TypeScript app (Vite); web/dist is what chatd serves
-├── desktop/          the desktop app (Electron)
-├── android/          the Android app (Kotlin, Jetpack Compose)
-├── downloads/        the published Android APKs and their manifest, served at /android/
-├── deploy/           systemd and launchd templates, installer, DNS helper
-├── tools/            screenshot.py and e2e.py (Playwright)
-├── docs/             design spec, implementation plans, STATUS.md, Discord UI reference captures
-├── data/             runtime (SQLite database, media blobs) — not in git
-└── logs/             runtime — not in git
+
+Build the web app and server into an isolated directory:
+
+```sh
+nexa_run_dir="$(mktemp -d)"
+(cd web && npm ci && npx vite build --outDir "$nexa_run_dir/dist" --emptyOutDir)
+go build -o "$nexa_run_dir/chatd" ./cmd/chatd
 ```
 
-## Build and run
+Start the server from that directory:
 
-```
-make build          # web app (needs the prebuilt Node under /usr/local/lib/nodejs) + Go binary
-make test           # go vet + go test -race + tsc + vitest
-make run            # the server from source, without touching bin/ (the deploy)
-./bin/chatd         # listens on 127.0.0.1:8090 (see chatd.env.example for every setting)
-```
-
-Install as a service (a systemd unit on Linux, a LaunchDaemon on macOS) and wire it
-into the tunnel (idempotent, needs sudo):
-
-```
-sudo bash deploy/install.sh
+```sh
+cd "$nexa_run_dir"
+LISTEN=127.0.0.1:8080 PUBLIC_URL=http://localhost:8080 \
+  WEB_DIST=./dist EGRESS_PROXY=off ./chatd
 ```
 
-See `deploy/README.md` for the one DNS step that only your Cloudflare account can do,
-and for restart/stop/update/backup commands.
+Open [localhost:8080](http://localhost:8080) and create an account. The first account
+becomes the instance owner. The local database and uploads stay in the temporary
+folder, separate from any existing installation.
 
-## What it does
+This setup uses SQLite and needs no external service keys. `EGRESS_PROXY=off` sends
+link-preview and media-proxy requests directly from your machine.
 
-- **Servers** with categories, text and voice channels, drag-and-drop reordering, role
-  hierarchy and per-channel permission overwrites (the Discord model, same bit values),
-  invites that can carry the encryption key in the URL fragment, member management,
-  bans, timeouts, an audit log, and per-server notification settings.
-- **Direct messages** and group DMs, friends with private nicknames and notes, blocking,
-  presence and custom status, typing indicators, read state and mention badges.
-- **Messages** with GitHub-style markdown and coloured text, replies, edits, pins, reactions,
-  encrypted attachments, link/GIF/YouTube embeds generated by the sender, and search
-  over the history this device has decrypted.
-- **Webhooks**: a secret URL per webhook that other programs post to, taking the JSON
-  Discord's webhooks take (rich embeds, link buttons, layout components, polls, files,
-  `?wait=true`, editing and deleting what it sent), so existing senders work unchanged;
-  `/github` and `/slack` on the end take those services' payloads. Managed in Server
-  Settings, Integrations, under the Manage Webhooks permission.
-- **Expressions**: unlimited custom server emoji (animated ones too), sticker packs that
-  any user can create and share by link, and GIF search when a Klipy key is configured.
-- **Voice and video**: voice channels and DM calls with ringing, camera,
-  screen share up to source resolution at 60 fps, push-to-talk or voice activity,
-  per-user volume to 200 %, server mute/deafen/move, and a link-quality readout.
-- **Nexa admin**: stats, registration policy, and enabling or disabling accounts.
-- **Apps**: a desktop app (Electron) for Windows, macOS and Linux, and an Android app,
-  both offered by the download page (Android phones also get a banner); the web app
-  runs everywhere else.
-- **Your data**: a one-click zip export of everything this device can decrypt.
+## Self-Hosting
 
-## How it works
+The Go server serves the API, WebSocket connection, media and built web app in one
+process. SQLite is the default database; PostgreSQL is supported through `DATABASE_URL`.
 
-- **One process.** `chatd` serves `/api/v1` (JSON), `/gateway` (WebSocket), `/media/*`
-  and the SPA from `web/dist`. SQLite in WAL mode with a single writer, or Postgres
-  when `DATABASE_URL` names one (`chatmigrate` moves a database across); blobs on disk,
-  content-addressed. No nginx.
-- **End-to-end encryption.** The password is stretched with Argon2id in the browser; from
-  it come an auth key (the only thing the server ever sees, hashed again server-side)
-  and an encryption key that wraps the account's X25519 identity. Each conversation has
-  root keys in numbered epochs, granted to members as sealed boxes; channel keys derive
-  from the root; messages are AES-256-GCM envelopes bound to their channel and author;
-  attachments carry their own random key inside the message. The server stores only
-  ciphertext plus the metadata it needs (author, channel, mentions, reactions, sizes).
-  A recovery key shown once at registration can restore the identity if the password
-  is lost. Details: `docs/superpowers/specs/2026-09-11-chat-design.md` §6.
-- **Photos and videos lose their hidden metadata** (location, camera, serial numbers,
-  times, XMP, IPTC) without being re-encoded: the app strips an attachment before it
-  encrypts it (`web/src/lib/scrubMetadata.ts`), and the server strips the pictures and
-  videos it keeps readable (`internal/media/scrub.go`). Both follow the same rules and
-  are checked against `internal/media/testdata/scrub`.
-- **Webhook messages are the exception.** A program posting to a webhook's URL holds no
-  key, so what it sends reaches the server readable and is kept that way
-  (`messages.plain`, its files as plain blobs); the app marks every such message as not
-  end-to-end encrypted. The URL's token is stored as a SHA-256 hash, and sealed with the
-  server secret so managers can copy the URL again. Pictures linked from elsewhere load
-  through the signed media proxy, so readers never contact the sender's hosts.
-- **Nothing a person links learns this server's address.** Link previews, the media
-  proxy and the YouTube player fetch through Cloudflare WARP's local SOCKS5 proxy
-  (`internal/egress`, `EGRESS_PROXY`), names included, so a site someone links sees
-  Cloudflare. WARP runs in proxy mode, not as a tunnel for the whole machine; chatd
-  keeps it connected, and with it down those requests fail instead of going direct.
-- **Realtime.** Clients hold one WebSocket; the hub fans events out to the members who
-  may see them and tracks presence and typing. Heartbeats every 25 s keep Cloudflare
-  from dropping idle sockets.
-- **Calls** are WebRTC with every frame sealed with the conversation's key. With
-  Cloudflare Realtime configured (`REALTIME_APP_ID` and `REALTIME_APP_SECRET`) every call
-  goes through its SFU, which forwards media it cannot read, so nobody in a call learns
-  another person's address; chatd estimates what the calls send and, to stay inside the
-  free monthly allowance (`REALTIME_MONTHLY_GB`), pauses video near it and stops
-  calls just short of it. Without those keys calls run peer to peer, which shows every
-  participant the others' addresses. Either way no media passes through this box: the
-  tunnel only carries HTTP.
+For a public instance:
+
+- Set `PUBLIC_URL` to your own address and serve the app over HTTPS.
+- Configure registration and any optional services you want to enable.
+- Configure an outbound proxy for link previews and remote media.
+- Back up the database, uploaded files and `data/server.secret` together.
+
+All settings are documented in [chatd.env.example](chatd.env.example). Environment
+variables override values in `chatd.env`. Service templates and hosting scripts are
+in [deploy](deploy/); review their domain and infrastructure assumptions before use.
 
 ## Development
 
+Install dependencies with `npm ci` in `web/` and `desktop/`. From the repository root,
+run the checks without publishing a build:
+
+```sh
+tools/check.sh
 ```
-cd web && npm run dev            # Vite on :5173, proxying /api, /gateway and /media to :8090
-go run ./cmd/chatd               # in another shell
+
+For focused checks:
+
+```sh
+go test ./...
+(cd web && npm run typecheck && npx vitest run)
+(cd desktop && npm run typecheck && npm test)
+python3 tools/i18n_check.py
 ```
 
-`tools/e2e.py` starts a throwaway server and drives three browser contexts (one of them
-phone-sized) through registration, friends, DMs, markdown, reactions, replies, edits,
-encrypted uploads, servers and invites, private channels, permissions, drag reordering,
-custom emoji, stickers, voice with fake devices, search, the admin page and data export;
-`tools/screenshot.py` captures any page at any viewport. Both need the Playwright venv
-described in `tools/README.md`.
+Build and release commands such as `make build` and `make web` write to directories
+served by a running installation. Use the isolated build above when testing changes.
 
-## Configuration
+The [tools guide](tools/README.md) covers browser tests and screenshots.
+[CLAUDE.md](CLAUDE.md) documents the codebase, platform builds and release workflow.
 
-`chatd.env` (created by the installer from `chatd.env.example`): listen address, public
-URL, data directory, upload limits (Cloudflare's free plan caps request bodies at 100 MB),
-registration mode (`open`, `invite` with a shared `REGISTRATION_KEY`, or `closed`), the
-admin username, optional Cloudflare Realtime keys for calls (and TURN credentials for peer
-to peer ones), an optional Klipy key for GIF search, and optional Discord activity sync
-(`DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`, and
-`DISCORD_ACTIVITY_GUILD_ID` to name the bot's server; see `chatd.env.example` for the
-Developer Portal settings and the OAuth redirect it needs).
-The registration mode and key can also be changed at runtime from Settings → Nexa
-Admin, which overrides the file until you clear it.
+## Project Layout
+
+| Directory | Contents |
+| --- | --- |
+| `cmd/` | Server and database migration commands |
+| `internal/` | Go server packages |
+| `web/` | React and TypeScript web app |
+| `desktop/` | Electron desktop app |
+| `android/` | Native Kotlin and Jetpack Compose app |
+| `docs/` | Design, privacy and integration documentation |
+| `tools/` | Testing, asset and release tools |
+| `deploy/` | Service templates and hosting scripts |
+
+## Documentation
+
+- [Building bots and apps](docs/bots.md)
+- [Plugin API](docs/plugins.md)
+- [Configuration reference](chatd.env.example)
+- [Terms of service](docs/legal/TERMS_OF_SERVICE.txt)
+- [Privacy policy](docs/legal/PRIVACY_POLICY.txt)
 
 ## License
 
-Nexa is licensed under the [MIT License](LICENSE). Copyright (c) 2026 terrydavisthe2nd / Nexa.
+[MIT](LICENSE). Copyright (c) 2026 terrydavisthe2nd / Nexa.
 Third-party components retain their own licenses and notices.

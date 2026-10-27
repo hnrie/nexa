@@ -6,7 +6,8 @@ Nexa is the end-to-end encrypted chat app served at https://nexa.fish (also http
 https://chat.evilion.xyz is its old address, which moves browsers on). This repository is all of it:
 the Go server (`cmd/`, `internal/`), the React + TypeScript web app (`web/`), the Electron desktop
 app that runs the web app (`desktop/`) and the native Android app (`android/`, Kotlin + Jetpack
-Compose). README.md describes the features and how the encryption works; the original design spec is
+Compose). README.md is the public project overview, with features, privacy boundaries, an isolated
+local quick start and links to development documentation. The original design spec is
 `docs/superpowers/specs/2026-09-11-chat-design.md` (section 6 is the cryptography).
 
 Nexa's first-party code is licensed under the root `LICENSE` (MIT), with the copyright
