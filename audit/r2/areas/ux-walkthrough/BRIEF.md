@@ -173,7 +173,7 @@ code-reading only; nobody has done this walkthrough before.
   Stop Gradle's daemon before starting it (the script does). Stop the
   emulator with `tools/emulator.sh stop`, not by killing processes.
 - `adb reverse` is not needed for `10.0.2.2`.
-- The owner's reference for the design is Discord; docs/design/reference/
+- Numeric design measurements are retained under docs/design/reference/; personal reference captures are excluded.
   has a few reference captures.
 
 ## Order

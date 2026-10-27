@@ -9,8 +9,8 @@ plugins {
 }
 
 /**
- * The release key and its passwords are kept in the repository, in android/signing (the owner's
- * choice, so the key is never lost again); a debug build never needs them.
+ * Release signing is configured locally in android/signing. The keystore and its passwords
+ * are never committed; see signing/README.md. A debug build never needs them.
  */
 val keystoreProps = Properties().apply {
     val f = rootProject.file("signing/release.properties")

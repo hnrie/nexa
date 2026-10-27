@@ -1,0 +1,6 @@
+# Copy to release.properties, fill in locally, and never commit that file.
+# storeFile is relative to android/ (an absolute path also works).
+storeFile=signing/release.jks
+storePassword=CHANGE_ME
+keyAlias=release
+keyPassword=CHANGE_ME

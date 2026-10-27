@@ -18,10 +18,10 @@ service so cloudflared reloads it.
 The tunnel credentials on this box can run the tunnel but cannot create DNS
 records. One of:
 
-- `cloudflared tunnel login` (opens a browser, pick evilion.xyz), then
+- `cloudflared tunnel login` (opens a browser, select your domain), then
   `bash deploy/route-dns.sh`; or
-- Cloudflare dashboard → DNS → add **CNAME** `chat` →
-  `<YOUR_TUNNEL_ID>.cfargotunnel.com`, proxied.
+- Cloudflare dashboard → DNS → add a proxied **CNAME** for your chat hostname
+  pointing to `<YOUR_TUNNEL_ID>.cfargotunnel.com`. Use your own tunnel ID.
 
 ## Day to day
 

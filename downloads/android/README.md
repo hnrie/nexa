@@ -18,7 +18,8 @@ one (versionCode one higher, the last number of versionName one higher) and publ
 chatd reads the folder on every request, so the app's updater offers it to every phone at once.
 `make publish-android` builds and publishes one whether or not anything changed.
 
-The builds are signed with the key in `android/signing` (`release.jks`, its passwords in
-`release.properties`), kept in git on purpose so it is never lost. Never replace it: Android only
-installs an update signed with the same key. Builds signed with the key before it (up to 1.1.0)
-cannot update to these; those phones uninstall the app and install it again.
+The builds are signed with a private local key configured by
+`android/signing/release.properties`. The key and its passwords are never committed.
+See [signing setup](../../android/signing/README.md). Keep a private backup and
+never replace an existing installation's key: Android only installs an update
+signed with the same key.

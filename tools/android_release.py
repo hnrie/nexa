@@ -4,7 +4,7 @@
   python3 tools/android_release.py [--notes "What changed"] [--if-changed]
 
 Builds android/ with Gradle (`:app:assembleRelease`, signed with the release
-key kept in the repository, android/signing, pointed at https://nexa.fish),
+key configured locally in android/signing, pointed at https://nexa.fish),
 checks every APK it made (package, version, minimum Android, signing
 certificate, and that no test server is baked into it), then copies the
 64-bit, 32-bit and universal builds into downloads/android under names that
@@ -28,7 +28,7 @@ not kept in git: each server builds and publishes its own.
   --server URL      the server the build talks to (default https://nexa.fish)
 
 Android installs an update only over a lower versionCode signed with the same
-key, which is why the key lives in android/signing and must never change.
+key, which is why the private local key must be backed up and never replaced.
 """
 from __future__ import annotations
 
@@ -143,7 +143,7 @@ def next_version(previous: dict) -> tuple[int, str]:
 def build(server: str, code: int, name: str) -> None:
     props = ANDROID / "signing/release.properties"
     if not props.is_file():
-        fail("A release is signed with the key android/signing/release.properties names, and that file is missing (it is kept in git).")
+        fail("Release signing is not configured. Restore android/signing/release.properties and its original keystore, or follow android/signing/README.md for a new distribution.")
     store = next((l.split("=", 1)[1].strip() for l in props.read_text().splitlines() if l.strip().startswith("storeFile=")), "")
     if not store or not (ANDROID / store).is_file():
         fail(f"android/signing/release.properties names the keystore {store or '(nothing)'}, which is not in android/.")
@@ -280,8 +280,7 @@ def main() -> int:
         fail("could not read the version from the APKs")
     min_sdk = builds[0][2].get("min_sdk", 0)
 
-    # The key is kept in git, so a change of key is a decision, not an accident: the
-    # owner moved to the key in android/signing on 2026-10-19 and had everyone reinstall.
+    # The private local key must stay the same across releases so installed apps can update.
     old_cert = previous.get("signing_sha256")
     if old_cert and old_cert != cert:
         print(f"note: this build is signed with a new key ({cert});\n  phones with the build signed by {old_cert} cannot update to it and must uninstall and install again")

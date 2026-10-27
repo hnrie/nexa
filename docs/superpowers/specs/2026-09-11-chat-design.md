@@ -648,7 +648,8 @@ would mint Realtime session tokens; nothing else changes.
 
 Captured from the running client on 2026-09-11 (Discord 0.0.411, 2025 redesign) over
 the Chrome DevTools protocol; kept under `docs/design/reference/` (colour tokens in
-`palette-final.json`, layout metrics in `metrics*.json`, screenshots). Token values are
+`palette-final.json`, layout metrics in `metrics*.json`). Personal screenshots were
+removed before publication. Token values are
 numbers and colours (not copyrightable); no asset or text was copied.
 
 Dark tokens used: base `#2c2d32`, raised `#323339`, surface `#393a41`, floating/modal

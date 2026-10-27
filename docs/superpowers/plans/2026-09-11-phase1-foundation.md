@@ -692,7 +692,7 @@ Grammar rules (Discord behaviour): `**` strong, `*`/`_` em (underscore only at w
 
 Theming: `data-theme` on `<html>` from settings (`system` follows `prefers-color-scheme`), `--font-scale` applied to `html { font-size }`, accent → `--brand`.
 
-- [ ] **Step 1:** Component tests: rail selection pill for active route, DM list sorting by last message, user panel status popover changes presence (mock gateway), drawer opens on hamburger click (jsdom). — [ ] **Step 2:** Implement. — [ ] **Step 3:** Screenshots at 1920×1080, 1366×768, 820×1180, 390×844 with seeded fake data (a `?demo=1` dev flag that loads fixture stores, only in dev builds); compare against `docs/design/reference/01-main.png` for proportions; fix. — [ ] **Step 4: Commit** — `git commit -am "feat: app shell with rail, DM sidebar, user panel, responsive drawers"`.
+- [ ] **Step 1:** Component tests: rail selection pill for active route, DM list sorting by last message, user panel status popover changes presence (mock gateway), drawer opens on hamburger click (jsdom). — [ ] **Step 2:** Implement. — [ ] **Step 3:** Screenshots at 1920×1080, 1366×768, 820×1180, 390×844 with seeded fake data (a `?demo=1` dev flag that loads fixture stores, only in dev builds); compare against synthetic screenshots for proportions; fix. — [ ] **Step 4: Commit** — `git commit -am "feat: app shell with rail, DM sidebar, user panel, responsive drawers"`.
 
 ---
 

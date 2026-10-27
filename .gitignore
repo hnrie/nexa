@@ -23,6 +23,27 @@
 /tools/out/
 __pycache__/
 
+# private configuration and signing material stay on each machine
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.key
+*.pem
+**/keystore.properties
+/android/signing/*
+!/android/signing/README.md
+!/android/signing/release.properties.example
+
+# personal reference captures, handoffs and unrelated local work
+/docs/design/reference/*.png
+/prompt.txt
+/sample.txt
+/workspace/
+
 # audit round 2 screenshots (large, regenerable)
 /audit/r2/shots/
 

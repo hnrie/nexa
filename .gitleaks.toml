@@ -1,0 +1,40 @@
+title = "Nexa secret scanning"
+
+[extend]
+useDefault = true
+
+# Reviewed, generated interoperability vectors and synthetic encryption test data.
+# Only the generic entropy rule is exempted; provider-token rules still apply.
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Synthetic cryptographic fixtures"
+paths = [
+  '''^android/app/src/test/resources/web-crypto-vectors\.json$''',
+  '''^web/src/crypto/testdata/go-vectors\.json$''',
+  '''^internal/e2ee/testdata/ts-vectors\.json$''',
+]
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Reviewed synthetic test constants, limited by file and matching line"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^android/app/src/debug/java/fish/nexa/voice/CallTestHooks\.kt$''',
+  '''^internal/api/(account_delete|note_handlers)_test\.go$''',
+  '''^internal/totp/totp_test\.go$''',
+  '''^web/src/lib/appLinks\.test\.ts$''',
+  '''^web/src/components/common/QrCode\.test\.tsx$''',
+]
+regexes = [
+  '''voiceKey == "''',
+  '''"key_sealed":''',
+  '''sealedKey\s*=''',
+  '''bobKey\s*=''',
+  '''"key_wrapped":''',
+  '''editToken\s*=''',
+  '''"prev_key":''',
+  '''rfcSecret\s*=''',
+  '''const token =''',
+  '''const URI = "otpauth://''',
+]

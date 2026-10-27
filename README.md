@@ -127,6 +127,14 @@ The [tools guide](tools/README.md) covers browser tests and screenshots.
 - [Terms of service](docs/legal/TERMS_OF_SERVICE.txt)
 - [Privacy policy](docs/legal/PRIVACY_POLICY.txt)
 
+## Contributing
+
+Nexa is open to any type of contribution to the code. Bug fixes, new features,
+tests, translations, documentation and accessibility improvements are welcome.
+Open an issue or pull request, and read [CLAUDE.md](CLAUDE.md) for development
+guidance. Keep personal data, credentials and signing keys out of contributions;
+see [repository maintenance](docs/REPOSITORY.md).
+
 ## License
 
 [MIT](LICENSE). Copyright (c) 2026 terrydavisthe2nd / Nexa.

@@ -73,9 +73,13 @@ new built-in ones. If an extra seems worth having, suggest it instead of shippin
    and update this file if the change touched anything it describes.
 2. Commit on `main`, and push to GitHub (`git push origin main`) only when the owner says to push.
    The owner also works on another machine and pulls from GitHub, so say what is committed and not
-   yet pushed. Never commit `chatd.env` or any token. The Android release key and its passwords
-   (`android/signing/`) are the one exception: the owner keeps them in git on purpose (2026-10-19),
-   so they are never lost again. Never replace or regenerate that key.
+   yet pushed. Never commit `chatd.env`, tokens, private keys, signing passwords, personal
+   screenshots or handoff transcripts. Android signing is private local configuration under
+   `android/signing/`; see its README. Keep a private backup and never replace or regenerate an
+   existing release key. `nexa` is the canonical source repository; keep deployment settings and
+   signing material out of Git rather than maintaining a separate private source branch.
+   Run `python3 tools/privacy_check.py` before committing and the full history privacy and
+   Gitleaks checks before publishing. See `docs/REPOSITORY.md` for the maintenance workflow.
 3. After a round of app changes, leave a throwaway server with the new build running and give the
    owner its address so they can try it. WebCrypto needs https or localhost, so from another machine
    it is reached through an SSH tunnel to localhost, not the plain LAN address. Do not deploy until
@@ -139,6 +143,7 @@ cd web && npx vitest run          # one file: npx vitest run src/lib/perms.test.
 cd desktop && npm run typecheck && npm test
 python3 tools/i18n_check.py       # every locale has every key, placeholder and plural form
 python3 tools/i18n_keys_used.py   # must say "web: ... 0 missing"; Android's keys built at runtime are listed, as expected
+python3 tools/privacy_check.py   # private artifacts must not be tracked; --history checks all reachable revisions too
 ```
 
 `make test` runs the Go suite with `-race` plus the web and desktop suites. `internal/db`'s Postgres
@@ -284,7 +289,6 @@ docs/               design spec and plans, STATUS.md, legal/ (the Terms and Priv
                     show word for word), plugins.md (the plugin API), bots.md (making apps and
                     pointing bot libraries at Nexa), design/reference captures
 audit/              two rounds of code audits: findings, triage and progress per area
-prompt.txt          the 2026-10-01 handoff to another machine, with the owner's messages word for word
 run.sh, backup.sh   what the service starts (bin/chatd -env chatd.env); the backup of data/
 ```
 
@@ -1400,7 +1404,7 @@ notes.
   release only when `android/` or the web files its build copies in changed since the one published
   in `downloads/android` (the manifest keeps a `source` hash of them), numbers it after that one
   (versionCode + 1 and the last number of versionName + 1, passed to Gradle as `-PnexaVersionCode`
-  and `-PnexaVersionName`, so nothing in git is edited), signs it with the key in `android/signing`
+  and `-PnexaVersionName`, so nothing in git is edited), signs it with the private local key configured in `android/signing`
   and publishes it there; chatd offers it at once and the updater brings every phone up to it.
   `make publish-android` builds one regardless. The APKs and manifest are not in git. Builds up to
   1.1.0 were signed with an older, lost key and cannot update to these; those phones reinstall.

@@ -9,7 +9,7 @@ HOST="${HOST:-nexa.fish}"
 TUNNEL="$(grep -E '^tunnel:' "$CFG" | awk '{print $2}')"
 [ -n "$TUNNEL" ] || { echo "no tunnel id in $CFG" >&2; exit 1; }
 if [ ! -f "$HOME/.cloudflared/cert.pem" ]; then
-  echo "No ~/.cloudflared/cert.pem. Run:  cloudflared tunnel login   (pick evilion.xyz), then re-run this script." >&2
+  echo "No ~/.cloudflared/cert.pem. Run:  cloudflared tunnel login   (select your domain), then re-run this script." >&2
   exit 1
 fi
 echo "routing $HOST -> tunnel $TUNNEL"
