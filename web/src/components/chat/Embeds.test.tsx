@@ -58,3 +58,27 @@ describe("siteAccount", () => {
     expect(siteAccount("@x", "X")).toBe(true);
   });
 });
+
+describe("media file links", () => {
+  const proxy = `/media/proxy/${Math.floor(Date.now() / 1000) + 86400}-signed/file`;
+  it("uses the existing audio player with the signed proxy URL and readable filename", () => {
+    const { container } = render(<Embeds list={[{ url: "https://files.example/music%20demo.mp3?download=1", type: "audio", media: proxy, media_kind: "audio" }]} />);
+    expect(container.querySelector("audio")?.getAttribute("src")).toBe(proxy);
+    expect(container.textContent).toContain("music demo.mp3");
+    expect(container.querySelector("audio")?.autoplay).toBe(false);
+  });
+
+  it("does not load a remote file if an embed contains an unproxied address", () => {
+    const { container } = render(<Embeds list={[
+      { url: "https://files.example/music.mp3", type: "audio", media: "https://files.example/music.mp3", media_kind: "audio" },
+      { url: "https://files.example/movie.mp4", type: "video", image: "https://files.example/movie.mp4" },
+    ]} />);
+    expect(container.querySelector("audio, video")).toBeNull();
+  });
+
+  it("plays video files through the proxy too", () => {
+    const { container } = render(<Embeds list={[{ url: "https://files.example/movie.mp4", type: "video", image: proxy }]} />);
+    expect(container.querySelector("video")?.getAttribute("src")).toBe(proxy);
+    expect(container.querySelector("video")?.autoplay).toBe(false);
+  });
+});

@@ -640,7 +640,7 @@ internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
         return
     }
     val embeds = if (cm != null && !cm.m.suppressEmbeds) payload?.embeds?.takeIf { it.isNotEmpty() } else null
-    // a GIF or picture link shows only the picture, the way an uploaded one does (isOnlyMediaLinks)
+    // Pictures and GIFs stand alone; audio and video keep their original link above the player.
     val doc by Nexa.settings.doc.collectAsState()
     val mediaOnly = embeds != null && remember(doc) { Nexa.settings.imagePreviews } &&
         remember(payload?.t, embeds) { isOnlyMediaLinks(payload?.t ?: "", embeds.mapNotNull { Unfurl.of(it) }) }

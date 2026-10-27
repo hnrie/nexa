@@ -1211,7 +1211,7 @@ export interface SocialPost {
 
 export interface UnfurlResult {
   url: string;
-  type: "link" | "image" | "gif" | "video" | "youtube" | "invite" | "profile";
+  type: "link" | "image" | "gif" | "video" | "audio" | "youtube" | "invite" | "profile";
   title?: string;
   description?: string;
   site_name?: string;

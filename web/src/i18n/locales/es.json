@@ -7241,5 +7241,7 @@
   "whatsNew.r202610262.voiceMessagesBody": "Cuando el cuadro de mensaje esté vacío, toca el micrófono para grabar un mensaje de voz. Escúchalo antes de enviarlo o envíalo directamente.",
   "whatsNew.r202610262.voiceMessagesTitle": "Mensajes de voz",
   "whatsNew.r202610263.ranksBody": "El equipo de Nexa ahora tiene rangos, Propietario, Desarrollador, Admin y Mod, cada uno con su insignia en los perfiles y las listas de miembros.",
-  "whatsNew.r202610263.ranksTitle": "Rangos del Equipo"
+  "whatsNew.r202610263.ranksTitle": "Rangos del Equipo",
+  "whatsNew.r202610264.mediaLinksBody": "Envía un enlace a un archivo de audio o vídeo para reproducirlo en el chat. Los archivos se cargan a través del proxy de Nexa.",
+  "whatsNew.r202610264.mediaLinksTitle": "Reproducir enlaces multimedia"
 }

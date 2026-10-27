@@ -106,6 +106,7 @@ fun EmbedList(list: List<Unfurl>, from: String) {
                 e.post != null -> PostEmbed(e)
                 e.type == "image" || e.type == "gif" -> if (imagePreviews) ImageEmbed(e, from)
                 e.type == "video" -> if (imagePreviews) VideoEmbed(e)
+                e.type == "audio" -> AudioEmbed(e)
                 e.type == "invite" || e.type == "profile" -> Unit
                 e.type == "youtube" || e.title != null || e.description != null || e.player != null || e.media != null -> LinkCard(e, from)
             }
@@ -150,6 +151,16 @@ private fun VideoEmbed(e: Unfurl) {
     val src = mediaSrc(e.image ?: e.url)
     if (src.isNullOrEmpty()) return
     VideoPlayer(VideoSource.Url(src), fileNameOf(e.url, t("perms.video")), e.imageW, e.imageH, eager = false)
+}
+
+/** A linked audio file uses the upload player, only with a safe proxy address. */
+@Composable
+private fun AudioEmbed(e: Unfurl) {
+    val src = mediaSrc(e.media)
+    if (src.isNullOrEmpty()) return
+    Box(Modifier.widthIn(max = 400.dp)) {
+        AudioPlayer(android.net.Uri.parse(src), fileNameOf(e.url, t("chat.embeds.audio")), null, null, null, null, null)
+    }
 }
 
 private val PLAYER_HOSTS = setOf("player.vimeo.com", "player.twitch.tv", "clips.twitch.tv", "www.dailymotion.com", "streamable.com", "www.loom.com")

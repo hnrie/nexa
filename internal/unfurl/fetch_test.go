@@ -131,7 +131,7 @@ func TestFetchOpenGraph(t *testing.T) {
 	if gotUA != defaultUserAgent {
 		t.Errorf("User-Agent = %q, want %q", gotUA, defaultUserAgent)
 	}
-	if gotAccept != "text/html,image/*,video/*,*/*;q=0.5" {
+	if gotAccept != "text/html,image/*,video/*,audio/*,*/*;q=0.5" {
 		t.Errorf("Accept = %q", gotAccept)
 	}
 }
@@ -367,7 +367,7 @@ func TestFetchImageReadsOnlyHead(t *testing.T) {
 }
 
 func TestFetchVideo(t *testing.T) {
-	for _, ct := range []string{"video/mp4", "video/webm"} {
+	for _, ct := range []string{"video/mp4", "video/webm", "video/ogg", "video/quicktime"} {
 		f, _ := fetcherFor(t, body(ct, "\x00\x00\x00\x18ftypmp42 binary junk"))
 		res := mustFetch(t, f, "http://example.test/clip")
 		if res.Type != "video" {
@@ -379,6 +379,38 @@ func TestFetchVideo(t *testing.T) {
 		if res.Image != "" {
 			t.Errorf("%s: Image = %q, want empty", ct, res.Image)
 		}
+	}
+}
+
+func TestFetchAudio(t *testing.T) {
+	for _, ct := range []string{"audio/mpeg", "audio/mp4", "audio/ogg", "audio/wav", "audio/x-wav", "audio/webm", "audio/aac", "audio/flac", "audio/x-flac"} {
+		t.Run(ct, func(t *testing.T) {
+			f, _ := fetcherFor(t, body(ct, "audio bytes"))
+			res := mustFetch(t, f, "http://example.test/music.mp3?download=1")
+			if res.Type != "audio" || res.MediaKind != "audio" || res.Media != res.URL || res.Mime != ct || res.MediaMime != ct {
+				t.Fatalf("audio preview = %+v", res)
+			}
+		})
+	}
+}
+
+func TestFetchUntypedMedia(t *testing.T) {
+	for _, ct := range []string{"application/octet-stream", "binary/octet-stream", ""} {
+		for _, media := range []struct{ data, kind string }{
+			{"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom", "video"},
+			{"ID3\x03\x00\x00\x00\x00\x00\x00", "audio"},
+		} {
+			f, _ := fetcherFor(t, body(ct, media.data))
+			res := mustFetch(t, f, "http://example.test/file")
+			if res.Type != media.kind {
+				t.Fatalf("%q: got %+v", ct, res)
+			}
+		}
+	}
+	// A filename alone does not turn a web page into playable media.
+	f, _ := fetcherFor(t, body("application/octet-stream", "<html><title>Not audio</title></html>"))
+	if _, err := f.Fetch(context.Background(), "http://example.test/music.mp3"); !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("disguised HTML: %v", err)
 	}
 }
 
@@ -808,5 +840,13 @@ func TestFetchMeasuresOnlyWhileThereIsTime(t *testing.T) {
 	res := mustFetch(t, f, "http://example.test/page")
 	if asked || res.ImageW != 0 || res.Image == "" {
 		t.Errorf("slow page: asked=%v dims=%dx%d image=%q", asked, res.ImageW, res.ImageH, res.Image)
+	}
+}
+
+func TestFetchPageWithOnlyPlayableMedia(t *testing.T) {
+	f, _ := fetcherFor(t, body("text/html", `<html><head><meta property="og:audio" content="/track.mp3"><meta property="og:audio:type" content="audio/mpeg"></head></html>`))
+	r := mustFetch(t, f, "http://example.test/page")
+	if r.Media != "http://example.test/track.mp3" || r.MediaKind != "audio" {
+		t.Fatalf("media-only card: %+v", r)
 	}
 }

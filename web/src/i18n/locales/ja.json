@@ -6891,5 +6891,7 @@
   "whatsNew.r202610262.voiceMessagesBody": "メッセージ欄が空のときにマイクをタップすると、ボイスメッセージを録音できます。送る前に聞き直すことも、そのまま送ることもできます。",
   "whatsNew.r202610262.voiceMessagesTitle": "ボイスメッセージ",
   "whatsNew.r202610263.ranksBody": "Nexa のスタッフにランクができました。オーナー、開発者、管理者、モデレーターで、それぞれのバッジがプロフィールやメンバー一覧に表示されます。",
-  "whatsNew.r202610263.ranksTitle": "スタッフのランク"
+  "whatsNew.r202610263.ranksTitle": "スタッフのランク",
+  "whatsNew.r202610264.mediaLinksBody": "音声や動画ファイルのリンクを送ると、チャット内で再生できます。メディアはNexaのプロキシ経由で読み込まれます。",
+  "whatsNew.r202610264.mediaLinksTitle": "メディアリンクを再生"
 }

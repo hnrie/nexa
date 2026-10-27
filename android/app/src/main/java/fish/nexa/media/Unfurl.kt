@@ -128,10 +128,10 @@ fun openExternal(url: String) {
     }
 }
 
-/** mediaLinks.ts isOnlyMediaLinks: a message that is nothing but the links of its picture or video previews. */
+/** mediaLinks.ts isOnlyMediaLinks: a message that is nothing but the links of its picture or GIF previews. Audio and video keep their original links. */
 fun isOnlyMediaLinks(text: String, embeds: List<Unfurl>): Boolean {
     val words = text.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-    if (words.isEmpty() || embeds.isEmpty() || !embeds.all { it.type == "image" || it.type == "gif" || it.type == "video" }) return false
+    if (words.isEmpty() || embeds.isEmpty() || !embeds.all { it.type == "image" || it.type == "gif" }) return false
     val own = embeds.flatMap { listOfNotNull(it.url, it.image) }.toSet()
     val link = Regex("^https?://\\S+$", RegexOption.IGNORE_CASE)
     if (!words.all { it in own || link.matches(it) }) return false

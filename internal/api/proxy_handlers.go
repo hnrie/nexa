@@ -30,13 +30,6 @@ const (
 	proxySigLength = 16 // bytes of HMAC kept, base64url encoded
 )
 
-// proxyTypes are the video and audio types passed through; images are
-// unfurl.ProxyImageTypes, which leaves out SVG because it can script.
-var proxyTypes = map[string]bool{
-	"video/mp4": true, "video/webm": true, "video/quicktime": true,
-	"audio/mpeg": true, "audio/mp4": true, "audio/ogg": true,
-}
-
 // proxyTTL is how long a signed media link stays usable. Long enough for a
 // page someone left open overnight, short enough that a link lifted from a
 // response does not become a permanent way to make this server fetch things.
@@ -250,7 +243,7 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 	if untypedMedia[ct] {
 		ct, body = sniffedType(target.String(), res)
 	}
-	if !proxyTypes[ct] && !unfurl.ProxyImageTypes[ct] {
+	if !unfurl.PlayableMediaType(ct) && !unfurl.ProxyImageTypes[ct] {
 		http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -306,7 +299,7 @@ func sniffedType(address string, res *http.Response) (string, io.Reader) {
 	head := bufio.NewReaderSize(res.Body, 512)
 	peek, _ := head.Peek(512)
 	ct := strings.ToLower(strings.TrimSpace(strings.Split(http.DetectContentType(peek), ";")[0]))
-	if proxyTypes[ct] || unfurl.ProxyImageTypes[ct] {
+	if unfurl.PlayableMediaType(ct) || unfurl.ProxyImageTypes[ct] {
 		sniffedTypes.Lock()
 		if len(sniffedTypes.m) >= 2000 {
 			clear(sniffedTypes.m)

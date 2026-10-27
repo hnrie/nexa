@@ -338,6 +338,7 @@ function embedFor(e: UnfurlResult, imagePreviews: boolean): ReactNode {
   if (e.type === "image" || e.type === "gif") return imagePreviews ? <ImageEmbed e={e} /> : null;
   // played through this server's proxy, so the host of the file never sees who is watching
   if (e.type === "video") return imagePreviews ? <VideoEmbed e={e} /> : null;
+  if (e.type === "audio") return <AudioEmbed e={e} />;
   if (e.type === "youtube") return <LinkEmbed e={e} />;
   // drawn by InviteCards and ProfileCards, which also cover links that came without a card
   if (e.type === "invite" || e.type === "profile") return null;
@@ -376,4 +377,10 @@ export function Embeds({ list, onRemove }: { list: UnfurlResult[]; onRemove?: ((
 function VideoEmbed({ e }: { e: UnfurlResult }) {
   const src = useMediaSrc(e.image ?? e.url);
   return src ? <VideoPlayer src={src} name={fileNameOf(e.url, t("perms.video"))} width={e.image_w} height={e.image_h} /> : null;
+}
+
+/** A linked audio file uses the same player as an upload, always through the proxy. */
+function AudioEmbed({ e }: { e: UnfurlResult }) {
+  const src = useMediaSrc(e.media);
+  return src ? <div className={s.audioFile}><AudioPlayer src={src} name={fileNameOf(e.url, t("chat.embeds.audio"))} /></div> : null;
 }

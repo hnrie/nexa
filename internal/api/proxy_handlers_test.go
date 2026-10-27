@@ -561,3 +561,53 @@ func TestMediaProxyJudgesUntypedFilesByWhatTheyAre(t *testing.T) {
 		t.Errorf("a later piece: %d %s, %d bytes", code, ct, len(data))
 	}
 }
+
+// File links go from the sender's unfurl request to signed proxy playback,
+// including seeking. The original URL remains only the message's link.
+func TestMediaFileLinksAlwaysUseProxy(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	for _, ct := range []string{"video/mp4", "video/webm", "video/ogg", "video/quicktime", "audio/mpeg", "audio/mp4", "audio/ogg", "audio/wav", "audio/x-wav", "audio/webm", "audio/aac", "audio/flac", "audio/x-flac", "application/octet-stream"} {
+		t.Run(ct, func(t *testing.T) {
+			data := "ID3\x03\x00\x00\x00\x00\x00\x00audio bytes"
+			srv.Unfurl = postUpstream(t, map[string]http.Handler{
+				"files.test": http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", ct)
+					if r.Header.Get("Range") != "" {
+						w.Header().Set("Accept-Ranges", "bytes")
+						w.Header().Set("Content-Range", fmt.Sprintf("bytes 0-%d/%d", len(data)-1, len(data)))
+						w.WriteHeader(http.StatusPartialContent)
+					}
+					io.WriteString(w, data)
+				}),
+			})
+			res, preview := do(t, ts, "GET", "/api/v1/unfurl?url=https://files.test/media", tok, nil)
+			if res.StatusCode != http.StatusOK {
+				t.Fatalf("unfurl: %d %v", res.StatusCode, preview)
+			}
+			field := "image"
+			if preview["type"] == "audio" {
+				field = "media"
+			}
+			link, _ := preview[field].(string)
+			if target, ok := srv.signedTarget(link); !ok || target != "https://files.test/media" {
+				t.Fatalf("unsigned playback: %v", preview)
+			}
+			req, _ := http.NewRequest(http.MethodGet, ts.URL+link, nil)
+			req.Header.Set("Range", "bytes=0-")
+			play, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer play.Body.Close()
+			got, _ := io.ReadAll(play.Body)
+			wantType := ct
+			if ct == "application/octet-stream" {
+				wantType = "audio/mpeg"
+			}
+			if play.StatusCode != http.StatusPartialContent || play.Header.Get("Content-Type") != wantType || string(got) != data {
+				t.Fatalf("playback: %d %s %q", play.StatusCode, play.Header.Get("Content-Type"), got)
+			}
+		})
+	}
+}

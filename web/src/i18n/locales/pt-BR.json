@@ -7242,5 +7242,7 @@
   "whatsNew.r202610262.voiceMessagesBody": "Quando a caixa de mensagem estiver vazia, toque no microfone para gravar uma mensagem de voz. Ouça antes de enviar ou envie direto.",
   "whatsNew.r202610262.voiceMessagesTitle": "Mensagens de voz",
   "whatsNew.r202610263.ranksBody": "A equipe do Nexa agora tem cargos, Dono, Desenvolvedor, Admin e Mod, cada um com seu emblema nos perfis e nas listas de membros.",
-  "whatsNew.r202610263.ranksTitle": "Cargos da Equipe"
+  "whatsNew.r202610263.ranksTitle": "Cargos da Equipe",
+  "whatsNew.r202610264.mediaLinksBody": "Envie um link para um arquivo de áudio ou vídeo para reproduzi-lo no chat. A mídia é carregada pelo proxy do Nexa.",
+  "whatsNew.r202610264.mediaLinksTitle": "Reproduzir Links de Mídia"
 }

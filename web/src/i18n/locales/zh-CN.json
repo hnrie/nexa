@@ -6891,5 +6891,7 @@
   "whatsNew.r202610262.voiceMessagesBody": "当消息框为空时，点按麦克风即可录制语音消息。发送前可以先听一遍，也可以直接发送。",
   "whatsNew.r202610262.voiceMessagesTitle": "语音消息",
   "whatsNew.r202610263.ranksBody": "Nexa 的工作人员现在有了等级：所有者、开发者、管理员和版主，每个等级在个人资料和成员列表中都有自己的徽章。",
-  "whatsNew.r202610263.ranksTitle": "工作人员等级"
+  "whatsNew.r202610263.ranksTitle": "工作人员等级",
+  "whatsNew.r202610264.mediaLinksBody": "发送音频或视频文件链接，即可在聊天中播放。媒体通过 Nexa 的代理加载。",
+  "whatsNew.r202610264.mediaLinksTitle": "播放媒体链接"
 }

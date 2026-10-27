@@ -7128,5 +7128,7 @@
   "whatsNew.r202610262.voiceMessagesBody": "When the message box is empty, tap the microphone to record a voice message. Listen back before sending, or send it straight away.",
   "whatsNew.r202610262.voiceMessagesTitle": "Voice Messages",
   "whatsNew.r202610263.ranksBody": "Nexa's staff now have ranks, Owner, Developer, Admin and Mod, each with its own badge on profiles and in member lists.",
-  "whatsNew.r202610263.ranksTitle": "Staff Ranks"
+  "whatsNew.r202610263.ranksTitle": "Staff Ranks",
+  "whatsNew.r202610264.mediaLinksBody": "Send a link to an audio or video file to play it in chat. Media loads through Nexa’s proxy.",
+  "whatsNew.r202610264.mediaLinksTitle": "Play Media Links"
 }

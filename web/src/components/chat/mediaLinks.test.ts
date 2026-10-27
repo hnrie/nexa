@@ -8,12 +8,20 @@ const video: UnfurlResult = { url: "https://cdn.example/clip.mp4", type: "video"
 const page: UnfurlResult = { url: "https://news.example/story", type: "link", title: "A story" };
 
 describe("isOnlyMediaLinks", () => {
-  it("hides a link that is only there to carry its picture, GIF or video", () => {
+  it("hides a link that is only there to carry its picture or GIF", () => {
     expect(isOnlyMediaLinks(gif.url, [gif])).toBe(true);
     expect(isOnlyMediaLinks("  https://cdn.example/cat.png\n", [image])).toBe(true);
-    expect(isOnlyMediaLinks("https://cdn.example/cat.png https://cdn.example/clip.mp4", [image, video])).toBe(true);
+    expect(isOnlyMediaLinks("https://cdn.example/cat.png https://cdn.example/other.png", [image, { ...image, url: "https://cdn.example/other.png" }])).toBe(true);
     // a redirect leaves the preview with a different address than the one typed
     expect(isOnlyMediaLinks("http://short.example/x", [image])).toBe(true);
+  });
+
+  it("keeps the original links of audio and video files visible", () => {
+    const audio: UnfurlResult = { url: "https://cdn.example/track.mp3?token=original", type: "audio", media: "/media/proxy/signed/file", media_kind: "audio" };
+    expect(isOnlyMediaLinks(video.url, [video])).toBe(false);
+    expect(isOnlyMediaLinks(audio.url, [audio])).toBe(false);
+    expect(isOnlyMediaLinks("https://short.example/movie", [video])).toBe(false);
+    expect(isOnlyMediaLinks(`${audio.url} ${video.url}`, [audio, video])).toBe(false);
   });
 
   it("does not take any path for a media link", () => {

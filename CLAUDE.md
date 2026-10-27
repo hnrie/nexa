@@ -1001,6 +1001,14 @@ signed-in shell `/channels/@me` (friends), `@me/nexa` (with
   in a worker for Nexa's own text menu), and single files for attachments, uploads, notifications,
   sounds, keybinds, the app lock, away detection, moving domains, invites, export, time, links,
   server tags, widgets and the rest.
+- Media file links (MP4, WebM, Ogg video, QuickTime, MP3, M4A, Ogg audio, WAV, WebM audio,
+  AAC and FLAC) use the existing video and audio players on web and Android. The unfurler
+  recognises their response type, or a bounded file header when the host omits it, never a
+  filename alone. Audio previews carry type `audio` and `media_kind: audio`. Every file a
+  preview loads goes through the signed media proxy, including audio. `unfurl.PlayableMediaType`
+  keeps the proxy's accepted types aligned with previews; no reader fetches the original URL.
+  Audio and video keep the original message link visible above the player on both apps;
+  pictures and GIFs keep standing alone when the message is only their links.
 - `components/` by area: `shell` (app frame, tabs, banners, What's New, update dialog), `sidebar`,
   `rail`, `chat` (message list, message item, embeds, attachments, players, pins, member list),
   `composer` (the box, autocomplete, commands, and `format/`, the formatting editor), `modals`,

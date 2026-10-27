@@ -7128,5 +7128,7 @@
   "whatsNew.r202610262.voiceMessagesBody": "När meddelanderutan är tom trycker du på mikrofonen för att spela in ett röstmeddelande. Lyssna innan du skickar, eller skicka det direkt.",
   "whatsNew.r202610262.voiceMessagesTitle": "Röstmeddelanden",
   "whatsNew.r202610263.ranksBody": "Nexas personal har nu rang, Ägare, Utvecklare, Admin och Mod, var och en med sitt eget märke på profiler och i medlemslistor.",
-  "whatsNew.r202610263.ranksTitle": "Personalens Rang"
+  "whatsNew.r202610263.ranksTitle": "Personalens Rang",
+  "whatsNew.r202610264.mediaLinksBody": "Skicka en länk till en ljud- eller videofil för att spela upp den i chatten. Media laddas via Nexas proxy.",
+  "whatsNew.r202610264.mediaLinksTitle": "Spela upp medielänkar"
 }

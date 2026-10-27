@@ -3,12 +3,12 @@ import type { UnfurlResult } from "@/api/types";
 const LINK = /^https?:\/\/\S+$/i;
 
 export function isMediaEmbed(e: UnfurlResult | null | undefined): boolean {
-  return !!e && (e.type === "image" || e.type === "gif" || e.type === "video");
+  return !!e && (e.type === "image" || e.type === "gif");
 }
 
 /**
- * Whether a message's text is nothing but links to the pictures and videos
- * shown under it. Such text only repeats them, so like an uploaded file the
+ * Whether a message's text is nothing but links to the pictures and GIFs
+ * shown under it. Audio and video keep their original links. For pictures,
  * media stands alone. A word counts as such a link when it is the address a
  * preview was made for, which is how a GIF from the picker arrives (through
  * this server's proxy, as a path), or any web link at all, since a preview

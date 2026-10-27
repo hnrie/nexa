@@ -451,7 +451,7 @@ function MessageContent({ msg, name, id, pending, upload }: { msg: DecryptedMess
   const hook = msg.hook;
   const imagePreviews = useSettings((st) => st.settings.imagePreviews);
   const embeds = msg.payload?.embeds?.length && !(msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) ? (msg.payload.embeds as UnfurlResult[]) : null;
-  // a GIF or picture link shows only the picture, the way an uploaded one does
+  // Pictures and GIFs stand alone; audio and video keep their original link above the player.
   const mediaOnly = !!embeds && imagePreviews && isOnlyMediaLinks(msg.payload?.t ?? "", embeds);
   const text = mediaOnly ? "" : (msg.payload?.t ?? "");
   const nodes = useMemo(() => (text ? parse(text) : []), [text]);

@@ -6891,5 +6891,7 @@
   "whatsNew.r202610262.voiceMessagesBody": "메시지 입력란이 비어 있을 때 마이크를 누르면 음성 메시지를 녹음할 수 있어요. 보내기 전에 들어 보거나 바로 보낼 수 있어요.",
   "whatsNew.r202610262.voiceMessagesTitle": "음성 메시지",
   "whatsNew.r202610263.ranksBody": "이제 Nexa 스태프에게 소유자, 개발자, 관리자, 모더레이터 등급이 있으며, 각각 프로필과 멤버 목록에 배지가 표시됩니다.",
-  "whatsNew.r202610263.ranksTitle": "스태프 등급"
+  "whatsNew.r202610263.ranksTitle": "스태프 등급",
+  "whatsNew.r202610264.mediaLinksBody": "오디오나 동영상 파일 링크를 보내 채팅에서 재생하세요. 미디어는 Nexa 프록시를 통해 로드됩니다.",
+  "whatsNew.r202610264.mediaLinksTitle": "미디어 링크 재생"
 }

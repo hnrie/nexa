@@ -1,6 +1,7 @@
 package unfurl
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -56,7 +57,7 @@ var ProxyImageTypes = map[string]bool{
 // Result is a link preview.
 type Result struct {
 	URL         string `json:"url"`
-	Type        string `json:"type"` // link | image | gif | video | youtube | invite | profile
+	Type        string `json:"type"` // link | image | gif | video | audio | youtube | invite | profile
 	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
 	SiteName    string `json:"site_name,omitempty"`
@@ -280,7 +281,7 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Result, error) {
 		return nil, ErrBlocked
 	}
 	req.Header.Set("User-Agent", f.userAgent())
-	req.Header.Set("Accept", "text/html,image/*,video/*,*/*;q=0.5")
+	req.Header.Set("Accept", "text/html,image/*,video/*,audio/*,*/*;q=0.5")
 	req.Header.Set("Accept-Language", "en")
 	res, err := client.Do(req)
 	if err != nil {
@@ -302,17 +303,31 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Result, error) {
 	}
 	ct, _, _ := mime.ParseMediaType(res.Header.Get("Content-Type"))
 	ct = strings.ToLower(ct)
+	var body io.Reader = res.Body
+	// File hosts sometimes omit the type. Judge only the bounded file header,
+	// never its extension, and keep those bytes for the image reader below.
+	if ct == "" || ct == "application/octet-stream" || ct == "binary/octet-stream" {
+		head := bufio.NewReaderSize(res.Body, 512)
+		peek, _ := head.Peek(512)
+		detected, _, _ := mime.ParseMediaType(http.DetectContentType(peek))
+		if ProxyImageTypes[detected] || PlayableMediaType(detected) {
+			ct = detected
+		}
+		body = head
+	}
 	switch {
 	case strings.HasPrefix(ct, "image/"):
 		// the preview is shown through the media proxy, so only what it passes on
 		if !ProxyImageTypes[ct] || res.ContentLength > MaxMediaBytes {
 			return nil, ErrUnsupported
 		}
-		return f.mediaResult(res.Body, final, ct, "image")
-	case ct == "video/mp4" || ct == "video/webm":
+		return f.mediaResult(body, final, ct, "image")
+	case playableVideo[ct]:
 		return &Result{URL: final.String(), Type: "video", Mime: ct}, nil
+	case playableAudio[ct]:
+		return &Result{URL: final.String(), Type: "audio", Mime: ct, Media: final.String(), MediaKind: "audio", MediaMime: ct}, nil
 	case ct == "text/html" || ct == "application/xhtml+xml":
-		return f.htmlResult(ctx, started, res.Body, final)
+		return f.htmlResult(ctx, started, body, final)
 	}
 	return nil, ErrUnsupported
 }
@@ -429,7 +444,7 @@ func (f *Fetcher) htmlResult(ctx context.Context, started time.Time, body io.Rea
 			r.ImageW, r.ImageH = 480, 360
 		}
 	}
-	if r.Title == "" && r.Description == "" && r.Image == "" && r.Player == "" {
+	if r.Title == "" && r.Description == "" && r.Image == "" && r.Player == "" && r.Media == "" {
 		return nil, ErrUnsupported
 	}
 	// A picture of unknown size is measured before the card goes out, if there
@@ -477,8 +492,12 @@ func (f *Fetcher) imageSize(ctx context.Context, raw string) (int, int) {
 
 // Files a browser plays without help; anything else would need a plugin or a
 // frame, and a preview gets neither.
-var playableVideo = map[string]bool{"video/mp4": true, "video/webm": true, "video/ogg": true}
-var playableAudio = map[string]bool{"audio/mpeg": true, "audio/mp4": true, "audio/ogg": true, "audio/wav": true, "audio/webm": true, "audio/aac": true, "audio/flac": true}
+var playableVideo = map[string]bool{"video/mp4": true, "video/webm": true, "video/ogg": true, "video/quicktime": true}
+var playableAudio = map[string]bool{"audio/mpeg": true, "audio/mp4": true, "audio/ogg": true, "audio/wav": true, "audio/webm": true, "audio/aac": true, "audio/flac": true, "audio/x-wav": true, "audio/x-flac": true}
+
+// PlayableMediaType is shared by preview fetching and the media proxy so a
+// file offered to a player is also allowed through its signed proxy link.
+func PlayableMediaType(ct string) bool { return playableVideo[ct] || playableAudio[ct] }
 
 var timeLayouts = []string{time.RFC3339, "2006-01-02T15:04:05Z0700", "2006-01-02T15:04:05", "2006-01-02 15:04:05", "2006-01-02"}
 
