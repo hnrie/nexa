@@ -514,8 +514,8 @@ fun LoopingVideo(url: String, poster: String?) {
 fun VideoAttachment(att: AttachmentMeta, fill: Boolean = false) {
     Saving.Track()
     val download = {
-        Saving.save(att.name, att.type, picture = false, write = { out -> Downloads.writeAttachment(att, out) {} }) { err ->
-            if (err != null) Nexa.ui.toast(t("chat.attachments.couldNotDownloadThatFile"), "error") else Nexa.ui.toast(t("android.media.savedToDownloads"), "success")
+        Saving.save(att.name, att.type, write = { out -> Downloads.writeAttachment(att, out) {} }) { err ->
+            if (err != null) Nexa.ui.toast(t("chat.attachments.couldNotDownloadThatFile"), "error") else Nexa.ui.toast(t("settings.account.saved"), "success")
         }
     }
     VideoPlayer(

@@ -1,3 +1,4 @@
+import { pickSaveFile, saveBlob } from "./saveFile";
 
 import { t } from "@/i18n";/**
  * Copying a picture to the clipboard and saving it, for the right-click menu
@@ -83,9 +84,8 @@ export function withExtension(name: string, type: string): string {
 
 /**
  * The picture as a PNG, the one image type every browser's clipboard takes;
- * animations keep their first frame. It is drawn from an image element rather
- * than fetched: a decrypted attachment is a blob: address, which the page's
- * content security policy lets it show but not fetch.
+ * animations keep their first frame. Drawing from an image element also
+ * handles decrypted attachments at blob: addresses.
  */
 async function toPng(src: string): Promise<Blob> {
   const img = new Image();
@@ -102,16 +102,6 @@ async function toPng(src: string): Promise<Blob> {
   if (!ctx) throw new Error(t("imageActions.thePictureCouldNotBeCopied"));
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(t("imageActions.thePictureCouldNotBeCopied")))), "image/png"));
-}
-
-function download(href: string, name: string): void {
-  const a = document.createElement("a");
-  a.href = href;
-  a.download = name;
-  a.rel = "noopener";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
 }
 
 /**
@@ -132,16 +122,12 @@ export function copyImage(src: string | Promise<string>): Promise<void> {
  * decrypted attachment already is a file in the page (and carries its name);
  * anything else is fetched first to learn what kind of picture it is.
  */
-export async function saveImage(src: string, name: string): Promise<void> {
-  if (src.startsWith("blob:")) {
-    download(src, name.trim() || "image");
-    return;
-  }
-  const res = await fetch(src);
+export async function saveImage(src: string | (() => Promise<string>), name: string): Promise<void> {
+  const handle = await pickSaveFile(name);
+  if (handle === null) return;
+  const url = typeof src === "function" ? await src() : src;
+  const res = await fetch(url);
   if (!res.ok) throw new Error(t("imageActions.thePictureCouldNotBeLoaded"));
   const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  download(url, withExtension(name, blob.type));
-  // the browser has its own hold on the file by the time this runs out
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  await saveBlob(blob, withExtension(name, blob.type), handle);
 }

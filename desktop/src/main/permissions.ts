@@ -56,7 +56,12 @@ export function lockPermissions(): void {
   });
   // nothing is ever loaded from anywhere else as a page, and downloads keep the system's own save flow
   ses.on("will-download", (_e, item) => {
-    if (!isAppUrl(item.getURL()) && !item.getURL().startsWith("blob:") && !item.getURL().startsWith("data:")) item.cancel();
+    if (!isAppUrl(item.getURL()) && !item.getURL().startsWith("blob:") && !item.getURL().startsWith("data:")) {
+      item.cancel();
+      return;
+    }
+    // Always offer a location, including downloads initiated by the worker.
+    item.setSaveDialogOptions({ defaultPath: path.join(app.getPath("downloads"), path.basename(item.getFilename())) });
   });
 }
 

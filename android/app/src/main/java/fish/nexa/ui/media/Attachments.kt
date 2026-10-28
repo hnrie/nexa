@@ -409,10 +409,10 @@ fun FileCard(att: AttachmentMeta) {
         if (!busy) {
             busy = true
             done = 0L
-            Saving.save(att.name, att.type, picture = false, write = { out -> Downloads.writeAttachment(att, out) { done = it } }) { err ->
+            Saving.save(att.name, att.type, write = { out -> Downloads.writeAttachment(att, out) { done = it } }, onCancel = { busy = false }) { err ->
                 busy = false
                 if (err != null) Nexa.ui.toast(err.message?.takeIf { it.isNotBlank() && err is fish.nexa.net.ApiError } ?: t("chat.attachments.couldNotDownloadThatFile"), "error")
-                else Nexa.ui.toast(t("android.media.savedToDownloads"), "success")
+                else Nexa.ui.toast(t("settings.account.saved"), "success")
             }
         }
     }

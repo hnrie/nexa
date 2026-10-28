@@ -8,6 +8,7 @@ import path from "node:path";
 import { BASE, ORIGIN, START_URL, isAppUrl, isFrameableUrl } from "./config";
 import { windowAudioSupported } from "./appAudio";
 import { shareAudioMode } from "./permissions";
+import { originalWindow, lockOriginalWindow } from "./originalWindow";
 import { nativeStrings } from "./strings";
 import type { SettingsStore } from "./settings";
 
@@ -102,9 +103,12 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
 
   const wc = win.webContents;
   wc.setWindowOpenHandler(({ url }) => {
+    const original = originalWindow(url);
+    if (original) return original;
     openExternal(url);
     return { action: "deny" };
   });
+  wc.on("did-create-window", (child, details) => lockOriginalWindow(child, details.url));
   wc.on("will-navigate", (event, url) => {
     if (isAppUrl(url)) return;
     event.preventDefault();

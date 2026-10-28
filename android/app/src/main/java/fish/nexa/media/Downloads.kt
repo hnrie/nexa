@@ -2,12 +2,8 @@ package fish.nexa.media
 
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
-import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
 import android.webkit.MimeTypeMap
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -27,9 +23,8 @@ import java.io.OutputStream
 
 /**
  * Saving files to the phone (lib/download.ts, lib/imageActions.ts): a file
- * goes to Downloads, a picture to Pictures/Nexa, each written as it is
- * decrypted so a big video is never whole in memory. Android 9 and older ask
- * where to put it instead, through the system's save sheet.
+ * goes to the location chosen in the system's save sheet, written as it is
+ * decrypted so a big video is never whole in memory.
  */
 object Downloads {
     private fun extOf(name: String, type: String): String =
@@ -75,33 +70,13 @@ object Downloads {
         }
     }
 
-    /** A new item in the shared Downloads (or Pictures) collection, hidden until it is whole. */
-    internal fun insert(name: String, type: String, picture: Boolean): Uri? {
-        if (Build.VERSION.SDK_INT < 29) return null
-        val cr = Nexa.app.contentResolver
-        val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-            put(MediaStore.MediaColumns.MIME_TYPE, type.ifEmpty { "application/octet-stream" })
-            put(MediaStore.MediaColumns.RELATIVE_PATH, if (picture) "${Environment.DIRECTORY_PICTURES}/Nexa" else Environment.DIRECTORY_DOWNLOADS)
-            put(MediaStore.MediaColumns.IS_PENDING, 1)
-        }
-        val collection = if (picture) MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) else MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        return cr.insert(collection, values)
-    }
-
-    private fun finish(uri: Uri) {
-        if (Build.VERSION.SDK_INT < 29) return
-        Nexa.app.contentResolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
-    }
-
-    /** Writes into a place the person picked (Android 9 and older) or a new shared item (10 and later). */
-    suspend fun saveInto(uri: Uri, write: suspend (OutputStream) -> Unit, pending: Boolean) {
+    /** Writes into the location the person picked, removing a partial file on failure. */
+    suspend fun saveInto(uri: Uri, write: suspend (OutputStream) -> Unit) {
         val cr = Nexa.app.contentResolver
         try {
             withContext(Dispatchers.IO) { cr.openOutputStream(uri, "w")?.use { write(it) } ?: throw java.io.IOException("could not write there") }
-            if (pending) finish(uri)
         } catch (e: Exception) {
-            if (pending) runCatching { cr.delete(uri, null, null) }
+            runCatching { android.provider.DocumentsContract.deleteDocument(cr, uri) }
             throw e
         }
     }
@@ -120,10 +95,9 @@ object Downloads {
 }
 
 /**
- * Saving: on Android 10 and later straight into Downloads or Pictures; on 9
- * and older through the system's save sheet, opened from the activity the
- * person is looking at. [onDone] gets null on success, the reason it failed,
- * or nothing at all when the person backed out of the save sheet.
+ * Saving through the system's save sheet on every Android version, opened
+ * from the activity the person is looking at. [onDone] gets null on success, the reason it failed,
+ * and [onCancel] runs when the person backs out of the save sheet.
  */
 object Saving {
     private var activity: java.lang.ref.WeakReference<androidx.activity.ComponentActivity>? = null
@@ -138,28 +112,23 @@ object Saving {
         }
     }
 
-    fun save(name: String, type: String, picture: Boolean, write: suspend (OutputStream) -> Unit, onDone: (Throwable?) -> Unit) {
-        if (Build.VERSION.SDK_INT >= 29) {
-            Nexa.scope.launch {
-                val err = runCatching {
-                    val uri = withContext(Dispatchers.IO) { Downloads.insert(name, type, picture) } ?: throw java.io.IOException("no room")
-                    Downloads.saveInto(uri, write, pending = true)
-                }.exceptionOrNull()
-                withContext(Dispatchers.Main) { onDone(err) }
-            }
-            return
-        }
+    fun save(name: String, type: String, write: suspend (OutputStream) -> Unit, onCancel: () -> Unit = {}, onDone: (Throwable?) -> Unit) {
         val act = activity?.get() ?: return onDone(java.io.IOException("no window to save from"))
         val key = "nexa-save-${seq++}"
         var launcher: androidx.activity.result.ActivityResultLauncher<String>? = null
         launcher = act.activityResultRegistry.register(key, ActivityResultContracts.CreateDocument(type.ifEmpty { "application/octet-stream" })) { uri ->
             launcher?.unregister()
-            if (uri == null) return@register
+            if (uri == null) { onCancel(); return@register }
             Nexa.scope.launch {
-                val err = runCatching { Downloads.saveInto(uri, write, pending = false) }.exceptionOrNull()
+                val err = runCatching { Downloads.saveInto(uri, write) }.exceptionOrNull()
                 withContext(Dispatchers.Main) { onDone(err) }
             }
         }
-        launcher.launch(name)
+        try {
+            launcher.launch(name)
+        } catch (e: Exception) {
+            launcher.unregister()
+            onDone(e)
+        }
     }
 }

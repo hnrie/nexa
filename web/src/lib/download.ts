@@ -15,6 +15,8 @@ import { DecryptError } from "@/crypto/keys";
 import type { AttachmentMeta } from "@/crypto/message";
 import { noDesktopBuild } from "@/lib/platform";
 
+import { pickSaveFile, saveBlob, type SaveFileHandle } from "./saveFile";
+
 import { t } from "@/i18n";
 /** Above this, a download streams through the service worker when it can. */
 export const STREAM_ABOVE = 64 * 1024 * 1024;
@@ -99,6 +101,7 @@ interface WorkerMessage {
   type?: string;
   done?: number;
   message?: string;
+  body?: ReadableStream<Uint8Array>;
 }
 
 /**
@@ -107,7 +110,7 @@ interface WorkerMessage {
  * older one that knows nothing of downloads, or the browser never came for
  * the file.
  */
-async function streamThroughWorker(att: AttachmentMeta, onProgress?: DownloadProgress): Promise<"done" | "unavailable"> {
+async function streamThroughWorker(att: AttachmentMeta, onProgress?: DownloadProgress, handle?: SaveFileHandle): Promise<"done" | "unavailable"> {
   const worker = await downloadWorker();
   if (!worker || typeof MessageChannel === "undefined" || typeof document === "undefined") return "unavailable";
   const id = hex(randomBytes(16));
@@ -116,6 +119,7 @@ async function streamThroughWorker(att: AttachmentMeta, onProgress?: DownloadPro
     let frame: HTMLIFrameElement | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let holding = false;
+    let fileReceived = false;
     const wait = (ms: number, then: () => void): void => {
       clearTimeout(timer);
       timer = setTimeout(then, ms);
@@ -142,7 +146,38 @@ async function streamThroughWorker(att: AttachmentMeta, onProgress?: DownloadPro
     channel.port1.onmessage = (e: MessageEvent<WorkerMessage>) => {
       const msg = e.data ?? {};
       switch (msg.type) {
+        case "file": {
+          const body = msg.body;
+          if (!handle || !body) { unavailable(); return; }
+          fileReceived = true;
+          if (!holding) hold();
+          holding = true;
+          clearTimeout(timer);
+          void (async () => {
+            try {
+              const out = await handle.createWritable();
+              await body.pipeTo(out);
+            } catch (err) {
+              if (!body.locked) await body.cancel().catch(() => undefined);
+              throw err;
+            }
+          })().then(() => {
+            onProgress?.(att.size, att.size);
+            end();
+            resolve("done");
+          }, (err: unknown) => {
+            worker.postMessage({ type: "download-forget", id });
+            end();
+            reject(err);
+          });
+          return;
+        }
+        case "file-unavailable":
+          unavailable();
+          return;
         case "ready":
+          // An older worker cannot transfer a stream into a chosen file yet.
+          if (handle) { unavailable(); return; }
           frame = document.createElement("iframe");
           frame.hidden = true;
           frame.src = DOWNLOAD_PATH + id;
@@ -152,22 +187,25 @@ async function streamThroughWorker(att: AttachmentMeta, onProgress?: DownloadPro
         case "started":
           if (!holding) hold();
           holding = true;
-          wait(QUIET_TIMEOUT, quiet);
+          if (!handle) wait(QUIET_TIMEOUT, quiet);
           return;
         case "progress":
           onProgress?.(msg.done ?? 0, att.size);
-          wait(QUIET_TIMEOUT, quiet);
+          if (!handle) wait(QUIET_TIMEOUT, quiet);
           return;
         case "done":
+          if (handle) return; // The last write and close must finish first.
           onProgress?.(att.size, att.size);
           end();
           resolve("done");
           return;
         case "cancelled":
+          if (handle) return; // pipeTo reports cancellation and disk failures.
           end();
           resolve("done");
           return;
         case "error":
+          if (handle && fileReceived) return; // The transferred stream rejects and aborts the pipe.
           end();
           reject(new Error(msg.message || t("download.theDownloadFailed")));
           return;
@@ -177,6 +215,7 @@ async function streamThroughWorker(att: AttachmentMeta, onProgress?: DownloadPro
     worker.postMessage(
       {
         type: "download",
+        toFile: !!handle,
         id,
         url: new URL(attachmentUrl(att.blob_id), location.href).href,
         token: api.getToken(),
@@ -192,7 +231,7 @@ async function streamThroughWorker(att: AttachmentMeta, onProgress?: DownloadPro
 /** The share of an in-page save's progress bar that the download itself fills; decrypting fills the rest. */
 const FETCH_SHARE = 0.9;
 
-async function saveInPage(att: AttachmentMeta, onProgress?: DownloadProgress): Promise<void> {
+async function saveInPage(att: AttachmentMeta, onProgress?: DownloadProgress, handle?: SaveFileHandle): Promise<void> {
   // a webhook's file came unencrypted and downloads as it is
   const expected = att.plain ? att.size : encryptedSize(att.size);
   // the body arrives in many small pieces, so only a new whole percent is passed on
@@ -216,23 +255,16 @@ async function saveInPage(att: AttachmentMeta, onProgress?: DownloadProgress): P
     if (err instanceof DecryptError) throw new Error(t("download.thisFileCouldNotBeDecrypted"));
     throw err;
   }
-  const url = URL.createObjectURL(new Blob([plain], { type: att.type || "application/octet-stream" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = att.name || "download";
-  a.rel = "noopener";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  // the browser has its own hold on the file by the time this runs out
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  await saveBlob(new Blob([plain], { type: att.type || "application/octet-stream" }), att.name || "download", handle);
 }
 
-/** Decrypts an attachment and saves it where the browser keeps downloads. */
+/** Decrypts an attachment and saves it at the chosen location where supported. */
 export async function saveAttachment(att: AttachmentMeta, onProgress?: DownloadProgress): Promise<void> {
+  const handle = await pickSaveFile(att.name || "download");
+  if (handle === null) return;
   // the streaming worker decrypts as it goes; a webhook's file has nothing to decrypt
   if (att.size > STREAM_ABOVE && !att.plain) {
-    if (!homeScreenIOS() && (await streamThroughWorker(att, onProgress)) === "done") return;
+    if (!homeScreenIOS() && (await streamThroughWorker(att, onProgress, handle)) === "done") return;
     // said before anything is fetched: a phone decrypting more than it can
     // hold does not fail, it reloads the app with nothing saved
     if (att.size > inPageMax()) {
@@ -241,5 +273,5 @@ export async function saveAttachment(att: AttachmentMeta, onProgress?: DownloadP
       throw new Error(later ? t("download.thisFileIsTooLargeTo") : t("download.tooLargeForThisDevice"));
     }
   }
-  await saveInPage(att, onProgress);
+  await saveInPage(att, onProgress, handle);
 }

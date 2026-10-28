@@ -340,8 +340,8 @@ fun AudioAttachment(att: AttachmentMeta) {
     val load = rememberAttachmentLoad(att, auto)
     val file = load.file
     val download = {
-        Saving.save(att.name, att.type, picture = false, write = { out -> Downloads.writeAttachment(att, out) {} }) { err ->
-            if (err != null) Nexa.ui.toast(t("chat.attachments.couldNotDownloadThatFile"), "error") else Nexa.ui.toast(t("android.media.savedToDownloads"), "success")
+        Saving.save(att.name, att.type, write = { out -> Downloads.writeAttachment(att, out) {} }) { err ->
+            if (err != null) Nexa.ui.toast(t("chat.attachments.couldNotDownloadThatFile"), "error") else Nexa.ui.toast(t("settings.account.saved"), "success")
         }
     }
     Box(Modifier.widthIn(max = 400.dp).fillMaxWidth().loadPriority(load, att.blobId)) {

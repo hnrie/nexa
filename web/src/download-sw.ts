@@ -105,6 +105,18 @@ sw.addEventListener("message", (e) => {
       return;
     }
     jobs.set(id, job);
+    if (msg["toFile"] === true) {
+      // A fetch from the uncontrolled app page would bypass this worker.
+      // Transfer the stream itself so its chosen file can consume it.
+      const body = streamDownload(id).body!;
+      try {
+        port.postMessage({ type: "file", body }, [body]);
+      } catch {
+        void body.cancel();
+        port.postMessage({ type: "file-unavailable" });
+      }
+      return;
+    }
     port.postMessage({ type: "ready" });
     return;
   }

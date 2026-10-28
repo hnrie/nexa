@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/lib/imageActions", async (original) => ({ ...await original<typeof import("@/lib/imageActions")>(), saveImage: vi.fn().mockResolvedValue(undefined) }));
+import { saveImage } from "@/lib/imageActions";
 import { Lightbox } from "./Lightbox";
 import { barsOf } from "./waveform";
 import { mediaPrefs, saveMediaPrefs } from "./mediaPrefs";
@@ -23,7 +25,8 @@ describe("Lightbox", () => {
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByText("2 of 3")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Download" }).getAttribute("download")).toBe("second.png");
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    expect(saveImage).toHaveBeenCalledWith("blob:b", "second.png");
   });
 
   it("steps through a message's pictures with the arrows, and stops at either end", () => {

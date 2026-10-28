@@ -7200,5 +7200,7 @@
   "chat.systemMessage.changedName": "{actor} hat den Gruppennamen geändert.",
   "chat.systemMessage.changedIcon": "{actor} hat das Gruppenbild geändert.",
   "whatsNew.r20261028.groupActivityTitle": "Aktivität in Gruppenchats",
-  "whatsNew.r20261028.groupActivityBody": "Gruppenchats zeigen Änderungen am Namen und Bild an. Wenn du eine oder mehrere ausgewählte Gruppen verlässt, kannst du deine Austrittsnachricht ausblenden."
+  "whatsNew.r20261028.groupActivityBody": "Gruppenchats zeigen Änderungen am Namen und Bild an. Wenn du eine oder mehrere ausgewählte Gruppen verlässt, kannst du deine Austrittsnachricht ausblenden.",
+  "whatsNew.r202610282.saveTitle": "Speicherort wählen",
+  "whatsNew.r202610282.saveBody": "Downloads und Bilder fragen jetzt unter Android und in unterstützten Desktop-Browsern nach dem Speicherort. Nutze in mobilen Browsern die Speicher- oder Freigabeoptionen des Systems."
 }

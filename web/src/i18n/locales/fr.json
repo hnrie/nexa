@@ -7313,5 +7313,7 @@
   "chat.systemMessage.changedName": "{actor} a changé le nom du groupe.",
   "chat.systemMessage.changedIcon": "{actor} a changé l’icône du groupe.",
   "whatsNew.r20261028.groupActivityTitle": "Activité des groupes",
-  "whatsNew.r20261028.groupActivityBody": "Les groupes affichent les changements de nom et d’icône. Quand vous quittez un ou plusieurs groupes sélectionnés, vous pouvez masquer votre message de départ."
+  "whatsNew.r20261028.groupActivityBody": "Les groupes affichent les changements de nom et d’icône. Quand vous quittez un ou plusieurs groupes sélectionnés, vous pouvez masquer votre message de départ.",
+  "whatsNew.r202610282.saveTitle": "Choisir où enregistrer",
+  "whatsNew.r202610282.saveBody": "Les téléchargements et les images demandent désormais où enregistrer sur Android et les navigateurs de bureau compatibles. Sur les navigateurs mobiles, utilisez les options système pour enregistrer ou partager."
 }

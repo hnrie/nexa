@@ -119,7 +119,7 @@ export function imageButtons<C>(ids: [copy: string, save: string], image: (ctx: 
     }),
     button(ids[1], (ctx) => {
       const img = image(ctx);
-      return img && { id: "save-image", label: t("chat.messageMenu.saveImage"), onSelect: () => void (img.full ? img.full() : Promise.resolve(img.src)).then((src) => saveImage(src, img.name)).catch((err: unknown) => failed(err, t("chat.messageMenu.couldNotSaveThePicture"))) };
+      return img && { id: "save-image", label: t("chat.messageMenu.saveImage"), onSelect: () => void saveImage(img.full ?? img.src, img.name).catch((err: unknown) => failed(err, t("chat.messageMenu.couldNotSaveThePicture"))) };
     }),
   ];
 }

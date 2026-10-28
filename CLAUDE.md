@@ -771,6 +771,13 @@ How each permission is held, as Discord holds it:
   pipe that closes its producer and source on failure or cancellation. Authentication and the message's expected file size still govern what
   is saved. Transfer tests cover bounded preparation/read-ahead, transferred-buffer retries,
   partial offsets, file integrity, cancellation and network/disk errors.
+- Saving attachments and pictures asks for a location: Android uses CreateDocument on every
+  version, desktop downloads keep Electron's Save As dialog, and web `lib/saveFile.ts` opens
+  showSaveFilePicker before fetching where supported. Large encrypted browser saves stream the
+  download worker's transferred ReadableStream into that file. Mobile browsers with file sharing
+  use the system sheet (including Save to Files); if loading outlives the tap's activation, a ready-file dialog
+  provides the fresh tap. Other browsers retain their own download behavior and settings.
+  Cancelling a picker saves nothing; failed writes abort or remove the partial file.
 - Before a GIF is decoded in full for cropping or an animated variant, `gif_budget.go` walks its
   compressed blocks and checks frame count and canvas work. Limits checked after `gif.DecodeAll`
   would let a small compressed file exhaust memory before it was refused. Cropping keeps the
@@ -1483,6 +1490,11 @@ real Discord when it runs, and handing activities to the page, which sends them 
 already have installed (anything new is optional and checked before use). `build.mjs` bundles with
 esbuild, `electron-builder.yml` packs (`sign-mac.cjs` signs Mac builds ad hoc), and
 `tools/mac_package.py` and `tools/publish_desktop.py` finish a release.
+
+From 1.2.9, Open Original opens a decrypted image's same-origin blob in an isolated window
+(`originalWindow.ts`), with scripts disabled, no preload or bridge, and no further navigation or
+windows. An external browser cannot read a blob belonging to Electron's session. Web originals
+open in a browser tab; Android shares a read-only FileProvider URI with an image viewer.
 
 Releases are built on the Linux server, never handed over from another machine: the owner wants
 every app that changed built and published by `make build` (2026-10-20). Its `desktop-release` step

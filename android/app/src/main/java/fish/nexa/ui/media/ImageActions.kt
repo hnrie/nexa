@@ -66,9 +66,9 @@ fun imageMenuItems(image: ImageTarget, separatorAfter: Boolean = true): List<Men
             try {
                 val (file, type) = fullPicture(image)
                 withContext(Dispatchers.Main) {
-                    Saving.save(image.name, type, picture = true, write = { out -> withContext(Dispatchers.IO) { file.inputStream().use { it.copyTo(out) } } }) { err ->
+                    Saving.save(image.name, type, write = { out -> withContext(Dispatchers.IO) { file.inputStream().use { it.copyTo(out) } } }) { err ->
                         if (err != null) Nexa.ui.toast(t("chat.messageMenu.couldNotSaveThePicture"), "error")
-                        else Nexa.ui.toast(t("android.media.savedToPictures"), "success")
+                        else Nexa.ui.toast(t("settings.account.saved"), "success")
                     }
                 }
             } catch (e: Exception) {

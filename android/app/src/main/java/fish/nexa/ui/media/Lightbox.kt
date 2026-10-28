@@ -285,8 +285,8 @@ private fun save(item: LightboxItem) {
         try {
             val f = fileOf(item) ?: return@launch
             withContext(Dispatchers.Main) {
-                Saving.save(item.name, item.type ?: "image/png", picture = true, write = { out -> withContext(Dispatchers.IO) { f.inputStream().use { it.copyTo(out) } } }) { err ->
-                    if (err != null) Nexa.ui.toast(t("chat.messageMenu.couldNotSaveThePicture"), "error") else Nexa.ui.toast(t("android.media.savedToPictures"), "success")
+                Saving.save(item.name, item.type ?: "image/png", write = { out -> withContext(Dispatchers.IO) { f.inputStream().use { it.copyTo(out) } } }) { err ->
+                    if (err != null) Nexa.ui.toast(t("chat.messageMenu.couldNotSaveThePicture"), "error") else Nexa.ui.toast(t("settings.account.saved"), "success")
                 }
             }
         } catch (e: Exception) {
