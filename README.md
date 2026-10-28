@@ -23,15 +23,17 @@ Try [Nexa in your browser](https://nexa.fish) or [download an app](https://nexa.
 
 Personal messages, attachments, shared notes and calls use end-to-end encryption.
 The server stores encrypted content along with the metadata needed to deliver it.
+Content shared with bots is readable by the server and the bot; bots with Message
+Content access can also read accessible channel history.
 
 Webhook and app content, bug reports and moderation conversations are not end-to-end
 encrypted. Account details, public profiles and server membership are also visible to
 the server. Peer-to-peer calls reveal participants' IP addresses to each other; calls
 through the optional Cloudflare Realtime service avoid this.
 
-See the [privacy policy](docs/legal/PRIVACY_POLICY.txt) for details and the
-[design specification](docs/superpowers/specs/2026-09-11-chat-design.md#6-end-to-end-encryption)
-for the encryption design.
+See [how Nexa's encryption works](ENCRYPTION.md) for key storage, password and
+recovery protection, message encryption, bot access and the limits of E2EE.
+The [privacy policy](docs/legal/PRIVACY_POLICY.txt) covers data collection and retention.
 
 ## Run Locally
 
@@ -123,6 +125,7 @@ The [tools guide](tools/README.md) covers browser tests and screenshots.
 
 ## Documentation
 
+- [How Nexa's encryption works](ENCRYPTION.md)
 - [Building bots and apps](docs/bots.md)
 - [Plugin API](docs/plugins.md)
 - [Configuration reference](chatd.env.example)

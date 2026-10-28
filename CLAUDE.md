@@ -7,7 +7,9 @@ https://chat.evilion.xyz is its old address, which moves browsers on). This repo
 the Go server (`cmd/`, `internal/`), the React + TypeScript web app (`web/`), the Electron desktop
 app that runs the web app (`desktop/`) and the native Android app (`android/`, Kotlin + Jetpack
 Compose). README.md is the public project overview, with features, privacy boundaries, an isolated
-local quick start and links to development documentation. The original design spec is
+local quick start and links to development documentation. `ENCRYPTION.md` is the public
+encryption explanation, covering key storage and distribution, recovery, bot access and trust
+boundaries, with links to the implementation. The original design spec is
 `docs/superpowers/specs/2026-09-11-chat-design.md` (section 6 is the cryptography).
 
 Nexa's first-party code is licensed under the root `LICENSE` (MIT), with the copyright
