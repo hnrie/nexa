@@ -17,8 +17,9 @@ import { t } from "@/i18n";
  * What this server takes: the largest file, the most to send in one request,
  * and the size of each piece of a file bigger than that. A file over one
  * piece goes up in pieces: each is encrypted whole in memory before it goes,
- * and a dropped connection costs only the piece in flight, which on a phone
- * matters far more than the round trip a piece adds.
+ * with one following piece prepared during the request. A dropped connection
+ * costs only the piece in flight, which on a phone matters far more than the
+ * round trip a piece adds.
  */
 const limits = { single: 32 * 1024 * 1024, chunk: 32 * 1024 * 1024 };
 
@@ -97,6 +98,8 @@ export interface PieceJob {
   first: number;
   count: number;
   skip: number;
+  /** Prepared while the previous request was in flight. Transferred to its sender once. */
+  body?: Uint8Array<ArrayBuffer>;
 }
 
 /** Sends a stretch, resolving with the server's answer; `signal` stops it part way. */
@@ -109,12 +112,18 @@ function cancelled(): ApiError {
 
 /** Encrypts the stretch a job describes: exactly the bytes its request carries. */
 async function bodyOf(job: PieceJob): Promise<Uint8Array<ArrayBuffer>> {
+  if (job.body) return job.body;
   const whole = await encryptChunks(job.file, job.key, job.baseIv, job.first, job.count);
-  return job.skip > 0 ? whole.slice(job.skip) : whole;
+  return whole.subarray(job.skip);
 }
 
 /** Sends from the page itself, for a browser that cannot start the worker. */
-export const sendInPage: PieceSender = async (job, onProgress, signal) => api.upload(job.path, await bodyOf(job), { method: job.method, headers: job.headers ?? {}, onProgress, ...(signal ? { signal } : {}) });
+export const sendInPage: PieceSender = async (job, onProgress, signal) => {
+  if (signal?.aborted) throw cancelled();
+  const body = await bodyOf(job);
+  if (signal?.aborted) throw cancelled();
+  return api.upload(job.path, body, { method: job.method, headers: job.headers ?? {}, onProgress, ...(signal ? { signal } : {}) });
+};
 
 let workers = typeof Worker !== "undefined";
 
@@ -207,9 +216,10 @@ export const sendInWorker: PieceSender = async (job, onProgress, signal) => {
       // The body went to it, so make the stretch again and send it from here.
       e.preventDefault();
       workers = false;
-      sendInPage(job, onProgress, signal).then(resolve, reject);
+      const { body: _body, ...unprepared } = job;
+      sendInPage(unprepared, onProgress, signal).then(resolve, reject);
     };
-    const request: PieceRequest = { url: new URL(api.url(job.path), location.href).href, method: job.method, headers, body: body.buffer };
+    const request: PieceRequest = { url: new URL(api.url(job.path), location.href).href, method: job.method, headers, body: body.buffer, offset: body.byteOffset, length: body.byteLength };
     watch();
     worker.postMessage(request, [body.buffer]);
   });
@@ -251,9 +261,9 @@ async function sendCopy(to: UploadPlace, copy: PictureCopy, send: PieceSender, s
  *
  * A small file goes up as one request, tried a second time if the connection
  * or the server lets it down. Anything larger goes up a stretch of chunks at a
- * time, each stretch encrypted only as it is sent, resuming where it stopped.
- * Either way the work happens in a worker that is ended afterwards, so memory
- * holds one request's worth at most, however big the file is.
+ * time, preparing one following stretch and resuming where it stopped.
+ * Each request goes through a worker that is ended afterwards, so memory
+ * holds the active request and one prepared piece at most, however big the file is.
  *
  * Meanwhile a picture is measured and, when it is big, a small copy of it is
  * made and sent beside it for the chat to show.
@@ -406,16 +416,34 @@ export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8A
   let sent = 0;
   /** When the upload last got further; it gives up after STALL_MS without. */
   let movedAt = Date.now();
+  // Only one piece ahead: encryption and disk reads run during the current
+  // request instead of leaving the connection idle at every piece boundary.
+  const prepare = (first: number): Promise<Uint8Array<ArrayBuffer>> => {
+    if (signal?.aborted) return Promise.reject(cancelled());
+    const body = encryptChunks(file, key, baseIv, first, Math.min(perPiece, chunks - first));
+    // It can fail while the previous request is still running. The loop will
+    // observe the failure when it takes this piece, without an unhandled rejection.
+    void body.catch(() => undefined);
+    return body;
+  };
+  let prepared: Promise<Uint8Array<ArrayBuffer>> | undefined;
   try {
+    prepared = prepare(0);
     for (let first = 0; first < chunks; first += perPiece) {
       const count = Math.min(perPiece, chunks - first);
       const start = first === 0 ? 0 : frameOffset(first);
       const end = Math.min(total, frameOffset(first + count));
       if (sent !== start) throw new Error(t("attachments.theUploadLostItsPlace"));
+      let body: Uint8Array<ArrayBuffer> | undefined = await prepared;
+      if (signal?.aborted) throw cancelled();
+      prepared = first + count < chunks ? prepare(first + count) : undefined;
       let tries = 0;
       while (sent < end) {
         try {
-          const job: PieceJob = { method: "PATCH", path: `/uploads/${session.id}`, headers: { "Upload-Offset": String(sent) }, file, key, baseIv, first, count, skip: sent - start };
+          if (signal?.aborted) throw cancelled();
+          const job: PieceJob = { method: "PATCH", path: `/uploads/${session.id}`, headers: { "Upload-Offset": String(sent) }, file, key, baseIv, first, count, skip: sent - start, ...(body ? { body } : {}) };
+          // A worker transfers the buffer, so a retry must regenerate it.
+          body = undefined;
           const from = sent;
           const reply = (await send(job, (loaded) => onProgress(from + loaded), signal)) as { received?: number } | undefined;
           const received = reply?.received ?? -1;

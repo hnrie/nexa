@@ -628,23 +628,23 @@ object Uploads {
     private fun channelOf(path: String): String? = Regex("^/channels/(\\d+)/attachments$").find(path)?.groupValues?.get(1)
 
     /** A body that counts what has gone, for the progress bar. */
-    private class Counted(private val data: ByteArray, private val onProgress: (Long) -> Unit) : RequestBody() {
+    private class Counted(private val data: ByteArray, private val start: Int, private val onProgress: (Long) -> Unit) : RequestBody() {
         override fun contentType() = OCTET
-        override fun contentLength() = data.size.toLong()
+        override fun contentLength() = (data.size - start).toLong()
         override fun writeTo(sink: BufferedSink) {
-            var off = 0
+            var off = start
             while (off < data.size) {
                 val n = minOf(64 * 1024, data.size - off)
                 sink.write(data, off, n)
                 off += n
-                onProgress(off.toLong())
+                onProgress((off - start).toLong())
             }
         }
     }
 
-    private suspend fun post(path: String, method: String, body: ByteArray, headers: Map<String, String>, onProgress: (Long) -> Unit): JsonObject {
+    private suspend fun post(path: String, method: String, body: ByteArray, headers: Map<String, String>, offset: Int = 0, onProgress: (Long) -> Unit): JsonObject {
         val api = Nexa.api
-        val b = api.requestBuilder(path).method(method, Counted(body, onProgress))
+        val b = api.requestBuilder(path).method(method, Counted(body, offset, onProgress))
         for ((k, v) in headers) b.header(k, v)
         val res = withContext(Dispatchers.IO) { api.execute(api.transfer, b.build(), true) }
         return res as? JsonObject ?: JsonObject(emptyMap())
@@ -774,7 +774,7 @@ object Uploads {
         }
     }
 
-    private suspend fun inPieces(st: Staged, key: ByteArray, baseIv: ByteArray, channelId: String?, onProgress: (Long) -> Unit): JsonObject {
+    private suspend fun inPieces(st: Staged, key: ByteArray, baseIv: ByteArray, channelId: String?, onProgress: (Long) -> Unit): JsonObject = coroutineScope {
         val total = FileCrypto.encryptedSize(st.size)
         val chunks = FileCrypto.chunkCount(st.size)
         val session = Nexa.api.request("POST", "/uploads", buildJsonObject { put("size", total); if (channelId != null) put("channel_id", channelId) }).jsonObject
@@ -784,21 +784,30 @@ object Uploads {
         var sent = 0L
         var movedAt = System.currentTimeMillis()
         try {
-            RandomAccessFile(st.file, "r").use { raf ->
+            // One prepared piece beside the active request, independent of file size.
+            // Each task owns its file handle, so a retry cannot race its seek position.
+            fun prepare(first: Int) = async(Dispatchers.Default) {
+                RandomAccessFile(st.file, "r").use { raf ->
+                    FileCrypto.encryptChunks(raf, st.size, key, baseIv, first, minOf(perPiece, chunks - first))
+                }
+            }
+            var prepared = prepare(0)
+            try {
                 var first = 0
                 while (first < chunks) {
                     val count = minOf(perPiece, chunks - first)
                     val start = if (first == 0) 0L else FileCrypto.frameOffset(first)
                     val end = minOf(total, FileCrypto.frameOffset(first + count))
                     if (sent != start) throw ApiError(0, "lost", t("attachments.theUploadLostItsPlace"))
+                    val whole = prepared.await()
+                    val next = first + count
+                    if (next < chunks) prepared = prepare(next)
                     var tries = 0
                     while (sent < end) {
                         try {
-                            val whole = withContext(Dispatchers.Default) { FileCrypto.encryptChunks(raf, st.size, key, baseIv, first, count) }
                             val skip = (sent - start).toInt()
-                            val piece = if (skip > 0) whole.copyOfRange(skip, whole.size) else whole
                             val from = sent
-                            val reply = post("/uploads/$id", "PATCH", piece, mapOf("Upload-Offset" to sent.toString())) { onProgress(from + it) }
+                            val reply = post("/uploads/$id", "PATCH", whole, mapOf("Upload-Offset" to sent.toString()), offset = skip) { onProgress(from + it) }
                             val received = (reply["received"] as? JsonPrimitive)?.longOrNull ?: -1
                             if (received <= sent || received > end) throw ApiError(0, "lost", t("attachments.theServerLostTrackOfThis"))
                             sent = received
@@ -820,21 +829,27 @@ object Uploads {
                     }
                     first += perPiece
                 }
+            } finally {
+                prepared.cancel()
             }
             if (sent != total) throw ApiError(0, "size", t("attachments.theUploadCameOutADifferentSize"))
-            var tries = 1
-            while (true) {
-                try {
-                    return Nexa.api.request("POST", "/uploads/$id/finish").jsonObject
-                } catch (e: ApiError) {
-                    if ((e.status in 1..499) || tries >= CHUNK_TRIES) throw e
-                    delay(400L * tries)
-                    tries++
-                }
-            }
+            finishUpload(id)
         } catch (e: Throwable) {
             runCatching { withContext(kotlinx.coroutines.NonCancellable) { Nexa.api.request("DELETE", "/uploads/$id") } }
             throw e
+        }
+    }
+
+    private suspend fun finishUpload(id: String): JsonObject {
+        var tries = 1
+        while (true) {
+            try {
+                return Nexa.api.request("POST", "/uploads/$id/finish").jsonObject
+            } catch (e: ApiError) {
+                if ((e.status in 1..499) || tries >= CHUNK_TRIES) throw e
+                delay(400L * tries)
+                tries++
+            }
         }
     }
 

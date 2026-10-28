@@ -14,6 +14,8 @@ export interface PieceRequest {
   headers: Record<string, string>;
   /** Transferred, not copied: the page no longer holds these bytes once sent here. */
   body: ArrayBuffer;
+  offset: number;
+  length: number;
 }
 
 export type PieceReply =
@@ -60,5 +62,5 @@ scope.onmessage = (e) => {
   // took most of a second over every 28 MB sent as an ArrayBuffer, long after
   // the last byte had reached the server; wrapped in a Blob the same bytes go
   // in a few milliseconds, and no browser is slower for it.
-  xhr.send(new Blob([job.body]));
+  xhr.send(new Blob([new Uint8Array(job.body, job.offset, job.length)]));
 };

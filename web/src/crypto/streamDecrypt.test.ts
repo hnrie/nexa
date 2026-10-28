@@ -213,7 +213,35 @@ describe("decryptStream", () => {
       expect((await src.next())?.length).toBe(CHUNK);
       await src.cancel();
       expect(await src.next()).toBeNull();
-      expect(net.cancelled()).toBe(1);
+      // Read-ahead may have reached the underlying stream's EOF already.
+      expect(net.cancelled()).toBeLessThanOrEqual(1);
+      expect(net.opens).toEqual([0]);
     });
+  });
+
+  it("reads one frame ahead while the consumer is idle, and cancels an active reader", async () => {
+    const size = 4 * CHUNK + 123;
+    const { key, enc } = await encrypt(size);
+    let at = 0;
+    let cancelled = false;
+    const frameEnd = 12 + 2 * (4 + CHUNK + 16);
+    let readAhead!: () => void;
+    const ready = new Promise<void>((resolve) => { readAhead = resolve; });
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const end = Math.min(enc.length, at + 65536);
+        controller.enqueue(enc.slice(at, end));
+        at = end;
+        if (at >= frameEnd) readAhead();
+      },
+      cancel() { cancelled = true; },
+    }, { highWaterMark: 0 });
+    const src = decryptStream({ key, size, open: async () => ({ reader: body.getReader(), start: 0 }) });
+    expect((await src.next())?.length).toBe(CHUNK);
+    await ready;
+    expect(at).toBeLessThan(frameEnd + 65536);
+    await src.cancel();
+    expect(cancelled).toBe(true);
+    expect(await src.next()).toBeNull();
   });
 });

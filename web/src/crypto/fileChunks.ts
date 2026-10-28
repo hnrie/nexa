@@ -1,7 +1,7 @@
 /**
  * The attachment format, down to where each chunk sits, kept apart from the
- * rest of the crypto code so the upload worker can encrypt without loading
- * any of it.
+ * rest of the crypto code so uploads can prepare a piece without loading any
+ * unrelated cryptography.
  *
  * Layout: "ECF1" (4) | base iv (8) | repeated [ciphertext length (u32be)][ciphertext].
  * Chunk `i` covers input bytes [i*CHUNK, (i+1)*CHUNK) and is encrypted under
@@ -16,7 +16,7 @@
  * comes out identical.
  */
 
-import { IV_LEN, TAG_LEN, gcmEncrypt } from "./aes";
+import { IV_LEN, TAG_LEN, bufferSource, gcmEncrypt } from "./aes";
 import { concat, randomBytes, u32be, utf8 } from "./bytes";
 
 export const CHUNK = 4 * 1024 * 1024;
@@ -79,10 +79,18 @@ export async function encryptChunks(data: Blob, key: Uint8Array, baseIv: Uint8Ar
     out.set(baseIv, MAGIC.length);
     off = HEADER_LEN;
   }
+  const imported = await crypto.subtle.importKey("raw", bufferSource(key), "AES-GCM", false, ["encrypt"]);
+  const lengths = new DataView(out.buffer);
   for (let i = first; i < first + count; i++) {
-    const frame = await encryptChunk(data, key, baseIv, i);
-    out.set(frame, off);
-    off += frame.length;
+    const start = i * CHUNK;
+    const plaintext = await data.slice(start, Math.min(start + CHUNK, data.size)).arrayBuffer();
+    const iv = concat(baseIv, u32be(i));
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: bufferSource(iv), additionalData: bufferSource(FILE_AAD) }, imported, plaintext);
+    // Write the frame straight into the request buffer, without another
+    // chunk-sized allocation and copy just to prepend its length.
+    lengths.setUint32(off, ct.byteLength);
+    out.set(new Uint8Array(ct), off + LEN_PREFIX);
+    off += LEN_PREFIX + ct.byteLength;
   }
   return out;
 }

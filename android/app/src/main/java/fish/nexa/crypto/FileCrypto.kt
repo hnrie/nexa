@@ -5,6 +5,9 @@ import java.io.EOFException
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.RandomAccessFile
+import javax.crypto.Cipher
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * The attachment format (web/src/crypto/fileChunks.ts and file.ts):
@@ -59,16 +62,21 @@ object FileCrypto {
             off = HEADER_LEN
         }
         val buf = ByteArray(CHUNK)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        val secret = SecretKeySpec(key, "AES")
         for (i in first until first + count) {
             val start = i.toLong() * CHUNK
             val len = minOf(CHUNK.toLong(), plainSize - start).toInt()
             file.seek(start)
             file.readFully(buf, 0, len)
-            val ct = Bytes.gcmEncrypt(key, chunkIv(baseIv, i), buf, FILE_AAD, 0, len)
-            System.arraycopy(Bytes.u32be(ct.size.toLong()), 0, out, off, 4)
+            cipher.init(Cipher.ENCRYPT_MODE, secret, GCMParameterSpec(Bytes.TAG_LEN * 8, chunkIv(baseIv, i)))
+            cipher.updateAAD(FILE_AAD)
+            // Seal straight into the request buffer instead of allocating and
+            // copying another chunk-sized ciphertext array.
+            val written = cipher.doFinal(buf, 0, len, out, off + LEN_PREFIX)
+            System.arraycopy(Bytes.u32be(written.toLong()), 0, out, off, 4)
             off += 4
-            System.arraycopy(ct, 0, out, off, ct.size)
-            off += ct.size
+            off += written
         }
         buf.fill(0)
         return out

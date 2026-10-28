@@ -5,7 +5,7 @@
  * Input is read one slice at a time, and output is folded into a Blob every
  * few megabytes, so a whole large file is never gathered in the page's memory
  * in one piece. Uploads do not come through here at all: they encrypt each
- * stretch of a file in a worker as it is sent (see lib/attachments.ts).
+ * stretch into a request buffer, one piece ahead (see lib/attachments.ts).
  */
 
 import { TAG_LEN, bufferSource, gcmDecrypt } from "./aes";

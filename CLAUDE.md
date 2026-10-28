@@ -757,6 +757,20 @@ How each permission is held, as Discord holds it:
   disk reservations, at most sixteen staged together and two per transfer, so a stalled request
   can be retried without allowing unlimited copies of the same offset. These reservations live
   in one chatd process, as the deployment model requires.
+- Web uploads (`lib/attachments.ts`) and Android uploads (`data/Send.kt`) prepare one following
+  piece while the current request is in flight, so reading and encrypting the next piece does
+  not add a full pause after every acknowledgement. Memory holds the active request and at most
+  one prepared piece, regardless of file size. Requests still land sequentially at the confirmed
+  offset, with the same Cloudflare-safe limits and retry protocol. `encryptChunks` on both clients
+  writes frames directly into the request buffer; a partial retry sends a view or offset rather
+  than copying its remaining bytes. Web workers receive the view's offset and length with the
+  transferred buffer, and regenerate it if the worker fails before starting.
+- Streaming downloads read ahead by at most one encrypted chunk during decryption and disk writes:
+  web `crypto/streamDecrypt.ts` validates the next frame's length before reading its ciphertext;
+  Android `media/Media.kt` and `media/Downloads.kt` use `media/TransferStreams.kt`, a bounded
+  pipe that closes its producer and source on failure or cancellation. Authentication and the message's expected file size still govern what
+  is saved. Transfer tests cover bounded preparation/read-ahead, transferred-buffer retries,
+  partial offsets, file integrity, cancellation and network/disk errors.
 - Before a GIF is decoded in full for cropping or an animated variant, `gif_budget.go` walks its
   compressed blocks and checks frame count and canvas work. Limits checked after `gif.DecodeAll`
   would let a small compressed file exhaust memory before it was refused. Cropping keeps the

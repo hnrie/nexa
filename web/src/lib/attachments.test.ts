@@ -28,6 +28,7 @@ async function same(bytes: Uint8Array, key: string, data: Uint8Array): Promise<b
 
 /** What a piece's request would carry. */
 async function bodyOf(job: PieceJob): Promise<Uint8Array> {
+  if (job.body) return job.body;
   const whole = await encryptChunks(job.file, job.key, job.baseIv, job.first, job.count);
   return whole.subarray(job.skip);
 }
@@ -213,6 +214,44 @@ describe("uploadStaged", () => {
       const { server, send } = fakeServer();
       const { meta } = await uploadStaged("c1", staged(data), () => undefined, send);
       expect(server.jobs.map((j) => [j.first, j.count])).toEqual([[0, 3], [3, 2]]);
+      expect(await same(server.stored(), meta.key, data)).toBe(true);
+    });
+
+    it("prepares just the next piece while the current request waits for its reply", async () => {
+      const st = staged(data);
+      const reads = vi.spyOn(st.file, "slice");
+      const { server, send } = fakeServer();
+      let reply!: () => void;
+      const waiting = new Promise<void>((resolve) => { reply = resolve; });
+      const sending: PieceSender = async (job, progress, signal) => {
+        if (job.first === 0) await waiting;
+        return send(job, progress, signal);
+      };
+      const run = uploadStaged("c1", st, () => undefined, sending);
+      try {
+        await vi.waitFor(() => expect(reads.mock.calls.map(([start]) => start)).toEqual([0, CHUNK]));
+        expect(server.jobs).toHaveLength(0);
+      } finally {
+        reply();
+      }
+      const { meta } = await run;
+      expect(await same(server.stored(), meta.key, data)).toBe(true);
+    });
+
+    it("regenerates transferred bytes when retrying a partly landed piece", async () => {
+      const { server, send } = fakeServer();
+      let failed = false;
+      const transferring: PieceSender = async (job, progress, signal) => {
+        if (job.first === 1 && !failed && job.body) {
+          failed = true;
+          const bytes = new Uint8Array(structuredClone(job.body.buffer, { transfer: [job.body.buffer] }));
+          server.land(bytes.subarray(0, 1000));
+          throw new Error("network");
+        }
+        return send(job, progress, signal);
+      };
+      const { meta } = await uploadStaged("c1", staged(data), () => undefined, transferring);
+      expect(failed).toBe(true);
       expect(await same(server.stored(), meta.key, data)).toBe(true);
     });
 

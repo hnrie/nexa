@@ -1,7 +1,7 @@
 /**
  * Decrypts an attachment while it downloads, one chunk at a time, so the
  * service worker can hand a file of any size straight to the browser's
- * download manager without ever holding more than a chunk of it.
+ * download manager with one encrypted chunk read ahead, independent of file size.
  *
  * This file imports nothing on purpose. sw.js runs as a classic script, which
  * cannot import, and a module shared with the app would be split out into a
@@ -80,6 +80,8 @@ export function decryptStream(opts: StreamOptions): PlainStream {
   let baseIv: Uint8Array | null = null;
   let failures = 0;
   let closed = false;
+  /** One encrypted frame read ahead while the current frame is decrypted/written. */
+  let ahead: Promise<Uint8Array<ArrayBuffer>> | null = null;
 
   const drop = (): void => {
     const r = reader;
@@ -114,6 +116,7 @@ export function decryptStream(opts: StreamOptions): PlainStream {
           skip = at - body.start;
         }
         const { done, value } = await reader.read();
+        if (closed) throw new Cancelled("download: cancelled");
         if (done) {
           reader = null;
           throw new Error("download: the connection ended early");
@@ -168,6 +171,16 @@ export function decryptStream(opts: StreamOptions): PlainStream {
     return key;
   }
 
+  async function frame(i: number): Promise<Uint8Array<ArrayBuffer>> {
+    await need(LEN_PREFIX);
+    const prefix = take(LEN_PREFIX);
+    const len = ((prefix[0]! << 24) | (prefix[1]! << 16) | (prefix[2]! << 8) | prefix[3]!) >>> 0;
+    const plainLen = Math.min(CHUNK, size - i * CHUNK);
+    if (len !== plainLen + TAG_LEN) throw new FileCorrupt("download: a chunk is the wrong size");
+    await need(len);
+    return take(len);
+  }
+
   async function next(): Promise<Uint8Array | null> {
     if (closed) return null;
     try {
@@ -177,14 +190,16 @@ export function decryptStream(opts: StreamOptions): PlainStream {
         if (MAGIC.some((b, i) => header[i] !== b)) throw new FileCorrupt("download: this is not an encrypted file");
         baseIv = header.slice(MAGIC.length);
       }
-      const plainLen = Math.min(CHUNK, size - index * CHUNK);
-      await need(LEN_PREFIX);
-      const prefix = take(LEN_PREFIX);
-      const len = ((prefix[0]! << 24) | (prefix[1]! << 16) | (prefix[2]! << 8) | prefix[3]!) >>> 0;
-      // every chunk's size follows from the file's, so anything else is tampering or a broken file
-      if (len !== plainLen + TAG_LEN) throw new FileCorrupt("download: a chunk is the wrong size");
-      await need(len);
-      const ct = take(len);
+      // Only this read-ahead task touches the reader between calls to next().
+      const ct = await (ahead ?? frame(index));
+      ahead = null;
+      if (closed) return null;
+      failures = 0;
+      if (index + 1 < count) {
+        ahead = frame(index + 1);
+        // Its error belongs to the next call, even if the disk is slow to ask.
+        void ahead.catch(() => undefined);
+      }
       const iv = new Uint8Array(IV_LEN);
       iv.set(baseIv);
       new DataView(iv.buffer).setUint32(BASE_IV_LEN, index);
@@ -195,8 +210,8 @@ export function decryptStream(opts: StreamOptions): PlainStream {
         if (err instanceof FileCorrupt) throw err;
         throw new FileCorrupt("download: a chunk failed to authenticate");
       }
+      if (closed) return null;
       index += 1;
-      failures = 0;
       if (index === count) {
         if (buffered > 0) throw new FileCorrupt("download: the file is longer than it should be");
         close();

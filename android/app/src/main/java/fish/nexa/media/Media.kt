@@ -127,8 +127,10 @@ object Media {
                     }
                     val tmp = File(cacheDir, "${out.name}.part")
                     try {
-                        tmp.outputStream().buffered(1 shl 16).use { os ->
-                            FileCrypto.decryptStream(r.body.byteStream().buffered(1 shl 16), key, os, expectedSize = plainSize) { done -> onProgress?.invoke(done, plainSize ?: len) }
+                        withReadAhead(r.body.byteStream()) { input ->
+                            tmp.outputStream().buffered(1 shl 16).use { os ->
+                                FileCrypto.decryptStream(input.buffered(1 shl 16), key, os, expectedSize = plainSize) { done -> onProgress?.invoke(done, plainSize ?: len) }
+                            }
                         }
                         if (!tmp.renameTo(out)) throw java.io.IOException("could not keep the file")
                     } finally {

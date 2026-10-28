@@ -68,7 +68,9 @@ object Downloads {
             } else {
                 val len = r.body.contentLength()
                 if (len >= 0 && r.header("Content-Encoding") == null && len != FileCrypto.encryptedSize(att.size)) throw DecryptError("file: the server sent a file of another size")
-                FileCrypto.decryptStream(input, Bytes.unb64(att.key), out, expectedSize = att.size) { done -> onProgress(done) }
+                withReadAhead(input) { ahead ->
+                    FileCrypto.decryptStream(ahead.buffered(1 shl 16), Bytes.unb64(att.key), out, expectedSize = att.size) { done -> onProgress(done) }
+                }
             }
         }
     }
