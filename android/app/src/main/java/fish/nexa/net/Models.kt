@@ -281,6 +281,7 @@ data class ServerTag(
 @Serializable
 data class Server(
     val id: Snowflake,
+    val nsfw: Boolean = false,
     val name: String = "",
     @SerialName("icon_id") val iconId: Snowflake? = null,
     @SerialName("banner_id") val bannerId: Snowflake? = null,
@@ -354,6 +355,7 @@ data class Role(
 @Serializable
 data class ServerView(
     val id: Snowflake,
+    val nsfw: Boolean = false,
     val name: String = "",
     @SerialName("icon_id") val iconId: Snowflake? = null,
     @SerialName("banner_id") val bannerId: Snowflake? = null,
@@ -386,7 +388,7 @@ data class ServerView(
     @SerialName("my_permissions") val myPermissions: String = "0",
 ) {
     fun server() = Server(
-        id = id, name = name, iconId = iconId, bannerId = bannerId, ownerId = ownerId, description = description, systemChannelId = systemChannelId,
+        id = id, nsfw = nsfw, name = name, iconId = iconId, bannerId = bannerId, ownerId = ownerId, description = description, systemChannelId = systemChannelId,
         defaultNotifications = defaultNotifications, flags = flags, createdAt = createdAt, tag = tag, invitesPausedUntil = invitesPausedUntil,
         discoverable = discoverable, discoveryCategory = discoveryCategory, discoveryTags = discoveryTags, discoveryLanguage = discoveryLanguage,
         discoveryHidden = discoveryHidden, verifyAccountMinutes = verifyAccountMinutes, verifyMemberMinutes = verifyMemberMinutes, automodAt = automodAt,
@@ -430,6 +432,8 @@ data class InviteChannel(val id: Snowflake, val name: String = "", val type: Str
 @Serializable
 data class InvitePreview(
     val code: String,
+    val nsfw: Boolean = false,
+    @SerialName("age_gate") val ageGate: Boolean = false,
     val server: InviteServer? = null,
     val group: InviteGroup? = null,
     val channel: InviteChannel? = null,

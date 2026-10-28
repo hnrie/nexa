@@ -179,6 +179,11 @@ func (s *Server) inviteUnfurlLink(ctx context.Context, raw string) *unfurl.Resul
 	if err != nil {
 		return nil
 	}
+	if srv.NSFW {
+		out.Title = "Age-Restricted Server"
+		out.Description = "This server contains NSFW content. You must be 18 or older to view this invite."
+		return out
+	}
 	count, online := s.counts(ctx, srv.ID)
 	out.Title = srv.Name
 	out.Description = srv.Description

@@ -6941,5 +6941,21 @@
   "whatsNew.r20261027.audioTitle": "更清晰的语音",
   "whatsNew.r20261027.audioBody": "增强降噪现使用更新的语音模型。语音录音使用相同的滤波器，提高音质并控制音量。",
   "whatsNew.r20261027.animationTitle": "选择哪些图片播放动画",
-  "whatsNew.r20261027.animationBody": "外观设置中可分别切换头像、服务器和群组图标、横幅、表情及贴纸的动画。"
+  "whatsNew.r20261027.animationBody": "外观设置中可分别切换头像、服务器和群组图标、横幅、表情及贴纸的动画。",
+  "nsfw.label": "NSFW",
+  "nsfw.serverToggle": "将此服务器标记为 NSFW 社区",
+  "nsfw.serverHint": "当大部分内容为 NSFW 时使用。邀请预览需要确认年满 18 岁，探索展示需要主动同意，服务器标签将被移除。",
+  "nsfw.channelHint": "如果服务器的大部分内容为 NSFW，请在服务器设置的“概览”中将整个服务器标记为 NSFW 社区。如果公开信息不含 NSFW 内容，仅有少数 NSFW 频道无需标记整个服务器。",
+  "nsfw.tagBlocked": "NSFW 社区不能使用服务器标签。仅有少数 NSFW 频道的服务器，只要公开信息不含 NSFW 内容，就可以保留标签。",
+  "nsfw.showServers": "显示含 NSFW 内容的服务器",
+  "nsfw.warningTitle": "有年龄限制的服务器",
+  "nsfw.warningBody": "此服务器含有 NSFW 内容。请确认您已年满 18 岁以查看邀请。",
+  "nsfw.confirm": "我已年满 18 岁",
+  "nsfw.discoveryWarning": "结果可能包含 NSFW 服务器名称、图片和描述。请确认您已年满 18 岁以显示这些内容。",
+  "legal.newNSFW": "平台允许 NSFW 社区。以 NSFW 内容为主的服务器必须将整个服务器标记为 NSFW。如果公开信息不含 NSFW 内容，仅有少数 NSFW 频道无需标记整个服务器。NSFW 内容仅限年满 18 岁的成年人。",
+  "whatsNew.r20261028.nsfwTitle": "NSFW 社区",
+  "whatsNew.r20261028.nsfwBody": "在服务器设置的“概览”中将社区标记为 NSFW。探索默认隐藏含 NSFW 内容的服务器，直到您主动同意显示。完全标记为 NSFW 的服务器会显示 18+ 邀请警告，且不能使用服务器标签。",
+  "moderation.tabs.discovery": "探索",
+  "whatsNew.r20261028.discoveryTitle": "探索内容管理",
+  "whatsNew.r20261028.discoveryBody": "管理面板新增独立的探索标签页，工作人员可查看已上架服务器、隐藏条目或恢复被工作人员隐藏的服务器。"
 }

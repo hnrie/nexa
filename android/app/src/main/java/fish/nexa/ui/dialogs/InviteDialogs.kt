@@ -401,6 +401,14 @@ internal fun OpenInviteSheet(layer: Layer, code: String, hash: String, close: ()
                     }
                     is InviteState.Ready -> {
                         val p = s.p
+                        if (p.ageGate) {
+                            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Txt(t("nsfw.warningTitle"), style = Nx.type.heading, color = c.textStrong)
+                                Txt(t("nsfw.warningBody"), style = Nx.type.body, color = c.textMuted)
+                                NxButton(t("nsfw.confirm"), { Invites.confirmAge(code); attempt += 1 }, block = true)
+                                NxButton(t("discovery.close"), close, kind = ButtonKind.GHOST, block = true)
+                            }
+                        } else {
                         InviteTop(p)
                         Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 24.dp)) {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -423,6 +431,7 @@ internal fun OpenInviteSheet(layer: Layer, code: String, hash: String, close: ()
                             }
                             if (!member && hash.contains("k=")) InviteNote("KeyRound", t("invite.thisLinkCarriesTheEncryptionKey"))
                             if (!member && p.group) InviteNote("Lock", t("invite.groupChatsAreEndToEnd"))
+                        }
                         }
                     }
                 }

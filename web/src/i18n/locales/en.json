@@ -7178,5 +7178,21 @@
   "whatsNew.r20261027.audioTitle": "Clearer Voice",
   "whatsNew.r20261027.audioBody": "Enhanced noise filtering now uses a newer speech model. Voice recordings use the same filter, with higher audio quality and controlled volume.",
   "whatsNew.r20261027.animationTitle": "Choose What Moves",
-  "whatsNew.r20261027.animationBody": "Appearance has separate animation switches for profile pictures, server and group icons, banners, emoji and stickers."
+  "whatsNew.r20261027.animationBody": "Appearance has separate animation switches for profile pictures, server and group icons, banners, emoji and stickers.",
+  "nsfw.label": "NSFW",
+  "nsfw.serverToggle": "Mark this server as an NSFW community",
+  "nsfw.serverHint": "Use this if most content is NSFW. Invite previews require 18+ confirmation, Discovery requires opt-in, and the server tag is removed.",
+  "nsfw.channelHint": "If most of your server’s content is NSFW, mark the whole server as an NSFW community in Server Settings, Overview. A few NSFW channels do not require this if your public details contain no NSFW content.",
+  "nsfw.tagBlocked": "NSFW communities cannot use server tags. Servers with only a few NSFW channels can keep their tags if their public details contain no NSFW content.",
+  "nsfw.showServers": "Show servers with NSFW Content",
+  "nsfw.warningTitle": "Age-Restricted Server",
+  "nsfw.warningBody": "This server contains NSFW content. Confirm that you are 18 or older to view the invite.",
+  "nsfw.confirm": "I’m 18 or Older",
+  "nsfw.discoveryWarning": "These results may include NSFW server names, pictures and descriptions. Confirm that you are 18 or older to show them.",
+  "legal.newNSFW": "NSFW communities are allowed. Servers with mostly NSFW content must mark the whole server NSFW. A few NSFW channels are allowed without that setting if public-facing details contain no NSFW content. NSFW content is for adults 18 and older.",
+  "whatsNew.r20261028.nsfwTitle": "NSFW Communities",
+  "whatsNew.r20261028.nsfwBody": "Mark a community NSFW in Server Settings, Overview. Discovery hides servers with NSFW content until you opt in; fully NSFW servers have an 18+ invite warning and cannot use server tags.",
+  "moderation.tabs.discovery": "Discovery",
+  "whatsNew.r20261028.discoveryTitle": "Discovery Moderation",
+  "whatsNew.r20261028.discoveryBody": "Staff have a separate Discovery tab in the moderation panel to review listed servers, hide listings, and restore servers hidden by staff."
 }

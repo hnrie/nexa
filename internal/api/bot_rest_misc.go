@@ -195,6 +195,18 @@ func (s *Server) botInviteGet(w http.ResponseWriter, r *http.Request) {
 		writeBotError(w, dErrUnknownInvite, nil)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
+	if inv.ServerID != nil {
+		srv, err := s.Store.ServerByID(ctx, *inv.ServerID)
+		if err != nil {
+			writeBotError(w, dErrUnknownInvite, nil)
+			return
+		}
+		if srv.NSFW && r.URL.Query().Get("nsfw") != "1" {
+			writeBotError(w, dErr(http.StatusForbidden, 50013, "Confirm that you are 18 or older to view this invite."), nil)
+			return
+		}
+	}
 	b := s.builder(ctx, nil, nil)
 	out := b.inviteObj(inv, false)
 	if boolQuery(r, "with_counts", false) && inv.ServerID != nil {

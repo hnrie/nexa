@@ -55,7 +55,12 @@ func (s *Server) handleModServers(w http.ResponseWriter, r *http.Request) {
 	if !OneOf(sort, "newest", "oldest", "members", "name") {
 		sort = "newest"
 	}
-	list, err := s.Store.ModServers(ctx, store.ModServerFilter{Query: q.Get("q"), Sort: sort, Offset: offset, Limit: limit + 1})
+	filter := store.ModServerFilter{Query: q.Get("q"), Discovery: q.Get("discovery"), Sort: sort, Offset: offset, Limit: limit + 1}
+	if filter.Discovery != "" && !OneOf(filter.Discovery, "all", "listed", "held") {
+		WriteError(w, E(http.StatusBadRequest, "invalid_filter", "Choose all, listed or held Discovery servers."))
+		return
+	}
+	list, err := s.Store.ModServers(ctx, filter)
 	if err != nil {
 		WriteError(w, err)
 		return
@@ -64,7 +69,11 @@ func (s *Server) handleModServers(w http.ResponseWriter, r *http.Request) {
 	if more {
 		list = list[:limit]
 	}
-	total, _ := s.Store.CountServers(ctx)
+	total, err := s.Store.CountModServers(ctx, filter)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	out := make([]modServerView, 0, len(list))
 	owners := make([]ids.ID, 0, len(list))
 	for _, m := range list {

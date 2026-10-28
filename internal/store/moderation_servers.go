@@ -24,6 +24,7 @@ type ModServer struct {
 
 // ModServerFilter picks which servers the panel lists, and in what order.
 type ModServerFilter struct {
+	Discovery string
 	// Query matches a server's name or description, or its owner's username.
 	Query string
 	// Sort is "newest" (the default), "oldest", "members" or "name".
@@ -66,17 +67,8 @@ func (s *Store) ModServers(ctx context.Context, f ModServerFilter) ([]*ModServer
 		f.Limit = 60
 	}
 	q := `SELECT ` + modServerCols + ` FROM servers s`
-	var args []any
-	if term := strings.TrimSpace(strings.ToLower(f.Query)); term != "" {
-		like := "%" + escapeLike(term) + "%"
-		q += ` JOIN users u ON u.id = s.owner_id WHERE (` + s.db.Dialect.Lower("s.name") + ` LIKE ? ESCAPE '\' OR ` + s.db.Dialect.Lower("s.description") + ` LIKE ? ESCAPE '\' OR u.username LIKE ? ESCAPE '\'`
-		args = append(args, like, like, like)
-		if id, err := ids.Parse(term); err == nil {
-			q += ` OR s.id = ?`
-			args = append(args, int64(id))
-		}
-		q += `)`
-	}
+	filter, args := s.modServerWhere(f)
+	q += filter
 	switch f.Sort {
 	case "oldest":
 		q += ` ORDER BY s.id`
@@ -103,6 +95,37 @@ func (s *Store) ModServers(ctx context.Context, f ModServerFilter) ([]*ModServer
 		out = append(out, m)
 	}
 	return out, rows.Err()
+}
+
+func (s *Store) modServerWhere(f ModServerFilter) (string, []any) {
+	q := ` JOIN users u ON u.id = s.owner_id WHERE 1 = 1`
+	var args []any
+	if term := strings.TrimSpace(strings.ToLower(f.Query)); term != "" {
+		like := "%" + escapeLike(term) + "%"
+		q += ` AND (` + s.db.Dialect.Lower("s.name") + ` LIKE ? ESCAPE '\' OR ` + s.db.Dialect.Lower("s.description") + ` LIKE ? ESCAPE '\' OR u.username LIKE ? ESCAPE '\'`
+		args = append(args, like, like, like)
+		if id, err := ids.Parse(term); err == nil {
+			q += ` OR s.id = ?`
+			args = append(args, int64(id))
+		}
+		q += `)`
+	}
+	switch f.Discovery {
+	case "all":
+		q += ` AND (s.discoverable = 1 OR s.discovery_hidden = 1)`
+	case "listed":
+		q += ` AND s.discoverable = 1 AND s.discovery_hidden = 0`
+	case "held":
+		q += ` AND s.discovery_hidden = 1`
+	}
+	return q, args
+}
+
+func (s *Store) CountModServers(ctx context.Context, f ModServerFilter) (int, error) {
+	filter, args := s.modServerWhere(f)
+	var n int
+	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM servers s`+filter, args...).Scan(&n)
+	return n, err
 }
 
 // ModServerByID loads one server for the panel.

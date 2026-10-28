@@ -307,6 +307,9 @@ func (s *Store) UpdateServer(ctx context.Context, id ids.ID, p ServerPatch) erro
 	var sets []string
 	var args []any
 	set := func(col string, v any) { sets = append(sets, col+" = ?"); args = append(args, v) }
+	if p.NSFW != nil {
+		set("nsfw", boolInt(*p.NSFW))
+	}
 	if p.Name != nil {
 		set("name", *p.Name)
 	}

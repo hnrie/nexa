@@ -95,6 +95,8 @@ import kotlinx.serialization.builtins.ListSerializer
 data class DiscoveryCard(
     val id: Snowflake,
     val name: String = "",
+    val nsfw: Boolean = false,
+    @SerialName("nsfw_content") val nsfwContent: Boolean = false,
     @SerialName("icon_id") val iconId: Snowflake? = null,
     @SerialName("banner_id") val bannerId: Snowflake? = null,
     val description: String = "",
@@ -147,16 +149,21 @@ fun DiscoverPage() {
     var language by remember { mutableStateOf("") }
     var size by remember { mutableStateOf("any") }
     var sort by remember { mutableStateOf("members") }
+    var showNSFW by remember { mutableStateOf(false) }
+    var nsfwOnly by remember { mutableStateOf(false) }
     var cards by remember { mutableStateOf<List<DiscoveryCard>?>(null) }
     var next by remember { mutableStateOf<Int?>(null) }
     var failed by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
+    var requestGeneration by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
-    val meta by produceState<Meta?>(null) { value = runCatching { Nexa.api.get("/discovery/categories", Meta.serializer()) }.getOrNull() }
+    val meta by produceState<Meta?>(null, showNSFW) { value = null; value = runCatching { Nexa.api.get("/discovery/categories" + if (showNSFW) "?nsfw=1" else "", Meta.serializer()) }.getOrNull() }
 
     fun path(offset: Int): String {
         val (min, max) = SIZES.first { it.first == size }.second
         val parts = buildList {
+            if (showNSFW) add("nsfw=1")
+            if (showNSFW && nsfwOnly) add("nsfw_only=1")
             if (q.isNotBlank()) add("q=" + java.net.URLEncoder.encode(q.trim(), "UTF-8"))
             if (category.isNotEmpty()) add("category=$category")
             if (tag.isNotEmpty()) add("tag=" + java.net.URLEncoder.encode(tag, "UTF-8"))
@@ -171,20 +178,24 @@ fun DiscoverPage() {
     }
 
     suspend fun load(offset: Int) {
+        val generation = ++requestGeneration
         failed = false
         try {
             val page = Nexa.api.get(path(offset), SearchPage.serializer())
+            if (generation != requestGeneration) return
             cards = if (offset > 0 && cards != null) cards!! + page.servers else page.servers
             next = if (page.hasMore) page.nextOffset else null
-        } catch (_: Exception) {
-            failed = true
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            if (generation == requestGeneration) failed = true
         }
     }
-    LaunchedEffect(q, category, tag, language, size, sort, reload) {
+    LaunchedEffect(q, category, tag, language, size, sort, reload, showNSFW, nsfwOnly) {
+        ++requestGeneration
         if (q.isNotEmpty()) delay(300)
         load(0)
     }
-    val filtered = q.isNotBlank() || category.isNotEmpty() || tag.isNotEmpty() || language.isNotEmpty() || size != "any"
+    val filtered = nsfwOnly || q.isNotBlank() || category.isNotEmpty() || tag.isNotEmpty() || language.isNotEmpty() || size != "any"
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -216,6 +227,13 @@ fun DiscoverPage() {
             item("search") {
                 // the magnifier and the way to clear it, as the web's search box has them
                 fish.nexa.ui.server.SearchBox(q, { q = it }, t("discovery.search"))
+            }
+            item("nsfw") {
+                fish.nexa.ui.components.ToggleLine(t("nsfw.showServers"), showNSFW, { on ->
+                    if (!on) { ++requestGeneration; showNSFW = false; nsfwOnly = false; cards = null; next = null }
+                    else fish.nexa.ui.shell.confirm(t("nsfw.warningTitle"), t("nsfw.discoveryWarning"), t("nsfw.confirm"), danger = false) { ++requestGeneration; showNSFW = true; cards = null; next = null }
+                })
+                if (showNSFW) CategoryChip(t("nsfw.label"), null, nsfwOnly) { nsfwOnly = !nsfwOnly }
             }
             item("cats") {
                 // one row that scrolls sideways, edge to edge, so the servers start higher up
@@ -408,6 +426,7 @@ internal fun ServerCard(card: DiscoveryCard, onTag: (String) -> Unit, onOpen: ()
         Column(Modifier.fillMaxWidth().offset(y = (-22).dp).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Txt(card.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(17f), fontWeight = FontWeight(700)), color = c.textStrong, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
+                if (card.nsfwContent) Badge(t("nsfw.label"), c.warning)
                 when {
                     card.member -> Badge(t("discovery.joined"), c.positive)
                     card.joinsPaused -> Badge(t("discovery.paused"), c.warning)
@@ -441,7 +460,7 @@ private fun ServerSheet(layer: Layer, card: DiscoveryCard, close: () -> Unit) {
     @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current.density
-    val detail by produceState<Detail?>(null, card.id) { value = runCatching { Nexa.api.get("/discovery/${card.id}", Detail.serializer()) }.getOrNull() }
+    val detail by produceState<Detail?>(null, card.id) { value = runCatching { Nexa.api.get("/discovery/${card.id}" + if (card.nsfw) "?nsfw=1" else "", Detail.serializer()) }.getOrNull() }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     fun firstChannel(list: Collection<Channel>) = list.filter { it.serverId == card.id && (it.isText || it.isAnnouncement) }.minByOrNull { it.position }
@@ -456,7 +475,7 @@ private fun ServerSheet(layer: Layer, card: DiscoveryCard, close: () -> Unit) {
         busy = true
         scope.launch {
             try {
-                val res = Nexa.auth.guarded("join") { captcha -> Nexa.api.request("POST", "/discovery/${card.id}/join", captcha = captcha) }
+                val res = Nexa.auth.guarded("join") { captcha -> Nexa.api.request("POST", "/discovery/${card.id}/join" + if (card.nsfw) "?nsfw=1" else "", captcha = captcha) }
                 val joined = wireJson.decodeFromJsonElement(Joined.serializer(), res)
                 Nexa.session.putServer(joined.server, joined.users)
                 close()

@@ -1,3 +1,4 @@
+import { inviteConsentQuery } from "@/lib/nsfw";
 import { api, captchaOptions } from "./client";
 import { t } from "@/i18n";
 import type { AuditEntry, Ban, Channel, ForumSettings, Invite, InvitePreview, Member, MemberDetail, MemberRow, MeUser, PermString, PublicUser, Role, Server, ServerKeyInfo, ServerTagPreview, ServerView, Snowflake } from "./types";
@@ -12,6 +13,7 @@ export type JoinedInvite = { server: ServerView; users: PublicUser[] } | { chann
 type Progress = (loaded: number, total: number) => void;
 
 export interface ServerPatch {
+  nsfw?: boolean;
   name?: string;
   description?: string;
   system_channel_id?: Snowflake | null;
@@ -291,11 +293,11 @@ export const servers = {
     return api.request<Invite>("POST", `/channels/${channelId}/invites`, body);
   },
   invitePreview(code: string): Promise<InvitePreview> {
-    return api.request<InvitePreview>("GET", `/invites/${encodeURIComponent(code)}`);
+    return api.request<InvitePreview>("GET", `/invites/${encodeURIComponent(code)}`, undefined, { query: inviteConsentQuery(code) });
   },
   /** Accepts a server or group invite; the payload says which came back. */
   join(code: string, captcha?: string | null): Promise<JoinedInvite> {
-    return api.request("POST", `/invites/${encodeURIComponent(code)}`, undefined, captchaOptions(captcha));
+    return api.request("POST", `/invites/${encodeURIComponent(code)}`, undefined, { ...captchaOptions(captcha), query: inviteConsentQuery(code) });
   },
   deleteInvite(code: string): Promise<void> {
     return api.request<void>("DELETE", `/invites/${encodeURIComponent(code)}`);

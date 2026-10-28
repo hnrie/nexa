@@ -7178,5 +7178,21 @@
   "whatsNew.r20261027.audioTitle": "Klarere Sprache",
   "whatsNew.r20261027.audioBody": "Die verbesserte Rauschunterdrückung nutzt ein neueres Sprachmodell. Sprachaufnahmen nutzen denselben Filter, mit höherer Audioqualität und kontrollierter Lautstärke.",
   "whatsNew.r20261027.animationTitle": "Wähle, was sich bewegt",
-  "whatsNew.r20261027.animationBody": "Unter Darstellung gibt es separate Animationsschalter für Profilbilder, Server- und Gruppensymbole, Banner, Emoji und Sticker."
+  "whatsNew.r20261027.animationBody": "Unter Darstellung gibt es separate Animationsschalter für Profilbilder, Server- und Gruppensymbole, Banner, Emoji und Sticker.",
+  "nsfw.label": "NSFW",
+  "nsfw.serverToggle": "Diesen Server als NSFW-Community markieren",
+  "nsfw.serverHint": "Aktivieren, wenn die meisten Inhalte NSFW sind. Einladungsvorschauen erfordern eine 18+-Bestätigung, die Entdeckung eine Zustimmung. Das Server-Tag wird entfernt.",
+  "nsfw.channelHint": "Wenn die meisten Inhalte deines Servers NSFW sind, markiere den gesamten Server in den Servereinstellungen unter Übersicht als NSFW-Community. Bei wenigen NSFW-Kanälen ist dies nicht nötig, solange die öffentlichen Angaben keine NSFW-Inhalte enthalten.",
+  "nsfw.tagBlocked": "NSFW-Communitys können keine Server-Tags verwenden. Server mit nur wenigen NSFW-Kanälen dürfen ihre Tags behalten, wenn ihre öffentlichen Angaben keine NSFW-Inhalte enthalten.",
+  "nsfw.showServers": "Server mit NSFW-Inhalten anzeigen",
+  "nsfw.warningTitle": "Server mit Altersbeschränkung",
+  "nsfw.warningBody": "Dieser Server enthält NSFW-Inhalte. Bestätige, dass du mindestens 18 Jahre alt bist, um die Einladung anzusehen.",
+  "nsfw.confirm": "Ich bin mindestens 18 Jahre alt",
+  "nsfw.discoveryWarning": "Diese Ergebnisse können NSFW-Servernamen, Bilder und Beschreibungen enthalten. Bestätige, dass du mindestens 18 Jahre alt bist, um sie anzuzeigen.",
+  "legal.newNSFW": "NSFW-Communitys sind erlaubt. Server mit überwiegend NSFW-Inhalten müssen den gesamten Server entsprechend markieren. Bei wenigen NSFW-Kanälen ist das nicht nötig, wenn öffentliche Angaben keine NSFW-Inhalte enthalten. NSFW-Inhalte sind ab 18 Jahren.",
+  "whatsNew.r20261028.nsfwTitle": "NSFW-Communitys",
+  "whatsNew.r20261028.nsfwBody": "Markiere eine Community in den Servereinstellungen unter Übersicht als NSFW. Die Entdeckung zeigt NSFW-Server erst nach Zustimmung an. Vollständig als NSFW markierte Server haben eine 18+-Einladungswarnung und keine Server-Tags.",
+  "moderation.tabs.discovery": "Entdeckung",
+  "whatsNew.r20261028.discoveryTitle": "Moderation der Entdeckung",
+  "whatsNew.r20261028.discoveryBody": "Das Moderationsteam hat einen eigenen Entdeckung-Tab im Moderationsbereich, um gelistete Server zu prüfen, Einträge auszublenden und ausgeblendete Server wieder freizugeben."
 }

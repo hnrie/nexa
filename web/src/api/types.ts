@@ -283,6 +283,7 @@ export interface Overwrite {
 }
 
 export interface Server {
+  nsfw?: boolean;
   id: Snowflake;
   name: string;
   icon_id: Snowflake | null;
@@ -427,6 +428,8 @@ export interface Invite {
 }
 
 export interface InvitePreview {
+  nsfw?: boolean;
+  age_gate?: boolean;
   code: string;
   /** Present for a server invite. */
   server?: { id: Snowflake; name: string; icon_id: Snowflake | null; banner_id: Snowflake | null; description: string; member_count: number; online_count: number };
@@ -434,7 +437,8 @@ export interface InvitePreview {
   group?: { id: Snowflake; name: string; icon_id: Snowflake | null; member_count: number };
   channel?: { id: Snowflake; name: string; type: Channel["type"] };
   inviter?: PublicUser;
-  expires_at: number | null;
+  /** Omitted while the invite preview is age-gated. */
+  expires_at?: number | null;
   /** The server takes nobody new right now. */
   joins_paused?: boolean;
 }
@@ -1415,6 +1419,8 @@ export interface AutomodPresets {
 
 /** A server as Discovery lists it. */
 export interface DiscoveryCard {
+  nsfw?: boolean;
+  nsfw_content?: boolean;
   id: Snowflake;
   name: string;
   icon_id: Snowflake | null;

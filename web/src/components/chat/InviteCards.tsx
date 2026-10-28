@@ -2,7 +2,7 @@ import { RotateCw } from "lucide-react";
 import { useMemo } from "react";
 import type { UnfurlResult } from "@/api/types";
 import { Button } from "@/components/common/Button";
-import { InviteGone, InviteSkeleton, InviteView, targetOfEmbed, targetOfPreview } from "@/components/invite/InviteView";
+import { InviteGone, InviteSkeleton, InviteView, targetOfPreview } from "@/components/invite/InviteView";
 import { useInviteJoin } from "@/components/invite/useInviteJoin";
 import { t } from "@/i18n";
 import { MAX_INVITE_CARDS, inviteLinksIn, type InviteLinkRef } from "@/lib/appLinks";
@@ -10,10 +10,8 @@ import { loadInvitePreview, useInvitePreview } from "@/lib/invitePreviews";
 import { useUI } from "@/stores/ui";
 import s from "@/components/invite/Invite.module.css";
 
-interface CardLink extends InviteLinkRef {
-  /** The card the sender's device sealed into the message, drawn until the server answers. */
-  sealed?: UnfurlResult;
-}
+// Always fetch current metadata before rendering a preview, including sealed links.
+type CardLink = InviteLinkRef;
 
 function fragmentOf(url: string): string {
   const at = url.indexOf("#");
@@ -26,8 +24,7 @@ function cardLinks(nodes: unknown, embeds: UnfurlResult[] | null | undefined): C
   for (const e of embeds ?? []) {
     if (!e || e.type !== "invite" || typeof e.invite_code !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(e.invite_code)) continue;
     const known = out.find((l) => l.code === e.invite_code);
-    if (known) known.sealed = e;
-    else if (out.length < MAX_INVITE_CARDS) out.push({ code: e.invite_code, hash: fragmentOf(e.url), url: e.url, sealed: e });
+    if (!known && out.length < MAX_INVITE_CARDS) out.push({ code: e.invite_code, hash: fragmentOf(e.url), url: e.url });
   }
   return out;
 }
@@ -50,7 +47,7 @@ export function InviteCards({ nodes, embeds }: { nodes: unknown; embeds: UnfurlR
 
 function InviteCard({ link }: { link: CardLink }) {
   const entry = useInvitePreview(link.code);
-  const target = entry?.status === "ready" ? targetOfPreview(entry.preview, "card") : link.sealed && entry?.status !== "invalid" ? targetOfEmbed(link.sealed) : null;
+  const target = entry?.status === "ready" ? targetOfPreview(entry.preview, "card") : null;
   const { member, busy, join, open } = useInviteJoin(link.code, link.hash, target, { onError: (m) => useUI.getState().toast(m, "error") });
   if (entry?.status === "invalid") {
     return (

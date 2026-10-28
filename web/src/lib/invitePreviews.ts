@@ -1,3 +1,5 @@
+import { useAuth } from "@/stores/auth";
+import { clearInviteAge } from "@/lib/nsfw";
 import { useEffect } from "react";
 import { create } from "zustand";
 import { ApiError } from "@/api/client";
@@ -27,6 +29,14 @@ const RETRY_MS = 30_000;
 export const useInvitePreviews = create<{ byCode: Record<string, InviteEntry> }>()(() => ({ byCode: {} }));
 
 const inflight = new Map<string, Promise<void>>();
+let accountGeneration = 0;
+useAuth.subscribe((next, previous) => {
+  if (next.me?.id === previous.me?.id) return;
+  ++accountGeneration;
+  inflight.clear();
+  clearInviteAge();
+  useInvitePreviews.setState({ byCode: {} });
+});
 
 function put(code: string, entry: InviteEntry): void {
   useInvitePreviews.setState((s) => ({ byCode: { ...s.byCode, [code]: entry } }));
@@ -47,6 +57,7 @@ interface LoadOptions {
 
 /** Asks the server about an invite unless this device already knows, or is already asking. */
 export function loadInvitePreview(code: string, opts: LoadOptions = {}): Promise<void> {
+  const generation = accountGeneration;
   const now = opts.now ?? Date.now;
   const running = inflight.get(code);
   if (running) return running;
@@ -57,23 +68,25 @@ export function loadInvitePreview(code: string, opts: LoadOptions = {}): Promise
   const fetchPreview = opts.fetch ?? ((c: string) => serversApi.invitePreview(c));
   const p = fetchPreview(code)
     .then(
-      (preview) => put(code, { status: "ready", preview, at: now() }),
+      (preview) => { if (generation === accountGeneration) put(code, { status: "ready", preview, at: now() }); },
       (err: unknown) => {
+        if (generation !== accountGeneration) return;
         if (err instanceof ApiError && err.status === 404) put(code, { status: "invalid", at: now() });
         else if (cur?.status === "ready") put(code, { ...cur, at: now() });
         else put(code, { status: "failed", at: now() });
       },
     )
-    .finally(() => inflight.delete(code));
+    .finally(() => { if (generation === accountGeneration) inflight.delete(code); });
   inflight.set(code, p);
   return p;
 }
 
 /** What is known about an invite, asking the server when that is nothing yet or out of date. */
 export function useInvitePreview(code: string): InviteEntry | undefined {
+  const accountId = useAuth((s) => s.me?.id);
   const entry = useInvitePreviews((s) => s.byCode[code]);
   useEffect(() => {
     void loadInvitePreview(code);
-  }, [code]);
+  }, [code, accountId]);
   return entry;
 }

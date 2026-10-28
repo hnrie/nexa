@@ -46,6 +46,7 @@ const adminPanel = () => import("@/pages/AdminPanelPage");
 const AdminPanelPage = lazyPage(adminPanel);
 const AdminUsers = lazyPage(() => adminPanel().then((m) => ({ default: m.UserGrid })));
 const AdminUser = lazyPage(() => adminPanel().then((m) => ({ default: m.PersonPage })));
+const AdminDiscovery = lazyPage(() => adminPanel().then((m) => ({ default: m.DiscoveryModerationTab })));
 const AdminServers = lazyPage(() => adminPanel().then((m) => ({ default: m.ServersTab })));
 const AdminBots = lazyPage(() => adminPanel().then((m) => ({ default: m.BotsTab })));
 const AdminServer = lazyPage(() => adminPanel().then((m) => ({ default: m.ServerPage })));
@@ -103,6 +104,7 @@ export function AppRoutes() {
                     <Route path="users/:userId/cases/:caseId" element={<AdminUser />} />
                     <Route path="bots" element={<AdminBots />} />
                     <Route path="servers" element={<AdminServers />} />
+                    <Route path="discovery" element={<AdminDiscovery />} />
                     <Route path="servers/:serverId" element={<AdminServer />} />
                     <Route path="expressions" element={<AdminExpressions />} />
                     <Route path="expressions/uploads" element={<AdminExpressions />} />

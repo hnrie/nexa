@@ -229,7 +229,8 @@ behaviour needs `tools/ios_sim.py` on a Mac (`tools/README.md`).
 ### Android in the emulator
 
 The AVD is `nexa_test`: a Pixel 7, 1080x2400 at 420 dpi, which is 411x914 for the web comparison.
-It boots headless in about 30 seconds.
+It boots headless in about 30 seconds. On this Mac the equivalent AVD is `nexa36`;
+install `app-arm64-v8a-debug.apk` there instead of the x86_64 APK.
 
 ```
 ADB=$HOME/android/sdk/platform-tools/adb
@@ -463,6 +464,33 @@ request may meet a captcha is disabled until that request ends (the Public Pack 
   hCaptcha from `hcaptcha.com` and `*.hcaptcha.com`).
 - `ChannelAccess`, `ConvForChannel`, `ServerChannelPatch` and `CanRotate` on `Server` are hooks the
   server-channel code (`server_glue.go`) installs; DM access is built in.
+
+### NSFW communities
+
+`servers.nsfw` is the whole-community toggle in Server Settings, Overview (migration 0040
+on SQLite and Postgres). Channel `nsfw` flags stay independent. A channel's settings recommend
+marking the whole server only if most of its content is NSFW. The Terms permit NSFW communities,
+require that classification for majority-NSFW servers, and allow a few NSFW channels without
+classifying the whole server when its public-facing details contain no NSFW content.
+
+Discovery excludes both kinds by default, including category counts and popular tags. `nsfw=1`
+opts in after an 18+ confirmation; `nsfw_only=1` filters those results to servers marked NSFW or
+containing any NSFW channel, including hidden or archived channels. Cards distinguish `nsfw`
+(the whole community) from `nsfw_content` (either kind).
+
+Only whole-community NSFW servers gate invite previews and invite/Discovery joins with `nsfw=1`.
+An unconfirmed invite preview returns only its code, `nsfw: true` and `age_gate: true`; link
+unfurls and page metadata reveal no server details. The public bot-protocol invite lookup
+requires the same confirmation before returning any invite metadata. Web and Android keep the per-invite
+confirmation in memory, scoped to the current account. Public media URLs remain public.
+The moderation panel has a separate Discovery tab at `/channels/@admin/discovery`, for Admin
+and higher, using the existing `/moderation/servers?discovery=all|listed|held` endpoint. It searches
+and paginates listings and staff holds before returning results, with matching totals, and reuses
+the existing audited hide/restore actions and owner cases on web and Android.
+
+Whole-community NSFW servers cannot create or wear guild tags; turning the server toggle on
+removes the existing tag from its wearers. A few NSFW channels alone do not hide public details
+or block guild tags. Both clients use the same catalogue strings and Terms version.
 
 ### Plans and payments (`api/billing.go`, `internal/stripe`)
 

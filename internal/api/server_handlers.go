@@ -320,6 +320,15 @@ func (s *Server) handleServerPatch(w http.ResponseWriter, r *http.Request) {
 	}
 	var p store.ServerPatch
 	changes := map[string]any{}
+	if v, ok := raw["nsfw"]; ok {
+		var on bool
+		if string(v) == "null" || json.Unmarshal(v, &on) != nil {
+			WriteError(w, E(http.StatusBadRequest, "invalid_value", "nsfw must be true or false."))
+			return
+		}
+		p.NSFW = &on
+		changes["nsfw"] = on
+	}
 	if v, ok := raw["name"]; ok {
 		var name string
 		if json.Unmarshal(v, &name) != nil {
@@ -428,6 +437,9 @@ func (s *Server) handleServerPatch(w http.ResponseWriter, r *http.Request) {
 	// {"t":"server_update","d":null} and the caller a 200 with a body of
 	// null. The write has landed, so saying so and letting the caller repeat
 	// the request is better than telling everyone nothing at all.
+	if p.NSFW != nil && *p.NSFW && !s.clearNSFWTag(w, r, srv.ID) {
+		return
+	}
 	updated, err := s.Store.ServerByID(r.Context(), srv.ID)
 	if err != nil {
 		WriteError(w, err)
@@ -2608,8 +2620,14 @@ func (s *Server) handleInvitePreview(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
 		return
 	}
+	restricted := srv.NSFW
+	w.Header().Set("Cache-Control", "no-store")
+	if restricted && r.URL.Query().Get("nsfw") != "1" {
+		WriteJSON(w, http.StatusOK, map[string]any{"code": in.Code, "nsfw": true, "age_gate": true})
+		return
+	}
 	count, online := s.counts(r.Context(), srv.ID)
-	resp := map[string]any{"code": in.Code, "server": map[string]any{"id": srv.ID, "name": srv.Name, "icon_id": srv.IconID, "banner_id": srv.BannerID, "description": srv.Description, "member_count": count, "online_count": online}, "expires_at": in.ExpiresAt, "joins_paused": joinsPaused(srv)}
+	resp := map[string]any{"code": in.Code, "server": map[string]any{"id": srv.ID, "name": srv.Name, "icon_id": srv.IconID, "banner_id": srv.BannerID, "description": srv.Description, "member_count": count, "online_count": online}, "expires_at": in.ExpiresAt, "joins_paused": joinsPaused(srv), "nsfw": restricted}
 	if in.ChannelID != nil {
 		if ch, err := s.Store.ChannelByID(r.Context(), *in.ChannelID); err == nil {
 			resp["channel"] = map[string]any{"id": ch.ID, "name": ch.Name, "type": ch.Type}
@@ -2638,6 +2656,9 @@ func (s *Server) handleInviteJoin(w http.ResponseWriter, r *http.Request) {
 	srv, err := s.Store.ServerByID(r.Context(), *in.ServerID)
 	if err != nil {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
+		return
+	}
+	if !s.requireNSFWConsent(w, r, srv.ID) {
 		return
 	}
 	// the ban check, the pause and the invite use happen with the insert, so

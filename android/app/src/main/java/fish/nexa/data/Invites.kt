@@ -26,6 +26,12 @@ import kotlinx.serialization.json.put
  * reaches the server, and joining through one.
  */
 object Invites {
+    private val ageConfirmed = mutableSetOf<String>()
+    private var accountGeneration = 0
+    fun clear() { accountGeneration++; ageConfirmed.clear(); byCode.clear(); synchronized(inflight) { inflight.clear() } }
+    private fun ageKey(code: String) = "${Nexa.users.meId}:$code"
+    fun confirmAge(code: String) { ageConfirmed += ageKey(code) }
+    private fun ageQuery(code: String) = if (ageKey(code) in ageConfirmed) "?nsfw=1" else ""
     data class Key(val epoch: Int, val root: ByteArray)
 
     private fun toUrl(b: String) = b.replace('+', '-').replace('/', '_').trimEnd('=')
@@ -165,13 +171,15 @@ object Invites {
         val inviter: PublicUser?,
         val group: Boolean,
         val channelName: String?,
+        val ageGate: Boolean = false,
     )
 
     suspend fun preview(code: String): Preview {
-        val res = Nexa.api.get("/invites/$code") as JsonObject
+        val res = Nexa.api.get("/invites/$code${ageQuery(code)}") as JsonObject
         val inviter = res["inviter"]?.let { runCatching { wireJson.decodeFromJsonElement(PublicUser.serializer(), it) }.getOrNull() }
         fun JsonObject.s(k: String) = (this[k] as? JsonPrimitive)?.takeIf { it.isString }?.content
         fun JsonObject.n(k: String) = (this[k] as? JsonPrimitive)?.content?.toIntOrNull()
+        if ((res["age_gate"] as? JsonPrimitive)?.content == "true") return Preview(code, null, t("nsfw.warningTitle"), null, null, "", null, null, null, false, null, ageGate = true)
         val server = res["server"] as? JsonObject
         if (server != null) {
             return Preview(
@@ -186,7 +194,7 @@ object Invites {
 
     /** acceptInvite: joins, keeps the link's key and grants it to this account, and says where to go. */
     suspend fun accept(code: String, fragment: String): Route {
-        val res = Nexa.auth.guarded("join") { captcha -> Nexa.api.request("POST", "/invites/$code", captcha = captcha) } as JsonObject
+        val res = Nexa.auth.guarded("join") { captcha -> Nexa.api.request("POST", "/invites/$code${ageQuery(code)}", captcha = captcha) } as JsonObject
         val users = (res["users"] as? JsonArray)?.let { runCatching { wireJson.decodeFromJsonElement(ListSerializer(PublicUser.serializer()), it) }.getOrNull() } ?: emptyList()
         Nexa.users.upsert(users)
         res["channel"]?.let { el ->
@@ -246,22 +254,23 @@ object Invites {
 
     fun load(code: String, force: Boolean = false) {
         synchronized(inflight) { if (code in inflight) return }
+        val generation = accountGeneration
         val cur = byCode[code]
         if (!force && !due(cur, System.currentTimeMillis())) return
         if (cur !is Entry.Ready) byCode[code] = Entry.Loading
         synchronized(inflight) { inflight += code }
         Nexa.scope.launch {
             try {
-                val p = Nexa.api.request("GET", "/invites/${java.net.URLEncoder.encode(code, "UTF-8")}", InvitePreview.serializer())
-                byCode[code] = Entry.Ready(p, System.currentTimeMillis())
+                val p = Nexa.api.request("GET", "/invites/${java.net.URLEncoder.encode(code, "UTF-8")}${ageQuery(code)}", InvitePreview.serializer())
+                if (generation == accountGeneration) byCode[code] = Entry.Ready(p, System.currentTimeMillis())
             } catch (e: Exception) {
-                byCode[code] = when {
+                if (generation == accountGeneration) byCode[code] = when {
                     e is ApiError && e.status == 404 -> Entry.Invalid(System.currentTimeMillis())
                     cur is Entry.Ready -> cur.copy(at = System.currentTimeMillis())
                     else -> Entry.Failed(System.currentTimeMillis())
                 }
             } finally {
-                synchronized(inflight) { inflight -= code }
+                if (generation == accountGeneration) synchronized(inflight) { inflight -= code }
             }
         }
     }

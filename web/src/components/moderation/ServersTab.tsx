@@ -14,6 +14,7 @@ import { profileTheme } from "@/lib/avatarColor";
 import { personName, previewText } from "@/lib/moderation";
 import { formatShortDate } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
+import { useUI } from "@/stores/ui";
 import { t, Tr } from "@/i18n";
 import { ModerateServerModal } from "./ModerateServerModal";
 import { ServerIcon } from "./ProfileSheet";
@@ -40,10 +41,14 @@ export function serverBlockedText(b: ModServer["blocked"]): string {
  * name and description, who owns it and how big it is. Nothing said inside
  * a server is here, or anywhere in the panel.
  */
-export function ServersTab() {
+export function DiscoveryModerationTab() { return <ServersTab key="discovery" discovery />; }
+
+export function ServersTab({ discovery = false }: { discovery?: boolean }) {
   const nav = useNavigate();
   const mergePeople = useModeration((s) => s.mergePeople);
   const [q, setQ] = useState("");
+  const [listing, setListing] = useState("all");
+  const openModal = useUI((u) => u.openModal);
   const [sort, setSort] = useState<ServerSort>("newest");
   const [servers, setServers] = useState<ModServer[] | null>(null);
   const [people, setPeople] = useState<People>({});
@@ -62,7 +67,7 @@ export function ServersTab() {
       setLoading(true);
       setFailed(false);
       try {
-        const r = await modApi.servers({ q, sort, offset, limit: PAGE });
+        const r = await modApi.servers({ q, sort, offset, limit: PAGE, discovery: discovery ? listing : undefined });
         if (id !== request.current) return;
         setServers((cur) => (offset ? [...(cur ?? []), ...r.servers.filter((x) => !cur?.some((y) => y.id === x.id))] : r.servers));
         setPeople((cur) => ({ ...cur, ...r.people }));
@@ -77,7 +82,7 @@ export function ServersTab() {
         if (id === request.current) setLoading(false);
       }
     },
-    [q, sort, mergePeople],
+    [q, sort, mergePeople, discovery, listing],
   );
 
   // A new search or order starts the list again (typing waits a moment). The
@@ -116,17 +121,35 @@ export function ServersTab() {
 
   useModEvents((e) => {
     const sid = e.type === "case" && e.case.action === "server_reset" ? e.case.details.server_id : undefined;
-    if (sid && servers?.some((x) => x.id === sid)) void refresh(sid);
+    if (sid && servers?.some((x) => x.id === sid)) { if (discovery) void load(0); else void refresh(sid); }
   });
 
+  const moderateServer = (server: ModServer) => {
+    if (!discovery || !server.discovery_hidden) {
+      setModerating(server);
+      return;
+    }
+    openModal("confirm", {
+      title: t("moderation.servers.discoveryShowTitle", { name: server.name }),
+      body: t("moderation.servers.discoveryShowBody"),
+      confirmLabel: t("moderation.servers.discoveryShow"),
+      onConfirm: async () => {
+        await modApi.showOnDiscover(server.id);
+        await load(0);
+      },
+    });
+  };
+
   return (
-    <div className={m.scroll} ref={scroller} data-testid="servers-tab">
+    <div className={m.scroll} ref={scroller} data-testid={discovery ? "moderation-discovery-tab" : "servers-tab"}>
       <div className={m.toolbar}>
+
         <label className={m.search}>
           <Search size={17} aria-hidden="true" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("moderation.servers.search")} aria-label={t("moderation.servers.search")} data-testid="servers-search" />
         </label>
         {total !== null ? <span className={p.total}>{t("moderation.servers.total", { count: total })}</span> : null}
+        {discovery ? <Select value={listing} onChange={(e) => setListing(e.target.value)} aria-label={t("moderation.tabs.discovery")}><option value="all">{t("discovery.all")}</option><option value="listed">{t("moderation.servers.discoveryListed")}</option><option value="held">{t("moderation.servers.discoveryHeld")}</option></Select> : null}
         <Select className={m.sort} value={sort} onChange={(e) => setSort(e.target.value as ServerSort)} aria-label={t("moderation.sort.label")}>
           <option value="newest">{t("moderation.sort.newest")}</option>
           <option value="oldest">{t("moderation.sort.oldest")}</option>
@@ -164,7 +187,7 @@ export function ServersTab() {
       {servers && servers.length > 0 ? (
         <div className={m.grid}>
           {servers.map((s) => (
-            <ServerCard key={s.id} s={s} people={people} onModerate={() => setModerating(s)} onOpen={() => nav(`/channels/@admin/servers/${s.id}`)} onOwner={() => nav(`/channels/@admin/users/${s.owner_id}`)} />
+            <ServerCard key={s.id} s={s} people={people} onModerate={() => moderateServer(s)} onOpen={() => nav(`/channels/@admin/servers/${s.id}`)} onOwner={() => nav(`/channels/@admin/users/${s.owner_id}`)} discovery={discovery} />
           ))}
         </div>
       ) : null}
@@ -174,19 +197,19 @@ export function ServersTab() {
           <Spinner size={24} label={t("chat.pins.loading")} />
         </div>
       ) : null}
-      {moderating ? <ModerateServerModal server={moderating} owner={people[moderating.owner_id]} onClose={() => setModerating(null)} onDone={() => void refresh(moderating.id)} /> : null}
+      {moderating ? <ModerateServerModal server={moderating} owner={people[moderating.owner_id]} onClose={() => setModerating(null)} preset={discovery ? ["discovery"] : undefined} onDone={() => discovery ? void load(0) : void refresh(moderating.id)} /> : null}
     </div>
   );
 }
 
-function ServerCard({ s, people, onModerate, onOpen, onOwner }: { s: ModServer; people: People; onModerate: () => void; onOpen: () => void; onOwner: () => void }) {
+function ServerCard({ s, people, onModerate, onOpen, onOwner, discovery = false }: { discovery?: boolean; s: ModServer; people: People; onModerate: () => void; onOpen: () => void; onOwner: () => void }) {
   useMediaAnimation();
   const banner = bannerUrl(s.banner_id, 320);
   const owner = people[s.owner_id];
   const blocked = serverBlockedText(s.blocked);
   const moderate = (
     <Button size="sm" variant="primary" onClick={onModerate} disabled={!!blocked} data-testid="server-card-moderate">
-      <Gavel size={15} aria-hidden="true" /> {t("moderation.moderate")}
+      <Gavel size={15} aria-hidden="true" /> {discovery ? t(s.discovery_hidden ? "moderation.servers.discoveryShow" : "moderation.servers.discoveryHide") : t("moderation.moderate")}
     </Button>
   );
   return (
@@ -200,6 +223,7 @@ function ServerCard({ s, people, onModerate, onOpen, onOwner }: { s: ModServer; 
       <div className={m.cardBody}>
         <div className={m.cardName}>
           <span className={m.cardNameText} dir="auto">{s.name}</span>
+          {s.nsfw ? <span>{t("nsfw.label")}</span> : null}
         </div>
         <button type="button" className={p.ownerChip} onClick={onOwner} data-testid="server-card-owner">
           <Avatar id={s.owner_id} avatarId={owner?.avatar_id ?? null} name={personName(owner)} size={18} />
@@ -209,6 +233,7 @@ function ServerCard({ s, people, onModerate, onOpen, onOwner }: { s: ModServer; 
           {s.description ? previewText(s.description) : t("moderation.servers.noDescription")}
         </p>
         <div className={m.cardMeta}>
+          {discovery ? <span>{t(s.discovery_hidden ? "moderation.servers.discoveryHeld" : "moderation.servers.discoveryListed")}</span> : null}
           <span>
             <Users size={13} aria-hidden="true" />
             {t("moderation.servers.members", { count: s.member_count })}

@@ -175,9 +175,12 @@ private fun InviteCard(link: AppLink.Invite, sealedEmbed: Unfurl?) {
         is Invites.Entry.Ready -> entry.preview.server?.let { s -> InviteTarget("server", s.id, s.name, s.description, s.iconId, s.bannerId, s.onlineCount, s.memberCount) }
             ?: entry.preview.group?.let { g -> InviteTarget("group", g.id, g.name, "", g.iconId, null, null, g.memberCount) }
         is Invites.Entry.Invalid -> null
-        else -> sealedEmbed?.let { e -> InviteTarget("server", null, e.title ?: e.siteName ?: "", "", mediaId(e.image, "icon"), mediaId(e.banner, "banner"), e.onlineCount, e.memberCount) }
+        else -> null
     }
     when {
+        entry is Invites.Entry.Ready && entry.preview.ageGate -> GoneCard("ShieldCheck", t("nsfw.warningTitle"), t("nsfw.warningBody")) {
+            NxButton(t("nsfw.confirm"), { Invites.confirmAge(link.code); Invites.load(link.code, force = true) }, size = ButtonSize.SM)
+        }
         entry is Invites.Entry.Invalid -> GoneCard("Link2Off", t("invite.invalidInvite"), t("invite.thisInviteIsInvalidOrHasExpired") + " " + t("invite.askForANewOne"))
         target == null && entry is Invites.Entry.Failed -> GoneCard(null, t("invite.couldNotLoadTheInvite"), t("invite.checkYourConnection")) {
             NxButton(t("invite.tryAgain"), { Invites.load(link.code, force = true) }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM, icon = "RotateCw")

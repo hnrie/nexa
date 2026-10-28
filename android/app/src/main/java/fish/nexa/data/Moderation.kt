@@ -217,6 +217,7 @@ data class ModApp(
 @Serializable
 data class ModServer(
     val id: String,
+    val nsfw: Boolean = false,
     val name: String = "",
     @SerialName("icon_id") val iconId: String? = null,
     @SerialName("banner_id") val bannerId: String? = null,
@@ -477,8 +478,8 @@ object Moderation {
         return AppPage(list(o, "apps", ModApp.serializer()), (o["total"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0, bool(o, "has_more"))
     }
 
-    suspend fun servers(q: String, sort: String, offset: Int, limit: Int): ServerPage {
-        val o = obj(Nexa.api.get("/moderation/servers" + q("q" to q.trim(), "sort" to sort, "offset" to offset.takeIf { it > 0 }, "limit" to limit)))
+    suspend fun servers(q: String, sort: String, offset: Int, limit: Int, discovery: String? = null): ServerPage {
+        val o = obj(Nexa.api.get("/moderation/servers" + q("discovery" to discovery, "q" to q.trim(), "sort" to sort, "offset" to offset.takeIf { it > 0 }, "limit" to limit)))
         peopleIn(o)
         return ServerPage(list(o, "servers", ModServer.serializer()), (o["total"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0, bool(o, "has_more"))
     }

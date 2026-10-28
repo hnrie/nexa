@@ -16,6 +16,8 @@ import (
 // DiscoveryQuery picks and orders listed servers.
 type DiscoveryQuery struct {
 	// Query matches names, descriptions and tags.
+	ShowNSFW bool
+	NSFWOnly bool
 	Query    string
 	Category string
 	Tag      string
@@ -49,6 +51,11 @@ func (s *Store) DiscoverServers(ctx context.Context, q DiscoveryQuery) ([]*Liste
 	}
 	count := `(SELECT count(*) FROM server_members m WHERE m.server_id = s.id)`
 	where := []string{discoveryWhere}
+	if !q.ShowNSFW {
+		where = append(where, "NOT "+ageRestrictedSQL)
+	} else if q.NSFWOnly {
+		where = append(where, ageRestrictedSQL)
+	}
 	var args []any
 	if term := strings.ToLower(strings.TrimSpace(q.Query)); term != "" {
 		like := "%" + escapeLike(term) + "%"
@@ -130,8 +137,8 @@ func (e extraScanner) Scan(dest ...any) error {
 }
 
 // DiscoveryCategoryCounts says how many listed servers each category has.
-func (s *Store) DiscoveryCategoryCounts(ctx context.Context) (map[string]int, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT s.discovery_category, count(*) FROM servers s WHERE `+discoveryWhere+` GROUP BY s.discovery_category`)
+func (s *Store) DiscoveryCategoryCounts(ctx context.Context, showNSFW ...bool) (map[string]int, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT s.discovery_category, count(*) FROM servers s WHERE `+discoveryVisibility(showNSFW)+` GROUP BY s.discovery_category`)
 	if err != nil {
 		return nil, err
 	}
@@ -149,8 +156,8 @@ func (s *Store) DiscoveryCategoryCounts(ctx context.Context) (map[string]int, er
 }
 
 // PopularDiscoveryTags lists the tags listed servers use most, for suggesting them.
-func (s *Store) PopularDiscoveryTags(ctx context.Context, limit int) ([]string, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT s.discovery_tags FROM servers s WHERE `+discoveryWhere+` AND s.discovery_tags <> '' LIMIT 2000`)
+func (s *Store) PopularDiscoveryTags(ctx context.Context, limit int, showNSFW ...bool) ([]string, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT s.discovery_tags FROM servers s WHERE `+discoveryVisibility(showNSFW)+` AND s.discovery_tags <> '' LIMIT 2000`)
 	if err != nil {
 		return nil, err
 	}
@@ -195,4 +202,11 @@ func sortByCount(words []string, counts map[string]int) {
 		}
 		return words[i] < words[j]
 	})
+}
+
+func discoveryVisibility(show []bool) string {
+	if len(show) > 0 && show[0] {
+		return discoveryWhere
+	}
+	return discoveryWhere + " AND NOT " + ageRestrictedSQL
 }

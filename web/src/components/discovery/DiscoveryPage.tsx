@@ -7,6 +7,7 @@ import { ApiError } from "@/api/client";
 import { discovery as discoveryApi, type DiscoveryQuery } from "@/api/discovery";
 import type { DiscoveryCard, PublicUser } from "@/api/types";
 import { bannerUrl, emojiUrl, iconUrl } from "@/api/users";
+import { Toggle } from "@/components/common/Toggle";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { SearchBox } from "@/components/common/SearchBox";
@@ -64,6 +65,7 @@ export function ServerCard({ card, onOpen, onTag }: { card: DiscoveryCard; onOpe
       <div className={s.body}>
         <h3 className={s.name} dir="auto">
           <span>{card.name}</span>
+          {card.nsfw_content ? <span className={s.badge}>{t("nsfw.label")}</span> : null}
           {card.member ? <span className={s.badge}>{t("discovery.joined")}</span> : card.joins_paused ? <span className={s.badge} data-paused="">{t("discovery.paused")}</span> : null}
         </h3>
         {words ? <p className={s.desc} dir="auto">{words}</p> : null}
@@ -95,7 +97,7 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
   useEffect(() => {
     let alive = true;
     void discoveryApi
-      .server(card.id)
+      .server(card.id, !!card.nsfw)
       .then((res) => {
         if (!alive) return;
         setEmojis(res.emojis ?? []);
@@ -120,7 +122,7 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
     }
     setBusy(true);
     try {
-      const res = await guarded("join", (captcha) => discoveryApi.join(card.id, captcha));
+      const res = await guarded("join", (captcha) => discoveryApi.join(card.id, captcha, !!card.nsfw));
       useUsers.getState().upsert(res.users);
       useChannels.getState().upsert(res.server.channels);
       useServers.getState().setFromView(res.server);
@@ -192,6 +194,8 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
  */
 export default function DiscoveryPage() {
   const [q, setQ] = useState("");
+  const [showNSFW, setShowNSFW] = useState(false);
+  const [nsfwOnly, setNSFWOnly] = useState(false);
   const [category, setCategory] = useState("");
   const [tag, setTag] = useState("");
   const [language, setLanguage] = useState("");
@@ -205,8 +209,10 @@ export default function DiscoveryPage() {
   const gen = useRef(0);
 
   useEffect(() => {
-    void discoveryApi.categories().then(setMeta).catch(() => undefined);
-  }, []);
+    let alive = true;
+    void discoveryApi.categories(showNSFW).then((meta) => { if (alive) setMeta(meta); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [showNSFW]);
 
   const query = useMemo((): DiscoveryQuery => {
     const sz = SIZES.find((x) => x.id === size);
@@ -218,9 +224,11 @@ export default function DiscoveryPage() {
       ...(sz?.min ? { min_members: sz.min } : {}),
       ...(sz?.max ? { max_members: sz.max } : {}),
       sort,
+      nsfw: showNSFW ? 1 : undefined,
+      nsfw_only: showNSFW && nsfwOnly ? 1 : undefined,
       limit: 24,
     };
-  }, [q, category, tag, language, size, sort]);
+  }, [q, category, tag, language, size, sort, showNSFW, nsfwOnly]);
 
   const load = useCallback(
     async (offset: number) => {
@@ -238,11 +246,31 @@ export default function DiscoveryPage() {
     [query],
   );
   useEffect(() => {
+    ++gen.current;
     const timer = setTimeout(() => void load(0), q ? 300 : 0);
     return () => clearTimeout(timer);
   }, [load, q]);
 
-  const filtered = !!(q.trim() || category || tag || language || size !== "any");
+  const changeNSFW = (on: boolean) => {
+    const apply = () => {
+      ++gen.current;
+      setCards(null);
+      setNext(null);
+      setOpen(null);
+      setMeta(null);
+      setNSFWOnly(false);
+      setShowNSFW(on);
+    };
+    if (!on) { apply(); return; }
+    useUI.getState().openModal("confirm", {
+      title: t("nsfw.warningTitle"),
+      body: t("nsfw.discoveryWarning"),
+      confirmLabel: t("nsfw.confirm"),
+      onConfirm: apply,
+    });
+  };
+
+  const filtered = !!(nsfwOnly || q.trim() || category || tag || language || size !== "any");
   return (
     <div className={s.page}>
       <header className={chat.header}>
@@ -257,6 +285,7 @@ export default function DiscoveryPage() {
             <p>{t("discovery.lead")}</p>
           </div>
           <SearchBox className={s.searchBig} value={q} onChange={setQ} placeholder={t("discovery.search")} aria-label={t("discovery.search")} data-testid="discovery-search" />
+          <Toggle checked={showNSFW} onChange={changeNSFW} label={t("nsfw.showServers")} />
           <div className={s.cats} role="group" aria-label={t("discovery.categories")}>
             <button type="button" className={s.cat} aria-pressed={!category} onClick={() => setCategory("")}>
               {t("discovery.all")} {meta ? <span className={s.catCount}>{meta.total}</span> : null}
@@ -268,6 +297,7 @@ export default function DiscoveryPage() {
             ))}
           </div>
           <div className={s.controls}>
+            {showNSFW ? <button type="button" className={s.cat} aria-pressed={nsfwOnly} onClick={() => setNSFWOnly(!nsfwOnly)}>{t("nsfw.label")}</button> : null}
             <div className={s.sorts} role="radiogroup" aria-label={t("discovery.sortLabel")}>
               {(["members", "newest", "created"] as const).map((x) => (
                 <button key={x} type="button" role="radio" aria-checked={sort === x} onClick={() => setSort(x)}>{t(`discovery.sort.${x}`)}</button>

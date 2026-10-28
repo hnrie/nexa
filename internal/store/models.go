@@ -352,6 +352,7 @@ type ForumTag struct {
 
 // Server is a community with channels, roles and members.
 type Server struct {
+	NSFW                 bool    `json:"nsfw"`
 	ID                   ids.ID  `json:"id"`
 	Name                 string  `json:"name"`
 	IconID               *ids.ID `json:"icon_id"`
@@ -390,6 +391,7 @@ type Server struct {
 
 // ServerPatch is an optional set of server changes.
 type ServerPatch struct {
+	NSFW                 *bool
 	Name                 *string
 	Description          *string
 	IconID               **ids.ID

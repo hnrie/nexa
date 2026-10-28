@@ -1,7 +1,7 @@
 NEXA - TERMS OF SERVICE
 Site: nexa.fish (also at mathtest.lol, and formerly chat.evilion.xyz)
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-10-26
+Effective: 2026-10-28
 
 These Terms are the agreement between you and the owner of Nexa.
 They are short on purpose and written in plain language. The Privacy
@@ -39,7 +39,9 @@ needs to work.
   pronouns, custom status, and the nicknames you use in servers are
   public. Everyone who can see them can see them as they are.
 - If you own a server, its name, icon, banner, and description are
-  public in the same way.
+  public in the same way. An NSFW server hides its invite preview
+  behind an 18+ confirmation, but its public images and details
+  are not private or end-to-end encrypted.
 
 3. ENCRYPTION AND PRIVACY
 
@@ -98,6 +100,26 @@ Please keep Nexa decent. These rules apply everywhere on it:
      no new accounts to get around a mute or a ban. To enforce this,
      staff can see which accounts have signed in from the same IP
      addresses (the Privacy Policy, section 3e, says what is kept).
+
+NSFW communities and channels:
+
+- NSFW servers are allowed. If most of a server's content is NSFW,
+  its managers must mark the whole server as an NSFW community in
+  Server Settings. You must be at least 18 to access NSFW content.
+- A server with only a few NSFW channels does not need to mark the
+  whole server NSFW. Mark each channel containing NSFW content as
+  age-restricted. Its public-facing details, including its name,
+  icon, banner, description and server tag, must contain no NSFW
+  content so they can stay visible to everyone.
+- Servers marked NSFW, and servers with any NSFW channels, appear
+  in Discovery only after Show servers with NSFW Content is turned
+  on. An NSFW filter is then available.
+- Only a server marked entirely NSFW hides its invite preview
+  until you confirm you are 18 or older, and cannot use server tags.
+  A few NSFW channels alone do not hide the server's public details
+  or block its server tag.
+- These settings do not allow illegal content, exploitation of
+  minors, gore, harassment or anything else prohibited above.
 
 5. HOW MODERATION WORKS
 
@@ -174,8 +196,8 @@ here has a way to read them, apart from what was opened for an app.
 - What you write and upload stays yours.
 - Public things (usernames, display names, nicknames, profile
   pictures, banners, server names, icons, banners, and descriptions,
-  custom emoji, stickers) are stored as uploaded and are visible to
-  everyone.
+  custom emoji, stickers) are stored as uploaded. An NSFW server
+  gates its invite preview, but public media URLs remain public.
 - Encrypted things (messages and files) stay readable only to the
   people holding the conversation key, and to the apps they reach
   (section 3). Deleting a message deletes its server row.

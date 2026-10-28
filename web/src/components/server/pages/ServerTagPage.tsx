@@ -60,6 +60,7 @@ export default function ServerTagPage({ serverId }: { serverId: string }) {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   if (!server || !me) return null;
+  if (server.server.nsfw) return <><h2 className={st.title}>{t("serverTag.page.title")}</h2><p className={st.hint}>{t("nsfw.tagBlocked")}</p></>;
 
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
   const letters = readTagText(draft.text);

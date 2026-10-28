@@ -860,7 +860,7 @@ func guildFeatures(srv *store.Server) []string {
 	if srv.Discoverable && !srv.DiscoveryHidden {
 		out = append(out, "COMMUNITY", "DISCOVERABLE")
 	}
-	if srv.Tag != nil {
+	if srv.Tag != nil && !srv.NSFW {
 		out = append(out, "GUILD_TAGS")
 	}
 	if srv.InvitesPausedUntil != nil && *srv.InvitesPausedUntil > time.Now().UnixMilli() {
@@ -876,6 +876,10 @@ func (b *dBuilder) guildObj(srv *store.Server) dGuild {
 		VerificationLevel: verificationLevel(srv), DefaultMessageNotifications: srv.DefaultNotifications, Features: guildFeatures(srv),
 		SystemChannelID: botproto.SP(srv.SystemChannelID), MaxMembers: 500000, Banner: b.hash(srv.BannerID), PreferredLocale: "en-US",
 		MaxVideoChannelUsers: 25, MaxStageVideoChannelUsers: 50, Roles: []dRole{}, Emojis: []dEmoji{}, Stickers: []dSticker{}}
+	out.NSFW = srv.NSFW
+	if srv.NSFW {
+		out.NSFWLevel = 1
+	}
 	out.IconHash = out.Icon
 	if srv.Description != "" {
 		d := srv.Description
@@ -965,8 +969,12 @@ func (b *dBuilder) inviteObj(inv *store.Invite, withMeta bool) dInvite {
 	}
 	if inv.ServerID != nil {
 		if srv, err := b.s.Store.ServerByID(b.ctx, *inv.ServerID); err == nil {
+			nsfwLevel := 0
+			if srv.NSFW {
+				nsfwLevel = 1
+			}
 			out.Guild = map[string]any{"id": snow(srv.ID), "name": srv.Name, "icon": b.hash(srv.IconID), "splash": nil, "banner": b.hash(srv.BannerID),
-				"description": srv.Description, "features": guildFeatures(srv), "verification_level": verificationLevel(srv), "vanity_url_code": nil, "nsfw_level": 0, "premium_subscription_count": 0}
+				"description": srv.Description, "features": guildFeatures(srv), "verification_level": verificationLevel(srv), "vanity_url_code": nil, "nsfw_level": nsfwLevel, "nsfw": srv.NSFW, "premium_subscription_count": 0}
 		}
 	}
 	if withMeta {

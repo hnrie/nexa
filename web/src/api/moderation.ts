@@ -264,6 +264,7 @@ export function hasServerProfile(m: ModMembership): boolean {
 
 /** A server as the panel shows it: what it shows everyone, who owns it, how many are in it. */
 export interface ModServer {
+  nsfw?: boolean;
   id: Snowflake;
   name: string;
   icon_id: Snowflake | null;
@@ -434,8 +435,8 @@ export const moderation = {
   user(id: Snowflake): Promise<{ user: ModUser; cases: StaffCase[]; people: People; servers?: ModMembership[]; packs?: ModPack[] }> {
     return api.request("GET", `/moderation/users/${id}`);
   },
-  servers(p: { q?: string; sort?: ServerSort; offset?: number; limit?: number }): Promise<{ servers: ModServer[]; people: People; total: number; has_more: boolean }> {
-    return api.request("GET", "/moderation/servers", undefined, { query: { q: p.q?.trim() || undefined, sort: p.sort, offset: p.offset || undefined, limit: p.limit } });
+  servers(p: { discovery?: string; q?: string; sort?: ServerSort; offset?: number; limit?: number }): Promise<{ servers: ModServer[]; people: People; total: number; has_more: boolean }> {
+    return api.request("GET", "/moderation/servers", undefined, { query: { discovery: p.discovery, q: p.q?.trim() || undefined, sort: p.sort, offset: p.offset || undefined, limit: p.limit } });
   },
   apps(p: { q?: string; sort?: AppSort; offset?: number; limit?: number }): Promise<{ apps: ModApp[]; people: People; total: number; has_more: boolean }> {
     return api.request("GET", "/moderation/apps", undefined, { query: { q: p.q?.trim() || undefined, sort: p.sort, offset: p.offset || undefined, limit: p.limit } });

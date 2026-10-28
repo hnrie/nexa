@@ -7292,5 +7292,21 @@
   "whatsNew.r20261027.audioTitle": "Voz mais clara",
   "whatsNew.r20261027.audioBody": "A filtragem de ruído aprimorada usa um modelo de voz mais recente. As gravações usam o mesmo filtro, com maior qualidade de áudio e volume controlado.",
   "whatsNew.r20261027.animationTitle": "Escolha o que se move",
-  "whatsNew.r20261027.animationBody": "Aparência tem controles de animação separados para fotos de perfil, ícones de servidores e grupos, banners, emojis e figurinhas."
+  "whatsNew.r20261027.animationBody": "Aparência tem controles de animação separados para fotos de perfil, ícones de servidores e grupos, banners, emojis e figurinhas.",
+  "nsfw.label": "NSFW",
+  "nsfw.serverToggle": "Marcar este servidor como comunidade NSFW",
+  "nsfw.serverHint": "Ative se a maioria do conteúdo for NSFW. Prévias de convites exigem confirmação de 18 anos, a descoberta exige consentimento e a tag do servidor é removida.",
+  "nsfw.channelHint": "Se a maioria do conteúdo do servidor for NSFW, marque todo o servidor como comunidade NSFW em Configurações do Servidor, Visão Geral. Poucos canais NSFW não exigem isso se as informações públicas não tiverem conteúdo NSFW.",
+  "nsfw.tagBlocked": "Comunidades NSFW não podem usar tags de servidor. Servidores com poucos canais NSFW podem mantê-las se suas informações públicas não tiverem conteúdo NSFW.",
+  "nsfw.showServers": "Mostrar servidores com conteúdo NSFW",
+  "nsfw.warningTitle": "Servidor com Restrição de Idade",
+  "nsfw.warningBody": "Este servidor contém conteúdo NSFW. Confirme que você tem pelo menos 18 anos para ver o convite.",
+  "nsfw.confirm": "Tenho 18 Anos ou Mais",
+  "nsfw.discoveryWarning": "Estes resultados podem incluir nomes, imagens e descrições NSFW. Confirme que você tem pelo menos 18 anos para exibi-los.",
+  "legal.newNSFW": "Comunidades NSFW são permitidas. Servidores com conteúdo majoritariamente NSFW devem ser marcados como tal. Poucos canais NSFW não exigem isso se as informações públicas não contiverem conteúdo NSFW. Conteúdo NSFW é para maiores de 18 anos.",
+  "whatsNew.r20261028.nsfwTitle": "Comunidades NSFW",
+  "whatsNew.r20261028.nsfwBody": "Marque uma comunidade como NSFW em Configurações do Servidor, Visão Geral. A descoberta oculta servidores com conteúdo NSFW até você permitir; servidores marcados NSFW têm aviso de 18+ nos convites e não podem usar tags.",
+  "moderation.tabs.discovery": "Descoberta",
+  "whatsNew.r20261028.discoveryTitle": "Moderação da Descoberta",
+  "whatsNew.r20261028.discoveryBody": "A equipe tem uma aba de Descoberta separada no painel de moderação para revisar servidores listados, ocultá-los e restaurar os ocultados pela equipe."
 }

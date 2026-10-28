@@ -62,6 +62,18 @@ func TestInviteBannerPreview(t *testing.T) {
 	if b, _ := unfurl()["banner"].(string); !strings.HasPrefix(b, "https://chat.example.org/media/banner/") {
 		t.Errorf("unfurl banner: %q", b)
 	}
+	// A whole-community NSFW setting replaces public link metadata with a
+	// generic warning; confirming an invite never changes crawler metadata.
+	if res, out := do(t, ts, "PATCH", "/api/v1/servers/"+sid, tok, map[string]any{"nsfw": true}); res.StatusCode != 200 {
+		t.Fatalf("mark NSFW: %d %v", res.StatusCode, out)
+	}
+	if body := page(); strings.Contains(body, "Bannered") || strings.Contains(body, "/media/banner/") || !strings.Contains(body, "Age-Restricted Server") {
+		t.Fatalf("NSFW page metadata leaked: %q", body)
+	}
+	if body := unfurl(); body["title"] != "Age-Restricted Server" || body["image"] != nil || body["banner"] != nil {
+		t.Fatalf("NSFW unfurl leaked: %v", body)
+	}
+
 }
 
 // A short link that lands on one of our invites unfurls as the invite, not as

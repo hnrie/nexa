@@ -71,14 +71,16 @@ fun OverviewPage(serverId: String) {
     var description by remember { mutableStateOf(server.description) }
     var system by remember { mutableStateOf(server.systemChannelId ?: "") }
     var notif by remember { mutableIntStateOf(server.defaultNotifications) }
+    var nsfw by remember { mutableStateOf(server.nsfw) }
     var busy by remember { mutableStateOf(false) }
     val texts = remember(channels) {
         val tree = ChannelTree.of(serverId, channels.values)
         (tree.loose + tree.categories.flatMap { it.children }).filter { it.isText }
     }
-    val dirty = name != server.name || description != server.description || system != (server.systemChannelId ?: "") || notif != server.defaultNotifications
+    val dirty = nsfw != server.nsfw || name != server.name || description != server.description || system != (server.systemChannelId ?: "") || notif != server.defaultNotifications
 
     fun reset() {
+        nsfw = server.nsfw
         name = server.name
         description = server.description
         system = server.systemChannelId ?: ""
@@ -90,6 +92,7 @@ fun OverviewPage(serverId: String) {
         scope.launch {
             try {
                 val body = buildJsonObject {
+                    if (nsfw != server.nsfw) put("nsfw", nsfw)
                     if (name != server.name) put("name", name)
                     if (description != server.description) put("description", description)
                     if (system != (server.systemChannelId ?: "")) if (system.isEmpty()) put("system_channel_id", JsonNull) else put("system_channel_id", system)
@@ -98,6 +101,7 @@ fun OverviewPage(serverId: String) {
                 val srv = Nexa.api.request("PATCH", "/servers/$serverId", Server.serializer(), body)
                 Nexa.servers.setServer(srv)
                 // the server tidies whitespace: show what it kept, or the save bar never goes away
+                nsfw = srv.nsfw
                 name = srv.name
                 description = srv.description
                 system = srv.systemChannelId ?: ""
@@ -159,6 +163,7 @@ fun OverviewPage(serverId: String) {
     SettingsPage(SaveState(dirty, busy, ::reset, ::save)) {
         PageTitle(t("server.serverOverview.serverOverview"))
         Form {
+            fish.nexa.ui.components.ToggleLine(t("nsfw.serverToggle"), nsfw, { nsfw = it }, description = t("nsfw.serverHint"), enabled = !busy)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 BigServerIcon(server)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {

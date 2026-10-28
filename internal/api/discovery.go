@@ -128,6 +128,8 @@ type discoveryCard struct {
 	Member      bool             `json:"member"`
 	// JoinsPaused says the server takes nobody new right now.
 	JoinsPaused bool `json:"joins_paused"`
+	NSFW        bool `json:"nsfw"`
+	NSFWContent bool `json:"nsfw_content"`
 }
 
 func (s *Server) card(r *http.Request, l *store.Listed, me ids.ID) discoveryCard {
@@ -136,7 +138,9 @@ func (s *Server) card(r *http.Request, l *store.Listed, me ids.ID) discoveryCard
 	c := discoveryCard{ID: l.ID, Name: l.Name, IconID: l.IconID, BannerID: l.BannerID, Description: l.Description, Category: l.DiscoveryCategory,
 		Tags: l.DiscoveryTags, Language: l.DiscoveryLanguage, MemberCount: l.MemberCount, OnlineCount: online, CreatedAt: l.CreatedAt,
 		ListedAt: l.DiscoverySince, Member: member, JoinsPaused: joinsPaused(l.Server)}
-	if l.Tag != nil {
+	c.NSFW = l.NSFW
+	c.NSFWContent, _ = s.Store.ServerAgeRestricted(r.Context(), l.ID)
+	if l.Tag != nil && !c.NSFW {
 		// what it looks like, never the invite it keeps
 		c.Tag = &store.ServerTag{Text: l.Tag.Text, Badge: l.Tag.Badge, Color: l.Tag.Color, Roles: []ids.ID{}}
 	}
@@ -155,7 +159,7 @@ func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {
 		n, _ := strconv.Atoi(q.Get(k))
 		return n
 	}
-	dq := store.DiscoveryQuery{Query: q.Get("q"), Category: q.Get("category"), Tag: q.Get("tag"), Language: q.Get("language"),
+	dq := store.DiscoveryQuery{ShowNSFW: q.Get("nsfw") == "1", NSFWOnly: q.Get("nsfw_only") == "1", Query: q.Get("q"), Category: q.Get("category"), Tag: q.Get("tag"), Language: q.Get("language"),
 		MinMembers: atoi("min_members"), MaxMembers: atoi("max_members"), Sort: q.Get("sort"), Offset: atoi("offset"), Limit: atoi("limit")}
 	if dq.Limit <= 0 || dq.Limit > 48 {
 		dq.Limit = 24
@@ -184,12 +188,12 @@ func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDiscoveryCategories(w http.ResponseWriter, r *http.Request) {
-	counts, err := s.Store.DiscoveryCategoryCounts(r.Context())
+	counts, err := s.Store.DiscoveryCategoryCounts(r.Context(), r.URL.Query().Get("nsfw") == "1")
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
-	tags, err := s.Store.PopularDiscoveryTags(r.Context(), 20)
+	tags, err := s.Store.PopularDiscoveryTags(r.Context(), 20, r.URL.Query().Get("nsfw") == "1")
 	if err != nil {
 		WriteError(w, err)
 		return
@@ -222,6 +226,9 @@ func (s *Server) handleDiscoveryServer(w http.ResponseWriter, r *http.Request) {
 	if l == nil {
 		return
 	}
+	if !s.requireNSFWConsent(w, r, l.ID) {
+		return
+	}
 	resp := map[string]any{"server": s.card(r, l, me.ID)}
 	// a taste of how the server talks: its own emoji, the newest first
 	if emojis, err := s.Store.ServerEmojis(r.Context(), l.ID); err == nil {
@@ -249,6 +256,9 @@ func (s *Server) handleDiscoveryJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	srv := l.Server
+	if !s.requireNSFWConsent(w, r, srv.ID) {
+		return
+	}
 	s.forgetCounts(srv.ID)
 	member, err := s.Store.Join(r.Context(), srv.ID, me.ID, store.JoinInfo{Method: "discovery"})
 	switch {

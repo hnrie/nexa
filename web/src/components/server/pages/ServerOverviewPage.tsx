@@ -5,6 +5,7 @@ import { describeError } from "@/lib/errors";
 import { bannerUrl, iconUrl } from "@/api/users";
 import { Button } from "@/components/common/Button";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
+import { Toggle } from "@/components/common/Toggle";
 import { Select } from "@/components/common/Select";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { FormattedText } from "@/components/common/FormattedText";
@@ -30,12 +31,14 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
   const [description, setDescription] = useState(server?.description ?? "");
   const [system, setSystem] = useState(server?.system_channel_id ?? "");
   const [notif, setNotif] = useState(server?.default_notifications ?? 0);
+  const [nsfw, setNSFW] = useState(!!server?.nsfw);
   const [busy, setBusy] = useState(false);
   const [crop, setCrop] = useState<{ file: File; kind: "icon" | "banner" } | null>(null);
   if (!server) return null;
   const texts = selectServerChannels(channels, serverId).filter((c) => c.type === "text");
-  const dirty = name !== server.name || description !== server.description || (system || "") !== (server.system_channel_id ?? "") || notif !== server.default_notifications;
+  const dirty = nsfw !== !!server.nsfw || name !== server.name || description !== server.description || (system || "") !== (server.system_channel_id ?? "") || notif !== server.default_notifications;
   const reset = () => {
+    setNSFW(!!server.nsfw);
     setName(server.name);
     setDescription(server.description);
     setSystem(server.system_channel_id ?? "");
@@ -45,6 +48,7 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
     setBusy(true);
     try {
       const body: Parameters<typeof serversApi.patch>[1] = {};
+      if (nsfw !== !!server.nsfw) body.nsfw = nsfw;
       if (name !== server.name) body.name = name;
       if (description !== server.description) body.description = description;
       if ((system || "") !== (server.system_channel_id ?? "")) body.system_channel_id = system || null;
@@ -52,6 +56,7 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
       const srv = await serversApi.patch(serverId, body);
       updateServer(srv);
       // the server tidies whitespace, so show what it kept or the save bar never goes away
+      setNSFW(!!srv.nsfw);
       setName(srv.name);
       setDescription(srv.description);
       setSystem(srv.system_channel_id ?? "");
@@ -104,6 +109,7 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
     <>
       <h2 className={st.title}>{t("server.serverOverview.serverOverview")}</h2>
       <div className={st.form}>
+        <Toggle checked={nsfw} onChange={setNSFW} disabled={busy} label={t("nsfw.serverToggle")} description={t("nsfw.serverHint")} />
         <div className={s.iconWrap}>
           <div className={s.serverIcon}>{icon ? <img src={icon} alt="" /> : initials(server.name)}</div>
           <div className={st.form} style={{ gap: 8 }}>

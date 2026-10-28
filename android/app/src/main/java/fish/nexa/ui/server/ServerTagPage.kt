@@ -142,6 +142,10 @@ fun ServerTagPage(serverId: String) {
     val servers by Nexa.servers.byId.collectAsState()
     val me by Nexa.users.me.collectAsState()
     val st = servers[serverId] ?: return
+    if (st.server.nsfw) {
+        SettingsPage { PageTitle(t("serverTag.page.title")); Hint(t("nsfw.tagBlocked")) }
+        return
+    }
     val saved = st.server.tag
     var draft by remember { mutableStateOf(draftOf(saved)) }
     // the server's own picture, kept as a choice while another badge is tried

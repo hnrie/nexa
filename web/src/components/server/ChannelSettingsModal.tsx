@@ -276,7 +276,7 @@ function OverviewPage({ channel }: { channel: Channel }) {
         {thread && mayManageThreads ? (
           <Toggle checked={locked} onChange={(v) => set({ locked: v })} label={tr_("threads.settings.locked")} description={tr_("threads.settings.lockedDesc")} />
         ) : null}
-        {textLike || forum ? <Toggle checked={nsfw} onChange={(v) => set({ nsfw: v })} label={tr_("server.channelSettings.ageRestrictedChannel")} description={tr_("server.channelSettings.usersWillNeedToConfirmThey")} /> : null}
+        {textLike || forum ? <Toggle checked={nsfw} onChange={(v) => set({ nsfw: v })} label={tr_("server.channelSettings.ageRestrictedChannel")} description={nsfw ? tr_("nsfw.channelHint") : undefined} /> : null}
         {channel.type === "voice" ? (
           <Field label={tr_("server.channelSettings.userLimitValue", { limit: limit === 0 ? tr_("server.channelSettings.noLimit") : tr_("server.channelSettings.usersCount", { count: limit }) })} hint={tr_("server.channelSettings.limitHowManyPeopleCanJoin")}>
             <input type="range" className={st.slider} min={0} max={99} value={limit} onChange={(e) => set({ limit: Number(e.target.value) })} />

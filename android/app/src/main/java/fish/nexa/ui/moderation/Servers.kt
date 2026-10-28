@@ -124,10 +124,11 @@ private fun tagOf(s: ModServer): WornTag? = s.tag?.let { WornTag(s.id, it.text, 
  * said inside a server is here, or anywhere in the panel.
  */
 @Composable
-fun ServersTab() {
+fun ServersTab(discovery: Boolean = false) {
     val scope = rememberCoroutineScope()
     var q by remember { mutableStateOf("") }
     var sort by remember { mutableStateOf("newest") }
+    var listing by remember { mutableStateOf("all") }
     val servers = remember { mutableStateListOf<ModServer>() }
     var loaded by remember { mutableStateOf(false) }
     var total by remember { mutableStateOf<Int?>(null) }
@@ -142,7 +143,7 @@ fun ServersTab() {
         failed = false
         scope.launch {
             try {
-                val r = Moderation.servers(q, sort, offset, PAGE)
+                val r = Moderation.servers(q, sort, offset, PAGE, if (discovery) listing else null)
                 if (id != request) return@launch
                 if (offset == 0) servers.clear()
                 servers.addAll(r.servers.filter { x -> servers.none { it.id == x.id } })
@@ -172,7 +173,7 @@ fun ServersTab() {
     val list = rememberLazyListState()
     // A new search, filter or order starts the list again, from its top (typing
     // waits a moment). The old order's pages stop at once, so none lands in the new one.
-    LaunchedEffect(q, sort) {
+    LaunchedEffect(q, sort, discovery, listing) {
         request++
         more = false
         if (q.isNotEmpty()) delay(250)
@@ -197,6 +198,7 @@ fun ServersTab() {
                     SearchField(q, { q = it }, t("moderation.servers.search"), Modifier.weight(1f))
                     total?.let { Txt(t("moderation.servers.total", "count" to it), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13f)), color = Nx.colors.textMuted, maxLines = 1) }
                 }
+                if (discovery) SortField(listOf("all" to t("discovery.all"), "listed" to t("moderation.servers.discoveryListed"), "held" to t("moderation.servers.discoveryHeld")), listing) { listing = it }
                 SortField(listOf("newest" to t("moderation.sort.newest"), "oldest" to t("moderation.sort.oldest"), "members" to t("moderation.servers.sortMembers"), "name" to t("moderation.sort.name")), sort) { sort = it }
             }
         }
@@ -208,7 +210,7 @@ fun ServersTab() {
                     if (q.isNotEmpty()) NxButton(t("moderation.clearFilters"), { q = "" }, kind = ButtonKind.SECONDARY, size = ButtonSize.SM)
                 }
             }
-            else -> items(servers, key = { it.id }) { s -> ServerCard(s) { openModerateServer(s, null) { refresh(s.id) } } }
+            else -> items(servers, key = { it.id }) { s -> ServerCard(s, discovery) { if (discovery && s.discoveryHidden) showOnDiscover(s) { load(0) } else openModerateServer(s, if (discovery) listOf("discovery") else null) { if (discovery) load(0) else refresh(s.id) } } }
         }
         if (loading && loaded) item("more") { LoadingRow() }
     }
@@ -217,7 +219,7 @@ fun ServersTab() {
 /** `.card` for a server: its banner, its icon on it, its name, owner, description, size, and what can be done. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ServerCard(s: ModServer, onModerate: () -> Unit) {
+private fun ServerCard(s: ModServer, discovery: Boolean = false, onModerate: () -> Unit) {
     val c = Nx.colors
     val owner = person(s.ownerId)
     val blocked = serverBlockedText(s.blocked)
@@ -226,6 +228,8 @@ private fun ServerCard(s: ModServer, onModerate: () -> Unit) {
             CardBanner(s.bannerId, profileBrush(null, null, s.id), 88.dp)
             Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 44.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 Txt(s.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(17.5f), fontWeight = FontWeight(690)), color = c.textStrong, maxLines = 1)
+                if (s.nsfw) Txt(t("nsfw.label"), style = Nx.type.hint, color = c.warning)
+                if (discovery) Txt(discoverState(s), style = Nx.type.hint, color = c.textMuted)
                 OwnerChip(s.ownerId, t("moderation.servers.ownedBy", "name" to fish.nexa.ui.chat.PERSON_SLOT), ownerName = nameOf(owner)) { goPanel("users/${s.ownerId}") }
                 Txt(
                     if (s.description.isNotEmpty()) previewText(s.description) else t("moderation.servers.noDescription"),
@@ -239,7 +243,7 @@ private fun ServerCard(s: ModServer, onModerate: () -> Unit) {
                     MetaItem("CalendarDays", Time.shortDate(s.createdAt))
                 }
                 Row(Modifier.padding(top = 8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NxButton(t("moderation.moderate"), onModerate, Modifier.weight(1f), icon = "Gavel", size = ButtonSize.TOUCH, enabled = blocked.isEmpty())
+                    NxButton(if (discovery) t(if (s.discoveryHidden) "moderation.servers.discoveryShow" else "moderation.servers.discoveryHide") else t("moderation.moderate"), onModerate, Modifier.weight(1f), icon = "Gavel", size = ButtonSize.TOUCH, enabled = blocked.isEmpty())
                     NxButton(t("moderation.servers.open"), { goPanel("servers/${s.id}") }, Modifier.weight(1f), kind = ButtonKind.SECONDARY, icon = "Server", size = ButtonSize.TOUCH)
                 }
                 if (blocked.isNotEmpty()) Txt(blocked, style = Nx.type.hint.copy(fontSize = Nx.type.sp(12f)), color = c.textMuted, modifier = Modifier.padding(top = 6.dp))

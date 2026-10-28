@@ -7178,5 +7178,21 @@
   "whatsNew.r20261027.audioTitle": "Tydligare röst",
   "whatsNew.r20261027.audioBody": "Förbättrad brusreducering använder nu en nyare talmodell. Röstinspelningar använder samma filter, med högre ljudkvalitet och kontrollerad volym.",
   "whatsNew.r20261027.animationTitle": "Välj vad som rör sig",
-  "whatsNew.r20261027.animationBody": "Utseende har separata animationsreglage för profilbilder, server- och gruppikoner, banderoller, emojier och klistermärken."
+  "whatsNew.r20261027.animationBody": "Utseende har separata animationsreglage för profilbilder, server- och gruppikoner, banderoller, emojier och klistermärken.",
+  "nsfw.label": "NSFW",
+  "nsfw.serverToggle": "Markera servern som en NSFW-community",
+  "nsfw.serverHint": "Använd detta om det mesta innehållet är NSFW. Inbjudningsförhandsvisningar kräver 18+-bekräftelse, Upptäck kräver samtycke och servertaggen tas bort.",
+  "nsfw.channelHint": "Om det mesta av serverns innehåll är NSFW, markera hela servern som en NSFW-community i Serverinställningar, Översikt. Några få NSFW-kanaler kräver inte detta om de offentliga uppgifterna saknar NSFW-innehåll.",
+  "nsfw.tagBlocked": "NSFW-communityer kan inte använda servertaggar. Servrar med bara några få NSFW-kanaler får behålla dem om deras offentliga uppgifter saknar NSFW-innehåll.",
+  "nsfw.showServers": "Visa servrar med NSFW-innehåll",
+  "nsfw.warningTitle": "Åldersbegränsad Server",
+  "nsfw.warningBody": "Den här servern innehåller NSFW-innehåll. Bekräfta att du är minst 18 år för att se inbjudan.",
+  "nsfw.confirm": "Jag är Minst 18 År",
+  "nsfw.discoveryWarning": "Resultaten kan innehålla NSFW-servernamn, bilder och beskrivningar. Bekräfta att du är minst 18 år för att visa dem.",
+  "legal.newNSFW": "NSFW-communityer är tillåtna. Servrar med mestadels NSFW-innehåll måste markera hela servern som NSFW. Några få NSFW-kanaler kräver inte detta om de offentliga uppgifterna saknar NSFW-innehåll. NSFW-innehåll är för vuxna från 18 år.",
+  "whatsNew.r20261028.nsfwTitle": "NSFW-communityer",
+  "whatsNew.r20261028.nsfwBody": "Markera en community som NSFW i Serverinställningar, Översikt. Upptäck döljer servrar med NSFW-innehåll tills du samtycker. Helt NSFW-markerade servrar har en 18+-varning på inbjudningar och kan inte använda servertaggar.",
+  "moderation.tabs.discovery": "Upptäck",
+  "whatsNew.r20261028.discoveryTitle": "Moderera Upptäck",
+  "whatsNew.r20261028.discoveryBody": "Personalen har en separat Upptäck-flik i modereringspanelen för att granska listade servrar, dölja listningar och återställa servrar som personalen dolt."
 }

@@ -1,3 +1,6 @@
+import { Button } from "@/components/common/Button";
+import { confirmInviteAge } from "@/lib/nsfw";
+import { loadInvitePreview } from "@/lib/invitePreviews";
 import { Link2Off } from "lucide-react";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { InvitePreview, UnfurlResult } from "@/api/types";
@@ -16,6 +19,7 @@ const DESCRIPTION_CTX: RenderCtx = { users: {}, channels: {}, roles: {}, emojiUr
 
 /** Where an invite leads, as the views draw it. */
 export interface InviteTarget {
+  ageGateCode?: string;
   kind: "server" | "group";
   /** The server or group; null while only a link card is known. */
   id: string | null;
@@ -38,6 +42,7 @@ const SIZES: Record<InviteVariant, { icon: number; banner: number }> = {
 
 export function targetOfPreview(p: InvitePreview, variant: InviteVariant): InviteTarget | null {
   const px = SIZES[variant];
+  if (p.age_gate) return { kind: "server", id: null, name: t("nsfw.warningTitle"), description: "", icon: null, banner: null, online: null, members: null, ageGateCode: p.code };
   if (p.server) {
     const sv = p.server;
     return { kind: "server", id: sv.id, name: sv.name, description: sv.description, icon: iconUrl(sv.icon_id, px.icon), banner: bannerUrl(sv.banner_id, px.banner), online: sv.online_count, members: sv.member_count };
@@ -149,6 +154,7 @@ interface ViewProps {
  */
 export function InviteView({ target, variant, lead, headingId, actions, children }: ViewProps) {
   const Heading = variant === "page" ? "h1" : variant === "dialog" ? "h2" : "p";
+  if (target.ageGateCode) return <InviteAgeGate code={target.ageGateCode} variant={variant} />;
   return (
     <div className={s.view} data-variant={variant}>
       <Band target={target} />
@@ -209,4 +215,28 @@ export function InviteGone({ variant, children }: { variant: InviteVariant; chil
       {children ? <div className={s.goneMore}>{children}</div> : null}
     </div>
   );
+}
+
+function InviteAgeGate({ code, variant }: { code: string; variant: InviteVariant }) {
+ const Heading = variant === "page" ? "h1" : variant === "dialog" ? "h2" : "p";
+ const [busy, setBusy] = useState(false);
+ const [failed, setFailed] = useState(false);
+ const confirm = async () => {
+  setBusy(true);
+  setFailed(false);
+  confirmInviteAge(code);
+  await loadInvitePreview(code, { force: true });
+  setBusy(false);
+  setFailed(true);
+ };
+ return <div className={s.view} data-variant={variant} data-testid="nsfw-invite-warning">
+  <div className={s.gone}><div className={s.goneText}>
+   <Heading className={s.goneTitle}>{t("nsfw.warningTitle")}</Heading>
+   <p className={s.goneBody}>{t("nsfw.warningBody")}</p>
+  </div></div>
+  <div className={s.goneMore}>
+   <Button block loading={busy} onClick={() => void confirm()}>{t("nsfw.confirm")}</Button>
+   {failed ? <p className={s.error} role="alert">{t("invite.checkYourConnection")}</p> : null}
+  </div>
+ </div>;
 }

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
-import type { InvitePreview } from "@/api/types";
+import { useAuth } from "@/stores/auth";
+import { clearInviteAge, confirmInviteAge, inviteConsentQuery } from "./nsfw";
+import type { InvitePreview, MeUser } from "@/api/types";
 import { loadInvitePreview, useInvitePreviews } from "./invitePreviews";
 
 const preview = (online: number): InvitePreview => ({
@@ -12,7 +14,7 @@ const preview = (online: number): InvitePreview => ({
 const entry = (code = "abc") => useInvitePreviews.getState().byCode[code];
 
 describe("invite previews", () => {
-  beforeEach(() => useInvitePreviews.setState({ byCode: {} }));
+  beforeEach(() => { useAuth.setState({ me: null }); clearInviteAge(); useInvitePreviews.setState({ byCode: {} }); });
 
   it("asks once, then answers from what it knows while that is fresh", async () => {
     let clock = 1_000;
@@ -59,4 +61,28 @@ describe("invite previews", () => {
     await loadInvitePreview("x", { fetch, now: () => clock });
     expect(entry("x")?.status).toBe("ready");
   });
+  it("discards age consent and gated previews when the account changes", async () => {
+    useAuth.setState({ me: { id: "first" } as MeUser });
+    confirmInviteAge("abc");
+    expect(inviteConsentQuery("abc")).toEqual({ nsfw: "1" });
+    await loadInvitePreview("abc", { fetch: async () => preview(2) });
+    useAuth.setState({ me: { id: "second" } as MeUser });
+    expect(entry()).toBeUndefined();
+    expect(inviteConsentQuery("abc")).toEqual({});
+    useAuth.setState({ me: { id: "first" } as MeUser });
+    expect(inviteConsentQuery("abc")).toEqual({});
+  });
+
+  it("ignores an earlier account's preview that finishes after switching", async () => {
+    useAuth.setState({ me: { id: "first" } as MeUser });
+    let resolve!: (p: InvitePreview) => void;
+    const pending = loadInvitePreview("abc", { fetch: () => new Promise((done) => { resolve = done; }) });
+    useAuth.setState({ me: { id: "second" } as MeUser });
+    resolve(preview(2));
+    await pending;
+    expect(entry()).toBeUndefined();
+    await loadInvitePreview("abc", { fetch: async () => ({ code: "abc", nsfw: true, age_gate: true, expires_at: null }) });
+    expect(entry()).toMatchObject({ status: "ready", preview: { age_gate: true } });
+  });
+
 });

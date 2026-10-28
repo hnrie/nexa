@@ -89,7 +89,7 @@ func cleanTagText(raw string) (string, bool) {
 // canWearTag says whether uid may wear srv's tag: a member, and when the tag
 // is kept to some roles, one with one of them or who runs the server.
 func (s *Server) canWearTag(ctx context.Context, srv *store.Server, uid ids.ID) (bool, error) {
-	if srv.Tag == nil {
+	if srv.Tag == nil || srv.NSFW {
 		return false, nil
 	}
 	m, err := s.Store.Member(ctx, srv.ID, uid)
@@ -228,6 +228,11 @@ func (s *Server) handleServerTagPut(w http.ResponseWriter, r *http.Request) {
 	if srv == nil {
 		return
 	}
+	if srv.NSFW {
+		WriteError(w, E(http.StatusForbidden, "nsfw_tag_blocked", "Servers marked as NSFW cannot use server tags."))
+		return
+	}
+
 	if ok, retry := s.limTag.Allow("tag:" + srv.ID.String()); !ok {
 		w.Header().Set("Retry-After", retryAfter(retry))
 		WriteError(w, ErrRateLimited)
@@ -410,6 +415,11 @@ func (s *Server) handleServerTagBadge(w http.ResponseWriter, r *http.Request) {
 	if srv == nil {
 		return
 	}
+	if srv.NSFW {
+		WriteError(w, E(http.StatusForbidden, "nsfw_tag_blocked", "Servers marked as NSFW cannot use server tags."))
+		return
+	}
+
 	lim := s.limitsFor("tag")
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, lim.MaxBytes+1))
 	if err != nil || int64(len(data)) > lim.MaxBytes {
@@ -477,7 +487,7 @@ func (s *Server) handleServerTagPreview(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	srv, err := s.Store.ServerByID(r.Context(), id)
-	if err != nil || srv.Tag == nil {
+	if err != nil || srv.Tag == nil || srv.NSFW {
 		WriteError(w, E(http.StatusNotFound, "no_tag", "That server has no tag any more."))
 		return
 	}

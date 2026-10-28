@@ -32,7 +32,7 @@ const serverTagCols = `tag_text, tag_badge, tag_color, tag_roles, tag_invite`
 
 // serverCommunityCols are a server's invite pause, Discovery listing and
 // safety settings, read after serverTagCols.
-const serverCommunityCols = `invites_paused_until, discoverable, discovery_category, discovery_tags, discovery_language, discovery_since, discovery_hidden, verify_account_minutes, verify_member_minutes, automod_at, boosts`
+const serverCommunityCols = `invites_paused_until, discoverable, discovery_category, discovery_tags, discovery_language, discovery_since, discovery_hidden, verify_account_minutes, verify_member_minutes, automod_at, boosts, nsfw`
 
 // communityScan holds what serverCommunityCols scan into until it is put on a Server.
 type communityScan struct {
@@ -42,10 +42,11 @@ type communityScan struct {
 	verifyAccount, verifyMembership int
 	automodAt                       int64
 	boosts                          int
+	nsfw                            int64
 }
 
 func (c *communityScan) dest() []any {
-	return []any{&c.paused, &c.discoverable, &c.category, &c.tags, &c.language, &c.since, &c.hidden, &c.verifyAccount, &c.verifyMembership, &c.automodAt, &c.boosts}
+	return []any{&c.paused, &c.discoverable, &c.category, &c.tags, &c.language, &c.since, &c.hidden, &c.verifyAccount, &c.verifyMembership, &c.automodAt, &c.boosts, &c.nsfw}
 }
 
 func (c *communityScan) apply(s *Server) {
@@ -63,6 +64,7 @@ func (c *communityScan) apply(s *Server) {
 	s.VerifyAccountMinutes, s.VerifyMemberMinutes = c.verifyAccount, c.verifyMembership
 	s.AutomodAt = c.automodAt
 	s.Boosts = c.boosts
+	s.NSFW = c.nsfw == 1
 }
 
 // scanServerTagged reads serverCols followed by serverTagCols and serverCommunityCols.
@@ -118,8 +120,13 @@ func (s *Store) SetServerTag(ctx context.Context, serverID ids.ID, t *ServerTag)
 		}
 		roles = string(b)
 	}
-	_, err := s.db.W.ExecContext(ctx, `UPDATE servers SET tag_text = ?, tag_badge = ?, tag_color = ?, tag_roles = ?, tag_invite = ?, updated_at = ? WHERE id = ?`,
+	res, err := s.db.W.ExecContext(ctx, `UPDATE servers SET tag_text = ?, tag_badge = ?, tag_color = ?, tag_roles = ?, tag_invite = ?, updated_at = ? WHERE id = ? AND nsfw = 0`,
 		t.Text, t.Badge, nullInt(t.Color), roles, t.Invite, nowMs(), int64(serverID))
+	if err == nil {
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNotFound
+		}
+	}
 	return err
 }
 
@@ -195,8 +202,13 @@ func (s *Store) WearTag(ctx context.Context, uid ids.ID, serverID *ids.ID, t *Se
 		_, err := s.db.W.ExecContext(ctx, `UPDATE users SET tag_server_id = NULL, tag_text = '', tag_badge = '', tag_color = NULL, updated_at = ? WHERE id = ?`, nowMs(), int64(uid))
 		return err
 	}
-	_, err := s.db.W.ExecContext(ctx, `UPDATE users SET tag_server_id = ?, tag_text = ?, tag_badge = ?, tag_color = ?, updated_at = ? WHERE id = ?`,
-		int64(*serverID), t.Text, t.Badge, nullInt(t.Color), nowMs(), int64(uid))
+	res, err := s.db.W.ExecContext(ctx, `UPDATE users SET tag_server_id = ?, tag_text = ?, tag_badge = ?, tag_color = ?, updated_at = ? WHERE id = ? AND EXISTS (SELECT 1 FROM servers WHERE id = ? AND nsfw = 0 AND tag_text = ?)`,
+		int64(*serverID), t.Text, t.Badge, nullInt(t.Color), nowMs(), int64(uid), int64(*serverID), t.Text)
+	if err == nil {
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNotFound
+		}
+	}
 	return err
 }
 

@@ -324,7 +324,7 @@ private fun ChannelOverviewPage(ch: Channel) {
                 SelectField(fish.nexa.ui.threads.ThreadsUi.AUTO_ARCHIVE.map { it to fish.nexa.ui.threads.ThreadsUi.archiveLabel(it) }, archive, { archiveEdit = it }, title = t("threads.create.closeAfter"))
             }
             if (thread && mayManageThreads) ToggleLine(t("threads.settings.locked"), locked, { lockedEdit = it }, description = t("threads.settings.lockedDesc"))
-            if (textLike || forum) ToggleLine(t("server.channelSettings.ageRestrictedChannel"), nsfw, { nsfwEdit = it }, description = t("server.channelSettings.usersWillNeedToConfirmThey"))
+            if (textLike || forum) ToggleLine(t("server.channelSettings.ageRestrictedChannel"), nsfw, { nsfwEdit = it }, description = if (nsfw) t("nsfw.channelHint") else null)
             if (ch.isVoice) Field(
                 t("server.channelSettings.userLimitValue", "limit" to if (limit == 0) t("server.channelSettings.noLimit") else t("server.channelSettings.usersCount", "count" to limit)),
                 hint = t("server.channelSettings.limitHowManyPeopleCanJoin"),

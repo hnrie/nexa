@@ -1,4 +1,4 @@
-import { Bot, Bug, FolderOpen, LayoutGrid, Megaphone, ScrollText, Server, Shield, Sticker } from "lucide-react";
+import { Compass, Bot, Bug, FolderOpen, LayoutGrid, Megaphone, ScrollText, Server, Shield, Sticker } from "lucide-react";
 import { Suspense, useEffect, type KeyboardEvent } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { moderation as modApi } from "@/api/moderation";
@@ -19,10 +19,10 @@ export { LogsTab } from "@/components/moderation/LogsTab";
 export { PackPage } from "@/components/moderation/PackPage";
 export { PersonPage } from "@/components/moderation/PersonPage";
 export { ServerPage } from "@/components/moderation/ServerPage";
-export { ServersTab } from "@/components/moderation/ServersTab";
+export { ServersTab, DiscoveryModerationTab } from "@/components/moderation/ServersTab";
 export { UserGrid } from "@/components/moderation/UserGrid";
 
-type Tab = "users" | "bots" | "servers" | "expressions" | "cases" | "bugs" | "logs" | "announcements";
+type Tab = "discovery" | "users" | "bots" | "servers" | "expressions" | "cases" | "bugs" | "logs" | "announcements";
 
 const BASE = "/channels/@admin";
 
@@ -31,7 +31,7 @@ const MOD_TABS: Tab[] = ["users", "cases", "logs"];
 
 function tabOf(path: string): Tab {
   const seg = path.slice(BASE.length + 1).split("/")[0];
-  return seg === "bots" || seg === "servers" || seg === "expressions" || seg === "cases" || seg === "bugs" || seg === "logs" || seg === "announcements" ? seg : "users";
+  return seg === "discovery" || seg === "bots" || seg === "servers" || seg === "expressions" || seg === "cases" || seg === "bugs" || seg === "logs" || seg === "announcements" ? seg : "users";
 }
 
 /**
@@ -81,6 +81,7 @@ export default function AdminPanelPage() {
     { id: "users", label: t("moderation.tabs.users"), icon: <LayoutGrid size={17} /> },
     { id: "bots", label: t("moderation.tabs.bots"), icon: <Bot size={17} /> },
     { id: "servers", label: t("moderation.tabs.servers"), icon: <Server size={17} /> },
+    { id: "discovery", label: t("moderation.tabs.discovery"), icon: <Compass size={17} /> },
     { id: "expressions", label: t("moderation.tabs.expressions"), icon: <Sticker size={17} /> },
     // what waits on the staff and is new to this person; reading it, or Mark as Read, takes it off
     { id: "cases", label: t("moderation.tabs.cases"), icon: <FolderOpen size={17} />, badge: unread.cases.length || undefined },
