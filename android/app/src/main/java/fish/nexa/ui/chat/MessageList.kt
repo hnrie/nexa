@@ -363,8 +363,9 @@ fun MessageList(channel: Channel, modifier: Modifier = Modifier) {
         wasAtBottom = true
     }
 
-    // read marking: newest page, at the bottom, on screen
-    LaunchedEffect(atBottom, visible, newest, mark?.lastReadId, mark?.mentions) {
+    // Read marking: newest page, at the bottom, on screen. Live arrivals can
+    // fill ids before history loads, without changing newest when it finishes.
+    LaunchedEffect(atBottom, visible, newest, state.loaded, state.hasNewer, mark?.lastReadId, mark?.mentions) {
         if (!atBottom || !visible || !state.loaded || state.hasNewer) return@LaunchedEffect
         val id = newest ?: return@LaunchedEffect
         val read = mark?.lastReadId

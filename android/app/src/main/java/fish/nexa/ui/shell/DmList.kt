@@ -731,7 +731,9 @@ private fun SubchatRow(sc: Channel, selected: Boolean) {
     val c = Nx.colors
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val read = Nexa.readStates.get(sc.id)
+    val reads by Nexa.readStates.byChannel.collectAsState()
+    val read = reads[sc.id]
+    val count = if (Unread.isUnread(read, sc.lastMessageId)) maxOf(read?.unread ?: 0, read?.mentions ?: 0) else 0
     val unread = !selected && Unread.isUnread(read, sc.lastMessageId)
     Row(
         Modifier
@@ -756,7 +758,7 @@ private fun SubchatRow(sc: Channel, selected: Boolean) {
             maxLines = 1,
             modifier = Modifier.weight(1f),
         )
-        if ((read?.mentions ?: 0) > 0) CountBadge(read!!.mentions)
+        if (count > 0) CountBadge(count)
     }
 }
 

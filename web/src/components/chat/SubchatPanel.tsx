@@ -6,6 +6,7 @@ import { channels as channelsApi } from "@/api/channels";
 import type { Channel } from "@/api/types";
 import { Spinner } from "@/components/common/Spinner";
 import { compareIds } from "@/lib/ids";
+import { badgeText } from "@/lib/unread";
 import { selectSubchats, useChannels } from "@/stores/channels";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { useUI } from "@/stores/ui";
@@ -108,6 +109,7 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
         {list.map((ch) => {
           const rs = reads[ch.id];
           const unread = isUnread(rs, ch.last_message_id) && ch.id !== activeId;
+          const count = isUnread(rs, ch.last_message_id) ? Math.max(rs?.unread ?? 0, rs?.mentions ?? 0) : 0;
           return (
             <button
               key={ch.id}
@@ -126,7 +128,7 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
             >
               {ch.locked ? <Lock size={16} className={s.subIcon} /> : <MessageCircle size={16} className={s.subIcon} />}
               <span className={s.subName}>{ch.name}</span>
-              {(rs?.mentions ?? 0) > 0 ? <span className={s.subBadge}>{rs?.mentions}</span> : null}
+              {count > 0 ? <span className={s.subBadge} data-testid="subchat-unread" aria-label={t("rail.rail.unreadMessagesCount", { count })}>{badgeText(count)}</span> : null}
             </button>
           );
         })}

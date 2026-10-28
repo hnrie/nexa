@@ -386,7 +386,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         // conversations count every message, so their badges say how many are waiting
         const type = useChannels.getState().byId[m.channel_id]?.type;
         // none of your own, as the server counts them
-        if (!mine && (!type || type === "dm" || type === "group_dm")) useReadStates.getState().bumpUnread(m.channel_id);
+        if (!mine && (!type || type === "dm" || type === "group_dm" || type === "subchat")) useReadStates.getState().bumpUnread(m.channel_id);
       }
       each(dispatchHooks.onMessage, (h) => h(m, mine, decrypted));
       return;

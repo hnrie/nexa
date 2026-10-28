@@ -872,7 +872,7 @@ export interface ReadState {
   last_read_message_id: Snowflake | null;
   last_ack_at: number;
   mention_count: number;
-  /** Other people's unread messages in a DM or group DM, up to 100; absent or 0 elsewhere. */
+  /** Other people's unread messages in a DM, group DM or subchat, up to 100; absent or 0 elsewhere. */
   unread_count?: number;
   /** Set by Mark Unread, the one change that moves the read marker back. */
   manual?: boolean;

@@ -766,7 +766,7 @@ type ReadState struct {
 	LastReadMessageID *ids.ID `json:"last_read_message_id"`
 	LastAckAt         int64   `json:"last_ack_at"`
 	MentionCount      int     `json:"mention_count"`
-	// UnreadCount counts other people's unread messages in a DM or group DM,
+	// UnreadCount counts other people's unread messages in a DM, group DM or subchat,
 	// up to MaxUnreadCount; it is zero for server channels.
 	UnreadCount int `json:"unread_count"`
 	// Manual is set on the state Mark Unread leaves, the one change that moves

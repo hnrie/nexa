@@ -430,7 +430,7 @@ private fun NewButton(icon: String, label: String, enabled: Boolean, onClick: ()
 private fun SubchatRow(s: Channel, open: Boolean, read: fish.nexa.data.ReadMark?) {
     val c = Nx.colors
     val unread = fish.nexa.ui.shell.Unread.isUnread(read, s.lastMessageId) && !open
-    val mentions = read?.mentions ?: 0
+    val count = if (fish.nexa.ui.shell.Unread.isUnread(read, s.lastMessageId)) maxOf(read?.unread ?: 0, read?.mentions ?: 0) else 0
     Row(
         Modifier
             .fillMaxWidth()
@@ -450,7 +450,7 @@ private fun SubchatRow(s: Channel, open: Boolean, read: fish.nexa.data.ReadMark?
             s.name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = if (unread) FontWeight(600) else FontWeight(400)),
             color = if (open || unread) c.textStrong else c.textSubtle, maxLines = 1, modifier = Modifier.weight(1f),
         )
-        if (mentions > 0) fish.nexa.ui.components.CountBadge(mentions)
+        if (count > 0) fish.nexa.ui.components.CountBadge(count)
     }
 }
 

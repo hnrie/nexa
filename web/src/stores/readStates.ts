@@ -8,7 +8,7 @@ import { useChannels } from "./channels";
 export interface ChannelRead {
   lastReadId: string | null;
   mentions: number;
-  /** Unread messages from others; kept for DMs and group DMs only. */
+  /** Unread messages from others; kept for DMs, group DMs and subchats. */
   unread: number;
 }
 

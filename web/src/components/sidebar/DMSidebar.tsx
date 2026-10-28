@@ -508,6 +508,7 @@ export function DMSidebar() {
         </div>
         {subs.map((sc) => {
           const srs = reads[sc.id];
+          const count = isUnread(srs, sc.last_message_id) ? Math.max(srs?.unread ?? 0, srs?.mentions ?? 0) : 0;
           return (
             <button
               key={sc.id}
@@ -523,7 +524,7 @@ export function DMSidebar() {
             >
               {sc.locked ? <Lock size={15} /> : <MessageCircle size={15} />}
               <span className={s.name}>{sc.name}</span>
-              {(srs?.mentions ?? 0) > 0 ? <span className={s.mention}>{srs?.mentions}</span> : null}
+              {count > 0 ? <span className={s.mention} data-testid="subchat-unread" aria-label={t("rail.rail.unreadMessagesCount", { count })}>{badgeText(count)}</span> : null}
             </button>
           );
         })}

@@ -1216,6 +1216,10 @@ This is a public website feature, with no corresponding native Android screen.
 - Hashtag suggestions and send/edit conversion include visible text, announcement and forum
   channels on both clients. Subchats stay listed under the open conversation; unread subchats
   also appear under their parent while another conversation is open, then hide after being read.
+  Sidebar rows and the Subchats panel show a small red unread-message count on both clients,
+  capped at 99+, counting every unread message from others rather than only mentions. Android
+  read marking reruns when history finishes loading, including when live messages were cached
+  before the conversation was first opened.
 - `lib/decrypt.ts` turns a message into what the stores keep (webhook messages pass through
   `lib/webhookMessage.ts` instead). `lib/keyring.ts` holds the roots in memory and caches channel keys.
 

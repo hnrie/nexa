@@ -149,6 +149,19 @@ describe("the order events arrive in", () => {
     };
   });
 
+  it("counts live subchat messages without mentions, takes back deletes and clears on read", async () => {
+    useUI.setState({ activeChannelId: null });
+    useChannels.getState().upsert([{ ...chan("subcount"), type: "subchat", server_id: null, parent_id: "parent" }]);
+    useReadStates.setState({ byChannel: { subcount: { lastReadId: "10", mentions: 0, unread: 0 } } });
+    await applyEvent(ev({ t: "message_create", d: msg("20", "subcount") }));
+    await applyEvent(ev({ t: "message_create", d: msg("21", "subcount") }));
+    expect(useReadStates.getState().byChannel["subcount"]).toMatchObject({ unread: 2, mentions: 0 });
+    await applyEvent(ev({ t: "message_delete", d: { id: "21", channel_id: "subcount", author_id: "u2", last_message_id: "20" } }));
+    expect(useReadStates.getState().byChannel["subcount"]?.unread).toBe(1);
+    await applyEvent(ev({ t: "read_state", d: { channel_id: "subcount", last_read_message_id: "20", last_ack_at: 0, mention_count: 0, unread_count: 0 } }));
+    expect(useReadStates.getState().byChannel["subcount"]).toMatchObject({ unread: 0, mentions: 0 });
+  });
+
   it("asks once for the profile of someone new, however their first message reaches the stores", async () => {
     useChannels.getState().upsert([chan("c5")]);
     await applyEvent(ev({ t: "message_create", d: msg("50", "c5", "newcomer") }));
