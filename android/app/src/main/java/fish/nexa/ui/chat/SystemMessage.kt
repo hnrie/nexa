@@ -47,6 +47,8 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
     val target = m.mentions.firstOrNull()
     val icon = when (m.type) {
         "system_member_remove" -> "ArrowLeftFromLine"
+        "system_name_change" -> "Pencil"
+        "system_icon_change" -> "Image"
         "system_owner_change" -> "Crown"
         "system_pin" -> "Pin"
         "system_poll_result" -> "ChartBar"
@@ -125,6 +127,8 @@ fun SystemRow(cm: ChatMessage, ctx: ListCtx) {
             }
             "system_thread_add" -> fill(t("chat.systemMessage.addedToThread"), mapOf("actor" to person(actor), "target" to person(target)))
             "system_thread_remove" -> fill(t("chat.systemMessage.removedFromThread"), mapOf("actor" to person(actor), "target" to person(target)))
+            "system_name_change" -> fill(t("chat.systemMessage.changedName"), mapOf("actor" to person(actor)))
+            "system_icon_change" -> fill(t("chat.systemMessage.changedIcon"), mapOf("actor" to person(actor)))
             "system_member_add" -> if (self) fill(t("chat.systemMessage.joinedGroup"), mapOf("actor" to person(actor)))
             else fill(t("chat.systemMessage.addedToGroup"), mapOf("actor" to person(actor), "target" to person(target)))
             "system_member_remove" -> if (self) fill(t("chat.systemMessage.leftGroup"), mapOf("actor" to person(actor)))

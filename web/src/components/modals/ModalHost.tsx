@@ -98,7 +98,8 @@ function ModalEntry({ modal }: { modal: ModalState }) {
           confirmLabel={modal.props?.["confirmLabel"] as string | undefined}
           cancelLabel={modal.props?.["cancelLabel"] as string | undefined}
           danger={Boolean(modal.props?.["danger"])}
-          onConfirm={modal.props?.["onConfirm"] as () => unknown}
+          checkboxLabel={modal.props?.["checkboxLabel"] as string | undefined}
+          onConfirm={modal.props?.["onConfirm"] as (checked: boolean) => unknown}
         />
       ) : null}
       {modal?.kind === "customStatus" ? <CustomStatusModal onClose={close} /> : null}

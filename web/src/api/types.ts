@@ -716,6 +716,8 @@ export type MessageType =
   | "system_member_add"
   | "system_member_remove"
   | "system_owner_change"
+  | "system_name_change"
+  | "system_icon_change"
   | "system_poll_result";
 
 export interface Message {

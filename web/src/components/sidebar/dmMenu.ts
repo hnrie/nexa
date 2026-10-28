@@ -46,9 +46,9 @@ function leave(channelId: string, nav?: (p: string) => void): void {
 }
 
 /** Closes a conversation for you; a new message brings it back, to the main list. */
-export async function closeDM(channelId: string, nav?: (p: string) => void): Promise<void> {
+export async function closeDM(channelId: string, nav?: (p: string) => void, silent = false): Promise<void> {
   try {
-    await channelsApi.close(channelId);
+    await channelsApi.close(channelId, silent);
     leave(channelId, nav);
     forget(channelId);
     forgetConversation(channelId);
@@ -164,7 +164,8 @@ export const dmMenu = defineMenu<DMMenuRowCtx>("dm", [
                 body: t("sidebar.dmMenu.youStopReceivingMessagesFromThis"),
                 confirmLabel: t("chat.groupMemberMenu.leaveGroup"),
                 danger: true,
-                onConfirm: () => closeDM(channelId, nav),
+                checkboxLabel: t("chat.leaveSilently"),
+                onConfirm: (silent: boolean) => closeDM(channelId, nav, silent),
               })
             : void closeDM(channelId, nav),
       };

@@ -7195,5 +7195,10 @@
   "moderation.tabs.discovery": "खोज",
   "whatsNew.r20261028.discoveryTitle": "खोज की मॉडरेशन",
   "whatsNew.r20261028.discoveryBody": "मॉडरेशन पैनल में स्टाफ के लिए अलग खोज टैब है, जहाँ वे सूचीबद्ध सर्वर देख सकते हैं, उन्हें छिपा सकते हैं और स्टाफ द्वारा छिपाए गए सर्वर बहाल कर सकते हैं।",
-  "nsfw.discoveryHint": "NSFW सामग्री वाले सर्वर दिखाएँ। आपकी आयु कम से कम 18 वर्ष होनी चाहिए।"
+  "nsfw.discoveryHint": "NSFW सामग्री वाले सर्वर दिखाएँ। आपकी आयु कम से कम 18 वर्ष होनी चाहिए।",
+  "chat.leaveSilently": "ग्रुप छोड़ने का संदेश दिखाए बिना छोड़ें",
+  "chat.systemMessage.changedName": "{actor} ने ग्रुप का नाम बदला।",
+  "chat.systemMessage.changedIcon": "{actor} ने ग्रुप का आइकन बदला।",
+  "whatsNew.r20261028.groupActivityTitle": "ग्रुप चैट की गतिविधि",
+  "whatsNew.r20261028.groupActivityBody": "ग्रुप चैट में नाम और आइकन के बदलाव दिखते हैं। एक ग्रुप या कई चुने हुए ग्रुप छोड़ते समय, आप अपना छोड़ने का संदेश छिपा सकते हैं।"
 }

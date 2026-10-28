@@ -181,10 +181,10 @@ object DmArrange {
 }
 
 /** Closes a DM (hidden until a new message) or leaves a group; goes to Friends when it was open. */
-fun closeDm(channelId: String) {
+fun closeDm(channelId: String, silent: Boolean = false) {
     Nexa.scope.launch {
         try {
-            Nexa.api.request("DELETE", "/channels/$channelId")
+            Nexa.api.request("DELETE", "/channels/$channelId" + if (silent) "?silent=true" else "")
             leaveIfViewing(channelId)
             Nexa.channels.remove(channelId)
             Nexa.messages.clearChannel(channelId)
@@ -239,7 +239,7 @@ fun dmMenu(ch: Channel, moves: List<MenuItem.Action> = emptyList(), select: Bool
     }
     items += MenuItem.Action(if (muted) t("sidebar.dmMenu.unmuteConversation") else t("sidebar.dmMenu.muteConversation"), separatorAfter = true) { DmArrange.setMuted(listOf(ch.id), !muted) }
     items += MenuItem.Action(if (group) t("chat.groupMemberMenu.leaveGroup") else t("sidebar.dMSidebar.closeDm"), danger = group) {
-        if (group) confirm(t("sidebar.dmMenu.leaveNamed", "name" to name), t("sidebar.dmMenu.youStopReceivingMessagesFromThis"), t("chat.groupMemberMenu.leaveGroup")) { closeDm(ch.id) }
+        if (group) confirmLeaveGroup(ch.id)
         else closeDm(ch.id)
     }
     if (!group || owner) {
@@ -313,12 +313,12 @@ private object DmBulk {
 
     fun closeAll(ids: List<String>) {
         val groups = ids.count { Nexa.channels.get(it)?.type == "group_dm" }
-        val run: suspend () -> Unit = {
+        val run: suspend (Boolean) -> Unit = { silent ->
             Pick.clear()
-            for (id in ids) if (id == DmLayout.NEXA_ID) closeNexa() else closeDm(id)
+            for (id in ids) if (id == DmLayout.NEXA_ID) closeNexa() else closeDm(id, silent && Nexa.channels.get(id)?.type == "group_dm")
         }
-        if (groups == 0) Nexa.scope.launch { run() }
-        else confirm(t("pick.closeTitle", "count" to ids.size), t("pick.closeBody", "count" to groups), t("pick.closeConfirm")) { run() }
+        if (groups == 0) Nexa.scope.launch { run(false) }
+        else confirmGroupLeave(t("pick.closeTitle", "count" to ids.size), t("pick.closeBody", "count" to groups), t("pick.closeConfirm")) { run(it) }
     }
 
     fun bar(ids: List<String>): List<PickAction> {

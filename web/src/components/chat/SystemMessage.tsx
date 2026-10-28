@@ -1,5 +1,5 @@
 import { PersonName } from "@/components/common/PersonName";
-import { ArrowLeftFromLine, ArrowRightToLine, ChartBar, Crown, MessageSquareText, Pin, Trash2 } from "lucide-react";
+import { ArrowLeftFromLine, ArrowRightToLine, ChartBar, Crown, Pencil, Image, MessageSquareText, Pin, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useChannels } from "@/stores/channels";
 import { AutomodAlert } from "./AutomodAlert";
@@ -35,6 +35,14 @@ function PlainSystemMessage({ msg }: { msg: DecryptedMessage }) {
   let icon = <ArrowRightToLine size={18} />;
   let body: React.ReactNode;
   switch (msg.type) {
+    case "system_name_change":
+      icon = <Pencil size={18} />;
+      body = <Tr id="chat.systemMessage.changedName" values={{ actor: A }} />;
+      break;
+    case "system_icon_change":
+      icon = <Image size={18} />;
+      body = <Tr id="chat.systemMessage.changedIcon" values={{ actor: A }} />;
+      break;
     case "system_member_add":
       // joining with a link is written as adding yourself
       body = msg.mentions[0] === msg.author_id

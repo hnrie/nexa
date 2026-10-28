@@ -196,7 +196,9 @@ func (s *Server) removeFromGroup(r *http.Request, ch *store.Channel, uid ids.ID)
 		next := remaining[0]
 		_ = s.Store.UpdateChannel(ctx, ch.ID, store.ChannelPatch{OwnerID: &next})
 	}
-	s.systemMessage(r, ch, uid, "system_member_remove", []ids.ID{uid}, nil)
+	if r.URL.Query().Get("silent") != "true" {
+		s.systemMessage(r, ch, uid, "system_member_remove", []ids.ID{uid}, nil)
+	}
 	if updated, err := s.Store.ChannelByID(ctx, ch.ID); err == nil {
 		s.Bcast.EmitUsers(remaining, "channel_update", updated)
 	}

@@ -348,6 +348,9 @@ func (s *Server) handleChannelPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.Bcast.EmitUsers(updated.Recipients, "channel_update", updated)
+	if p.Name != nil && *p.Name != ch.Name {
+		s.systemMessage(r, updated, me.ID, "system_name_change", nil, nil)
+	}
 	if handedOn {
 		// said in the group, as adding and removing people are: who made whom its owner
 		s.systemMessage(r, updated, me.ID, "system_owner_change", []ids.ID{*req.OwnerID}, nil)
@@ -393,6 +396,9 @@ func (s *Server) iconChanged(r *http.Request, ch *store.Channel, me *store.User,
 		s.Bcast.EmitChannel(ch.ID, "channel_update", updated)
 	} else {
 		s.Bcast.EmitUsers(updated.Recipients, "channel_update", updated)
+		if ch.Type == "group_dm" && (set || ch.IconID != nil) {
+			s.systemMessage(r, updated, me.ID, "system_icon_change", nil, nil)
+		}
 	}
 	return updated, nil
 }
@@ -563,7 +569,9 @@ func (s *Server) handleRecipientRemove(w http.ResponseWriter, r *http.Request) {
 	}
 	s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": ch.ID})
 	s.Bcast.EmitUsers(remaining, "channel_update", updated)
-	s.systemMessage(r, updated, me.ID, "system_member_remove", []ids.ID{uid}, nil)
+	if uid != me.ID || r.URL.Query().Get("silent") != "true" {
+		s.systemMessage(r, updated, me.ID, "system_member_remove", []ids.ID{uid}, nil)
+	}
 	tr := true
 	_ = s.Store.SetKeyFlags(r.Context(), ch.ID, &tr, nil)
 	s.Bcast.EmitUsers(remaining, "key_rotation_needed", map[string]any{"conv_id": ch.ID})

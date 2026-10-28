@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
  * ConfirmModal: a question, what it does, and the one button that does it
  * (red when it cannot be undone), with Cancel beside it.
  */
-fun confirm(title: String, body: String, confirmLabel: String, danger: Boolean = true, titleWords: fish.nexa.ui.chat.PersonWords? = null, bodyWords: fish.nexa.ui.chat.PersonWords? = null, onConfirm: suspend () -> Unit) {
+fun confirm(title: String, body: String, confirmLabel: String, danger: Boolean = true, titleWords: fish.nexa.ui.chat.PersonWords? = null, bodyWords: fish.nexa.ui.chat.PersonWords? = null, checkboxLabel: String? = null, onCheckedChange: (Boolean) -> Unit = {}, onConfirm: suspend () -> Unit) {
     openSheet("confirm", title = title, heading = titleWords?.let { words -> { fish.nexa.ui.chat.PersonHeading(words) } }, footer = { close ->
         var busy by remember { mutableStateOf(false) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, androidx.compose.ui.Alignment.End)) {
@@ -49,6 +49,10 @@ fun confirm(title: String, body: String, confirmLabel: String, danger: Boolean =
     }) {
         if (bodyWords != null) fish.nexa.ui.chat.PersonWordsText(bodyWords, Nx.type.body.copy(lineHeight = Nx.type.sp(23f)), Nx.colors.text)
         else Txt(body, style = Nx.type.body.copy(lineHeight = Nx.type.sp(23f)), color = Nx.colors.text)
+        if (checkboxLabel != null) {
+            var checked by remember { mutableStateOf(false) }
+            fish.nexa.ui.components.NxCheckbox(checked, { checked = it; onCheckedChange(it) }, checkboxLabel)
+        }
     }
 }
 
@@ -61,11 +65,16 @@ fun confirmLeaveServer(serverId: String) {
     }
 }
 
+/** One unchecked choice per leave operation, including a selection of groups. */
+fun confirmGroupLeave(title: String, body: String, confirmLabel: String, onConfirm: suspend (Boolean) -> Unit) {
+    var silent = false
+    confirm(title, body, confirmLabel, checkboxLabel = t("chat.leaveSilently"), onCheckedChange = { silent = it }) { onConfirm(silent) }
+}
+
 fun confirmLeaveGroup(channelId: String) {
     val ch = Nexa.channels.get(channelId) ?: return
-    confirm(t("sidebar.dmMenu.leaveNamed", "name" to Names.channel(ch)), t("sidebar.dmMenu.youStopReceivingMessagesFromThis"), t("chat.groupMemberMenu.leaveGroup")) {
-        Nexa.api.request("DELETE", "/channels/$channelId")
-        if ((Nav.route as? Route.Dm)?.channelId == channelId) Nav.go(Route.Friends, replace = true)
+    confirmGroupLeave(t("sidebar.dmMenu.leaveNamed", "name" to Names.channel(ch)), t("sidebar.dmMenu.youStopReceivingMessagesFromThis"), t("chat.groupMemberMenu.leaveGroup")) { silent ->
+        closeDm(channelId, silent)
     }
 }
 

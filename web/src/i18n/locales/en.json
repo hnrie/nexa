@@ -7195,5 +7195,10 @@
   "moderation.tabs.discovery": "Discovery",
   "whatsNew.r20261028.discoveryTitle": "Discovery Moderation",
   "whatsNew.r20261028.discoveryBody": "Staff have a separate Discovery tab in the moderation panel to review listed servers, hide listings, and restore servers hidden by staff.",
-  "nsfw.discoveryHint": "Show servers with NSFW content. You must be 18 or older."
+  "nsfw.discoveryHint": "Show servers with NSFW content. You must be 18 or older.",
+  "chat.leaveSilently": "Leave without showing a leave message",
+  "chat.systemMessage.changedName": "{actor} changed the group name.",
+  "chat.systemMessage.changedIcon": "{actor} changed the group icon.",
+  "whatsNew.r20261028.groupActivityTitle": "Group Chat Activity",
+  "whatsNew.r20261028.groupActivityBody": "Group chats show name and icon changes. When leaving one group or several selected groups, you can choose to hide your leave message."
 }

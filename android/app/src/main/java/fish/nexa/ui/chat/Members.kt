@@ -619,11 +619,11 @@ fun groupMemberMenuItems(channelId: String, userId: String): List<MenuItem.Actio
     }
     if (self && ch.type == "group_dm") {
         items += MenuItem.Action(t("chat.groupMemberMenu.leaveGroup"), danger = true) {
-            confirm(
+            fish.nexa.ui.shell.confirmGroupLeave(
                 t("sidebar.dmMenu.leaveNamed", "name" to group),
                 if (isOwner) t("chat.groupMemberMenu.youStopReceivingMessagesFromThis") else t("sidebar.dmMenu.youStopReceivingMessagesFromThis"),
                 t("chat.groupMemberMenu.leaveGroup"),
-            ) { closeDm(channelId) }
+            ) { silent -> closeDm(channelId, silent) }
         }
     }
     if (Nexa.settings.developerMode) {

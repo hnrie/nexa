@@ -7195,5 +7195,10 @@
   "moderation.tabs.discovery": "Upptäck",
   "whatsNew.r20261028.discoveryTitle": "Moderera Upptäck",
   "whatsNew.r20261028.discoveryBody": "Personalen har en separat Upptäck-flik i modereringspanelen för att granska listade servrar, dölja listningar och återställa servrar som personalen dolt.",
-  "nsfw.discoveryHint": "Visa servrar med NSFW-innehåll. Du måste vara minst 18 år."
+  "nsfw.discoveryHint": "Visa servrar med NSFW-innehåll. Du måste vara minst 18 år.",
+  "chat.leaveSilently": "Lämna utan att visa ett meddelande",
+  "chat.systemMessage.changedName": "{actor} ändrade gruppens namn.",
+  "chat.systemMessage.changedIcon": "{actor} ändrade gruppens ikon.",
+  "whatsNew.r20261028.groupActivityTitle": "Aktivitet i gruppchattar",
+  "whatsNew.r20261028.groupActivityBody": "Gruppchattar visar ändringar av namn och ikon. När du lämnar en grupp eller flera valda grupper kan du dölja ditt meddelande om att du lämnar."
 }

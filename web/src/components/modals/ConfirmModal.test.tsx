@@ -29,3 +29,16 @@ describe("ConfirmModal", () => {
     expect(useUI.getState().toasts).toEqual([]);
   });
 });
+
+it("passes the unchecked default and the selected checkbox choice", async () => {
+  for (const checked of [false, true]) {
+    const onConfirm = vi.fn();
+    render(<ConfirmModal title="Leave Group" body="Leave?" checkboxLabel="Leave silently" onClose={() => {}} onConfirm={onConfirm} />);
+    const checkbox = screen.getByRole("checkbox", { name: "Leave silently" });
+    expect((checkbox as HTMLInputElement).checked).toBe(false);
+    if (checked) fireEvent.click(checkbox);
+    fireEvent.click(screen.getByText("Confirm"));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith(checked));
+    cleanup();
+  }
+});

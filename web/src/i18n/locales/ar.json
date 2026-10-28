@@ -8053,5 +8053,10 @@
   "moderation.tabs.discovery": "الاستكشاف",
   "whatsNew.r20261028.discoveryTitle": "إدارة الاستكشاف",
   "whatsNew.r20261028.discoveryBody": "يتوفر للفريق تبويب استكشاف مستقل في لوحة الإشراف لمراجعة الخوادم المدرجة وإخفائها واستعادة الخوادم التي أخفاها الفريق.",
-  "nsfw.discoveryHint": "إظهار الخوادم التي تحتوي على محتوى NSFW. يجب أن يكون عمرك 18 عامًا أو أكثر."
+  "nsfw.discoveryHint": "إظهار الخوادم التي تحتوي على محتوى NSFW. يجب أن يكون عمرك 18 عامًا أو أكثر.",
+  "chat.leaveSilently": "المغادرة دون إظهار رسالة مغادرة",
+  "chat.systemMessage.changedName": "غيّر {actor} اسم المجموعة.",
+  "chat.systemMessage.changedIcon": "غيّر {actor} أيقونة المجموعة.",
+  "whatsNew.r20261028.groupActivityTitle": "نشاط الدردشة الجماعية",
+  "whatsNew.r20261028.groupActivityBody": "تعرض الدردشات الجماعية تغييرات الاسم والأيقونة. عند مغادرة مجموعة واحدة أو عدة مجموعات محددة، يمكنك إخفاء رسالة المغادرة."
 }

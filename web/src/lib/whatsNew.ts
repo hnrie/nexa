@@ -28,6 +28,7 @@ export const RELEASES: Release[] = [
   {
     id: "2026-10-28",
     items: [
+      { icon: Users, title: "whatsNew.r20261028.groupActivityTitle", body: "whatsNew.r20261028.groupActivityBody" },
       { icon: ShieldCheck, title: "whatsNew.r20261028.nsfwTitle", body: "whatsNew.r20261028.nsfwBody" },
       { icon: Compass, title: "whatsNew.r20261028.discoveryTitle", body: "whatsNew.r20261028.discoveryBody" },
     ],

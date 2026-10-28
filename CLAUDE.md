@@ -369,6 +369,13 @@ keeper, the Realtime usage meter, `maintenance`) and serves until SIGINT or SIGT
   missing from that map is never swept or shared.
 - `moderation_gate.go` lists what a muted or banned account may still do. A new signed-in route is
   closed to them until it is added there.
+- Group chat activity uses `system_member_add`, `system_member_remove`, `system_owner_change`,
+  `system_name_change` and `system_icon_change` messages, rendered by both clients. Renaming to the
+  same name or removing an absent icon posts nothing. Leaving through either DELETE channel or
+  DELETE recipient accepts `?silent=true` to omit the caller's leave message; removing someone else
+  always posts a message. Single and bulk leave confirmations offer an unchecked "Leave without
+  showing a leave message" checkbox. Bulk close asks once only when groups are selected and applies
+  the choice to every selected group.
 - Areas, by file: `auth_handlers` and `mfa_handlers` (register, KDF parameters, login, recovery,
   password, sessions, TOTP and backup codes), `passkey_handlers` and `qr_login` (see Signing in
   below), `user_handlers` (me, encrypted settings, keys, search,

@@ -443,6 +443,19 @@ func TestGroupDMLifecycle(t *testing.T) {
 	if rs.StatusCode != 200 || iconBody["icon_id"] == nil {
 		t.Errorf("icon: %d %v", rs.StatusCode, iconBody)
 	}
+	// Repeating the name and deleting an absent icon must not add activity.
+	do(t, ts, "PATCH", "/api/v1/channels/"+g, tokB, map[string]any{"name": "renamed"})
+	do(t, ts, "DELETE", "/api/v1/channels/"+g+"/icon", tokB, nil)
+	do(t, ts, "DELETE", "/api/v1/channels/"+g+"/icon", tokB, nil)
+	_, history := do(t, ts, "GET", "/api/v1/channels/"+g+"/messages", tokB, nil)
+	counts := map[string]int{}
+	for _, raw := range history["_list"].([]any) {
+		m := raw.(map[string]any)
+		counts[m["type"].(string)]++
+	}
+	if counts["system_name_change"] != 1 || counts["system_icon_change"] != 2 {
+		t.Errorf("name and icon activity: %v", counts)
+	}
 	if res, _ = do(t, ts, "DELETE", "/api/v1/channels/"+g+"/recipients/"+idA, tokA, nil); res.StatusCode != 204 {
 		t.Error("alice leaves")
 	}

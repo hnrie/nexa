@@ -56,16 +56,16 @@ export const channels = {
   createSubchat(id: Snowflake, name: string, lock?: Record<string, unknown>): Promise<Channel> {
     return api.request<Channel>("POST", `/channels/${id}/subchats`, { name, ...(lock ?? {}) });
   },
-  close(id: Snowflake): Promise<void> {
-    return api.request<void>("DELETE", `/channels/${id}`);
+  close(id: Snowflake, silent = false): Promise<void> {
+    return api.request<void>("DELETE", `/channels/${id}`, undefined, { query: silent ? { silent: "true" } : {} });
   },
   /** Deletes the conversation for everyone, or deletes a group you own. */
   purge(id: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/channels/${id}`, undefined, { query: { purge: "true" } });
   },
   /** Leaves a group DM. */
-  leave(id: Snowflake): Promise<void> {
-    return api.request<void>("DELETE", `/channels/${id}`);
+  leave(id: Snowflake, silent = false): Promise<void> {
+    return channels.close(id, silent);
   },
   groupInvites(id: Snowflake): Promise<Invite[]> {
     return api.request<Invite[]>("GET", `/channels/${id}/invites`);

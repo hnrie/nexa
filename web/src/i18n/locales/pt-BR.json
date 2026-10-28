@@ -7309,5 +7309,10 @@
   "moderation.tabs.discovery": "Descoberta",
   "whatsNew.r20261028.discoveryTitle": "Moderação da Descoberta",
   "whatsNew.r20261028.discoveryBody": "A equipe tem uma aba de Descoberta separada no painel de moderação para revisar servidores listados, ocultá-los e restaurar os ocultados pela equipe.",
-  "nsfw.discoveryHint": "Mostrar servidores com conteúdo NSFW. Você deve ter pelo menos 18 anos."
+  "nsfw.discoveryHint": "Mostrar servidores com conteúdo NSFW. Você deve ter pelo menos 18 anos.",
+  "chat.leaveSilently": "Sair sem mostrar uma mensagem de saída",
+  "chat.systemMessage.changedName": "{actor} alterou o nome do grupo.",
+  "chat.systemMessage.changedIcon": "{actor} alterou o ícone do grupo.",
+  "whatsNew.r20261028.groupActivityTitle": "Atividade dos grupos",
+  "whatsNew.r20261028.groupActivityBody": "Os grupos mostram alterações de nome e ícone. Ao sair de um ou vários grupos selecionados, você pode ocultar sua mensagem de saída."
 }

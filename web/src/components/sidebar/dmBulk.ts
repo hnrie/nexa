@@ -69,11 +69,11 @@ function setMuted(ids: string[], on: boolean): void {
 function closeAll(ids: string[], ctx: Ctx): void {
   const byId = useChannels.getState().byId;
   const groups = ids.filter((id) => byId[id]?.type === "group_dm");
-  const run = async () => {
+  const run = async (silent = false) => {
     usePick.getState().clear();
     for (const id of ids) {
       if (id === NEXA_ID) closeNexa(ctx.nav);
-      else await closeDM(id, ctx.nav);
+      else await closeDM(id, ctx.nav, silent && groups.includes(id));
     }
   };
   if (groups.length === 0) return void run();
@@ -82,6 +82,7 @@ function closeAll(ids: string[], ctx: Ctx): void {
     body: t("pick.closeBody", { count: groups.length }),
     confirmLabel: t("pick.closeConfirm"),
     danger: true,
+    checkboxLabel: t("chat.leaveSilently"),
     onConfirm: run,
   });
 }

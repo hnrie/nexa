@@ -6958,5 +6958,10 @@
   "moderation.tabs.discovery": "探索",
   "whatsNew.r20261028.discoveryTitle": "探索内容管理",
   "whatsNew.r20261028.discoveryBody": "管理面板新增独立的探索标签页，工作人员可查看已上架服务器、隐藏条目或恢复被工作人员隐藏的服务器。",
-  "nsfw.discoveryHint": "显示含 NSFW 内容的服务器。您必须年满 18 岁。"
+  "nsfw.discoveryHint": "显示含 NSFW 内容的服务器。您必须年满 18 岁。",
+  "chat.leaveSilently": "退出时不显示退出消息",
+  "chat.systemMessage.changedName": "{actor}更改了群组名称。",
+  "chat.systemMessage.changedIcon": "{actor}更改了群组图标。",
+  "whatsNew.r20261028.groupActivityTitle": "群组聊天动态",
+  "whatsNew.r20261028.groupActivityBody": "群组聊天会显示名称和图标的更改。退出一个群组或多个选中的群组时，你可以选择隐藏退出消息。"
 }

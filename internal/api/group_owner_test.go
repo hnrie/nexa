@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -45,7 +46,7 @@ func TestOwnerRemovesAMember(t *testing.T) {
 	if res, body := do(t, ts, "DELETE", "/api/v1/channels/"+g+"/recipients/"+idC, tokB, nil); res.StatusCode != 403 || errCode(body) != "not_owner" {
 		t.Fatalf("member removing another: %d %v", res.StatusCode, body)
 	}
-	if res, body := do(t, ts, "DELETE", "/api/v1/channels/"+g+"/recipients/"+idC, tokA, nil); res.StatusCode != 204 {
+	if res, body := do(t, ts, "DELETE", "/api/v1/channels/"+g+"/recipients/"+idC+"?silent=true", tokA, nil); res.StatusCode != 204 {
 		t.Fatalf("owner removing carol: %d %v", res.StatusCode, body)
 	}
 
@@ -173,5 +174,56 @@ func TestOwnerHandsTheGroupOn(t *testing.T) {
 	}
 	if res, body := do(t, ts, "DELETE", "/api/v1/channels/"+g+"/recipients/"+idA, tokB, nil); res.StatusCode != 204 {
 		t.Errorf("the new owner removing the old one: %d %v", res.StatusCode, body)
+	}
+}
+
+// A silent exit still removes access and rotates keys. The option only hides
+// someone's own departure, never an owner's removal of somebody else.
+func TestGroupSilentLeave(t *testing.T) {
+	for _, route := range []string{"channel", "recipient"} {
+		for _, silent := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/silent=%t", route, silent), func(t *testing.T) {
+				_, ts := newTestServer(t)
+				a, aid := register(t, ts, "alice")
+				b, bid := register(t, ts, "bob")
+				c, cid := register(t, ts, "carol")
+				friend(t, ts, a, "bob", b, aid)
+				friend(t, ts, a, "carol", c, aid)
+				_, group := do(t, ts, "POST", "/api/v1/users/@me/channels", a, map[string]any{"recipient_ids": []string{bid, cid}, "name": "crew"})
+				g := group["id"].(string)
+				gw := connectGW(t, ts, b)
+				path := "/api/v1/channels/" + g
+				if route == "recipient" {
+					path += "/recipients/" + aid
+				}
+				if silent {
+					path += "?silent=true"
+				}
+				if res, body := do(t, ts, "DELETE", path, a, nil); res.StatusCode != 204 {
+					t.Fatalf("leave: %d %v", res.StatusCode, body)
+				}
+				if ev := gw.next("key_rotation_needed", 3*time.Second); ev == nil {
+					t.Fatal("silent leave must still rotate keys")
+				}
+				if res, _ := do(t, ts, "GET", "/api/v1/channels/"+g, a, nil); res.StatusCode != 404 {
+					t.Fatal("departed member retains access")
+				}
+				_, history := do(t, ts, "GET", "/api/v1/channels/"+g+"/messages", b, nil)
+				count := 0
+				for _, raw := range history["_list"].([]any) {
+					m := raw.(map[string]any)
+					if m["type"] == "system_member_remove" && m["author_id"] == aid {
+						count++
+					}
+				}
+				want := 1
+				if silent {
+					want = 0
+				}
+				if count != want {
+					t.Fatalf("leave messages: got %d, want %d", count, want)
+				}
+			})
+		}
 	}
 }
