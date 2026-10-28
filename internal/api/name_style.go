@@ -12,9 +12,10 @@ import (
 // apps know (web lib/nameStyle.ts, Android data/NameStyle.kt); a style an app
 // cannot draw falls back to the plain name there.
 type nameStyle struct {
-	Font   string `json:"font,omitempty"`
-	Effect string `json:"effect"`
-	Colors []int  `json:"colors"`
+	Animated *bool  `json:"animated,omitempty"`
+	Font     string `json:"font,omitempty"`
+	Effect   string `json:"effect"`
+	Colors   []int  `json:"colors"`
 }
 
 var nameFonts = map[string]bool{

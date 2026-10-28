@@ -15,6 +15,8 @@ export interface NameStyle {
   /** One of NAME_FONTS' ids, or "" for the app's own. */
   font: string;
   effect: NameEffect;
+  /** Omitted styles retain their original motion. */
+  animated?: boolean;
   /** 0xRRGGBB, as many as the effect takes (NAME_EFFECTS). Solid with none is the usual colour. */
   colors: number[];
 }
@@ -100,7 +102,7 @@ export function readNameStyle(x: unknown): NameStyle | null {
   const colors = Array.isArray(raw["colors"]) ? raw["colors"].filter((c): c is number => Number.isInteger(c) && c >= 0 && c <= 0xffffff).slice(0, spec.max) : [];
   if (colors.length < spec.min) return null;
   if (!font && effect === "solid" && colors.length === 0) return null;
-  return { font, effect, colors };
+  return { font, effect, colors, ...(typeof raw["animated"] === "boolean" ? { animated: raw["animated"] } : {}) };
 }
 
 export function sameNameStyle(a: NameStyle | null, b: NameStyle | null): boolean {
@@ -112,7 +114,7 @@ export function withEffect(style: NameStyle | null, effect: NameEffect): NameSty
   const spec = NAME_EFFECTS.find((e) => e.id === effect)!;
   let colors = (style?.colors ?? []).slice(0, spec.max);
   if (colors.length < spec.min || (colors.length === 0 && effect !== "solid")) colors = spec.start.slice();
-  return { font: style?.font ?? "", effect, colors };
+  return { font: style?.font ?? "", effect, colors, ...(style?.animated !== undefined ? { animated: style.animated } : {}) };
 }
 
 /** Something to try: a font, an effect and colours picked at random; the paid effects only with a plan. */
@@ -130,11 +132,19 @@ const CAP_HEIGHT = 0.715;
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
 
-/** The class a styled name takes (styles/nameStyle.css); the colour part is left out when a role colours it. */
+/** Missing motion choices keep each effect's original behavior. */
+export function nameStyleAnimated(style: NameStyle): boolean {
+  return style.animated ?? ["aurora", "holo", "neon", "flame"].includes(style.effect);
+}
+
+/** The class a styled name takes; role colours override personal effects. */
 export function nameStyleClass(style: NameStyle | null, roleColoured: boolean): string {
   if (!style) return "";
   const out = style.font ? ["ns-font"] : [];
-  if (!roleColoured && style.colors.length) out.push("ns", `ns-${style.effect}`);
+  if (!roleColoured && style.colors.length) {
+    out.push("ns", `ns-${style.effect}`);
+    if (nameStyleAnimated(style)) out.push("ns-animated");
+  }
   return out.join(" ");
 }
 

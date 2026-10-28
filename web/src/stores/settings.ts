@@ -139,6 +139,7 @@ export interface Settings {
   animateBanners: boolean;
   animateEmoji: boolean;
   animateStickers: boolean;
+  animateNames: boolean;
   sidebarWidth: number;
   showMembers: boolean;
   recentEmoji: string[];
@@ -258,6 +259,7 @@ export const DEFAULT_SETTINGS: Settings = {
   animateBanners: true,
   animateEmoji: true,
   animateStickers: true,
+  animateNames: true,
 
   typingChannels: true,
   sidebarWidth: 240,
@@ -366,6 +368,7 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     animateIcons: typeof inc.animateIcons === "boolean" ? inc.animateIcons : base.animateIcons,
     animateBanners: typeof inc.animateBanners === "boolean" ? inc.animateBanners : base.animateBanners,
     animateEmoji: typeof inc.animateEmoji === "boolean" ? inc.animateEmoji : base.animateEmoji,
+    animateNames: typeof inc.animateNames === "boolean" ? inc.animateNames : base.animateNames,
     animateStickers: typeof inc.animateStickers === "boolean" ? inc.animateStickers : base.animateStickers,
     seasonalSnow: typeof inc.seasonalSnow === "boolean" ? inc.seasonalSnow : base.seasonalSnow,
     typingChannels: typeof inc.typingChannels === "boolean" ? inc.typingChannels : base.typingChannels,

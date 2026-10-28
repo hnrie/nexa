@@ -7156,7 +7156,7 @@
   "shell.requiredUpdate.manualRequired": "Ladda ned och installera den nya skrivbordsappen och öppna sedan Nexa igen för att fortsätta. Behåll dina befintliga appdata.",
   "whatsNew.r202610267.desktopSecurityTitle": "Säkerhetsuppdatering för skrivbordsappen",
   "whatsNew.r202610267.desktopSecurityBody": "Installera den nya skrivbordsappen en gång. Framtida uppdateringar kontrollerar att de kommer från Nexa.",
-  "settings.appearance.animatedImages": "Animerade bilder",
+  "settings.appearance.animatedImages": "Animationer",
   "settings.appearance.animateAvatars": "Animera profilbilder",
   "settings.appearance.animateIcons": "Animera server- och gruppikoner",
   "settings.appearance.animateBanners": "Animera banderoller",
@@ -7204,5 +7204,11 @@
   "whatsNew.r202610282.saveTitle": "Välj var du vill spara",
   "whatsNew.r202610282.saveBody": "Nedladdningar och bilder frågar nu var de ska sparas på Android och i datorwebbläsare som stöds. I mobilwebbläsare använder du systemets alternativ för att spara eller dela.",
   "whatsNew.r202610283.discoveryTitle": "Enklare NSFW-upptäckt",
-  "whatsNew.r202610283.discoveryBody": "Använd NSFW-reglaget bredvid filtren i Upptäck för att visa vuxengemenskaper. NSFW-servrar har en märkning bredvid namnet; sök på nsfw för att hitta dem."
+  "whatsNew.r202610283.discoveryBody": "Använd NSFW-reglaget bredvid filtren i Upptäck för att visa vuxengemenskaper. NSFW-servrar har en märkning bredvid namnet; sök på nsfw för att hitta dem.",
+  "nameStyle.motion": "Rörelse",
+  "nameStyle.static": "Statisk",
+  "nameStyle.animated": "Animerad",
+  "whatsNew.r202610284.nameMotionTitle": "Animerade Namnstilar",
+  "whatsNew.r202610284.nameMotionBody": "Låt övertoningar flöda, godisränder röra sig och namneffekter pulsera. Välj Statisk eller Animerad i Inställningar, Profiler, Namnstil; stäng av Animera namn under Utseende för att hålla allas namn stilla.",
+  "settings.appearance.animateNames": "Animera namn"
 }

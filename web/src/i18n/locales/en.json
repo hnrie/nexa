@@ -7156,7 +7156,7 @@
   "shell.requiredUpdate.manualRequired": "Download and install the new desktop app, then open Nexa again to continue. Keep your existing app data.",
   "whatsNew.r202610267.desktopSecurityTitle": "Desktop Security Update",
   "whatsNew.r202610267.desktopSecurityBody": "Install the new desktop app once. Future desktop updates verify that they came from Nexa.",
-  "settings.appearance.animatedImages": "Animated Images",
+  "settings.appearance.animatedImages": "Animations",
   "settings.appearance.animateAvatars": "Animate profile pictures",
   "settings.appearance.animateIcons": "Animate server and group icons",
   "settings.appearance.animateBanners": "Animate banners",
@@ -7204,5 +7204,11 @@
   "whatsNew.r202610282.saveTitle": "Choose Where to Save",
   "whatsNew.r202610282.saveBody": "Downloads and pictures now ask where to save on Android and supported desktop browsers. On mobile browsers, use the system save or share options.",
   "whatsNew.r202610283.discoveryTitle": "Simpler NSFW Discovery",
-  "whatsNew.r202610283.discoveryBody": "Use the NSFW switch beside Discovery filters to include adult communities. NSFW servers have a badge beside their name; search nsfw to find them."
+  "whatsNew.r202610283.discoveryBody": "Use the NSFW switch beside Discovery filters to include adult communities. NSFW servers have a badge beside their name; search nsfw to find them.",
+  "nameStyle.motion": "Motion",
+  "nameStyle.static": "Static",
+  "nameStyle.animated": "Animated",
+  "whatsNew.r202610284.nameMotionTitle": "Animated Name Styles",
+  "whatsNew.r202610284.nameMotionBody": "Make gradients flow, candy stripes move and name effects pulse. Choose Static or Animated in Settings, Profiles, Name Style; turn off Animate names in Appearance to keep everyone’s names still.",
+  "settings.appearance.animateNames": "Animate names"
 }

@@ -736,6 +736,7 @@ private fun settingsIndex(groups: List<SettingsGroup>): List<SettingResult> {
         Triple("appearance", "animateBanners", "settings.appearance.animateBanners"),
         Triple("appearance", "animateEmoji", "settings.appearance.animateEmoji"),
         Triple("appearance", "animateStickers", "settings.appearance.animateStickers"),
+        Triple("appearance", "animateNames", "settings.appearance.animateNames"),
 
         Triple("appearance", "accent", "settings.appearance.accentColour"),
         Triple("appearance", "font", "settings.appearance.font"),

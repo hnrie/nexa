@@ -145,7 +145,8 @@ fun RoleName(text: String, look: RoleLook?, style: TextStyle, fallback: Color, m
         Txt(text, style = styled, color = look?.color ?: fallback, maxLines = maxLines, modifier = modifier)
         return
     }
-    val phase = if (look.shimmer && !Nx.motion.reduced) {
+    val animateNames = fish.nexa.ui.shell.settingOn("animateNames")
+    val phase = if (look.shimmer && animateNames && !Nx.motion.reduced) {
         val t = rememberInfiniteTransition(label = "shimmer")
         val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Restart), label = "shimmer")
         p
@@ -217,14 +218,35 @@ private fun PlainName(text: String, style: TextStyle, modifier: Modifier, maxLin
 
 /** A name in its own effect and colours (lib/nameStyle.ts, styles/nameStyle.css). */
 @Composable
-private fun OwnName(text: String, own: NameStyle, style: TextStyle, modifier: Modifier, maxLines: Int) {
+private fun OwnName(text: String, own: NameStyle, style: TextStyle, outerModifier: Modifier, maxLines: Int) {
+    val animate = fish.nexa.ui.shell.settingOn("animateNames") && own.isAnimated && !Nx.motion.reduced
+    val phase = if (animate && own.effect in listOf("gradient", "candy", "chrome", "glow", "ink", "pop")) {
+        val t = rememberInfiniteTransition(label = "name-motion")
+        val duration = when (own.effect) { "gradient", "chrome" -> 4000; "candy" -> 3000; else -> 1500 }
+        val reverse = own.effect in listOf("chrome", "glow", "ink", "pop")
+        val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(duration, easing = if (reverse) FastOutSlowInEasing else LinearEasing), if (reverse) RepeatMode.Reverse else RepeatMode.Restart), label = "name-motion")
+        p
+    } else 0f
+    val modifier = if (own.effect in listOf("glow", "ink", "pop")) outerModifier.alpha(1f - 0.35f * phase) else outerModifier
     val light = Nx.colors.isLight
     val cs = own.colors.map { rgbColor(it) }
     val c1 = cs.first()
     val c2 = cs.getOrElse(1) { c1 }
     val em = with(LocalDensity.current) { style.fontSize.toPx() }
     when (own.effect) {
-        "gradient" -> PlainName(text, style.copy(brush = Brush.horizontalGradient(listOf(c1, c2))), modifier, maxLines)
+        "gradient" -> {
+            val brush = remember(cs, phase, animate) {
+                object : ShaderBrush() {
+                    override fun createShader(size: Size): Shader {
+                        if (!animate) return LinearGradientShader(Offset.Zero, Offset(size.width, 0f), listOf(c1, c2))
+                        val w = size.width * 2f
+                        val x = -phase * w
+                        return LinearGradientShader(Offset(x, 0f), Offset(x + w, 0f), listOf(c1, c2, c1), tileMode = TileMode.Repeated)
+                    }
+                }
+            }
+            PlainName(text, style.copy(brush = brush), modifier, maxLines)
+        }
         "glow" -> PlainName(
             text,
             style.copy(
@@ -252,13 +274,14 @@ private fun OwnName(text: String, own: NameStyle, style: TextStyle, modifier: Mo
         "candy" -> {
             // hard stripes, leaning, like boiled sweets
             val band = em * 0.42f
-            val brush = remember(cs, band) {
+            val brush = remember(cs, band, phase) {
                 object : ShaderBrush() {
                     override fun createShader(size: Size): Shader {
                         val run = band * cs.size
                         val colors = cs.flatMap { listOf(it, it) }
                         val stops = cs.indices.flatMap { i -> listOf(i.toFloat() / cs.size, (i + 1f) / cs.size) }
-                        return LinearGradientShader(Offset.Zero, Offset(run * 0.985f, run * 0.174f), colors, stops, TileMode.Repeated)
+                        val x = phase * run
+                        return LinearGradientShader(Offset(x, 0f), Offset(x + run * 0.985f, run * 0.174f), colors, stops, TileMode.Repeated)
                     }
                 }
             }
@@ -266,7 +289,7 @@ private fun OwnName(text: String, own: NameStyle, style: TextStyle, modifier: Mo
         }
         "aurora" -> {
             // every colour flowing through the name and round again
-            val phase = if (!Nx.motion.reduced) {
+            val phase = if (animate) {
                 val t = rememberInfiniteTransition(label = "aurora")
                 val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(6000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "aurora")
                 p
@@ -285,18 +308,24 @@ private fun OwnName(text: String, own: NameStyle, style: TextStyle, modifier: Mo
         }
         "chrome" -> {
             // polished metal tinted by the colour: a bright sky, a hard horizon, a dark ground
-            val brush = Brush.verticalGradient(
-                0f to lerp(Color.White, c1, 0.2f),
-                0.46f to lerp(Color.White, c1, 0.55f),
-                0.52f to lerp(Color(0xFF10131A), c1, 0.6f),
-                0.78f to c1,
-                1f to lerp(Color.White, c1, 0.35f),
-            )
+            val brush = remember(c1, phase, animate) {
+                object : ShaderBrush() {
+                    override fun createShader(size: Size): Shader {
+                        val h = size.height * if (animate) 1.8f else 1f
+                        val y = -phase * (h - size.height)
+                        return LinearGradientShader(
+                            Offset(0f, y), Offset(0f, y + h),
+                            listOf(lerp(Color.White, c1, 0.2f), lerp(Color.White, c1, 0.55f), lerp(Color(0xFF10131A), c1, 0.6f), c1, lerp(Color.White, c1, 0.35f)),
+                            listOf(0f, 0.46f, 0.52f, 0.78f, 1f),
+                        )
+                    }
+                }
+            }
             PlainName(text, style.copy(brush = brush), modifier, maxLines)
         }
         "holo" -> {
             // holographic foil: the colour with a sheen of every hue sweeping across it
-            val phase = if (!Nx.motion.reduced) {
+            val phase = if (animate) {
                 val t = rememberInfiniteTransition(label = "holo")
                 val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(5000, easing = LinearEasing), RepeatMode.Restart), label = "holo")
                 p
@@ -322,7 +351,7 @@ private fun OwnName(text: String, own: NameStyle, style: TextStyle, modifier: Mo
         }
         "neon" -> {
             // a tube lit from inside: a pale core, a line of the colour round it, and its glow, with a flicker now and then
-            val flicker = if (!Nx.motion.reduced) {
+            val flicker = if (animate) {
                 val t = rememberInfiniteTransition(label = "neon")
                 val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(7000, easing = LinearEasing), RepeatMode.Restart), label = "neon")
                 if (p in 0.92f..0.935f || p in 0.945f..0.96f) 0.72f else 1f
@@ -338,7 +367,7 @@ private fun OwnName(text: String, own: NameStyle, style: TextStyle, modifier: Mo
         }
         "flame" -> {
             // the colours rising through the name, with their warmth over it
-            val phase = if (!Nx.motion.reduced) {
+            val phase = if (animate) {
                 val t = rememberInfiniteTransition(label = "flame")
                 val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Restart), label = "flame")
                 p

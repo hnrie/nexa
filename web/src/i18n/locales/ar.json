@@ -8014,7 +8014,7 @@
   "shell.requiredUpdate.manualRequired": "نزّل تطبيق سطح المكتب الجديد وثبّته، ثم افتح Nexa مجددًا للمتابعة. احتفظ ببيانات التطبيق الحالية.",
   "whatsNew.r202610267.desktopSecurityTitle": "تحديث أمان تطبيق سطح المكتب",
   "whatsNew.r202610267.desktopSecurityBody": "ثبّت تطبيق سطح المكتب الجديد مرة واحدة. ستتحقق التحديثات اللاحقة من أنها صادرة عن Nexa.",
-  "settings.appearance.animatedImages": "صور متحركة",
+  "settings.appearance.animatedImages": "الرسوم المتحركة",
   "settings.appearance.animateAvatars": "تحريك صور الملف الشخصي",
   "settings.appearance.animateIcons": "تحريك أيقونات الخوادم والمجموعات",
   "settings.appearance.animateBanners": "تحريك اللافتات",
@@ -8062,5 +8062,11 @@
   "whatsNew.r202610282.saveTitle": "اختر مكان الحفظ",
   "whatsNew.r202610282.saveBody": "تطلب التنزيلات والصور الآن اختيار مكان الحفظ على Android ومتصفحات الكمبيوتر المدعومة. في متصفحات الهاتف، استخدم خيارات الحفظ أو المشاركة في النظام.",
   "whatsNew.r202610283.discoveryTitle": "اكتشاف أبسط لمحتوى NSFW",
-  "whatsNew.r202610283.discoveryBody": "استخدم مفتاح NSFW بجانب مرشحات الاستكشاف لإظهار مجتمعات البالغين. تحمل خوادم NSFW شارة بجانب اسمها؛ ابحث عن nsfw للعثور عليها."
+  "whatsNew.r202610283.discoveryBody": "استخدم مفتاح NSFW بجانب مرشحات الاستكشاف لإظهار مجتمعات البالغين. تحمل خوادم NSFW شارة بجانب اسمها؛ ابحث عن nsfw للعثور عليها.",
+  "nameStyle.motion": "الحركة",
+  "nameStyle.static": "ثابت",
+  "nameStyle.animated": "متحرك",
+  "whatsNew.r202610284.nameMotionTitle": "أنماط أسماء متحركة",
+  "whatsNew.r202610284.nameMotionBody": "اجعل التدرجات تنساب وخطوط الحلوى تتحرك وتأثيرات الاسم تنبض. اختر ثابت أو متحرك في الإعدادات، الملفات الشخصية، نمط الاسم; أوقف تحريك الأسماء في المظهر لإبقاء أسماء الجميع ثابتة.",
+  "settings.appearance.animateNames": "تحريك الأسماء"
 }

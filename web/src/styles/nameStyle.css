@@ -12,7 +12,7 @@
 /* hard stripes, leaning, like boiled sweets */
 .ns-candy { background-image: repeating-linear-gradient(100deg, var(--ns-stripes)); background-size: var(--ns-stripe-run) 100%; }
 /* every colour flowing through the name and round again */
-.ns-aurora { background-image: linear-gradient(90deg, var(--ns-stops)); background-size: 300% 100%; animation: ns-aurora 6s ease-in-out infinite alternate; }
+.ns-aurora { background-image: linear-gradient(90deg, var(--ns-stops)); background-size: 300% 100%; }
 @keyframes ns-aurora { to { background-position: 100% 0; } }
 /* polished metal tinted by the colour: a bright sky, a hard horizon, a dark ground */
 .ns-chrome { background-image: linear-gradient(180deg, color-mix(in srgb, var(--ns-c1) 20%, #fff) 0%, color-mix(in srgb, var(--ns-c1) 55%, #fff) 46%, color-mix(in srgb, var(--ns-c1) 60%, #10131a) 52%, var(--ns-c1) 78%, color-mix(in srgb, var(--ns-c1) 35%, #fff) 100%); }
@@ -33,17 +33,32 @@
 
 /* --- the effects that come with a plan ------------------------------------ */
 /* holographic foil: the colour with a sheen of every hue sweeping across it */
-.ns-holo { -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent !important; background-image: linear-gradient(105deg, var(--ns-c1) 0%, color-mix(in oklab, var(--ns-c1) 45%, #7ff3ff) 18%, color-mix(in oklab, var(--ns-c1) 30%, #fff) 30%, color-mix(in oklab, var(--ns-c1) 45%, #ff8ff0) 44%, color-mix(in oklab, var(--ns-c1) 45%, #fff38a) 58%, var(--ns-c1) 72%, color-mix(in oklab, var(--ns-c1) 45%, #7ff3ff) 86%, var(--ns-c1) 100%); background-size: 260% 100%; animation: ns-holo 5s linear infinite; }
+.ns-holo { -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent !important; background-image: linear-gradient(105deg, var(--ns-c1) 0%, color-mix(in oklab, var(--ns-c1) 45%, #7ff3ff) 18%, color-mix(in oklab, var(--ns-c1) 30%, #fff) 30%, color-mix(in oklab, var(--ns-c1) 45%, #ff8ff0) 44%, color-mix(in oklab, var(--ns-c1) 45%, #fff38a) 58%, var(--ns-c1) 72%, color-mix(in oklab, var(--ns-c1) 45%, #7ff3ff) 86%, var(--ns-c1) 100%); background-size: 260% 100%; }
 @keyframes ns-holo { from { background-position: 100% 0; } to { background-position: -160% 0; } }
 /* a lit tube: a pale core, the colour as its rim and a tight light round it
    that catches now and then. Its light needs room, as Glow's does. */
-.ns-neon { color: color-mix(in srgb, var(--ns-c1) 18%, #fff) !important; -webkit-text-stroke: 0.035em var(--ns-c1); text-shadow: 0 0 0.05em #fff, 0 0 0.12em var(--ns-c1), 0 0 0.28em var(--ns-c1), 0 0 0.5em color-mix(in srgb, var(--ns-c1) 70%, transparent); animation: ns-neon 7s steps(1) infinite; }
+.ns-neon { color: color-mix(in srgb, var(--ns-c1) 18%, #fff) !important; -webkit-text-stroke: 0.035em var(--ns-c1); text-shadow: 0 0 0.05em #fff, 0 0 0.12em var(--ns-c1), 0 0 0.28em var(--ns-c1), 0 0 0.5em color-mix(in srgb, var(--ns-c1) 70%, transparent); }
 @keyframes ns-neon { 0%, 91%, 93.5%, 100% { opacity: 1; } 92%, 94.5% { opacity: 0.72; } }
 :root[data-scheme="light"] .ns-neon { color: var(--ns-c1) !important; -webkit-text-stroke: 0; text-shadow: 0 0 0.3em color-mix(in srgb, var(--ns-c1) 55%, transparent); }
 /* fire: the first colour at the root, the second at the tips, always rising */
-.ns-flame { -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent !important; background-image: linear-gradient(0deg, var(--ns-c1) 0%, color-mix(in oklab, var(--ns-c1), var(--ns-c2)) 25%, var(--ns-c2) 50%, color-mix(in oklab, var(--ns-c1), var(--ns-c2)) 75%, var(--ns-c1) 100%); background-size: 100% 200%; animation: ns-flame 1.8s linear infinite; filter: drop-shadow(0 -0.04em 0.16em color-mix(in srgb, var(--ns-c1) 70%, transparent)); }
+.ns-flame { -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent !important; background-image: linear-gradient(0deg, var(--ns-c1) 0%, color-mix(in oklab, var(--ns-c1), var(--ns-c2)) 25%, var(--ns-c2) 50%, color-mix(in oklab, var(--ns-c1), var(--ns-c2)) 75%, var(--ns-c1) 100%); background-size: 100% 200%; filter: drop-shadow(0 -0.04em 0.16em color-mix(in srgb, var(--ns-c1) 70%, transparent)); }
 @keyframes ns-flame { from { background-position: 0 0; } to { background-position: 0 -200%; } }
 
-@media (prefers-reduced-motion: reduce) { .ns-aurora, .ns-holo, .ns-neon, .ns-flame { animation: none; } }
-[data-reduced-motion="true"] :is(.ns-aurora, .ns-holo, .ns-neon, .ns-flame) { animation: none; }
-@media (forced-colors: active) { .ns { -webkit-text-fill-color: currentColor; color: CanvasText !important; background: none; text-shadow: none; } }
+/* Motion is a profile choice; static keeps the same colours and treatment. */
+.ns-gradient.ns-animated { background-image: linear-gradient(90deg, var(--ns-c1), var(--ns-c2), var(--ns-c1)); background-size: 200% 100%; animation: ns-flow 4s linear infinite; }
+.ns-candy.ns-animated { animation: ns-candy 3s linear infinite; }
+.ns-aurora.ns-animated { animation: ns-aurora 6s ease-in-out infinite alternate; }
+.ns-chrome.ns-animated { background-size: 100% 180%; animation: ns-chrome 4s ease-in-out infinite alternate; }
+.ns-holo.ns-animated { animation: ns-holo 5s linear infinite; }
+.ns-neon.ns-animated { animation: ns-neon 7s steps(1) infinite; }
+.ns-flame.ns-animated { animation: ns-flame 1.8s linear infinite; }
+.ns-glow.ns-animated, .ns-ink.ns-animated, .ns-pop.ns-animated { animation: ns-pulse 3s ease-in-out infinite; }
+@keyframes ns-flow { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@keyframes ns-candy { to { background-position: var(--ns-stripe-run) 0; } }
+@keyframes ns-chrome { to { background-position: 0 100%; } }
+@keyframes ns-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }
+@media (prefers-reduced-motion: reduce) { .ns.ns-animated { animation: none; } }
+[data-reduced-motion="true"] .ns.ns-animated { animation: none; }
+@media (forced-colors: active) { .ns { -webkit-text-fill-color: currentColor; color: CanvasText !important; background: none; text-shadow: none; animation: none; } }
+
+[data-animate-names="false"] :is(.ns.ns-animated, .role-shimmer) { animation: none; }

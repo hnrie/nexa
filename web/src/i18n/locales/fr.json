@@ -7269,7 +7269,7 @@
   "shell.requiredUpdate.manualRequired": "Téléchargez et installez la nouvelle application de bureau, puis rouvrez Nexa pour continuer. Conservez les données actuelles de l’application.",
   "whatsNew.r202610267.desktopSecurityTitle": "Mise à jour de sécurité pour ordinateur",
   "whatsNew.r202610267.desktopSecurityBody": "Installez une fois la nouvelle application de bureau. Les prochaines mises à jour vérifieront qu’elles proviennent de Nexa.",
-  "settings.appearance.animatedImages": "Images animées",
+  "settings.appearance.animatedImages": "Animations",
   "settings.appearance.animateAvatars": "Animer les photos de profil",
   "settings.appearance.animateIcons": "Animer les icônes des serveurs et des groupes",
   "settings.appearance.animateBanners": "Animer les bannières",
@@ -7317,5 +7317,11 @@
   "whatsNew.r202610282.saveTitle": "Choisir où enregistrer",
   "whatsNew.r202610282.saveBody": "Les téléchargements et les images demandent désormais où enregistrer sur Android et les navigateurs de bureau compatibles. Sur les navigateurs mobiles, utilisez les options système pour enregistrer ou partager.",
   "whatsNew.r202610283.discoveryTitle": "Découverte NSFW Simplifiée",
-  "whatsNew.r202610283.discoveryBody": "Utilisez le bouton NSFW à côté des filtres de découverte pour inclure les communautés pour adultes. Les serveurs NSFW portent un badge à côté de leur nom ; recherchez nsfw pour les trouver."
+  "whatsNew.r202610283.discoveryBody": "Utilisez le bouton NSFW à côté des filtres de découverte pour inclure les communautés pour adultes. Les serveurs NSFW portent un badge à côté de leur nom ; recherchez nsfw pour les trouver.",
+  "nameStyle.motion": "Mouvement",
+  "nameStyle.static": "Statique",
+  "nameStyle.animated": "Animé",
+  "whatsNew.r202610284.nameMotionTitle": "Styles de Nom Animés",
+  "whatsNew.r202610284.nameMotionBody": "Anime les dégradés, les rayures bonbon et les effets de ton nom. Choisis Statique ou Animé dans Paramètres, Profils, Style du Nom; désactive Animer les noms dans Apparence pour garder tous les noms immobiles.",
+  "settings.appearance.animateNames": "Animer les noms"
 }

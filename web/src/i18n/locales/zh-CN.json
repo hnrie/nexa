@@ -6919,7 +6919,7 @@
   "shell.requiredUpdate.manualRequired": "下载并安装新的桌面应用，然后重新打开 Nexa 以继续使用。请保留现有的应用数据。",
   "whatsNew.r202610267.desktopSecurityTitle": "桌面安全更新",
   "whatsNew.r202610267.desktopSecurityBody": "请手动安装一次新的桌面应用。之后的桌面更新会验证其是否由 Nexa 发布。",
-  "settings.appearance.animatedImages": "动画图片",
+  "settings.appearance.animatedImages": "动画",
   "settings.appearance.animateAvatars": "播放头像动画",
   "settings.appearance.animateIcons": "播放服务器和群组图标动画",
   "settings.appearance.animateBanners": "播放横幅动画",
@@ -6967,5 +6967,11 @@
   "whatsNew.r202610282.saveTitle": "选择保存位置",
   "whatsNew.r202610282.saveBody": "现在，在 Android 和支持的桌面浏览器上下载文件和图片时，可以选择保存位置。在手机浏览器上，请使用系统的保存或分享选项。",
   "whatsNew.r202610283.discoveryTitle": "更简洁的 NSFW 发现",
-  "whatsNew.r202610283.discoveryBody": "使用发现筛选项旁的 NSFW 开关显示成人社区。NSFW 服务器名称旁会显示标记；搜索 nsfw 即可查找。"
+  "whatsNew.r202610283.discoveryBody": "使用发现筛选项旁的 NSFW 开关显示成人社区。NSFW 服务器名称旁会显示标记；搜索 nsfw 即可查找。",
+  "nameStyle.motion": "动态效果",
+  "nameStyle.static": "静态",
+  "nameStyle.animated": "动画",
+  "whatsNew.r202610284.nameMotionTitle": "名字样式动画",
+  "whatsNew.r202610284.nameMotionBody": "让渐变流动、糖果条纹移动、名字特效轻轻闪动。在设置、个人资料、名字样式中选择静态或动画、 在外观中关闭名字动画，即可让所有人的名字保持静态。",
+  "settings.appearance.animateNames": "播放名字动画"
 }

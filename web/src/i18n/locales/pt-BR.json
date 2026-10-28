@@ -7270,7 +7270,7 @@
   "shell.requiredUpdate.manualRequired": "Baixe e instale o novo aplicativo para computador e abra o Nexa novamente para continuar. Mantenha os dados atuais do aplicativo.",
   "whatsNew.r202610267.desktopSecurityTitle": "Atualização de segurança para computador",
   "whatsNew.r202610267.desktopSecurityBody": "Instale o novo aplicativo para computador uma vez. As próximas atualizações verificarão se vieram do Nexa.",
-  "settings.appearance.animatedImages": "Imagens animadas",
+  "settings.appearance.animatedImages": "Animações",
   "settings.appearance.animateAvatars": "Animar fotos de perfil",
   "settings.appearance.animateIcons": "Animar ícones de servidores e grupos",
   "settings.appearance.animateBanners": "Animar banners",
@@ -7318,5 +7318,11 @@
   "whatsNew.r202610282.saveTitle": "Escolha Onde Salvar",
   "whatsNew.r202610282.saveBody": "Downloads e imagens agora perguntam onde salvar no Android e em navegadores de computador compatíveis. Nos navegadores móveis, use as opções de salvar ou compartilhar do sistema.",
   "whatsNew.r202610283.discoveryTitle": "Descoberta NSFW Mais Simples",
-  "whatsNew.r202610283.discoveryBody": "Use o botão NSFW ao lado dos filtros de descoberta para incluir comunidades adultas. Servidores NSFW têm um selo ao lado do nome; pesquise nsfw para encontrá-los."
+  "whatsNew.r202610283.discoveryBody": "Use o botão NSFW ao lado dos filtros de descoberta para incluir comunidades adultas. Servidores NSFW têm um selo ao lado do nome; pesquise nsfw para encontrá-los.",
+  "nameStyle.motion": "Movimento",
+  "nameStyle.static": "Estático",
+  "nameStyle.animated": "Animado",
+  "whatsNew.r202610284.nameMotionTitle": "Estilos de Nome Animados",
+  "whatsNew.r202610284.nameMotionBody": "Faça os degradês fluírem, as listras de doce se moverem e os efeitos do nome pulsarem. Escolha Estático ou Animado em Configurações, Perfis, Estilo do Nome; desative Animar nomes em Aparência para manter todos os nomes parados.",
+  "settings.appearance.animateNames": "Animar nomes"
 }

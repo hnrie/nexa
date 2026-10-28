@@ -117,7 +117,7 @@ private fun NameStyleBody(me: MeUser, name: String, state: MutableState<NameStyl
         val paid = fish.nexa.data.Plans.limitsOf(me?.plan).nameEffects
         Section(t("nameStyle.effect")) {
             Grid(NameStyle.EFFECTS, 4) { e ->
-                val sample = RoleLook(color = null, own = NameStyle("", e.id, if (e.id == "solid") emptyList() else e.start))
+                val sample = RoleLook(color = null, own = NameStyle("", e.id, if (e.id == "solid") emptyList() else e.start, animated = style.animated))
                 val locked = e.paid && !paid
                 Tile(style.effect == e.id, t("nameStyle.effects.${e.id}"), Modifier.height(52.dp), {
                     if (locked) fish.nexa.data.Plans.offer(fish.nexa.data.Plans.Offer.Effect) else state.value = NameStyle.withEffect(style, e.id)
@@ -128,6 +128,15 @@ private fun NameStyleBody(me: MeUser, name: String, state: MutableState<NameStyl
                     if (e.paid) Box(Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 2.dp).semantics { contentDescription = t("support.effects.withPlan") }) {
                         Icon(if (paid) "Heart" else "Lock", c.textSupporter, size = 11.dp, filled = paid)
                     }
+                }
+            }
+        }
+
+        if (style.effect != "solid") Section(t("nameStyle.motion")) {
+            Grid(listOf(false, true), 2) { animated ->
+                val label = t(if (animated) "nameStyle.animated" else "nameStyle.static")
+                Tile(style.isAnimated == animated, label, Modifier.height(48.dp), { state.value = style.copy(animated = animated) }) {
+                    Txt(label, style = Nx.type.body, color = c.textStrong)
                 }
             }
         }

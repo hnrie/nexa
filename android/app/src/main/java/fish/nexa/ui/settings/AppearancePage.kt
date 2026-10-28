@@ -161,11 +161,11 @@ fun AppearancePage() {
         }
     }
 
-    SectionHeading(t("settings.appearance.font"), Modifier.settingAnchor("font"))
     GroupTitle(t("settings.appearance.animatedImages"))
-    for (key in listOf("animateAvatars", "animateIcons", "animateBanners", "animateEmoji", "animateStickers")) {
+    for (key in listOf("animateAvatars", "animateIcons", "animateBanners", "animateEmoji", "animateStickers", "animateNames")) {
         ToggleRow(t("settings.appearance.$key"), doc.bool(key, true), { setSetting(key, it) }, anchor = key)
     }
+    SectionHeading(t("settings.appearance.font"), Modifier.settingAnchor("font"))
     val face = doc.str("fontFace") ?: "default"
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         for (f in listOf("default", "classic")) FontTile(f, face == f, Modifier.weight(1f)) { setSetting("fontFace", f) }

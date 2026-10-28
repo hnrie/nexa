@@ -5,7 +5,7 @@ import { t } from "@/i18n";
 import { nameClass, nameStyle } from "@/lib/roleLook";
 import { myLimits } from "@/lib/plans";
 import { offerPlan } from "@/stores/upsell";
-import { NAME_EFFECTS, NAME_FONTS, NAME_PALETTES, NAME_SWATCHES, surpriseStyle, withEffect, type NameStyle } from "@/lib/nameStyle";
+import { nameStyleAnimated, NAME_EFFECTS, NAME_FONTS, NAME_PALETTES, NAME_SWATCHES, surpriseStyle, withEffect, type NameStyle } from "@/lib/nameStyle";
 import n from "./NameStyle.module.css";
 
 const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
@@ -65,7 +65,7 @@ export function NameStyleEditor({ value, onChange, name, plate = false }: { valu
         <h3 className={n.heading} id="ns-effect">{t("nameStyle.effect")}</h3>
         <div className={n.effects} role="radiogroup" aria-labelledby="ns-effect">
           {NAME_EFFECTS.map((e) => {
-            const sample = { own: { font: "", effect: e.id, colors: e.id === "solid" ? [] : e.start } };
+            const sample = { own: { font: "", effect: e.id, colors: e.id === "solid" ? [] : e.start, animated: style.animated } };
             return (
               <button
                 key={e.id}
@@ -88,6 +88,19 @@ export function NameStyleEditor({ value, onChange, name, plate = false }: { valu
           })}
         </div>
       </section>
+
+      {style.effect !== "solid" ? (
+        <section aria-labelledby="ns-motion">
+          <h3 className={n.heading} id="ns-motion">{t("nameStyle.motion")}</h3>
+          <div className={n.motion} role="radiogroup" aria-labelledby="ns-motion">
+            {[false, true].map((animated) => (
+              <button key={String(animated)} type="button" role="radio" aria-checked={nameStyleAnimated(style) === animated} className={n.tile} onClick={() => setStyle((s) => ({ ...s, animated }))} data-testid={`name-motion-${animated ? "animated" : "static"}`}>
+                {t(animated ? "nameStyle.animated" : "nameStyle.static")}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section aria-labelledby="ns-colour">
         <h3 className={n.heading} id="ns-colour">{many ? t("nameStyle.colours") : t("nameStyle.colour")}</h3>

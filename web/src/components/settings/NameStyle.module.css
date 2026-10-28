@@ -119,3 +119,6 @@
 .effectTile { position: relative; }
 .planMark { position: absolute; inset-block-start: 5px; inset-inline-end: 6px; display: flex; color: var(--text-supporter); }
 .effectTile[data-locked] > :first-child { opacity: 0.6; }
+
+.motion { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.motion .tile { min-height: 48px; padding: 8px 12px; }

@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
@@ -18,12 +19,15 @@ import kotlin.random.Random
  * a coloured role still colours the name; the font always shows. The lists
  * are the web's, in the same order.
  */
-data class NameStyle(val font: String, val effect: String, val colors: List<Long>) {
+data class NameStyle(val font: String, val effect: String, val colors: List<Long>, val animated: Boolean? = null) {
     fun toJson(): JsonObject = buildJsonObject {
         if (font.isNotEmpty()) put("font", font)
+        animated?.let { put("animated", it) }
         put("effect", effect)
         putJsonArray("colors") { colors.forEach { add(JsonPrimitive(it)) } }
     }
+
+    val isAnimated get() = animated ?: (effect in listOf("aurora", "holo", "neon", "flame"))
 
     val isPlain get() = font.isEmpty() && effect == "solid" && colors.isEmpty()
 
@@ -104,7 +108,7 @@ data class NameStyle(val font: String, val effect: String, val colors: List<Long
             val spec = effect(effect)
             val colors = (raw["colors"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.longOrNull?.takeIf { c -> c in 0..0xFFFFFF } }?.take(spec.max) ?: emptyList()
             if (colors.size < spec.min) return null
-            val out = NameStyle(font, effect, colors)
+            val out = NameStyle(font, effect, colors, (raw["animated"] as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull)
             return if (out.isPlain) null else out
         }
 
@@ -113,7 +117,7 @@ data class NameStyle(val font: String, val effect: String, val colors: List<Long
             val spec = effect(effect)
             var colors = (style?.colors ?: emptyList()).take(spec.max)
             if (colors.size < spec.min || (colors.isEmpty() && effect != "solid")) colors = spec.start
-            return NameStyle(style?.font ?: "", effect, colors)
+            return NameStyle(style?.font ?: "", effect, colors, style?.animated)
         }
 
         /** A style as words a moderator reads: its effect, its font and its colours. */

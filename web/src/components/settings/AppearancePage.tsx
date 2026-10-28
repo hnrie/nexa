@@ -114,7 +114,7 @@ export default function AppearancePage() {
         </label>
       </div>
       <h3 className={s.h5}>{tr_("settings.appearance.animatedImages")}</h3>
-      {(["animateAvatars", "animateIcons", "animateBanners", "animateEmoji", "animateStickers"] as const).map((key) => <Toggle key={key} setting={key} checked={st[key]} onChange={(v) => patch({ [key]: v })} label={tr_(`settings.appearance.${key}`)} />)}
+      {(["animateAvatars", "animateIcons", "animateBanners", "animateEmoji", "animateStickers", "animateNames"] as const).map((key) => <Toggle key={key} setting={key} checked={st[key]} onChange={(v) => patch({ [key]: v })} label={tr_(`settings.appearance.${key}`)} />)}
       <h3 className={s.h5} data-setting="font">{tr_("settings.appearance.font")}</h3>
       <div className={look.fonts} role="radiogroup" aria-label={tr_("settings.appearance.font")} data-testid="font-choice">
         {(["default", "classic"] as const).map((face) => (

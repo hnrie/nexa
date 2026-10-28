@@ -1404,7 +1404,14 @@ This is a public website feature, with no corresponding native Android screen.
   look carries the person's own style as `own` (`useMemberLook` adds it, `withOwn` for lists): in a
   server a role's colour still colours the name and only the font stays. Settings, Profiles edits it
   with `components/settings/NameStyleEditor.tsx`, saved with the profile; the
-  staff can reset it (field `name_style`). Identity labels use
+  staff can reset it (field `name_style`). The optional public `animated` boolean selects Static or
+  Animated for every non-Solid effect, including flowing gradients, moving Candy stripes, Chrome
+  sheen and pulsing Glow, Ink and Pop. Missing values preserve the original behavior (only Aurora,
+  Holo, Neon and Flame animate). Both editors preview the selected motion and preserve explicit
+  choices when changing effects. Appearance has a synced Animate names toggle (`animateNames`, on
+  by default) that stops personal name animations and role shimmer locally, preserving colours and
+  fonts. Reduce Motion also stops them.
+  Identity labels use
   `components/common/PersonName.tsx` on web and `PersonName` in Android's
   `ui/chat/RoleLook.kt`: preserve the caller's nickname/text, observe live user styles and the
   current account's profile, and fetch missing profiles when a list only supplies IDs. A canonical

@@ -7156,7 +7156,7 @@
   "shell.requiredUpdate.manualRequired": "Lade die neue Desktop-App herunter, installiere sie und öffne Nexa erneut. Behalte deine vorhandenen App-Daten.",
   "whatsNew.r202610267.desktopSecurityTitle": "Sicherheitsupdate für die Desktop-App",
   "whatsNew.r202610267.desktopSecurityBody": "Installiere die neue Desktop-App einmal. Künftige Desktop-Updates prüfen, ob sie von Nexa stammen.",
-  "settings.appearance.animatedImages": "Animierte Bilder",
+  "settings.appearance.animatedImages": "Animationen",
   "settings.appearance.animateAvatars": "Profilbilder animieren",
   "settings.appearance.animateIcons": "Server- und Gruppensymbole animieren",
   "settings.appearance.animateBanners": "Banner animieren",
@@ -7204,5 +7204,11 @@
   "whatsNew.r202610282.saveTitle": "Speicherort wählen",
   "whatsNew.r202610282.saveBody": "Downloads und Bilder fragen jetzt unter Android und in unterstützten Desktop-Browsern nach dem Speicherort. Nutze in mobilen Browsern die Speicher- oder Freigabeoptionen des Systems.",
   "whatsNew.r202610283.discoveryTitle": "Einfachere NSFW-Entdeckung",
-  "whatsNew.r202610283.discoveryBody": "Mit dem NSFW-Schalter neben den Entdecken-Filtern blendest du Communitys für Erwachsene ein. NSFW-Server tragen ein Abzeichen neben ihrem Namen. Suche nach nsfw, um sie zu finden."
+  "whatsNew.r202610283.discoveryBody": "Mit dem NSFW-Schalter neben den Entdecken-Filtern blendest du Communitys für Erwachsene ein. NSFW-Server tragen ein Abzeichen neben ihrem Namen. Suche nach nsfw, um sie zu finden.",
+  "nameStyle.motion": "Bewegung",
+  "nameStyle.static": "Statisch",
+  "nameStyle.animated": "Animiert",
+  "whatsNew.r202610284.nameMotionTitle": "Animierte Namensstile",
+  "whatsNew.r202610284.nameMotionBody": "Lass Farbverläufe fließen, Bonbonstreifen wandern und Namenseffekte pulsieren. Wähle Statisch oder Animiert unter Einstellungen, Profile, Namensstil; schalte Namen animieren unter Erscheinungsbild aus, damit alle Namen stillstehen.",
+  "settings.appearance.animateNames": "Namen animieren"
 }

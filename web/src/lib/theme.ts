@@ -9,6 +9,7 @@ import type { Settings } from "@/stores/settings";
 
 /** What applyTheme draws the page with. */
 export type Appearance = Pick<Settings, "theme" | "accent" | "fontScale" | "reducedMotion" | "underlineLinks"> & {
+  animateNames?: boolean;
   /** The app's typeface; the default one when not said. */
   fontFace?: Settings["fontFace"];
   /** The custom themes `theme` may name. */
@@ -193,6 +194,7 @@ export function applyTheme(s: Appearance, draft?: ThemeDraft | null): void {
   const style = themeStyle();
   const text = rules ? `:root{${rules}}` : "";
   if (style.textContent !== text) style.textContent = text;
+  root.dataset["animateNames"] = s.animateNames === false ? "false" : "true";
   root.dataset["reducedMotion"] = s.reducedMotion ? "true" : "false";
   root.dataset["underlineLinks"] = s.underlineLinks || look.underlineLinks ? "true" : "false";
   applyFontFace(s.fontFace ?? "default");
@@ -262,6 +264,7 @@ export function rememberedAppearance(): Appearance | null {
       theme,
       accent,
       fontScale: Number.isFinite(scale) && scale > 0 ? scale : 1,
+      ...(v["animateNames"] === false ? { animateNames: false } : {}),
       reducedMotion: v["reducedMotion"] === true,
       underlineLinks: v["underlineLinks"] === true,
     };
@@ -286,6 +289,7 @@ export function rememberAppearance(a: Appearance): void {
       theme: a.theme,
       accent: a.accent,
       fontScale: a.fontScale,
+      ...(a.animateNames === false ? { animateNames: false } : {}),
       reducedMotion: a.reducedMotion,
       underlineLinks: a.underlineLinks,
       ...(a.fontFace === "classic" ? { fontFace: "classic" } : {}),

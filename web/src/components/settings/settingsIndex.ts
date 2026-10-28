@@ -83,6 +83,7 @@ export function settingsIndex(opts: { pageLabels: Record<string, string> }): Set
     e("appearance", t("settings.appearance.animateBanners"), "animateBanners"),
     e("appearance", t("settings.appearance.animateEmoji"), "animateEmoji"),
     e("appearance", t("settings.appearance.animateStickers"), "animateStickers"),
+    e("appearance", t("settings.appearance.animateNames"), "animateNames"),
 
     e("appearance", t("settings.appearance.accentColour"), "accent"),
     e("appearance", t("settings.appearance.font"), "font"),

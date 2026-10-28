@@ -7156,7 +7156,7 @@
   "shell.requiredUpdate.manualRequired": "नया डेस्कटॉप ऐप डाउनलोड करके इंस्टॉल करें, फिर आगे बढ़ने के लिए Nexa दोबारा खोलें। ऐप का मौजूदा डेटा रखें।",
   "whatsNew.r202610267.desktopSecurityTitle": "डेस्कटॉप सुरक्षा अपडेट",
   "whatsNew.r202610267.desktopSecurityBody": "नया डेस्कटॉप ऐप एक बार इंस्टॉल करें। आगे के डेस्कटॉप अपडेट जाँचेंगे कि वे Nexa से आए हैं।",
-  "settings.appearance.animatedImages": "एनिमेटेड चित्र",
+  "settings.appearance.animatedImages": "एनिमेशन",
   "settings.appearance.animateAvatars": "प्रोफ़ाइल चित्रों का एनिमेशन चलाएँ",
   "settings.appearance.animateIcons": "सर्वर और समूह आइकन का एनिमेशन चलाएँ",
   "settings.appearance.animateBanners": "बैनर का एनिमेशन चलाएँ",
@@ -7204,5 +7204,11 @@
   "whatsNew.r202610282.saveTitle": "सहेजने की जगह चुनें",
   "whatsNew.r202610282.saveBody": "Android और समर्थित डेस्कटॉप ब्राउज़र पर डाउनलोड और तस्वीरें अब पूछते हैं कि कहाँ सहेजना है। मोबाइल ब्राउज़र पर सिस्टम के सहेजने या शेयर करने के विकल्प इस्तेमाल करें।",
   "whatsNew.r202610283.discoveryTitle": "आसान NSFW खोज",
-  "whatsNew.r202610283.discoveryBody": "वयस्क समुदाय दिखाने के लिए डिस्कवरी फ़िल्टर के पास NSFW स्विच इस्तेमाल करें। NSFW सर्वर के नाम के पास बैज दिखता है; उन्हें ढूँढने के लिए nsfw खोजें।"
+  "whatsNew.r202610283.discoveryBody": "वयस्क समुदाय दिखाने के लिए डिस्कवरी फ़िल्टर के पास NSFW स्विच इस्तेमाल करें। NSFW सर्वर के नाम के पास बैज दिखता है; उन्हें ढूँढने के लिए nsfw खोजें।",
+  "nameStyle.motion": "गति",
+  "nameStyle.static": "स्थिर",
+  "nameStyle.animated": "एनिमेटेड",
+  "whatsNew.r202610284.nameMotionTitle": "एनिमेटेड नाम शैलियाँ",
+  "whatsNew.r202610284.nameMotionBody": "ग्रेडिएंट बहने दें, कैंडी धारियाँ चलाएँ और नाम के प्रभावों को धड़कने दें। सेटिंग्स, प्रोफ़ाइल, नाम शैली में स्थिर या एनिमेटेड चुनें, सभी के नाम स्थिर रखने के लिए दिखावट में नामों का एनिमेशन बंद करें।",
+  "settings.appearance.animateNames": "नामों का एनिमेशन चलाएँ"
 }

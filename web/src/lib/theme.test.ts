@@ -15,6 +15,11 @@ describe("the appearance remembered on this device", () => {
     document.getElementById("nexa-theme")?.remove();
   });
 
+  it("remembers disabled name animations before the account loads", () => {
+    rememberAppearance({ theme: "dark", accent: null, fontScale: 1, reducedMotion: false, underlineLinks: false, animateNames: false });
+    expect(rememberedAppearance()?.animateNames).toBe(false);
+  });
+
   it("comes back as it was kept", () => {
     rememberAppearance({ theme: "light", accent: "#3366ff", fontScale: 1.25, reducedMotion: true, underlineLinks: false });
     expect(rememberedAppearance()).toEqual({ theme: "light", accent: "#3366ff", fontScale: 1.25, reducedMotion: true, underlineLinks: false });

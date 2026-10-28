@@ -15,6 +15,7 @@ export function ThemeEffect() {
   const accent = useSettings((s) => s.settings.accent);
   const fontScale = useSettings((s) => s.settings.fontScale);
   const fontFace = useSettings((s) => s.settings.fontFace);
+  const animateNames = useSettings((s) => s.settings.animateNames);
   const reducedMotion = useSettings((s) => s.settings.reducedMotion);
   const underlineLinks = useSettings((s) => s.settings.underlineLinks);
   const rawThemes = useSettings((s) => s.settings.customThemes);
@@ -29,8 +30,8 @@ export function ThemeEffect() {
   // Read again whenever that changes, so signing out keeps the latest look.
   const remembered = useMemo(() => (loaded ? null : rememberedAppearance()), [loaded]);
   const look: Appearance = useMemo(
-    () => (loaded || !remembered ? { theme, accent, fontScale, fontFace, reducedMotion, underlineLinks, customThemes, systemThemes } : remembered),
-    [loaded, remembered, theme, accent, fontScale, fontFace, reducedMotion, underlineLinks, customThemes, systemThemes],
+    () => (loaded || !remembered ? { theme, accent, fontScale, fontFace, animateNames, reducedMotion, underlineLinks, customThemes, systemThemes } : remembered),
+    [loaded, remembered, theme, accent, fontScale, fontFace, animateNames, reducedMotion, underlineLinks, customThemes, systemThemes],
   );
   const patch = useSettings((s) => s.patch);
   const today = useToday();
