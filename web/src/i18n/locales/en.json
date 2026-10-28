@@ -7194,5 +7194,6 @@
   "whatsNew.r20261028.nsfwBody": "Mark a community NSFW in Server Settings, Overview. Discovery hides servers with NSFW content until you opt in; fully NSFW servers have an 18+ invite warning and cannot use server tags.",
   "moderation.tabs.discovery": "Discovery",
   "whatsNew.r20261028.discoveryTitle": "Discovery Moderation",
-  "whatsNew.r20261028.discoveryBody": "Staff have a separate Discovery tab in the moderation panel to review listed servers, hide listings, and restore servers hidden by staff."
+  "whatsNew.r20261028.discoveryBody": "Staff have a separate Discovery tab in the moderation panel to review listed servers, hide listings, and restore servers hidden by staff.",
+  "nsfw.discoveryHint": "Show servers with NSFW content. You must be 18 or older."
 }

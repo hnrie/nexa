@@ -7194,5 +7194,6 @@
   "whatsNew.r20261028.nsfwBody": "Markiere eine Community in den Servereinstellungen unter Übersicht als NSFW. Die Entdeckung zeigt NSFW-Server erst nach Zustimmung an. Vollständig als NSFW markierte Server haben eine 18+-Einladungswarnung und keine Server-Tags.",
   "moderation.tabs.discovery": "Entdeckung",
   "whatsNew.r20261028.discoveryTitle": "Moderation der Entdeckung",
-  "whatsNew.r20261028.discoveryBody": "Das Moderationsteam hat einen eigenen Entdeckung-Tab im Moderationsbereich, um gelistete Server zu prüfen, Einträge auszublenden und ausgeblendete Server wieder freizugeben."
+  "whatsNew.r20261028.discoveryBody": "Das Moderationsteam hat einen eigenen Entdeckung-Tab im Moderationsbereich, um gelistete Server zu prüfen, Einträge auszublenden und ausgeblendete Server wieder freizugeben.",
+  "nsfw.discoveryHint": "Server mit NSFW-Inhalten anzeigen. Du musst mindestens 18 Jahre alt sein."
 }

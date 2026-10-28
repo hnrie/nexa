@@ -7307,5 +7307,6 @@
   "whatsNew.r20261028.nsfwBody": "Marquez une communauté NSFW dans Paramètres du Serveur, Vue d’Ensemble. La découverte masque ces serveurs sans votre accord ; les serveurs marqués NSFW affichent un avertissement 18+ pour les invitations et ne peuvent pas utiliser de tags.",
   "moderation.tabs.discovery": "Découverte",
   "whatsNew.r20261028.discoveryTitle": "Modération de la Découverte",
-  "whatsNew.r20261028.discoveryBody": "L’équipe dispose d’un onglet Découverte distinct dans le panneau de modération pour examiner les serveurs répertoriés, les masquer et rétablir ceux masqués par l’équipe."
+  "whatsNew.r20261028.discoveryBody": "L’équipe dispose d’un onglet Découverte distinct dans le panneau de modération pour examiner les serveurs répertoriés, les masquer et rétablir ceux masqués par l’équipe.",
+  "nsfw.discoveryHint": "Afficher les serveurs contenant du contenu NSFW. Vous devez avoir au moins 18 ans."
 }

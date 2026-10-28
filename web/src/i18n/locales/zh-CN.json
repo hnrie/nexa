@@ -6957,5 +6957,6 @@
   "whatsNew.r20261028.nsfwBody": "在服务器设置的“概览”中将社区标记为 NSFW。探索默认隐藏含 NSFW 内容的服务器，直到您主动同意显示。完全标记为 NSFW 的服务器会显示 18+ 邀请警告，且不能使用服务器标签。",
   "moderation.tabs.discovery": "探索",
   "whatsNew.r20261028.discoveryTitle": "探索内容管理",
-  "whatsNew.r20261028.discoveryBody": "管理面板新增独立的探索标签页，工作人员可查看已上架服务器、隐藏条目或恢复被工作人员隐藏的服务器。"
+  "whatsNew.r20261028.discoveryBody": "管理面板新增独立的探索标签页，工作人员可查看已上架服务器、隐藏条目或恢复被工作人员隐藏的服务器。",
+  "nsfw.discoveryHint": "显示含 NSFW 内容的服务器。您必须年满 18 岁。"
 }

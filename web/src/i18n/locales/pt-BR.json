@@ -7308,5 +7308,6 @@
   "whatsNew.r20261028.nsfwBody": "Marque uma comunidade como NSFW em Configurações do Servidor, Visão Geral. A descoberta oculta servidores com conteúdo NSFW até você permitir; servidores marcados NSFW têm aviso de 18+ nos convites e não podem usar tags.",
   "moderation.tabs.discovery": "Descoberta",
   "whatsNew.r20261028.discoveryTitle": "Moderação da Descoberta",
-  "whatsNew.r20261028.discoveryBody": "A equipe tem uma aba de Descoberta separada no painel de moderação para revisar servidores listados, ocultá-los e restaurar os ocultados pela equipe."
+  "whatsNew.r20261028.discoveryBody": "A equipe tem uma aba de Descoberta separada no painel de moderação para revisar servidores listados, ocultá-los e restaurar os ocultados pela equipe.",
+  "nsfw.discoveryHint": "Mostrar servidores com conteúdo NSFW. Você deve ter pelo menos 18 anos."
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -176,4 +177,70 @@ func TestModerationDiscoveryFilters(t *testing.T) {
 	}
 	check("all", 0)
 	check("held", 0)
+}
+
+func TestNSFWDiscoverySearchAndAutomaticTag(t *testing.T) {
+	c := newCommunity(t)
+	patch := func(id string, body map[string]any) {
+		t.Helper()
+		res, out := do(t, c.ts, "PATCH", "/api/v1/servers/"+id, c.tokA, body)
+		if res.StatusCode != 200 {
+			t.Fatalf("patch: %d %v", res.StatusCode, out)
+		}
+	}
+	patch(c.server, map[string]any{"discoverable": true, "nsfw": true, "description": "Gardening together", "discovery_tags": []string{"nsfw", "plants"}})
+	safe := createServer(t, c.ts, c.tokA, "NSFW is mentioned here")
+	patch(safe["id"].(string), map[string]any{"discoverable": true, "discovery_tags": []string{"NSFW", "safe"}})
+	mixed := createServer(t, c.ts, c.tokA, "Mixed community")
+	patch(mixed["id"].(string), map[string]any{"discoverable": true, "description": "Games together"})
+	if res, out := do(t, c.ts, "PATCH", "/api/v1/channels/"+channelNamed(mixed, "general")["id"].(string), c.tokA, map[string]any{"nsfw": true}); res.StatusCode != 200 {
+		t.Fatalf("mixed channel: %d %v", res.StatusCode, out)
+	}
+	for _, query := range []string{"nsfw", "NSFW", "nSfW", "  #NsFw  ", "nsfw NSFW"} {
+		for _, show := range []bool{false, true} {
+			path := "/api/v1/discovery?q=" + url.QueryEscape(query)
+			want := 0
+			if show {
+				path += "&nsfw=1"
+				want = 2
+			}
+			res, out := do(t, c.ts, "GET", path, c.tokB, nil)
+			if res.StatusCode != 200 || len(listOf(out, "servers")) != want {
+				t.Fatalf("query %q show=%v: %d %v", query, show, res.StatusCode, out)
+			}
+			for _, entry := range listOf(out, "servers") {
+				card := entry.(map[string]any)
+				tags := toStrings(card["tags"])
+				count := 0
+				for _, tag := range tags {
+					if tag == "nsfw" {
+						count++
+					}
+				}
+				if card["nsfw_content"] != true || count != 1 {
+					t.Fatalf("automatic tag: %v", card)
+				}
+			}
+		}
+	}
+	for query, want := range map[string]int{"NSFW gardening": 1, "games nsfw": 1, "nsfw missing": 0} {
+		_, out := do(t, c.ts, "GET", "/api/v1/discovery?nsfw=1&q="+url.QueryEscape(query), c.tokB, nil)
+		if len(listOf(out, "servers")) != want {
+			t.Fatalf("combined query %q: %v", query, out)
+		}
+	}
+	_, out := do(t, c.ts, "GET", "/api/v1/discovery?nsfw=1&tag=NsFw", c.tokB, nil)
+	if len(listOf(out, "servers")) != 2 {
+		t.Fatalf("reserved tag filter: %v", out)
+	}
+	_, out = do(t, c.ts, "GET", "/api/v1/discovery", c.tokB, nil)
+	if cards := listOf(out, "servers"); len(cards) != 1 || cards[0].(map[string]any)["id"] != safe["id"] {
+		t.Fatalf("default visibility changed: %v", out)
+	}
+	_, out = do(t, c.ts, "GET", "/api/v1/discovery/categories?nsfw=1", c.tokB, nil)
+	for _, tag := range toStrings(out["tags"]) {
+		if strings.EqualFold(tag, "nsfw") {
+			t.Fatalf("reserved tag promoted above ordinary filters: %v", out)
+		}
+	}
 }

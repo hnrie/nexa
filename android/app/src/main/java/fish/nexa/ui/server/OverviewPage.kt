@@ -163,7 +163,6 @@ fun OverviewPage(serverId: String) {
     SettingsPage(SaveState(dirty, busy, ::reset, ::save)) {
         PageTitle(t("server.serverOverview.serverOverview"))
         Form {
-            fish.nexa.ui.components.ToggleLine(t("nsfw.serverToggle"), nsfw, { nsfw = it }, description = t("nsfw.serverHint"), enabled = !busy)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 BigServerIcon(server)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -202,6 +201,7 @@ fun OverviewPage(serverId: String) {
                     RadioCard(t("server.serverOverview.onlyMentions"), notif == 1, { notif = 1 })
                 }
             }
+            fish.nexa.ui.components.ToggleLine(t("nsfw.label"), nsfw, { nsfw = it }, description = t("nsfw.serverHint"), enabled = !busy, descriptionBelow = true)
         }
     }
 }

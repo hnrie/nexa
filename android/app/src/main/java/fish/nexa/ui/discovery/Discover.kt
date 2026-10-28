@@ -228,13 +228,6 @@ fun DiscoverPage() {
                 // the magnifier and the way to clear it, as the web's search box has them
                 fish.nexa.ui.server.SearchBox(q, { q = it }, t("discovery.search"))
             }
-            item("nsfw") {
-                fish.nexa.ui.components.ToggleLine(t("nsfw.showServers"), showNSFW, { on ->
-                    if (!on) { ++requestGeneration; showNSFW = false; nsfwOnly = false; cards = null; next = null }
-                    else fish.nexa.ui.shell.confirm(t("nsfw.warningTitle"), t("nsfw.discoveryWarning"), t("nsfw.confirm"), danger = false) { ++requestGeneration; showNSFW = true; cards = null; next = null }
-                })
-                if (showNSFW) CategoryChip(t("nsfw.label"), null, nsfwOnly) { nsfwOnly = !nsfwOnly }
-            }
             item("cats") {
                 // one row that scrolls sideways, edge to edge, so the servers start higher up
                 Row(
@@ -274,6 +267,13 @@ fun DiscoverPage() {
                     Txt(t("discovery.popularTags"), style = Nx.type.bodySmall, color = c.textMuted)
                     for (tg in popular) TagButton(tg) { tag = tg }
                 }
+            }
+            item("nsfw") {
+                fish.nexa.ui.components.ToggleLine(t("nsfw.label"), showNSFW, { on ->
+                    if (!on) { ++requestGeneration; showNSFW = false; nsfwOnly = false; cards = null; next = null }
+                    else fish.nexa.ui.shell.confirm(t("nsfw.warningTitle"), t("nsfw.discoveryWarning"), t("nsfw.confirm"), danger = false) { ++requestGeneration; showNSFW = true; cards = null; next = null }
+                }, description = t("nsfw.discoveryHint"), descriptionBelow = true)
+                if (showNSFW) CategoryChip(t("nsfw.label"), null, nsfwOnly) { nsfwOnly = !nsfwOnly }
             }
             val list = cards
             when {
@@ -360,7 +360,7 @@ private fun TagButton(tag: String, onClick: () -> Unit) {
             .pressable(remember { MutableInteractionSource() }, onClick = onClick)
             .padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center,
-    ) { Txt(tag, style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(600)), color = c.text, maxLines = 1) }
+    ) { Txt(if (tag.equals("nsfw", ignoreCase = true)) t("nsfw.label") else tag, style = Nx.type.hint.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(600)), color = c.text, maxLines = 1) }
 }
 
 /** A server's colour where it has no banner: its own steady colour, deepened. */
@@ -426,7 +426,6 @@ internal fun ServerCard(card: DiscoveryCard, onTag: (String) -> Unit, onOpen: ()
         Column(Modifier.fillMaxWidth().offset(y = (-22).dp).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Txt(card.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(17f), fontWeight = FontWeight(700)), color = c.textStrong, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
-                if (card.nsfwContent) Badge(t("nsfw.label"), c.warning)
                 when {
                     card.member -> Badge(t("discovery.joined"), c.positive)
                     card.joinsPaused -> Badge(t("discovery.paused"), c.warning)
@@ -514,7 +513,7 @@ private fun ServerSheet(layer: Layer, card: DiscoveryCard, close: () -> Unit) {
             }
             if (card.description.isNotBlank()) fish.nexa.ui.markdown.MarkdownView(card.description, fish.nexa.ui.markdown.RenderCtx(surface = c.bgFloating))
             if (card.tags.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                for (tg in card.tags) Txt(tg, style = Nx.type.hint, color = c.text, modifier = Modifier.background(c.bgActive, RoundedCornerShape(999.dp)).padding(horizontal = 8.dp, vertical = 2.dp))
+                for (tg in card.tags) Txt(if (tg.equals("nsfw", ignoreCase = true)) t("nsfw.label") else tg, style = Nx.type.hint, color = c.text, modifier = Modifier.background(c.bgActive, RoundedCornerShape(999.dp)).padding(horizontal = 8.dp, vertical = 2.dp))
             }
             val emojis = detail?.emojis ?: emptyList()
             if (emojis.isNotEmpty()) FlowRow(Modifier.semantics { contentDescription = t("discovery.emojis") }, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

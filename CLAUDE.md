@@ -468,14 +468,20 @@ request may meet a captcha is disabled until that request ends (the Public Pack 
 ### NSFW communities
 
 `servers.nsfw` is the whole-community toggle in Server Settings, Overview (migration 0040
-on SQLite and Postgres). Channel `nsfw` flags stay independent. A channel's settings recommend
+on SQLite and Postgres). Its compact NSFW toggle sits below the ordinary Overview settings,
+with its description below the label and switch. Discovery uses the same layout after the regular
+categories, filters and popular tags. Channel `nsfw` flags stay independent. A channel's settings recommend
 marking the whole server only if most of its content is NSFW. The Terms permit NSFW communities,
 require that classification for majority-NSFW servers, and allow a few NSFW channels without
 classifying the whole server when its public-facing details contain no NSFW content.
 
 Discovery excludes both kinds by default, including category counts and popular tags. `nsfw=1`
 opts in after an 18+ confirmation; `nsfw_only=1` filters those results to servers marked NSFW or
-containing any NSFW channel, including hidden or archived channels. Cards distinguish `nsfw`
+containing any NSFW channel, including hidden or archived channels. The reserved `nsfw` tag is
+derived from that classification, does not use a custom-tag slot, and cannot be assigned to a safe
+server by editing its tags. Case-insensitive `nsfw` or `#nsfw` search words and `tag=nsfw` apply
+that filter; other search words still match normally. Searching never bypasses the opt-in.
+Cards distinguish `nsfw`
 (the whole community) from `nsfw_content` (either kind).
 
 Only whole-community NSFW servers gate invite previews and invite/Discovery joins with `nsfw=1`.

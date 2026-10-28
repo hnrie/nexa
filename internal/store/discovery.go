@@ -51,9 +51,27 @@ func (s *Store) DiscoverServers(ctx context.Context, q DiscoveryQuery) ([]*Liste
 	}
 	count := `(SELECT count(*) FROM server_members m WHERE m.server_id = s.id)`
 	where := []string{discoveryWhere}
+	words := []string{}
+	searchNSFW := false
+	for _, word := range strings.Fields(strings.ToLower(q.Query)) {
+		if strings.TrimPrefix(word, "#") == "nsfw" {
+			q.NSFWOnly = true
+			searchNSFW = true
+		} else {
+			words = append(words, word)
+		}
+	}
+	if searchNSFW {
+		q.Query = strings.Join(words, " ")
+	}
+	if strings.EqualFold(strings.TrimSpace(q.Tag), "nsfw") {
+		q.NSFWOnly = true
+		q.Tag = ""
+	}
 	if !q.ShowNSFW {
 		where = append(where, "NOT "+ageRestrictedSQL)
-	} else if q.NSFWOnly {
+	}
+	if q.NSFWOnly {
 		where = append(where, ageRestrictedSQL)
 	}
 	var args []any
@@ -169,6 +187,9 @@ func (s *Store) PopularDiscoveryTags(ctx context.Context, limit int, showNSFW ..
 			return nil, err
 		}
 		for _, t := range parseTagList(raw) {
+			if strings.EqualFold(t, "nsfw") {
+				continue
+			}
 			counts[t]++
 		}
 	}

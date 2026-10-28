@@ -48,7 +48,7 @@ func cleanDiscoveryTags(raw []string) ([]string, bool) {
 	seen := map[string]bool{}
 	for _, t := range raw {
 		t = strings.ToLower(strings.Join(strings.Fields(t), " "))
-		if t == "" {
+		if t == "" || t == "nsfw" {
 			continue
 		}
 		n := len([]rune(t))
@@ -140,6 +140,16 @@ func (s *Server) card(r *http.Request, l *store.Listed, me ids.ID) discoveryCard
 		ListedAt: l.DiscoverySince, Member: member, JoinsPaused: joinsPaused(l.Server)}
 	c.NSFW = l.NSFW
 	c.NSFWContent, _ = s.Store.ServerAgeRestricted(r.Context(), l.ID)
+	// NSFW is a reserved, derived Discovery tag, not one of the five custom tags.
+	c.Tags = make([]string, 0, len(l.DiscoveryTags)+1)
+	for _, tag := range l.DiscoveryTags {
+		if !strings.EqualFold(tag, "nsfw") {
+			c.Tags = append(c.Tags, tag)
+		}
+	}
+	if c.NSFWContent {
+		c.Tags = append(c.Tags, "nsfw")
+	}
 	if l.Tag != nil && !c.NSFW {
 		// what it looks like, never the invite it keeps
 		c.Tag = &store.ServerTag{Text: l.Tag.Text, Badge: l.Tag.Badge, Color: l.Tag.Color, Roles: []ids.ID{}}

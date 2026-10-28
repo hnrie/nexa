@@ -13,3 +13,7 @@
 .knob { position: absolute; top: 3px; inset-inline-start: 3px; width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(180deg, #ffffff, #eeeaf4); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 0.5px rgba(0, 0, 0, 0.08); transition: transform 260ms var(--ease-spring); pointer-events: none; }
 .switch[data-on="true"] .knob { transform: translateX(18px); }
 [dir="rtl"] .switch[data-on="true"] .knob { transform: translateX(-18px); }
+
+.row[data-description-below] { flex-wrap: wrap; gap: 6px 16px; }
+.row[data-description-below] > .text { flex: 1; }
+.row[data-description-below] > .desc { flex-basis: 100%; }

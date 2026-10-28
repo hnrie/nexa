@@ -7194,5 +7194,6 @@
   "whatsNew.r20261028.nsfwBody": "Markera en community som NSFW i Serverinställningar, Översikt. Upptäck döljer servrar med NSFW-innehåll tills du samtycker. Helt NSFW-markerade servrar har en 18+-varning på inbjudningar och kan inte använda servertaggar.",
   "moderation.tabs.discovery": "Upptäck",
   "whatsNew.r20261028.discoveryTitle": "Moderera Upptäck",
-  "whatsNew.r20261028.discoveryBody": "Personalen har en separat Upptäck-flik i modereringspanelen för att granska listade servrar, dölja listningar och återställa servrar som personalen dolt."
+  "whatsNew.r20261028.discoveryBody": "Personalen har en separat Upptäck-flik i modereringspanelen för att granska listade servrar, dölja listningar och återställa servrar som personalen dolt.",
+  "nsfw.discoveryHint": "Visa servrar med NSFW-innehåll. Du måste vara minst 18 år."
 }

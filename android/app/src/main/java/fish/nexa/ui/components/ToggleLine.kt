@@ -24,7 +24,7 @@ import fish.nexa.ui.theme.Nx
  * with the switch at the end, the whole row one target, a hairline under it.
  */
 @Composable
-fun ToggleLine(label: String, checked: Boolean, onChange: (Boolean) -> Unit, description: String? = null, enabled: Boolean = true) {
+fun ToggleLine(label: String, checked: Boolean, onChange: (Boolean) -> Unit, description: String? = null, enabled: Boolean = true, descriptionBelow: Boolean = false) {
     val c = Nx.colors
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -38,10 +38,11 @@ fun ToggleLine(label: String, checked: Boolean, onChange: (Boolean) -> Unit, des
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Txt(label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), fontWeight = FontWeight(550)), color = c.text)
-                if (description != null) Txt(description, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), lineHeight = Nx.type.sp(18.9f)), color = c.textMuted)
+                if (description != null && !descriptionBelow) Txt(description, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), lineHeight = Nx.type.sp(18.9f)), color = c.textMuted)
             }
             NxToggle(checked, onChange, enabled = enabled, label = label)
         }
+        if (description != null && descriptionBelow) Txt(description, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(13.5f), lineHeight = Nx.type.sp(18.9f)), color = c.textMuted, modifier = Modifier.padding(bottom = 14.dp).alpha(if (enabled) 1f else 0.5f))
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
     }
 }

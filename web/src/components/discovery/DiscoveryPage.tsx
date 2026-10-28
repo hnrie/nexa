@@ -65,14 +65,13 @@ export function ServerCard({ card, onOpen, onTag }: { card: DiscoveryCard; onOpe
       <div className={s.body}>
         <h3 className={s.name} dir="auto">
           <span>{card.name}</span>
-          {card.nsfw_content ? <span className={s.badge}>{t("nsfw.label")}</span> : null}
           {card.member ? <span className={s.badge}>{t("discovery.joined")}</span> : card.joins_paused ? <span className={s.badge} data-paused="">{t("discovery.paused")}</span> : null}
         </h3>
         {words ? <p className={s.desc} dir="auto">{words}</p> : null}
         {card.tags.length ? (
           <div className={s.cardTags}>
             {card.tags.map((tg) => (
-              <button key={tg} type="button" className={s.tagBtn} style={{ position: "relative", zIndex: 2 }} onClick={() => onTag(tg)}>{tg}</button>
+              <button key={tg} type="button" className={s.tagBtn} style={{ position: "relative", zIndex: 2 }} onClick={() => onTag(tg)}>{tg.toLowerCase() === "nsfw" ? t("nsfw.label") : tg}</button>
             ))}
           </div>
         ) : null}
@@ -172,7 +171,7 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
         ) : null}
         {card.tags.length ? (
           <div className={s.cardTags}>
-            {card.tags.map((tg) => <span key={tg} className={s.cardTag}>{tg}</span>)}
+            {card.tags.map((tg) => <span key={tg} className={s.cardTag}>{tg.toLowerCase() === "nsfw" ? t("nsfw.label") : tg}</span>)}
           </div>
         ) : null}
         {emojis.length ? (
@@ -285,7 +284,6 @@ export default function DiscoveryPage() {
             <p>{t("discovery.lead")}</p>
           </div>
           <SearchBox className={s.searchBig} value={q} onChange={setQ} placeholder={t("discovery.search")} aria-label={t("discovery.search")} data-testid="discovery-search" />
-          <Toggle checked={showNSFW} onChange={changeNSFW} label={t("nsfw.showServers")} />
           <div className={s.cats} role="group" aria-label={t("discovery.categories")}>
             <button type="button" className={s.cat} aria-pressed={!category} onClick={() => setCategory("")}>
               {t("discovery.all")} {meta ? <span className={s.catCount}>{meta.total}</span> : null}
@@ -297,7 +295,6 @@ export default function DiscoveryPage() {
             ))}
           </div>
           <div className={s.controls}>
-            {showNSFW ? <button type="button" className={s.cat} aria-pressed={nsfwOnly} onClick={() => setNSFWOnly(!nsfwOnly)}>{t("nsfw.label")}</button> : null}
             <div className={s.sorts} role="radiogroup" aria-label={t("discovery.sortLabel")}>
               {(["members", "newest", "created"] as const).map((x) => (
                 <button key={x} type="button" role="radio" aria-checked={sort === x} onClick={() => setSort(x)}>{t(`discovery.sort.${x}`)}</button>
@@ -327,10 +324,12 @@ export default function DiscoveryPage() {
             <div className={s.popular}>
               <span>{t("discovery.popularTags")}</span>
               {meta.tags.slice(0, 12).map((tg) => (
-                <button key={tg} type="button" className={s.tagBtn} onClick={() => setTag(tg)}>{tg}</button>
+                <button key={tg} type="button" className={s.tagBtn} onClick={() => setTag(tg)}>{tg.toLowerCase() === "nsfw" ? t("nsfw.label") : tg}</button>
               ))}
             </div>
           ) : null}
+          <Toggle checked={showNSFW} onChange={changeNSFW} label={t("nsfw.label")} description={t("nsfw.discoveryHint")} descriptionBelow />
+          {showNSFW ? <button type="button" className={s.cat} aria-pressed={nsfwOnly} onClick={() => setNSFWOnly(!nsfwOnly)}>{t("nsfw.label")}</button> : null}
           {failed ? (
             <div className={s.note}>
               {t("discovery.failed")}{" "}

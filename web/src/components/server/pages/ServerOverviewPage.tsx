@@ -109,7 +109,6 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
     <>
       <h2 className={st.title}>{t("server.serverOverview.serverOverview")}</h2>
       <div className={st.form}>
-        <Toggle checked={nsfw} onChange={setNSFW} disabled={busy} label={t("nsfw.serverToggle")} description={t("nsfw.serverHint")} />
         <div className={s.iconWrap}>
           <div className={s.serverIcon}>{icon ? <img src={icon} alt="" /> : initials(server.name)}</div>
           <div className={st.form} style={{ gap: 8 }}>
@@ -146,6 +145,7 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
             <label className={st.radio} data-on={notif === 1}><input type="radio" name="server-default-notifications" checked={notif === 1} onChange={() => setNotif(1)} /><span className={st.radioText}><span className={st.radioLabel}>{t("server.serverOverview.onlyMentions")}</span></span></label>
           </div>
         </Field>
+        <Toggle checked={nsfw} onChange={setNSFW} disabled={busy} label={t("nsfw.label")} description={t("nsfw.serverHint")} descriptionBelow />
       </div>
       {crop ? (
         <ImageCropModal
