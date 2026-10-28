@@ -2,13 +2,14 @@
  * Nexa for the desktop: one window on the live site, a tray icon, the
  * Rich Presence server, and updates.
  */
-import { app, BrowserWindow, globalShortcut, ipcMain, nativeImage, powerMonitor, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, nativeImage, powerMonitor, shell, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { IPC, type DesktopSettings, type Identity, type WindowState } from "../shared/bridge";
 import { BASE, ORIGIN, isAppUrl, testHook } from "./config";
 import { chooseDisplaySource, handleDisplayMedia, lockPermissions, openScreenSettings, resetScreenAccess, restartApp, screenAccess, shareAudioFailed } from "./permissions";
 import { RpcService } from "./rpc/service";
+import { Originals } from "./originals";
 import { PasteGate } from "./pasteGate";
 import { applyShortcuts, cleanRequests } from "./shortcuts";
 import { SettingsStore } from "./settings";
@@ -21,6 +22,7 @@ import { applicationMenu, createMainWindow, resourcePath } from "./window";
 // tests run the app with a profile of their own
 const testProfile = testHook("EVILION_USER_DATA");
 if (testProfile) app.setPath("userData", testProfile);
+const originals = new Originals((url) => shell.openExternal(url));
 const settings = new SettingsStore(path.join(app.getPath("userData"), "settings.json"));
 if (!settings.get("hardwareAcceleration")) app.disableHardwareAcceleration();
 if (process.platform === "linux") app.commandLine.appendSwitch("enable-features", "WebRTCPipeWireCapturer");
@@ -245,6 +247,7 @@ function registerIpc(): void {
   on(IPC.requestAttention, () => requestAttention());
   handle(IPC.windowGetState, () => windowState());
   handle(IPC.shareAudioFailed, () => shareAudioFailed(log));
+  handle(IPC.openOriginal, (bytes: unknown, type: unknown, name: unknown) => originals.open(bytes, type, name));
   handle(IPC.screenAccess, () => screenAccess());
   handle(IPC.openScreenSettings, () => openScreenSettings());
   handle(IPC.resetScreenAccess, () => resetScreenAccess());
@@ -382,6 +385,7 @@ app.on("before-quit", () => {
   quitting = true;
 });
 app.on("will-quit", () => {
+  originals.dispose();
   globalShortcut.unregisterAll();
   stopRpc();
   settings.flush();

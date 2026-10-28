@@ -114,6 +114,7 @@ export interface NativeStrings {
 }
 
 export const IPC = {
+  openOriginal: "app:open-original",
   setStrings: "app:set-strings",
   rpcGetState: "rpc:get-state",
   rpcSetEnabled: "rpc:set-enabled",

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/imageActions", async (original) => ({ ...await original<typeof import("@/lib/imageActions")>(), saveImage: vi.fn().mockResolvedValue(undefined) }));
 import { saveImage } from "@/lib/imageActions";
@@ -9,6 +9,7 @@ import { mediaPrefs, saveMediaPrefs } from "./mediaPrefs";
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   localStorage.clear();
 });
 
@@ -27,6 +28,26 @@ describe("Lightbox", () => {
     expect(screen.getByText("2 of 3")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Download" }));
     expect(saveImage).toHaveBeenCalledWith("blob:b", "second.png");
+  });
+
+  it("hands a desktop original to the default browser without opening an Electron window", async () => {
+    const openOriginal = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("evilionDesktop", { openOriginal });
+    const bytes = new Uint8Array([137, 80, 78, 71]);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true, blob: async () => ({ type: "image/png", arrayBuffer: async () => bytes.buffer }),
+    }));
+    render(<Lightbox items={pictures.slice(0, 1)} onClose={() => {}} />);
+    expect(fireEvent.click(screen.getByRole("link", { name: "Open Original" }))).toBe(false);
+    await waitFor(() => expect(openOriginal).toHaveBeenCalledWith(bytes, "image/png", "first.png"));
+    expect(fetch).toHaveBeenCalledWith("blob:a");
+  });
+
+  it("keeps Open Original as a normal browser link outside the desktop app", () => {
+    render(<Lightbox items={pictures.slice(0, 1)} onClose={() => {}} />);
+    const link = screen.getByRole("link", { name: "Open Original" });
+    expect(link.getAttribute("href")).toBe("blob:a");
+    expect(link.getAttribute("target")).toBe("_blank");
   });
 
   it("steps through a message's pictures with the arrows, and stops at either end", () => {

@@ -122,6 +122,8 @@ export interface WindowState {
 }
 
 export interface EvilionDesktop {
+  /** Open decrypted media in the default web browser (app 1.2.10 and later). */
+  openOriginal?(bytes: Uint8Array, type: string, name: string): Promise<void>;
   version: string;
   platform: "win32" | "darwin" | "linux";
   /** Whether a screen share here can carry the computer's sound (app 1.0.1 and later). */

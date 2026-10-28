@@ -1495,10 +1495,13 @@ already have installed (anything new is optional and checked before use). `build
 esbuild, `electron-builder.yml` packs (`sign-mac.cjs` signs Mac builds ad hoc), and
 `tools/mac_package.py` and `tools/publish_desktop.py` finish a release.
 
-From 1.2.9, Open Original opens a decrypted image's same-origin blob in an isolated window
-(`originalWindow.ts`), with scripts disabled, no preload or bridge, and no further navigation or
-windows. An external browser cannot read a blob belonging to Electron's session. Web originals
-open in a browser tab; Android shares a read-only FileProvider URI with an image viewer.
+From 1.2.10, Open Original hands decrypted images and videos to the default web browser through
+`originals.ts`, using an optional `openOriginal` bridge call. Its temporary HTTP listener binds
+only to 127.0.0.1, accepts only exact random-token paths and Host headers, serves inert media types
+with no-store and a sandbox CSP, and expires each original after ten minutes. Files stay in memory
+(up to eight originals and 256 MiB total, dropping the oldest when full); nothing is uploaded or
+written to disk. Quit closes the listener and drops the files. It creates no extra Electron window.
+Web originals keep their normal browser tab; Android shares a read-only FileProvider URI with an image viewer.
 
 Releases are built on the Linux server, never handed over from another machine: the owner wants
 every app that changed built and published by `make build` (2026-10-20). Its `desktop-release` step

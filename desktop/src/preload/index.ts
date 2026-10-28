@@ -23,6 +23,7 @@ function listen<T>(channel: string) {
 
 if (origin && location.origin === origin) {
   contextBridge.exposeInMainWorld("evilionDesktop", {
+    openOriginal: (bytes: Uint8Array, type: string, name: string): Promise<void> => ipcRenderer.invoke(IPC.openOriginal, bytes, type, name),
     version,
     platform: process.platform,
     shareAudio,

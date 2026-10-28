@@ -6,6 +6,7 @@ import { PRIORITY, acquire, attachmentObjectURL, cachedURL, release } from "@/li
 import { Spinner } from "@/components/common/Spinner";
 import { useFocusTrap } from "@/components/common/useFocusTrap";
 import { ZoomPan, type ZoomPanHandle } from "@/components/common/ZoomPan";
+import { desktopBridge } from "@/lib/desktopBridge";
 import { saveImage } from "@/lib/imageActions";
 import { useUI } from "@/stores/ui";
 import { imageMenu } from "./messageMenu";
@@ -165,7 +166,17 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
           </span>
           )}
           {/* an SVG opened on its own is a page in this app's origin that can reach out to other servers */}
-          {src && !svg ? <a className={s.tool} href={src} target="_blank" rel="noopener noreferrer" aria-label={t("chat.attachments.openOriginal")} title={t("chat.attachments.openOriginal")}><ExternalLink size={20} /></a> : null}
+          {src && !svg ? <a className={s.tool} href={src} target="_blank" rel="noopener noreferrer" onClick={(event) => {
+            const desktop = desktopBridge();
+            if (!desktop?.openOriginal) return;
+            event.preventDefault();
+            void (async () => {
+              const response = await fetch(src);
+              if (!response.ok) throw new Error("original unavailable");
+              const file = await response.blob();
+              await desktop.openOriginal!(new Uint8Array(await file.arrayBuffer()), file.type, item.name);
+            })().catch(() => useUI.getState().toast(t("chat.attachments.imageUnloadable"), "error"));
+          }} aria-label={t("chat.attachments.openOriginal")} title={t("chat.attachments.openOriginal")}><ExternalLink size={20} /></a> : null}
           {src ? <button type="button" className={s.tool} onClick={() => void saveImage(src, item.name).catch(() => useUI.getState().toast(t("chat.messageMenu.couldNotSaveThePicture"), "error"))} aria-label={t("chat.attachments.download")} title={t("chat.attachments.download")}><Download size={20} /></button> : null}
           <button ref={closeBtn} type="button" className={[s.tool, s.close].join(" ")} aria-label={t("chat.attachments.close")} title={t("chat.attachments.close")} onClick={onClose}><X size={22} /></button>
         </div>
