@@ -205,9 +205,25 @@ ids without the offset.
 - The gateway speaks JSON or ETF, with `zlib-stream` or `zstd-stream`
   compression, or each frame compressed on its own.
 
+## Voice Channel Text Chat
+
+Bots can send and receive text in a server's voice channel without joining
+its call. The channel keeps type `2` (`discord.VoiceChannel` in discord.py)
+and uses the usual message endpoints, intents and Message Content rules.
+Sending requires View Channel and Send Messages; fetching messages also
+requires Read Message History and Connect.
+
+```py
+channel = await client.fetch_channel(VOICE_CHANNEL_ID)
+message = await channel.send("Hello from the voice channel chat")
+await message.edit(content="Hello again")
+async for message in channel.history(limit=10):
+    print(message.content)
+```
+
 ## What Is Not Here Yet
 
-- **Voice.** Bots cannot join calls yet. A bot that tries is told it is in no
+- **Voice calls.** Bots cannot join calls yet. A bot that tries is told it is in no
   channel, and its library gives up as it would on a failed connection.
 - **What Nexa does not have.** Stage channels, scheduled events, soundboard
   sounds, server templates, widgets, welcome screens, onboarding prompts,

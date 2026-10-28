@@ -180,14 +180,51 @@ async def run_steps():
     out("pins", count=len(pins))
     await pins_msg.unpin()
     await pins_msg.delete()
+    await voice_chat_steps(guild)
     out("steps_done")
+
+
+async def voice_chat_steps(guild):
+    # Use the real VoiceChannel methods without opening an audio connection.
+    voice = await guild.create_voice_channel("Bot Lounge")
+    assert isinstance(voice, discord.VoiceChannel)
+    fetched_channel = await client.fetch_channel(voice.id)
+    assert isinstance(fetched_channel, discord.VoiceChannel)
+    assert guild.voice_client is None
+    created = asyncio.create_task(client.wait_for(
+        "message", check=lambda m: m.channel.id == voice.id and m.content == "voice chat from discord.py", timeout=15))
+    await asyncio.sleep(0)
+    msg = await voice.send("voice chat from discord.py", embed=discord.Embed(title="Voice Chat"))
+    event = await created
+    assert isinstance(event.channel, discord.VoiceChannel) and event.id == msg.id
+    edited = await msg.edit(content="voice chat, edited")
+    assert edited.content == "voice chat, edited"
+    await msg.add_reaction("👍")
+    fetched = await voice.fetch_message(msg.id)
+    assert fetched.content == "voice chat, edited" and len(fetched.embeds) == 1 and fetched.reactions
+    reply = await fetched.reply("voice chat reply")
+    assert reply.reference.message_id == msg.id
+    assert {msg.id, reply.id} <= {m.id async for m in voice.history(limit=10)}
+    await msg.pin()
+    assert msg.id in [m.id async for m in voice.pins()]
+    await msg.unpin()
+    async with voice.typing():
+        pass
+    deleted = asyncio.create_task(client.wait_for(
+        "raw_message_delete", check=lambda p: p.message_id == reply.id, timeout=15))
+    await asyncio.sleep(0)
+    await reply.delete()
+    await deleted
+    refreshed = await client.fetch_channel(voice.id)
+    assert refreshed.last_message_id is not None
+    out("voice_chat", channel=voice.id, message=msg.id, type=str(voice.type))
 
 
 @client.event
 async def on_message(message: discord.Message):
     if message.author.id == client.user.id:
         return
-    out("message", id=message.id, author=message.author.id, content=message.content, guild=message.guild.id if message.guild else None)
+    out("message", id=message.id, author=message.author.id, content=message.content, channel=message.channel.id, channel_type=str(message.channel.type), guild=message.guild.id if message.guild else None)
     if message.content == "!hello":
         await message.reply("hello back")
 

@@ -99,6 +99,12 @@ func (s *Server) botChannel(w http.ResponseWriter, r *http.Request, need string)
 		writeBotError(w, dErrMissingAccess, nil)
 		return nil
 	}
+	// Discord requires Connect as well as the history permissions when
+	// fetching messages from a voice channel; joining the call is not required.
+	if ch.Type == "voice" && need == NeedHistory && !s.botPerms(r.Context(), ch, b.user.ID).Has(perms.Connect) {
+		writeBotError(w, dErrMissingPerms, nil)
+		return nil
+	}
 	return ch
 }
 
@@ -323,7 +329,7 @@ func (s *Server) postBotMessage(r *http.Request, bot *store.User, app *store.App
 		if ch.Type == store.ChannelForum {
 			return nil, dErr(http.StatusBadRequest, 40058, "Cannot send a message in a forum channel")
 		}
-		if ch.Type == "voice" || ch.Type == "category" {
+		if ch.Type == "category" {
 			return nil, dErrNotText
 		}
 		if wait := s.slowmodeLeft(ctx, ch, bot); wait > 0 {

@@ -183,6 +183,9 @@ def exercise(lib, bot, a, b, sid, general, app):
     bot.wait("thread", 30)
     pins = bot.wait("pins", 30)
     check(pins["count"] >= 1, f"{lib}: a pin lists")
+    if lib == "discord.py":
+        voice = bot.wait("voice_chat", 30)
+        check(voice["type"] == "voice", "discord.py: voice channel REST and gateway message lifecycle")
     bot.wait("steps_done", 30)
     # what the bot sent, as people see it
     _, msgs = a.call("GET", f"/api/v1/channels/{general}/messages?limit=20", expect=200)
@@ -233,11 +236,14 @@ def message_content(lib, bot, alice, bob, base, sid, general):
     for sess in (alice, bob):
         sess.page.goto(f"{base}/channels/{sid}/{general}", wait_until="networkidle")
         sess.dismiss_whats_new()
+        toggle = sess.page.locator('[data-testid="voice-chat-toggle"]')
+        if toggle.count() and not sess.page.locator('[data-testid="voice-chat"]').is_visible():
+            toggle.click()
     # give the members' apps a moment to hand the bot its keys
     time.sleep(3)
     bob.send("!hello")
     seen = bot.wait("message", 30)
-    check(seen["content"] == "!hello", f"{lib}: the bot reads what bob typed")
+    check(seen["content"] == "!hello" and nexa_id(seen["channel"]) == general, f"{lib}: the bot reads what bob typed")
     b = API(base, bob.page.evaluate("localStorage.getItem('ec.token')"))
     reply = None
     for _ in range(50):
@@ -302,6 +308,19 @@ def main():
                     exercise(name, bot, a, b, sid, general, app)
                     if name == "discord.py":
                         message_content(name, bot, alice, bob, srv.base, sid, general)
+                        _, channels = a.call("GET", f"/api/v1/servers/{sid}/channels", expect=200)
+                        voice = next(c for c in channels if c["name"] == "Bot Lounge")
+                        message_content(name, bot, alice, bob, srv.base, sid, voice["id"])
+                        cmds, _ = commands_for(b, voice["id"])
+                        res = interact(b, {"type": 2, "application_id": app["id"], "channel_id": voice["id"], "data": {"id": cmds["ping"]["id"], "options": []}})
+                        check(res["message"]["webhook"]["content"] == "pong", "discord.py: a voice chat slash command answers")
+                        bot.wait("ping", 15)
+                        for width, height in ((1366, 768), (411, 914)):
+                            bob.page.set_viewport_size({"width": width, "height": height})
+                            if not bob.page.locator('[data-testid="voice-chat"]').is_visible():
+                                bob.page.locator('[data-testid="voice-chat-toggle"]').click()
+                            bob.wait_text("voice chat, edited")
+                            bob.shot("voice-chat")
                 except AssertionError as e:
                     failed = True
                     print(f"FAIL {name}: {e}")

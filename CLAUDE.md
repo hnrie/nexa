@@ -457,7 +457,11 @@ request may meet a captcha is disabled until that request ends (the Public Pack 
   limit and the protocol's error shapes; `bot_rest_*`, `bot_message_routes`, `bot_commands`,
   `bot_modals`, `bot_audit`), its gateway at `/bot-gateway` (`bot_gateway`; events translated and
   filtered by intent in `bot_dispatch`), files and pictures at `/cdn/...` (`bot_cdn`), and the
-  objects it speaks (`bot_objects`, `bot_messages`). Where the app has a route for the same thing,
+  objects it speaks (`bot_objects`, `bot_messages`). Voice channels keep protocol type 2 and
+  support text chat through the normal message routes without joining a call; fetching their
+  messages also requires Connect. `tools/bots/dpy_bot.py` and `tools/bot_e2e.py --only dpy`
+  exercise voice chat with discord.py, including REST, gateway events and a person's encrypted
+  message and the bot's reply. Where the app has a route for the same thing,
   the bot route runs that route's code as the bot (`callNexa`), so a bot is held to a person's
   rules and everyone sees the same events. A bot is a user with flag 64 (128 when its app reads
   every message); an app's id is its bot's. Interactions and app events go to an app's own
