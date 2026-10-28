@@ -32,6 +32,16 @@ func decodeFirstFrame(path, mime string) (image.Image, error) {
 	defer src.Close()
 	if mime != "image/webp" {
 		img, _, err := image.Decode(bufio.NewReader(src))
+		if err == nil && mime == "image/jpeg" {
+			if _, seekErr := src.Seek(0, io.SeekStart); seekErr != nil {
+				return nil, seekErr
+			}
+			head, readErr := io.ReadAll(io.LimitReader(src, jpegHeadMax))
+			if readErr != nil {
+				return nil, readErr
+			}
+			img = orientImage(img, jpegOrientation(head))
+		}
 		return img, err
 	}
 	data, err := io.ReadAll(io.LimitReader(src, maxStillSource))

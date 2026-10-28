@@ -81,10 +81,16 @@
   .cats::-webkit-scrollbar { display: none; }
   .cat { flex: none; }
   .controls { display: grid; grid-template-columns: 1fr 1fr; }
-  .sorts, .activeTag { grid-column: 1 / -1; }
+  .sorts, .activeTag, .nsfwSwitch { grid-column: 1 / -1; }
   .activeTag { justify-self: start; }
   .control { flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; }
   .control select { width: 100%; min-width: 0; }
   .sheetBand { height: 120px; margin: -16px -16px 0; }
 }
 @media (prefers-reduced-motion: reduce) { .card { transition: none; } .card:hover { transform: none; } }
+
+.nsfwSwitch { display: flex; align-items: center; gap: 8px; min-height: 44px; color: var(--text-muted); font-size: 13px; font-weight: 600; }
+.nsfwSwitch > svg { color: var(--warning); }
+.badge[data-nsfw] { background: color-mix(in srgb, var(--warning) 22%, transparent); }
+
+.nsfwSwitch > label { min-height: 44px; }

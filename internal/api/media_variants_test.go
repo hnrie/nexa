@@ -63,7 +63,7 @@ func TestPublicImagesComeInTheSizeTheyAreShown(t *testing.T) {
 		t.Fatalf("sized copy: %d %v %dx%d %s %v", res.StatusCode, err, cfg.Width, cfg.Height, format, res.Header)
 	}
 	// made once and kept
-	made, _ := filepath.Glob(filepath.Join(srv.Media.Dir, "variants", "*", "*-64.jpg"))
+	made, _ := filepath.Glob(filepath.Join(srv.Media.Dir, "variants", "*", "*-64-oriented.jpg"))
 	if len(made) != 1 {
 		t.Errorf("copies on disk: %v", made)
 	}

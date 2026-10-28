@@ -7202,5 +7202,7 @@
   "whatsNew.r20261028.groupActivityTitle": "Aktivitet i gruppchattar",
   "whatsNew.r20261028.groupActivityBody": "Gruppchattar visar ändringar av namn och ikon. När du lämnar en grupp eller flera valda grupper kan du dölja ditt meddelande om att du lämnar.",
   "whatsNew.r202610282.saveTitle": "Välj var du vill spara",
-  "whatsNew.r202610282.saveBody": "Nedladdningar och bilder frågar nu var de ska sparas på Android och i datorwebbläsare som stöds. I mobilwebbläsare använder du systemets alternativ för att spara eller dela."
+  "whatsNew.r202610282.saveBody": "Nedladdningar och bilder frågar nu var de ska sparas på Android och i datorwebbläsare som stöds. I mobilwebbläsare använder du systemets alternativ för att spara eller dela.",
+  "whatsNew.r202610283.discoveryTitle": "Enklare NSFW-upptäckt",
+  "whatsNew.r202610283.discoveryBody": "Använd NSFW-reglaget bredvid filtren i Upptäck för att visa vuxengemenskaper. NSFW-servrar har en märkning bredvid namnet; sök på nsfw för att hitta dem."
 }

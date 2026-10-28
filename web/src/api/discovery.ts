@@ -3,7 +3,6 @@ import type { DiscoveryCard, PublicUser, ServerView, Snowflake } from "./types";
 
 export interface DiscoveryQuery {
   nsfw?: number;
-  nsfw_only?: number;
   q?: string;
   category?: string;
   tag?: string;

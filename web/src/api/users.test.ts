@@ -146,13 +146,13 @@ describe("media urls", () => {
     const dpr = Object.getOwnPropertyDescriptor(globalThis, "window");
     Object.defineProperty(globalThis, "window", { value: { devicePixelRatio: 2 }, configurable: true });
     try {
-      expect(avatarUrl("7", 32)).toBe("/media/avatar/7?size=64&v=2");
+      expect(avatarUrl("7", 32)).toBe("/media/avatar/7?size=64&v=3");
       // rounded up to the powers of two the server keeps
-      expect(iconUrl("7", 48)).toBe("/media/icon/7?size=128&v=2");
+      expect(iconUrl("7", 48)).toBe("/media/icon/7?size=128&v=3");
       expect(emojiUrl("7", true, 24)).toBe("/media/emoji/7?size=64");
       expect(stickerUrl("7", 160)).toBe("/media/sticker/7?size=512");
       // never past the largest copy
-      expect(bannerUrl("7", 600)).toBe("/media/banner/7?size=1024&v=2");
+      expect(bannerUrl("7", 600)).toBe("/media/banner/7?size=1024&v=3");
     } finally {
       if (dpr) Object.defineProperty(globalThis, "window", dpr);
       else delete (globalThis as { window?: unknown }).window;

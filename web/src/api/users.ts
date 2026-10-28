@@ -154,7 +154,7 @@ function mediaUrl(kind: string, id: Snowflake | null, css?: number, version = ""
   const params = new URLSearchParams();
   if (css) params.set("size", String(mediaSize(css)));
   if (still) params.set("still", "1");
-  if (css && version) params.set("v", "2");
+  if (css && version) params.set("v", "3");
   return params.size ? `${url}?${params}` : url;
 }
 
@@ -163,9 +163,10 @@ function mediaUrl(kind: string, id: Snowflake | null, css?: number, version = ""
  * upload was a GIF over 512 pixels, which froze animated banners; the server
  * now shrinks every frame. Sized copies are served as immutable, so browsers
  * that kept the still one would keep showing it at the old address: this
- * gives those three kinds a new one. The server ignores it.
+ * gives those three kinds a new one. Version 3 also drops copies made before
+ * the server applied photo orientation when resizing. The server ignores it.
  */
-const MOVING = "&v=2";
+const MOVING = "&v=3";
 
 /** `css` is how many pixels across it is drawn; leave it out for the original. */
 export function avatarUrl(id: Snowflake | null, css?: number): string | null {

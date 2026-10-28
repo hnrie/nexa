@@ -7315,5 +7315,7 @@
   "whatsNew.r20261028.groupActivityTitle": "Activité des groupes",
   "whatsNew.r20261028.groupActivityBody": "Les groupes affichent les changements de nom et d’icône. Quand vous quittez un ou plusieurs groupes sélectionnés, vous pouvez masquer votre message de départ.",
   "whatsNew.r202610282.saveTitle": "Choisir où enregistrer",
-  "whatsNew.r202610282.saveBody": "Les téléchargements et les images demandent désormais où enregistrer sur Android et les navigateurs de bureau compatibles. Sur les navigateurs mobiles, utilisez les options système pour enregistrer ou partager."
+  "whatsNew.r202610282.saveBody": "Les téléchargements et les images demandent désormais où enregistrer sur Android et les navigateurs de bureau compatibles. Sur les navigateurs mobiles, utilisez les options système pour enregistrer ou partager.",
+  "whatsNew.r202610283.discoveryTitle": "Découverte NSFW Simplifiée",
+  "whatsNew.r202610283.discoveryBody": "Utilisez le bouton NSFW à côté des filtres de découverte pour inclure les communautés pour adultes. Les serveurs NSFW portent un badge à côté de leur nom ; recherchez nsfw pour les trouver."
 }

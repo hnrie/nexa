@@ -7316,5 +7316,7 @@
   "whatsNew.r20261028.groupActivityTitle": "Atividade dos grupos",
   "whatsNew.r20261028.groupActivityBody": "Os grupos mostram alterações de nome e ícone. Ao sair de um ou vários grupos selecionados, você pode ocultar sua mensagem de saída.",
   "whatsNew.r202610282.saveTitle": "Escolha Onde Salvar",
-  "whatsNew.r202610282.saveBody": "Downloads e imagens agora perguntam onde salvar no Android e em navegadores de computador compatíveis. Nos navegadores móveis, use as opções de salvar ou compartilhar do sistema."
+  "whatsNew.r202610282.saveBody": "Downloads e imagens agora perguntam onde salvar no Android e em navegadores de computador compatíveis. Nos navegadores móveis, use as opções de salvar ou compartilhar do sistema.",
+  "whatsNew.r202610283.discoveryTitle": "Descoberta NSFW Mais Simples",
+  "whatsNew.r202610283.discoveryBody": "Use o botão NSFW ao lado dos filtros de descoberta para incluir comunidades adultas. Servidores NSFW têm um selo ao lado do nome; pesquise nsfw para encontrá-los."
 }

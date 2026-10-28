@@ -683,8 +683,10 @@ object Uploads {
         if (!type.startsWith("image/")) return Look()
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.path, bounds)
-        val w = bounds.outWidth.takeIf { it > 0 }
-        val h = bounds.outHeight.takeIf { it > 0 }
+        val orientation = fish.nexa.media.PhotoOrientation.of(file)
+        val swapped = orientation in 5..8
+        val w = (if (swapped) bounds.outHeight else bounds.outWidth).takeIf { it > 0 }
+        val h = (if (swapped) bounds.outWidth else bounds.outHeight).takeIf { it > 0 }
         if (w == null || h == null) return Look()
         if (type !in COPYABLE || file.length() < COPY_FROM) return Look(w, h)
         val head = ByteArray(minOf(64 * 1024, file.length().toInt()))
@@ -701,7 +703,8 @@ object Uploads {
         val th = maxOf(1, Math.round(h * scale).toInt())
         var sample = 1
         while (w / (sample * 2) >= tw && h / (sample * 2) >= th) sample *= 2
-        val src = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+        val raw = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+        val src = fish.nexa.media.PhotoOrientation.apply(raw, fish.nexa.media.PhotoOrientation.of(file))
         val scaled = if (src.width != tw || src.height != th) Bitmap.createScaledBitmap(src, tw, th, true).also { if (it !== src) src.recycle() } else src
         val out = ByteArrayOutputStream()
         val webp = if (Build.VERSION.SDK_INT >= 30) Bitmap.CompressFormat.WEBP_LOSSY else @Suppress("DEPRECATION") Bitmap.CompressFormat.WEBP

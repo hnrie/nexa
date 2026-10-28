@@ -7202,5 +7202,7 @@
   "whatsNew.r20261028.groupActivityTitle": "Group Chat Activity",
   "whatsNew.r20261028.groupActivityBody": "Group chats show name and icon changes. When leaving one group or several selected groups, you can choose to hide your leave message.",
   "whatsNew.r202610282.saveTitle": "Choose Where to Save",
-  "whatsNew.r202610282.saveBody": "Downloads and pictures now ask where to save on Android and supported desktop browsers. On mobile browsers, use the system save or share options."
+  "whatsNew.r202610282.saveBody": "Downloads and pictures now ask where to save on Android and supported desktop browsers. On mobile browsers, use the system save or share options.",
+  "whatsNew.r202610283.discoveryTitle": "Simpler NSFW Discovery",
+  "whatsNew.r202610283.discoveryBody": "Use the NSFW switch beside Discovery filters to include adult communities. NSFW servers have a badge beside their name; search nsfw to find them."
 }

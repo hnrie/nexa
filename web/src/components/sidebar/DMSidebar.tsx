@@ -457,7 +457,7 @@ export function DMSidebar() {
       avatar = <TypingAvatar channelId={ch.id} id={ch.id} avatarId={ch.icon_id} name={name} group />;
     }
     const look = withOwn(undefined, tagOf ? users[tagOf]?.name_style : null);
-    const subs = activeConvo === ch.id && !isPicking ? selectSubchats(channels, ch.id) : [];
+    const subs = !isPicking ? selectSubchats(channels, ch.id).filter((sc) => activeConvo === ch.id || isUnread(reads[sc.id], sc.last_message_id)) : [];
     return (
       <div key={ch.id}>
         {/* A row of two buttons rather than one button with a role="button"

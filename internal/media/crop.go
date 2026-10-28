@@ -63,7 +63,7 @@ func Crop(data []byte, spec CropSpec) ([]byte, string, error) {
 	if spec.MaxW <= 0 || spec.MaxH <= 0 {
 		return nil, "", ErrBadDimensions
 	}
-	if !animated {
+	if !animated && jpegOrientation(data) <= 1 {
 		if w, h, err := ImageDims(bytes.NewReader(data)); err == nil {
 			bounds := image.Rect(0, 0, w, h)
 			rect := cropRect(bounds, spec)
@@ -183,7 +183,7 @@ func decodeStill(data []byte, mime string) (*image.NRGBA, error) {
 	if err != nil {
 		return nil, ErrUnsupported
 	}
-	return toNRGBA(img), nil
+	return toNRGBA(orientImage(img, jpegOrientation(data))), nil
 }
 
 func toNRGBA(img image.Image) *image.NRGBA {

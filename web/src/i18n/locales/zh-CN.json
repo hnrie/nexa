@@ -6965,5 +6965,7 @@
   "whatsNew.r20261028.groupActivityTitle": "群组聊天动态",
   "whatsNew.r20261028.groupActivityBody": "群组聊天会显示名称和图标的更改。退出一个群组或多个选中的群组时，你可以选择隐藏退出消息。",
   "whatsNew.r202610282.saveTitle": "选择保存位置",
-  "whatsNew.r202610282.saveBody": "现在，在 Android 和支持的桌面浏览器上下载文件和图片时，可以选择保存位置。在手机浏览器上，请使用系统的保存或分享选项。"
+  "whatsNew.r202610282.saveBody": "现在，在 Android 和支持的桌面浏览器上下载文件和图片时，可以选择保存位置。在手机浏览器上，请使用系统的保存或分享选项。",
+  "whatsNew.r202610283.discoveryTitle": "更简洁的 NSFW 发现",
+  "whatsNew.r202610283.discoveryBody": "使用发现筛选项旁的 NSFW 开关显示成人社区。NSFW 服务器名称旁会显示标记；搜索 nsfw 即可查找。"
 }

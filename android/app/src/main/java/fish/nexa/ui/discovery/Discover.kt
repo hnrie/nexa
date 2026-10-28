@@ -150,7 +150,6 @@ fun DiscoverPage() {
     var size by remember { mutableStateOf("any") }
     var sort by remember { mutableStateOf("members") }
     var showNSFW by remember { mutableStateOf(false) }
-    var nsfwOnly by remember { mutableStateOf(false) }
     var cards by remember { mutableStateOf<List<DiscoveryCard>?>(null) }
     var next by remember { mutableStateOf<Int?>(null) }
     var failed by remember { mutableStateOf(false) }
@@ -163,7 +162,6 @@ fun DiscoverPage() {
         val (min, max) = SIZES.first { it.first == size }.second
         val parts = buildList {
             if (showNSFW) add("nsfw=1")
-            if (showNSFW && nsfwOnly) add("nsfw_only=1")
             if (q.isNotBlank()) add("q=" + java.net.URLEncoder.encode(q.trim(), "UTF-8"))
             if (category.isNotEmpty()) add("category=$category")
             if (tag.isNotEmpty()) add("tag=" + java.net.URLEncoder.encode(tag, "UTF-8"))
@@ -190,12 +188,12 @@ fun DiscoverPage() {
             if (generation == requestGeneration) failed = true
         }
     }
-    LaunchedEffect(q, category, tag, language, size, sort, reload, showNSFW, nsfwOnly) {
+    LaunchedEffect(q, category, tag, language, size, sort, reload, showNSFW) {
         ++requestGeneration
         if (q.isNotEmpty()) delay(300)
         load(0)
     }
-    val filtered = nsfwOnly || q.isNotBlank() || category.isNotEmpty() || tag.isNotEmpty() || language.isNotEmpty() || size != "any"
+    val filtered = q.isNotBlank() || category.isNotEmpty() || tag.isNotEmpty() || language.isNotEmpty() || size != "any"
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -261,19 +259,22 @@ fun DiscoverPage() {
                     }
                 }
             }
-            val popular = meta?.tags?.take(12) ?: emptyList()
+            item("nsfw") {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(min = 48.dp)) {
+                    Icon("TriangleAlert", c.warning, size = 16.dp)
+                    Txt(t("nsfw.label"), style = Nx.type.bodySmall, color = c.textMuted)
+                    fish.nexa.ui.components.NxToggle(showNSFW, { on ->
+                        if (!on) { ++requestGeneration; showNSFW = false; cards = null; next = null }
+                        else fish.nexa.ui.shell.confirm(t("nsfw.warningTitle"), t("nsfw.discoveryWarning"), t("nsfw.confirm"), danger = false) { ++requestGeneration; showNSFW = true; cards = null; next = null }
+                    }, label = t("nsfw.label"))
+                }
+            }
+            val popular = meta?.tags?.filter { !it.equals("nsfw", ignoreCase = true) }?.take(12) ?: emptyList()
             if (tag.isEmpty() && popular.isNotEmpty()) item("popular") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                     Txt(t("discovery.popularTags"), style = Nx.type.bodySmall, color = c.textMuted)
                     for (tg in popular) TagButton(tg) { tag = tg }
                 }
-            }
-            item("nsfw") {
-                fish.nexa.ui.components.ToggleLine(t("nsfw.label"), showNSFW, { on ->
-                    if (!on) { ++requestGeneration; showNSFW = false; nsfwOnly = false; cards = null; next = null }
-                    else fish.nexa.ui.shell.confirm(t("nsfw.warningTitle"), t("nsfw.discoveryWarning"), t("nsfw.confirm"), danger = false) { ++requestGeneration; showNSFW = true; cards = null; next = null }
-                }, description = t("nsfw.discoveryHint"), descriptionBelow = true)
-                if (showNSFW) CategoryChip(t("nsfw.label"), null, nsfwOnly) { nsfwOnly = !nsfwOnly }
             }
             val list = cards
             when {
@@ -426,14 +427,15 @@ internal fun ServerCard(card: DiscoveryCard, onTag: (String) -> Unit, onOpen: ()
         Column(Modifier.fillMaxWidth().offset(y = (-22).dp).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Txt(card.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(17f), fontWeight = FontWeight(700)), color = c.textStrong, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
+                if (card.nsfw) Badge(t("nsfw.label"), c.warning)
                 when {
                     card.member -> Badge(t("discovery.joined"), c.positive)
                     card.joinsPaused -> Badge(t("discovery.paused"), c.warning)
                 }
             }
             if (words.isNotEmpty()) Txt(words, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20f)), color = c.textMuted, maxLines = 3)
-            if (card.tags.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                for (tg in card.tags) TagButton(tg) { onTag(tg) }
+            if (card.tags.any { !it.equals("nsfw", ignoreCase = true) }) FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                for (tg in card.tags.filter { !it.equals("nsfw", ignoreCase = true) }) TagButton(tg) { onTag(tg) }
             }
             Stats(card)
         }
@@ -496,6 +498,7 @@ private fun ServerSheet(layer: Layer, card: DiscoveryCard, close: () -> Unit) {
         Band(card, Modifier.fillMaxWidth().height(140.dp))
         Box(Modifier.padding(start = 20.dp).offset(y = (-36).dp)) { ServerIconTile(card, 80.dp, 24.dp, c.bgFloating) }
         Column(Modifier.fillMaxWidth().offset(y = (-24).dp).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (card.nsfw) Badge(t("nsfw.label"), c.warning)
             Txt(card.name, style = Nx.type.title.copy(fontSize = Nx.type.sp(24f), lineHeight = Nx.type.sp(28f)), color = c.textStrong)
             // `.facts`: who is about, how many belong, and what it is
             val fact = Nx.type.hint.copy(fontSize = Nx.type.sp(13.5f))
@@ -512,8 +515,8 @@ private fun ServerSheet(layer: Layer, card: DiscoveryCard, close: () -> Unit) {
                 if (card.language.isNotEmpty()) Txt(languageName(card.language), style = fact, color = c.textMuted)
             }
             if (card.description.isNotBlank()) fish.nexa.ui.markdown.MarkdownView(card.description, fish.nexa.ui.markdown.RenderCtx(surface = c.bgFloating))
-            if (card.tags.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                for (tg in card.tags) Txt(if (tg.equals("nsfw", ignoreCase = true)) t("nsfw.label") else tg, style = Nx.type.hint, color = c.text, modifier = Modifier.background(c.bgActive, RoundedCornerShape(999.dp)).padding(horizontal = 8.dp, vertical = 2.dp))
+            if (card.tags.any { !it.equals("nsfw", ignoreCase = true) }) FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                for (tg in card.tags.filter { !it.equals("nsfw", ignoreCase = true) }) Txt(if (tg.equals("nsfw", ignoreCase = true)) t("nsfw.label") else tg, style = Nx.type.hint, color = c.text, modifier = Modifier.background(c.bgActive, RoundedCornerShape(999.dp)).padding(horizontal = 8.dp, vertical = 2.dp))
             }
             val emojis = detail?.emojis ?: emptyList()
             if (emojis.isNotEmpty()) FlowRow(Modifier.semantics { contentDescription = t("discovery.emojis") }, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

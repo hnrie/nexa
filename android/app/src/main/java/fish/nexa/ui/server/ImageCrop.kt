@@ -289,7 +289,7 @@ private fun decode(bytes: ByteArray): Decoded? = try {
         var sample = 1
         while (max(bounds.outWidth, bounds.outHeight) / sample > 4096) sample *= 2
         val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
-        bmp?.let { Decoded(it, sample) }
+        bmp?.let { Decoded(fish.nexa.media.PhotoOrientation.apply(it, fish.nexa.media.PhotoOrientation.of(bytes)), sample) }
     }
 } catch (_: Throwable) {
     null

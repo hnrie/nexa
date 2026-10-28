@@ -51,7 +51,7 @@ func VariantSize(raw string) int {
 
 // variantPath is where the copy of a blob at size lives.
 func (m *Store) variantPath(sha string, size int, ext string) string {
-	return filepath.Join(m.Dir, "variants", sha[:2], fmt.Sprintf("%s-%d.%s", sha, size, ext))
+	return filepath.Join(m.Dir, "variants", sha[:2], fmt.Sprintf("%s-%d-oriented.%s", sha, size, ext))
 }
 
 // removeVariants deletes every copy made of a blob's bytes.

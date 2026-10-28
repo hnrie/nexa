@@ -38,7 +38,7 @@ object Mentions {
             members = st.members.values.map { m -> Md.Member(m.userId, listOfNotNull(nameOf(m.userId), m.nickname.takeIf { it.isNotEmpty() })) }
             val everyRole = Nexa.servers.canI(st, P.MENTION_EVERYONE, channelId)
             roles = st.roles.values.filter { it.id != st.server.id && (it.mentionable || everyRole) }.map { Md.Named(it.id, it.name) }
-            channels = Nexa.channels.byId.value.values.filter { it.serverId == serverId && it.type == "text" && Nexa.servers.canI(st, P.VIEW_CHANNEL, it.id) }
+            channels = Nexa.channels.byId.value.values.filter { it.serverId == serverId && (it.isText || it.isAnnouncement || it.isForum) && Nexa.servers.canI(st, P.VIEW_CHANNEL, it.id) }
                 .map { Md.Named(it.id, it.name) }
         } else if (ch != null) {
             val ids = (ch.recipientIds + listOfNotNull(me?.id)).toSet()

@@ -482,8 +482,11 @@ request may meet a captcha is disabled until that request ends (the Public Pack 
 
 `servers.nsfw` is the whole-community toggle in Server Settings, Overview (migration 0040
 on SQLite and Postgres). Its compact NSFW toggle sits below the ordinary Overview settings,
-with its description below the label and switch. Discovery uses the same layout after the regular
-categories, filters and popular tags. Channel `nsfw` flags stay independent. A channel's settings recommend
+with its description below the label and switch. Discovery instead uses a compact warning-icon
+NSFW switch beside its regular filters, with
+no separate NSFW filter button or popular-tag shortcut. Whole-community NSFW listings have an NSFW
+badge beside their name; searching `nsfw` still finds classified content after opting in. Channel
+`nsfw` flags stay independent. A channel's settings recommend
 marking the whole server only if most of its content is NSFW. The Terms permit NSFW communities,
 require that classification for majority-NSFW servers, and allow a few NSFW channels without
 classifying the whole server when its public-facing details contain no NSFW content.
@@ -735,7 +738,11 @@ How each permission is held, as Discord holds it:
   power of two). An animation keeps moving at any size: one of 512 px or less is served as it is, a
   larger GIF gets every frame composed and shrunk (`animated.go`), and a WebP or APNG is served as
   uploaded; `?still=1` asks for the first frame. Sized avatar, banner and icon addresses carry
-  `&v=2` (web `api/users.ts`, Android `Media.kt`) so caches drop the stills that large GIFs used to be. The kind in the address must match the stored one, and a picture the staff blocked
+  `&v=3` (web `api/users.ts`, Android `Media.kt`) so caches drop earlier still or incorrectly
+  oriented copies. JPEG crops and sized variants (`orientation.go`) apply all eight Exif transforms before cropping
+  or shrinking; variant filenames carry an orientation version too. Android applies the same
+  transforms (`media/PhotoOrientation`) when making attachment thumbnails and crop previews,
+  and measures the displayed dimensions. The kind in the address must match the stored one, and a picture the staff blocked
   is served to nobody.
   Appearance has independent synced `animateAvatars`, `animateIcons` (servers, channels and groups),
   `animateBanners`, `animateEmoji` and `animateStickers` settings, all on by default. Public URL
@@ -1206,6 +1213,9 @@ This is a public website feature, with no corresponding native Android screen.
   where, for the status dot's typing pill (the dot stretched sideways, never taller) and the dots
   just after a server channel's name, both of which the account's settings can turn off
   (`typingAvatars`, `typingChannels`).
+- Hashtag suggestions and send/edit conversion include visible text, announcement and forum
+  channels on both clients. Subchats stay listed under the open conversation; unread subchats
+  also appear under their parent while another conversation is open, then hide after being read.
 - `lib/decrypt.ts` turns a message into what the stores keep (webhook messages pass through
   `lib/webhookMessage.ts` instead). `lib/keyring.ts` holds the roots in memory and caches channel keys.
 

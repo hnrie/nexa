@@ -536,13 +536,15 @@ private fun ConversationEntry(
         NexaRow(nexaOpen, picking, { openRowMenu(id, place) }) { tapRow(id) { Nav.go(Route.NexaConvo) } }
         return
     }
-    val ch = Nexa.channels.get(id) ?: return
+    val channels by Nexa.channels.byId.collectAsState()
+    val reads by Nexa.readStates.byChannel.collectAsState()
+    val ch = channels[id] ?: return
     Column {
         ConversationRow(ch, selected = activeId == ch.id, parentSelected = activeConvo == ch.id && activeId != ch.id, picking = picking, onLongPress = { openRowMenu(ch.id, place) }) {
             tapRow(ch.id) { Nav.go(Route.Dm(ch.id)) }
         }
-        if (activeConvo == ch.id && !picking) {
-            val subs = Nexa.channels.byId.value.values.filter { it.type == "subchat" && it.parentId == ch.id }.sortedBy { it.position }
+        if (!picking) {
+            val subs = channels.values.filter { it.type == "subchat" && it.parentId == ch.id && (activeConvo == ch.id || Unread.isUnread(reads[it.id], it.lastMessageId)) }.sortedBy { it.position }
             for (sc in subs) SubchatRow(sc, activeId == sc.id)
         }
     }

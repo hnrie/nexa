@@ -104,7 +104,7 @@ function conversation(channelId: string) {
 /**
  * Who and what a message in this channel can name: its people, the roles one
  * may mention there (the mentionable ones, or all of them with Mention
- * @everyone), the server's text channels one can see, and the custom emoji,
+ * @everyone), the server's text, announcement and forum channels one can see, and the custom emoji,
  * this server's own first.
  */
 export function mentionScope(channelId: string): MentionScope {
@@ -122,7 +122,7 @@ export function mentionScope(channelId: string): MentionScope {
       .filter((r) => r.id !== st.server.id && (r.mentionable || everyRole))
       .map((r) => ({ id: r.id, name: r.name }));
     scope.channels = Object.values(useChannels.getState().byId)
-      .filter((c) => c.server_id === serverId && c.type === "text" && canI(st, P.VIEW_CHANNEL, c.id))
+      .filter((c) => c.server_id === serverId && ["text", "announcement", "forum"].includes(c.type) && canI(st, P.VIEW_CHANNEL, c.id))
       .map((c) => ({ id: c.id, name: c.name }));
   } else if (ch) {
     const ids = new Set([...ch.recipient_ids, ...(me ? [me.id] : [])]);

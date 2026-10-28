@@ -1,6 +1,6 @@
 import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
-import { Compass, Users, X } from "lucide-react";
+import { TriangleAlert, Compass, Users, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -65,12 +65,13 @@ export function ServerCard({ card, onOpen, onTag }: { card: DiscoveryCard; onOpe
       <div className={s.body}>
         <h3 className={s.name} dir="auto">
           <span>{card.name}</span>
+          {card.nsfw ? <span className={s.badge} data-nsfw="">{t("nsfw.label")}</span> : null}
           {card.member ? <span className={s.badge}>{t("discovery.joined")}</span> : card.joins_paused ? <span className={s.badge} data-paused="">{t("discovery.paused")}</span> : null}
         </h3>
         {words ? <p className={s.desc} dir="auto">{words}</p> : null}
-        {card.tags.length ? (
+        {card.tags.some((tg) => tg.toLowerCase() !== "nsfw") ? (
           <div className={s.cardTags}>
-            {card.tags.map((tg) => (
+            {card.tags.filter((tg) => tg.toLowerCase() !== "nsfw").map((tg) => (
               <button key={tg} type="button" className={s.tagBtn} style={{ position: "relative", zIndex: 2 }} onClick={() => onTag(tg)}>{tg.toLowerCase() === "nsfw" ? t("nsfw.label") : tg}</button>
             ))}
           </div>
@@ -156,7 +157,7 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
       </div>
       <div className={s.sheetBody}>
         <div>
-          <h2 className={s.sheetName} dir="auto">{card.name}</h2>
+          <h2 className={s.sheetName} dir="auto">{card.name} {card.nsfw ? <span className={s.badge} data-nsfw="">{t("nsfw.label")}</span> : null}</h2>
           <div className={s.facts}>
             <span className={s.stat}><span className={s.dot} data-online="" />{t("discovery.online", { count: card.online_count, shown: count(card.online_count) })}</span>
             <span className={s.stat}><Users size={14} aria-hidden="true" />{t("discovery.members", { count: card.member_count, shown: count(card.member_count) })}</span>
@@ -169,9 +170,9 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
             <Markdown source={card.description} ctx={ctx} />
           </div>
         ) : null}
-        {card.tags.length ? (
+        {card.tags.some((tg) => tg.toLowerCase() !== "nsfw") ? (
           <div className={s.cardTags}>
-            {card.tags.map((tg) => <span key={tg} className={s.cardTag}>{tg.toLowerCase() === "nsfw" ? t("nsfw.label") : tg}</span>)}
+            {card.tags.filter((tg) => tg.toLowerCase() !== "nsfw").map((tg) => <span key={tg} className={s.cardTag}>{tg.toLowerCase() === "nsfw" ? t("nsfw.label") : tg}</span>)}
           </div>
         ) : null}
         {emojis.length ? (
@@ -194,7 +195,6 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
 export default function DiscoveryPage() {
   const [q, setQ] = useState("");
   const [showNSFW, setShowNSFW] = useState(false);
-  const [nsfwOnly, setNSFWOnly] = useState(false);
   const [category, setCategory] = useState("");
   const [tag, setTag] = useState("");
   const [language, setLanguage] = useState("");
@@ -224,10 +224,9 @@ export default function DiscoveryPage() {
       ...(sz?.max ? { max_members: sz.max } : {}),
       sort,
       nsfw: showNSFW ? 1 : undefined,
-      nsfw_only: showNSFW && nsfwOnly ? 1 : undefined,
       limit: 24,
     };
-  }, [q, category, tag, language, size, sort, showNSFW, nsfwOnly]);
+  }, [q, category, tag, language, size, sort, showNSFW]);
 
   const load = useCallback(
     async (offset: number) => {
@@ -257,7 +256,6 @@ export default function DiscoveryPage() {
       setNext(null);
       setOpen(null);
       setMeta(null);
-      setNSFWOnly(false);
       setShowNSFW(on);
     };
     if (!on) { apply(); return; }
@@ -269,7 +267,7 @@ export default function DiscoveryPage() {
     });
   };
 
-  const filtered = !!(nsfwOnly || q.trim() || category || tag || language || size !== "any");
+  const filtered = !!(q.trim() || category || tag || language || size !== "any");
   return (
     <div className={s.page}>
       <header className={chat.header}>
@@ -313,6 +311,11 @@ export default function DiscoveryPage() {
                 {(meta?.languages ?? Object.keys(LANGUAGE_NAMES)).map((l) => <option key={l} value={l}>{LANGUAGE_NAMES[l] ?? l}</option>)}
               </select>
             </label>
+            <div className={s.nsfwSwitch}>
+              <TriangleAlert size={16} aria-hidden="true" />
+              <span>{t("nsfw.label")}</span>
+              <Toggle checked={showNSFW} onChange={changeNSFW} ariaLabel={t("nsfw.label")} />
+            </div>
             {tag ? (
               <span className={s.activeTag}>
                 {t("discovery.taggedWith", { tag })}
@@ -320,16 +323,14 @@ export default function DiscoveryPage() {
               </span>
             ) : null}
           </div>
-          {!tag && meta?.tags.length ? (
+          {!tag && meta?.tags.some((tg) => tg.toLowerCase() !== "nsfw") ? (
             <div className={s.popular}>
               <span>{t("discovery.popularTags")}</span>
-              {meta.tags.slice(0, 12).map((tg) => (
+              {meta.tags.filter((tg) => tg.toLowerCase() !== "nsfw").slice(0, 12).map((tg) => (
                 <button key={tg} type="button" className={s.tagBtn} onClick={() => setTag(tg)}>{tg.toLowerCase() === "nsfw" ? t("nsfw.label") : tg}</button>
               ))}
             </div>
           ) : null}
-          <Toggle checked={showNSFW} onChange={changeNSFW} label={t("nsfw.label")} description={t("nsfw.discoveryHint")} descriptionBelow />
-          {showNSFW ? <button type="button" className={s.cat} aria-pressed={nsfwOnly} onClick={() => setNSFWOnly(!nsfwOnly)}>{t("nsfw.label")}</button> : null}
           {failed ? (
             <div className={s.note}>
               {t("discovery.failed")}{" "}
