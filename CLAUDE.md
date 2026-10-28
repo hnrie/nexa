@@ -564,6 +564,9 @@ payload's `fwd.at` is when the original was sent, drawn as Forwarded with a bar 
 The forwarding sheet accepts an optional message, kept as `fwd.comment` inside the same encrypted
 payload and drawn above the forwarded block. Both clients enforce the ordinary 4000-character
 text limit on the comment and include it in search, copying, notifications and AutoMod checks.
+Android draws the forwarded bar after normal layout, without intrinsic measurements of the
+message body: video players and post previews use BoxWithConstraints, which cannot answer
+intrinsic height queries and previously crashed when a forwarded message was viewed.
 
 ### Voice messages
 
@@ -572,7 +575,10 @@ A voice message is an ordinary encrypted audio attachment whose meta says `voice
 bytes, and only on `audio/` files). The shape travels in the message, so the bubble is drawn whole
 before the file comes down; it is drawn with 32 bars (`SHOWN_BARS`). The server knows nothing of
 it. While the box is empty (no words, files or command) a mic takes the send button's place, for
-anyone with Attach Files; it opens a bar laid over the box that records at once (red dot, time,
+anyone with Attach Files. On desktop web, Show Send Message Button keeps a disabled Send beside
+the mic until there is something to send. The text menu's useTextMenu keeps the switch object
+and its latest checked state and callback, rather than wrapping that object as a function.
+The mic opens a bar laid over the box that records at once (red dot, time,
 live shape), Stop gives a review to listen back, Send goes from either, the bin, Escape or Back
 throws it away. At most ten minutes, under half a second is dropped. The web records with
 MediaRecorder from the microphone chosen in Voice & Video, AAC in MP4 where the browser makes it,

@@ -59,9 +59,14 @@ export function useTextMenu(ref: RefObject<HTMLElement | null>, hooks: TextMenuH
   const through = useRef<TextMenuHooks | null>(null);
   if (!through.current) {
     // every call reaches the hooks of the latest render
-    const h: TextMenuHooks = { formatKeys: hooks.formatKeys };
+    const h: TextMenuHooks = {};
     for (const key of Object.keys(hooks) as (keyof TextMenuHooks)[]) {
-      if (key === "formatKeys") continue;
+      // These are values, not callbacks. Wrapping sendButton in a function
+      // loses both its checked state and toggle, so the menu cannot switch it.
+      if (key === "formatKeys" || key === "sendButton") {
+        Object.defineProperty(h, key, { get: () => latest.current[key] });
+        continue;
+      }
       (h as Record<string, unknown>)[key] = (...args: unknown[]) => (latest.current[key] as ((...a: unknown[]) => unknown) | undefined)?.(...args);
     }
     through.current = h;

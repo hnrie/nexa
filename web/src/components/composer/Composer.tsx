@@ -752,6 +752,7 @@ export function Composer({ channel }: { channel: Channel }) {
 
   // A voice message: the mic takes the send button's place while the box is empty.
   const [recording, setRecording] = useState(false);
+  const showVoiceButton = !cmd.active && !text.trim() && files.length === 0 && canAttach && canRecordVoice();
   useEffect(() => setRecording(false), [channel.id]);
   const startVoice = () => {
     if (remaining > 0) return toast(tr_("composer.composer.slowModeOnSeconds", { seconds: remaining }), "error");
@@ -1123,7 +1124,7 @@ export function Composer({ channel }: { channel: Channel }) {
               <button className={s.iconBtn} data-on={picker} data-picker-toggle={picker || undefined} aria-label={tr_("composer.composer.selectEmoji")} onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
             </>
           )}
-          {!cmd.active && !text.trim() && files.length === 0 && canAttach && canRecordVoice() ? (
+          {showVoiceButton ? (
             <button
               type="button"
               className={[s.iconBtn, s.mic].join(" ")}
@@ -1134,9 +1135,10 @@ export function Composer({ channel }: { channel: Channel }) {
             >
               <Mic size={22} />
             </button>
-          ) : (
+          ) : null}
+          {!showVoiceButton || sendButton ? (
           <button
-            className={[s.iconBtn, s.send, s.sendMobile, sendButton ? s.sendShown : ""].join(" ")}
+            className={[s.iconBtn, s.send, s.sendMobile, sendButton ? s.sendShown : "", showVoiceButton ? s.sendEmpty : ""].join(" ")}
             aria-label={tr_("composer.composer.sendMessage")}
             title={tr_("composer.composer.sendMessage")}
             // Pressing Send leaves the caret in the box: on a phone taking the
@@ -1164,7 +1166,7 @@ export function Composer({ channel }: { channel: Channel }) {
           >
             <SendHorizontal size={22} />
           </button>
-          )}
+          ) : null}
         </div>
         {recording ? <VoiceRecordBar onSend={(rec) => void sendVoice(rec)} onClose={() => { setRecording(false); taRef.current?.focus({ preventScroll: true }); }} /> : null}
       </div>

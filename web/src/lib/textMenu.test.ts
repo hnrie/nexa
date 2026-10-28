@@ -2,6 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContextMenuItem } from "@/stores/ui";
 import { useUI } from "@/stores/ui";
+import { createElement, useRef } from "react";
+import { cleanup, render } from "@testing-library/react";
 
 const spell = vi.hoisted(() => ({ active: false, learn: vi.fn() }));
 vi.mock("@/lib/spell", async (importOriginal) => {
@@ -15,7 +17,7 @@ vi.mock("@/lib/spell", async (importOriginal) => {
   };
 });
 
-import { installTextMenu, setTextMenu } from "./textMenu";
+import { installTextMenu, setTextMenu, useTextMenu } from "./textMenu";
 
 let uninstall: () => void = () => {};
 
@@ -28,6 +30,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   uninstall();
   delete (window as { evilionDesktop?: unknown }).evilionDesktop;
 });
@@ -54,6 +57,29 @@ function box(value: string, attrs: Record<string, string> = {}): HTMLTextAreaEle
 const ids = (items: ContextMenuItem[]) => items.map((i) => i.id);
 
 describe("the text box menu", () => {
+  it("keeps the mounted box's Send switch and its latest value and callback", async () => {
+    const first = vi.fn();
+    const next = vi.fn();
+    function Composer({ on, toggle }: { on: boolean; toggle: () => void }) {
+      const ref = useRef<HTMLTextAreaElement>(null);
+      useTextMenu(ref, { sendButton: { on, toggle } });
+      return createElement("textarea", { ref });
+    }
+    const view = render(createElement(Composer, { on: false, toggle: first }));
+    rightClick(view.container.querySelector("textarea")!);
+    let item = (await opened()).find((i) => i.id === "sendButton")!;
+    expect(item.checked).toBe(false);
+    item.onSelect!();
+    expect(first).toHaveBeenCalledOnce();
+    useUI.setState({ contextMenu: null });
+    view.rerender(createElement(Composer, { on: true, toggle: next }));
+    rightClick(view.container.querySelector("textarea")!);
+    item = (await opened()).find((i) => i.id === "sendButton")!;
+    expect(item.checked).toBe(true);
+    item.onSelect!();
+    expect(next).toHaveBeenCalledOnce();
+    expect(first).toHaveBeenCalledOnce();
+  });
   it("opens on a textarea in place of the browser's, with the editing items", async () => {
     const ta = box("hello there");
     ta.setSelectionRange(0, 5);

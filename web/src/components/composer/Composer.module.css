@@ -135,6 +135,9 @@
 /* every touch screen gets a send button, a tablet as much as a phone; a computer when it is asked for */
 @media (max-width: 767px), (pointer: coarse) { .sendMobile { display: flex; } }
 .sendMobile.sendShown { display: flex; }
+/* The desktop preference reveals Send immediately; phones keep the mic in
+   its usual place until there is something to send, as the native app does. */
+@media (max-width: 767px), (pointer: coarse) { .sendMobile.sendEmpty { display: none; } }
 .send:disabled { opacity: 1; cursor: default; background: transparent; color: var(--text-muted); box-shadow: none; filter: none; }
 .locked { align-items: center; padding: 0 16px; color: var(--text-muted); font-size: 16px; cursor: not-allowed; }
 .attachSpacer { width: 16px; flex: none; }

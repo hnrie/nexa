@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -40,6 +39,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -582,16 +584,21 @@ object AppNames : fish.nexa.ui.markdown.NameLookup {
 @Composable
 private fun Forwarded(at: Long, body: @Composable () -> Unit) {
     val c = Nx.colors
-    Row(Modifier.padding(vertical = 2.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
-        Box(Modifier.width(3.dp).fillMaxHeight().background(c.borderStrong))
-        Column(Modifier.padding(start = 10.dp)) {
-            Row(Modifier.padding(bottom = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Icon("CornerUpRight", c.textMuted, size = 13.dp)
-                Txt(t("forward.forwarded"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12f), fontWeight = FontWeight(600)), color = c.textMuted)
-                Txt(Time.shortDate(at), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12f), fontWeight = FontWeight(500)), color = c.textMuted)
-            }
-            body()
+    // Draw the bar after normal measurement. IntrinsicSize asks the whole
+    // message for intrinsic height, which crashes for BoxWithConstraints in
+    // video players and post previews (including pending forwards).
+    Column(
+        Modifier.padding(vertical = 2.dp).drawBehind {
+            val width = 3.dp.toPx()
+            drawRect(c.borderStrong, Offset(if (layoutDirection == LayoutDirection.Rtl) size.width - width else 0f, 0f), Size(width, size.height))
+        }.padding(start = 13.dp),
+    ) {
+        Row(Modifier.padding(bottom = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Icon("CornerUpRight", c.textMuted, size = 13.dp)
+            Txt(t("forward.forwarded"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12f), fontWeight = FontWeight(600)), color = c.textMuted)
+            Txt(Time.shortDate(at), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12f), fontWeight = FontWeight(500)), color = c.textMuted)
         }
+        body()
     }
 }
 
