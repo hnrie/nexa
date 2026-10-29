@@ -175,14 +175,13 @@ export function UserPanel() {
       </div>
       {open ? (
         <div className={s.pop} ref={pop} role="menu" aria-label={me.display_name} onKeyDown={onPopKey} data-modal-layer>
-          {/* Not a menu item: it is who the menu is about. */}
-          <div className={s.popHead} role="presentation">
+          <button className={s.popHead} role="menuitem" onClick={() => { setOpen(false); openModal("profile", { userId: me.id }); }} data-testid="menu-profile">
             <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={40} status={status} />
-            <div>
+            <div className={s.popIdentity}>
               <div className={s.popName}><PersonName user={me}>{me.display_name}</PersonName></div>
               <div className={s.popUser}>@{me.username}</div>
             </div>
-          </div>
+          </button>
           <div className={s.sep} role="separator" />
           <button className={s.opt} role="menuitem" onClick={() => { setOpen(false); openModal("customStatus"); }}>
             <Pencil size={16} />

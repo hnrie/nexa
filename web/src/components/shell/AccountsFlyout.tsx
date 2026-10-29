@@ -50,26 +50,26 @@ export default function AccountsFlyout({ meId, flyoutRef, closeMenu, back }: { m
         <div key={a.id} className={f.account}>
           {a.id === meId ? (
             // who is open now: no switch to make
-            <div className={[s.opt, f.accountOpt, f.accountHere].join(" ")}>
-              <Avatar id={a.id} avatarId={a.avatar_id} name={a.display_name} size={24} />
-              <span className={s.optText} style={{ flex: 1 }}>
+            <div className={[f.accountOpt, f.accountHere].join(" ")} role="menuitem" aria-disabled="true">
+              <Avatar id={a.id} avatarId={a.avatar_id} name={a.display_name} size={32} />
+              <span className={f.identity}>
                 <PersonName user={a}>{a.display_name}</PersonName>
-                <span className={s.optSub}>@{a.username}</span>
+                <span className={f.username}>@{a.username}</span>
               </span>
-              <Check size={16} aria-label={t("accounts.current")} />
+              <span className={f.trailing}><Check size={16} aria-label={t("accounts.current")} /></span>
             </div>
           ) : (
             <>
-              <button className={[s.opt, f.accountOpt].join(" ")} role="menuitem" onClick={() => { closeMenu(); void switchAccount(a.id); }} data-testid="menu-account">
-                <Avatar id={a.id} avatarId={a.avatar_id} name={a.display_name} size={24} />
-                <span className={s.optText}>
+              <button className={f.accountOpt} role="menuitem" onClick={() => { closeMenu(); void switchAccount(a.id); }} data-testid="menu-account">
+                <Avatar id={a.id} avatarId={a.avatar_id} name={a.display_name} size={32} />
+                <span className={f.identity}>
                   <PersonName user={a}>{a.display_name}</PersonName>
-                  <span className={s.optSub}>@{a.username}</span>
+                  <span className={f.username}>@{a.username}</span>
                 </span>
               </button>
-              <Tooltip text={t("accounts.remove")}>
+              <Tooltip text={t("accounts.remove")} className={f.trailing}>
                 <button className={f.accountRemove} role="menuitem" aria-label={t("accounts.removeTitle", { name: a.display_name })} onClick={() => askRemove(a.id, a.display_name)}>
-                  <X size={14} />
+                  <X size={16} strokeWidth={1.5} />
                 </button>
               </Tooltip>
             </>
@@ -78,7 +78,7 @@ export default function AccountsFlyout({ meId, flyoutRef, closeMenu, back }: { m
       ))}
       {accounts.length ? <div className={s.sep} role="separator" /> : null}
       <button
-        className={s.opt}
+        className={f.addAccount}
         role="menuitem"
         onClick={() => {
           closeMenu();
@@ -87,8 +87,8 @@ export default function AccountsFlyout({ meId, flyoutRef, closeMenu, back }: { m
         }}
         data-testid="menu-add-account"
       >
-        <Plus size={16} />
-        <span className={s.optText}><span>{t("accounts.addAnotherAccount")}</span></span>
+        <span className={f.addIcon}><Plus size={18} strokeWidth={1.75} /></span>
+        <span>{t("accounts.addAnotherAccount")}</span>
       </button>
     </div>
   );
