@@ -1,16 +1,11 @@
 package fish.nexa.ui.reports
 
-import android.net.Uri
-import android.provider.OpenableColumns
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import fish.nexa.Nexa
 import fish.nexa.data.*
-import fish.nexa.net.UriBody
 import fish.nexa.ui.components.*
 import fish.nexa.ui.describeError
 import fish.nexa.ui.layers.MenuItem
@@ -57,10 +52,6 @@ private class ReportSubmit {
     var sent by mutableStateOf(false)
 }
 
-private class ReportFile(val uri: Uri, val name: String, val type: String, val size: Long) {
-    var uploaded: String? = null
-}
-
 @Composable
 private fun ReportForm(
     context: ReportContext,
@@ -77,24 +68,23 @@ private fun ReportForm(
     var reason by remember { mutableStateOf("harassment") }
     var description by remember { mutableStateOf("") }
     val custom = if (kind == "other") description.take(120) else ""
+    var preview by remember { mutableStateOf<ChatMessage?>(null) }
     var message by remember { mutableStateOf<JsonObject?>(null) }
-    var excerpt by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var receipt by remember { mutableStateOf("") }
-    val selected = remember { mutableStateListOf<Int>() }
     val requestId = remember { java.util.UUID.randomUUID().toString() }
-    val files = remember { mutableStateListOf<ReportFile>() }
     val busy = busyState.value
     LaunchedEffect(kind, id, context.serverId) {
         target = null
         loading = false
         message = null
+        preview = null
         error = ""
         if (kind != "other" && !id.matches(Regex("[0-9]{1,20}"))) return@LaunchedEffect
         loading = true
         try {
             val r = Reports.target(kind, id.ifEmpty { "0" }, context.serverId)
-            if (kind == "message") message = Reports.fullMessage(r)
+            if (kind == "message") message = Reports.fullMessage(r) { preview = it }
             target = r
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -103,59 +93,7 @@ private fun ReportForm(
             loading = false
         }
     }
-    val picker =
-        rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-            val resolver = Nexa.app.contentResolver
-            for (uri in uris) {
-                val type = resolver.getType(uri) ?: ""
-                var name = ""
-                var size = 0L
-                runCatching {
-                    resolver
-                        .query(
-                            uri,
-                            arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
-                            null,
-                            null,
-                            null,
-                        )
-                        ?.use { cur ->
-                            if (cur.moveToFirst()) {
-                                name = cur.getString(0) ?: ""
-                                size = cur.getLong(1)
-                            }
-                        }
-                }
-                val allowed =
-                    type in
-                        listOf(
-                            "image/png",
-                            "image/jpeg",
-                            "image/gif",
-                            "image/webp",
-                            "video/mp4",
-                            "video/quicktime",
-                            "video/webm",
-                        )
-                if (
-                    !allowed ||
-                        files.size >= 5 ||
-                        size < 0 ||
-                        size > (if (type.startsWith("image/")) 10L else 50L) * 1024 * 1024 ||
-                        files.sumOf { it.size } + size > 100L * 1024 * 1024
-                ) {
-                    error = t("reports.filesHint")
-                    continue
-                }
-                files.add(ReportFile(uri, name, type, size))
-            }
-        }
-    val evidenceText =
-        selected
-            .mapNotNull { context.evidence.getOrNull(it)?.text }
-            .plus(excerpt.takeIf { it.isNotBlank() })
-            .filterNotNull()
-            .joinToString("\n\n")
+    val evidenceText = if (kind == "message") "" else context.evidence.joinToString("\n\n") { it.text }
     val valid =
         target != null &&
             (kind != "message" || message != null) &&
@@ -168,22 +106,6 @@ private fun ReportForm(
         error = ""
         scope.launch {
             try {
-                for (f in files) if (f.uploaded == null) {
-                    val path =
-                        "/reports/attachments?name=" + java.net.URLEncoder.encode(f.name, "UTF-8")
-                    val req =
-                        Nexa.api
-                            .requestBuilder(path)
-                            .post(UriBody(f.uri, f.type, f.size) {})
-                            .header("Content-Type", f.type)
-                            .build()
-                    f.uploaded =
-                        Nexa.api
-                            .execute(Nexa.api.http, req, true)
-                            .jsonObject["id"]!!
-                            .jsonPrimitive
-                            .content
-                }
                 val body = buildJsonObject {
                     put("request_id", requestId)
                     put("target_kind", kind)
@@ -195,17 +117,7 @@ private fun ReportForm(
                     put("reason", reason)
                     put("description", description)
                     put("excerpt", evidenceText)
-                    put(
-                        "files",
-                        JsonArray(
-                            files.map { f ->
-                                buildJsonObject {
-                                    put("id", f.uploaded!!)
-                                    put("name", f.name)
-                                }
-                            }
-                        ),
-                    )
+                    put("files", JsonArray(emptyList()))
                 }
                 receipt = Reports.send(body)
             } catch (e: Exception) {
@@ -228,8 +140,8 @@ private fun ReportForm(
             Txt(receipt, style = Nx.type.bodySmall, color = c.textMuted)
             return@Column
         }
-        Txt(
-            t(if (kind == "message") "reports.fullMessageNotice" else "reports.privacy"),
+        if (kind != "message") Txt(
+            t("reports.privacy"),
             style = Nx.type.bodySmall,
             color = c.textSubtle,
         )
@@ -242,9 +154,8 @@ private fun ReportForm(
             ) {
                 kind = it
                 id = ""
-                selected.clear()
             }
-        else Txt(t("reports.kind.$kind"), style = Nx.type.body, color = c.textStrong)
+        else if (kind != "message") Txt(t("reports.kind.$kind"), style = Nx.type.body, color = c.textStrong)
         if (context.id == null && kind != "other")
             NxTextField(
                 id,
@@ -260,6 +171,32 @@ private fun ReportForm(
         ) {
             reason = it
         }
+        if (kind == "message") {
+            preview?.let { cm ->
+                val channel = Nexa.channels.get(cm.channelId) ?: fish.nexa.net.Channel(id = cm.channelId)
+                fish.nexa.ui.chat.MessageRow(
+                    fish.nexa.ui.chat.MsgItem(cm.id, cm = cm, groupStart = true),
+                    fish.nexa.ui.chat.ListCtx(channel, Nexa.servers.byId.value[channel.serverId], false, false, Nexa.users.meId ?: ""),
+                    null, false, false, preview = true,
+                )
+            }
+            Txt(t("reports.fullMessageNotice"), style = Nx.type.bodySmall, color = c.textSubtle)
+        }
+        if (kind != "message") target?.snapshot?.let { snapshot ->
+            val image = snapshot["avatar_id"] ?: snapshot["icon_id"]
+            if (image is JsonPrimitive && image.contentOrNull != null) Avatar(target!!.id, snapshot["name"]?.jsonPrimitive?.content ?: snapshot["display_name"]?.jsonPrimitive?.content ?: "", image.content, 40.dp, icon = snapshot["avatar_id"] == null)
+            val blob = (snapshot["blob_id"] ?: snapshot["cover_blob_id"])?.jsonPrimitive?.contentOrNull
+            if (blob != null) coil3.compose.AsyncImage(model = if (kind == "emoji") fish.nexa.media.Media.emojiUrl(blob, 96, 1f) else fish.nexa.media.Media.stickerUrl(blob, 180, 1f), contentDescription = snapshot["name"]?.jsonPrimitive?.content, modifier = Modifier.size(120.dp))
+            snapshot.filterKeys { it in listOf("username", "display_name", "name", "description", "about_me", "pronouns", "status_text", "topic", "tags") }.forEach { (key, value) ->
+                if (value !is JsonNull && value.toString() != "\"\"") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Txt(t("reports.part.$key"), style = Nx.type.bodySmall, color = c.textMuted, modifier = Modifier.width(100.dp))
+                        Txt((value as? JsonPrimitive)?.content ?: value.toString(), style = Nx.type.body, color = c.text, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+        if (kind != "message") context.evidence.forEach { fish.nexa.ui.markdown.MarkdownView(it.text, fish.nexa.ui.markdown.RenderCtx()) }
         NxTextField(
             description,
             { if (it.length <= 4000) description = it },
@@ -270,103 +207,6 @@ private fun ReportForm(
             minLines = 4,
             enabled = !busy,
         )
-        if (kind == "message") {
-            message?.get("content")?.jsonObject?.let { content ->
-                (content["t"] as? JsonPrimitive)?.contentOrNull?.let {
-                    Txt(it, style = Nx.type.body, color = c.text)
-                }
-                content
-                    .filterKeys { it !in listOf("t", "type", "flags", "att") }
-                    .forEach { (key, value) ->
-                        Txt(value.toString(), style = Nx.type.bodySmall, color = c.text)
-                    }
-                message
-                    ?.get("attachments")
-                    ?.jsonArray
-                    ?.filter { it.jsonObject["preview"]?.jsonPrimitive?.booleanOrNull != true }
-                    ?.forEach { a ->
-                        Txt(
-                            a.jsonObject["name"]!!.jsonPrimitive.content,
-                            style = Nx.type.bodySmall,
-                            color = c.textMuted,
-                        )
-                    }
-            }
-        }
-        if (kind != "message" && context.evidence.isNotEmpty()) {
-            Txt(t("reports.chooseEvidence"), style = Nx.type.bodySmall, color = c.textStrong)
-            Txt(t("reports.selectedOnly"), style = Nx.type.bodySmall, color = c.textMuted)
-            context.evidence.forEachIndexed { i, e ->
-                Column {
-                    NxCheckbox(
-                        i in selected,
-                        { on -> if (on) selected.add(i) else selected.remove(i) },
-                        e.label,
-                        enabled = !busy,
-                    )
-                    Txt(e.text, style = Nx.type.bodySmall, color = c.text, maxLines = 8)
-                }
-            }
-        }
-        if (kind != "message")
-            NxTextField(
-                excerpt,
-                { if (it.length <= 16000) excerpt = it },
-                label = t("reports.excerpt"),
-                hint = t("reports.excerptHint"),
-                singleLine = false,
-                minLines = 3,
-                enabled = !busy,
-            )
-        NxButton(
-            t("reports.files"),
-            {
-                picker.launch(
-                    arrayOf(
-                        "image/png",
-                        "image/jpeg",
-                        "image/gif",
-                        "image/webp",
-                        "video/mp4",
-                        "video/quicktime",
-                        "video/webm",
-                    )
-                )
-            },
-            kind = ButtonKind.SECONDARY,
-            enabled = !busy,
-        )
-        Txt(t("reports.filesHint"), style = Nx.type.bodySmall, color = c.textMuted)
-        files.toList().forEach { f ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Txt(
-                    f.name,
-                    style = Nx.type.bodySmall,
-                    color = c.text,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 2,
-                )
-                NxButton(
-                    t("reports.remove"),
-                    { files.remove(f) },
-                    kind = ButtonKind.GHOST,
-                    size = ButtonSize.SM,
-                    enabled = !busy,
-                )
-            }
-        }
-        var showSnapshot by remember { mutableStateOf(false) }
-        if (target?.snapshot?.isNotEmpty() == true) {
-            NxButton(
-                t("reports.sharedDetails"),
-                { showSnapshot = !showSnapshot },
-                kind = ButtonKind.GHOST,
-            )
-            if (showSnapshot) {
-                Txt(t("reports.snapshotHint"), style = Nx.type.bodySmall, color = c.textMuted)
-                Txt(target!!.snapshot.toString(), style = Nx.type.bodySmall, color = c.text)
-            }
-        }
         if (loading) Txt(t("reports.loading"), style = Nx.type.bodySmall, color = c.textMuted)
         if (evidenceText.length > 16000)
             Txt(t("reports.evidenceTooLong"), style = Nx.type.bodySmall, color = c.textDanger)

@@ -317,14 +317,25 @@ private fun ReportWorkspace(id: String) {
                     Txt(t("reports.evidence"), style = Nx.type.heading, color = c.textStrong)
                     Txt(t("reports.unverified"), style = Nx.type.bodySmall, color = c.textMuted)
                     v.snapshot["message_content"]?.jsonObject?.let { content ->
-                        (content["t"] as? JsonPrimitive)?.contentOrNull?.let {
-                            Txt(it, style = Nx.type.body, color = c.text)
-                        }
-                        content
-                            .filterKeys { it !in listOf("t", "att", "flags", "type") }
-                            .forEach { (_, value) ->
-                                Txt(value.toString(), style = Nx.type.body, color = c.text)
-                            }
+                        val ch = v.snapshot["channel_id"]!!.jsonPrimitive.content
+                        val channel = Nexa.channels.get(ch) ?: fish.nexa.net.Channel(id = ch)
+                        val cm = ChatMessage(
+                            fish.nexa.net.Message(v.targetId, ch, v.subjectId, type = content["type"]?.jsonPrimitive?.content ?: "default", createdAt = v.snapshot["created_at"]?.jsonPrimitive?.longOrNull ?: v.createdAt, editedAt = v.snapshot["edited_at"]?.jsonPrimitive?.longOrNull),
+                            payload = fish.nexa.crypto.MessageCrypto.sanitizePayload(JsonObject(content.filterKeys { it !in listOf("att", "sticker") })),
+                            hook = content["hook"] as? JsonObject,
+                            call = content["call"] as? JsonObject,
+                        )
+                        fish.nexa.ui.chat.MessageRow(
+                            fish.nexa.ui.chat.MsgItem(cm.id, cm = cm, groupStart = true),
+                            fish.nexa.ui.chat.ListCtx(channel, Nexa.servers.byId.value[channel.serverId], false, false, Nexa.users.meId ?: ""),
+                            null, false, false, preview = true, previewAuthor = detail!!.people[v.subjectId],
+                            evidence = {
+                                v.snapshot["message_sticker"]?.jsonObject?.let { sticker ->
+                                    ReportFile(NexaFile(sticker["blob_id"]!!.jsonPrimitive.content, sticker["name"]?.jsonPrimitive?.content ?: "", "image/*"), sticker["format"]?.jsonPrimitive?.content)
+                                }
+                                detail!!.files.forEach { ReportFile(it) }
+                            },
+                        )
                     }
                     if (v.excerpt.isNotEmpty() || v.snapshot["message_content"] == null)
                         Txt(
@@ -333,7 +344,7 @@ private fun ReportWorkspace(id: String) {
                             color = c.text,
                         )
                 }
-                v.snapshot["message_sticker"]?.jsonObject?.let { sticker ->
+                v.snapshot["message_sticker"]?.jsonObject?.takeIf { v.snapshot["message_content"] == null }?.let { sticker ->
                     item {
                         ReportFile(
                             NexaFile(
@@ -345,7 +356,7 @@ private fun ReportWorkspace(id: String) {
                         )
                     }
                 }
-                items(detail!!.files, key = { it.id }) { file -> ReportFile(file) }
+                items(if (v.snapshot["message_content"] == null) detail!!.files else emptyList(), key = { it.id }) { file -> ReportFile(file) }
                 item {
                     NxButton(
                         t("reports.sharedDetails"),

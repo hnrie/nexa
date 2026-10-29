@@ -109,7 +109,7 @@ data class MsgItem(
  * reading direction replies.
  */
 @Composable
-fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, canPick: Boolean) {
+fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, canPick: Boolean, preview: Boolean = false, previewAuthor: fish.nexa.data.NexaPerson? = null, evidence: (@Composable () -> Unit)? = null) {
     val c = Nx.colors
     val cm = item.cm
     val p = item.pending
@@ -170,7 +170,7 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
             .then(
                 if (ctx.selecting && canPick) Modifier.pressable(remember { MutableInteractionSource() }) { ChatUi.togglePick(cm!!.id) }
                 else Modifier.rowTouch(
-                    enabled = cm != null && !ctx.selecting && !ephemeral,
+                    enabled = !preview && cm != null && !ctx.selecting && !ephemeral,
                     canReply = cm != null && canSend(ctx),
                     swipe = swipe,
                     onLongPress = {
@@ -224,7 +224,7 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
                         else -> {
                             // in a server, the picture someone set for it
                             val own = ctx.server?.members?.get(item.authorId)?.avatarId
-                            Avatar(item.authorId, authorName, own ?: user?.avatarId, 40.dp)
+                            Avatar(item.authorId, previewAuthor?.displayName?.ifEmpty { previewAuthor.username } ?: authorName, previewAuthor?.avatarId ?: own ?: user?.avatarId, 40.dp)
                         }
                     }
                 }
@@ -238,11 +238,12 @@ fun MessageRow(item: MsgItem, ctx: ListCtx, flashSeq: Int?, picked: Boolean, can
             ) {
                 if (command != null && cm != null) fish.nexa.ui.apps.InteractionLine(cm, command, ctx)
                 else if (reply != null) ReplyLine(ctx, reply, cm?.m)
-                if (showHead) MessageHeader(item, ctx)
+                if (showHead) MessageHeader(item, ctx, previewAuthor)
                 (cm?.payload ?: p?.payload)?.fwdComment?.let { fish.nexa.ui.markdown.MarkdownView(it, fish.nexa.ui.markdown.RenderCtx(serverId = ctx.server?.server?.id, surface = c.bgRaised)) }
                 val fwdAt = (cm?.payload ?: p?.payload)?.fwdAt
-                if (fwdAt != null) Forwarded(fwdAt) { MessageBody(item, ctx, failed) }
-                else MessageBody(item, ctx, failed)
+                if (fwdAt != null) Forwarded(fwdAt) { MessageBody(item, ctx, failed, preview) }
+                else MessageBody(item, ctx, failed, preview)
+                evidence?.invoke()
                 if (failed && p != null) FailedRow(ctx.channel.id, p.tmpId)
                 val sid = ctx.server?.server?.id
                 // an announcement not yet sent on to the channels following this one
@@ -355,7 +356,7 @@ private fun Modifier.claimsPerson(userId: String?): Modifier = if (userId == nul
 }
 
 @Composable
-private fun MessageHeader(item: MsgItem, ctx: ListCtx) {
+private fun MessageHeader(item: MsgItem, ctx: ListCtx, previewAuthor: fish.nexa.data.NexaPerson? = null) {
     val c = Nx.colors
     val sid = ctx.server?.server?.id
     val hook = fish.nexa.ui.markdown.Webhook.of(item.cm?.hook)
@@ -363,6 +364,7 @@ private fun MessageHeader(item: MsgItem, ctx: ListCtx) {
     // a published post's copy speaks for a channel elsewhere, not for a person
     val copy = item.cm?.m?.crosspost?.takeIf { item.cm.m.type == "crosspost" }
     val name = when {
+        previewAuthor != null -> previewAuthor.displayName.ifEmpty { previewAuthor.username }
         copy != null -> "${copy.serverName} #${copy.channelName}"
         hook != null && hookId != null -> hook.name
         else -> Names.member(sid, item.authorId)
@@ -603,7 +605,7 @@ private fun Forwarded(at: Long, body: @Composable () -> Unit) {
 }
 
 @Composable
-internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
+internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean, preview: Boolean = false) {
     val c = Nx.colors
     val cm = item.cm
     // AutoMod keeps what got past it hidden: a moderator can still read it, on purpose
@@ -674,13 +676,13 @@ internal fun MessageBody(item: MsgItem, ctx: ListCtx, failed: Boolean) {
         if (stickerOutside) Txt(st.name?.let { ":$it:" } ?: t("chat.messageItem.sticker"), style = Nx.type.hint.copy(fontSize = Nx.type.sp(10f)), color = c.textMuted)
         else StickerView(st)
     }
-    payload?.poll?.let { if (cm != null) PollCard(cm, ctx) }
+    payload?.poll?.let { if (cm != null) PollCard(cm, ctx, readOnly = preview) }
     // files on their way up show their progress until the message is in (Sending… once they are up)
     val up = item.pending?.upload
     if (up != null) UploadCard(ctx.channel.id, item.pending, up)
     else payload?.att?.takeIf { it.isNotEmpty() }?.let { Attachments(it, cm, ctx) }
     if (cm != null && embeds != null) Embeds(embeds, cm, ctx)
-    if (cm?.hook != null) HookBody(cm, ctx)
+    if (cm?.hook != null) HookBody(if (preview) cm.copy(local = true) else cm, ctx)
     // cards for the Nexa invites, profiles, notes and packs the message links to (none once its embeds were removed)
     if (cm != null && !cm.m.suppressEmbeds) {
         val sealed = remember(embeds, cm.hook) {

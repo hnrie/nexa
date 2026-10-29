@@ -20,78 +20,103 @@ export function ReportSnapshot({
   snapshot,
   kind,
   saved = false,
+  compact = false,
 }: {
   snapshot: Record<string, unknown>;
   kind: string;
   saved?: boolean;
+  compact?: boolean;
 }) {
   return (
     <dl className={s.snapshot}>
-      {Object.entries(snapshot).map(([name, value]) => {
-        const key = `reports.part.${LABELS[name] ?? name}`;
-        const translated = t(key);
-        const label =
-          translated === key ? name.replaceAll("_", " ") : translated;
-        const mediaKind =
-          name === "avatar_id"
-            ? "avatar"
-            : name === "banner_id"
-              ? "banner"
-              : name === "icon_id"
-                ? "icon"
-                : name === "cover_blob_id"
-                  ? "sticker"
-                  : name === "blob_id"
-                    ? kind === "emoji"
-                      ? "emoji"
-                      : "sticker"
-                    : null;
-        return (
-          <Fragment key={name}>
-            <dt>{label}</dt>
-            <dd>
-              {mediaKind && typeof value === "string" ? (
-                saved ? (
-                  <SavedPicture
-                    id={value}
-                    label={label}
-                    format={String(
-                      snapshot[
-                        name === "cover_blob_id" ? "cover_format" : "format"
-                      ] ?? "",
-                    )}
-                  />
-                ) : (
-                  <img
-                    src={api.url(`/media/${mediaKind}/${value}`)}
-                    alt={label}
-                    loading="lazy"
-                  />
-                )
-              ) : value === null ? (
-                t("reports.unspecified")
-              ) : Array.isArray(value) ? (
-                value
-                  .map((v) =>
-                    typeof v === "object" ? JSON.stringify(v) : String(v),
+      {Object.entries(snapshot)
+        .filter(
+          ([name, value]) =>
+            !compact ||
+            (value != null &&
+              value !== "" &&
+              [
+                "username",
+                "display_name",
+                "name",
+                "description",
+                "about_me",
+                "pronouns",
+                "status_text",
+                "topic",
+                "tags",
+                "avatar_id",
+                "banner_id",
+                "icon_id",
+                "blob_id",
+                "cover_blob_id",
+              ].includes(name)),
+        )
+        .map(([name, value]) => {
+          const key = `reports.part.${LABELS[name] ?? name}`;
+          const translated = t(key);
+          const label =
+            translated === key ? name.replaceAll("_", " ") : translated;
+          const mediaKind =
+            name === "avatar_id"
+              ? "avatar"
+              : name === "banner_id"
+                ? "banner"
+                : name === "icon_id"
+                  ? "icon"
+                  : name === "cover_blob_id"
+                    ? "sticker"
+                    : name === "blob_id"
+                      ? kind === "emoji"
+                        ? "emoji"
+                        : "sticker"
+                      : null;
+          return (
+            <Fragment key={name}>
+              <dt>{label}</dt>
+              <dd>
+                {mediaKind && typeof value === "string" ? (
+                  saved ? (
+                    <SavedPicture
+                      id={value}
+                      label={label}
+                      format={String(
+                        snapshot[
+                          name === "cover_blob_id" ? "cover_format" : "format"
+                        ] ?? "",
+                      )}
+                    />
+                  ) : (
+                    <img
+                      src={api.url(`/media/${mediaKind}/${value}`)}
+                      alt={label}
+                      loading="lazy"
+                    />
                   )
-                  .join(", ")
-              ) : typeof value === "object" ? (
-                <details>
-                  <summary>{label}</summary>
-                  <ReportSnapshot
-                    snapshot={value as Record<string, unknown>}
-                    kind={kind}
-                    saved={saved}
-                  />
-                </details>
-              ) : (
-                String(value)
-              )}
-            </dd>
-          </Fragment>
-        );
-      })}
+                ) : value === null ? (
+                  t("reports.unspecified")
+                ) : Array.isArray(value) ? (
+                  value
+                    .map((v) =>
+                      typeof v === "object" ? JSON.stringify(v) : String(v),
+                    )
+                    .join(", ")
+                ) : typeof value === "object" ? (
+                  <details>
+                    <summary>{label}</summary>
+                    <ReportSnapshot
+                      snapshot={value as Record<string, unknown>}
+                      kind={kind}
+                      saved={saved}
+                    />
+                  </details>
+                ) : (
+                  String(value)
+                )}
+              </dd>
+            </Fragment>
+          );
+        })}
     </dl>
   );
 }

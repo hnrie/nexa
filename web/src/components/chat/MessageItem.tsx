@@ -1,7 +1,7 @@
 import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { Check, CornerUpRight, Hash, Link2, Lock, MailOpen, Megaphone, MessageSquareText, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, ShieldAlert, SmilePlus, Trash2 } from "lucide-react";
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type ReactNode, memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { Markdown, isEmojiOnly, parse, plainText } from "@/markdown";
 import { useRowRenderCtx } from "@/lib/markdownCtx";
@@ -69,6 +69,9 @@ import s from "./Chat.module.css";
 
 import { t } from "@/i18n";
 interface Props {
+  preview?: boolean;
+  evidence?: ReactNode;
+  previewAuthor?: { name: string; avatarId: string | null };
   msg: DecryptedMessage;
   groupStart: boolean;
   pending?: "sending" | "failed";
@@ -190,7 +193,7 @@ function ToolButton({ label, danger, onClick, children }: { label: string; dange
   );
 }
 
-export const MessageItem = memo(function MessageItem({ msg, groupStart, pending, upload, highlight, first }: Props) {
+export const MessageItem = memo(function MessageItem({ msg, groupStart, pending, upload, highlight, first, preview, evidence, previewAuthor }: Props) {
   const me = useAuth((a) => a.me);
   const ownAvatar = useUsers((u) => u.byId[msg.author_id]?.avatar_id ?? null);
   // in a server, the picture someone set for it
@@ -198,7 +201,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
     const sid = useChannels.getState().byId[msg.channel_id]?.server_id;
     return sid ? (st.byId[sid]?.members[msg.author_id]?.avatar_id ?? null) : null;
   });
-  const avatarId = serverAvatar ?? ownAvatar;
+  const avatarId = previewAuthor ? previewAuthor.avatarId : serverAvatar ?? ownAvatar;
   // A webhook's message goes by the name and picture it was sent with; an
   // app's goes by its bot, like anyone's, but says it is an app's.
   const hook = msg.hook;
@@ -211,10 +214,10 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   // a post published from an announcement channel this one follows goes by where it came from
   const copy = msg.type === "crosspost" ? msg.crosspost : undefined;
   const shownName = useShownName(msg.channel_id, webhookHook || copy ? undefined : msg.author_id);
-  const name = copy ? `${copy.server_name} #${copy.channel_name}` : webhookHook ? webhookHook.name : shownName;
+  const name = previewAuthor?.name ?? (copy ? `${copy.server_name} #${copy.channel_name}` : webhookHook ? webhookHook.name : shownName);
   const [hookCard, setHookCard] = useState<HTMLElement | null>(null);
   const closeHookCard = useCallback(() => setHookCard(null), []);
-  const editing = useUI((u) => u.editing?.channelId === msg.channel_id && u.editing.messageId === msg.id);
+  const editing = useUI((u) => !preview && u.editing?.channelId === msg.channel_id && u.editing.messageId === msg.id);
   const dev = useSettings((st) => st.settings.developerMode);
   const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
   // the author's colours and role icon only, so a change to anyone else in the server leaves this row alone
@@ -229,7 +232,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const nav = useNavigate();
   const openModal = useUI((u) => u.openModal);
   const picked = useSelection((x) => x.channelId === msg.channel_id && !!x.picked[msg.id]);
-  const pickable = selecting && !pending && canPick(msg);
+  const pickable = !preview && selecting && !pending && canPick(msg);
 
   // A role of mine in the server counts too. The row listens to my roles
   // there, so its tint follows a role given or taken away.
@@ -331,7 +334,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       onClickCapture={pickable ? pick : undefined}
       onContextMenu={(e) => {
         // an answer only you see is nobody else's to react to or reply to: it has no menu
-        if (pending || ephemeral) return;
+        if (preview || pending || ephemeral) return;
         // a right click in the edit box is for the text: spelling suggestions, cut, copy and paste
         if (e.target instanceof Element && e.target.closest("textarea, input, [contenteditable='true']")) return;
         e.preventDefault();
@@ -384,8 +387,9 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           <span className="visually-hidden" id={whoId}>{t("chat.messageItem.whoWhen", { name, time: formatTimestamp(msg.created_at) })}</span>
         </>
       )}
-      {editing ? <EditMessage msg={msg} /> : <MessageBody msg={msg} name={name} id={bodyId} pending={pending} upload={upload} />}
-      {!pending && !editing && canPublish(msg) ? (
+      {preview ? <div ref={(el) => el?.setAttribute("inert", "")}><MessageBody msg={msg} name={name} id={bodyId} pending={pending} upload={upload} /></div> : editing ? <EditMessage msg={msg} /> : <MessageBody msg={msg} name={name} id={bodyId} pending={pending} upload={upload} />}
+      {evidence}
+      {!preview && !pending && !editing && canPublish(msg) ? (
         <button type="button" className={s.publishBtn} onClick={() => void publish(msg)} data-testid="publish">
           <Megaphone size={15} aria-hidden="true" />
           {t("follows.publish")}
@@ -395,7 +399,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       {/* the thread it started hangs under everything the message carries, its reactions too */}
       {msg.thread && serverId && !pending ? <ThreadChip serverId={serverId} summary={msg.thread} /> : null}
       {ephemeral ? <OnlyYou msg={msg} /> : null}
-      {!pending && !ephemeral && !editing && !selecting && (active || menuOpen) ? <RowToolbar msg={msg} pinned={pinned} dev={dev} setPicker={setPicker} openMenu={openMenu} /> : null}
+      {!preview && !pending && !ephemeral && !editing && !selecting && (active || menuOpen) ? <RowToolbar msg={msg} pinned={pinned} dev={dev} setPicker={setPicker} openMenu={openMenu} /> : null}
       {dev && !pending ? <span hidden data-dev-id={msg.id} /> : null}
     </div>
   );

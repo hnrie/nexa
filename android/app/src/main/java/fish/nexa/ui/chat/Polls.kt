@@ -90,11 +90,11 @@ data class PollShape(val question: String, val answers: List<Answer>, val expiry
 
 /** A person's poll in their message (MessageItem PersonPoll); a poll still being sent, or one the server keeps no tally for, takes no votes. */
 @Composable
-fun PollCard(cm: ChatMessage, ctx: ListCtx) {
+fun PollCard(cm: ChatMessage, ctx: ListCtx, readOnly: Boolean = false) {
     val poll = cm.payload?.poll ?: return
     val tally = cm.m.pollResults
     val shape = remember(poll, tally, cm.m.createdAt) { PollShape.of(poll, tally, cm.m.createdAt) }
-    PollView(shape, tally, ctx.channel.id, cm.id, readOnly = tally == null)
+    PollView(shape, tally, ctx.channel.id, cm.id, readOnly = readOnly || tally == null)
 }
 
 /** timeLeft: how long a poll has, at the precision it deserves. */

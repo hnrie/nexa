@@ -160,7 +160,7 @@ object Reports {
         )
 
     /** Complete readable message and per-file keys only; never conversation keys. */
-    suspend fun fullMessage(target: SafetyReportTarget): JsonObject {
+    suspend fun fullMessage(target: SafetyReportTarget, preview: (ChatMessage) -> Unit = {}): JsonObject {
         val channel = target.snapshot["channel_id"]!!.jsonPrimitive.content
         val raw = Nexa.api.get("/channels/$channel/messages/${target.id}", Message.serializer())
         val message = Nexa.messages.decrypt(raw)
@@ -210,6 +210,7 @@ object Reports {
                 is JsonArray -> JsonArray(value.map { readable(it) })
                 else -> value
             }
+        preview(message)
         val content = buildJsonObject {
             message.payload?.toJson()?.forEach { (key, value) -> put(key, readable(value)) }
             put("type", raw.type)

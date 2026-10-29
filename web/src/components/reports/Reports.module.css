@@ -319,22 +319,11 @@
   margin: 0;
   line-height: 1.6;
 }
-.messageContent {
-  background: var(--bg-input);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 16px;
+.retainedFiles {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-.messageText {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font: inherit;
-  font-size: 14px;
-  line-height: 1.65;
-  margin: 0;
+  gap: 8px;
+  margin-top: 8px;
 }
 .technical {
   font-size: 13px;
@@ -347,4 +336,11 @@
 .back {
   display: inline-flex;
   align-self: flex-start;
+}
+
+.chatPreview {
+  background: var(--bg-raised);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  padding-block: 4px 16px;
 }

@@ -159,3 +159,5 @@ From the owner (CLAUDE.md and standing feedback):
 | While picking accounts in the staff panel, a tap anywhere on a card picks it | Done: UserGrid cards |
 | Choose a save location for files and pictures | Done: lib/saveFile.ts uses a picker where supported and mobile file sharing, with the browser download flow elsewhere |
 | Full-message reporting and Report, Review, History staff tabs, with a return path from related staff pages | Done: ReportModal, ReportsTab and reportNavigation on the web |
+
+Report forms use a reason, content preview and explanation. Message previews and staff evidence use MessageRow, with readonly polls and retained files supplied to the staff row. All report forms omit extra evidence fields and upload controls, matching the web.

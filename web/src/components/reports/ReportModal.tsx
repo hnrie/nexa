@@ -1,3 +1,7 @@
+import { MessageItem } from "@/components/chat/MessageItem";
+import type { DecryptedMessage } from "@/lib/decrypt";
+import { Markdown } from "@/markdown";
+import { useRenderCtx } from "@/lib/markdownCtx";
 import { ReportSnapshot } from "./ReportSnapshot";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -13,12 +17,7 @@ import { Modal } from "@/components/common/Modal";
 import { Select } from "@/components/common/Select";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
 import { describeError } from "@/lib/errors";
-import {
-  fullReportedMessage,
-  messageEvidence,
-  type ReportContext,
-  type ReportEvidence,
-} from "@/lib/reporting";
+import { fullReportedMessage, type ReportContext } from "@/lib/reporting";
 import { messages } from "@/api/messages";
 import { decryptForStore } from "@/lib/decrypt";
 import { useUI } from "@/stores/ui";
@@ -32,6 +31,7 @@ export default function ReportModal({
   context?: ReportContext;
   onClose: () => void;
 }) {
+  const renderCtx = useRenderCtx();
   const [kind, setKind] = useState<ReportKind>(context.kind ?? "other");
   const [id, setId] = useState(context.id ?? "");
   const [target, setTarget] = useState<ReportTarget | null>(null);
@@ -41,23 +41,18 @@ export default function ReportModal({
   const [description, setDescription] = useState("");
   const custom = kind === "other" ? description.slice(0, 120) : "";
   const [message, setMessage] = useState<ReportedMessage | null>(null);
-  const [messageParts, setMessageParts] = useState<ReportEvidence[]>([]);
-  const [excerpt, setExcerpt] = useState("");
-  const [selected, setSelected] = useState<number[]>([]);
-  const [files, setFiles] = useState<File[]>([]);
+  const [preview, setPreview] = useState<DecryptedMessage | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState("");
   const requestId = useRef(crypto.randomUUID());
-  const filePicker = useRef<HTMLInputElement>(null);
   const sendLock = useRef(false);
-  const uploadCache = useRef(new Map<File, { id: string; name: string }>());
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     setTarget(null);
     setLoading(false);
     setMessage(null);
-    setMessageParts([]);
+    setPreview(null);
     setError("");
     if (kind !== "other" && !/^\d{1,20}$/.test(id)) return;
     const controller = new AbortController();
@@ -73,7 +68,7 @@ export default function ReportModal({
           const full = fullReportedMessage(opened);
           if (!full) throw new Error(t("reports.messageUnavailable"));
           setMessage(full);
-          setMessageParts(messageEvidence(opened));
+          setPreview(opened);
         }
         if (!controller.signal.aborted) setTarget(value);
       })
@@ -86,12 +81,10 @@ export default function ReportModal({
       });
     return () => controller.abort();
   }, [kind, id, context.serverId]);
-  const evidence = kind === "message" ? messageParts : (context.evidence ?? []);
-  const selectedText = selected
-    .map((i) => evidence[i]?.text ?? "")
-    .filter(Boolean)
-    .concat(excerpt.trim() ? [excerpt] : [])
-    .join("\n\n");
+  const selectedText =
+    kind === "message"
+      ? ""
+      : (context.evidence ?? []).map((item) => item.text).join("\n\n");
   const valid =
     !!target &&
     (kind !== "message" || !!message) &&
@@ -104,16 +97,6 @@ export default function ReportModal({
     setBusy(true);
     setError("");
     try {
-      const uploaded = [];
-      for (const file of files) {
-        let result = uploadCache.current.get(file);
-        if (!result) {
-          const f = await reports.upload(file);
-          result = { id: f.id, name: file.name };
-          uploadCache.current.set(file, result);
-        }
-        uploaded.push(result);
-      }
       const result = await reports.send({
         request_id: requestId.current,
         ...(kind === "message" && message ? { message } : {}),
@@ -125,7 +108,7 @@ export default function ReportModal({
         reason,
         description,
         excerpt: selectedText,
-        files: uploaded,
+        files: [],
       });
       setReceipt(result.report.id);
       useUI.getState().toast(t("reports.sent"), "success");
@@ -165,13 +148,9 @@ export default function ReportModal({
           </>
         ) : (
           <>
-            <p className={s.notice}>
-              {t(
-                kind === "message"
-                  ? "reports.fullMessageNotice"
-                  : "reports.privacy",
-              )}
-            </p>
+            {kind !== "message" && (
+              <p className={s.notice}>{t("reports.privacy")}</p>
+            )}
             {!context.kind && (
               <Field label={t("reports.target")}>
                 <Select
@@ -179,7 +158,6 @@ export default function ReportModal({
                   onChange={(e) => {
                     setKind(e.target.value as ReportKind);
                     setId("");
-                    setSelected([]);
                   }}
                   disabled={busy}
                 >
@@ -202,7 +180,9 @@ export default function ReportModal({
                 />
               </Field>
             )}
-            {context.kind && <strong>{t(`reports.kind.${kind}`)}</strong>}
+            {context.kind && kind !== "message" && (
+              <strong>{t(`reports.kind.${kind}`)}</strong>
+            )}
             <Field label={t("reports.reason")}>
               <Select
                 value={reason}
@@ -216,6 +196,24 @@ export default function ReportModal({
                 ))}
               </Select>
             </Field>
+            {kind === "message" && preview && (
+              <div
+                className={s.chatPreview}
+                ref={(el) => el?.setAttribute("inert", "")}
+              >
+                <MessageItem msg={preview} groupStart preview />
+              </div>
+            )}
+            {kind === "message" && (
+              <p className={s.notice}>{t("reports.fullMessageNotice")}</p>
+            )}
+            {kind !== "message" && target && (
+              <ReportSnapshot snapshot={target.snapshot} kind={kind} compact />
+            )}
+            {kind !== "message" &&
+              context.evidence?.map((item, i) => (
+                <Markdown key={i} source={item.text} ctx={renderCtx} />
+              ))}
             <Field
               label={t("reports.description")}
               required
@@ -229,116 +227,6 @@ export default function ReportModal({
                 disabled={busy}
               />
             </Field>
-            {kind === "message" &&
-              messageParts.map((item, i) => (
-                <section className={s.section} key={i}>
-                  <strong>{item.label}</strong>
-                  <pre className={s.preview}>{item.text}</pre>
-                </section>
-              ))}
-            {kind !== "message" && evidence.length > 0 && (
-              <fieldset className={s.evidence}>
-                <legend>{t("reports.chooseEvidence")}</legend>
-                <p className={s.meta}>{t("reports.selectedOnly")}</p>
-                {evidence.map((item, i) => (
-                  <label key={i} className={s.check}>
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(i)}
-                      disabled={busy}
-                      onChange={(e) =>
-                        setSelected((old) =>
-                          e.target.checked
-                            ? [...old, i]
-                            : old.filter((n) => n !== i),
-                        )
-                      }
-                    />
-                    <span>
-                      <strong>{item.label}</strong>
-                      <pre className={s.preview}>{item.text}</pre>
-                    </span>
-                  </label>
-                ))}
-              </fieldset>
-            )}
-            {kind !== "message" && (
-              <Field
-                label={t("reports.excerpt")}
-                hint={t("reports.excerptHint")}
-              >
-                <TextArea
-                  value={excerpt}
-                  onChange={(e) => setExcerpt(e.target.value)}
-                  maxLength={16000}
-                  rows={3}
-                  disabled={busy}
-                />
-              </Field>
-            )}
-            <Field
-              as="div"
-              label={t("reports.files")}
-              hint={t("reports.filesHint")}
-            >
-              <div>
-                <Button
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => filePicker.current?.click()}
-                >
-                  {t("reports.files")}
-                </Button>
-                <input
-                  ref={filePicker}
-                  hidden
-                  type="file"
-                  accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/quicktime,video/webm"
-                  multiple
-                  disabled={busy}
-                  onChange={(e) => {
-                    const added = Array.from(e.target.files ?? []);
-                    e.target.value = "";
-                    if (
-                      files.length + added.length > 5 ||
-                      [...files, ...added].reduce((sum, f) => sum + f.size, 0) >
-                        100 * 1024 * 1024 ||
-                      added.some(
-                        (f) =>
-                          f.size >
-                          (f.type.startsWith("image/") ? 10 : 50) * 1024 * 1024,
-                      )
-                    ) {
-                      setError(t("reports.filesHint"));
-                      return;
-                    }
-                    setFiles((old) => [...old, ...added]);
-                  }}
-                />
-              </div>
-            </Field>
-            {files.map((f, i) => (
-              <div key={i} className={s.actions}>
-                <span>{f.name}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() =>
-                    setFiles((old) => old.filter((_, n) => n !== i))
-                  }
-                >
-                  {t("reports.remove")}
-                </Button>
-              </div>
-            ))}
-            {target && Object.keys(target.snapshot).length > 0 && (
-              <details>
-                <summary>{t("reports.sharedDetails")}</summary>
-                <p className={s.meta}>{t("reports.snapshotHint")}</p>
-                <ReportSnapshot snapshot={target.snapshot} kind={kind} />
-              </details>
-            )}
             {loading && <p role="status">{t("reports.loading")}</p>}
             {selectedText.length > 16000 && (
               <p className={s.error} role="alert">

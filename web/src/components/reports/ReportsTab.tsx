@@ -1,3 +1,7 @@
+import { MessageItem } from "@/components/chat/MessageItem";
+import { sanitizePayload } from "@/crypto/message";
+import { sanitizeHook } from "@/lib/webhookMessage";
+import type { DecryptedMessage } from "@/lib/decrypt";
 import { INLINE_MAX } from "@/lib/mediaCache";
 import { ReportSnapshot } from "./ReportSnapshot";
 import { bugFileURL } from "@/lib/bugMedia";
@@ -420,65 +424,128 @@ function ReportWorkspace({
             <section className={s.section}>
               <h3>{t("reports.evidence")}</h3>
               <p className={s.notice}>{t("reports.unverified")}</p>
-              {!!v.snapshot.message_content && (
-                <MessageReportContent
-                  content={
-                    v.snapshot.message_content as Record<string, unknown>
+              {v.snapshot.message_content ? (
+                <MessageItem
+                  msg={reportedChatMessage(v)}
+                  groupStart
+                  preview
+                  previewAuthor={{
+                    name:
+                      detail.people[v.subject_id]?.display_name ||
+                      detail.people[v.subject_id]?.username ||
+                      v.subject_id,
+                    avatarId: detail.people[v.subject_id]?.avatar_id ?? null,
+                  }}
+                  evidence={
+                    <div className={s.retainedFiles}>
+                      {!!v.snapshot.message_sticker && (
+                        <ReportSnapshot
+                          snapshot={
+                            v.snapshot.message_sticker as Record<
+                              string,
+                              unknown
+                            >
+                          }
+                          kind="sticker"
+                          saved
+                        />
+                      )}{" "}
+                      <ThreadFiles
+                        files={detail.files.filter(
+                          (f) =>
+                            f.size <= INLINE_MAX &&
+                            /^(image\/(png|jpeg|gif|webp|avif)$|video\/)/i.test(
+                              f.mime,
+                            ),
+                        )}
+                        kind="reports"
+                      />
+                      {detail.files
+                        .filter(
+                          (f) =>
+                            f.size > INLINE_MAX ||
+                            !/^(image\/(png|jpeg|gif|webp|avif)$|video\/)/i.test(
+                              f.mime,
+                            ),
+                        )
+                        .map((f) => (
+                          <Button
+                            key={f.id}
+                            variant="secondary"
+                            onClick={async () => {
+                              try {
+                                const url = await bugFileURL(
+                                  f.id,
+                                  undefined,
+                                  "reports",
+                                );
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = f.name || f.id;
+                                a.click();
+                              } catch (err) {
+                                setError(
+                                  describeError(err, t("reports.failed")),
+                                );
+                              }
+                            }}
+                          >
+                            {t("reports.openFile")}: {f.name}
+                          </Button>
+                        ))}
+                    </div>
                   }
                 />
+              ) : (
+                <>
+                  {v.excerpt ? (
+                    <pre className={s.preview}>{v.excerpt}</pre>
+                  ) : (
+                    <p className={s.meta}>{t("reports.noExcerpt")}</p>
+                  )}
+                  <ThreadFiles
+                    files={detail.files.filter(
+                      (f) =>
+                        f.size <= INLINE_MAX &&
+                        /^(image\/(png|jpeg|gif|webp|avif)$|video\/)/i.test(
+                          f.mime,
+                        ),
+                    )}
+                    kind="reports"
+                  />
+                  {detail.files
+                    .filter(
+                      (f) =>
+                        f.size > INLINE_MAX ||
+                        !/^(image\/(png|jpeg|gif|webp|avif)$|video\/)/i.test(
+                          f.mime,
+                        ),
+                    )
+                    .map((f) => (
+                      <Button
+                        key={f.id}
+                        variant="secondary"
+                        onClick={async () => {
+                          try {
+                            const url = await bugFileURL(
+                              f.id,
+                              undefined,
+                              "reports",
+                            );
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = f.name || f.id;
+                            a.click();
+                          } catch (err) {
+                            setError(describeError(err, t("reports.failed")));
+                          }
+                        }}
+                      >
+                        {t("reports.openFile")}: {f.name}
+                      </Button>
+                    ))}
+                </>
               )}
-              {!!v.snapshot.message_sticker && (
-                <ReportSnapshot
-                  snapshot={
-                    v.snapshot.message_sticker as Record<string, unknown>
-                  }
-                  kind="sticker"
-                  saved
-                />
-              )}
-              {v.excerpt ? (
-                <pre className={s.preview}>{v.excerpt}</pre>
-              ) : !v.snapshot.message_content ? (
-                <p className={s.meta}>{t("reports.noExcerpt")}</p>
-              ) : null}
-              <ThreadFiles
-                files={detail.files.filter(
-                  (f) =>
-                    f.size <= INLINE_MAX &&
-                    /^(image\/(png|jpeg|gif|webp|avif)$|video\/)/i.test(f.mime),
-                )}
-                kind="reports"
-              />
-              {detail.files
-                .filter(
-                  (f) =>
-                    !/^(image\/(png|jpeg|gif|webp|avif)$|video\/)/i.test(
-                      f.mime,
-                    ),
-                )
-                .map((f) => (
-                  <Button
-                    key={f.id}
-                    variant="secondary"
-                    onClick={async () => {
-                      try {
-                        const url = await bugFileURL(
-                          f.id,
-                          undefined,
-                          "reports",
-                        );
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = f.name || f.id;
-                        a.click();
-                      } catch (err) {
-                        setError(describeError(err, t("reports.failed")));
-                      }
-                    }}
-                  >
-                    {t("reports.openFile")}: {f.name}
-                  </Button>
-                ))}
             </section>
             <details className={s.technical}>
               <summary>{t("reports.sharedDetails")}</summary>
@@ -691,31 +758,30 @@ function ReportWorkspace({
   );
 }
 
-function MessageReportContent({
-  content,
-}: {
-  content: Record<string, unknown>;
-}) {
-  const { t: text, att: _files, ...other } = content;
-  return (
-    <div className={s.messageContent}>
-      {typeof text === "string" && <pre className={s.messageText}>{text}</pre>}
-      {Object.entries(other)
-        .filter(([key]) => key !== "type" && key !== "flags")
-        .map(([key, value]) => (
-          <section key={key} className={s.section}>
-            <strong>
-              {t(
-                key === "call"
-                  ? "reports.kind.message"
-                  : `reports.part.${key === "embeds" || key === "hook" ? "embed" : key === "fwd" ? "text" : key}`,
-              )}
-            </strong>
-            <pre className={s.messageText}>
-              {JSON.stringify(value, null, 2)}
-            </pre>
-          </section>
-        ))}
-    </div>
-  );
+function reportedChatMessage(report: SafetyReport): DecryptedMessage {
+  const content = report.snapshot.message_content as Record<string, unknown>;
+  const { att: _att, sticker: _sticker, ...body } = content;
+  return {
+    id: report.target_id,
+    channel_id: String(report.snapshot.channel_id),
+    author_id: report.subject_id,
+    type: String(content.type ?? "default"),
+    created_at: Number(report.snapshot.created_at ?? report.created_at),
+    edited_at: report.snapshot.edited_at
+      ? Number(report.snapshot.edited_at)
+      : null,
+    ciphertext: null,
+    key_conv_id: null,
+    key_epoch: null,
+    reply_to_id: null,
+    mentions: [],
+    mention_roles: [],
+    mention_everyone: false,
+    attachments: [],
+    reactions: [],
+    flags: 0,
+    payload: sanitizePayload(body),
+    ...(content.call ? { call: content.call as DecryptedMessage["call"] } : {}),
+    ...(content.hook ? { hook: sanitizeHook(content.hook) ?? undefined } : {}),
+  };
 }

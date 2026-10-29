@@ -108,6 +108,7 @@ they open the app after an update, and it is how they find out what changed.
 
 ## Writing UI text
 
+- The product name is written "Nexa" in prose and UI labels.
 - Labels use Title Case: buttons, menu items, tabs, navigation, dialog and page titles, headings
   and column headers ("Add Friends", "Create Group", "Mark as Read", "Add to Group"). Short
   articles, conjunctions and prepositions stay lowercase unless first or last. English only; the
@@ -1075,6 +1076,9 @@ use chunked AES-GCM decryption with range support in `media/reported.go`; report
 blob references after source deletion. Other reports may include plaintext excerpts and screenshots
 or recordings. This evidence is not end-to-end encrypted and is labelled reporter-supplied, not independently authenticated proof of the original message.
 Reports do not give staff conversation keys or access to unreported content.
+
+All report forms use a reason, content preview and explanation, with no selected-text field, evidence checkboxes or upload picker. Message forms use the standard chat row as an inert preview with mandatory full-message sharing disclosure.
+Staff message evidence uses the same chat message row as conversations on web and Android, with retained report files in its attachment area and supplied author details.
 
 Web `api/reports.ts`, `lib/reporting.ts` and `components/reports/` implement registered
 context-menu report actions, the report dialog and `/channels/@admin/reports[/:reportId]`.
