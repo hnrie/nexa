@@ -1,4 +1,4 @@
-import { Compass, Bot, Bug, FolderOpen, LayoutGrid, Megaphone, ScrollText, Server, Shield, Sticker } from "lucide-react";
+import { Flag, Compass, Bot, Bug, FolderOpen, LayoutGrid, Megaphone, ScrollText, Server, Shield, Sticker } from "lucide-react";
 import { Suspense, useEffect, type KeyboardEvent } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { moderation as modApi } from "@/api/moderation";
@@ -22,16 +22,18 @@ export { ServerPage } from "@/components/moderation/ServerPage";
 export { ServersTab, DiscoveryModerationTab } from "@/components/moderation/ServersTab";
 export { UserGrid } from "@/components/moderation/UserGrid";
 
-type Tab = "discovery" | "users" | "bots" | "servers" | "expressions" | "cases" | "bugs" | "logs" | "announcements";
+export { ReportsTab } from "@/components/reports/ReportsTab";
+
+type Tab = "reports" | "discovery" | "users" | "bots" | "servers" | "expressions" | "cases" | "bugs" | "logs" | "announcements";
 
 const BASE = "/channels/@admin";
 
 /** The tabs a mod has; admins and above have every one. */
-const MOD_TABS: Tab[] = ["users", "cases", "logs"];
+const MOD_TABS: Tab[] = ["users", "reports", "cases", "logs"];
 
 function tabOf(path: string): Tab {
   const seg = path.slice(BASE.length + 1).split("/")[0];
-  return seg === "discovery" || seg === "bots" || seg === "servers" || seg === "expressions" || seg === "cases" || seg === "bugs" || seg === "logs" || seg === "announcements" ? seg : "users";
+  return seg === "reports" || seg === "discovery" || seg === "bots" || seg === "servers" || seg === "expressions" || seg === "cases" || seg === "bugs" || seg === "logs" || seg === "announcements" ? seg : "users";
 }
 
 /**
@@ -78,6 +80,7 @@ export default function AdminPanelPage() {
   if (!isAdmin) return <Navigate to="/channels/@me" replace />;
 
   const all: { id: Tab; label: string; icon: JSX.Element; badge?: number; badgeLabel?: string }[] = [
+    { id: "reports", label: t("reports.title"), icon: <Flag size={17} /> },
     { id: "users", label: t("moderation.tabs.users"), icon: <LayoutGrid size={17} /> },
     { id: "bots", label: t("moderation.tabs.bots"), icon: <Bot size={17} /> },
     { id: "servers", label: t("moderation.tabs.servers"), icon: <Server size={17} /> },

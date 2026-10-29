@@ -1,3 +1,4 @@
+import { openReport } from "@/lib/reporting";
 import { Bug, CodeXml, Download, LogOut, Smartphone } from "lucide-react";
 import { GITHUB_URL } from "@/lib/legal";
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -223,6 +224,7 @@ export default function SettingsModal({ onClose, page: initial, packId, modalId,
           <NavIcon icon={CodeXml} />
           <span className={s.navLabel}>{t("project.github")}</span>
         </button>
+        <button className={s.navItem} onClick={() => openReport()} data-nav="report-content"><NavIcon icon={Bug} /><span className={s.navLabel}>{t("reports.report")}</span></button>
         <button className={s.navItem} onClick={() => openReportBug("settings")} data-nav="report-bug">
           <NavIcon icon={Bug} />
           <span className={s.navLabel}>{t("bugs.report")}</span>

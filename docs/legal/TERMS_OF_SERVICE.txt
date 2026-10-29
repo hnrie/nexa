@@ -56,9 +56,14 @@ needs to work.
 - A few things are not end-to-end encrypted, because Nexa itself
   has to read them: your public profile, moderation cases and the
   threads that go with them, announcements from Nexa, bug reports
-  you send, messages that programs post through a server's webhooks,
+  you send, safety reports and the evidence you choose to share,
+  messages that programs post through a server's webhooks,
   and what apps post and receive. The Privacy Policy explains each
   of them.
+- You can report specific content and choose text, screenshots or recordings
+  to share with Nexa staff. This creates a separate readable report; it does
+  not give staff your conversation keys or access to other private content.
+  Staff may remove a reported message or take other moderation actions.
 - Apps are programs other people make in Settings, Developer Portal.
   Anyone can add one to their account, or to a server they manage.
   What reaches an app is not end-to-end encrypted from it: messages

@@ -204,6 +204,7 @@ fun toggleCollapsed(id: String, collapsed: Boolean) {
 private fun categoryMenu(serverId: String, cat: Channel, collapsed: Boolean): List<MenuItem> {
     val st = Nexa.servers.get(serverId)
     val items = ArrayList<MenuItem>()
+    items += fish.nexa.ui.reports.reportItem(fish.nexa.data.ReportContext(kind = "channel", id = cat.id))
     items += MenuItem.Action(if (collapsed) t("sidebar.serverMenu.expandCategory") else t("sidebar.serverMenu.collapseCategory"), separatorAfter = true) { toggleCollapsed(cat.id, collapsed) }
     if (Nexa.servers.canI(st, P.MANAGE_CHANNELS)) {
         items += MenuItem.Action(t("modals.createChannel.createChannel")) { openCreateChannel(serverId, cat.id) }
@@ -496,6 +497,7 @@ private fun VoiceParticipantRow(serverId: String, v: fish.nexa.net.VoiceState) {
 private fun channelMenu(serverId: String, ch: Channel): List<MenuItem> {
     val st = Nexa.servers.get(serverId)
     val items = ArrayList<MenuItem>()
+    items += fish.nexa.ui.reports.reportItem(fish.nexa.data.ReportContext(kind = "channel", id = ch.id))
     if (ch.isTextLike) items += MenuItem.Action(t("sidebar.dmMenu.markAsRead"), disabled = ch.lastMessageId == null, separatorAfter = true) { Unread.markRead(ch.id) }
     if (Nexa.servers.canI(st, P.CREATE_INSTANT_INVITE, ch.id)) items += MenuItem.Action(t("chat.chat.invitePeople")) { openInvite(serverId, ch.id) }
     items += MenuItem.Action(t("sidebar.serverMenu.copyLink"), separatorAfter = true) { copyText("${Nexa.api.baseUrl}/channels/$serverId/${ch.id}") }

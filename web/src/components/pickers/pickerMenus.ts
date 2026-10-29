@@ -1,3 +1,4 @@
+import { reportItem } from "@/lib/reporting";
 import type { StickerPack } from "@/api/types";
 import { button, defineMenu } from "@/lib/contextMenus/registry";
 import { canRemovePack, confirmRemovePack } from "@/lib/packRemoval";
@@ -22,6 +23,7 @@ export const gifResultMenu = defineMenu<{ favorite: boolean; send: () => void; t
 /** A sticker pack's header in the picker: edit your own, or remove it. */
 export const stickerPackMenu = defineMenu<{ pack: StickerPack; meId: string | undefined; edit: () => void }>("stickerPack", [
   [
+    button("reportStickerPack", ({ pack }) => reportItem({ kind: "pack", id: pack.id })),
     button("editStickerPack", ({ pack, meId, edit }) => pack.owner_user_id === meId && { id: "edit", label: t("pickers.stickerPicker.editPack"), onSelect: edit }),
     button("removeStickerPack", ({ pack, meId }) => canRemovePack(pack, meId) && { id: "remove", label: t("pickers.stickerPicker.removePack"), danger: true, onSelect: () => confirmRemovePack(pack) }),
   ],

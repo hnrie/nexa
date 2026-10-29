@@ -408,6 +408,7 @@ private fun SettingsList(query: String, setQuery: (String) -> Unit, onOpen: (Str
                     Spacer(Modifier.height(20.dp))
                     NavCard {
                         NavRow("CodeXml", t("project.github"), first = true, chevron = false) { Legal.openGitHub(context) }
+                        NavRow("Flag", t("reports.report"), chevron = false) { fish.nexa.ui.reports.openReport() }
                         NavRow("Bug", t("bugs.report"), chevron = false) { fish.nexa.ui.bugs.openBugReport("settings") }
                         NavRow("LogOut", t("settings.settings.logOut"), danger = true, chevron = false) { fish.nexa.ui.shell.confirmLogout() }
                     }

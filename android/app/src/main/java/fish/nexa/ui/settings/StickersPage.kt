@@ -242,6 +242,7 @@ private fun PackView(packId: String, onBack: () -> Unit) {
         Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { Spinner() }
         return
     }
+    NxButton(t("reports.report"), { fish.nexa.ui.reports.openReport(fish.nexa.data.ReportContext(kind = "pack", id = pack.id)) }, kind = ButtonKind.GHOST)
     val emoji = isEmoji(pack)
     val manage = pack.ownerUserId == me
     if (!manage) {
@@ -368,7 +369,7 @@ private fun ItemGrid(pack: StickerPack, emoji: Boolean, onItem: ((Sticker) -> Un
                         .ring(shape, c.borderSubtle)
                         .background(c.bgSurface, shape)
                         .clip(shape)
-                        .then(if (onItem != null) Modifier.pressable(remember(s.id) { MutableInteractionSource() }, onLongClick = { onItem(s) }) { onItem(s) } else Modifier)
+                        .pressable(remember(s.id) { MutableInteractionSource() }, onLongClick = { fish.nexa.ui.reports.openReport(fish.nexa.data.ReportContext(kind = "sticker", id = s.id)) }) { if (onItem != null) onItem(s) else fish.nexa.ui.reports.openReport(fish.nexa.data.ReportContext(kind = "sticker", id = s.id)) }
                         .padding(8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(6.dp),

@@ -1,3 +1,4 @@
+import { reportItem, messageEvidence } from "@/lib/reporting";
 import { canForward } from "@/lib/forward";
 import { rankedKeys, unicodeKey } from "@/lib/emojiUsage";
 import { channels as channelsApi } from "@/api/channels";
@@ -188,6 +189,7 @@ export const messageMenu = defineMenu<MessageMenuCtx>("message", [
     button("copyMessageLink", ({ msg }) => ({ id: "link", label: t("chat.messageItem.copyMessageLink"), onSelect: () => copyMessageLink(msg) })),
   ],
   // what apps can do with a message, their message commands
+  [button("reportMessageContent", ({ msg }) => !msg.local && reportItem({ kind: "message", id: msg.id, evidence: messageEvidence(msg) }))],
   [button("messageApps", ({ msg }) => messageAppsItem(msg))],
   [button("copyMessageId", ({ msg }) => useSettings.getState().settings.developerMode && { id: "id", label: t("chat.messageItem.copyMessageId"), onSelect: () => void copyText(msg.id, t("clipboard.idCopied")) })],
   [

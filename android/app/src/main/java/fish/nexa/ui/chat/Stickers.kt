@@ -97,9 +97,13 @@ private object Tgs {
         synchronized(cache) { cache[url] }?.let { return it }
         return withContext(Dispatchers.IO) {
             runCatching {
-                Nexa.api.http.newCall(Request.Builder().url(url).build()).execute().use { r ->
-                    if (!r.isSuccessful) return@use null
-                    GZIPInputStream(r.body.byteStream()).bufferedReader().use { it.readText() }
+                if (url.startsWith("file:")) {
+                    GZIPInputStream(java.io.File(java.net.URI(url)).inputStream()).bufferedReader().use { it.readText() }
+                } else {
+                    Nexa.api.http.newCall(Request.Builder().url(url).build()).execute().use { r ->
+                        if (!r.isSuccessful) return@use null
+                        GZIPInputStream(r.body.byteStream()).bufferedReader().use { it.readText() }
+                    }
                 }
             }.getOrNull()?.also { synchronized(cache) { cache[url] = it } }
         }
@@ -244,6 +248,7 @@ private fun openStickerPopout(sticker: StickerRef, format: String?, ref: AnchorR
                     if (packName != null) Txt(t("chat.stickerPopout.fromPack", "name" to packName), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted, maxLines = 1)
                 }
             }
+            NxButton(t("reports.report"), { close(); fish.nexa.ui.reports.openReport(fish.nexa.data.ReportContext(kind = "sticker", id = sticker.id)) }, kind = fish.nexa.ui.components.ButtonKind.GHOST, size = ButtonSize.SM, block = true)
             val opener = StickerPacks.open
             when {
                 !loaded -> Box(Modifier.fillMaxWidth().background(c.bgFloating), contentAlignment = Alignment.Center) { Spinner(size = 16.dp) }

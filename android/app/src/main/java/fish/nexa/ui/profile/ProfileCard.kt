@@ -983,9 +983,11 @@ private fun editNickname(user: PublicUser, rel: Relationship) {
 }
 
 /** View Full Profile and Copy Profile Link (popout), the friend's nickname and removal, Block or Unblock, Copy User ID. */
-fun openProfileMenu(user: PublicUser, popout: Boolean, viewFull: () -> Unit) {
+fun openProfileMenu(user: PublicUser, popout: Boolean, serverId: String? = null, viewFull: () -> Unit) {
     val rel = Nexa.relationships.byId.value[user.id]
     val items = ArrayList<MenuItem>()
+    items += fish.nexa.ui.reports.reportItem(fish.nexa.data.ReportContext(kind = "user", id = user.id, serverId = serverId))
+    if (user.isBot) items += fish.nexa.ui.reports.reportItem(fish.nexa.data.ReportContext(kind = "application", id = user.id))
     if (popout) {
         items += MenuItem.Action(t("profile.profileCard.viewFullProfile")) { viewFull() }
         items += MenuItem.Action(t("profileLink.copy"), separatorAfter = true) { ProfileLinks.copy(user.username) }
@@ -1070,7 +1072,7 @@ fun ProfilePopoutCard(user: PublicUser, serverId: String?, close: () -> Unit, de
                     else if (bot) Unit // Add App is across the card, over the message box
                     else if (rel == null) BannerButton("UserPlus", if (busy) t("people.request.sending") else t("profile.profileCard.addFriend"), busy = busy) { Nexa.scope.launch { People.sendRequest(user) } }
                     BannerButton("Maximize2", t("profile.profileCard.viewFullProfile"), iconSize = 16.dp) { viewFull() }
-                    if (!isMe) BannerButton("MoreHorizontal", t("chat.chat.more")) { openProfileMenu(user, popout = true) { viewFull() } }
+                    if (!isMe) BannerButton("MoreHorizontal", t("chat.chat.more")) { openProfileMenu(user, popout = true, serverId = serverId) { viewFull() } }
                 }
             }
             Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1320,7 +1322,7 @@ fun FullProfileCard(
                 }
                 if (!isMe && rel == null && !(bot && !canAddApp(app))) RoundAction("MessageCircle", t("profile.profileCard.message")) { message() }
                 RoundAction("Link2", t("profileLink.copy")) { ProfileLinks.copy(user.username) }
-                if (!isMe) RoundAction("MoreHorizontal", t("chat.chat.more")) { openProfileMenu(user, popout = false) {} }
+                if (!isMe) RoundAction("MoreHorizontal", t("chat.chat.more")) { openProfileMenu(user, popout = false, serverId = serverId) {} }
             }
             if (!isMe && mutualCount > 0) MutualRow(extras.mutualFriends, mutualServers.size) { pick(ProfileTab.MUTUALS) }
         }

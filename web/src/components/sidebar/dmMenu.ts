@@ -1,3 +1,4 @@
+import { reportItem } from "@/lib/reporting";
 import { personText } from "@/lib/personText";
 import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
@@ -95,6 +96,7 @@ const otherIn = (ch: Channel) => (ch.type === "group_dm" ? undefined : ch.recipi
 
 /** Context menu for a DM or group row in the sidebar, the rail and wherever else one is listed. */
 export const dmMenu = defineMenu<DMMenuRowCtx>("dm", [
+  [button("reportConversationContent", ({ channelId }) => reportItem({ kind: "channel", id: channelId }))],
   [openInTabButton<DMMenuRowCtx>("openDmInTab", ({ channelId }) => (dmOf(channelId) ? { serverId: null, channelId } : null))],
   [button("markDmRead", ({ channelId }) => {
     const ch = dmOf(channelId);

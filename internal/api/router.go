@@ -102,6 +102,7 @@ type Server struct {
 	limExpr    *ratelimit.Limiter
 	limImport  *ratelimit.Limiter
 	limCrash   *ratelimit.Limiter
+	limReport  *ratelimit.Limiter
 	limBug     *ratelimit.Limiter
 	// notes: making them, saving them, inviting people to them, opening links to them
 	limNote         *ratelimit.Limiter
@@ -317,7 +318,8 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limNoteLink: ratelimit.New(ratelimit.Every(120, time.Hour), 40, 2*time.Hour),
 		// bug reports, per account: someone who hit a few bugs in one sitting
 		// can send them all, and the team is not flooded by one account
-		limBug: ratelimit.New(ratelimit.Every(4, time.Hour), 4, 2*time.Hour),
+		limReport: ratelimit.New(ratelimit.Every(10, time.Hour), 10, 2*time.Hour),
+		limBug:    ratelimit.New(ratelimit.Every(4, time.Hour), 4, 2*time.Hour),
 		// files for bug reports, per account: five to a report, a few reports,
 		// and room to add one again after taking it out
 		limBugFile: ratelimit.New(ratelimit.Every(30, time.Hour), 15, 2*time.Hour),
@@ -391,7 +393,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"generic": s.limGeneric, "auth-ip": s.limAuthIP, "auth-user": s.limAuthUsr, "register": s.limReg, "signup": s.limSignup, "message": s.limMsg,
 		"upload": s.limUpload, "unfurl": s.limUnfurl, "proxy": s.limProxy, "youtube": s.limYouTube, "refresh": s.limRefresh, "voice": s.limVoice,
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
-		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile, "key-ask": s.limKeyAsk,
+		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "report": s.limReport, "bug-file": s.limBugFile, "key-ask": s.limKeyAsk,
 		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord, "server-tag": s.limTag, "music-search": s.limMusic, "music-preview": s.limPreview,
 		"automod": s.limAutomod, "publish": s.limPublish, "thread": s.limThread, "discover": s.limDiscover,
 		"note": s.limNote, "note-save": s.limNoteSave, "note-update": s.limNoteUpdate, "note-invite": s.limNoteInvite, "note-link": s.limNoteLink, "note-presence": s.limNotePresence,

@@ -1041,6 +1041,45 @@ meter charges a pulled share sound at `StreamAudioBps` (128 kbit/s). The mesh ke
   post titles); the members' apps apply the same rules to encrypted messages and report what they
   held (`POST /servers/{id}/automod/report`).
 
+### Safety reports
+
+`api/reports.go` registers `/api/v1/reports` (submit and own receipts),
+`GET /reports/target` (permission-checked preview), `POST /reports/attachments`,
+`GET /media/reports/{id}`, and the staff's `/api/v1/moderation/reports` list,
+`/{id}` detail and version-checked review. `POST /{id}/remove-message`, Admin and higher,
+removes exactly the reported message without joining its conversation or granting keys.
+It opens a case and appends the report event and moderation log in the same transaction.
+All staff ranks can review reports; existing rank limits still govern other actions.
+`staff` keeps the required rank immutable across requests, including rejected requests.
+
+Migration 0041 adds `safety_reports`, `safety_report_events`, `safety_report_files` and
+`safety_report_snapshot_blobs` on both databases. `store/reports.go` owns their queries.
+A per-account request reference makes submission retries idempotent. Ten reports an hour
+(`limReport`, captcha action `safety_report`) and existing upload budgets limit abuse.
+Muted members can report. Receipts expose only the reporter's own submissions and statuses,
+never internal notes or assignments. Evidence files use the private blob kind `report`,
+visible only to their uploader until submitted, then also to staff. Snapshot pictures take
+blob references so later edits do not garbage-collect the evidence.
+
+Reports cover profiles (including server profiles), servers and Discovery listings,
+channels, conversations, messages, emoji, stickers, packs, shared notes, applications and roles.
+Every target offers specific parts and a custom part, with a reason and freeform description.
+The backend resolves the responsible account and captures only explicit readable fields;
+message and note keys are never requested or automatically exported. Readers choose plaintext excerpts
+and screenshots or recordings to share. This evidence is not end-to-end encrypted and is
+labelled reporter-supplied, not independently authenticated proof of the original message.
+Reports do not give staff conversation keys or access to unreported content.
+
+Web `api/reports.ts`, `lib/reporting.ts` and `components/reports/` implement registered
+context-menu report actions, the report dialog and `/channels/@admin/reports[/:reportId]`.
+`lib/bugMedia.ts` and `nexa/ThreadFiles` also support private report evidence.
+Snapshots preserve expression formats and use the existing TGS and WebM players; Android
+can read those private snapshot files from its cache without fetching a public URL.
+Android `data/Reports.kt`, `ui/reports/ReportForm.kt` and `ui/moderation/Reports.kt` use
+the same endpoints, fields, evidence choices and staff workflow. Settings has Report Content
+as a fallback for any content without its own menu. Reporting preserves the existing
+account, server and expression moderation flows rather than adding new staff privileges.
+
 ### Configuration
 
 Every setting is documented in `chatd.env.example`; `internal/config` loads them. Groups:

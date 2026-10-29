@@ -736,12 +736,12 @@ Message on someone else's message, for one).
 | `callParticipant` | A person in a call's list of who is in it | `user`, `channel`, `server` | `viewParticipantProfile`, `viewParticipantMemberProfile`, `copyParticipantProfileLink`, `mentionParticipant`, `participantVolume`, `muteParticipant`, `resetParticipantVolume`, `serverMuteParticipant`, `serverDeafenParticipant`, `moveParticipant`, `disconnectParticipant`, `participantFriendship`, `blockParticipant`, `editParticipantNickname`, `editParticipantRoles`, `timeoutParticipant`, `kickParticipant`, `banParticipant`, `removeGuestParticipant`, `copyParticipantId`, `copyParticipantBotId` |
 | `callTile` | A person's tile in a call | `user`, `channel`, `server` | `viewTileProfile`, `stopSharingFromTile`, `watchStream`, `focusTile`, `fullScreenTile`, `streamVolume`, `muteStream`, `resetStreamVolume`, `tileVolume`, `muteTile`, `resetTileVolume`, `serverMuteTile`, `serverDeafenTile`, `moveTile`, `disconnectTile`, `timeoutTile`, `kickTile`, `banTile`, `removeGuestFromTile`, `copyTileUserId`, `copyTileBotId` |
 | `camera` | The arrow beside the camera button in a call | none | `cameraDevices`, `videoSettings` |
-| `category` | A category in a server's channel list | `channel`, `server` | `collapseCategory`, `moveCategory`, `createChannelInCategory`, `editCategory`, `deleteCategory`, `copyCategoryId` |
-| `channel` | A channel in a server's channel list | `channel`, `server` | `openChannelInTab`, `markChannelRead`, `inviteToChannel`, `inviteGuestsToCall`, `copyChannelLink`, `muteChannel`, `moveChannel`, `editChannel`, `deleteChannel`, `copyChannelId` |
+| `category` | A category in a server's channel list | `channel`, `server` | `reportCategoryContent`, `collapseCategory`, `moveCategory`, `createChannelInCategory`, `editCategory`, `deleteCategory`, `copyCategoryId` |
+| `channel` | A channel in a server's channel list | `channel`, `server` | `reportChannelContent`, `openChannelInTab`, `markChannelRead`, `inviteToChannel`, `inviteGuestsToCall`, `copyChannelLink`, `muteChannel`, `moveChannel`, `editChannel`, `deleteChannel`, `copyChannelId` |
 | `chatMore` | The More button at the top of a conversation | `channel`, `server` | `joinThreadFromMore`, `closeThreadFromMore`, `lockThreadFromMore`, `threadSettingsFromMore`, `deleteThreadFromMore`, `pinnedMessages`, `threadList`, `followChannel`, `subchatList`, `inviteFromMore`, `toggleMemberList`, `inviteGuestsFromMore`, `reportBugFromMore` |
 | `composerPlus` | The plus button in the message box, when it offers a choice | none | `uploadFile`, `createPoll` |
 | `composerTools` | The tools button of the message box on a phone (formatting, preview, emoji) | none | `formattingEditor`, `messagePreview`, `emojiPicker` |
-| `dm` | A conversation in the direct messages list | `channel`, `user` | `openDmInTab`, `markDmRead`, `selectConversations`, `pinConversation`, `addConversationToGroup`, `removeConversationFromGroup`, `moveConversation`, `editGroup`, `inviteToGroup`, `addFriendsToGroup`, `viewDmProfile`, `copyDmProfileLink`, `startDmCall`, `muteConversation`, `closeConversation`, `deleteConversation`, `copyDmUserId`, `copyDmUserBotId`, `copyDmChannelId` |
+| `dm` | A conversation in the direct messages list | `channel`, `user` | `reportConversationContent`, `openDmInTab`, `markDmRead`, `selectConversations`, `pinConversation`, `addConversationToGroup`, `removeConversationFromGroup`, `moveConversation`, `editGroup`, `inviteToGroup`, `addFriendsToGroup`, `viewDmProfile`, `copyDmProfileLink`, `startDmCall`, `muteConversation`, `closeConversation`, `deleteConversation`, `copyDmUserId`, `copyDmUserBotId`, `copyDmChannelId` |
 | `dmBulk` | Several conversations picked in the direct messages list | none | `markConversationsRead`, `pinConversations`, `addConversationsToGroup`, `muteConversations`, `groupChatWithPeople`, `removeFriendsOfConversations`, `blockPeopleOfConversations`, `closeConversations` |
 | `dmGroup` | A group of conversations in the direct messages list | none | `markDmGroupRead`, `collapseDmGroup`, `renameDmGroup`, `pinDmGroup`, `moveDmGroup`, `deleteDmGroup` |
 | `dmList` | The empty space of the direct messages list | none | `selectConversationsInList` |
@@ -762,24 +762,24 @@ Message on someone else's message, for one).
 | `memberJoinedFilter` | The joined filter of Server Settings, Members | none | `memberJoinedFilter` |
 | `memberRoleFilter` | The roles filter of Server Settings, Members | none | `memberRoleFilter` |
 | `memberSort` | The sort order of Server Settings, Members | none | `memberSortOrder` |
-| `message` | A message | `message`, `user`, `channel`, `server` | `copyMessageImage`, `saveMessageImage`, `addReaction`, `editMessage`, `replyToMessage`, `forwardMessage`, `createThreadFromMessage`, `publishMessage`, `copyMessageText`, `pinMessage`, `markUnread`, `toggleEmbeds`, `copyMessageLink`, `messageApps`, `copyMessageId`, `selectMessages`, `deleteMessage`, `messageTimes` |
+| `message` | A message | `message`, `user`, `channel`, `server` | `copyMessageImage`, `saveMessageImage`, `addReaction`, `editMessage`, `replyToMessage`, `forwardMessage`, `createThreadFromMessage`, `publishMessage`, `copyMessageText`, `pinMessage`, `markUnread`, `toggleEmbeds`, `copyMessageLink`, `reportMessageContent`, `messageApps`, `copyMessageId`, `selectMessages`, `deleteMessage`, `messageTimes` |
 | `microphone` | The arrow beside the microphone button in a call | none | `microphoneDevices`, `speakerDevices`, `microphoneNoiseModes`, `voiceSettings` |
 | `moderation` | The staff panel's entry in the server rail or the direct messages list | none | `markModerationRead` |
 | `nexa` | Nexa's own conversation in the direct messages list | none | `markNexaRead`, `selectNexa`, `pinNexa`, `addNexaToGroup`, `removeNexaFromGroup`, `moveNexa`, `closeNexa` |
 | `noiseMode` | The noise suppression button in a call | none | `noiseModes` |
-| `note` | A note in the notes list | none | `openNote`, `shareNote`, `noteHistory`, `deleteNote` |
+| `note` | A note in the notes list | none | `reportNoteContent`, `openNote`, `shareNote`, `noteHistory`, `deleteNote` |
 | `noteLinkRole` | What a note's share link lets people do | none | `noteLinkCanView`, `noteLinkCanEdit` |
 | `noteMemberRole` | What a person may do in a shared note | none | `noteMemberCanEdit`, `noteMemberCanView`, `removeNoteMember` |
 | `page` | Selected text or a link anywhere else in the app | none | `copySelection`, `openLink`, `copyLink` |
 | `profileAddRole` | The add role button on a person's profile in a server | none | `addProfileRole` |
-| `profileMore` | The More button on a person's profile | `user` | `viewFullProfile`, `copyProfileCardLink`, `editFriendNickname`, `removeFriendFromProfile`, `blockFromProfile`, `copyProfileUserId`, `copyProfileBotId` |
+| `profileMore` | The More button on a person's profile | `user` | `reportProfileContent`, `reportProfileApp`, `viewFullProfile`, `copyProfileCardLink`, `editFriendNickname`, `removeFriendFromProfile`, `blockFromProfile`, `copyProfileUserId`, `copyProfileBotId` |
 | `roleOrder` | Moving a role, in Server Settings, Roles | none | `moveRole` |
 | `searchSort` | The sort order of search results | none | `searchSortOrder` |
-| `server` | A server in the server rail | `server` | `markServerRead`, `pinServer`, `addServerToFolder`, `removeServerFromFolder`, `moveServer`, `selectServers`, `inviteToServer`, `serverSettings`, `createChannel`, `createCategory`, `boostServer`, `muteServer`, `serverNotifications`, `editServerProfile`, `wearServerTag`, `leaveServer`, `copyServerId` |
+| `server` | A server in the server rail | `server` | `reportServerContent`, `markServerRead`, `pinServer`, `addServerToFolder`, `removeServerFromFolder`, `moveServer`, `selectServers`, `inviteToServer`, `serverSettings`, `createChannel`, `createCategory`, `boostServer`, `muteServer`, `serverNotifications`, `editServerProfile`, `wearServerTag`, `leaveServer`, `copyServerId` |
 | `serverBulk` | Several servers picked in the server rail | none | `markServersRead`, `pinServers`, `addServersToFolder`, `muteServers`, `leaveServers` |
 | `serverProfilePick` | Picking a server, in Settings, Profiles | none | `pickProfileServer` |
 | `stickerOrder` | Moving a sticker, in a sticker pack's editor | none | `moveSticker` |
-| `stickerPack` | A sticker pack in the sticker picker | none | `editStickerPack`, `removeStickerPack` |
+| `stickerPack` | A sticker pack in the sticker picker | none | `reportStickerPack`, `editStickerPack`, `removeStickerPack` |
 | `subchat` | A sub-conversation of a direct message | `channel` | `editSubchat`, `deleteSubchat`, `copySubchatId` |
 | `systemMessage` | A message the app writes itself (a join, a pin, a call) | `message`, `user`, `channel`, `server` | `deleteSystemMessage` |
 | `textBox` | The message box and other text you can type in | none | `spellingSuggestions`, `addToDictionary`, `undoText`, `redoText`, `cutText`, `copyText`, `pasteText`, `selectAllText`, `formatText`, `showSendButton` |

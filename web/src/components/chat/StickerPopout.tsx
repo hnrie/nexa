@@ -1,3 +1,4 @@
+import { openReport } from "@/lib/reporting";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -134,6 +135,7 @@ export function StickerPopout({ sticker, anchor, onClose }: { sticker: MessageSt
           {info ? <div className={s.sub}>{t("chat.stickerPopout.fromPack", { name: info.pack.name })}</div> : null}
         </div>
       </div>
+      <Button variant="ghost" size="sm" block onClick={() => { onClose(); openReport({ kind: "sticker", id: sticker.id }); }}>{t("reports.report")}</Button>
       {info === undefined ? (
         <div className={s.pending}><Spinner size={16} /></div>
       ) : info ? (

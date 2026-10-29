@@ -1,3 +1,5 @@
+import { openReport } from "@/lib/reporting";
+import { Button } from "@/components/common/Button";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -201,6 +203,13 @@ function EmojiCard({ open, onClose }: { open: Open; onClose: () => void }) {
       <span className={s.words}>
         {name ? <span className={s.name}>{name}</span> : null}
         <span className={s.sub}>{emoji.kind === "unicode" ? t("chat.emojiDetails.standard") : <CustomSource id={emoji.id} />}</span>
+        {pinned && emoji.kind === "custom" && <Button variant="ghost" size="sm" onClick={() => {
+          const state = useExpressions.getState();
+          const custom = Object.values(state.emojis).flat().find((e) => e.blob_id === emoji.id);
+          const sticker = Object.values(state.packs).flatMap((p) => p.stickers).find((e) => e.blob_id === emoji.id);
+          onClose();
+          openReport(custom ? { kind: "emoji", id: custom.id } : sticker ? { kind: "sticker", id: sticker.id } : { evidence: [{ part: "image", label: t("reports.part.image"), text: `${emoji.name} (${emoji.id})` }] });
+        }}>{t("reports.report")}</Button>}
       </span>
     </div>,
     portalRoot(),

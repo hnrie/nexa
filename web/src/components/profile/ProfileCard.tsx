@@ -573,7 +573,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
   };
   const more = (e: MouseEvent<HTMLButtonElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    profileMoreMenu.open({ user, compact, popout, friend, viewFull: () => viewFull(), copyLink, editNickname: () => void editNickname() }, { x: r.left, y: r.bottom + 4 });
+    profileMoreMenu.open({ user, serverId, compact, popout, friend, viewFull: () => viewFull(), copyLink, editNickname: () => void editNickname() }, { x: r.left, y: r.bottom + 4 });
   };
   const setNote = (value: string) => {
     const userNotes = { ...allNotes };

@@ -10,7 +10,7 @@ import { api } from "@/api/client";
 import { playableType } from "@/lib/mediaCache";
 
 /** Whose files: a bug report's (/media/bugs/{id}) or a case thread's (/media/cases/{id}). */
-export type PrivateFileKind = "bugs" | "cases";
+export type PrivateFileKind = "bugs" | "cases" | "reports";
 
 interface Entry {
   url: string;

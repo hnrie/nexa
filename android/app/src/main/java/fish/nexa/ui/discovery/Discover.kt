@@ -491,6 +491,7 @@ private fun ServerSheet(layer: Layer, card: DiscoveryCard, close: () -> Unit) {
     }
     Sheet(layer, bare = true, padding = 0.dp, maxWidth = 560.dp, footer = {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+            NxButton(t("reports.report"), { fish.nexa.ui.reports.openReport(fish.nexa.data.ReportContext(kind = "server", id = card.id)) }, kind = ButtonKind.GHOST)
             NxButton(t("discovery.close"), close, kind = ButtonKind.GHOST)
             NxButton(if (card.member) t("discovery.open") else t("discovery.join"), ::join, loading = busy, enabled = card.member || !card.joinsPaused)
         }

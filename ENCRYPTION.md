@@ -272,3 +272,13 @@ protocol or deployed service. Review the code links above and the
 [original encryption design](docs/superpowers/specs/2026-09-11-chat-design.md#6-end-to-end-encryption)
 alongside this explanation; where they differ, the running implementation
 determines actual behavior.
+
+### Reporting selected content
+
+Reporting creates a separate record for the moderation team. A participant can
+choose readable text, screenshots or recordings to submit, and preview the readable
+item details captured with the report. These reports and review records are not
+end-to-end encrypted. Clients do not export conversation roots, attachment keys or
+note keys as part of reporting. Staff can remove the exact message named in a report
+without joining the conversation or receiving its keys. A reporter-supplied excerpt
+is not independently authenticated proof of what the original sender wrote.

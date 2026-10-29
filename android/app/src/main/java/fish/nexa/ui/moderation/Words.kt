@@ -31,6 +31,8 @@ fun actionLabel(action: String): String = when (action) {
     "unban" -> t("moderation.action.unban")
     "announcement" -> t("moderation.action.announcement")
     "announcement_delete" -> t("moderation.action.announcementDelete")
+    "report_review" -> t("reports.review")
+    "message_remove" -> t("reports.messageRemoved")
     "rank_change" -> t("staff.log.rankChange")
     "admin_grant" -> t("moderation.action.adminGrant")
     "admin_revoke" -> t("moderation.action.adminRevoke")
@@ -65,7 +67,7 @@ fun logIcon(action: String): String = when (action) {
 
 /** Log filters as the panel groups them. */
 val LOG_GROUPS: Map<String, List<String>> = mapOf(
-    "punishments" to listOf("avatar_remove", "field_reset", "server_reset", "expression_takedown", "mute", "ban", "delete", "account_delete_profile"),
+    "punishments" to listOf("message_remove", "avatar_remove", "field_reset", "server_reset", "expression_takedown", "mute", "ban", "delete", "account_delete_profile"),
     "lifts" to listOf("unmute", "unban", "expression_relist", "discovery_restore"),
     "announcements" to listOf("announcement", "announcement_delete"),
     "access" to listOf("rank_change", "admin_grant", "admin_revoke", "account_disable", "account_enable"),

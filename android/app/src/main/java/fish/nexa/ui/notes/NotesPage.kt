@@ -424,6 +424,7 @@ internal fun noteMenuItems(note: NoteItem, inList: Boolean, onHistory: (() -> Un
     val owner = note.role == NoteRole.OWNER
     val title = NoteModel.name(note.head?.title)
     val items = ArrayList<MenuItem>()
+    items += fish.nexa.ui.reports.reportItem(fish.nexa.data.ReportContext(kind = "note", id = note.id, evidence = note.head?.title?.let { listOf(fish.nexa.data.ReportEvidence("title", t("reports.part.title"), it)) } ?: emptyList()))
     if (inList) items += MenuItem.Action(t("notes.menu.open")) { Nav.go(Route.Notes(note.id)) }
     items += MenuItem.Action(if (owner) t("notes.menu.share") else t("notes.menu.whoHasAccess"), separatorAfter = onHistory == null) { openShareNote(note.id) }
     if (onHistory != null) items += MenuItem.Action(t("notes.menu.history"), separatorAfter = true, onClick = onHistory)

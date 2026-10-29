@@ -161,3 +161,5 @@ android/app/src/main/java/fish/nexa/ui/shell/Accounts.kt:201	NxTextField	usernam
 android/app/src/main/java/fish/nexa/ui/shell/Accounts.kt:202	NxTextField	password	credential
 android/app/src/main/java/fish/nexa/ui/threads/Threads.kt:367	NxTextField	name	conversation
 android/app/src/main/java/fish/nexa/ui/voice/CallMenus.kt:614	NxTextField	ui.url	readonly
+android/app/src/main/java/fish/nexa/ui/reports/ReportForm.kt:234	NxTextField	custom part (120), description (4000), evidence (16000)	staff
+android/app/src/main/java/fish/nexa/ui/moderation/Reports.kt:74	NxTextField	internal note (2000), public removal reason (1000)	staff

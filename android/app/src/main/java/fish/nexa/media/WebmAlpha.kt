@@ -242,8 +242,12 @@ object Webm {
         synchronized(clips) { clips[url] }?.let { return it }
         return withContext(Dispatchers.IO) {
             runCatching {
-                Nexa.api.http.newCall(Request.Builder().url(url).build()).execute().use { r ->
-                    if (r.isSuccessful) parse(r.body.bytes()) else null
+                if (url.startsWith("file:")) {
+                    parse(java.io.File(java.net.URI(url)).readBytes())
+                } else {
+                    Nexa.api.http.newCall(Request.Builder().url(url).build()).execute().use { r ->
+                        if (r.isSuccessful) parse(r.body.bytes()) else null
+                    }
                 }
             }.getOrNull()?.also { synchronized(clips) { clips[url] = it } }
         }

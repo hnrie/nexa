@@ -1,3 +1,4 @@
+import { reportItem } from "@/lib/reporting";
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import { billing as billingApi } from "@/api/billing";
@@ -70,6 +71,7 @@ const leaveButton = button<ServerMenuCtx>("leaveServer", ({ serverId, nav, openM
 
 /** A server's menu, from its header or the rail; the rail adds arranging it and picking more. */
 export const serverMenu = defineMenu<ServerMenuCtx>("server", [
+  [button("reportServerContent", ({ serverId }) => reportItem({ kind: "server", id: serverId }))],
   [button("markServerRead", ({ serverId }) => !!serverOf(serverId) && { id: "read", label: t("sidebar.dmMenu.markAsRead"), onSelect: () => markServerRead(serverId) })],
   // arranging it comes straight after Mark as read, which stays first, and then picking more
   serverArrangeButtons,
@@ -198,6 +200,7 @@ export interface ChannelMenuCtx extends MenuCtx {
 
 /** A server channel's menu in the channel list. */
 export const channelMenu = defineMenu<ChannelMenuCtx>("channel", [
+  [button("reportChannelContent", ({ channelId }) => reportItem({ kind: "channel", id: channelId }))],
   // a voice channel has no chat to open beside another one
   [openInTabButton<ChannelMenuCtx>("openChannelInTab", ({ channelId }) => {
     const ch = serverChannel(channelId);
@@ -260,6 +263,7 @@ export interface CategoryMenuCtx extends MenuCtx {
 
 /** A category's menu in the channel list. */
 export const categoryMenu = defineMenu<CategoryMenuCtx>("category", [
+  [button("reportCategoryContent", ({ categoryId }) => reportItem({ kind: "channel", id: categoryId }))],
   [button("collapseCategory", ({ categoryId, collapsed, toggle }) => !!serverChannel(categoryId) && { id: "collapse", label: collapsed ? t("sidebar.serverMenu.expandCategory") : t("sidebar.serverMenu.collapseCategory"), onSelect: toggle })],
   [button("moveCategory", ({ categoryId }) => {
     const ch = serverChannel(categoryId);

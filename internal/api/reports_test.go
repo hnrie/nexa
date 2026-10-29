@@ -1,0 +1,349 @@
+package api
+
+import (
+	"encoding/json"
+	"evilion.xyz/chat/internal/ids"
+	"fmt"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+)
+
+func reportBody(kind, id string) map[string]any {
+	return map[string]any{"request_id": "report-request-" + randomSuffix(), "target_kind": kind, "target_id": id, "part": "whole", "reason": "harassment", "description": "This content targets another person.", "excerpt": "Only this selected evidence."}
+}
+func sendReport(t *testing.T, ts *httptest.Server, tok string, body map[string]any) map[string]any {
+	t.Helper()
+	res, v := do(t, ts, "POST", "/api/v1/reports", tok, body)
+	if res.StatusCode != 201 {
+		t.Fatalf("report: %d %v", res.StatusCode, v)
+	}
+	return v["report"].(map[string]any)
+}
+func TestSafetyReportsLifecycleAndPrivacy(t *testing.T) {
+	_, ts := newTestServer(t)
+	owner, _ := register(t, ts, "owner")
+	reporter, rid := register(t, ts, "reporter")
+	target, tid := register(t, ts, "target")
+	mod, mid := register(t, ts, "moddy")
+	setRank(t, ts, owner, mid, "mod")
+	_, _ = do(t, ts, "PATCH", "/api/v1/users/@me", target, map[string]any{"about_me": "Original profile detail"})
+	req := reportBody("user", tid)
+	req["part"] = "about_me"
+	v := sendReport(t, ts, reporter, req)
+	id := v["id"].(string)
+	for _, key := range []string{"reporter_id", "snapshot", "excerpt", "assigned_to"} {
+		if _, ok := v[key]; ok {
+			t.Errorf("receipt reveals %s", key)
+		}
+	}
+	// A retry returns the original receipt rather than creating another report.
+	retry := sendReport(t, ts, reporter, req)
+	if retry["id"] != id {
+		t.Fatal("retry duplicated report")
+	}
+	_, _ = do(t, ts, "PATCH", "/api/v1/users/@me", target, map[string]any{"about_me": "Changed later"})
+	res, detail := do(t, ts, "GET", "/api/v1/moderation/reports/"+id, mod, nil)
+	if res.StatusCode != 200 {
+		t.Fatalf("mod read: %d %v", res.StatusCode, detail)
+	}
+	full := detail["report"].(map[string]any)
+	snapshot := full["snapshot"].(map[string]any)
+	if snapshot["about_me"] != "Original profile detail" || full["reporter_id"] != rid || full["subject_id"] != tid {
+		t.Fatalf("snapshot: %v", full)
+	}
+	for _, key := range []string{"public_key", "identity_private", "password", "key_sealed"} {
+		if _, ok := snapshot[key]; ok {
+			t.Errorf("snapshot leaked %s", key)
+		}
+	}
+	for _, tok := range []string{reporter, target} {
+		if res, _ := do(t, ts, "GET", "/api/v1/moderation/reports/"+id, tok, nil); res.StatusCode != 403 {
+			t.Errorf("nonstaff detail: %d", res.StatusCode)
+		}
+	}
+	_, mine := do(t, ts, "GET", "/api/v1/reports", target, nil)
+	if len(mine["reports"].([]any)) != 0 {
+		t.Fatal("reported user discovered report")
+	}
+	res, changed := do(t, ts, "PATCH", "/api/v1/moderation/reports/"+id, mod, map[string]any{"version": 1, "status": "in_review", "note": "Checking the details", "assigned_to": mid})
+	if res.StatusCode != 200 {
+		t.Fatalf("review: %d %v", res.StatusCode, changed)
+	}
+	if res, body := do(t, ts, "PATCH", "/api/v1/moderation/reports/"+id, owner, map[string]any{"version": 1, "status": "dismissed", "note": "Overwriting old state", "assigned_to": "0"}); res.StatusCode != 409 || errCode(body) != "report_changed" {
+		t.Errorf("stale review: %d %v", res.StatusCode, body)
+	}
+	if res, _ := do(t, ts, "PATCH", "/api/v1/moderation/reports/"+id, mod, map[string]any{"version": 2, "status": "actioned", "note": "", "assigned_to": mid}); res.StatusCode != 400 {
+		t.Error("closed without outcome")
+	}
+	res, changed = do(t, ts, "PATCH", "/api/v1/moderation/reports/"+id, owner, map[string]any{"version": 2, "status": "dismissed", "note": "No rule violation found", "assigned_to": mid})
+	if res.StatusCode != 200 {
+		t.Fatalf("preserve another assignee: %d %v", res.StatusCode, changed)
+	}
+	if len(changed["events"].([]any)) != 2 {
+		t.Fatalf("lost review history: %v", changed)
+	}
+	_, filtered := do(t, ts, "GET", "/api/v1/moderation/reports?status=dismissed&kind=user&q=targets", mod, nil)
+	if len(filtered["reports"].([]any)) != 1 {
+		t.Fatalf("filter: %v", filtered)
+	}
+	_, filtered = do(t, ts, "GET", "/api/v1/moderation/reports?q=%25", mod, nil)
+	if len(filtered["reports"].([]any)) != 0 {
+		t.Fatal("query wildcards not escaped")
+	}
+	_, mine = do(t, ts, "GET", "/api/v1/reports", reporter, nil)
+	encoded, _ := json.Marshal(mine)
+	if strings.Contains(string(encoded), "No rule violation") || strings.Contains(string(encoded), "Checking the details") {
+		t.Fatal("internal notes exposed")
+	}
+}
+func TestSafetyReportMessageAccess(t *testing.T) {
+	_, ts := newTestServer(t)
+	_, _ = register(t, ts, "owner")
+	a, _ := register(t, ts, "alice")
+	b, bid := register(t, ts, "bob")
+	other, _ := register(t, ts, "outsider")
+	_, dm := do(t, ts, "POST", "/api/v1/users/@me/channels", a, map[string]any{"recipient_ids": []string{bid}})
+	cid := dm["id"].(string)
+	createEpoch(t, ts, a, cid)
+	res, m := sendMsg(t, ts, a, cid, cid, 0, "secret", "", nil)
+	if res.StatusCode != 201 {
+		t.Fatalf("message: %v", m)
+	}
+	mid := m["id"].(string)
+	for _, kind := range []string{"message", "channel"} {
+		id := mid
+		if kind == "channel" {
+			id = cid
+		}
+		if res, _ := do(t, ts, "POST", "/api/v1/reports", other, reportBody(kind, id)); res.StatusCode != 404 {
+			t.Errorf("outsider %s: %d", kind, res.StatusCode)
+		}
+	}
+	v := sendReport(t, ts, b, reportBody("message", mid))
+	if v["target_id"] != mid {
+		t.Fatal("wrong message target")
+	}
+	// A report does not change membership or give staff a key.
+	if res, _ := do(t, ts, "GET", "/api/v1/channels/"+cid, other, nil); res.StatusCode != 404 {
+		t.Error("report granted channel access")
+	}
+	_, sub := do(t, ts, "POST", "/api/v1/channels/"+cid+"/subchats", a, map[string]any{"name": "locked", "password_key": b64(make([]byte, 32)), "password_salt": b64(make([]byte, 16)), "password_params": json.RawMessage(`{"m":65536,"t":3,"p":1,"v":1}`)})
+	subID := sub["id"].(string)
+	if res, _ := do(t, ts, "POST", "/api/v1/reports", b, reportBody("channel", subID)); res.StatusCode != 404 {
+		t.Error("locked subchat report leaked details")
+	}
+}
+func TestSafetyReportFiles(t *testing.T) {
+	_, ts := newTestServer(t)
+	staff, _ := register(t, ts, "owner")
+	a, _ := register(t, ts, "alice")
+	b, bid := register(t, ts, "bob")
+	code, file := caseUpload(t, ts, "/api/v1/reports/attachments", a, "proof.png", pngBytes(32, 32))
+	if code != 201 {
+		t.Fatalf("upload: %d %v", code, file)
+	}
+	fid := file["id"].(string)
+	if code, _ := authedGet(t, ts, staff, "/media/reports/"+fid); code != 404 {
+		t.Fatal("staff read unsent file")
+	}
+	bad := reportBody("user", bid)
+	bad["files"] = []map[string]any{{"id": fid, "name": "proof.png"}}
+	if res, _ := do(t, ts, "POST", "/api/v1/reports", b, bad); res.StatusCode != 400 {
+		t.Fatal("attached someone else's file")
+	}
+	v := sendReport(t, ts, a, bad)
+	id := v["id"].(string)
+	if code, _ := authedGet(t, ts, staff, "/media/reports/"+fid); code != 200 {
+		t.Errorf("staff cannot read evidence: %d", code)
+	}
+	if code, _ := authedGet(t, ts, b, "/media/reports/"+fid); code != 404 {
+		t.Fatal("target read evidence")
+	}
+	if code, _ := authedGet(t, ts, "", "/media/report/"+fid); code != 404 {
+		t.Fatal("public evidence")
+	}
+	// A retried report works even though its files are now referenced.
+	if retry := sendReport(t, ts, a, bad); retry["id"] != id {
+		t.Fatal("file report retry duplicated")
+	}
+	bad["request_id"] = "another-request-" + randomSuffix()
+	if res, _ := do(t, ts, "POST", "/api/v1/reports", a, bad); res.StatusCode != 400 {
+		t.Fatal("file reused for another report")
+	}
+}
+func TestSafetyReportValidation(t *testing.T) {
+	_, ts := newTestServer(t)
+	_, _ = register(t, ts, "owner")
+	a, aid := register(t, ts, "alice")
+	for _, change := range []map[string]any{{"part": "password"}, {"reason": "arbitrary"}, {"description": " "}, {"description": strings.Repeat("x", 4001)}, {"excerpt": strings.Repeat("x", 16001)}, {"part": "custom", "custom_part": ""}, {"target_kind": "arbitrary"}, {"request_id": "bad"}, {"files": []map[string]any{{"id": "0"}}}} {
+		req := reportBody("user", aid)
+		for k, v := range change {
+			req[k] = v
+		}
+		if res, body := do(t, ts, "POST", "/api/v1/reports", a, req); res.StatusCode != 400 {
+			t.Errorf("accepted %v: %d %v", change, res.StatusCode, body)
+		}
+	}
+	req := reportBody("other", "0")
+	req["part"] = "custom"
+	req["custom_part"] = "A specific widget and link"
+	sendReport(t, ts, a, req)
+}
+func TestSafetyReportConcurrentReview(t *testing.T) {
+	_, ts := newTestServer(t)
+	staff, sid := register(t, ts, "owner")
+	a, aid := register(t, ts, "alice")
+	v := sendReport(t, ts, a, reportBody("user", aid))
+	id := v["id"].(string)
+	// Store-level race uses the same version in both reviewers.
+	var wg sync.WaitGroup
+	results := make(chan int, 2)
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			res, _ := do(t, ts, "PATCH", "/api/v1/moderation/reports/"+id, staff, map[string]any{"version": 1, "status": "in_review", "assigned_to": sid, "note": fmt.Sprintf("Review %d", i)})
+			results <- res.StatusCode
+		}(i)
+	}
+	wg.Wait()
+	close(results)
+	counts := map[int]int{}
+	for code := range results {
+		counts[code]++
+	}
+	if counts[200] != 1 || counts[409] != 1 {
+		t.Fatalf("concurrent review: %v", counts)
+	}
+}
+
+func TestSafetyReportRemovalIsScopedAndAudited(t *testing.T) {
+	_, ts := newTestServer(t)
+	staff, _ := register(t, ts, "owner")
+	a, aid := register(t, ts, "alice")
+	b, bid := register(t, ts, "bob")
+	mod, modID := register(t, ts, "moddy")
+	setRank(t, ts, staff, modID, "mod")
+	_, dm := do(t, ts, "POST", "/api/v1/users/@me/channels", a, map[string]any{"recipient_ids": []string{bid}})
+	cid := dm["id"].(string)
+	createEpoch(t, ts, a, cid)
+	_, m := sendMsg(t, ts, a, cid, cid, 0, "reported", "", nil)
+	mid := m["id"].(string)
+	_, m = sendMsg(t, ts, a, cid, cid, 0, "unrelated", "", nil)
+	other := m["id"].(string)
+	v := sendReport(t, ts, b, reportBody("message", mid))
+	id := v["id"].(string)
+	path := "/api/v1/moderation/reports/" + id + "/remove-message"
+	body := map[string]any{"version": 1, "reason": "The reported message violates the rules."}
+	for _, tok := range []string{a, b, mod} {
+		if res, _ := do(t, ts, "POST", path, tok, body); res.StatusCode != 403 {
+			t.Fatalf("non-admin removal: %d", res.StatusCode)
+		}
+	}
+	if res, _ := do(t, ts, "GET", "/api/v1/channels/"+cid, staff, nil); res.StatusCode != 404 {
+		t.Fatal("staff unexpectedly joined private conversation")
+	}
+	res, action := do(t, ts, "POST", path, staff, body)
+	if res.StatusCode != 201 {
+		t.Fatalf("remove: %d %v", res.StatusCode, action)
+	}
+	caseView := action["case"].(map[string]any)
+	if caseView["user_id"] != aid || caseView["action"] != "message_remove" {
+		t.Fatalf("wrong case: %v", caseView)
+	}
+	if res, _ := do(t, ts, "GET", "/api/v1/channels/"+cid+"/messages/"+mid, b, nil); res.StatusCode != 404 {
+		t.Fatal("reported message survived")
+	}
+	if res, _ := do(t, ts, "GET", "/api/v1/channels/"+cid+"/messages/"+other, b, nil); res.StatusCode != 200 {
+		t.Fatal("unrelated message removed")
+	}
+	if res, _ := do(t, ts, "GET", "/api/v1/channels/"+cid, staff, nil); res.StatusCode != 404 {
+		t.Fatal("removal granted channel access")
+	}
+	_, detail := do(t, ts, "GET", "/api/v1/moderation/reports/"+id, staff, nil)
+	if detail["report"].(map[string]any)["version"] != float64(2) || len(detail["events"].([]any)) != 1 {
+		t.Fatalf("missing report audit: %v", detail)
+	}
+	if res, _ := do(t, ts, "POST", path, staff, body); res.StatusCode != 404 {
+		t.Fatal("repeated removal made another case")
+	}
+}
+func TestStaffGateDoesNotChangeAfterRefusals(t *testing.T) {
+	_, ts := newTestServer(t)
+	owner, _ := register(t, ts, "owner")
+	a, _ := register(t, ts, "alice")
+	b, _ := register(t, ts, "bob")
+	mod, mid := register(t, ts, "moddy")
+	setRank(t, ts, owner, mid, "mod")
+	for _, path := range []string{"/api/v1/moderation/reports", "/api/v1/moderation/users", "/api/v1/moderation/servers", "/api/v1/admin/stats"} {
+		for i := 0; i < 3; i++ {
+			for _, tok := range []string{a, b} {
+				if res, _ := do(t, ts, "GET", path, tok, nil); res.StatusCode != 403 {
+					t.Fatalf("staff gate changed after rejection: %s %d", path, res.StatusCode)
+				}
+			}
+		}
+	}
+	if res, _ := do(t, ts, "GET", "/api/v1/moderation/servers", mod, nil); res.StatusCode != 403 {
+		t.Error("mod gained admin rights after rejection")
+	}
+}
+
+func TestSafetyReportSnapshotPicturesAndExpressionVisibility(t *testing.T) {
+	srv, ts := newTestServer(t)
+	staff, _ := register(t, ts, "owner")
+	a, aid := register(t, ts, "alice")
+	b, _ := register(t, ts, "bob")
+	if res, raw := rawPut(t, ts.URL+"/api/v1/users/@me/avatar", a, "image/png", pngBytes(32, 32)); res.StatusCode != 200 {
+		t.Fatalf("avatar: %d %s", res.StatusCode, raw)
+	}
+	_, me := do(t, ts, "GET", "/api/v1/users/@me", a, nil)
+	avatar := me["avatar_id"].(string)
+	req := reportBody("user", aid)
+	req["part"] = "avatar"
+	sendReport(t, ts, b, req)
+	_, _ = do(t, ts, "DELETE", "/api/v1/users/@me/avatar", a, nil)
+	blobID, _ := ids.Parse(avatar)
+	blob, err := srv.Store.BlobByID(t.Context(), blobID)
+	if err != nil || blob.RefCount < 1 {
+		t.Fatalf("snapshot lost its picture: %v %v", blob, err)
+	}
+	if code, _ := authedGet(t, ts, staff, "/media/reports/"+avatar); code != 200 {
+		t.Fatalf("snapshot image inaccessible to staff: %d", code)
+	}
+	if code, _ := authedGet(t, ts, b, "/media/reports/"+avatar); code != 404 {
+		t.Fatal("member fetched private retained snapshot")
+	}
+	_, pack := do(t, ts, "POST", "/api/v1/stickers/packs", a, map[string]any{"name": "Private pack"})
+	pid := pack["id"].(string)
+	sticker, stickerBlob := addSticker(t, ts.URL, a, pid, "proof", pngBytes(24, 24))
+	for _, target := range []struct{ kind, id string }{{"pack", pid}, {"sticker", sticker}} {
+		if res, _ := do(t, ts, "GET", "/api/v1/reports/target?kind="+target.kind+"&id="+target.id, b, nil); res.StatusCode != 404 {
+			t.Errorf("private %s revealed: %d", target.kind, res.StatusCode)
+		}
+	}
+
+	packReport := sendReport(t, ts, a, reportBody("pack", pid))
+	_, packDetail := do(t, ts, "GET", "/api/v1/moderation/reports/"+packReport["id"].(string), staff, nil)
+	packSnapshot := packDetail["report"].(map[string]any)["snapshot"].(map[string]any)
+	if packSnapshot["cover_blob_id"] != stickerBlob || packSnapshot["cover_format"] != "png" {
+		t.Fatalf("cover not captured: %v", packSnapshot)
+	}
+	_, _ = do(t, ts, "DELETE", "/api/v1/stickers/packs/"+pid+"/stickers/"+sticker, a, nil)
+	if code, _ := authedGet(t, ts, staff, "/media/reports/"+stickerBlob); code != 200 {
+		t.Fatalf("cover lost after removal: %d", code)
+	}
+	view := createServer(t, ts, a, "Private server")
+	sid := view["id"].(string)
+	res, raw := rawPost(t, ts.URL+"/api/v1/servers/"+sid+"/emojis?name=private", a, "image/png", pngBytes(20, 20))
+	if res.StatusCode != 201 {
+		t.Fatalf("emoji: %s", raw)
+	}
+	var emoji map[string]any
+	_ = json.Unmarshal(raw, &emoji)
+	if res, _ := do(t, ts, "GET", "/api/v1/reports/target?kind=emoji&id="+emoji["id"].(string), b, nil); res.StatusCode != 404 {
+		t.Fatal("private emoji metadata revealed")
+	}
+}

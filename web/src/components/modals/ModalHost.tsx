@@ -49,6 +49,7 @@ const ForwardModal = lazyPage(() => import("./ForwardModal").then((m) => ({ defa
 const AddAccountModal = lazyPage(() => import("./AddAccountModal"));
 const VerifyKeyModal = lazyPage(() => import("./VerifyKeyModal"));
 const KeyChangeModal = lazyPage(() => import("./KeyChangeModal"));
+const ReportContentModal = lazyPage(() => import("@/components/reports/ReportModal"));
 const ReportBugModal = lazyPage(() => import("@/components/bugs/ReportBugModal"));
 const ShareNoteModal = lazyPage(() => import("@/components/notes/ShareNoteModal").then((m) => ({ default: m.ShareNoteModal })));
 const AppFormModal = lazyPage(() => import("@/components/apps/AppFormModal").then((m) => ({ default: m.AppFormModal })));
@@ -85,6 +86,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
   const close = useCallback(() => closeModal(modal.id), [closeModal, modal.id]);
   return (
     <>
+      {modal?.kind === "reportContent" ? <Suspense fallback={<Loading onClose={close} />}><ReportContentModal context={modal.props?.["context"] as import("@/lib/reporting").ReportContext | undefined} onClose={close} /></Suspense> : null}
       {modal?.kind === "createDM" ? <CreateDMModal onClose={close} initial={(modal.props?.["initial"] as string[] | undefined) ?? []} groupId={modal.props?.["groupId"] as string | undefined} /> : null}
       {modal?.kind === "confirm" ? (
         <ConfirmModal

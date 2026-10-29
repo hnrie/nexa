@@ -91,10 +91,11 @@ func (s *Server) staff(need staffRank, h http.HandlerFunc) http.Handler {
 	return s.authed(func(w http.ResponseWriter, r *http.Request) {
 		// someone with no rank at all is told what they always were
 		if rank := s.rankOf(r.Context(), auth.UserFrom(r.Context())); rank < need {
+			required := need
 			if rank == rankNone {
-				need = rankNone
+				required = rankNone
 			}
-			WriteError(w, staffRankError(need))
+			WriteError(w, staffRankError(required))
 			return
 		}
 		h(w, r)

@@ -98,6 +98,7 @@ fun AdminPanel(route: Route.Admin) {
     }
     LaunchedEffect(Unit) { runCatching { Moderation.summary() } }
     val all = listOf(
+        PanelTab("reports", t("reports.title"), "Flag"),
         PanelTab("users", t("moderation.tabs.users"), "LayoutGrid"),
         PanelTab("bots", t("moderation.tabs.bots"), "Bot"),
         PanelTab("servers", t("moderation.tabs.servers"), "Server"),
@@ -110,7 +111,7 @@ fun AdminPanel(route: Route.Admin) {
         PanelTab("announcements", t("moderation.tabs.announcements"), "Megaphone"),
     )
     // a mod has the people, cases and log; admins and above every tab
-    val tabs = if (rank != null && rank.atLeast(fish.nexa.data.StaffRank.ADMIN)) all else all.filter { it.id in listOf("users", "cases", "logs") }
+    val tabs = if (rank != null && rank.atLeast(fish.nexa.data.StaffRank.ADMIN)) all else all.filter { it.id in listOf("reports", "users", "cases", "logs") }
     val tab = route.tab.takeIf { t -> tabs.any { it.id == t } } ?: "users"
     Column(Modifier.fillMaxSize()) {
         Column(
@@ -139,6 +140,7 @@ fun AdminPanel(route: Route.Admin) {
                     else -> ExpressionsTab(uploads = parts.getOrNull(1) == "uploads")
                 }
                 "cases" -> CasesTab(parts.getOrNull(1))
+                "reports" -> ReportsTab(parts.getOrNull(1))
                 "bugs" -> BugsTab(parts.getOrNull(1))
                 "logs" -> LogsTab()
                 "announcements" -> AnnouncementsTab()

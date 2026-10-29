@@ -1,3 +1,4 @@
+import { reportItem } from "@/lib/reporting";
 import type { NavigateFunction } from "react-router-dom";
 import { NOTE_EDITOR, NOTE_OWNER, NOTE_VIEWER, type NoteRole } from "@/api/types";
 import { button, defineMenu } from "@/lib/contextMenus/registry";
@@ -42,6 +43,7 @@ function removeItem({ note, openModal, onGone }: NoteMenuCtx): ContextMenuItem {
 /** What can be done with a note from its card's menu or the menu on its page. */
 export const noteMenu = defineMenu<NoteMenuCtx>("note", [
   [
+    button("reportNoteContent", ({ note }) => reportItem({ kind: "note", id: note.id, evidence: note.head?.title ? [{ part: "title", label: t("reports.part.title"), text: note.head.title }] : [] })),
     button("openNote", ({ note, nav, inList }) => !!inList && { id: "open", label: t("notes.menu.open"), onSelect: () => nav(`/channels/@me/notes/${note.id}`) }),
     button("shareNote", ({ note, openModal }) => ({ id: "share", label: note.role === NOTE_OWNER ? t("notes.menu.share") : t("notes.menu.whoHasAccess"), onSelect: () => openModal("shareNote", { noteId: note.id }) })),
     button("noteHistory", ({ onHistory }) => !!onHistory && { id: "history", label: t("notes.menu.history"), onSelect: onHistory }),

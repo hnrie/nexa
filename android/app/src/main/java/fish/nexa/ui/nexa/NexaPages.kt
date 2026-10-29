@@ -220,6 +220,7 @@ fun actionIcon(action: String): String = when (action) {
 }
 
 fun noticeTitle(action: String, d: kotlinx.serialization.json.JsonObject): String = when (action) {
+    "message_remove" -> t("reports.messageRemoved")
     "avatar_remove" -> when {
         detailsBool(d, "avatar") && detailsBool(d, "banner") -> t("nexa.notice.titleAvatarAndBanner")
         detailsBool(d, "banner") -> t("nexa.notice.titleBanner")
@@ -242,6 +243,7 @@ fun noticeTitle(action: String, d: kotlinx.serialization.json.JsonObject): Strin
 private fun noticeExplainer(c: MemberCase): String {
     val d = c.details
     return when (c.action) {
+        "message_remove" -> t("reports.messageRemovedBody")
         "avatar_remove" -> t("nexa.notice.explainAvatar")
         "field_reset" -> if ("username" in detailsFields(d)) t("nexa.notice.explainUsername") else t("nexa.notice.explainFields")
         // a server hidden from Discover stays hidden until staff show it again, whatever the owner does

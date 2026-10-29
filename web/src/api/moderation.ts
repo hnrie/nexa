@@ -11,7 +11,7 @@ import { api, type UploadOptions } from "./client";
 import type { BugCounts, BugMessage, MemberBug } from "./bugs";
 import type { Activity, Emoji, PublicUser, ServerTag, Snowflake, StickerPack } from "./types";
 
-export type ModAction = "avatar_remove" | "field_reset" | "mute" | "ban" | "delete" | "server_reset" | "expression_takedown";
+export type ModAction = "message_remove" | "avatar_remove" | "field_reset" | "mute" | "ban" | "delete" | "server_reset" | "expression_takedown";
 export type ResetField = "username" | "display_name" | "about_me" | "pronouns" | "status" | "nicknames" | "server_profiles" | "typing_style" | "name_style" | "widgets" | "server_tag";
 /** What a server_reset can take back of what a server shows everyone. */
 export type ServerField = "icon" | "banner" | "name" | "description" | "tag" | "discovery";

@@ -181,6 +181,13 @@ g) Moderation records (not end-to-end encrypted, kept as the record
      and staff in a moderation case, stored in readable form and
      readable by every member of staff. Only the member and staff can
      open the pictures and videos. A closed case keeps its thread.
+   - Safety reports: who reported which item and specific part, the reason,
+     description, selected text, pictures or recordings deliberately shared,
+     and a snapshot of the reported item's readable details. These are not
+     end-to-end encrypted. Reports do not share conversation or note keys,
+     or grant staff access to the rest of an encrypted conversation. Staff
+     record assignments, review decisions and internal notes. The reported
+     person is not shown the reporter's identity or the report itself.
    - The moderation log: an append-only record of every staff action
      (who, to whom, what, why, and when), with the names as they were
      at the time. Nobody can edit or delete it.
@@ -293,8 +300,9 @@ drafts live only inside your encrypted settings.
   use a moderation panel that shows public profiles, what servers
   show everyone, when accounts were last active, which accounts have
   used the same IP addresses (never the addresses), moderation cases
-  and their threads, the log, announcements, and bug reports. It shows
-  nothing that is encrypted, because nothing here can decrypt it.
+  and their threads, the log, announcements, bug reports and safety reports.
+  For encrypted content, staff can read only the selected evidence a
+  participant deliberately submits, not the original encrypted conversation.
 - Link previews, pictures and videos linked from elsewhere, GIFs, and
   YouTube videos are fetched by the Nexa server, not by your device,
   and the server fetches them through Cloudflare's WARP network. The
@@ -424,7 +432,8 @@ calls.
   10 minutes. An app's sign in tokens: until you take the app back,
   or after 90 days without use.
 - Moderation cases, case threads, held usernames, fingerprints of
-  removed pictures, and the moderation log: kept as the moderation
+  removed pictures, safety reports with their snapshots, evidence and review
+  history, and the moderation log: kept as the moderation
   record, including after an account is deleted.
 - Backups: a copy of everything the server stores, made from time to
   time (usually before an update) and kept on the same machine.
@@ -500,7 +509,8 @@ of your data. These are Nexa's:
   in section 3e, which show staff the accounts that share one and go
   with the account; and moderation cases and their threads, the
   moderation log, held usernames, and fingerprints of removed
-  pictures, which are kept after an account is deleted so that what
+  pictures, and safety reports with their evidence and review history,
+  which are kept after an account is deleted so that what
   was done, by whom, and why stays on record, and so a name or picture
   that was taken down stays down.
 - To follow the law (a legal obligation): answering a valid legal

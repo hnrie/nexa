@@ -1,3 +1,4 @@
+import { reportItem } from "@/lib/reporting";
 import type { PublicUser, Role } from "@/api/types";
 import { about, button, defineMenu } from "@/lib/contextMenus/registry";
 import { copyText } from "@/lib/clipboard";
@@ -8,6 +9,7 @@ import { t } from "@/i18n";
 
 export interface ProfileMoreCtx {
   user: PublicUser;
+  serverId?: string | undefined;
   /** A popout or a panel, which have a full profile to open. */
   compact: boolean;
   popout: boolean;
@@ -21,6 +23,8 @@ export interface ProfileMoreCtx {
 /** The More menu on a profile. */
 export const profileMoreMenu = defineMenu<ProfileMoreCtx>("profileMore", [
   [
+    button("reportProfileContent", ({ user, serverId }) => reportItem({ kind: "user", id: user.id, ...(serverId ? { serverId } : {}) })),
+    button("reportProfileApp", ({ user }) => (user.flags & 64) !== 0 && reportItem({ kind: "application", id: user.id }, "report-app")),
     button("viewFullProfile", ({ compact, viewFull }) => compact && { id: "full", label: t("profile.profileCard.viewFullProfile"), onSelect: viewFull }),
     button("copyProfileCardLink", ({ popout, copyLink }) => popout && { id: "link", label: t("profileLink.copy"), onSelect: copyLink }),
   ],

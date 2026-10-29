@@ -38,6 +38,8 @@ var banAllowed = map[string]bool{
 // anything to anybody. A few of these routes can also do something public;
 // their handlers ask mutedFor for that part (see there).
 var muteAllowed = map[string]bool{
+	"POST /api/v1/reports":                                              true,
+	"POST /api/v1/reports/attachments":                                  true,
 	"POST /api/v1/auth/logout":                                          true,
 	"POST /api/v1/billing/portal":                                       true,
 	"POST /api/v1/billing/checkout":                                     true,

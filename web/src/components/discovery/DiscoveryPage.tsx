@@ -1,3 +1,4 @@
+import { openReport } from "@/lib/reporting";
 import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { TriangleAlert, Compass, Users, X } from "lucide-react";
@@ -144,6 +145,7 @@ function ServerSheet({ card, onClose }: { card: DiscoveryCard; onClose: () => vo
       width={560}
       footer={
         <>
+          <Button variant="ghost" onClick={() => openReport({ kind: "server", id: card.id })}>{t("reports.report")}</Button>
           <Button variant="ghost" onClick={onClose}>{t("discovery.close")}</Button>
           <Button onClick={() => void join()} loading={busy} disabled={card.joins_paused && !card.member} data-testid="discovery-join">
             {card.member ? t("discovery.open") : t("discovery.join")}

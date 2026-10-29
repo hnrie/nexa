@@ -539,6 +539,7 @@ fun typersIn(channelId: String): List<String> {
 fun serverMenu(serverId: String, fromRail: Boolean): List<MenuItem> {
     val st = Nexa.servers.get(serverId) ?: return emptyList()
     val items = ArrayList<MenuItem>()
+    items += fish.nexa.ui.reports.reportItem(fish.nexa.data.ReportContext(kind = "server", id = serverId))
     items += MenuItem.Action(t("sidebar.dmMenu.markAsRead"), separatorAfter = true) { Unread.markServerRead(serverId) }
     if (fromRail) {
         val pinned = Rail.isPinned(serverId)

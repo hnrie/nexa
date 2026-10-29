@@ -1,3 +1,4 @@
+import { openReport } from "@/lib/reporting";
 import { PersonName } from "@/components/common/PersonName";
 import { Check } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -67,7 +68,7 @@ export function StickerPackModal({ onClose, info, stickerId }: { onClose: () => 
   );
 
   return (
-    <Modal open onClose={onClose} title={pack.name} width={540} footer={footer}>
+    <Modal open onClose={onClose} title={pack.name} width={540} footer={<><Button variant="ghost" onClick={() => openReport({ kind: "sticker", id: current.id })}>{t("reports.report")} ({current.name})</Button><Button variant="ghost" onClick={() => openReport({ kind: "pack", id: pack.id })}>{t("reports.report")}</Button>{footer}</>}>
       <div className={s.top} data-testid="sticker-pack">
         <StickerView format={current.format} src={packImageUrl(pack, current)} alt={current.name} className={s.big} eager />
         <div className={s.info}>

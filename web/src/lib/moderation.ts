@@ -115,6 +115,10 @@ export function actionLabel(action: string): string {
       return t("moderation.action.adminRevoke");
     case "rank_change":
       return t("staff.log.rankChange");
+    case "message_remove":
+      return t("reports.messageRemoved");
+    case "report_review":
+      return t("reports.review");
     case "account_disable":
       return t("moderation.action.accountDisable");
     case "account_enable":
@@ -215,6 +219,8 @@ export function fullDate(ms: number): string {
 /** The headline of a notice, as the member reads it: "Your account was muted". */
 export function noticeTitle(action: ModAction, d: CaseDetails): string {
   switch (action) {
+    case "message_remove":
+      return t("reports.messageRemoved");
     case "avatar_remove":
       if (d.avatar && d.banner) return t("nexa.notice.titleAvatarAndBanner");
       return d.banner ? t("nexa.notice.titleBanner") : t("nexa.notice.titleAvatar");
@@ -245,6 +251,8 @@ function onlyDiscover(d: CaseDetails): boolean {
 /** What an action means for the member, in a sentence under the headline. */
 export function noticeExplainer(c: Pick<MemberCase, "action" | "details" | "expires_at">): string {
   switch (c.action) {
+    case "message_remove":
+      return t("reports.messageRemovedBody");
     case "avatar_remove":
       return t("nexa.notice.explainAvatar");
     case "field_reset":
@@ -393,7 +401,7 @@ export function expressionSummary(d: CaseDetails): string {
 
 /** Log filters as the panel groups them. */
 export const LOG_GROUPS: Record<string, string[]> = {
-  punishments: ["avatar_remove", "field_reset", "server_reset", "expression_takedown", "mute", "ban", "delete", "account_delete_profile"],
+  punishments: ["message_remove", "avatar_remove", "field_reset", "server_reset", "expression_takedown", "mute", "ban", "delete", "account_delete_profile"],
   lifts: ["unmute", "unban", "expression_relist", "discovery_restore"],
   announcements: ["announcement", "announcement_delete"],
   access: ["rank_change", "admin_grant", "admin_revoke", "account_disable", "account_enable"],
