@@ -38,19 +38,20 @@ func TestNSFWCommunityAndMixedServer(t *testing.T) {
 		return nil
 	}
 	list("", 1)
-	// Even a channel hidden from the viewer must classify the server in Discovery.
+	// An NSFW channel must not classify the whole server in Discovery.
 	if res, body := do(t, c.ts, "PATCH", "/api/v1/channels/"+c.general, c.tokA, map[string]any{"nsfw": true}); res.StatusCode != 200 {
 		t.Fatalf("channel: %d %v", res.StatusCode, body)
 	}
-	list("", 0)
+	list("", 1)
 	list("?nsfw_only=1", 0)
-	mixed := list("?nsfw=1&nsfw_only=1", 1)
-	if mixed["nsfw"] != false || mixed["nsfw_content"] != true || mixed["tag"] == nil {
+	list("?nsfw=1&nsfw_only=1", 0)
+	mixed := list("?nsfw=1", 1)
+	if mixed["nsfw"] != false || mixed["nsfw_content"] != false || mixed["tag"] == nil {
 		t.Fatalf("mixed classification: %v", mixed)
 	}
 	_, meta := do(t, c.ts, "GET", "/api/v1/discovery/categories", tokC, nil)
-	if meta["total"].(float64) != 0 || len(listOf(meta, "tags")) != 0 {
-		t.Fatalf("hidden metadata: %v", meta)
+	if meta["total"].(float64) != 1 || len(listOf(meta, "tags")) != 1 {
+		t.Fatalf("mixed metadata: %v", meta)
 	}
 	_, meta = do(t, c.ts, "GET", "/api/v1/discovery/categories?nsfw=1", tokC, nil)
 	if meta["total"].(float64) != 1 || len(listOf(meta, "tags")) != 1 {
@@ -114,7 +115,11 @@ func TestNSFWCommunityAndMixedServer(t *testing.T) {
 	}
 	// Turning the whole-server flag off preserves individual channel flags.
 	patch(map[string]any{"nsfw": false})
-	list("", 0)
+	list("", 1)
+	list("?nsfw=1&nsfw_only=1", 0)
+	if res, channel := do(t, c.ts, "GET", "/api/v1/channels/"+c.general, c.tokA, nil); res.StatusCode != 200 || channel["nsfw"] != true {
+		t.Fatalf("channel restriction lost: %d %v", res.StatusCode, channel)
+	}
 	_, preview = do(t, c.ts, "GET", "/api/v1/invites/"+code, "", nil)
 	if preview["server"] == nil {
 		t.Fatalf("mixed preview stayed hidden: %v", preview)
@@ -202,7 +207,7 @@ func TestNSFWDiscoverySearchAndAutomaticTag(t *testing.T) {
 			want := 0
 			if show {
 				path += "&nsfw=1"
-				want = 2
+				want = 1
 			}
 			res, out := do(t, c.ts, "GET", path, c.tokB, nil)
 			if res.StatusCode != 200 || len(listOf(out, "servers")) != want {
@@ -223,19 +228,31 @@ func TestNSFWDiscoverySearchAndAutomaticTag(t *testing.T) {
 			}
 		}
 	}
-	for query, want := range map[string]int{"NSFW gardening": 1, "games nsfw": 1, "nsfw missing": 0} {
+	for query, want := range map[string]int{"NSFW gardening": 1, "games nsfw": 0, "nsfw missing": 0} {
 		_, out := do(t, c.ts, "GET", "/api/v1/discovery?nsfw=1&q="+url.QueryEscape(query), c.tokB, nil)
 		if len(listOf(out, "servers")) != want {
 			t.Fatalf("combined query %q: %v", query, out)
 		}
 	}
 	_, out := do(t, c.ts, "GET", "/api/v1/discovery?nsfw=1&tag=NsFw", c.tokB, nil)
-	if len(listOf(out, "servers")) != 2 {
+	if len(listOf(out, "servers")) != 1 {
 		t.Fatalf("reserved tag filter: %v", out)
 	}
 	_, out = do(t, c.ts, "GET", "/api/v1/discovery", c.tokB, nil)
-	if cards := listOf(out, "servers"); len(cards) != 1 || cards[0].(map[string]any)["id"] != safe["id"] {
-		t.Fatalf("default visibility changed: %v", out)
+	cards := listOf(out, "servers")
+	if len(cards) != 2 {
+		t.Fatalf("default visibility: %v", out)
+	}
+	for _, entry := range cards {
+		card := entry.(map[string]any)
+		if (card["id"] != safe["id"] && card["id"] != mixed["id"]) || card["nsfw"] != false || card["nsfw_content"] != false {
+			t.Fatalf("safe or mixed classification: %v", card)
+		}
+		for _, tag := range toStrings(card["tags"]) {
+			if strings.EqualFold(tag, "nsfw") {
+				t.Fatalf("safe or mixed server given NSFW tag: %v", card)
+			}
+		}
 	}
 	_, out = do(t, c.ts, "GET", "/api/v1/discovery/categories?nsfw=1", c.tokB, nil)
 	for _, tag := range toStrings(out["tags"]) {
