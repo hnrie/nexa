@@ -274,6 +274,7 @@ private fun LinkCard(e: Unfurl, from: String) {
                         Txt(
                             title, style = Nx.type.body.copy(fontWeight = FontWeight(600), lineHeight = Nx.type.sp(20.8f)), color = c.link,
                             modifier = Modifier.pressable(remember { MutableInteractionSource() }) { openExternal(e.url) },
+                            maxLines = 3,
                         )
                     }
                     e.description?.let { d -> Folding(linkify(d, c.link), Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(19.6f), color = c.text), 6) }

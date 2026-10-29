@@ -39,3 +39,6 @@
 .reveal:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 @media (pointer: coarse) { .reveal { width: 44px; } }
 .area { height: auto; min-height: 88px; padding: 10px 12px; resize: vertical; line-height: 1.4; }
+
+/* Metadata can be supplied by a person or app. */
+.label { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }

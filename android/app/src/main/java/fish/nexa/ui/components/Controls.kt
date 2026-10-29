@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -119,7 +120,8 @@ fun Txt(
 ) {
     BasicText(
         text = text,
-        modifier = modifier,
+        // Text ink (especially combining marks) must stay in its measured box.
+        modifier = modifier.clipToBounds(),
         style = style.copy(color = color).let { s -> if (weight != null) s.copy(fontWeight = FontWeight(weight)) else s }.let { s -> if (align != null) s.copy(textAlign = align) else s },
         maxLines = maxLines,
         overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis,
@@ -384,6 +386,9 @@ fun NxTextField(
                     if (required) withStyle(SpanStyle(color = c.textDanger)) { append(" *") }
                 },
                 style = type.label.copy(color = if (error != null) c.textDanger else c.textSubtle),
+                modifier = Modifier.clipToBounds(),
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
         }
         Box(

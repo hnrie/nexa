@@ -363,3 +363,7 @@
 .roleBtn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-strong); }
 .roleBtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .roleBtn:disabled { opacity: 0.6; }
+
+/* Keep shared user text inside its own layout slot. */
+.theirName { max-width: min(220px, 60vw); overflow: hidden; text-overflow: ellipsis; }
+.readTitle, .linkTitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

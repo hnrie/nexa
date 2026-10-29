@@ -406,7 +406,7 @@ fun ThreadIntro(thread: Channel) {
                 .background(c.bgSurface, CircleShape),
             contentAlignment = Alignment.Center,
         ) { Icon(if (post) "MessagesSquare" else "MessageSquareText", c.textStrong, size = 28.dp) }
-        Txt(thread.name, style = Nx.type.title.copy(fontSize = Nx.type.sp(28f), lineHeight = Nx.type.sp(30.8f), fontWeight = FontWeight(700)), color = c.textStrong)
+        Txt(thread.name, style = Nx.type.title.copy(fontSize = Nx.type.sp(28f), lineHeight = Nx.type.sp(30.8f), fontWeight = FontWeight(700)), color = c.textStrong, maxLines = 2)
         val tags = if (post) (thread.thread?.appliedTags ?: emptyList()).mapNotNull { id -> parent?.forum?.tags?.firstOrNull { it.id == id } } else emptyList()
         if (tags.isNotEmpty()) FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             for (tag in tags) TagChip(tag.name, tag.emoji)

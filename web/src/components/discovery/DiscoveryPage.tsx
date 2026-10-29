@@ -318,7 +318,7 @@ export default function DiscoveryPage() {
             </div>
             {tag ? (
               <span className={s.activeTag}>
-                {t("discovery.taggedWith", { tag })}
+                <span>{t("discovery.taggedWith", { tag })}</span>
                 <button type="button" aria-label={t("discovery.clearTag")} onClick={() => setTag("")}><X size={14} /></button>
               </span>
             ) : null}

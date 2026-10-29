@@ -233,7 +233,7 @@ private fun AuthorizeSheet(layer: Layer, initialQuery: String, close: () -> Unit
                         Avatar(i.application.id, i.application.name, i.application.iconId ?: i.application.bot?.avatarId, 72.dp, icon = i.application.iconId != null, shape = fish.nexa.ui.components.SQUARE_AVATAR)
                     }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), itemVerticalAlignment = Alignment.CenterVertically) {
-                        Txt(i.application.name, style = Nx.type.heading.copy(fontSize = Nx.type.sp(24f), fontWeight = FontWeight(700)), color = c.textStrong, modifier = Modifier.semantics { heading() })
+                        Txt(i.application.name, style = Nx.type.heading.copy(fontSize = Nx.type.sp(24f), fontWeight = FontWeight(700)), color = c.textStrong, modifier = Modifier.semantics { heading() }, maxLines = 2)
                         HookTags(null, app = true)
                     }
                     Txt(if (toAccount) t("apps.consent.wantsAccount") else t("apps.consent.wantsServer"), style = Nx.type.body.copy(fontSize = Nx.type.sp(16f), fontWeight = FontWeight(550)), color = c.textSubtle, align = TextAlign.Center)

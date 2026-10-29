@@ -632,7 +632,7 @@ private fun Favorite(w: Widgets.GameWidget) {
             GameCover(g, 76, 76.dp)
             Column(Modifier.weight(1f)) {
                 Txt(t("widgets.type.favorite"), style = Nx.type.label.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(700)), color = c.textMuted, modifier = Modifier.padding(bottom = 2.dp))
-                Txt(g.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(19f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(22.8f)), color = c.textStrong)
+                Txt(g.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(19f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(22.8f)), color = c.textStrong, maxLines = 2)
                 w.note?.let { Txt(it, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(19.6f)), color = c.text, modifier = Modifier.padding(top = 5.dp)) }
             }
         }
@@ -868,7 +868,7 @@ private fun CardWidget(w: Widgets.CardWidget) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (w.image != null && w.shape == "square") AsyncImage(Media.widgetUrl(w.image, 56, density), null, Media.loader, Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)).background(c.bgActive), contentScale = ContentScale.Crop)
-                Txt(w.title, style = Nx.type.name.copy(fontSize = Nx.type.sp(17f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(21.25f)), color = c.textStrong)
+                Txt(w.title, style = Nx.type.name.copy(fontSize = Nx.type.sp(17f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(21.25f)), color = c.textStrong, maxLines = 2)
             }
             w.text?.let { Txt(it, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20.3f)), color = c.text, modifier = Modifier.padding(top = 6.dp)) }
             if (w.stats.isNotEmpty()) BoxWithConstraints(Modifier.padding(top = 12.dp).fillMaxWidth()) {
@@ -876,7 +876,7 @@ private fun CardWidget(w: Widgets.CardWidget) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (row in w.stats.chunked(cols)) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         for (st in row) Column(Modifier.weight(1f).clip(RoundedCornerShape(9.dp)).background(p.chip).topEdge(RoundedCornerShape(9.dp), c.edgeLight).padding(start = 10.dp, end = 10.dp, top = 7.dp, bottom = 8.dp)) {
-                            Txt(st.label, style = Nx.type.hint.copy(fontWeight = FontWeight(600), lineHeight = Nx.type.sp(15f)), color = c.textMuted)
+                            Txt(st.label, style = Nx.type.hint.copy(fontWeight = FontWeight(600), lineHeight = Nx.type.sp(15f)), color = c.textMuted, maxLines = 2)
                             Txt(st.value, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(19f)), color = c.textStrong, modifier = Modifier.padding(top = 2.dp))
                         }
                         repeat(cols - row.size) { Box(Modifier.weight(1f)) }

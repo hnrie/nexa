@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.graphics.Color
@@ -108,7 +109,7 @@ fun PersonText(
     nameTextStyle: TextStyle = style,
 ) {
     if (!text.contains(PERSON_SLOT)) {
-        BasicText(text, modifier, style.copy(color = color), maxLines = maxLines,
+        BasicText(text, modifier.clipToBounds(), style.copy(color = color), maxLines = maxLines,
             overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis)
         return
     }
@@ -137,7 +138,7 @@ fun PersonLine(
 ) {
     val width = rememberInlineWidth()
     val maxWidth = with(LocalDensity.current) { width.pixels.toDp() }
-    Box(modifier.then(width.modifier)) {
+    Box(modifier.then(width.modifier).clipToBounds()) {
         val names = personInlines(nameTextStyle, nameColor, maxWidth, serverId, nameStyle)
         val words = text(names)
         BasicText(words, style = style.copy(color = color), inlineContent = names.content, maxLines = maxLines,

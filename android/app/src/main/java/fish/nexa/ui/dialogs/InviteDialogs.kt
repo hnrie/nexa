@@ -417,7 +417,7 @@ internal fun OpenInviteSheet(layer: Layer, code: String, hash: String, close: ()
                                     inviter?.id, if (inviter != null) t("invite.invitedYouToJoin", "name" to fish.nexa.ui.chat.PERSON_SLOT) else t("invite.youveBeenInvited"), inviter?.let { it.displayName.ifBlank { it.username } } ?: "",
                                     style = Nx.type.bodySmall.copy(lineHeight = Nx.type.sp(18.9f)), color = c.textMuted,
                                 )
-                                Txt(p.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(24f), lineHeight = Nx.type.sp(28.8f), fontWeight = FontWeight(700), letterSpacing = (-0.01).em), color = c.textStrong, modifier = Modifier.semantics { heading() })
+                                Txt(p.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(24f), lineHeight = Nx.type.sp(28.8f), fontWeight = FontWeight(700), letterSpacing = (-0.01).em), color = c.textStrong, modifier = Modifier.semantics { heading() }, maxLines = 2)
                                 if (p.online != null || p.members != null) FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     p.online?.let { InviteCount(true, t("invite.onlineCount", "count" to it)) }
                                     p.members?.let { InviteCount(false, if (p.group) t("invite.inThisGroupCount", "count" to it) else t("invite.membersCount", "count" to it)) }

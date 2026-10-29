@@ -70,7 +70,7 @@ fun ScrollGroup(content: @Composable () -> Unit) {
 @Composable
 fun ScrollingText(text: AnnotatedString, style: TextStyle, modifier: Modifier = Modifier, inlineContent: Map<String, InlineTextContent> = emptyMap()) {
     if (Nx.motion.reduced) {
-        BasicText(text, modifier, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis, inlineContent = inlineContent)
+        BasicText(text, modifier.clipToBounds(), style = style, maxLines = 1, overflow = TextOverflow.Ellipsis, inlineContent = inlineContent)
         return
     }
     var box by remember { mutableIntStateOf(0) }

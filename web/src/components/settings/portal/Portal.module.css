@@ -113,3 +113,8 @@
   .twoFields { grid-template-columns: 1fr; }
   .empty { flex-direction: column; align-items: flex-start; }
 }
+
+/* A tag leaves room for its remove button even with very wide glyphs. */
+.tag { min-width: 0; max-width: 100%; }
+.tag > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag > button { flex: none; }

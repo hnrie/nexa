@@ -382,3 +382,6 @@
 
 /* the guest link dialog's "Revoke all links": quiet, at the start of the footer, and it asks first */
 .revokeStart { margin-inline-end: auto; color: var(--text-danger); padding-inline: 8px; }
+
+/* Keep shared user text inside its own layout slot. */
+.lobbyTitle, .ringName { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

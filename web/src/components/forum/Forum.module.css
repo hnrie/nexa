@@ -86,3 +86,7 @@
   .filterChip { min-height: 36px; }
 }
 @media (prefers-reduced-motion: reduce) { .post { transition: none; } }
+
+/* Keep shared user text inside its own layout slot. */
+.tag, .filterChip { min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; }
+.tag > span, .filterChip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

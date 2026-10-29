@@ -1154,6 +1154,23 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
 switching pages goes through `startTransition`, which keeps the page on screen until the next one's
 file is here.
 
+### Shared user text layout
+
+User text must fit its display slot independently of its character limit. Do not blacklist
+Unicode to fix layout: U+FDFD, combining sequences, nonbreaking spaces and long plain words
+must be contained even when previously saved or received from another client. `base.css`
+provides inherited emergency wrapping and the web `PersonName` identity boundary. Compact
+labels stay on one line, conversation/invite/note/dialog titles are bounded, and markdown
+blocks wrap and clip excess glyph ink. Code and tables scroll inside their own wrappers;
+the chat list never scrolls horizontally. Android bounds ink in its common text/name/markdown
+renderers and uses matching title limits. Preserve its bounded personal-name effect halo.
+Keep removable labels in a shrinkable text child so their buttons stay visible.
+`docs/UI_TEXT_AUDIT.md` records the input-to-display inventory and the regression workflow.
+The dev-only `web/tests/text-layout.html` fixture is checked with
+`cd web && npx tsc --noEmit -p tests` and `tools/text_layout_audit.py` against an explicit Vite
+scratch-server proxy. Android's debug-only `TextLayoutAuditActivity` accepts theme, payload
+and page extras for adversarial text screenshots. Neither fixture is a production route.
+
 ### Routes (`routes.tsx`)
 
 `/` (home), `/login`, `/login/qr` (approving a QR sign-in), `/register`, `/recover`, `/invite/:code`, `/note/:token`, `/download`,
@@ -1708,7 +1725,7 @@ notes. CMake also fetches pinned Xiph RNNoise source and weights matching rnnois
 
 ## Tools (`tools/`)
 
-- Testing: `check.sh`, `e2e.py`, `screenshot.py`, `seed.py`, `webhook_e2e.py`, `bot_e2e.py` with
+- Testing: `check.sh`, `e2e.py`, `screenshot.py`, `text_layout_audit.py`, `seed.py`, `webhook_e2e.py`, `bot_e2e.py` with
   `bots/`, `apps_ui.py`, `discord_e2e.py`,
   `sfu_call.py`, `sfu_guest.py`, `call_quality.py` and `share_quality.py` with `netsim/`, `ios_sim.py`
   with `ios/`, `app_size.py`, `desktop_idle.py` with `desktop_idle/`.

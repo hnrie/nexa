@@ -94,3 +94,12 @@
 .badge[data-nsfw] { background: color-mix(in srgb, var(--warning) 22%, transparent); }
 
 .nsfwSwitch > label { min-height: 44px; }
+
+/* Keep shared user text inside its own layout slot. */
+.name > span:first-child { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.badge { flex: none; }
+.sheetName { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.cardTag, .tagBtn { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activeTag { min-width: 0; max-width: 100%; }
+.activeTag > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activeTag > button { flex: none; }

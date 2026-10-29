@@ -1,10 +1,10 @@
-.chat { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.chat { min-width: 0; display: flex; flex-direction: column; height: 100%; min-height: 0; }
 /* the header rides on top of the conversation, with a soft shadow falling onto it */
 .header { position: relative; z-index: 2; flex: none; height: var(--header-h); display: flex; align-items: center; gap: 8px; padding-block: 0; padding-inline: 18px 10px; background: var(--sheen); box-shadow: 0 1px 0 var(--border-subtle), 0 8px 16px -14px color-mix(in srgb, var(--shade) 90%, transparent); }
 .hIcon { color: var(--text-muted); display: flex; flex: none; }
 /* The line beside the name gives way first. A name shrinks only once that line is gone: shared
    out by size, even a factor of 1 there would take a sliver off it and cut it with an ellipsis. */
-.hName { font-family: var(--font-display); font-size: 16.5px; font-weight: 660; letter-spacing: 0; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0.001; }
+.hName { font-family: var(--font-display); font-size: 16.5px; font-weight: 660; letter-spacing: 0; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; flex-shrink: 0.001; }
 .hNameBtn { min-width: 0; }
 .hNameBtn:hover { text-decoration: underline; }
 /* The line after the name gives way first, so a narrow header still shows who
@@ -49,8 +49,8 @@
 /* Scrolled from its bottom (MessageList.tsx): the one child of a column-reverse
    box sits at the bottom of it, and the scroll position counts up from there,
    so history added at the top leaves what is on screen where it is. */
-.scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; display: flex; flex-direction: column-reverse; }
-.inner { flex: none; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 8px; }
+.scroll { overflow-x: hidden; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; display: flex; flex-direction: column-reverse; }
+.inner { min-width: 0; max-width: 100%; flex: none; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 8px; }
 .loader { display: flex; justify-content: center; align-items: center; box-sizing: border-box; min-height: 56px; padding: 16px; color: var(--text-muted); }
 .loadError { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; padding: 16px; color: var(--text-muted); font-size: 14px; text-align: center; }
 .loadRetry { color: var(--link); font-size: 14px; font-weight: 500; padding: 4px; }
@@ -552,3 +552,17 @@ button.sysName:hover { text-decoration: underline; }
 .publishBtn { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; min-height: 32px; padding: 0 12px; border-radius: var(--radius-sm); background: var(--bg-active); color: var(--text-strong); font-size: 13px; font-weight: 600; }
 .publishBtn:hover { background: var(--bg-selected); }
 .publishBtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* Names never set the width or an unbounded height of a conversation. */
+.hGroup .hName { flex-shrink: 1; }
+.emptyName { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.emptyUser { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emptyText { overflow-wrap: anywhere; overflow: clip; }
+
+/* Keep shared user text inside its own layout slot. */
+.emptyText b { display: inline-block; min-width: 0; max-width: 100%; max-height: 1lh; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; unicode-bidi: isolate; }
+.content { overflow-wrap: anywhere; overflow: clip; }
+
+/* Event links carry thread names, and names inside prose still need one line. */
+.sysName, .sysLink { display: inline-block; min-width: 0; max-width: 100%; max-height: 1lh; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; unicode-bidi: isolate; }
+.system > span:not(.sysIcon) { min-width: 0; max-width: 100%; }

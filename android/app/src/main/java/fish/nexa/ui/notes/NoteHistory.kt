@@ -303,6 +303,7 @@ private fun VersionView(doc: NoteDoc, note: String) {
                 style = Nx.type.title.copy(fontSize = Nx.type.sp(24f), lineHeight = Nx.type.sp(28.8f), fontWeight = FontWeight(720), letterSpacing = (-0.018).em),
                 color = if (doc.title.isBlank()) c.textMuted else c.textStrong,
                 modifier = Modifier.semantics { heading() },
+                maxLines = 2,
             )
             Spacer(Modifier.height(22.dp))
             if (doc.md.isNotBlank()) MarkdownView(doc.md, ctx) else Txt(t("notes.reader.empty"), style = Nx.type.body, color = c.textMuted)

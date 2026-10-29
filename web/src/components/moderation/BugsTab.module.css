@@ -238,3 +238,5 @@
     min-height: 32px;
   }
 }
+
+.paneTitle > span[dir] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

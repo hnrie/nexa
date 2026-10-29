@@ -53,3 +53,7 @@ button.chip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset
 .linkBtn:hover { text-decoration: underline; }
 .pending { display: flex; justify-content: center; padding: 28px 0; }
 .gone { margin: 0; padding: 18px; font-size: 14px; color: var(--text-muted); }
+
+/* Bound labels supplied by other people and apps. */
+.chip { min-width: 0; flex-shrink: 1; }
+.text { min-width: 0; max-height: 1lh; }

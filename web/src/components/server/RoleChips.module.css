@@ -10,3 +10,8 @@
 .chipDot { width: 12px; height: 12px; border-radius: 50%; }
 .chipX { display: flex; color: var(--text-muted); cursor: pointer; }
 .chipX:hover { color: var(--text-strong); }
+
+/* Keep shared user text inside its own layout slot. */
+.chip { min-width: 0; max-width: 100%; }
+.chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chipDot, .chipX { flex: none; }

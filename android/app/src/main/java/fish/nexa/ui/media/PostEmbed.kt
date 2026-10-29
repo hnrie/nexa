@@ -219,7 +219,7 @@ private fun PostView(post: SocialPost, icon: String?, link: String?, quoted: Boo
         t("chat.post.forwardedFrom", "name" to post.community), style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f)), color = c.textMuted,
         modifier = if (post.communityUrl != null) Modifier.pressable(remember { MutableInteractionSource() }) { openExternal(post.communityUrl) } else Modifier,
     )
-    post.title?.let { Txt(it, style = Nx.type.name.copy(fontSize = Nx.type.sp(16f), fontWeight = FontWeight(650), lineHeight = Nx.type.sp(20.8f)), color = c.textStrong) }
+    post.title?.let { Txt(it, style = Nx.type.name.copy(fontSize = Nx.type.sp(16f), fontWeight = FontWeight(650), lineHeight = Nx.type.sp(20.8f)), color = c.textStrong, maxLines = 3) }
     if (video != null && video.first != null) PostMediaBlock(post, link, quoted, video)
     post.text?.takeIf { it.isNotEmpty() }?.let { text ->
         val words = remember(text, post.links, post.platform) { postText(text, post.links, post.platform, c.link) }

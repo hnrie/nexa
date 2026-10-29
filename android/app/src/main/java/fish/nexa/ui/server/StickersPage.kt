@@ -360,7 +360,7 @@ private fun PackDetail(pack: StickerPack, manage: Boolean, onDeleted: () -> Unit
         header()
         Wrap(Modifier.fillMaxWidth().padding(bottom = 16.dp), gap = 12.dp) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Txt(pack.name, style = Nx.type.heading.copy(fontSize = Nx.type.sp(21f), fontWeight = FontWeight(690)), color = c.textStrong)
+                Txt(pack.name, style = Nx.type.heading.copy(fontSize = Nx.type.sp(21f), fontWeight = FontWeight(690)), color = c.textStrong, maxLines = 2)
                 Txt(
                     packCount(pack) + " · " + (if (pack.public) t("server.packEditor.publicAnyoneWithTheLink") else t("server.packEditor.privateOnlyYouCanSeeIt")) +
                         (if (pack.serverId != null) " · " + t("server.packEditor.serverPack") else ""),

@@ -251,7 +251,7 @@ fun InviteCardView(target: InviteTarget, lead: (@Composable () -> Unit)?, action
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     lead?.invoke()
-                    Txt(target.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(16.5f), fontWeight = FontWeight(680), lineHeight = Nx.type.sp(21.45f)), color = c.textStrong)
+                    Txt(target.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(16.5f), fontWeight = FontWeight(680), lineHeight = Nx.type.sp(21.45f)), color = c.textStrong, maxLines = 2)
                     InviteCounts(target)
                 }
                 action?.invoke()
@@ -574,7 +574,7 @@ private fun PackCard(pack: StickerPack) {
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Txt(if (emoji) t("stickerPack.emojiPack") else t("stickerPack.stickerPack"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
-                Txt(pack.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(16.5f), fontWeight = FontWeight(680), lineHeight = Nx.type.sp(21.45f)), color = c.textStrong)
+                Txt(pack.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(16.5f), fontWeight = FontWeight(680), lineHeight = Nx.type.sp(21.45f)), color = c.textStrong, maxLines = 2)
                 Txt(
                     if (emoji) t("server.packEditor.emojiCount", "count" to pack.stickers.size) else t("server.packEditor.stickerCount", "count" to pack.stickers.size),
                     style = Nx.type.hint.copy(fontSize = Nx.type.sp(13f), lineHeight = Nx.type.sp(18f)), color = c.textMuted, maxLines = 1,

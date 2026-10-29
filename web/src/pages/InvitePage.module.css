@@ -27,3 +27,6 @@
 @media (pointer: coarse) {
   .link { display: inline-flex; align-items: center; min-height: 40px; }
 }
+
+/* Metadata can be supplied by a person or app. */
+.title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

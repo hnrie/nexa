@@ -872,6 +872,7 @@ private fun NoteReader(noteId: String, initial: NoteDoc, bridge: NoteBridge, nar
                     style = Nx.type.title.copy(fontSize = Nx.type.sp(24f), lineHeight = Nx.type.sp(28.8f), fontWeight = FontWeight(720), letterSpacing = (-0.018).em),
                     color = if (untitled) c.textMuted else c.textStrong,
                     modifier = Modifier.semantics { heading() },
+                    maxLines = 2,
                 )
                 Byline(noteId)
                 if (doc.md.isNotBlank()) androidx.compose.runtime.key(named) { MarkdownView(doc.md, ctx) }

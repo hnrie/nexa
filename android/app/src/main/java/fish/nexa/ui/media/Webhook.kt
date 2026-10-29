@@ -207,19 +207,20 @@ private fun RichEmbed(hook: Webhook.Content, embed: Webhook.Embed, all: List<Web
                             Txt(
                                 a.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong,
                                 modifier = if (a.url != null) Modifier.pressable(remember { MutableInteractionSource() }) { openExternal(a.url) } else Modifier,
+                                maxLines = 1,
                             )
                         }
                     }
                     embed.title?.let { title ->
                         Box(if (embed.url != null) Modifier.pressable(remember { MutableInteractionSource() }) { openExternal(embed.url) } else Modifier) {
-                            fish.nexa.ui.markdown.MarkdownView(title, fish.nexa.ui.markdown.RenderCtx(color = if (embed.url != null) c.link else c.textStrong, bodyPx = 16f, bodyLine = 22f, weight = FontWeight(600)))
+                            fish.nexa.ui.markdown.MarkdownView(title, fish.nexa.ui.markdown.RenderCtx(color = if (embed.url != null) c.link else c.textStrong, bodyPx = 16f, bodyLine = 22f, weight = FontWeight(600)), Modifier.heightIn(max = with(LocalDensity.current) { Nx.type.sp(66f).toDp() }))
                         }
                     }
                     // an embed's words are a size down from a message's (Webhook.module.css .grid)
                     embed.description?.let { fish.nexa.ui.markdown.MarkdownView(it, fish.nexa.ui.markdown.RenderCtx(color = c.text, bodyPx = 14f, bodyLine = 18f)) }
                     for (row in rows) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         for (f in row) Column(Modifier.weight(1f)) {
-                            Txt(f.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong)
+                            Txt(f.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textStrong, maxLines = 3)
                             fish.nexa.ui.markdown.MarkdownView(f.value, fish.nexa.ui.markdown.RenderCtx(color = c.text, bodyPx = 14f, bodyLine = 18f))
                         }
                     }

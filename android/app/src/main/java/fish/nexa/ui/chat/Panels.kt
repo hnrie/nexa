@@ -684,7 +684,7 @@ fun LockedSubchat(channel: Channel, checkFailed: Boolean, onRecheck: () -> Unit,
                     .topEdge(iconShape, c.edgeLight),
                 contentAlignment = Alignment.Center,
             ) { Icon("Lock", c.textBrand, size = 28.dp) }
-            Txt(channel.name, style = Nx.type.heading.copy(fontSize = Nx.type.sp(21f), lineHeight = Nx.type.sp(26f), fontWeight = FontWeight(680)), color = c.textStrong, align = TextAlign.Center)
+            Txt(channel.name, style = Nx.type.heading.copy(fontSize = Nx.type.sp(21f), lineHeight = Nx.type.sp(26f), fontWeight = FontWeight(680)), color = c.textStrong, align = TextAlign.Center, maxLines = 2)
             if (checkFailed) {
                 Txt(t("chat.lockedChannel.thatCouldNotBeCheckedTry"), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted, align = TextAlign.Center)
                 NxButton(t("chat.messageList.tryAgain"), onRecheck, block = true)

@@ -358,3 +358,10 @@ button.track:focus-visible { outline-offset: -2px; }
 .peekArt > .peekMusic:nth-child(2) { z-index: 2; margin-inline-start: -10px; }
 .peekArt > .peekMusic:nth-child(3) { z-index: 1; margin-inline-start: -10px; }
 .peekArt > .peekMusic[data-round] { border-radius: 50%; box-shadow: 0 0 0 2px var(--profile-chip, var(--bg-floating)); }
+
+/* Keep shared user text inside its own layout slot. */
+.widget { min-width: 0; overflow-wrap: anywhere; }
+
+.favName, .widget h3.cardTitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.tag { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cardText { overflow: clip; }

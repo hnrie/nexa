@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -604,13 +605,13 @@ private fun ConversationStart(channel: Channel) {
                         // whoever is picked here joins this group, and is handed its key like anyone added later
                         NxButton(t("chat.chat.addFriends"), { fish.nexa.ui.dialogs.Dialogs.createDm(groupId = channel.id) }, size = ButtonSize.SM, icon = "UserPlus")
                     }
-                } else StartText(boldIn("chat.messageList.groupStart", "name", name, " $endToEnd"))
+                } else StartWithName("chat.messageList.groupStart", "name", name, " $endToEnd")
             }
             channel.type == "subchat" -> {
                 StartTitle(channel.name)
                 Spacer(Modifier.height(8.dp))
                 val parent = channel.parentId?.let { Nexa.channels.get(it) }?.let { Names.channel(it) } ?: t("chat.messageList.thisConversation")
-                StartText(boldIn("chat.messageList.subchatStart", "where", parent))
+                StartWithName("chat.messageList.subchatStart", "where", parent)
             }
             else -> {
                 StartTitle(t("chat.messageList.welcomeToChannel", "name" to channel.name))
@@ -619,7 +620,7 @@ private fun ConversationStart(channel: Channel) {
                 // apps that read every message here: the start of the channel names them with the encryption line
                 val readers = fish.nexa.ui.apps.readingApps(channel.serverId, channel.id)
                 val encryption = if (readers.isEmpty()) endToEnd else t("apps.reading.endToEndExcept", "apps" to Names.list(readers.map { Names.shown(it) }))
-                StartText(boldIn("chat.messageList.channelStart", "name", "#${channel.name}", listOfNotNull(topic, encryption).joinToString(" ", prefix = " ")))
+                StartWithName("chat.messageList.channelStart", "name", "#${channel.name}", listOfNotNull(topic, encryption).joinToString(" ", prefix = " "))
             }
         }
     }
@@ -642,6 +643,7 @@ internal fun StartTitle(text: String) = Txt(
     text,
     style = Nx.type.title.copy(fontSize = Nx.type.sp(28f), lineHeight = Nx.type.sp(30.8f), fontWeight = FontWeight(700)),
     color = Nx.colors.textStrong,
+    maxLines = 2,
 )
 
 @Composable
@@ -650,9 +652,17 @@ internal fun StartText(text: String) = StartText(androidx.compose.ui.text.Annota
 @Composable
 internal fun StartText(text: androidx.compose.ui.text.AnnotatedString) = androidx.compose.foundation.text.BasicText(
     text,
-    modifier = Modifier.widthIn(max = 560.dp),
+    modifier = Modifier.widthIn(max = 560.dp).clipToBounds(),
     style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(23.25f), color = Nx.colors.textMuted),
 )
+
+/** Keep a conversation name to one inline slot without clipping the explanatory prose. */
+@Composable
+private fun StartWithName(key: String, arg: String, name: String, after: String = "") {
+    val style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), lineHeight = Nx.type.sp(23.25f))
+    PersonText(null, t(key, arg to PERSON_SLOT) + after, name, style, Nx.colors.textMuted,
+        Modifier.widthIn(max = 560.dp), nameTextStyle = style.copy(fontWeight = FontWeight(700)))
+}
 
 /** A sentence with one of its values in bold, as the web's `<Tr values={{ name: <b>…</b> }}>` draws it. */
 internal fun boldIn(key: String, arg: String, value: String, after: String = ""): androidx.compose.ui.text.AnnotatedString {

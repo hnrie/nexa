@@ -22,5 +22,5 @@ export function PersonName({ userId, serverId, user, children, className, style,
   useEffect(() => {
     if (id && !known && !me && user?.name_style === undefined) fetchMissingUsers([id]);
   }, [id, known, me, user?.name_style]);
-  return <span dir="auto" {...props} className={[className, nameClass(look)].filter(Boolean).join(" ") || undefined} style={{ ...style, ...nameStyle(look) }}>{children}</span>;
+  return <span dir="auto" {...props} className={["person-name", className, nameClass(look)].filter(Boolean).join(" ") || undefined} style={{ ...style, ...nameStyle(look) }}>{children}</span>;
 }

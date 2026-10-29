@@ -28,3 +28,9 @@
 .fileError, .error { font-size: 13.5px; color: var(--text-danger); margin: 0; }
 .note { display: flex; align-items: flex-start; gap: 8px; margin: 2px 0 0; font-size: 13px; line-height: 17px; color: var(--text-muted); }
 .note svg { flex: none; margin-top: 1px; }
+
+/* Keep shared user text inside its own layout slot. */
+.text { overflow: clip; }
+
+/* Bound labels supplied by other people and apps. */
+.title, .choiceLabel { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

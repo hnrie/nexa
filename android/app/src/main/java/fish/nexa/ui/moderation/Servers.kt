@@ -342,7 +342,7 @@ fun StaffServerPage(serverId: String) {
                             Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Box(Modifier.pullUp(48.dp).background(cardFill(c), RoundedCornerShape(30)).padding(6.dp)) { ServerIcon(server.id, server.iconId, server.name, 84.dp) }
                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Txt(server.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(21f), fontWeight = FontWeight(700)), color = c.textStrong)
+                                    Txt(server.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(21f), fontWeight = FontWeight(700)), color = c.textStrong, maxLines = 2)
                                     Txt(t("moderation.servers.members", "count" to server.memberCount), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
                                 }
                                 FaceSection(t("moderation.servers.description")) {

@@ -28,6 +28,7 @@ run "go vet"     go vet ./...
 run "go test"    go test ./internal/...
 
 run "web typecheck" bash -c 'cd web && npx tsc --noEmit'
+run "text layout fixture typecheck" bash -c 'cd web && npx tsc --noEmit -p tests'
 run "web tests"     bash -c 'cd web && npx vitest run --reporter dot'
 run "web build"     bash -c 'cd web && npx vite build --outDir "${TMPDIR:-/tmp}/dist-check" --emptyOutDir >/dev/null'
 # the front page says how much the app is to download; this keeps that true

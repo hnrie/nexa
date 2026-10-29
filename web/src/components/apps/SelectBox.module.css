@@ -45,3 +45,6 @@
   .option { min-height: 48px; }
   .select { min-height: 44px; }
 }
+
+/* Bound labels supplied by other people and apps. */
+.optLabel, .optDesc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

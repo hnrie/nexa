@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -32,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -211,7 +213,11 @@ fun PersonName(
 private fun PlainName(text: String, style: TextStyle, modifier: Modifier, maxLines: Int) {
     androidx.compose.foundation.text.BasicText(
         text = text,
-        modifier = modifier,
+        modifier = modifier.drawWithContent {
+            // Keep the intentional name-effect halo, but bound arbitrary glyph ink.
+            val ink = if (style.shadow != null || style.drawStyle is Stroke) style.fontSize.toPx() * 0.5f else 0f
+            clipRect(-ink, -ink, size.width + ink, size.height + ink) { this@drawWithContent.drawContent() }
+        },
         style = style,
         maxLines = maxLines,
         overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis,

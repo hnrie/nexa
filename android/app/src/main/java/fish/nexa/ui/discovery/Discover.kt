@@ -499,7 +499,7 @@ private fun ServerSheet(layer: Layer, card: DiscoveryCard, close: () -> Unit) {
         Box(Modifier.padding(start = 20.dp).offset(y = (-36).dp)) { ServerIconTile(card, 80.dp, 24.dp, c.bgFloating) }
         Column(Modifier.fillMaxWidth().offset(y = (-24).dp).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (card.nsfw) Badge(t("nsfw.label"), c.warning)
-            Txt(card.name, style = Nx.type.title.copy(fontSize = Nx.type.sp(24f), lineHeight = Nx.type.sp(28f)), color = c.textStrong)
+            Txt(card.name, style = Nx.type.title.copy(fontSize = Nx.type.sp(24f), lineHeight = Nx.type.sp(28f)), color = c.textStrong, maxLines = 2)
             // `.facts`: who is about, how many belong, and what it is
             val fact = Nx.type.hint.copy(fontSize = Nx.type.sp(13.5f))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {

@@ -25,6 +25,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -212,6 +213,9 @@ private fun Labeled(label: String, required: Boolean, hint: String?, error: Stri
                 if (required) withStyle(SpanStyle(color = c.textDanger)) { append(" *") }
             },
             style = Nx.type.label.copy(color = if (error != null) c.textDanger else c.textSubtle),
+            modifier = Modifier.clipToBounds(),
+            maxLines = 2,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
         content()
         if (error != null) Txt(error, style = Nx.type.hint, color = c.textDanger)

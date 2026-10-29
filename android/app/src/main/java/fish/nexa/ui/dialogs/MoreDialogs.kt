@@ -301,7 +301,7 @@ internal fun CreateServerSheet(layer: Layer, close: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Txt(prev.name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight.SemiBold), color = c.textStrong)
+                        Txt(prev.name, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight.SemiBold), color = c.textStrong, maxLines = 2)
                         Txt(
                             t("modals.createServer.templateSummary", "channels" to chanCount, "categories" to cats.size, "roles" to prev.roles.size),
                             style = Nx.type.hint,
@@ -321,7 +321,7 @@ internal fun CreateServerSheet(layer: Layer, close: () -> Unit) {
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
                                     Box(Modifier.size(8.dp).background(dotColor, CircleShape))
-                                    Txt(r.name, style = Nx.type.hint, color = c.textSubtle)
+                                    Txt(r.name, style = Nx.type.hint, color = c.textSubtle, maxLines = 2)
                                 }
                             }
                         }
@@ -340,7 +340,7 @@ internal fun CreateServerSheet(layer: Layer, close: () -> Unit) {
                                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                                     ) {
                                         Icon(templateChannelIcon(ch.type), c.textMuted, size = 13.dp)
-                                        Txt(ch.name, style = Nx.type.hint, color = c.text)
+                                        Txt(ch.name, style = Nx.type.hint, color = c.text, maxLines = 2)
                                         if (ch.isPrivate) Icon("Lock", c.textMuted, size = 11.dp)
                                     }
                                 }
@@ -349,7 +349,7 @@ internal fun CreateServerSheet(layer: Layer, close: () -> Unit) {
                         for (cat in cats) {
                             val children = prev.channels.filter { it.type != "category" && it.parentIndex == cat.id }
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Txt(cat.name, style = Nx.type.hint.copy(fontWeight = FontWeight.SemiBold), color = c.textMuted)
+                                Txt(cat.name, style = Nx.type.hint.copy(fontWeight = FontWeight.SemiBold), color = c.textMuted, maxLines = 2)
                                 if (children.isNotEmpty()) {
                                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         for (ch in children) {
@@ -359,7 +359,7 @@ internal fun CreateServerSheet(layer: Layer, close: () -> Unit) {
                                                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                                             ) {
                                                 Icon(templateChannelIcon(ch.type), c.textMuted, size = 13.dp)
-                                                Txt(ch.name, style = Nx.type.hint, color = c.text)
+                                                Txt(ch.name, style = Nx.type.hint, color = c.text, maxLines = 2)
                                                 if (ch.isPrivate) Icon("Lock", c.textMuted, size = 11.dp)
                                             }
                                         }

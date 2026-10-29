@@ -490,7 +490,7 @@ private fun FieldTable(label: String, rows: List<FieldRow>) {
             if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
             // a phone's narrow card: the field over its value
             Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Txt(r.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textMuted)
+                Txt(r.name, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)), color = c.textMuted, maxLines = 2)
                 Txt(
                     r.value,
                     style = if (r.word) Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), fontWeight = FontWeight(600)) else Nx.type.code.copy(fontSize = Nx.type.sp(13f)),
@@ -748,7 +748,7 @@ private fun AnnouncementCard(a: fish.nexa.data.Announcement) {
     ) {
         if (a.title.isNotEmpty()) Row(Modifier.padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon("Megaphone", c.textStrong, size = 18.dp)
-            Txt(a.title, style = Nx.type.body.copy(fontWeight = FontWeight(700)), color = c.textStrong, modifier = Modifier.semantics { heading() })
+            Txt(a.title, style = Nx.type.body.copy(fontWeight = FontWeight(700)), color = c.textStrong, modifier = Modifier.semantics { heading() }, maxLines = 2)
         }
         MarkdownView(a.body, RenderCtx(surface = c.bgRaised))
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -847,7 +847,7 @@ private fun BugFeedEntry(it: FeedItem, onOpen: (String) -> Unit) {
             }
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-                Txt(b.subject, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(20.9f)), color = c.textStrong, modifier = Modifier.weight(1f))
+                Txt(b.subject, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(20.9f)), color = c.textStrong, modifier = Modifier.weight(1f), maxLines = 2)
                 BugStatusChip(b.status)
             }
             Txt(Markdown.plainText(Markdown.parse(b.description), fish.nexa.ui.chat.AppNames), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f), lineHeight = Nx.type.sp(20.3f)), color = c.textSubtle, maxLines = 2)

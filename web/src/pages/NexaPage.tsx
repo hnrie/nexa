@@ -196,7 +196,7 @@ function FeedEntry({ item, people, onOpen }: { item: Exclude<FeedItem, BugItem>;
             {item.announcement.title ? (
               <h3 className={s.announcementTitle}>
                 <Megaphone size={18} aria-hidden="true" />
-                {item.announcement.title}
+                <span>{item.announcement.title}</span>
               </h3>
             ) : null}
             <div className={s.announcementBody}>

@@ -537,7 +537,7 @@ fun PackPage(packId: String) {
                         PackMosaic(pack, tall = true)
                         Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Txt(pack.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(21f), fontWeight = FontWeight(700)), color = c.textStrong)
+                                Txt(pack.name, style = Nx.type.name.copy(fontSize = Nx.type.sp(21f), fontWeight = FontWeight(700)), color = c.textStrong, maxLines = 2)
                                 fish.nexa.ui.chat.PersonText(pack.ownerId, if (server != null) t("moderation.packs.inServer", "name" to server.name) else t("moderation.servers.ownedBy", "name" to fish.nexa.ui.chat.PERSON_SLOT), nameOf(owner), style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.textMuted)
                             }
                             FaceSection(t("moderation.servers.description")) {

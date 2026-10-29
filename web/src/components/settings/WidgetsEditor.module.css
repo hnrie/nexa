@@ -155,3 +155,8 @@
   background: color-mix(in oklab, var(--bg-floating) 55%, var(--bg-base));
   box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle);
 }
+
+/* A tag leaves room for its remove button even with very wide glyphs. */
+.tag { min-width: 0; max-width: 100%; }
+.tag > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag > button { flex: none; }

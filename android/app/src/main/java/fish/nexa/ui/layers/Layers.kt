@@ -355,6 +355,7 @@ fun SheetTitle(text: String, modifier: Modifier = Modifier) {
         style = Nx.type.heading.copy(fontSize = Nx.type.sp(21f), fontWeight = FontWeight(680), lineHeight = Nx.type.sp(25.2f)),
         color = Nx.colors.textStrong,
         modifier = modifier.semantics { heading() },
+        maxLines = 2,
     )
 }
 
@@ -454,7 +455,7 @@ private fun MenuSheet(
 
 @Composable
 private fun MenuHeading(label: String) =
-    Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(650)), color = Nx.colors.textMuted, modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 4.dp))
+    Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f), fontWeight = FontWeight(650)), color = Nx.colors.textMuted, modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 4.dp), maxLines = 2)
 
 @Composable
 private fun MenuSeparator() = Box(Modifier.padding(horizontal = 6.dp, vertical = 5.dp).fillMaxWidth().background(Nx.colors.borderSubtle).size(1.dp))

@@ -813,7 +813,7 @@ private fun openMusicEditor(initial: Widgets.MusicWidget, onDone: (Widgets.Widge
                         MusicArt(type, m, 36, 36.dp)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Column {
-                                Txt(m.name, style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), lineHeight = Nx.type.sp(18f), fontWeight = FontWeight(650)), color = c.textStrong)
+                                Txt(m.name, style = Nx.type.body.copy(fontSize = Nx.type.sp(14.5f), lineHeight = Nx.type.sp(18f), fontWeight = FontWeight(650)), color = c.textStrong, maxLines = 2)
                                 if (!m.by.isNullOrEmpty()) Txt(m.by, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(12.5f), lineHeight = Nx.type.sp(16f)), color = c.textMuted)
                             }
                             if (m.art == null && m.id == null) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

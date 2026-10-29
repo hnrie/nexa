@@ -38,3 +38,7 @@ button.starter:hover, button.starter:focus-visible { border-color: var(--border)
 .starterWhen { flex: none; font-size: 12px; color: var(--text-muted); }
 .starterText { color: var(--text); line-height: 1.45; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 @media (max-width: 767px) { .introIcon { width: 56px; height: 56px; } }
+
+/* Keep shared user text inside its own layout slot. */
+.introTag { min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; }
+.introTag > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

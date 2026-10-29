@@ -139,7 +139,7 @@ function PlainMembers({ serverId }: { serverId: string }) {
                   return (
                     <span key={id} className={r.chip}>
                       <span className={r.chipDot} style={{ background: ro.color ? `#${ro.color.toString(16).padStart(6, "0")}` : "var(--text-muted)" }} />
-                      {ro.name}
+                      <span>{ro.name}</span>
                     </span>
                   );
                 })}

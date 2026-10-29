@@ -24,7 +24,7 @@ it("keeps the supplied nickname while following live style changes and explicit 
   expect(label.className).toContain("ns-glow");
   expect(label.className).not.toContain("ns-gradient");
   act(() => useUsers.setState({ byId: { "2": person(null) } }));
-  expect(label.className).toBe("");
+  expect(label.className).toBe("person-name");
   expect(label.style.getPropertyValue("--ns-family")).toBe("");
 });
 
@@ -34,7 +34,7 @@ it("shows an own-profile save immediately, before the gateway updates the user c
   render(<PersonName userId="2">Me</PersonName>);
   expect(screen.getByText("Me").className).toContain("ns-gradient");
   act(() => useAuth.setState({ me: person(null) as MeUser }));
-  expect(screen.getByText("Me").className).toBe("");
+  expect(screen.getByText("Me").className).toBe("person-name");
 });
 
 it("keeps the custom font when a server role overrides the effect colours", () => {
@@ -42,7 +42,7 @@ it("keeps the custom font when a server role overrides the effect colours", () =
   useServers.setState({ byId: { s: { members: { "2": { role_ids: ["r"] } }, roles: { r: { color: 0x00ff00, position: 1 } } } as unknown as ServerState } });
   render(<PersonName userId="2" serverId="s">Member</PersonName>);
   const label = screen.getByText("Member");
-  expect(label.className).toBe("ns-font");
+  expect(label.className).toBe("person-name ns-font");
   expect(label.style.color).toBe("rgb(0, 255, 0)");
   expect(label.style.getPropertyValue("--ns-family")).toBe('"Comic Neue"');
   expect(label.style.getPropertyValue("--ns-c1")).toBe("");

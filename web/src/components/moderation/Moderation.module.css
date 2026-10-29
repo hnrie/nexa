@@ -1877,3 +1877,7 @@ td.logReason {
   color: var(--text-warning);
   font-weight: 650;
 }
+
+/* Keep shared user text inside its own layout slot. */
+.logReasonText { overflow-wrap: anywhere; overflow: clip; }
+.cardNameLink { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

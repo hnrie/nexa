@@ -8,3 +8,6 @@
 /* on a phone, under the page's header rather than over its buttons */
 @media (max-width: 767px) { .stack { top: calc(var(--header-h) + 8px + env(safe-area-inset-top, 0px)); width: calc(100% - 24px); align-items: center; } }
 @keyframes drop { from { transform: translateY(-14px) scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Keep shared user text inside its own layout slot. */
+.toast { min-width: 0; max-height: min(240px, 50dvh); overflow-wrap: anywhere; overflow: hidden; }

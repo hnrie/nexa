@@ -178,8 +178,10 @@ export function Tooltip({ text, keys, side = "top", children, className, delay =
                 } as React.CSSProperties
               }
             >
-              {text}
-              {keys ? <span className={s.keys} dir="ltr">{keys}</span> : null}
+              <span className={s.words}>
+                {text}
+                {keys ? <span className={s.keys} dir="ltr">{keys}</span> : null}
+              </span>
             </span>,
             // tooltips come and go too often to each follow full screen; they look where to mount as they open
             portalRoot(),

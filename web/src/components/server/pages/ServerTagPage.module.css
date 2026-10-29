@@ -43,3 +43,7 @@
 .member { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 8px; border-radius: var(--radius-sm); background: var(--bg-hover); }
 .memberName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 550; color: var(--text); }
 .big { display: flex; justify-content: center; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+
+/* Bound labels supplied by other people and apps. */
+.role { min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; }
+.role > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

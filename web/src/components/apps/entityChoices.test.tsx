@@ -13,5 +13,5 @@ it("resolves a selected app identity when its profile arrives and follows later 
   act(() => useUsers.setState({ byId: { person: user } }));
   expect(screen.getByText("Bob").className).toContain("ns-font");
   act(() => useUsers.setState({ byId: { person: { ...user, display_name: "Robert", name_style: null } } }));
-  expect(screen.getByText("Robert").className).toBe("");
+  expect(screen.getByText("Robert").className).toBe("person-name");
 });

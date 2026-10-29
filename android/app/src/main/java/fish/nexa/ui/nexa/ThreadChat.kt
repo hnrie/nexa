@@ -323,7 +323,7 @@ fun ThreadIntro(avatar: @Composable () -> Unit, title: String, sub: String?, tex
     Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp)) {
         StartAvatar(avatar)
         StartTitle(title)
-        if (!sub.isNullOrEmpty()) Txt(sub, style = Nx.type.body.copy(fontSize = Nx.type.sp(18f), fontWeight = FontWeight(500)), color = c.textSubtle, modifier = Modifier.padding(top = 6.dp))
+        if (!sub.isNullOrEmpty()) Txt(sub, style = Nx.type.body.copy(fontSize = Nx.type.sp(18f), fontWeight = FontWeight(500)), color = c.textSubtle, modifier = Modifier.padding(top = 6.dp), maxLines = 1)
         Spacer(Modifier.height(10.dp))
         StartText(text)
     }
@@ -890,7 +890,7 @@ private fun TrayCard(f: Staged, onRemove: () -> Unit) {
 @Composable
 fun ReportOpener(subject: String, description: String, attachments: List<NexaFile>, context: kotlinx.serialization.json.JsonObject, from: String?) {
     val c = Nx.colors
-    Txt(subject, style = Nx.type.body.copy(fontSize = Nx.type.sp(16f), fontWeight = FontWeight(650), lineHeight = Nx.type.sp(22f)), color = c.textStrong)
+    Txt(subject, style = Nx.type.body.copy(fontSize = Nx.type.sp(16f), fontWeight = FontWeight(650), lineHeight = Nx.type.sp(22f)), color = c.textStrong, maxLines = 3)
     MarkdownView(description, RenderCtx(surface = c.bgCanvas))
     if (attachments.isNotEmpty()) ThreadFiles(attachments, "bugs", from)
     BugFacts(context)

@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
@@ -131,7 +132,7 @@ data class RenderCtx(
 fun MarkdownView(source: String, ctx: RenderCtx, modifier: Modifier = Modifier) {
     val nodes = remember(source, ctx.files, ctx.max) { Markdown.parse(source, files = ctx.files, max = ctx.max) }
     val jumbo = remember(nodes) { Markdown.isEmojiOnly(nodes) }
-    Column(modifier) { Blocks(nodes, ctx, jumbo, top = true, edited = ctx.edited) }
+    Column(modifier.clipToBounds()) { Blocks(nodes, ctx, jumbo, top = true, edited = ctx.edited) }
 }
 
 /**
@@ -544,7 +545,7 @@ private fun InlineText(
     val density = LocalDensity.current
     BasicText(
         built.text,
-        modifier = modifier.then(inlineWidth.modifier).drawBehind {
+        modifier = modifier.then(inlineWidth.modifier).clipToBounds().drawBehind {
             val l = layout ?: return@drawBehind
             for (chip in built.chips) for (r in boxes(l, chip.start, chip.end)) {
                 val inset = with(density) { chip.inset.toPx() }

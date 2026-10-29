@@ -237,7 +237,7 @@ function GeneralTab({ app, draft, setApp, onDeleted }: TabProps & { onDeleted: (
         <div className={s.tags}>
           {tags.map((x) => (
             <span key={x} className={s.tag}>
-              {x}
+              <span>{x}</span>
               <button type="button" aria-label={t("apps.portal.removeTag", { tag: x })} onClick={() => setApp({ tags: tags.filter((y) => y !== x) })}>
                 <X size={13} />
               </button>

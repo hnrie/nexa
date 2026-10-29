@@ -79,3 +79,6 @@
 .itemIcon + .itemLabel { flex: 1; }
 .itemPicture { flex: none; display: inline-flex; width: 18px; height: 18px; margin-inline-end: 8px; }
 .itemPicture + .itemLabel { flex: 1; }
+
+/* Metadata can be supplied by a person or app. */
+.heading { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }

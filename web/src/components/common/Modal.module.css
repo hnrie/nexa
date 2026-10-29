@@ -46,3 +46,8 @@
   .overlay[data-centered] .body:last-child, .overlay[data-centered] .footer { padding-bottom: 16px; }
 }
 @media (pointer: coarse) { .close { padding: 10px; margin: -6px; } }
+
+/* Keep shared user text inside its own layout slot. */
+.title { min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.header { flex-shrink: 0; }
+.close { flex: none; }

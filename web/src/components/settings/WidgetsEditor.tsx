@@ -438,7 +438,7 @@ function TagEditor({ tags, onChange, game, suggest, onFocus }: { tags: string[];
       <div className={s.tags}>
         {tags.map((tag) => (
           <span key={tag} className={s.tag} dir="auto">
-            {tag}
+            <span>{tag}</span>
             <button aria-label={t("widgets.game.removeTag", { tag })} onClick={() => onChange(tags.filter((x) => x !== tag))}><X size={12} /></button>
           </span>
         ))}

@@ -309,7 +309,7 @@ private fun AnnouncementCard(a: Announcement, onRetract: () -> Unit) {
     Column(Modifier.fillMaxWidth().shadowMedium(shape, c).ring(shape, c.panelEdge).background(cardFill(c), shape).background(sheen(c), shape).topEdge(shape, c.edgeLight).padding(start = 18.dp, end = 10.dp, top = 12.dp, bottom = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 6.dp)) {
             NexaAvatar(28.dp)
-            Txt(a.title.ifEmpty { t("moderation.ann.untitled") }, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), fontWeight = FontWeight(700)), color = c.textStrong, modifier = Modifier.weight(1f))
+            Txt(a.title.ifEmpty { t("moderation.ann.untitled") }, style = Nx.type.body.copy(fontSize = Nx.type.sp(15.5f), fontWeight = FontWeight(700)), color = c.textStrong, modifier = Modifier.weight(1f), maxLines = 2)
             ModIconButton("Trash2", t("moderation.ann.retract"), onRetract)
         }
         Box(Modifier.padding(end = 8.dp)) { MarkdownView(a.body, RenderCtx(surface = cardFill(c))) }

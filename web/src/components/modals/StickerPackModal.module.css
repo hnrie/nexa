@@ -18,3 +18,6 @@
   .big { width: 96px; height: 96px; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
 }
+
+/* Bound labels supplied by other people and apps. */
+.stickerName { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

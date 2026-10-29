@@ -125,3 +125,7 @@ a.tile:hover .play { background: var(--post-tint); transform: scale(1.06); }
 .counts { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .count { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
 .when { margin-inline-start: auto; color: inherit; }
+
+/* Keep shared user text inside its own layout slot. */
+.title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.text[data-open="true"] { overflow: clip; }

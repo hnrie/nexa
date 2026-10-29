@@ -165,3 +165,8 @@ a.title:hover { text-decoration: underline; }
   .thumb img { max-width: 64px; max-height: 64px; }
   .poll { padding: 12px; }
 }
+
+/* Keep shared user text inside its own layout slot. */
+.author > :not(.authorIcon) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title, a.title, .fieldName { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.description, .fieldValue, .text, .answerText { overflow: clip; }
