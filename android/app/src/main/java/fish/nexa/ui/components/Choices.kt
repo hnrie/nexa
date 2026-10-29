@@ -40,15 +40,15 @@ import fish.nexa.ui.theme.topEdge
  * which opens the choices as a menu sheet with the current one marked.
  */
 @Composable
-fun <T> SelectField(label: String?, options: List<Pair<T, String>>, selected: T, modifier: Modifier = Modifier, enabled: Boolean = true, optionPersonId: ((T) -> String?)? = null, onSelect: (T) -> Unit) {
+fun <T> SelectField(label: String?, options: List<Pair<T, String>>, selected: T, modifier: Modifier = Modifier, enabled: Boolean = true, optionPersonId: ((T) -> String?)? = null, large: Boolean = false, onSelect: (T) -> Unit) {
     val c = Nx.colors
     val shown = options.firstOrNull { it.first == selected }?.second ?: ""
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (label != null) Txt(label, style = Nx.type.label, color = c.textSubtle)
+        if (label != null) Txt(label, style = if (large) Nx.type.label.copy(fontSize = Nx.type.sp(15f)) else Nx.type.label, color = c.textSubtle)
         Row(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 44.dp)
+                .heightIn(min = if (large) 48.dp else 44.dp)
                 .alpha(if (enabled) 1f else 0.5f)
                 .sunken(Radii.Sm, c)
                 .border(1.dp, c.borderSubtle, Radii.Sm)
@@ -61,7 +61,7 @@ fun <T> SelectField(label: String?, options: List<Pair<T, String>>, selected: T,
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            fish.nexa.ui.chat.PersonName(optionPersonId?.invoke(selected), shown, style = Nx.type.input.copy(fontSize = Nx.type.sp(15f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f))
+            fish.nexa.ui.chat.PersonName(optionPersonId?.invoke(selected), shown, style = Nx.type.input.copy(fontSize = Nx.type.sp(if (large) 16f else 15f)), color = c.text, maxLines = 1, modifier = Modifier.weight(1f))
             fish.nexa.ui.Icon("ChevronDown", c.textMuted, size = 18.dp)
         }
     }

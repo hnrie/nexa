@@ -161,3 +161,5 @@ From the owner (CLAUDE.md and standing feedback):
 | Full-message reporting and Report, Review, History staff tabs, with a return path from related staff pages | Done: ReportModal, ReportsTab and reportNavigation on the web |
 
 Report forms use a reason, content preview and explanation. Message previews and staff evidence use MessageRow, with readonly polls and retained files supplied to the staff row. All report forms omit extra evidence fields and upload controls, matching the web.
+
+Reports use 24 dp section spacing, 15 sp labels and sharing notices, and 16 sp reading and input text. The message preview keeps the chat row gutter. Sharing notices sit with the explanation, and staff report headers keep their status and assignment controls aligned.

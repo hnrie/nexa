@@ -41,6 +41,7 @@ export interface ReportTarget {
   subject_id: string;
   server_id: string;
   parts: string[];
+  reasons?: string[];
   snapshot: Record<string, unknown>;
 }
 export interface SafetyReport {

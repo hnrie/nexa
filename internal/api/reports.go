@@ -46,6 +46,7 @@ type reportTarget struct {
 	SubjectID ids.ID         `json:"subject_id"`
 	ServerID  ids.ID         `json:"server_id"`
 	Parts     []string       `json:"parts"`
+	Reasons   []string       `json:"reasons"`
 	Snapshot  map[string]any `json:"snapshot"`
 }
 
@@ -58,7 +59,7 @@ func (s *Server) reportTarget(r *http.Request, kind string, id, contextServer id
 	if !ok {
 		return nil, E(400, "bad_target", "Choose a kind of content to report.")
 	}
-	t := &reportTarget{Kind: kind, ID: id, Parts: parts, Snapshot: map[string]any{}}
+	t := &reportTarget{Kind: kind, ID: id, Parts: parts, Reasons: append([]string(nil), reportReasons...), Snapshot: map[string]any{}}
 	if kind == "other" {
 		t.ID = 0
 		return t, nil
@@ -76,6 +77,7 @@ func (s *Server) reportTarget(r *http.Request, kind string, id, contextServer id
 		t.SubjectID = sv.OwnerID
 		return nil
 	}
+	sexualAllowed := true
 	channel := func(cid ids.ID, need string) (*store.Channel, error) {
 		ch, err := s.Store.ChannelByID(ctx, cid)
 		if err != nil {
@@ -94,6 +96,23 @@ func (s *Server) reportTarget(r *http.Request, kind string, id, contextServer id
 			}
 		} else if ch.OwnerID != nil {
 			t.SubjectID = *ch.OwnerID
+		}
+		if ch.ServerID == nil || ch.NSFW {
+			sexualAllowed = false
+		}
+		// Threads inherit their parent channel's content designation.
+		parent := ch.ParentID
+		seen := map[ids.ID]bool{ch.ID: true}
+		for parent != nil && !seen[*parent] {
+			seen[*parent] = true
+			p, err := s.Store.ChannelByID(ctx, *parent)
+			if err != nil {
+				return nil, err
+			}
+			if p.NSFW {
+				sexualAllowed = false
+			}
+			parent = p.ParentID
 		}
 		return ch, nil
 	}
@@ -226,6 +245,23 @@ func (s *Server) reportTarget(r *http.Request, kind string, id, contextServer id
 		}
 		t.Snapshot = map[string]any{"name": role.Name, "icon_id": role.IconID, "icon_emoji": role.IconEmoji}
 	}
+	if t.ServerID != 0 {
+		sv, err := s.Store.ServerByID(ctx, t.ServerID)
+		if err != nil {
+			return nil, err
+		}
+		if sv.NSFW {
+			sexualAllowed = false
+		}
+	}
+	if !sexualAllowed {
+		t.Reasons = make([]string, 0, len(reportReasons)-1)
+		for _, reason := range reportReasons {
+			if reason != "sexual" {
+				t.Reasons = append(t.Reasons, reason)
+			}
+		}
+	}
 	return t, nil
 }
 func (s *Server) handleReportTarget(w http.ResponseWriter, r *http.Request) {
@@ -276,15 +312,15 @@ func (s *Server) handleReportCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	if !OneOf(req.Part, target.Parts...) || !OneOf(req.Reason, target.Reasons...) {
+		WriteError(w, E(400, "bad_report", "Choose what you are reporting and why."))
+		return
+	}
 	if req.Kind == "message" {
 		if err := s.captureReportedMessage(r, target, req.Message); err != nil {
 			WriteError(w, err)
 			return
 		}
-	}
-	if !OneOf(req.Part, target.Parts...) || !OneOf(req.Reason, reportReasons...) {
-		WriteError(w, E(400, "bad_report", "Choose what you are reporting and why."))
-		return
 	}
 	description, ok := CleanText(req.Description, 4000)
 	if !ok || len([]rune(description)) < 3 {

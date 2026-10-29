@@ -1,18 +1,18 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 20px;
+  gap: 24px;
+  padding: 8px 0 0;
+  font-size: 16px;
+  line-height: 1.5;
   min-width: 0;
 }
 .notice {
   margin: 0;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface);
+  padding: 0;
   color: var(--text-subtle);
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .error {
@@ -91,7 +91,9 @@
 .row {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
+  font-size: 16px;
+  line-height: 1.45;
   text-align: start;
   color: var(--text);
   width: 100%;
@@ -120,20 +122,23 @@
 }
 .meta {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.5;
 }
 .detail {
   flex: 1;
   min-width: 0;
   overflow: auto;
-  padding: 24px;
+  padding: 28px 32px;
+  font-size: 16px;
+  line-height: 1.5;
 }
 .detailInner {
-  max-width: 850px;
+  max-width: 800px;
   margin: auto;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
 }
 .detail h2,
 .detail h3 {
@@ -142,10 +147,11 @@
   font-family: var(--font-display);
 }
 .detail h2 {
-  font-size: 21px;
+  font-size: 26px;
 }
 .detail h3 {
-  font-size: 15px;
+  font-size: 18px;
+  line-height: 1.4;
 }
 .section {
   display: flex;
@@ -157,7 +163,7 @@
   display: grid;
   grid-template-columns: minmax(90px, 140px) minmax(0, 1fr);
   gap: 10px 16px;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.5;
 }
 .snapshot dt {
@@ -220,7 +226,7 @@
 }
 @media (max-width: 600px) {
   .form {
-    padding: 16px;
+    padding: 4px 0 0;
   }
   .snapshot {
     grid-template-columns: minmax(70px, 100px) minmax(0, 1fr);
@@ -247,14 +253,15 @@
 .rowHeading .badge {
   display: inline-block;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 13px;
 }
 .badge {
   padding: 4px 8px;
   border-radius: var(--radius-pill);
   color: var(--text-subtle);
   background: var(--bg-surface);
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 20px;
   white-space: nowrap;
 }
 .badge[data-status="open"] {
@@ -271,7 +278,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-subtle);
 }
 .detailTabs {
@@ -287,8 +294,8 @@
   color: var(--text-muted);
   font: inherit;
   font-weight: 600;
-  font-size: 13px;
-  min-height: 40px;
+  font-size: 16px;
+  min-height: 48px;
   padding: 8px 16px;
   cursor: pointer;
 }
@@ -326,7 +333,7 @@
   margin-top: 8px;
 }
 .technical {
-  font-size: 13px;
+  font-size: 14px;
 }
 .technical summary {
   color: var(--text-muted);
@@ -343,4 +350,53 @@
   border-radius: var(--radius-sm);
   overflow: hidden;
   padding-block: 4px 16px;
+}
+
+.form label > span:first-child,
+.detail label > span:first-child {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text-strong);
+}
+.form :is(input, select),
+.filters :is(input, select) {
+  min-height: 48px;
+}
+.form textarea {
+  min-height: 120px;
+  line-height: 1.5;
+}
+.form [id$="-hint"],
+.detail [id$="-hint"] {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.explanation {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sendButton {
+  min-height: 48px;
+  font-size: 16px;
+  padding-inline: 24px;
+}
+@media (max-width: 767px) {
+  .sendButton {
+    width: 100%;
+  }
+}
+
+.claimButton {
+  min-height: 48px;
+  font-size: 15px;
+}
+.actions > button {
+  min-height: 44px;
+  font-size: 15px;
+}
+.back {
+  min-height: 44px;
+  padding-inline: 0;
+  font-size: 15px;
 }

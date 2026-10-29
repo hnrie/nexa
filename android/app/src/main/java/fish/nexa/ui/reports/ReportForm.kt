@@ -1,6 +1,8 @@
 package fish.nexa.ui.reports
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import fish.nexa.ui.theme.Radii
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -39,6 +41,8 @@ fun openReport(context: ReportContext = ReportContext()) {
                 enabled = submitState.sent || (submitState.enabled && !busy.value),
                 loading = busy.value,
                 block = true,
+                size = ButtonSize.LG,
+                modifier = Modifier.heightIn(min = 48.dp),
             )
         },
     ) { _ ->
@@ -94,8 +98,10 @@ private fun ReportForm(
         }
     }
     val evidenceText = if (kind == "message") "" else context.evidence.joinToString("\n\n") { it.text }
+    val reasons = target?.reasons ?: Reports.reasons.filter { it != "sexual" }
+    LaunchedEffect(reasons) { if (reason !in reasons) reason = "harassment" }
     val valid =
-        target != null &&
+        target != null && reason in reasons &&
             (kind != "message" || message != null) &&
             description.trim().length >= 3 &&
             (part != "custom" || custom.isNotBlank()) &&
@@ -133,18 +139,13 @@ private fun ReportForm(
         submitState.enabled = valid
         submitState.sent = receipt.isNotEmpty()
     }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         if (receipt.isNotEmpty()) {
             Txt(t("reports.sent"), style = Nx.type.heading, color = c.textStrong)
             Txt(t("reports.receipt"), style = Nx.type.body, color = c.text)
             Txt(receipt, style = Nx.type.bodySmall, color = c.textMuted)
             return@Column
         }
-        if (kind != "message") Txt(
-            t("reports.privacy"),
-            style = Nx.type.bodySmall,
-            color = c.textSubtle,
-        )
         if (context.kind == null)
             SelectField(
                 t("reports.target"),
@@ -165,24 +166,27 @@ private fun ReportForm(
             )
         SelectField(
             t("reports.reason"),
-            Reports.reasons.map { it to t("reports.reason.$it") },
+            reasons.map { it to t("reports.reason.$it") },
             reason,
             enabled = !busy,
+            large = true,
         ) {
             reason = it
         }
         if (kind == "message") {
             preview?.let { cm ->
                 val channel = Nexa.channels.get(cm.channelId) ?: fish.nexa.net.Channel(id = cm.channelId)
+                Box(Modifier.fillMaxWidth().background(c.bgRaised, Radii.Sm).padding(bottom = 12.dp)) {
                 fish.nexa.ui.chat.MessageRow(
                     fish.nexa.ui.chat.MsgItem(cm.id, cm = cm, groupStart = true),
                     fish.nexa.ui.chat.ListCtx(channel, Nexa.servers.byId.value[channel.serverId], false, false, Nexa.users.meId ?: ""),
                     null, false, false, preview = true,
                 )
+                }
             }
-            Txt(t("reports.fullMessageNotice"), style = Nx.type.bodySmall, color = c.textSubtle)
         }
         if (kind != "message") target?.snapshot?.let { snapshot ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val image = snapshot["avatar_id"] ?: snapshot["icon_id"]
             if (image is JsonPrimitive && image.contentOrNull != null) Avatar(target!!.id, snapshot["name"]?.jsonPrimitive?.content ?: snapshot["display_name"]?.jsonPrimitive?.content ?: "", image.content, 40.dp, icon = snapshot["avatar_id"] == null)
             val blob = (snapshot["blob_id"] ?: snapshot["cover_blob_id"])?.jsonPrimitive?.contentOrNull
@@ -190,23 +194,27 @@ private fun ReportForm(
             snapshot.filterKeys { it in listOf("username", "display_name", "name", "description", "about_me", "pronouns", "status_text", "topic", "tags") }.forEach { (key, value) ->
                 if (value !is JsonNull && value.toString() != "\"\"") {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Txt(t("reports.part.$key"), style = Nx.type.bodySmall, color = c.textMuted, modifier = Modifier.width(100.dp))
+                        Txt(t("reports.part.$key"), style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = c.textMuted, modifier = Modifier.width(100.dp))
                         Txt((value as? JsonPrimitive)?.content ?: value.toString(), style = Nx.type.body, color = c.text, modifier = Modifier.weight(1f))
                     }
                 }
             }
         }
+        }
         if (kind != "message") context.evidence.forEach { fish.nexa.ui.markdown.MarkdownView(it.text, fish.nexa.ui.markdown.RenderCtx()) }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         NxTextField(
             description,
             { if (it.length <= 4000) description = it },
             label = t("reports.description"),
-            hint = t("reports.descriptionHint"),
+            labelContent = { Txt(t("reports.description") + " *", style = Nx.type.label.copy(fontSize = Nx.type.sp(15f)), color = c.textStrong) },
             required = true,
             singleLine = false,
             minLines = 4,
             enabled = !busy,
         )
+        Txt(t(if (kind == "message") "reports.fullMessageNotice" else "reports.privacy"), style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = c.textSubtle)
+        }
         if (loading) Txt(t("reports.loading"), style = Nx.type.bodySmall, color = c.textMuted)
         if (evidenceText.length > 16000)
             Txt(t("reports.evidenceTooLong"), style = Nx.type.bodySmall, color = c.textDanger)

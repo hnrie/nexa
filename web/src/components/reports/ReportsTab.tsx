@@ -335,9 +335,7 @@ function ReportWorkspace({
                 {t(`reports.status.${v.status}`)}
               </span>
             </div>
-            <span className={s.meta}>
-              #{v.id} / {fullDate(v.created_at)}
-            </span>
+            <span className={s.meta}>{fullDate(v.created_at)}</span>
             <div className={s.assignment}>
               <span>
                 {t("reports.assignment")}:{" "}
@@ -347,6 +345,7 @@ function ReportWorkspace({
               </span>
               {v.assigned_to !== me ? (
                 <Button
+                  className={s.claimButton}
                   variant="secondary"
                   size="sm"
                   disabled={busy || !me}
@@ -356,6 +355,7 @@ function ReportWorkspace({
                 </Button>
               ) : (
                 <Button
+                  className={s.claimButton}
                   variant="ghost"
                   size="sm"
                   disabled={busy}
@@ -549,6 +549,7 @@ function ReportWorkspace({
             </section>
             <details className={s.technical}>
               <summary>{t("reports.sharedDetails")}</summary>
+              <p className={s.meta}>#{v.id}</p>
               <p className={s.meta}>{t("reports.snapshotHint")}</p>
               <ReportSnapshot
                 snapshot={Object.fromEntries(

@@ -1077,6 +1077,8 @@ blob references after source deletion. Other reports may include plaintext excer
 or recordings. This evidence is not end-to-end encrypted and is labelled reporter-supplied, not independently authenticated proof of the original message.
 Reports do not give staff conversation keys or access to unreported content.
 
+Report forms use one modal inset, 24px section spacing, 15px labels and notices, and 16px input text. Sharing disclosures belong with the explanation. Staff views use 18px section headings, 16px reading text and 14px metadata, with the report ID in expandable details.
+Target responses include the allowed reasons. Sexual content is unavailable for messages or channels in DMs and group chats, NSFW channels (including inherited parent designations), and content tied to NSFW communities. The API enforces this against current target settings when submitting.
 All report forms use a reason, content preview and explanation, with no selected-text field, evidence checkboxes or upload picker. Message forms use the standard chat row as an inert preview with mandatory full-message sharing disclosure.
 Staff message evidence uses the same chat message row as conversations on web and Android, with retained report files in its attachment area and supplied author details.
 

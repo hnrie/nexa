@@ -32,6 +32,7 @@ data class SafetyReportTarget(
     val kind: String,
     val id: String,
     val parts: List<String>,
+    val reasons: List<String> = emptyList(),
     val snapshot: JsonObject = JsonObject(emptyMap()),
 )
 

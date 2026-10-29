@@ -239,7 +239,7 @@ private fun ReportWorkspace(id: String) {
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         item {
             NxButton(
@@ -257,32 +257,28 @@ private fun ReportWorkspace(id: String) {
             item { Txt(t("reports.loading"), style = Nx.type.body, color = c.textMuted) }
         if (v != null) {
             item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Txt(t("reports.kind.${v.targetKind}"), style = Nx.type.heading.copy(fontSize = Nx.type.sp(26f)), color = c.textStrong, modifier = Modifier.weight(1f))
+                    Txt(t("reports.status.${v.status}"), style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = if (v.status == "open") c.textBrand else c.textSubtle)
+                }
+                Spacer(Modifier.height(8.dp))
                 Txt(
-                    t("reports.kind.${v.targetKind}"),
-                    style = Nx.type.heading,
-                    color = c.textStrong,
-                )
-                Txt(
-                    v.id + " / " + date(v.createdAt),
+                    date(v.createdAt),
                     style = Nx.type.bodySmall,
                     color = c.textMuted,
                 )
             }
             item {
-                Txt(
-                    t("reports.status.${v.status}"),
-                    style = Nx.type.bodySmall,
-                    color = if (v.status == "open") c.textBrand else c.textMuted,
-                )
-                ReportPerson(t("reports.assignment"), v.assignedTo, detail!!)
                 val me = Nexa.users.meId
-                NxButton(
-                    if (v.assignedTo == me) t("reports.unassign") else t("reports.claim"),
-                    { review(if (v.assignedTo == me) "0" else me ?: "0", true) },
-                    kind = ButtonKind.SECONDARY,
-                    enabled = !busy && me != null,
-                )
-                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Txt(t("reports.assignment"), style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = c.textMuted)
+                        val assigned = detail!!.people[v.assignedTo]
+                        Txt(if (v.assignedTo == "0") t("reports.unassigned") else assigned?.displayName?.ifEmpty { assigned.username } ?: v.assignedTo, style = Nx.type.body, color = c.text)
+                    }
+                    NxButton(if (v.assignedTo == me) t("reports.unassign") else t("reports.claim"), { review(if (v.assignedTo == me) "0" else me ?: "0", true) }, kind = ButtonKind.SECONDARY, size = ButtonSize.LG, enabled = !busy && me != null)
+                }
+                Spacer(Modifier.height(24.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(
                             "report" to "reports.reportTab",
@@ -295,7 +291,7 @@ private fun ReportWorkspace(id: String) {
                                 { tab = key },
                                 Modifier.weight(1f),
                                 kind = if (tab == key) ButtonKind.SECONDARY else ButtonKind.GHOST,
-                                size = ButtonSize.SM,
+                                size = ButtonSize.LG,
                             )
                         }
                 }
@@ -304,18 +300,21 @@ private fun ReportWorkspace(id: String) {
                 item {
                     Txt(
                         t("reports.reason.${v.reason}"),
-                        style = Nx.type.heading,
+                        style = Nx.type.heading.copy(fontSize = Nx.type.sp(18f)),
                         color = c.textStrong,
+                        modifier = Modifier.padding(bottom = 8.dp),
                     )
                     Txt(v.description, style = Nx.type.body, color = c.text)
                 }
                 item {
-                    ReportPerson(t("reports.reporter"), v.reporterId, detail!!)
-                    ReportPerson(t("reports.subject"), v.subjectId, detail!!)
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ReportPerson(t("reports.reporter"), v.reporterId, detail!!)
+                        ReportPerson(t("reports.subject"), v.subjectId, detail!!)
+                    }
                 }
                 item {
-                    Txt(t("reports.evidence"), style = Nx.type.heading, color = c.textStrong)
-                    Txt(t("reports.unverified"), style = Nx.type.bodySmall, color = c.textMuted)
+                    Txt(t("reports.evidence"), style = Nx.type.heading.copy(fontSize = Nx.type.sp(18f)), color = c.textStrong, modifier = Modifier.padding(bottom = 8.dp))
+                    Txt(t("reports.unverified"), style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)), color = c.textSubtle)
                     v.snapshot["message_content"]?.jsonObject?.let { content ->
                         val ch = v.snapshot["channel_id"]!!.jsonPrimitive.content
                         val channel = Nexa.channels.get(ch) ?: fish.nexa.net.Channel(id = ch)
@@ -365,6 +364,7 @@ private fun ReportWorkspace(id: String) {
                         size = ButtonSize.SM,
                     )
                 }
+                if (showDetails) item { Txt("#" + v.id, style = Nx.type.bodySmall, color = c.textMuted) }
                 if (showDetails)
                     items(
                         v.snapshot
@@ -610,7 +610,7 @@ private fun ReportPerson(label: String, id: String, detail: SafetyReportDetail) 
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Txt(
             label,
-            style = Nx.type.bodySmall,
+            style = Nx.type.body.copy(fontSize = Nx.type.sp(15f)),
             color = c.textMuted,
             modifier = Modifier.width(100.dp),
         )

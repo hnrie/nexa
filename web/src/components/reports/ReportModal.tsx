@@ -85,8 +85,14 @@ export default function ReportModal({
     kind === "message"
       ? ""
       : (context.evidence ?? []).map((item) => item.text).join("\n\n");
+  const reasons =
+    target?.reasons ?? REPORT_REASONS.filter((r) => r !== "sexual");
+  useEffect(() => {
+    if (!reasons.includes(reason)) setReason("harassment");
+  }, [target, reason]);
   const valid =
     !!target &&
+    reasons.includes(reason) &&
     (kind !== "message" || !!message) &&
     description.trim().length >= 3 &&
     (part !== "custom" || !!custom.trim()) &&
@@ -132,6 +138,7 @@ export default function ReportModal({
       swipe={!busy}
       footer={
         <Button
+          className={s.sendButton}
           onClick={receipt ? onClose : () => void send()}
           disabled={!receipt && !valid}
           loading={busy}
@@ -148,9 +155,6 @@ export default function ReportModal({
           </>
         ) : (
           <>
-            {kind !== "message" && (
-              <p className={s.notice}>{t("reports.privacy")}</p>
-            )}
             {!context.kind && (
               <Field label={t("reports.target")}>
                 <Select
@@ -189,7 +193,7 @@ export default function ReportModal({
                 onChange={(e) => setReason(e.target.value)}
                 disabled={busy}
               >
-                {REPORT_REASONS.map((r) => (
+                {reasons.map((r) => (
                   <option key={r} value={r}>
                     {t(`reports.reason.${r}`)}
                   </option>
@@ -204,9 +208,6 @@ export default function ReportModal({
                 <MessageItem msg={preview} groupStart preview />
               </div>
             )}
-            {kind === "message" && (
-              <p className={s.notice}>{t("reports.fullMessageNotice")}</p>
-            )}
             {kind !== "message" && target && (
               <ReportSnapshot snapshot={target.snapshot} kind={kind} compact />
             )}
@@ -214,19 +215,24 @@ export default function ReportModal({
               context.evidence?.map((item, i) => (
                 <Markdown key={i} source={item.text} ctx={renderCtx} />
               ))}
-            <Field
-              label={t("reports.description")}
-              required
-              hint={t("reports.descriptionHint")}
-            >
-              <TextArea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                maxLength={4000}
-                rows={4}
-                disabled={busy}
-              />
-            </Field>
+            <div className={s.explanation}>
+              <Field label={t("reports.description")} required>
+                <TextArea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  maxLength={4000}
+                  rows={4}
+                  disabled={busy}
+                />
+              </Field>
+              <p className={s.notice}>
+                {t(
+                  kind === "message"
+                    ? "reports.fullMessageNotice"
+                    : "reports.privacy",
+                )}
+              </p>
+            </div>
             {loading && <p role="status">{t("reports.loading")}</p>}
             {selectedText.length > 16000 && (
               <p className={s.error} role="alert">

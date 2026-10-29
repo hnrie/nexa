@@ -492,3 +492,59 @@ func TestSafetyReportedMessageSharesCompleteFilesWithoutConversationAccess(t *te
 		t.Fatal("deletion lost reported file")
 	}
 }
+
+func TestSafetyReportSexualReasonFollowsContentContext(t *testing.T) {
+	c := newCommunity(t)
+	check := func(kind, id string, allowed bool) {
+		t.Helper()
+		res, target := do(t, c.ts, "GET", "/api/v1/reports/target?kind="+kind+"&id="+id, c.tokA, nil)
+		if res.StatusCode != 200 {
+			t.Fatalf("target: %d %v", res.StatusCode, target)
+		}
+		found := false
+		for _, reason := range target["reasons"].([]any) {
+			if reason == "sexual" {
+				found = true
+			}
+		}
+		if found != allowed {
+			t.Fatalf("%s sexual reason: %v, want %v", kind, found, allowed)
+		}
+		body := reportBody(kind, id)
+		body["reason"] = "sexual"
+		res, out := do(t, c.ts, "POST", "/api/v1/reports", c.tokA, body)
+		want := 400
+		if allowed {
+			want = 201
+		}
+		if res.StatusCode != want {
+			t.Fatalf("submit %s: %d %v, want %d", kind, res.StatusCode, out, want)
+		}
+	}
+	check("channel", c.general, true)
+	res, out := do(t, c.ts, "PATCH", "/api/v1/channels/"+c.general, c.tokA, map[string]any{"nsfw": true})
+	if res.StatusCode != 200 {
+		t.Fatalf("nsfw channel: %d %v", res.StatusCode, out)
+	}
+	check("channel", c.general, false)
+	_, _ = do(t, c.ts, "PATCH", "/api/v1/channels/"+c.general, c.tokA, map[string]any{"nsfw": false})
+	_, _ = do(t, c.ts, "PATCH", "/api/v1/servers/"+c.server, c.tokA, map[string]any{"nsfw": true})
+	check("channel", c.general, false)
+	check("server", c.server, false)
+	ctok, cid := register(t, c.ts, "carol")
+	friend(t, c.ts, c.tokA, "bob", c.tokB, c.idA)
+	friend(t, c.ts, c.tokA, "carol", ctok, c.idA)
+	for _, recipients := range [][]string{{c.idB}, {c.idB, cid}} {
+		res, dm := do(t, c.ts, "POST", "/api/v1/users/@me/channels", c.tokA, map[string]any{"recipient_ids": recipients})
+		if res.StatusCode != 200 && res.StatusCode != 201 {
+			t.Fatalf("dm: %d %v", res.StatusCode, dm)
+		}
+		check("channel", dm["id"].(string), false)
+		createEpoch(t, c.ts, c.tokA, dm["id"].(string))
+		res, msg := sendMsg(t, c.ts, c.tokA, dm["id"].(string), dm["id"].(string), 0, "secret", "", nil)
+		if res.StatusCode != 201 {
+			t.Fatalf("message: %d %v", res.StatusCode, msg)
+		}
+		check("message", msg["id"].(string), false)
+	}
+}
