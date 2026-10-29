@@ -6,13 +6,21 @@ import {
   reports,
   type ReportKind,
   type ReportTarget,
+  type ReportedMessage,
 } from "@/api/reports";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Select } from "@/components/common/Select";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
 import { describeError } from "@/lib/errors";
-import type { ReportContext } from "@/lib/reporting";
+import {
+  fullReportedMessage,
+  messageEvidence,
+  type ReportContext,
+  type ReportEvidence,
+} from "@/lib/reporting";
+import { messages } from "@/api/messages";
+import { decryptForStore } from "@/lib/decrypt";
 import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
 import s from "./Reports.module.css";
@@ -27,10 +35,13 @@ export default function ReportModal({
   const [kind, setKind] = useState<ReportKind>(context.kind ?? "other");
   const [id, setId] = useState(context.id ?? "");
   const [target, setTarget] = useState<ReportTarget | null>(null);
-  const [part, setPart] = useState(context.part ?? "whole");
-  const [custom, setCustom] = useState("");
+  const part = kind === "other" ? "custom" : "whole";
+
   const [reason, setReason] = useState("harassment");
   const [description, setDescription] = useState("");
+  const custom = kind === "other" ? description.slice(0, 120) : "";
+  const [message, setMessage] = useState<ReportedMessage | null>(null);
+  const [messageParts, setMessageParts] = useState<ReportEvidence[]>([]);
   const [excerpt, setExcerpt] = useState("");
   const [selected, setSelected] = useState<number[]>([]);
   const [files, setFiles] = useState<File[]>([]);
@@ -44,18 +55,27 @@ export default function ReportModal({
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     setTarget(null);
+    setLoading(false);
+    setMessage(null);
+    setMessageParts([]);
     setError("");
     if (kind !== "other" && !/^\d{1,20}$/.test(id)) return;
     const controller = new AbortController();
     setLoading(true);
     reports
       .target(kind, id || "0", context.serverId, controller.signal)
-      .then((value) => {
-        if (controller.signal.aborted) return;
-        setTarget(value);
-        setPart((previous) =>
-          value.parts.includes(previous) ? previous : value.parts[0]!,
-        );
+      .then(async (value) => {
+        if (kind === "message") {
+          const opened = await decryptForStore(
+            await messages.get(String(value.snapshot.channel_id), value.id),
+          );
+          if (controller.signal.aborted) return;
+          const full = fullReportedMessage(opened);
+          if (!full) throw new Error(t("reports.messageUnavailable"));
+          setMessage(full);
+          setMessageParts(messageEvidence(opened));
+        }
+        if (!controller.signal.aborted) setTarget(value);
       })
       .catch((err: unknown) => {
         if (!controller.signal.aborted)
@@ -66,7 +86,7 @@ export default function ReportModal({
       });
     return () => controller.abort();
   }, [kind, id, context.serverId]);
-  const evidence = context.evidence ?? [];
+  const evidence = kind === "message" ? messageParts : (context.evidence ?? []);
   const selectedText = selected
     .map((i) => evidence[i]?.text ?? "")
     .filter(Boolean)
@@ -74,6 +94,7 @@ export default function ReportModal({
     .join("\n\n");
   const valid =
     !!target &&
+    (kind !== "message" || !!message) &&
     description.trim().length >= 3 &&
     (part !== "custom" || !!custom.trim()) &&
     selectedText.length <= 16000;
@@ -95,6 +116,7 @@ export default function ReportModal({
       }
       const result = await reports.send({
         request_id: requestId.current,
+        ...(kind === "message" && message ? { message } : {}),
         target_kind: kind,
         target_id: target.id,
         ...(context.serverId ? { server_id: context.serverId } : {}),
@@ -143,7 +165,13 @@ export default function ReportModal({
           </>
         ) : (
           <>
-            <p className={s.notice}>{t("reports.privacy")}</p>
+            <p className={s.notice}>
+              {t(
+                kind === "message"
+                  ? "reports.fullMessageNotice"
+                  : "reports.privacy",
+              )}
+            </p>
             {!context.kind && (
               <Field label={t("reports.target")}>
                 <Select
@@ -175,31 +203,6 @@ export default function ReportModal({
               </Field>
             )}
             {context.kind && <strong>{t(`reports.kind.${kind}`)}</strong>}
-            {target && (
-              <Field label={t("reports.part")}>
-                <Select
-                  value={part}
-                  onChange={(e) => setPart(e.target.value)}
-                  disabled={busy}
-                >
-                  {target.parts.map((p) => (
-                    <option key={p} value={p}>
-                      {t(`reports.part.${p}`)}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            )}
-            {part === "custom" && (
-              <Field label={t("reports.customPart")} required>
-                <TextInput
-                  value={custom}
-                  onChange={(e) => setCustom(e.target.value)}
-                  maxLength={120}
-                  disabled={busy}
-                />
-              </Field>
-            )}
             <Field label={t("reports.reason")}>
               <Select
                 value={reason}
@@ -226,7 +229,14 @@ export default function ReportModal({
                 disabled={busy}
               />
             </Field>
-            {evidence.length > 0 && (
+            {kind === "message" &&
+              messageParts.map((item, i) => (
+                <section className={s.section} key={i}>
+                  <strong>{item.label}</strong>
+                  <pre className={s.preview}>{item.text}</pre>
+                </section>
+              ))}
+            {kind !== "message" && evidence.length > 0 && (
               <fieldset className={s.evidence}>
                 <legend>{t("reports.chooseEvidence")}</legend>
                 <p className={s.meta}>{t("reports.selectedOnly")}</p>
@@ -252,15 +262,20 @@ export default function ReportModal({
                 ))}
               </fieldset>
             )}
-            <Field label={t("reports.excerpt")} hint={t("reports.excerptHint")}>
-              <TextArea
-                value={excerpt}
-                onChange={(e) => setExcerpt(e.target.value)}
-                maxLength={16000}
-                rows={3}
-                disabled={busy}
-              />
-            </Field>
+            {kind !== "message" && (
+              <Field
+                label={t("reports.excerpt")}
+                hint={t("reports.excerptHint")}
+              >
+                <TextArea
+                  value={excerpt}
+                  onChange={(e) => setExcerpt(e.target.value)}
+                  maxLength={16000}
+                  rows={3}
+                  disabled={busy}
+                />
+              </Field>
+            )}
             <Field
               as="div"
               label={t("reports.files")}

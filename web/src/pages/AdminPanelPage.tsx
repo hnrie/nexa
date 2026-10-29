@@ -1,3 +1,5 @@
+import { reportReturnPath } from "@/lib/reportNavigation";
+import { Button } from "@/components/common/Button";
 import { Flag, Compass, Bot, Bug, FolderOpen, LayoutGrid, Megaphone, ScrollText, Server, Shield, Sticker } from "lucide-react";
 import { Suspense, useEffect, type KeyboardEvent } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -109,6 +111,7 @@ export default function AdminPanelPage() {
 
   return (
     <div className={m.page} data-testid="admin-panel">
+      {reportReturnPath(loc.state) && <div style={{padding:"8px 16px",borderBottom:"1px solid var(--border-subtle)"}}><Button variant="secondary" size="sm" onClick={() => nav(reportReturnPath(loc.state)!)}>{t("reports.returnToReport")}</Button></div>}
       <header className={m.header}>
         <PageHeaderButtons />
         <div className={m.title}>

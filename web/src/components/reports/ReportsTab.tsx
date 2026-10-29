@@ -1,7 +1,14 @@
+import { INLINE_MAX } from "@/lib/mediaCache";
 import { ReportSnapshot } from "./ReportSnapshot";
+import { bugFileURL } from "@/lib/bugMedia";
 import { ThreadFiles } from "@/components/nexa/ThreadFiles";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import {
+  useNavigate,
+  useParams,
+  useLocation,
+  useSearchParams,
+} from "react-router-dom";
 import {
   REPORT_KINDS,
   REPORT_STATUSES,
@@ -27,10 +34,26 @@ const BASE = "/channels/@admin/reports";
 export function ReportsTab() {
   const { reportId } = useParams();
   const nav = useNavigate();
-  const [status, setStatus] = useState("active");
-  const [kind, setKind] = useState("");
-  const [query, setQuery] = useState("");
-  const [mine, setMine] = useState(false);
+  const [filters, setFilters] = useSearchParams();
+  const status = filters.get("status") ?? "active";
+  const kind = filters.get("kind") ?? "";
+  const query = filters.get("q") ?? "";
+  const mine = filters.get("mine") === "1";
+  const setFilter = (key: string, value: string) =>
+    setFilters(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
+  const setStatus = (value: string) => setFilter("status", value || "all");
+  const setKind = (value: string) => setFilter("kind", value);
+  const setQuery = (value: string) => setFilter("q", value);
+  const setMine = (value: boolean) => setFilter("mine", value ? "1" : "");
+  const suffix = filters.size ? `?${filters}` : "";
   const [list, setList] = useState<SafetyReport[]>([]);
   const [more, setMore] = useState(false);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -45,7 +68,7 @@ export function ReportsTab() {
       setError("");
       try {
         const r = await reports.list({
-          status,
+          status: status === "all" ? "" : status,
           kind,
           q: query,
           mine: mine ? "1" : undefined,
@@ -98,7 +121,7 @@ export function ReportsTab() {
             onChange={(e) => setStatus(e.target.value)}
           >
             <option value="active">{t("reports.active")}</option>
-            <option value="">{t("reports.all")}</option>
+            <option value="all">{t("reports.all")}</option>
             {REPORT_STATUSES.map((k) => (
               <option key={k} value={k}>
                 {t(`reports.status.${k}`)} ({counts[k] ?? 0})
@@ -148,19 +171,21 @@ export function ReportsTab() {
               key={v.id}
               className={s.row}
               aria-current={v.id === reportId}
-              onClick={() => nav(`${BASE}/${v.id}`)}
+              onClick={() => nav(`${BASE}/${v.id}${suffix}`)}
             >
-              <strong>
-                {t(`reports.kind.${v.target_kind}`)}:{" "}
-                {v.part === "custom"
-                  ? v.custom_part
-                  : t(`reports.part.${v.part}`)}
-              </strong>
-              <span>{v.description}</span>
+              <div className={s.rowHeading}>
+                <strong>{t(`reports.reason.${v.reason}`)}</strong>
+                <span className={s.badge} data-status={v.status}>
+                  {t(`reports.status.${v.status}`)}
+                </span>
+              </div>
               <span className={s.meta}>
-                {t(`reports.reason.${v.reason}`)} /{" "}
-                {t(`reports.status.${v.status}`)}
+                {t(`reports.kind.${v.target_kind}`)}
+                {typeof v.snapshot.name === "string"
+                  ? `: ${v.snapshot.name}`
+                  : ""}
               </span>
+              <span>{v.description}</span>
               <time className={s.meta}>{fullDate(v.created_at)}</time>
             </button>
           ))}
@@ -186,7 +211,7 @@ export function ReportsTab() {
           <ReportWorkspace
             key={reportId}
             id={reportId}
-            onBack={() => nav(BASE)}
+            onBack={() => nav(`${BASE}${suffix}`)}
             changed={() => setRefresh((n) => n + 1)}
           />
         ) : (
@@ -206,6 +231,13 @@ function ReportWorkspace({
   changed: () => void;
 }) {
   const nav = useNavigate();
+  const location = useLocation();
+  const related = (path: string) =>
+    nav(path, {
+      state: { reportReturnTo: location.pathname + location.search },
+    });
+  const [tab, setTab] = useState("report");
+  const [saved, setSaved] = useState(false);
   const rank = useMyRank();
   const me = useAuth((st) => st.me?.id);
   const [detail, setDetail] = useState<ReportDetail | null>(null);
@@ -229,7 +261,7 @@ function ReportWorkspace({
   useEffect(() => {
     void load();
   }, [load]);
-  const review = async (assigned: string) => {
+  const review = async (assigned: string, assignmentOnly = false) => {
     if (!detail || reviewLock.current) return;
     reviewLock.current = true;
     setBusy(true);
@@ -237,13 +269,16 @@ function ReportWorkspace({
     try {
       const r = await reports.review(id, {
         version: detail.report.version,
-        status,
-        note,
+        status: assignmentOnly ? detail.report.status : status,
+        note: assignmentOnly ? "" : note,
         assigned_to: assigned,
       });
       setDetail(r);
-      setStatus(r.report.status);
-      setNote("");
+      if (!assignmentOnly) {
+        setStatus(r.report.status);
+        setNote("");
+        setSaved(true);
+      }
       changed();
     } catch (err) {
       setError(describeError(err, t("reports.failed")));
@@ -289,210 +324,354 @@ function ReportWorkspace({
       {!detail && !error && <p role="status">{t("reports.loading")}</p>}
       {v && detail && (
         <>
-          <section className={s.section}>
-            <h2>
-              {t(`reports.kind.${v.target_kind}`)}:{" "}
-              {v.part === "custom"
-                ? v.custom_part
-                : t(`reports.part.${v.part}`)}
-            </h2>
-            <div className={s.meta}>
-              {v.id} / {fullDate(v.created_at)}
+          <header className={s.reportHeader}>
+            <div className={s.rowHeading}>
+              <h2>{t(`reports.kind.${v.target_kind}`)}</h2>
+              <span className={s.badge} data-status={v.status}>
+                {t(`reports.status.${v.status}`)}
+              </span>
             </div>
-            <strong>{t(`reports.reason.${v.reason}`)}</strong>
-            <p className={s.preview}>{v.description}</p>
-          </section>
-          <dl className={s.snapshot}>
-            <dt>{t("reports.reporter")}</dt>
-            <dd>{person(v.reporter_id)}</dd>
-            <dt>{t("reports.subject")}</dt>
-            <dd>
-              {v.subject_id !== "0"
-                ? person(v.subject_id)
-                : t("reports.unspecified")}
-            </dd>
-            <dt>{t("reports.assignment")}</dt>
-            <dd>
-              {v.assigned_to !== "0"
-                ? person(v.assigned_to)
-                : t("reports.unassigned")}
-            </dd>
-            <dt>{t("reports.targetId")}</dt>
-            <dd>{v.target_id}</dd>
-          </dl>
-          <section className={s.section}>
-            <h3>{t("reports.evidence")}</h3>
-            <p className={s.notice}>{t("reports.unverified")}</p>
-            {v.excerpt ? (
-              <pre className={s.preview}>{v.excerpt}</pre>
-            ) : (
-              <p className={s.meta}>{t("reports.noExcerpt")}</p>
-            )}
-            <ThreadFiles files={detail.files} kind="reports" />
-          </section>
-          <section className={s.section}>
-            <h3>{t("reports.sharedDetails")}</h3>
-            <p className={s.meta}>{t("reports.snapshotHint")}</p>
-            <ReportSnapshot snapshot={v.snapshot} kind={v.target_kind} saved />
-          </section>
-          <section className={s.section}>
-            <h3>{t("reports.actions")}</h3>
-            <p className={s.meta}>{t("reports.actionHint")}</p>
-            <div className={s.actions}>
-              {v.subject_id !== "0" && (
-                <>
-                  <Button onClick={() => void moderate()} disabled={busy}>
-                    {t("reports.moderateAccount")}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      nav(`/channels/@admin/users/${v.subject_id}`)
-                    }
-                  >
-                    {t("reports.openAccount")}
-                  </Button>
-                </>
-              )}
-              {atLeast(rank, "admin") && v.server_id !== "0" && (
+            <span className={s.meta}>
+              #{v.id} / {fullDate(v.created_at)}
+            </span>
+            <div className={s.assignment}>
+              <span>
+                {t("reports.assignment")}:{" "}
+                {v.assigned_to !== "0"
+                  ? person(v.assigned_to)
+                  : t("reports.unassigned")}
+              </span>
+              {v.assigned_to !== me ? (
                 <Button
                   variant="secondary"
-                  onClick={() => nav(`/channels/@admin/servers/${v.server_id}`)}
+                  size="sm"
+                  disabled={busy || !me}
+                  onClick={() => void review(me ?? "0", true)}
                 >
-                  {t("reports.openServer")}
+                  {t("reports.claim")}
                 </Button>
-              )}
-              {atLeast(rank, "admin") &&
-                (v.target_kind === "pack" || v.target_kind === "sticker") && (
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      nav(
-                        `/channels/@admin/expressions/packs/${v.target_kind === "pack" ? v.target_id : String(v.snapshot.pack_id)}`,
-                      )
-                    }
-                  >
-                    {t("reports.openPack")}
-                  </Button>
-                )}
-            </div>
-          </section>
-          <section className={s.section}>
-            <h3>{t("reports.review")}</h3>
-            <Field label={t("reports.status")}>
-              <Select
-                value={status}
-                disabled={busy}
-                onChange={(e) => setStatus(e.target.value as ReportStatus)}
-              >
-                {REPORT_STATUSES.map((k) => (
-                  <option key={k} value={k}>
-                    {t(`reports.status.${k}`)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label={t("reports.staffNote")} hint={t("reports.noteHint")}>
-              <TextArea
-                value={note}
-                rows={3}
-                maxLength={2000}
-                disabled={busy}
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </Field>
-            <div className={s.actions}>
-              {atLeast(rank, "admin") && v.target_kind === "message" && (
-                <div className={s.section}>
-                  <Field
-                    label={t("moderation.form.reason")}
-                    hint={t("moderation.form.reasonVisible")}
-                  >
-                    <TextArea
-                      value={removeReason}
-                      onChange={(e) => setRemoveReason(e.target.value)}
-                      maxLength={1000}
-                      rows={2}
-                      disabled={busy}
-                    />
-                  </Field>
-                  <Button
-                    variant="danger"
-                    disabled={busy || removeReason.trim().length < 3}
-                    onClick={() =>
-                      useUI.getState().openModal("confirm", {
-                        title: t("chat.messageMenu.deleteMessage"),
-                        body: t("reports.actionHint"),
-                        confirmLabel: t("chat.messageMenu.deleteMessage"),
-                        danger: true,
-                        onConfirm: async () => {
-                          try {
-                            await reports.removeMessage(
-                              v.id,
-                              v.version,
-                              removeReason.trim(),
-                            );
-                            await load();
-                            changed();
-                          } catch (err) {
-                            setError(describeError(err, t("reports.failed")));
-                          }
-                        },
-                      })
-                    }
-                  >
-                    {t("chat.messageMenu.deleteMessage")}
-                  </Button>
-                </div>
-              )}
-              <Button
-                loading={busy}
-                disabled={
-                  (status === "actioned" || status === "dismissed") &&
-                  note.trim().length < 3
-                }
-                onClick={() => void review(v.assigned_to)}
-              >
-                {t("reports.save")}
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={busy || !me || v.assigned_to === me}
-                onClick={() => void review(me ?? "0")}
-              >
-                {t("reports.claim")}
-              </Button>
-              {v.assigned_to !== "0" && (
+              ) : (
                 <Button
                   variant="ghost"
+                  size="sm"
                   disabled={busy}
-                  onClick={() => void review("0")}
+                  onClick={() => void review("0", true)}
                 >
                   {t("reports.unassign")}
                 </Button>
               )}
             </div>
-          </section>
-          <section className={s.section}>
-            <h3>{t("reports.history")}</h3>
-            {detail.events.length ? (
-              detail.events.map((e) => (
-                <article className={s.event} key={e.id}>
-                  <strong>{person(e.actor_id)}</strong> /{" "}
-                  {t(`reports.status.${e.status}`)}
-                  <p className={s.meta}>
-                    {fullDate(e.created_at)} /{" "}
-                    {e.assigned_to !== "0"
-                      ? person(e.assigned_to)
-                      : t("reports.unassigned")}
-                  </p>
-                  {e.note && <p className={s.preview}>{e.note}</p>}
-                </article>
-              ))
-            ) : (
-              <p className={s.meta}>{t("reports.noHistory")}</p>
+          </header>
+          <nav
+            className={s.detailTabs}
+            role="tablist"
+            aria-label={t("reports.title")}
+          >
+            {[
+              ["report", "reports.reportTab"],
+              ["review", "reports.review"],
+              ["history", "reports.historyTab"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                role="tab"
+                id={`report-tab-${key}`}
+                aria-selected={tab === key}
+                aria-controls={`report-panel-${key}`}
+                tabIndex={tab === key ? 0 : -1}
+                onClick={() => setTab(key!)}
+                onKeyDown={(e) => {
+                  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+                  e.preventDefault();
+                  const tabs = ["report", "review", "history"];
+                  const next =
+                    tabs[
+                      (tabs.indexOf(tab) + (e.key === "ArrowRight" ? 1 : 2)) % 3
+                    ]!;
+                  setTab(next);
+                  document.getElementById(`report-tab-${next}`)?.focus();
+                }}
+              >
+                {t(label!)}
+              </button>
+            ))}
+          </nav>
+          <div
+            role="tabpanel"
+            id="report-panel-report"
+            aria-labelledby="report-tab-report"
+            hidden={tab !== "report"}
+            className={s.tabBody}
+          >
+            <section className={s.section}>
+              <h3>{t(`reports.reason.${v.reason}`)}</h3>
+              <p className={s.description}>{v.description}</p>
+            </section>
+            <dl className={s.snapshot}>
+              <dt>{t("reports.reporter")}</dt>
+              <dd>{person(v.reporter_id)}</dd>
+              <dt>{t("reports.subject")}</dt>
+              <dd>
+                {v.subject_id !== "0"
+                  ? person(v.subject_id)
+                  : t("reports.unspecified")}
+              </dd>
+            </dl>
+            <section className={s.section}>
+              <h3>{t("reports.evidence")}</h3>
+              <p className={s.notice}>{t("reports.unverified")}</p>
+              {!!v.snapshot.message_content && (
+                <MessageReportContent
+                  content={
+                    v.snapshot.message_content as Record<string, unknown>
+                  }
+                />
+              )}
+              {!!v.snapshot.message_sticker && (
+                <ReportSnapshot
+                  snapshot={
+                    v.snapshot.message_sticker as Record<string, unknown>
+                  }
+                  kind="sticker"
+                  saved
+                />
+              )}
+              {v.excerpt ? (
+                <pre className={s.preview}>{v.excerpt}</pre>
+              ) : !v.snapshot.message_content ? (
+                <p className={s.meta}>{t("reports.noExcerpt")}</p>
+              ) : null}
+              <ThreadFiles
+                files={detail.files.filter(
+                  (f) =>
+                    f.size <= INLINE_MAX &&
+                    /^(image\/(png|jpeg|gif|webp|avif)$|video\/)/i.test(f.mime),
+                )}
+                kind="reports"
+              />
+              {detail.files
+                .filter(
+                  (f) =>
+                    !/^(image\/(png|jpeg|gif|webp|avif)$|video\/)/i.test(
+                      f.mime,
+                    ),
+                )
+                .map((f) => (
+                  <Button
+                    key={f.id}
+                    variant="secondary"
+                    onClick={async () => {
+                      try {
+                        const url = await bugFileURL(
+                          f.id,
+                          undefined,
+                          "reports",
+                        );
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = f.name || f.id;
+                        a.click();
+                      } catch (err) {
+                        setError(describeError(err, t("reports.failed")));
+                      }
+                    }}
+                  >
+                    {t("reports.openFile")}: {f.name}
+                  </Button>
+                ))}
+            </section>
+            <details className={s.technical}>
+              <summary>{t("reports.sharedDetails")}</summary>
+              <p className={s.meta}>{t("reports.snapshotHint")}</p>
+              <ReportSnapshot
+                snapshot={Object.fromEntries(
+                  Object.entries(v.snapshot).filter(
+                    ([key]) =>
+                      key !== "message_content" && key !== "message_sticker",
+                  ),
+                )}
+                kind={v.target_kind}
+                saved
+              />
+            </details>
+          </div>
+          <div
+            role="tabpanel"
+            id="report-panel-review"
+            aria-labelledby="report-tab-review"
+            hidden={tab !== "review"}
+            className={s.tabBody}
+          >
+            <section className={s.section}>
+              <h3>{t("reports.actions")}</h3>
+              <p className={s.meta}>{t("reports.actionHint")}</p>
+              <div className={s.actions}>
+                {v.subject_id !== "0" && (
+                  <>
+                    <Button onClick={() => void moderate()} disabled={busy}>
+                      {t("reports.moderateAccount")}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        related(`/channels/@admin/users/${v.subject_id}`)
+                      }
+                    >
+                      {t("reports.openAccount")}
+                    </Button>
+                  </>
+                )}
+                {atLeast(rank, "admin") && v.server_id !== "0" && (
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      related(`/channels/@admin/servers/${v.server_id}`)
+                    }
+                  >
+                    {t("reports.openServer")}
+                  </Button>
+                )}
+                {atLeast(rank, "admin") &&
+                  (v.target_kind === "pack" || v.target_kind === "sticker") && (
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        related(
+                          `/channels/@admin/expressions/packs/${v.target_kind === "pack" ? v.target_id : String(v.snapshot.pack_id)}`,
+                        )
+                      }
+                    >
+                      {t("reports.openPack")}
+                    </Button>
+                  )}
+              </div>
+            </section>
+            <section className={s.section}>
+              <h3>{t("reports.review")}</h3>
+              <Field label={t("reports.status")}>
+                <Select
+                  value={status}
+                  disabled={busy}
+                  onChange={(e) => setStatus(e.target.value as ReportStatus)}
+                >
+                  {REPORT_STATUSES.map((k) => (
+                    <option key={k} value={k}>
+                      {t(`reports.status.${k}`)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field
+                label={t("reports.staffNote")}
+                hint={t("reports.noteHint")}
+              >
+                <TextArea
+                  value={note}
+                  rows={3}
+                  maxLength={2000}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setNote(e.target.value);
+                    setSaved(false);
+                  }}
+                />
+              </Field>
+              <div className={s.actions}>
+                {atLeast(rank, "admin") && v.target_kind === "message" && (
+                  <div className={s.section}>
+                    <Field
+                      label={t("moderation.form.reason")}
+                      hint={t("moderation.form.reasonVisible")}
+                    >
+                      <TextArea
+                        value={removeReason}
+                        onChange={(e) => setRemoveReason(e.target.value)}
+                        maxLength={1000}
+                        rows={2}
+                        disabled={busy}
+                      />
+                    </Field>
+                    <Button
+                      variant="danger"
+                      disabled={busy || removeReason.trim().length < 3}
+                      onClick={() =>
+                        useUI.getState().openModal("confirm", {
+                          title: t("chat.messageMenu.deleteMessage"),
+                          body: t("reports.actionHint"),
+                          confirmLabel: t("chat.messageMenu.deleteMessage"),
+                          danger: true,
+                          onConfirm: async () => {
+                            if (reviewLock.current) return;
+                            reviewLock.current = true;
+                            setBusy(true);
+                            try {
+                              await reports.removeMessage(
+                                v.id,
+                                v.version,
+                                removeReason.trim(),
+                              );
+                              await load();
+                              changed();
+                            } catch (err) {
+                              setError(describeError(err, t("reports.failed")));
+                            } finally {
+                              reviewLock.current = false;
+                              setBusy(false);
+                            }
+                          },
+                        })
+                      }
+                    >
+                      {t("chat.messageMenu.deleteMessage")}
+                    </Button>
+                  </div>
+                )}
+                <Button
+                  loading={busy}
+                  disabled={
+                    (status === "actioned" || status === "dismissed") &&
+                    note.trim().length < 3
+                  }
+                  onClick={() => void review(v.assigned_to)}
+                >
+                  {t("reports.save")}
+                </Button>
+              </div>
+            </section>
+            {saved && (
+              <p role="status" className={s.notice}>
+                {t("reports.saved")}
+              </p>
             )}
-          </section>
+          </div>
+          <div
+            role="tabpanel"
+            id="report-panel-history"
+            aria-labelledby="report-tab-history"
+            hidden={tab !== "history"}
+            className={s.tabBody}
+          >
+            <section className={s.section}>
+              <h3>{t("reports.history")}</h3>
+              {detail.events.length ? (
+                detail.events.map((e) => (
+                  <article className={s.event} key={e.id}>
+                    <strong>{person(e.actor_id)}</strong> /{" "}
+                    {t(`reports.status.${e.status}`)}
+                    <p className={s.meta}>
+                      {fullDate(e.created_at)} /{" "}
+                      {e.assigned_to !== "0"
+                        ? person(e.assigned_to)
+                        : t("reports.unassigned")}
+                    </p>
+                    {e.note && <p className={s.preview}>{e.note}</p>}
+                  </article>
+                ))
+              ) : (
+                <p className={s.meta}>{t("reports.noHistory")}</p>
+              )}
+            </section>
+          </div>
         </>
       )}
       {moderating && (
@@ -508,6 +687,35 @@ function ReportWorkspace({
           }}
         />
       )}
+    </div>
+  );
+}
+
+function MessageReportContent({
+  content,
+}: {
+  content: Record<string, unknown>;
+}) {
+  const { t: text, att: _files, ...other } = content;
+  return (
+    <div className={s.messageContent}>
+      {typeof text === "string" && <pre className={s.messageText}>{text}</pre>}
+      {Object.entries(other)
+        .filter(([key]) => key !== "type" && key !== "flags")
+        .map(([key, value]) => (
+          <section key={key} className={s.section}>
+            <strong>
+              {t(
+                key === "call"
+                  ? "reports.kind.message"
+                  : `reports.part.${key === "embeds" || key === "hook" ? "embed" : key === "fwd" ? "text" : key}`,
+              )}
+            </strong>
+            <pre className={s.messageText}>
+              {JSON.stringify(value, null, 2)}
+            </pre>
+          </section>
+        ))}
     </div>
   );
 }

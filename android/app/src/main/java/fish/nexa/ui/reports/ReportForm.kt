@@ -71,12 +71,13 @@ private fun ReportForm(
     val scope = rememberCoroutineScope()
     var kind by remember { mutableStateOf(context.kind ?: "other") }
     var id by remember { mutableStateOf(context.id ?: "") }
-    var part by remember { mutableStateOf(context.part ?: "whole") }
-    var custom by remember { mutableStateOf("") }
+    val part = if (kind == "other") "custom" else "whole"
     var target by remember { mutableStateOf<SafetyReportTarget?>(null) }
     var loading by remember { mutableStateOf(false) }
     var reason by remember { mutableStateOf("harassment") }
     var description by remember { mutableStateOf("") }
+    val custom = if (kind == "other") description.take(120) else ""
+    var message by remember { mutableStateOf<JsonObject?>(null) }
     var excerpt by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var receipt by remember { mutableStateOf("") }
@@ -86,13 +87,15 @@ private fun ReportForm(
     val busy = busyState.value
     LaunchedEffect(kind, id, context.serverId) {
         target = null
+        loading = false
+        message = null
         error = ""
         if (kind != "other" && !id.matches(Regex("[0-9]{1,20}"))) return@LaunchedEffect
         loading = true
         try {
             val r = Reports.target(kind, id.ifEmpty { "0" }, context.serverId)
+            if (kind == "message") message = Reports.fullMessage(r)
             target = r
-            if (part !in r.parts) part = r.parts.first()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             error = describeError(e, t("reports.failed"))
@@ -155,6 +158,7 @@ private fun ReportForm(
             .joinToString("\n\n")
     val valid =
         target != null &&
+            (kind != "message" || message != null) &&
             description.trim().length >= 3 &&
             (part != "custom" || custom.isNotBlank()) &&
             evidenceText.length <= 16000
@@ -183,6 +187,7 @@ private fun ReportForm(
                 val body = buildJsonObject {
                     put("request_id", requestId)
                     put("target_kind", kind)
+                    if (kind == "message") put("message", message!!)
                     put("target_id", target!!.id)
                     context.serverId?.let { put("server_id", it) }
                     put("part", part)
@@ -223,7 +228,11 @@ private fun ReportForm(
             Txt(receipt, style = Nx.type.bodySmall, color = c.textMuted)
             return@Column
         }
-        Txt(t("reports.privacy"), style = Nx.type.bodySmall, color = c.textSubtle)
+        Txt(
+            t(if (kind == "message") "reports.fullMessageNotice" else "reports.privacy"),
+            style = Nx.type.bodySmall,
+            color = c.textSubtle,
+        )
         if (context.kind == null)
             SelectField(
                 t("reports.target"),
@@ -241,24 +250,6 @@ private fun ReportForm(
                 id,
                 { if (it.length <= 20) id = it },
                 label = t("reports.targetId"),
-                enabled = !busy,
-            )
-        target?.let {
-            SelectField(
-                t("reports.part"),
-                it.parts.map { p -> p to t("reports.part.$p") },
-                part,
-                enabled = !busy,
-            ) {
-                part = it
-            }
-        }
-        if (part == "custom")
-            NxTextField(
-                custom,
-                { if (it.length <= 120) custom = it },
-                label = t("reports.customPart"),
-                required = true,
                 enabled = !busy,
             )
         SelectField(
@@ -279,7 +270,30 @@ private fun ReportForm(
             minLines = 4,
             enabled = !busy,
         )
-        if (context.evidence.isNotEmpty()) {
+        if (kind == "message") {
+            message?.get("content")?.jsonObject?.let { content ->
+                (content["t"] as? JsonPrimitive)?.contentOrNull?.let {
+                    Txt(it, style = Nx.type.body, color = c.text)
+                }
+                content
+                    .filterKeys { it !in listOf("t", "type", "flags", "att") }
+                    .forEach { (key, value) ->
+                        Txt(value.toString(), style = Nx.type.bodySmall, color = c.text)
+                    }
+                message
+                    ?.get("attachments")
+                    ?.jsonArray
+                    ?.filter { it.jsonObject["preview"]?.jsonPrimitive?.booleanOrNull != true }
+                    ?.forEach { a ->
+                        Txt(
+                            a.jsonObject["name"]!!.jsonPrimitive.content,
+                            style = Nx.type.bodySmall,
+                            color = c.textMuted,
+                        )
+                    }
+            }
+        }
+        if (kind != "message" && context.evidence.isNotEmpty()) {
             Txt(t("reports.chooseEvidence"), style = Nx.type.bodySmall, color = c.textStrong)
             Txt(t("reports.selectedOnly"), style = Nx.type.bodySmall, color = c.textMuted)
             context.evidence.forEachIndexed { i, e ->
@@ -294,15 +308,16 @@ private fun ReportForm(
                 }
             }
         }
-        NxTextField(
-            excerpt,
-            { if (it.length <= 16000) excerpt = it },
-            label = t("reports.excerpt"),
-            hint = t("reports.excerptHint"),
-            singleLine = false,
-            minLines = 3,
-            enabled = !busy,
-        )
+        if (kind != "message")
+            NxTextField(
+                excerpt,
+                { if (it.length <= 16000) excerpt = it },
+                label = t("reports.excerpt"),
+                hint = t("reports.excerptHint"),
+                singleLine = false,
+                minLines = 3,
+                enabled = !busy,
+            )
         NxButton(
             t("reports.files"),
             {

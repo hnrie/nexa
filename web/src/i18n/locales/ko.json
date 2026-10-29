@@ -7087,12 +7087,18 @@
   "reports.target": "콘텐츠 유형",
   "reports.targetId": "콘텐츠 ID",
   "reports.title": "신고",
-  "reports.unassign": "대기열로 반환",
+  "reports.unassign": "담당 해제",
   "reports.unassigned": "미배정",
   "reports.unspecified": "미지정",
   "reports.unverified": "아래 텍스트와 파일은 신고자가 제공했습니다. 원 작성자가 보낸 내용을 독립적으로 검증한 증거는 아닙니다.",
   "whatsNew.r202610285.reportsTitle": "콘텐츠 신고",
-  "whatsNew.r202610285.reportsBody": "콘텐츠 메뉴 또는 설정의 콘텐츠 신고에서 신고하세요. 구체적인 부분을 선택하고 문제를 설명한 다음 운영팀에 공유할 증거를 고르세요.",
+  "whatsNew.r202610285.reportsBody": "신고하면 이 메시지 전체와 모든 첨부 파일이 NEXA 운영진에게 공유됩니다. 일부를 제외할 수 없습니다. 다른 메시지와 대화 키는 비공개로 유지됩니다.",
   "reports.messageRemoved": "메시지 삭제됨",
-  "reports.messageRemovedBody": "Nexa 직원이 신고된 메시지를 삭제했습니다. 다른 메시지와 계정은 변경되지 않았습니다."
+  "reports.messageRemovedBody": "Nexa 직원이 신고된 메시지를 삭제했습니다. 다른 메시지와 계정은 변경되지 않았습니다.",
+  "reports.fullMessageNotice": "신고하면 이 메시지 전체와 모든 첨부 파일이 NEXA 운영진에게 공유됩니다. 일부를 제외할 수 없습니다. 다른 메시지와 대화 키는 비공개로 유지됩니다.",
+  "reports.messageUnavailable": "이 기기에서 메시지 전체를 열 수 없습니다. 메시지를 연 뒤 신고해 주세요.",
+  "reports.returnToReport": "신고로 돌아가기",
+  "reports.reportTab": "신고",
+  "reports.saved": "검토 저장됨",
+  "reports.historyTab": "기록"
 }

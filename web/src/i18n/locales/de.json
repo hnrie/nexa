@@ -7324,12 +7324,18 @@
   "reports.target": "Inhaltstyp",
   "reports.targetId": "Inhalts-ID",
   "reports.title": "Meldungen",
-  "reports.unassign": "Zurück in die Warteschlange",
+  "reports.unassign": "Zuweisung aufheben",
   "reports.unassigned": "Nicht Zugewiesen",
   "reports.unspecified": "Nicht Angegeben",
   "reports.unverified": "Text und Dateien unten stammen von der meldenden Person. Sie sind kein unabhängig bestätigter Beweis für den ursprünglichen Inhalt.",
   "whatsNew.r202610285.reportsTitle": "Inhalt Melden",
-  "whatsNew.r202610285.reportsBody": "Melde Inhalte über ihr Menü oder Einstellungen, Inhalt Melden. Wähle einen bestimmten Teil, beschreibe das Problem und entscheide, welche Belege das Moderationsteam erhält.",
+  "whatsNew.r202610285.reportsBody": "Beim Melden werden diese gesamte Nachricht und alle zugehörigen Dateien mit dem NEXA-Team geteilt. Teile können nicht entfernt werden. Andere Nachrichten und Gesprächsschlüssel bleiben privat.",
   "reports.messageRemoved": "Nachricht Entfernt",
-  "reports.messageRemovedBody": "Das Nexa-Team hat eine gemeldete Nachricht entfernt. Deine anderen Nachrichten und dein Konto bleiben unverändert."
+  "reports.messageRemovedBody": "Das Nexa-Team hat eine gemeldete Nachricht entfernt. Deine anderen Nachrichten und dein Konto bleiben unverändert.",
+  "reports.fullMessageNotice": "Beim Melden werden diese gesamte Nachricht und alle zugehörigen Dateien mit dem NEXA-Team geteilt. Teile können nicht entfernt werden. Andere Nachrichten und Gesprächsschlüssel bleiben privat.",
+  "reports.messageUnavailable": "Dieses Gerät kann die Nachricht nicht vollständig öffnen. Öffne sie, bevor du sie meldest.",
+  "reports.returnToReport": "Zurück zur Meldung",
+  "reports.reportTab": "Meldung",
+  "reports.saved": "Prüfung gespeichert",
+  "reports.historyTab": "Verlauf"
 }

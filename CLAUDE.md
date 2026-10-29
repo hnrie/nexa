@@ -1063,11 +1063,17 @@ blob references so later edits do not garbage-collect the evidence.
 
 Reports cover profiles (including server profiles), servers and Discovery listings,
 channels, conversations, messages, emoji, stickers, packs, shared notes, applications and roles.
-Every target offers specific parts and a custom part, with a reason and freeform description.
+Reporting asks for a reason and freeform description, without a part selector. The API still
+accepts legacy part metadata for non-message reports; message reports accept only `whole`.
 The backend resolves the responsible account and captures only explicit readable fields;
-message and note keys are never requested or automatically exported. Readers choose plaintext excerpts
-and screenshots or recordings to share. This evidence is not end-to-end encrypted and is
-labelled reporter-supplied, not independently authenticated proof of the original message.
+message reports must include the complete opened message and every attached file.
+Clients load the current message and submission rejects a stale edit
+version, missing message content, omitted attachments and invalid file keys. Only each reported
+file's own key is shared, never conversation roots or note keys. Private descriptors are stored
+under `_message_files` and removed from all list and detail JSON. Authenticated staff downloads
+use chunked AES-GCM decryption with range support in `media/reported.go`; reported files retain
+blob references after source deletion. Other reports may include plaintext excerpts and screenshots
+or recordings. This evidence is not end-to-end encrypted and is labelled reporter-supplied, not independently authenticated proof of the original message.
 Reports do not give staff conversation keys or access to unreported content.
 
 Web `api/reports.ts`, `lib/reporting.ts` and `components/reports/` implement registered
@@ -1076,7 +1082,11 @@ context-menu report actions, the report dialog and `/channels/@admin/reports[/:r
 Snapshots preserve expression formats and use the existing TGS and WebM players; Android
 can read those private snapshot files from its cache without fetching a public URL.
 Android `data/Reports.kt`, `ui/reports/ReportForm.kt` and `ui/moderation/Reports.kt` use
-the same endpoints, fields, evidence choices and staff workflow. Settings has Report Content
+the same endpoints, fields and staff workflow. Both staff views have Report, Review and History
+tabs. Web queue filters live in the URL, and Android retains its queue state while opening a
+report. Related account, server and pack pages retain the originating report and expose a return
+link; their Back buttons return there too. Android `Nav.returnTo` also removes inspected
+pages from Back history when returning to the report. Settings has Report Content
 as a fallback for any content without its own menu. Reporting preserves the existing
 account, server and expression moderation flows rather than adding new staff privileges.
 

@@ -92,12 +92,25 @@ func (s *Store) CreateSafetyReport(ctx context.Context, v *SafetyReport, files [
 		if err := json.Unmarshal(v.Snapshot, &snapshot); err != nil {
 			return err
 		}
+		var privateFiles struct {
+			Files []struct {
+				ID ids.ID `json:"blob_id"`
+			} `json:"_message_files"`
+		}
+		_ = json.Unmarshal(v.Snapshot, &privateFiles)
+		requiredFiles := map[ids.ID]bool{}
+		for _, f := range privateFiles.Files {
+			requiredFiles[f.ID] = true
+		}
 		blobs := map[ids.ID]bool{}
 		var collect func(any)
 		collect = func(value any) {
 			switch x := value.(type) {
 			case map[string]any:
 				for key, child := range x {
+					if key == "message_content" {
+						continue
+					}
 					if key == "avatar_id" || key == "banner_id" || key == "icon_id" || key == "blob_id" || key == "cover_blob_id" {
 						if raw, ok := child.(string); ok {
 							if id, err := ids.Parse(raw); err == nil {
@@ -115,9 +128,12 @@ func (s *Store) CreateSafetyReport(ctx context.Context, v *SafetyReport, files [
 		}
 		collect(snapshot)
 		for blob := range blobs {
-			res, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count=ref_count+1 WHERE id=? AND encrypted=0 AND kind IN ('avatar','banner','icon','emoji','sticker','tag','widget','typing')`, int64(blob))
+			res, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count=ref_count+1 WHERE id=? AND ((encrypted=0 AND kind IN ('avatar','banner','icon','emoji','sticker','tag','widget','typing')) OR (kind='attachment' AND ?='message'))`, int64(blob), v.TargetKind)
 			if err != nil {
 				return err
+			}
+			if n, _ := res.RowsAffected(); n == 0 && requiredFiles[blob] {
+				return ErrBugAttachment
 			}
 			if n, _ := res.RowsAffected(); n == 1 {
 				if _, err := tx.ExecContext(ctx, `INSERT INTO safety_report_snapshot_blobs (report_id,blob_id) VALUES (?,?)`, int64(v.ID), int64(blob)); err != nil {
@@ -339,4 +355,38 @@ func (s *Store) SafetyReportSnapshotBlob(ctx context.Context, id ids.ID) (bool, 
 	var count int
 	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM safety_report_snapshot_blobs WHERE blob_id=?`, int64(id)).Scan(&count)
 	return count > 0, err
+}
+
+// Only attachments already validated against a reported message can have this
+// retained reference. Scan the small indexed set of reports for this blob.
+func (s *Store) SafetyReportAttachment(ctx context.Context, id ids.ID) (json.RawMessage, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT r.snapshot FROM safety_report_snapshot_blobs b JOIN safety_reports r ON r.id=b.report_id WHERE b.blob_id=? AND r.target_kind='message'`, int64(id))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		var snap struct {
+			Files []json.RawMessage `json:"_message_files"`
+		}
+		if json.Unmarshal([]byte(raw), &snap) != nil {
+			continue
+		}
+		for _, f := range snap.Files {
+			var a struct {
+				ID ids.ID `json:"blob_id"`
+			}
+			if json.Unmarshal(f, &a) == nil && a.ID == id {
+				return f, nil
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return nil, ErrNotFound
 }

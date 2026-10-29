@@ -7437,12 +7437,18 @@
   "reports.target": "Type de Contenu",
   "reports.targetId": "Identifiant du Contenu",
   "reports.title": "Signalements",
-  "reports.unassign": "Remettre dans la File",
+  "reports.unassign": "Retirer l’attribution",
   "reports.unassigned": "Non Attribué",
   "reports.unspecified": "Non Précisé",
   "reports.unverified": "Le texte et les fichiers ci-dessous viennent de la personne qui signale. Ils ne constituent pas une preuve vérifiée indépendamment de l’envoi original.",
   "whatsNew.r202610285.reportsTitle": "Signaler du Contenu",
-  "whatsNew.r202610285.reportsBody": "Signalez du contenu depuis son menu ou Paramètres, Signaler du Contenu. Choisissez une partie, décrivez le problème et sélectionnez les preuves à partager avec la modération.",
+  "whatsNew.r202610285.reportsBody": "Le signalement partage ce message entier et tous ses fichiers avec l’équipe NEXA. Vous ne pouvez pas en retirer des parties. Les autres messages et les clés de conversation restent privés.",
   "reports.messageRemoved": "Message Supprimé",
-  "reports.messageRemovedBody": "L’équipe Nexa a supprimé un message signalé. Vos autres messages et votre compte restent inchangés."
+  "reports.messageRemovedBody": "L’équipe Nexa a supprimé un message signalé. Vos autres messages et votre compte restent inchangés.",
+  "reports.fullMessageNotice": "Le signalement partage ce message entier et tous ses fichiers avec l’équipe NEXA. Vous ne pouvez pas en retirer des parties. Les autres messages et les clés de conversation restent privés.",
+  "reports.messageUnavailable": "Cet appareil ne peut pas ouvrir le message complet. Ouvrez-le avant de le signaler.",
+  "reports.returnToReport": "Retour au signalement",
+  "reports.reportTab": "Signalement",
+  "reports.saved": "Examen enregistré",
+  "reports.historyTab": "Historique"
 }

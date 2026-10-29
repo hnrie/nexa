@@ -1,7 +1,8 @@
+import { useReportNavigation } from "@/lib/reportNavigation";
 import { PersonName } from "@/components/common/PersonName";
 import { ChevronLeft, FolderOpen, Gavel, IdCard, ShieldCheck, UserRound } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { moderation as modApi, type ModAction, type ModMembership, type ModUser, type People, type StaffCase, type ModPack } from "@/api/moderation";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
@@ -33,7 +34,7 @@ export interface ModerateIntent {
  */
 export function PersonPage() {
   const { userId = "", caseId } = useParams();
-  const nav = useNavigate();
+  const {nav,back,returnTo} = useReportNavigation();
   const openModal = useUI((u) => u.openModal);
   const mergePeople = useModeration((s) => s.mergePeople);
   const ownerId = useModeration((s) => s.ownerId);
@@ -102,7 +103,7 @@ export function PersonPage() {
     return (
       <div className={m.empty}>
         <p>{t("moderation.user.missing")}</p>
-        <Button size="sm" variant="secondary" onClick={() => nav("/channels/@admin/users")}>
+        <Button size="sm" variant="secondary" onClick={() => back("/channels/@admin/users")}>
           {t("moderation.backToUsers")}
         </Button>
       </div>
@@ -123,7 +124,7 @@ export function PersonPage() {
   return (
     <>
       <div className={m.userHeader} data-testid="user-cases-header">
-        <button type="button" className={m.iconBtn} onClick={() => nav("/channels/@admin/users")} aria-label={t("moderation.backToUsers")}>
+        <button type="button" className={m.iconBtn} onClick={() => back("/channels/@admin/users")} aria-label={t(returnTo ? "reports.returnToReport" : "moderation.backToUsers")}>
           <ChevronLeft size={18} className={m.flip} />
         </button>
         <div className={m.userWho}>

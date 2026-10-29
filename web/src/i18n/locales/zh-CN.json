@@ -7087,12 +7087,18 @@
   "reports.target": "内容类型",
   "reports.targetId": "内容 ID",
   "reports.title": "举报",
-  "reports.unassign": "退回队列",
+  "reports.unassign": "取消指派",
   "reports.unassigned": "未分配",
   "reports.unspecified": "未指定",
   "reports.unverified": "下方文本和文件由举报人提供，并非对原作者所发内容的独立验证证明。",
   "whatsNew.r202610285.reportsTitle": "举报内容",
-  "whatsNew.r202610285.reportsBody": "通过内容菜单或设置中的“举报内容”提交举报。选择具体部分、描述问题，并选择要共享给审核团队的证据。",
+  "whatsNew.r202610285.reportsBody": "举报会将此消息的全部内容和所有附件分享给 NEXA 工作人员。你无法排除其中的部分内容。其他消息和会话密钥仍保持私密。",
   "reports.messageRemoved": "消息已移除",
-  "reports.messageRemovedBody": "Nexa 工作人员移除了一条被举报的消息。你的其他消息和账号保持不变。"
+  "reports.messageRemovedBody": "Nexa 工作人员移除了一条被举报的消息。你的其他消息和账号保持不变。",
+  "reports.fullMessageNotice": "举报会将此消息的全部内容和所有附件分享给 NEXA 工作人员。你无法排除其中的部分内容。其他消息和会话密钥仍保持私密。",
+  "reports.messageUnavailable": "此设备无法打开完整消息。请先打开消息再举报。",
+  "reports.returnToReport": "返回举报",
+  "reports.reportTab": "举报",
+  "reports.saved": "审核已保存",
+  "reports.historyTab": "历史"
 }

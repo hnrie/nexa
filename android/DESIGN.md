@@ -158,3 +158,4 @@ From the owner (CLAUDE.md and standing feedback):
 | Tabs that do not fit on a phone (an app's five) slide sideways in their bar, not the whole page | Done: Designer.module.css `.scopeTabs` |
 | While picking accounts in the staff panel, a tap anywhere on a card picks it | Done: UserGrid cards |
 | Choose a save location for files and pictures | Done: lib/saveFile.ts uses a picker where supported and mobile file sharing, with the browser download flow elsewhere |
+| Full-message reporting and Report, Review, History staff tabs, with a return path from related staff pages | Done: ReportModal, ReportsTab and reportNavigation on the web |

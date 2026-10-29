@@ -326,8 +326,8 @@ fun StaffServerPage(serverId: String) {
     val density = LocalDensity.current.density
     Column(Modifier.fillMaxSize()) {
         PageHead(
-            back = t("moderation.servers.back"),
-            onBack = { goPanel("servers", replace = true) },
+            back = t(if(ReportNavigation.origin != null) "reports.returnToReport" else "moderation.servers.back"),
+            onBack = { panelBack("servers") },
             leading = { ServerIcon(server.id, server.iconId, server.name, 48.dp) },
             title = server.name,
             sub = listOf(t("moderation.servers.members", "count" to server.memberCount), t("moderation.servers.channels", "count" to server.channelCount), t("moderation.casesCount", "count" to d.cases.size)).joinToString(" · "),

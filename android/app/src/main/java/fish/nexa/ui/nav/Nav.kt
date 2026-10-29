@@ -184,6 +184,15 @@ object Nav {
         return true
     }
 
+    /** Return to an existing workspace without leaving inspected pages in Back history. */
+    fun returnTo(next:Route) {
+        val target=resolve(next)
+        if(history.contains(target)) {
+            while(history.lastOrNull()!=target) history.removeLast()
+            back()
+        } else go(target,replace=true)
+    }
+
     /** A server opens on its remembered text channel, else its first one (serverNav.ts). */
     private fun resolve(r: Route): Route {
         if (r is Route.Server && r.channelId == null) {

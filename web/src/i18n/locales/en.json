@@ -7324,12 +7324,18 @@
   "reports.target": "Content Type",
   "reports.targetId": "Content ID",
   "reports.title": "Reports",
-  "reports.unassign": "Return to Queue",
+  "reports.unassign": "Unassign",
   "reports.unassigned": "Unassigned",
   "reports.unspecified": "Not Specified",
   "reports.unverified": "Text and files below were supplied by the reporter. They are not independently verified proof of what the original author sent.",
   "whatsNew.r202610285.reportsTitle": "Report Content",
-  "whatsNew.r202610285.reportsBody": "Report content from its menu or Settings, Report Content. Choose a specific part, describe the concern, and select the evidence to share with the moderation team.",
+  "whatsNew.r202610285.reportsBody": "Reporting shares this entire message and all its files with NEXA staff. You cannot remove parts. Other messages and conversation keys stay private.",
   "reports.messageRemoved": "Message Removed",
-  "reports.messageRemovedBody": "Nexa staff removed a reported message. Your other messages and your account are unchanged."
+  "reports.messageRemovedBody": "Nexa staff removed a reported message. Your other messages and your account are unchanged.",
+  "reports.fullMessageNotice": "Reporting shares this entire message and all its files with NEXA staff. You cannot remove parts. Other messages and conversation keys stay private.",
+  "reports.messageUnavailable": "This device cannot open the complete message. Open the message before reporting it.",
+  "reports.returnToReport": "Back to Report",
+  "reports.reportTab": "Report",
+  "reports.saved": "Review Saved",
+  "reports.historyTab": "History"
 }

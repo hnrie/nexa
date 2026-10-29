@@ -519,8 +519,8 @@ fun PackPage(packId: String) {
     }
     Column(Modifier.fillMaxSize()) {
         PageHead(
-            back = t("moderation.packs.back"),
-            onBack = { goPanel("expressions", replace = true) },
+            back = t(if(ReportNavigation.origin != null) "reports.returnToReport" else "moderation.packs.back"),
+            onBack = { panelBack("expressions") },
             leading = { PackCover(pack, big = true) },
             title = pack.name,
             sub = listOf(

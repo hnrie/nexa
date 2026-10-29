@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -16,7 +17,7 @@ var reportParts = map[string][]string{
 	"user":        {"whole", "username", "display_name", "avatar", "banner", "about_me", "pronouns", "status", "widgets", "typing_style", "name_style", "server_profile", "activity", "custom"},
 	"server":      {"whole", "name", "icon", "banner", "description", "tag", "discovery", "custom"},
 	"channel":     {"whole", "name", "topic", "icon", "tags", "custom"},
-	"message":     {"whole", "text", "attachment", "sticker", "embed", "poll", "reaction", "custom"},
+	"message":     {"whole"},
 	"emoji":       {"whole", "name", "image", "custom"},
 	"sticker":     {"whole", "name", "image", "tags", "custom"},
 	"pack":        {"whole", "name", "description", "image", "custom"},
@@ -163,7 +164,7 @@ func (s *Server) reportTarget(r *http.Request, kind string, id, contextServer id
 			return nil, err
 		}
 		t.SubjectID = m.AuthorID
-		t.Snapshot = map[string]any{"channel_id": ch.ID, "author_id": m.AuthorID, "created_at": m.CreatedAt, "edited_at": m.EditedAt, "type": m.Type}
+		t.Snapshot = map[string]any{"channel_id": ch.ID, "author_id": m.AuthorID, "created_at": m.CreatedAt, "edited_at": m.EditedAt, "type": m.Type, "reply_to_id": m.ReplyToID, "reactions": m.Reactions, "poll_results": m.Poll, "mentions": m.Mentions, "flags": m.Flags}
 	case "emoji":
 		e, err := s.Store.EmojiByID(ctx, id)
 		if err != nil {
@@ -252,8 +253,9 @@ func (s *Server) handleReportCreate(w http.ResponseWriter, r *http.Request) {
 		Description string                `json:"description"`
 		Excerpt     string                `json:"excerpt"`
 		Files       []store.BugAttachment `json:"files"`
+		Message     *reportedMessage      `json:"message"`
 	}
-	if err := ReadJSON(w, r, &req, 128<<10); err != nil {
+	if err := ReadJSON(w, r, &req, 512<<10); err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -273,6 +275,12 @@ func (s *Server) handleReportCreate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		WriteError(w, err)
 		return
+	}
+	if req.Kind == "message" {
+		if err := s.captureReportedMessage(r, target, req.Message); err != nil {
+			WriteError(w, err)
+			return
+		}
 	}
 	if !OneOf(req.Part, target.Parts...) || !OneOf(req.Reason, reportReasons...) {
 		WriteError(w, E(400, "bad_report", "Choose what you are reporting and why."))
@@ -390,6 +398,9 @@ func (s *Server) handleModReports(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	for _, v := range list {
+		publicReportSnapshot(v)
+	}
 	WriteJSON(w, 200, map[string]any{"reports": list, "counts": counts, "has_more": more})
 }
 func (s *Server) staffReport(w http.ResponseWriter, r *http.Request) *store.SafetyReport {
@@ -420,6 +431,11 @@ func (s *Server) handleModReport(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	for _, a := range messageReportFiles(v) {
+		// A client cannot hide an original file by labelling it a preview.
+		files = append(files, store.BugAttachment{BlobID: a.BlobID, Name: a.Name, Mime: a.Type, Size: a.Size})
+	}
+	publicReportSnapshot(v)
 	who := []ids.ID{v.ReporterID, v.SubjectID, v.AssignedTo}
 	for _, e := range events {
 		who = append(who, e.ActorID, e.AssignedTo)
@@ -446,7 +462,7 @@ func (s *Server) handleModReportReview(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(400, "bad_review", "Choose a status and keep notes under 2000 characters."))
 		return
 	}
-	if (req.Status == "actioned" || req.Status == "dismissed") && len([]rune(note)) < 3 {
+	if (req.Status == "actioned" || req.Status == "dismissed") && req.Status != v.Status && len([]rune(note)) < 3 {
 		WriteError(w, E(400, "review_reason", "Explain the outcome before closing the report."))
 		return
 	}
@@ -525,10 +541,25 @@ func (s *Server) handleReportFile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		saved, err := s.Store.SafetyReportSnapshotBlob(r.Context(), id)
-		if err != nil || !saved || blob.Encrypted {
+		if err != nil || !saved {
 			http.NotFound(w, r)
 			return
 		}
+	}
+	if blob.Kind == "attachment" {
+		if s.rankOf(r.Context(), me) < rankMod {
+			http.NotFound(w, r)
+			return
+		}
+		raw, err := s.Store.SafetyReportAttachment(r.Context(), id)
+		var a reportedAttachment
+		if err != nil || json.Unmarshal(raw, &a) != nil {
+			http.NotFound(w, r)
+			return
+		}
+		key, _ := base64.StdEncoding.DecodeString(a.Key)
+		s.Media.ServeReportedAttachment(w, r, blob, key, a.Size, a.Type)
+		return
 	}
 	b := blob
 	s.Media.ServePrivate(w, r, b, media.VariantSize(r.URL.Query().Get("size")))

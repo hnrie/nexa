@@ -1,7 +1,8 @@
+import { useReportNavigation } from "@/lib/reportNavigation";
 import { PersonName } from "@/components/common/PersonName";
 import { CalendarDays, ChevronLeft, ChevronRight, Copy, Download, Eraser, EyeOff, FolderOpen, Gavel, LockOpen, Smile, Sticker as StickerIcon } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { moderation as modApi, type ModPack, type ModServerRef, type PackField, type People, type StaffCase } from "@/api/moderation";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
@@ -28,7 +29,7 @@ import x from "./Expressions.module.css";
  */
 export function PackPage() {
   const { packId = "" } = useParams();
-  const nav = useNavigate();
+  const {nav,back,returnTo} = useReportNavigation();
   const mergePeople = useModeration((s) => s.mergePeople);
   const toast = useUI((u) => u.toast);
   const [pack, setPack] = useState<ModPack | null>(null);
@@ -69,7 +70,7 @@ export function PackPage() {
     return (
       <div className={m.empty}>
         <p>{t("moderation.packs.missing")}</p>
-        <Button size="sm" variant="secondary" onClick={() => nav("/channels/@admin/expressions")}>
+        <Button size="sm" variant="secondary" onClick={() => back("/channels/@admin/expressions")}>
           {t("moderation.packs.back")}
         </Button>
       </div>
@@ -141,7 +142,7 @@ export function PackPage() {
   return (
     <>
       <div className={m.userHeader} data-testid="pack-header">
-        <button type="button" className={m.iconBtn} onClick={() => nav("/channels/@admin/expressions")} aria-label={t("moderation.packs.back")}>
+        <button type="button" className={m.iconBtn} onClick={() => back("/channels/@admin/expressions")} aria-label={t(returnTo ? "reports.returnToReport" : "moderation.packs.back")}>
           <ChevronLeft size={18} className={m.flip} />
         </button>
         <div className={m.userWho}>
@@ -320,7 +321,7 @@ export function PackPage() {
           onDone={(c, removed) => {
             setPicked((cur) => cur.filter((id) => !removed.includes(id)));
             // a pack taken down whole has no page any more
-            if (c.details.deleted) nav("/channels/@admin/expressions");
+            if (c.details.deleted) back("/channels/@admin/expressions");
             else void load();
           }}
         />

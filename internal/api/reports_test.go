@@ -1,9 +1,15 @@
 package api
 
 import (
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/binary"
 	"encoding/json"
 	"evilion.xyz/chat/internal/ids"
 	"fmt"
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
@@ -11,7 +17,11 @@ import (
 )
 
 func reportBody(kind, id string) map[string]any {
-	return map[string]any{"request_id": "report-request-" + randomSuffix(), "target_kind": kind, "target_id": id, "part": "whole", "reason": "harassment", "description": "This content targets another person.", "excerpt": "Only this selected evidence."}
+	body := map[string]any{"request_id": "report-request-" + randomSuffix(), "target_kind": kind, "target_id": id, "part": "whole", "reason": "harassment", "description": "This content targets another person.", "excerpt": "Only this selected evidence."}
+	if kind == "message" {
+		body["message"] = map[string]any{"content": map[string]any{"t": "The complete reported message"}, "attachments": []any{}, "edited_at": nil}
+	}
+	return body
 }
 func sendReport(t *testing.T, ts *httptest.Server, tok string, body map[string]any) map[string]any {
 	t.Helper()
@@ -84,6 +94,9 @@ func TestSafetyReportsLifecycleAndPrivacy(t *testing.T) {
 	if len(changed["events"].([]any)) != 2 {
 		t.Fatalf("lost review history: %v", changed)
 	}
+	if res, _ := do(t, ts, "PATCH", "/api/v1/moderation/reports/"+id, owner, map[string]any{"version": 3, "status": "dismissed", "note": "", "assigned_to": "0"}); res.StatusCode != 200 {
+		t.Fatal("could not unassign resolved report without replacing outcome")
+	}
 	_, filtered := do(t, ts, "GET", "/api/v1/moderation/reports?status=dismissed&kind=user&q=targets", mod, nil)
 	if len(filtered["reports"].([]any)) != 1 {
 		t.Fatalf("filter: %v", filtered)
@@ -120,6 +133,21 @@ func TestSafetyReportMessageAccess(t *testing.T) {
 		if res, _ := do(t, ts, "POST", "/api/v1/reports", other, reportBody(kind, id)); res.StatusCode != 404 {
 			t.Errorf("outsider %s: %d", kind, res.StatusCode)
 		}
+	}
+	missing := reportBody("message", mid)
+	delete(missing, "message")
+	if res, _ := do(t, ts, "POST", "/api/v1/reports", b, missing); res.StatusCode != 400 {
+		t.Fatal("message report accepted without full content")
+	}
+	partial := reportBody("message", mid)
+	partial["part"] = "text"
+	if res, _ := do(t, ts, "POST", "/api/v1/reports", b, partial); res.StatusCode != 400 {
+		t.Fatal("message report accepted selected part")
+	}
+	changed := reportBody("message", mid)
+	changed["message"].(map[string]any)["edited_at"] = int64(123)
+	if res, _ := do(t, ts, "POST", "/api/v1/reports", b, changed); res.StatusCode != 409 {
+		t.Fatal("message report accepted outdated version")
 	}
 	v := sendReport(t, ts, b, reportBody("message", mid))
 	if v["target_id"] != mid {
@@ -345,5 +373,122 @@ func TestSafetyReportSnapshotPicturesAndExpressionVisibility(t *testing.T) {
 	_ = json.Unmarshal(raw, &emoji)
 	if res, _ := do(t, ts, "GET", "/api/v1/reports/target?kind=emoji&id="+emoji["id"].(string), b, nil); res.StatusCode != 404 {
 		t.Fatal("private emoji metadata revealed")
+	}
+}
+
+func TestSafetyReportedMessageSharesCompleteFilesWithoutConversationAccess(t *testing.T) {
+	_, ts := newTestServer(t)
+	staff, _ := register(t, ts, "owner")
+	author, _ := register(t, ts, "alice")
+	reporter, rid := register(t, ts, "bob")
+	outsider, _ := register(t, ts, "carol")
+	_, dm := do(t, ts, "POST", "/api/v1/users/@me/channels", author, map[string]any{"recipient_ids": []string{rid}})
+	cid := dm["id"].(string)
+	createEpoch(t, ts, author, cid)
+	key := bytes.Repeat([]byte{0x64}, 32)
+	plain := []byte("Entire private attachment, including the ending.")
+	block, _ := aes.NewCipher(key)
+	gcm, _ := cipher.NewGCM(block)
+	nonce := make([]byte, 12)
+	ciphertext := gcm.Seal(nil, nonce, plain, []byte("file/v1"))
+	var encoded bytes.Buffer
+	encoded.WriteString("ECF1")
+	encoded.Write(nonce[:8])
+	_ = binary.Write(&encoded, binary.BigEndian, uint32(len(ciphertext)))
+	encoded.Write(ciphertext)
+	request, _ := http.NewRequest("POST", ts.URL+"/api/v1/channels/"+cid+"/attachments", bytes.NewReader(encoded.Bytes()))
+	request.Header.Set("Authorization", "Bearer "+author)
+	request.Header.Set("Content-Type", "application/octet-stream")
+	uploaded, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var up map[string]any
+	_ = json.NewDecoder(uploaded.Body).Decode(&up)
+	uploaded.Body.Close()
+	if uploaded.StatusCode != 201 {
+		t.Fatal(up)
+	}
+	blob := up["blob_id"].(string)
+	response, m := sendMsg(t, ts, author, cid, cid, 0, "encrypted message", "", map[string]any{"attachments": []map[string]any{{"blob_id": blob, "size": len(plain)}}})
+	if response.StatusCode != 201 {
+		t.Fatal(m)
+	}
+	mid := m["id"].(string)
+	body := reportBody("message", mid)
+	evidence := body["message"].(map[string]any)
+	evidence["attachments"] = []map[string]any{}
+	if res, _ := do(t, ts, "POST", "/api/v1/reports", reporter, body); res.StatusCode != 400 {
+		t.Fatal("accepted omitted attachment")
+	}
+	file := map[string]any{"blob_id": blob, "name": "full.txt", "type": "text/html", "size": len(plain), "key": b64(key), "preview": true}
+	evidence["attachments"] = []map[string]any{file}
+	evidence["content"] = map[string]any{"t": "The complete text including its ending", "att": []map[string]any{file}, "embeds": []map[string]any{{"fields": []map[string]any{{"name": "Full field", "value": "Full value"}}}}}
+	file["key"] = b64(bytes.Repeat([]byte{1}, 32))
+	if res, _ := do(t, ts, "POST", "/api/v1/reports", reporter, body); res.StatusCode != 400 {
+		t.Fatal("accepted incorrect file key")
+	}
+	file["key"] = b64(key)
+	if status, _ := authedGet(t, ts, staff, "/media/reports/"+blob); status != 404 {
+		t.Fatal("staff read unreported attachment")
+	}
+	report := sendReport(t, ts, reporter, body)
+	id := report["id"].(string)
+	res, detail := do(t, ts, "GET", "/api/v1/moderation/reports/"+id, staff, nil)
+	if res.StatusCode != 200 {
+		t.Fatal(detail)
+	}
+	data, _ := json.Marshal(detail)
+	if strings.Contains(string(data), b64(key)) || strings.Contains(string(data), "_message_files") {
+		t.Fatal("file keys leaked into staff JSON")
+	}
+	if !strings.Contains(string(data), "The complete text including its ending") || !strings.Contains(string(data), "Full value") || len(detail["files"].([]any)) != 1 {
+		t.Fatal("missing full evidence", detail)
+	}
+	_, queue := do(t, ts, "GET", "/api/v1/moderation/reports", staff, nil)
+	data, _ = json.Marshal(queue)
+	if strings.Contains(string(data), b64(key)) {
+		t.Fatal("file keys leaked into queue")
+	}
+	if status, _ := authedGet(t, ts, staff, "/api/v1/channels/"+cid); status != 404 {
+		t.Fatal("staff joined conversation")
+	}
+	if status, _ := authedGet(t, ts, outsider, "/media/reports/"+blob); status != 404 {
+		t.Fatal("stranger read evidence")
+	}
+	if status, _ := authedGet(t, ts, reporter, "/media/reports/"+blob); status != 404 {
+		t.Fatal("staff evidence route bypassed membership")
+	}
+	get := func(rangeHeader string) (int, []byte, http.Header) {
+		r, _ := http.NewRequest("GET", ts.URL+"/media/reports/"+blob, nil)
+		r.Header.Set("Authorization", "Bearer "+staff)
+		if rangeHeader != "" {
+			r.Header.Set("Range", rangeHeader)
+		}
+		res, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return res.StatusCode, b, res.Header
+	}
+	status, full, headers := get("")
+	if status != 200 || !bytes.Equal(full, plain) {
+		t.Fatal("staff cannot read full attachment", status, string(full))
+	}
+	if headers.Get("Content-Type") != "application/octet-stream" || headers.Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatal("document could execute in app origin")
+	}
+	status, part, _ := get("bytes=7-19")
+	if status != 206 || !bytes.Equal(part, plain[7:20]) {
+		t.Fatal("range request lost bytes")
+	}
+	if res, v := do(t, ts, "DELETE", "/api/v1/channels/"+cid+"/messages/"+mid, author, nil); res.StatusCode != 204 {
+		t.Fatal("delete source", res.StatusCode, v)
+	}
+	status, full, _ = get("")
+	if status != 200 || !bytes.Equal(full, plain) {
+		t.Fatal("deletion lost reported file")
 	}
 }

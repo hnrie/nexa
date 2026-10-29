@@ -7324,12 +7324,18 @@
   "reports.target": "Innehållstyp",
   "reports.targetId": "Innehålls-ID",
   "reports.title": "Rapporter",
-  "reports.unassign": "Återför till Kön",
+  "reports.unassign": "Ta bort tilldelning",
   "reports.unassigned": "Inte Tilldelad",
   "reports.unspecified": "Inte Angivet",
   "reports.unverified": "Texten och filerna nedan kommer från den som rapporterat. De är inte oberoende verifierade bevis på vad den ursprungliga författaren skickade.",
   "whatsNew.r202610285.reportsTitle": "Rapportera Innehåll",
-  "whatsNew.r202610285.reportsBody": "Rapportera innehåll via dess meny eller Inställningar, Rapportera Innehåll. Välj en specifik del, beskriv problemet och välj vilka bevis som delas med modereringsteamet.",
+  "whatsNew.r202610285.reportsBody": "När du rapporterar delas hela detta meddelande och alla dess filer med NEXA:s personal. Du kan inte utelämna delar. Andra meddelanden och konversationsnycklar förblir privata.",
   "reports.messageRemoved": "Meddelande Borttaget",
-  "reports.messageRemovedBody": "Nexas personal tog bort ett rapporterat meddelande. Dina andra meddelanden och ditt konto är oförändrade."
+  "reports.messageRemovedBody": "Nexas personal tog bort ett rapporterat meddelande. Dina andra meddelanden och ditt konto är oförändrade.",
+  "reports.fullMessageNotice": "När du rapporterar delas hela detta meddelande och alla dess filer med NEXA:s personal. Du kan inte utelämna delar. Andra meddelanden och konversationsnycklar förblir privata.",
+  "reports.messageUnavailable": "Enheten kan inte öppna hela meddelandet. Öppna meddelandet innan du rapporterar det.",
+  "reports.returnToReport": "Tillbaka till rapporten",
+  "reports.reportTab": "Rapport",
+  "reports.saved": "Granskning sparad",
+  "reports.historyTab": "Historik"
 }

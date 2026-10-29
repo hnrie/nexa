@@ -21,10 +21,6 @@ import kotlinx.serialization.json.*
 
 @Composable
 fun ReportsTab(id: String?) {
-    if (id != null) {
-        ReportWorkspace(id)
-        return
-    }
     val c = Nx.colors
     val scope = rememberCoroutineScope()
     val generation = remember { java.util.concurrent.atomic.AtomicInteger(0) }
@@ -38,6 +34,11 @@ fun ReportsTab(id: String?) {
     var loading by remember { mutableStateOf(false) }
     var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var refresh by remember { mutableIntStateOf(0) }
+    val queueScroll = androidx.compose.foundation.lazy.rememberLazyListState()
+    if (id != null) {
+        ReportWorkspace(id)
+        return
+    }
     LaunchedEffect(status, kind, query, mine, refresh) {
         val ticket = generation.incrementAndGet()
         list = emptyList()
@@ -60,6 +61,7 @@ fun ReportsTab(id: String?) {
     }
     LazyColumn(
         Modifier.fillMaxSize(),
+        state = queueScroll,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -74,23 +76,25 @@ fun ReportsTab(id: String?) {
             NxTextField(query, { if (it.length <= 200) query = it }, label = t("reports.search"))
         }
         item {
-            SelectField(
-                t("reports.status"),
-                listOf("active" to t("reports.active"), "" to t("reports.all")) +
-                    Reports.statuses.map { it to t("reports.status.$it") },
-                status,
-            ) {
-                status = it
-            }
-        }
-        item {
-            SelectField(
-                t("reports.target"),
-                listOf("" to t("reports.allKinds")) +
-                    Reports.kinds.map { it to t("reports.kind.$it") },
-                kind,
-            ) {
-                kind = it
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SelectField(
+                    t("reports.status"),
+                    listOf("active" to t("reports.active"), "" to t("reports.all")) +
+                        Reports.statuses.map { it to t("reports.status.$it") },
+                    status,
+                    Modifier.weight(1f),
+                ) {
+                    status = it
+                }
+                SelectField(
+                    t("reports.target"),
+                    listOf("" to t("reports.allKinds")) +
+                        Reports.kinds.map { it to t("reports.kind.$it") },
+                    kind,
+                    Modifier.weight(1f),
+                ) {
+                    kind = it
+                }
             }
         }
         item { NxCheckbox(mine, { mine = it }, t("reports.mine")) }
@@ -120,16 +124,14 @@ fun ReportsTab(id: String?) {
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 Txt(
-                    t("reports.kind.${v.targetKind}") +
-                        ": " +
-                        if (v.part == "custom") v.customPart else t("reports.part.${v.part}"),
+                    t("reports.reason.${v.reason}"),
                     style = Nx.type.heading,
                     color = c.textStrong,
                     maxLines = 2,
                 )
                 Txt(v.description, style = Nx.type.body, color = c.text, maxLines = 2)
                 Txt(
-                    t("reports.reason.${v.reason}") + " / " + t("reports.status.${v.status}"),
+                    t("reports.kind.${v.targetKind}") + " / " + t("reports.status.${v.status}"),
                     style = Nx.type.bodySmall,
                     color = c.textMuted,
                 )
@@ -184,6 +186,9 @@ private fun ReportWorkspace(id: String) {
     val scope = rememberCoroutineScope()
     val meUser by Nexa.users.me.collectAsState()
     val rank = StaffRanks.of(meUser?.id, meUser?.flags ?: 0L)
+    var showDetails by remember(id) { mutableStateOf(false) }
+    var tab by remember(id) { mutableStateOf("report") }
+    var saved by remember(id) { mutableStateOf(false) }
     var removeReason by remember(id) { mutableStateOf("") }
     var detail by remember(id) { mutableStateOf<SafetyReportDetail?>(null) }
     var status by remember(id) { mutableStateOf("open") }
@@ -202,17 +207,26 @@ private fun ReportWorkspace(id: String) {
             error = describeError(e, t("reports.failed"))
         }
     }
-    fun review(assigned: String) {
+    fun review(assigned: String, assignmentOnly: Boolean = false) {
         val v = detail?.report ?: return
         if (busy) return
         busy = true
         error = ""
         scope.launch {
             try {
-                val r = Reports.review(v, status, note, assigned)
+                val r =
+                    Reports.review(
+                        v,
+                        if (assignmentOnly) v.status else status,
+                        if (assignmentOnly) "" else note,
+                        assigned,
+                    )
                 detail = r
-                status = r.report.status
-                note = ""
+                if (!assignmentOnly) {
+                    status = r.report.status
+                    note = ""
+                    saved = true
+                }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 error = describeError(e, t("reports.failed"))
@@ -227,7 +241,13 @@ private fun ReportWorkspace(id: String) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { NxButton(t("reports.back"), { goPanel("reports") }, kind = ButtonKind.GHOST) }
+        item {
+            NxButton(
+                t("reports.back"),
+                { fish.nexa.ui.nav.Nav.returnTo(fish.nexa.ui.nav.Route.Admin("reports")) },
+                kind = ButtonKind.GHOST,
+            )
+        }
         if (error.isNotEmpty())
             item {
                 Txt(error, style = Nx.type.body, color = c.textDanger)
@@ -238,9 +258,7 @@ private fun ReportWorkspace(id: String) {
         if (v != null) {
             item {
                 Txt(
-                    t("reports.kind.${v.targetKind}") +
-                        ": " +
-                        if (v.part == "custom") v.customPart else t("reports.part.${v.part}"),
+                    t("reports.kind.${v.targetKind}"),
                     style = Nx.type.heading,
                     color = c.textStrong,
                 )
@@ -251,248 +269,323 @@ private fun ReportWorkspace(id: String) {
                 )
             }
             item {
-                Txt(t("reports.reason.${v.reason}"), style = Nx.type.heading, color = c.textStrong)
-                Txt(v.description, style = Nx.type.body, color = c.text)
-            }
-            item {
-                ReportPerson(t("reports.reporter"), v.reporterId, detail!!)
-                ReportPerson(t("reports.subject"), v.subjectId, detail!!)
-                ReportPerson(t("reports.assignment"), v.assignedTo, detail!!)
                 Txt(
-                    t("reports.targetId") + ": " + v.targetId,
+                    t("reports.status.${v.status}"),
                     style = Nx.type.bodySmall,
-                    color = c.textMuted,
+                    color = if (v.status == "open") c.textBrand else c.textMuted,
                 )
-            }
-            item {
-                Txt(t("reports.evidence"), style = Nx.type.heading, color = c.textStrong)
-                Txt(t("reports.unverified"), style = Nx.type.bodySmall, color = c.textMuted)
-                Txt(
-                    v.excerpt.ifEmpty { t("reports.noExcerpt") },
-                    style = Nx.type.body,
-                    color = c.text,
+                ReportPerson(t("reports.assignment"), v.assignedTo, detail!!)
+                val me = Nexa.users.meId
+                NxButton(
+                    if (v.assignedTo == me) t("reports.unassign") else t("reports.claim"),
+                    { review(if (v.assignedTo == me) "0" else me ?: "0", true) },
+                    kind = ButtonKind.SECONDARY,
+                    enabled = !busy && me != null,
                 )
-            }
-            items(detail!!.files, key = { it.id }) { file -> ReportFile(file) }
-            item {
-                Txt(t("reports.sharedDetails"), style = Nx.type.heading, color = c.textStrong)
-                Txt(t("reports.snapshotHint"), style = Nx.type.bodySmall, color = c.textMuted)
-            }
-            items(v.snapshot.entries.toList(), key = { it.key }) { (key, value) ->
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Txt(key.replace('_', ' '), style = Nx.type.bodySmall, color = c.textMuted)
-                    if (
-                        key in
-                            listOf(
-                                "avatar_id",
-                                "banner_id",
-                                "icon_id",
-                                "blob_id",
-                                "cover_blob_id",
-                            ) &&
-                            value is JsonPrimitive &&
-                            value.contentOrNull != null &&
-                            value != JsonNull
-                    )
-                        ReportFile(
-                            NexaFile(value.content, key, "image/*"),
-                            (v.snapshot[if (key == "cover_blob_id") "cover_format" else "format"]
-                                    as? JsonPrimitive)
-                                ?.contentOrNull,
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(
+                            "report" to "reports.reportTab",
+                            "review" to "reports.review",
+                            "history" to "reports.historyTab",
                         )
-                    else
+                        .forEach { (key, label) ->
+                            NxButton(
+                                t(label),
+                                { tab = key },
+                                Modifier.weight(1f),
+                                kind = if (tab == key) ButtonKind.SECONDARY else ButtonKind.GHOST,
+                                size = ButtonSize.SM,
+                            )
+                        }
+                }
+            }
+            if (tab == "report") {
+                item {
+                    Txt(
+                        t("reports.reason.${v.reason}"),
+                        style = Nx.type.heading,
+                        color = c.textStrong,
+                    )
+                    Txt(v.description, style = Nx.type.body, color = c.text)
+                }
+                item {
+                    ReportPerson(t("reports.reporter"), v.reporterId, detail!!)
+                    ReportPerson(t("reports.subject"), v.subjectId, detail!!)
+                }
+                item {
+                    Txt(t("reports.evidence"), style = Nx.type.heading, color = c.textStrong)
+                    Txt(t("reports.unverified"), style = Nx.type.bodySmall, color = c.textMuted)
+                    v.snapshot["message_content"]?.jsonObject?.let { content ->
+                        (content["t"] as? JsonPrimitive)?.contentOrNull?.let {
+                            Txt(it, style = Nx.type.body, color = c.text)
+                        }
+                        content
+                            .filterKeys { it !in listOf("t", "att", "flags", "type") }
+                            .forEach { (_, value) ->
+                                Txt(value.toString(), style = Nx.type.body, color = c.text)
+                            }
+                    }
+                    if (v.excerpt.isNotEmpty() || v.snapshot["message_content"] == null)
                         Txt(
-                            if (value is JsonPrimitive) value.content else value.toString(),
+                            v.excerpt.ifEmpty { t("reports.noExcerpt") },
                             style = Nx.type.body,
                             color = c.text,
                         )
                 }
-            }
-            item {
-                Txt(t("reports.actions"), style = Nx.type.heading, color = c.textStrong)
-                Txt(t("reports.actionHint"), style = Nx.type.bodySmall, color = c.textMuted)
-            }
-            if (v.subjectId != "0")
+                v.snapshot["message_sticker"]?.jsonObject?.let { sticker ->
+                    item {
+                        ReportFile(
+                            NexaFile(
+                                sticker["blob_id"]!!.jsonPrimitive.content,
+                                sticker["name"]?.jsonPrimitive?.content ?: "",
+                                "image/*",
+                            ),
+                            sticker["format"]?.jsonPrimitive?.content,
+                        )
+                    }
+                }
+                items(detail!!.files, key = { it.id }) { file -> ReportFile(file) }
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NxButton(
-                            t("reports.moderateAccount"),
-                            {
-                                if (!busy) {
-                                    busy = true
-                                    scope.launch {
-                                        try {
-                                            val p = Moderation.user(v.subjectId)
-                                            openModerate(p.user, p.servers) { case ->
-                                                note =
-                                                    listOf(
-                                                            note,
-                                                            t(
-                                                                "reports.caseRecorded",
-                                                                "number" to case.number,
-                                                            ),
-                                                        )
-                                                        .filter { it.isNotBlank() }
-                                                        .joinToString("\n")
+                    NxButton(
+                        t("reports.sharedDetails"),
+                        { showDetails = !showDetails },
+                        kind = ButtonKind.GHOST,
+                        size = ButtonSize.SM,
+                    )
+                }
+                if (showDetails)
+                    items(
+                        v.snapshot
+                            .filterKeys { it != "message_content" && it != "message_sticker" }
+                            .entries
+                            .toList(),
+                        key = { it.key },
+                    ) { (key, value) ->
+                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Txt(
+                                key.replace('_', ' '),
+                                style = Nx.type.bodySmall,
+                                color = c.textMuted,
+                            )
+                            if (
+                                key in
+                                    listOf(
+                                        "avatar_id",
+                                        "banner_id",
+                                        "icon_id",
+                                        "blob_id",
+                                        "cover_blob_id",
+                                    ) &&
+                                    value is JsonPrimitive &&
+                                    value.contentOrNull != null &&
+                                    value != JsonNull
+                            )
+                                ReportFile(
+                                    NexaFile(value.content, key, "image/*"),
+                                    (v.snapshot[
+                                                if (key == "cover_blob_id") "cover_format"
+                                                else "format"]
+                                            as? JsonPrimitive)
+                                        ?.contentOrNull,
+                                )
+                            else
+                                Txt(
+                                    if (value is JsonPrimitive) value.content else value.toString(),
+                                    style = Nx.type.body,
+                                    color = c.text,
+                                )
+                        }
+                    }
+            }
+            if (tab == "review") {
+                item {
+                    Txt(t("reports.actions"), style = Nx.type.heading, color = c.textStrong)
+                    Txt(t("reports.actionHint"), style = Nx.type.bodySmall, color = c.textMuted)
+                }
+                if (v.subjectId != "0")
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            NxButton(
+                                t("reports.moderateAccount"),
+                                {
+                                    if (!busy) {
+                                        busy = true
+                                        scope.launch {
+                                            try {
+                                                val p = Moderation.user(v.subjectId)
+                                                openModerate(p.user, p.servers) { case ->
+                                                    note =
+                                                        listOf(
+                                                                note,
+                                                                t(
+                                                                    "reports.caseRecorded",
+                                                                    "number" to case.number,
+                                                                ),
+                                                            )
+                                                            .filter { it.isNotBlank() }
+                                                            .joinToString("\n")
+                                                }
+                                            } catch (e: Exception) {
+                                                if (e is CancellationException) throw e
+                                                error = describeError(e, t("reports.failed"))
+                                            } finally {
+                                                busy = false
                                             }
-                                        } catch (e: Exception) {
-                                            if (e is CancellationException) throw e
-                                            error = describeError(e, t("reports.failed"))
-                                        } finally {
-                                            busy = false
                                         }
                                     }
-                                }
-                            },
-                            enabled = !busy,
-                        )
+                                },
+                                enabled = !busy,
+                            )
+                            NxButton(
+                                t("reports.openAccount"),
+                                { openReportTarget("users/${v.subjectId}", v.id) },
+                                kind = ButtonKind.SECONDARY,
+                            )
+                        }
+                    }
+                if (rank?.atLeast(StaffRank.ADMIN) == true && v.serverId != "0")
+                    item {
                         NxButton(
-                            t("reports.openAccount"),
-                            { goPanel("users/${v.subjectId}") },
+                            t("reports.openServer"),
+                            { openReportTarget("servers/${v.serverId}", v.id) },
                             kind = ButtonKind.SECONDARY,
                         )
                     }
-                }
-            if (rank?.atLeast(StaffRank.ADMIN) == true && v.serverId != "0")
-                item {
-                    NxButton(
-                        t("reports.openServer"),
-                        { goPanel("servers/${v.serverId}") },
-                        kind = ButtonKind.SECONDARY,
-                    )
-                }
-            if (rank?.atLeast(StaffRank.ADMIN) == true && v.targetKind in listOf("pack", "sticker"))
-                item {
-                    NxButton(
-                        t("reports.openPack"),
-                        {
-                            val pid =
-                                if (v.targetKind == "pack") v.targetId
-                                else v.snapshot["pack_id"]!!.jsonPrimitive.content
-                            goPanel("expressions/packs/$pid")
-                        },
-                        kind = ButtonKind.SECONDARY,
-                    )
-                }
-            item {
-                Txt(t("reports.review"), style = Nx.type.heading, color = c.textStrong)
-                SelectField(
-                    t("reports.status"),
-                    Reports.statuses.map { it to t("reports.status.$it") },
-                    status,
-                    enabled = !busy,
-                ) {
-                    status = it
-                }
-            }
-            item {
-                NxTextField(
-                    note,
-                    { if (it.length <= 2000) note = it },
-                    label = t("reports.staffNote"),
-                    hint = t("reports.noteHint"),
-                    singleLine = false,
-                    minLines = 3,
-                    enabled = !busy,
+                if (
+                    rank?.atLeast(StaffRank.ADMIN) == true &&
+                        v.targetKind in listOf("pack", "sticker")
                 )
-            }
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (rank?.atLeast(StaffRank.ADMIN) == true && v.targetKind == "message") {
-                        NxTextField(
-                            removeReason,
-                            { if (it.length <= 1000) removeReason = it },
-                            label = t("moderation.form.reason"),
-                            hint = t("moderation.form.reasonVisible"),
-                            singleLine = false,
-                            minLines = 2,
-                            enabled = !busy,
-                        )
+                    item {
                         NxButton(
-                            t("chat.messageMenu.deleteMessage"),
+                            t("reports.openPack"),
                             {
-                                if (!busy && removeReason.trim().length >= 3) {
-                                    fish.nexa.ui.layers.openSheet(
-                                        "removeReportedMessage",
-                                        title = t("chat.messageMenu.deleteMessage"),
-                                    ) { close ->
-                                        Txt(
-                                            removeReason,
-                                            style = Nx.type.body,
-                                            color = Nx.colors.text,
-                                        )
-                                        NxButton(
-                                            t("chat.messageMenu.deleteMessage"),
-                                            {
-                                                close()
-                                                busy = true
-                                                scope.launch {
-                                                    try {
-                                                        Nexa.api.request(
-                                                            "POST",
-                                                            "/moderation/reports/${v.id}/remove-message",
-                                                            buildJsonObject {
-                                                                put("version", v.version)
-                                                                put("reason", removeReason.trim())
-                                                            },
-                                                        )
-                                                        reload++
-                                                    } catch (e: Exception) {
-                                                        if (e is CancellationException) throw e
-                                                        error =
-                                                            describeError(e, t("reports.failed"))
-                                                    } finally {
-                                                        busy = false
-                                                    }
-                                                }
-                                            },
-                                            kind = ButtonKind.DANGER,
-                                        )
-                                    }
-                                }
+                                val pid =
+                                    if (v.targetKind == "pack") v.targetId
+                                    else v.snapshot["pack_id"]!!.jsonPrimitive.content
+                                openReportTarget("expressions/packs/$pid", v.id)
                             },
-                            kind = ButtonKind.DANGER,
-                            enabled = !busy && removeReason.trim().length >= 3,
+                            kind = ButtonKind.SECONDARY,
                         )
                     }
-                    NxButton(
-                        t("reports.save"),
-                        { review(v.assignedTo) },
-                        enabled =
-                            !busy &&
-                                (status !in listOf("actioned", "dismissed") ||
-                                    note.trim().length >= 3),
-                        loading = busy,
-                    )
-                    val me = Nexa.users.meId
-                    NxButton(
-                        t("reports.claim"),
-                        { review(me ?: "0") },
-                        kind = ButtonKind.SECONDARY,
-                        enabled = !busy && me != null && v.assignedTo != me,
-                    )
-                    if (v.assignedTo != "0")
-                        NxButton(
-                            t("reports.unassign"),
-                            { review("0") },
-                            kind = ButtonKind.GHOST,
-                            enabled = !busy,
-                        )
+                item {
+                    Txt(t("reports.review"), style = Nx.type.heading, color = c.textStrong)
+                    SelectField(
+                        t("reports.status"),
+                        Reports.statuses.map { it to t("reports.status.$it") },
+                        status,
+                        enabled = !busy,
+                    ) {
+                        status = it
+                    }
                 }
-            }
-            item { Txt(t("reports.history"), style = Nx.type.heading, color = c.textStrong) }
-            if (detail!!.events.isEmpty())
-                item { Txt(t("reports.noHistory"), style = Nx.type.bodySmall, color = c.textMuted) }
-            items(detail!!.events, key = { it.id }) { e ->
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    ReportPerson(t("reports.review"), e.actorId, detail!!)
-                    Txt(
-                        t("reports.status.${e.status}") + " / " + date(e.createdAt),
-                        style = Nx.type.bodySmall,
-                        color = c.textMuted,
+                item {
+                    NxTextField(
+                        note,
+                        { if (it.length <= 2000) note = it },
+                        label = t("reports.staffNote"),
+                        hint = t("reports.noteHint"),
+                        singleLine = false,
+                        minLines = 3,
+                        enabled = !busy,
                     )
-                    ReportPerson(t("reports.assignment"), e.assignedTo, detail!!)
-                    if (e.note.isNotEmpty()) Txt(e.note, style = Nx.type.body, color = c.text)
+                }
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (rank?.atLeast(StaffRank.ADMIN) == true && v.targetKind == "message") {
+                            NxTextField(
+                                removeReason,
+                                { if (it.length <= 1000) removeReason = it },
+                                label = t("moderation.form.reason"),
+                                hint = t("moderation.form.reasonVisible"),
+                                singleLine = false,
+                                minLines = 2,
+                                enabled = !busy,
+                            )
+                            NxButton(
+                                t("chat.messageMenu.deleteMessage"),
+                                {
+                                    if (!busy && removeReason.trim().length >= 3) {
+                                        fish.nexa.ui.layers.openSheet(
+                                            "removeReportedMessage",
+                                            title = t("chat.messageMenu.deleteMessage"),
+                                        ) { close ->
+                                            Txt(
+                                                removeReason,
+                                                style = Nx.type.body,
+                                                color = Nx.colors.text,
+                                            )
+                                            NxButton(
+                                                t("chat.messageMenu.deleteMessage"),
+                                                {
+                                                    close()
+                                                    busy = true
+                                                    scope.launch {
+                                                        try {
+                                                            Nexa.api.request(
+                                                                "POST",
+                                                                "/moderation/reports/${v.id}/remove-message",
+                                                                buildJsonObject {
+                                                                    put("version", v.version)
+                                                                    put(
+                                                                        "reason",
+                                                                        removeReason.trim(),
+                                                                    )
+                                                                },
+                                                            )
+                                                            reload++
+                                                        } catch (e: Exception) {
+                                                            if (e is CancellationException) throw e
+                                                            error =
+                                                                describeError(
+                                                                    e,
+                                                                    t("reports.failed"),
+                                                                )
+                                                        } finally {
+                                                            busy = false
+                                                        }
+                                                    }
+                                                },
+                                                kind = ButtonKind.DANGER,
+                                            )
+                                        }
+                                    }
+                                },
+                                kind = ButtonKind.DANGER,
+                                enabled = !busy && removeReason.trim().length >= 3,
+                            )
+                        }
+                        NxButton(
+                            t("reports.save"),
+                            { review(v.assignedTo) },
+                            enabled =
+                                !busy &&
+                                    (status !in listOf("actioned", "dismissed") ||
+                                        note.trim().length >= 3),
+                            loading = busy,
+                        )
+                    }
+                }
+                if (saved)
+                    item { Txt(t("reports.saved"), style = Nx.type.bodySmall, color = c.textBrand) }
+            }
+            if (tab == "history") {
+                item { Txt(t("reports.history"), style = Nx.type.heading, color = c.textStrong) }
+                if (detail!!.events.isEmpty())
+                    item {
+                        Txt(t("reports.noHistory"), style = Nx.type.bodySmall, color = c.textMuted)
+                    }
+                items(detail!!.events, key = { it.id }) { e ->
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        ReportPerson(t("reports.review"), e.actorId, detail!!)
+                        Txt(
+                            t("reports.status.${e.status}") + " / " + date(e.createdAt),
+                            style = Nx.type.bodySmall,
+                            color = c.textMuted,
+                        )
+                        ReportPerson(t("reports.assignment"), e.assignedTo, detail!!)
+                        if (e.note.isNotEmpty()) Txt(e.note, style = Nx.type.body, color = c.text)
+                    }
                 }
             }
         }
@@ -528,13 +621,26 @@ private fun ReportFile(file: NexaFile, format: String? = null) {
     val c = Nx.colors
     var local by remember(file.id) { mutableStateOf<java.io.File?>(null) }
     var error by remember(file.id) { mutableStateOf(false) }
-    LaunchedEffect(file.id) {
+    val scope = rememberCoroutineScope()
+    var loading by remember(file.id) { mutableStateOf(false) }
+    suspend fun load() {
+        loading = true
+        error = false
         try {
             local = PrivateFiles.file("reports", file.id)
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             error = true
+        } finally {
+            loading = false
         }
+    }
+    LaunchedEffect(file.id) {
+        if (
+            file.size <= 256L * 1024 * 1024 &&
+                (file.mime.startsWith("image/") || file.mime.startsWith("video/") || format != null)
+        )
+            load()
     }
     Column {
         if (format != null && local != null)
@@ -552,13 +658,19 @@ private fun ReportFile(file: NexaFile, format: String? = null) {
             )
         Txt(file.name, style = Nx.type.bodySmall, color = c.text)
         if (error) Txt(t("reports.failed"), style = Nx.type.bodySmall, color = c.textDanger)
-        local?.let { f ->
-            NxButton(
-                t("reports.openFile"),
-                { openEvidence(f, file.mime, file.name) },
-                kind = ButtonKind.SECONDARY,
-            )
-        }
+        NxButton(
+            t("reports.openFile"),
+            {
+                local?.let { openEvidence(it, file.mime, file.name) }
+                    ?: scope.launch {
+                        load()
+                        local?.let { openEvidence(it, file.mime, file.name) }
+                    }
+            },
+            kind = ButtonKind.SECONDARY,
+            enabled = !loading,
+            loading = loading,
+        )
     }
 }
 
@@ -575,7 +687,8 @@ private fun openEvidence(file: java.io.File, mime: String, name: String) {
                             "report-" +
                                 file.name +
                                 "." +
-                                if (mime.startsWith("image/")) "png" else "mp4",
+                                (android.webkit.MimeTypeMap.getSingleton()
+                                    .getExtensionFromMimeType(mime) ?: "bin"),
                         )
                     file.copyTo(out, true)
                     out

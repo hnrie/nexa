@@ -81,8 +81,21 @@ export interface ReportList {
   counts: Record<ReportStatus, number>;
   has_more: boolean;
 }
+export interface ReportedMessage {
+  content: Record<string, unknown>;
+  attachments: {
+    blob_id: string;
+    name: string;
+    type: string;
+    size: number;
+    key: string;
+    preview?: boolean;
+  }[];
+  edited_at: number | null;
+}
 export interface ReportSubmission {
   request_id: string;
+  message?: ReportedMessage;
   target_kind: ReportKind;
   target_id: string;
   server_id?: string;

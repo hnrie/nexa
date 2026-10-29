@@ -181,10 +181,12 @@ g) Moderation records (not end-to-end encrypted, kept as the record
      and staff in a moderation case, stored in readable form and
      readable by every member of staff. Only the member and staff can
      open the pictures and videos. A closed case keeps its thread.
-   - Safety reports: who reported which item and specific part, the reason,
-     description, selected text, pictures or recordings deliberately shared,
+   - Safety reports: who reported which item, the reason,
+     description, the complete content and all files of a reported message,
+     optional text, pictures or recordings supplied with other reports,
      and a snapshot of the reported item's readable details. These are not
-     end-to-end encrypted. Reports do not share conversation or note keys,
+     end-to-end encrypted. Reported files include their individual file keys
+     so staff can read them. Reports do not share conversation or note keys,
      or grant staff access to the rest of an encrypted conversation. Staff
      record assignments, review decisions and internal notes. The reported
      person is not shown the reporter's identity or the report itself.
@@ -301,8 +303,8 @@ drafts live only inside your encrypted settings.
   show everyone, when accounts were last active, which accounts have
   used the same IP addresses (never the addresses), moderation cases
   and their threads, the log, announcements, bug reports and safety reports.
-  For encrypted content, staff can read only the selected evidence a
-  participant deliberately submits, not the original encrypted conversation.
+  For a reported message, staff can read its complete content and files,
+  not the rest of the encrypted conversation.
 - Link previews, pictures and videos linked from elsewhere, GIFs, and
   YouTube videos are fetched by the Nexa server, not by your device,
   and the server fetches them through Cloudflare's WARP network. The

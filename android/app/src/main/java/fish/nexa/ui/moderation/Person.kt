@@ -119,8 +119,8 @@ fun PersonPage(userId: String, cases: Boolean, caseId: String?) {
 
     Column(Modifier.fillMaxSize()) {
         PageHead(
-            back = t("moderation.backToUsers"),
-            onBack = { goPanel("users", replace = true) },
+            back = t(if(ReportNavigation.origin != null) "reports.returnToReport" else "moderation.backToUsers"),
+            onBack = { panelBack("users") },
             leading = { Avatar(user.id, user.displayName, user.avatarId, 48.dp, status = if (deleted) null else st.status) },
             title = if (deleted) t("nexa.deletedUser") else user.displayName,
             titlePersonId = user.id.takeUnless { deleted },

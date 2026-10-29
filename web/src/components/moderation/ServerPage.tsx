@@ -1,8 +1,9 @@
+import { useReportNavigation } from "@/lib/reportNavigation";
 import { PersonName } from "@/components/common/PersonName";
 import { useMediaAnimation } from "@/lib/mediaAnimation";
 import { CalendarDays, ChevronLeft, ChevronRight, Compass, Copy, Eraser, Eye, FolderOpen, Gavel, Hash, ImageOff, Smile, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { moderation as modApi, type ModPack, type ModServer, type People, type ServerField, type StaffCase } from "@/api/moderation";
 import { ServerTagChip } from "@/components/servertag/ServerTagChip";
 import type { Emoji } from "@/api/types";
@@ -35,7 +36,7 @@ import x from "./Expressions.module.css";
 export function ServerPage() {
   useMediaAnimation();
   const { serverId = "" } = useParams();
-  const nav = useNavigate();
+  const {nav,back,returnTo} = useReportNavigation();
   const mergePeople = useModeration((s) => s.mergePeople);
   const toast = useUI((u) => u.toast);
   const openModal = useUI((u) => u.openModal);
@@ -79,7 +80,7 @@ export function ServerPage() {
     return (
       <div className={m.empty}>
         <p>{t("moderation.servers.missing")}</p>
-        <Button size="sm" variant="secondary" onClick={() => nav("/channels/@admin/servers")}>
+        <Button size="sm" variant="secondary" onClick={() => back("/channels/@admin/servers")}>
           {t("moderation.servers.back")}
         </Button>
       </div>
@@ -149,7 +150,7 @@ export function ServerPage() {
   return (
     <>
       <div className={m.userHeader} data-testid="server-header">
-        <button type="button" className={m.iconBtn} onClick={() => nav("/channels/@admin/servers")} aria-label={t("moderation.servers.back")}>
+        <button type="button" className={m.iconBtn} onClick={() => back("/channels/@admin/servers")} aria-label={t(returnTo ? "reports.returnToReport" : "moderation.servers.back")}>
           <ChevronLeft size={18} className={m.flip} />
         </button>
         <div className={m.userWho}>

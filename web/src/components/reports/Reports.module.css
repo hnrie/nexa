@@ -231,3 +231,120 @@
   flex-basis: 100%;
   align-items: stretch;
 }
+
+.rowHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+.rowHeading strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rowHeading .badge {
+  display: inline-block;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.badge {
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  color: var(--text-subtle);
+  background: var(--bg-surface);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.badge[data-status="open"] {
+  color: var(--text-brand);
+  background: color-mix(in srgb, var(--brand) 14%, var(--bg-input));
+}
+.reportHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.assignment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-subtle);
+}
+.detailTabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 8px;
+}
+.detailTabs button {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  min-height: 40px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.detailTabs button[aria-selected="true"] {
+  background: var(--bg-surface);
+  color: var(--text-strong);
+  box-shadow: var(--shadow-low);
+}
+.detailTabs button:hover {
+  color: var(--text-strong);
+}
+.detailTabs button:focus-visible,
+.row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.tabBody {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.tabBody[hidden] {
+  display: none;
+}
+.description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+  line-height: 1.6;
+}
+.messageContent {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.messageText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 0;
+}
+.technical {
+  font-size: 13px;
+}
+.technical summary {
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 8px 0;
+}
+.back {
+  display: inline-flex;
+  align-self: flex-start;
+}

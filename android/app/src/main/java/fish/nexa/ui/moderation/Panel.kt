@@ -15,6 +15,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -36,6 +39,9 @@ import androidx.compose.ui.unit.dp
 import fish.nexa.Nexa
 import fish.nexa.data.Moderation
 import fish.nexa.ui.Icon
+import fish.nexa.ui.components.NxButton
+import fish.nexa.ui.components.ButtonKind
+import fish.nexa.ui.components.ButtonSize
 import fish.nexa.ui.components.Txt
 import fish.nexa.ui.components.pressable
 import fish.nexa.ui.components.claimsSideways
@@ -55,7 +61,16 @@ import fish.nexa.ui.theme.topEdge
 import kotlinx.coroutines.launch
 
 /** Somewhere in the panel, by the web's own path below @admin. */
-fun goPanel(path: String, replace: Boolean = false) = Nav.go(Route.Admin(path), replace = replace)
+object ReportNavigation {
+ private var owner:String?=null
+ private var stored by mutableStateOf<String?>(null)
+ var origin:String?
+  get()=stored.takeIf {owner==Nexa.users.meId}
+  set(value){owner=Nexa.users.meId;stored=value}
+}
+fun openReportTarget(path:String,reportId:String) {ReportNavigation.origin="reports/$reportId";goPanel(path)}
+fun panelBack(fallback:String) {val origin=ReportNavigation.origin;ReportNavigation.origin=null;Nav.returnTo(Route.Admin(origin ?: fallback))}
+fun goPanel(path: String, replace: Boolean = false) {if(path.startsWith("reports")) ReportNavigation.origin=null;Nav.go(Route.Admin(path), replace = replace)}
 
 /**
  * The menu of the panel's place in the drawer: Mark as Read, which reads
@@ -88,6 +103,7 @@ private data class PanelTab(val id: String, val label: String, val icon: String,
  */
 @Composable
 fun AdminPanel(route: Route.Admin) {
+ DisposableEffect(Unit){onDispose {ReportNavigation.origin=null}}
     val c = Nx.colors
     val me by Nexa.users.me.collectAsState()
     val unread by Moderation.unread.collectAsState()
@@ -126,6 +142,7 @@ fun AdminPanel(route: Route.Admin) {
                 Icon("Shield", c.textBrand, size = 20.dp)
                 Txt(t("moderation.title"), style = Nx.type.headerTitle.copy(fontSize = Nx.type.sp(16.5f), fontWeight = FontWeight(680)), color = c.textStrong, maxLines = 1)
             }
+            ReportNavigation.origin?.let { origin -> NxButton(t("reports.returnToReport"),{panelBack(origin)},kind=ButtonKind.SECONDARY,size=ButtonSize.SM) }
             TabStripRow(tabs, tab)
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -183,7 +200,7 @@ private fun TabStripRow(tabs: List<PanelTab>, selected: String) {
                     .height(40.dp)
                     .then(if (on) Modifier.shadowLow(shape, c).ring(shape, c.borderSubtle).background(c.bgSurface, shape).background(sheen(c), shape).topEdge(shape, c.edgeLight) else Modifier)
                     .clip(shape)
-                    .pressable(interaction, role = Role.Tab) { if (!on) goPanel(tb.id, replace = true) }
+                    .pressable(interaction, role = Role.Tab) { if (!on) {ReportNavigation.origin=null;goPanel(tb.id, replace = true)} }
                     .semantics {
                         this.selected = on
                         if (tb.badge > 0 && tb.badgeLabel != null) contentDescription = "${tb.label}, ${tb.badgeLabel}"

@@ -7437,12 +7437,18 @@
   "reports.target": "Tipo de Contenido",
   "reports.targetId": "ID del Contenido",
   "reports.title": "Denuncias",
-  "reports.unassign": "Devolver a la Cola",
+  "reports.unassign": "Quitar asignación",
   "reports.unassigned": "Sin Asignar",
   "reports.unspecified": "Sin Especificar",
   "reports.unverified": "El texto y los archivos de abajo los aportó quien denuncia. No son pruebas verificadas de forma independiente de lo que envió el autor original.",
   "whatsNew.r202610285.reportsTitle": "Denunciar Contenido",
-  "whatsNew.r202610285.reportsBody": "Denuncia contenido desde su menú o Ajustes, Denunciar Contenido. Elige una parte, describe el problema y selecciona las pruebas que compartirás con el equipo de moderación.",
+  "whatsNew.r202610285.reportsBody": "Al denunciar se comparte este mensaje completo y todos sus archivos con el equipo de NEXA. No puedes excluir partes. Los demás mensajes y las claves de la conversación siguen siendo privados.",
   "reports.messageRemoved": "Mensaje Eliminado",
-  "reports.messageRemovedBody": "El equipo de Nexa eliminó un mensaje denunciado. Tus otros mensajes y tu cuenta no han cambiado."
+  "reports.messageRemovedBody": "El equipo de Nexa eliminó un mensaje denunciado. Tus otros mensajes y tu cuenta no han cambiado.",
+  "reports.fullMessageNotice": "Al denunciar se comparte este mensaje completo y todos sus archivos con el equipo de NEXA. No puedes excluir partes. Los demás mensajes y las claves de la conversación siguen siendo privados.",
+  "reports.messageUnavailable": "Este dispositivo no puede abrir el mensaje completo. Ábrelo antes de denunciarlo.",
+  "reports.returnToReport": "Volver a la denuncia",
+  "reports.reportTab": "Denuncia",
+  "reports.saved": "Revisión guardada",
+  "reports.historyTab": "Historial"
 }

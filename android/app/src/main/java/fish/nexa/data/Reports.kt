@@ -1,6 +1,7 @@
 package fish.nexa.data
 
 import fish.nexa.Nexa
+import fish.nexa.net.Message
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -158,7 +159,70 @@ object Reports {
             },
         )
 
-    /** Copy readable fields deliberately; never serialize att keys or the whole payload. */
+    /** Complete readable message and per-file keys only; never conversation keys. */
+    suspend fun fullMessage(target: SafetyReportTarget): JsonObject {
+        val channel = target.snapshot["channel_id"]!!.jsonPrimitive.content
+        val raw = Nexa.api.get("/channels/$channel/messages/${target.id}", Message.serializer())
+        val message = Nexa.messages.decrypt(raw)
+        if (
+            message.error != null ||
+                (message.payload == null &&
+                    message.hook == null &&
+                    message.call == null &&
+                    !raw.type.startsWith("system_"))
+        )
+            error(fish.nexa.ui.t("reports.messageUnavailable"))
+        val files = buildList {
+            message.payload?.att?.forEach { a ->
+                add(
+                    buildJsonObject {
+                        put("blob_id", a.blobId)
+                        put("name", a.name)
+                        put("type", a.type)
+                        put("size", a.size)
+                        put("key", a.key)
+                    }
+                )
+                a.preview?.let { p ->
+                    add(
+                        buildJsonObject {
+                            put("blob_id", p.blobId)
+                            put("name", a.name)
+                            put("type", p.type)
+                            put("size", p.size)
+                            put("key", p.key)
+                            put("preview", true)
+                        }
+                    )
+                }
+            }
+        }
+        if (
+            raw.attachments.any { a ->
+                files.none { it["blob_id"]?.jsonPrimitive?.content == a.blobId }
+            }
+        )
+            error(fish.nexa.ui.t("reports.messageUnavailable"))
+        fun readable(value: JsonElement): JsonElement =
+            when (value) {
+                is JsonObject ->
+                    JsonObject(value.filterKeys { it != "key" }.mapValues { readable(it.value) })
+                is JsonArray -> JsonArray(value.map { readable(it) })
+                else -> value
+            }
+        val content = buildJsonObject {
+            message.payload?.toJson()?.forEach { (key, value) -> put(key, readable(value)) }
+            put("type", raw.type)
+            message.hook?.let { put("hook", it) }
+            message.call?.let { put("call", it) }
+        }
+        return buildJsonObject {
+            put("content", content)
+            put("attachments", JsonArray(files))
+            put("edited_at", raw.editedAt?.let { JsonPrimitive(it) } ?: JsonNull)
+        }
+    }
+
     fun evidence(message: ChatMessage): List<ReportEvidence> {
         val p = message.payload ?: return emptyList()
         return buildList {

@@ -273,12 +273,16 @@ protocol or deployed service. Review the code links above and the
 alongside this explanation; where they differ, the running implementation
 determines actual behavior.
 
-### Reporting selected content
+### Reporting content
 
-Reporting creates a separate record for the moderation team. A participant can
-choose readable text, screenshots or recordings to submit, and preview the readable
-item details captured with the report. These reports and review records are not
-end-to-end encrypted. Clients do not export conversation roots, attachment keys or
-note keys as part of reporting. Staff can remove the exact message named in a report
-without joining the conversation or receiving its keys. A reporter-supplied excerpt
-is not independently authenticated proof of what the original sender wrote.
+Reporting creates a separate record for the moderation team. Reporting a message
+shares its entire readable content and all its files, with no option to omit parts.
+Clients send the current opened message, and the API requires it, checks its edit
+version, and validates every attached file against the original message. The files'
+own keys are shared to let staff read those reported files; conversation roots and
+note keys are never exported. These reports and review records are not end-to-end
+encrypted. Staff can remove the exact reported message without joining its
+conversation or receiving conversation keys. Because the message plaintext comes
+from the reporter's client, it is not independently authenticated proof of what
+the original sender wrote. A modified client could supply different plaintext;
+the server cannot verify encrypted message text without a conversation key.
