@@ -26,6 +26,12 @@ PAYLOADS = {
 CHECK = """() => {
   const failures = [];
   if (document.querySelectorAll("[data-boundary]").length < 15) failures.push("fixture did not render");
+  for (const el of document.querySelectorAll('[data-emoji-slot]')) {
+    if (el.getBoundingClientRect().width > 28) failures.push(`emoji slot expanded to ${el.getBoundingClientRect().width}`);
+  }
+  for (const el of document.querySelectorAll('[data-boundary="typing"] [class*="_words_"]')) {
+    if (el.getBoundingClientRect().height > parseFloat(getComputedStyle(el).lineHeight) * 3 + 1) failures.push('typing preview exceeds three lines');
+  }
   const bounds = document.querySelectorAll('[data-boundary], [data-scroll]');
   for (const el of bounds) {
     if (el.scrollWidth > el.clientWidth + 1) failures.push(`${el.dataset.boundary || el.dataset.scroll}: width ${el.scrollWidth} > ${el.clientWidth}`);

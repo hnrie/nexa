@@ -466,7 +466,7 @@ fun NxCheckbox(checked: Boolean, onChange: (Boolean) -> Unit, label: String, mod
         verticalAlignment = Alignment.Top,
     ) {
         TickBox(checked, Modifier.padding(top = 2.dp))
-        Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text, modifier = Modifier.weight(1f))
+        Txt(label, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(14f)), color = c.text, modifier = Modifier.weight(1f), maxLines = 2)
     }
 }
 

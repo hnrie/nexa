@@ -100,3 +100,7 @@
   .tab { padding: 8px 12px; }
   .cat, .close { width: 40px; height: 40px; }
 }
+
+.section { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.catInitial { flex: none; overflow: hidden; white-space: nowrap; }

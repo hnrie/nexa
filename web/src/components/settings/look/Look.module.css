@@ -324,3 +324,6 @@
 .reviewFingerprint { margin-top: 4px; font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .fullAccess { color: var(--text-danger); font-weight: 600; }
 .permsPanel { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+
+/* User-supplied compact metadata must not grow its surrounding controls. */
+.cardName { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

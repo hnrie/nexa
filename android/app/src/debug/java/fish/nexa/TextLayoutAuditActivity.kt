@@ -12,6 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fish.nexa.data.TypingStyle
+import fish.nexa.ui.chat.StyledTyping
+import fish.nexa.ui.components.NxCheckbox
 import fish.nexa.ui.chat.PersonText
 import fish.nexa.ui.chat.PERSON_SLOT
 import fish.nexa.ui.chat.RoleName
@@ -42,7 +45,17 @@ class TextLayoutAuditActivity : ComponentActivity() {
         setContent {
             NexaTheme(Looks.preview(theme, emptyList()) ?: Palettes.dark, reducedMotion = true) {
                 Column(Modifier.fillMaxSize().background(Nx.colors.bgRaised).statusBarsPadding().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    if (page == 0) {
+                    if (page == 2) {
+                        StyledTyping(TypingStyle(emptyList(), "wave", words = text.take(32)), text)
+                        Txt("Typing preview action", maxLines = 1)
+                        NxCheckbox(false, {}, text)
+                        Txt("Option action", maxLines = 1)
+                        Txt(text, style = Nx.type.hint, maxLines = 2)
+                        Txt(text, style = Nx.type.body, maxLines = 2)
+                        Txt("Statistic action", maxLines = 1)
+                        Txt(text, style = Nx.type.bodySmall, maxLines = 2)
+                        Txt("Call actions", maxLines = 1)
+                    } else if (page == 0) {
                         Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
                             RoleName(text, null, Nx.type.headerTitle, Nx.colors.textStrong, Modifier.weight(1f))
                             Txt("☎", modifier = Modifier.width(40.dp), maxLines = 1)

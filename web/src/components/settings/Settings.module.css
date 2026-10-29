@@ -250,3 +250,6 @@
   100% { box-shadow: 0 0 0 3px transparent; background: transparent; }
 }
 @media (prefers-reduced-motion: reduce) { [data-setting][data-found] { animation-duration: 0.01s; outline: 2px solid var(--brand); } }
+
+.deviceName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deviceName > span[dir] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

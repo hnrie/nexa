@@ -3,6 +3,9 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import "@/styles/base.css";
+import { Twemoji } from "@/components/common/Twemoji";
+import { RoleIcon } from "@/components/common/RoleIcon";
+import { StyledTyping } from "@/components/chat/TypingLine";
 import { PersonName } from "@/components/common/PersonName";
 import { ScrollingText } from "@/components/common/ScrollingText";
 import { InviteView } from "@/components/invite/InviteView";
@@ -19,6 +22,17 @@ import hook from "@/components/chat/webhook/Webhook.module.css";
 import side from "@/components/sidebar/Sidebar.module.css";
 import embed from "@/components/chat/Embeds.module.css";
 import profile from "@/components/profile/Profile.module.css";
+import typing from "@/components/chat/Typing.module.css";
+import template from "@/components/modals/ServerModals.module.css";
+import bugs from "@/components/bugs/Bugs.module.css";
+import emojiDetails from "@/components/chat/EmojiDetails.module.css";
+import widgets from "@/components/profile/Widgets.module.css";
+import look from "@/components/settings/look/Look.module.css";
+import picker from "@/components/pickers/Picker.module.css";
+import forms from "@/components/apps/AppForm.module.css";
+import composer from "@/components/composer/Composer.module.css";
+import server from "@/components/server/ServerSettings.module.css";
+import nexa from "@/components/nexa/Nexa.module.css";
 import voice from "@/components/voice/Voice.module.css";
 import { useUsers } from "@/stores/users";
 import { useSettings } from "@/stores/settings";
@@ -69,6 +83,22 @@ function Audit() {
     <section data-boundary="rich-embed"><RichEmbeds hook={{ name: text, content: "", tts: false, embeds: [{ type: "rich", title: text, url: "https://example.com", author: { name: text, url: "https://example.com" }, description: body, fields: [{ name: text, value: body, inline: false }], footer: { text } }], components: [], attachments: [], link_embeds: [], stickers: [] }} /></section>
     <section data-boundary="system" className={chat.system}><span>Opened <button className={chat.sysLink}>{text}</button>.</span><button data-action style={{ flex: "none" }}>View</button></section>
     <section data-boundary="profile" className={profile.ident}><div className={profile.nameRow}><h2 className={profile.display}><PersonName>{text}</PersonName></h2><button data-action>Note</button></div></section>
+    <section data-boundary="emoji"><button className={chat.pill}><span data-emoji-slot><Twemoji text={"😀".repeat(16)} fallbackClassName={chat.pillEmoji} /></span><span>12</span></button><span data-emoji-slot><RoleIcon icon={{ kind: "emoji", name: text, text }} size={20} /></span></section>
+    <section data-boundary="typing" className={typing.stage}><StyledTyping style={{ emoji: [], motion: "still", words: text.slice(0, 32) }} name={text} size="big" /></section>
+    <section data-boundary="template" className={template.templateCard}>
+      <p data-lines="2" className={template.templateTitle}>{text}</p><div className={template.templateRoles}><span className={template.rolePill}><i className={template.roleDot} /><span data-lines="1">{text}</span></span></div>
+      <div className={template.templateTree}><div data-lines="1" className={template.templateCat}>{text}</div><div className={template.templateChans}><span className={template.templateChan}><i>#</i><span data-lines="1">{text}</span><i>⌑</i></span></div></div>
+    </section>
+    <section data-boundary="metadata">
+      <Button data-action>{text}</Button>
+      {[bugs.feedTitle, emojiDetails.name, chat.lockedTitle, hook.voterHead, look.cardName, voice.ringSub].map((className) => <div key={className} data-lines="2" className={className}>{text}</div>)}
+      <div className={widgets.stats}><dl className={widgets.stat}><dt data-lines="2">{text}</dt><dd data-lines="2">{text}</dd></dl></div>
+      <div style={{ paddingInline: 8 }}><button className={profile.listItem}><span className={profile.listInitial}>{text.slice(0, 1)}</span><span data-lines="1" className={profile.listName}>{text}</span></button></div>
+      <div data-lines="1" className={picker.section}>{text}</div>
+      <label className={forms.check}><input type="checkbox" /><span className={forms.checkText}><span data-lines="2">{text}</span></span></label>
+      <div data-lines="1" className={server.keyName}>{text}</div><span data-lines="1" className={nexa.personUser}>@{text}</span>
+      <div className={composer.cmdBox}><span className={composer.slot}><span data-lines="1" className={composer.slotName}>{text}</span><span className={composer.slotGrow}><input value="answer" readOnly /></span><button data-action className={composer.slotRemove}>×</button></span></div>
+    </section>
     <section data-boundary="voice"><div data-lines="1" className={voice.ringName}>{text}</div></section>
   </main></MemoryRouter>;
 }

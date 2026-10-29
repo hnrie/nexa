@@ -1,0 +1,163 @@
+source	control	binding	disposition
+android/app/src/main/java/fish/nexa/ui/apps/AppForm.kt:232	NxTextField	answer.value	app
+android/app/src/main/java/fish/nexa/ui/apps/CommandMode.kt:658	BasicTextField	value = slot.text	app
+android/app/src/main/java/fish/nexa/ui/apps/CommandMode.kt:713	BasicTextField	value = ""	app
+android/app/src/main/java/fish/nexa/ui/apps/SelectBox.kt:153	NxTextField	query	local
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:325	NxTextField	value = code	credential
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:374	NxTextField	username	credential
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:376	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:506	NxTextField	username	identity
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:507	NxTextField	display	identity
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:509	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:512	NxTextField	confirm	credential
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:514	NxTextField	inviteKey	credential
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:517	NxTextField	inviteKey	credential
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:577	NxTextField	username	credential
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:578	NxTextField	key	credential
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:579	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:580	NxTextField	confirm	credential
+android/app/src/main/java/fish/nexa/ui/auth/AuthScreens.kt:613	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/auth/Passcode.kt:122	NxTextField	passcode	credential
+android/app/src/main/java/fish/nexa/ui/automod/AutomodPage.kt:538	NxTextField	d.name	server
+android/app/src/main/java/fish/nexa/ui/automod/AutomodPage.kt:549	NxTextField	d.wordsText	server
+android/app/src/main/java/fish/nexa/ui/automod/AutomodPage.kt:552	NxTextField	d.regexText	server
+android/app/src/main/java/fish/nexa/ui/automod/AutomodPage.kt:557	NxTextField	d.allowText	server
+android/app/src/main/java/fish/nexa/ui/automod/AutomodPage.kt:576	NxTextField	d.domainsText	server
+android/app/src/main/java/fish/nexa/ui/automod/AutomodPage.kt:578	NxTextField	d.allowText	server
+android/app/src/main/java/fish/nexa/ui/automod/AutomodPage.kt:603	NxTextField	d.extText	server
+android/app/src/main/java/fish/nexa/ui/automod/AutomodPage.kt:608	NxTextField	sample	local
+android/app/src/main/java/fish/nexa/ui/automod/AutomodPage.kt:628	NxTextField	a.message ?: ""	server
+android/app/src/main/java/fish/nexa/ui/automod/AutomodPage.kt:715	NxTextField	text	nontext
+android/app/src/main/java/fish/nexa/ui/bugs/ReportBug.kt:373	NxTextField	subject	staff
+android/app/src/main/java/fish/nexa/ui/bugs/ReportBug.kt:381	NxTextField	description	staff
+android/app/src/main/java/fish/nexa/ui/chat/Composer.kt:724	BasicTextField	state = state	message
+android/app/src/main/java/fish/nexa/ui/chat/CreatePoll.kt:107	NxTextField	question	poll
+android/app/src/main/java/fish/nexa/ui/chat/CreatePoll.kt:118	NxTextField	row.text	poll
+android/app/src/main/java/fish/nexa/ui/chat/EditMessage.kt:127	BasicTextField	state = state	message
+android/app/src/main/java/fish/nexa/ui/chat/ForwardSheet.kt:95	NxTextField	comment	message
+android/app/src/main/java/fish/nexa/ui/chat/Panels.kt:381	BasicTextField	name	conversation
+android/app/src/main/java/fish/nexa/ui/chat/Panels.kt:564	NxTextField	name	conversation
+android/app/src/main/java/fish/nexa/ui/chat/Panels.kt:571	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/chat/Panels.kt:577	NxTextField	again	credential
+android/app/src/main/java/fish/nexa/ui/chat/Panels.kt:693	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/components/Controls.kt:404	BasicTextField	value = value	primitive
+android/app/src/main/java/fish/nexa/ui/dialogs/CreateDm.kt:146	NxTextField	query	local
+android/app/src/main/java/fish/nexa/ui/dialogs/CreateDm.kt:183	NxTextField	name	conversation
+android/app/src/main/java/fish/nexa/ui/dialogs/GroupDialogs.kt:209	NxTextField	name	conversation
+android/app/src/main/java/fish/nexa/ui/dialogs/GroupDialogs.kt:345	NxTextField	query	local
+android/app/src/main/java/fish/nexa/ui/dialogs/MoreDialogs.kt:257	NxTextField	code	credential
+android/app/src/main/java/fish/nexa/ui/dialogs/MoreDialogs.kt:273	NxTextField	templateUrl	server
+android/app/src/main/java/fish/nexa/ui/dialogs/MoreDialogs.kt:375	NxTextField	templateName	server
+android/app/src/main/java/fish/nexa/ui/dialogs/MoreDialogs.kt:404	NxTextField	name	server
+android/app/src/main/java/fish/nexa/ui/dialogs/MoreDialogs.kt:506	NxTextField	text	profile
+android/app/src/main/java/fish/nexa/ui/dialogs/MoreDialogs.kt:608	NxTextField	name	conversation
+android/app/src/main/java/fish/nexa/ui/dialogs/MoreDialogs.kt:615	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/dialogs/MoreDialogs.kt:623	NxTextField	confirm	credential
+android/app/src/main/java/fish/nexa/ui/dialogs/Prompt.kt:89	NxTextField	value = values[f.key] ?: ""	primitive
+android/app/src/main/java/fish/nexa/ui/dialogs/QuickSwitcher.kt:187	BasicTextField	q	local
+android/app/src/main/java/fish/nexa/ui/dialogs/ServerDialogs.kt:134	NxTextField	nick	identity
+android/app/src/main/java/fish/nexa/ui/dialogs/ServerDialogs.kt:289	NxTextField	name	server
+android/app/src/main/java/fish/nexa/ui/dialogs/ServerDialogs.kt:337	NxTextField	name	server
+android/app/src/main/java/fish/nexa/ui/format/FormatEditor.kt:657	BasicTextField	value	message
+android/app/src/main/java/fish/nexa/ui/format/FormatPage.kt:534	BasicTextField	state = state	message
+android/app/src/main/java/fish/nexa/ui/format/FormattedTextField.kt:57	NxTextField	value	primitive
+android/app/src/main/java/fish/nexa/ui/forum/Forum.kt:620	NxTextField	title	conversation
+android/app/src/main/java/fish/nexa/ui/moderation/Logs.kt:277	NxTextField	title	staff
+android/app/src/main/java/fish/nexa/ui/moderation/Logs.kt:283	NxTextField	body	staff
+android/app/src/main/java/fish/nexa/ui/moderation/Moderate.kt:236	NxTextField	d.amount	nontext
+android/app/src/main/java/fish/nexa/ui/moderation/Moderate.kt:521	NxTextField	s.confirm	local
+android/app/src/main/java/fish/nexa/ui/moderation/Parts.kt:173	NxTextField	value	primitive
+android/app/src/main/java/fish/nexa/ui/moderation/Parts.kt:733	NxTextField	reason	primitive
+android/app/src/main/java/fish/nexa/ui/nexa/ThreadChat.kt:749	BasicTextField	value	staff
+android/app/src/main/java/fish/nexa/ui/notes/NoteScreen.kt:753	BasicTextField	value = title	note
+android/app/src/main/java/fish/nexa/ui/notes/ShareNote.kt:292	NxTextField	q	local
+android/app/src/main/java/fish/nexa/ui/people/FriendsPage.kt:298	BasicTextField	query	local
+android/app/src/main/java/fish/nexa/ui/people/FriendsPage.kt:591	BasicTextField	value	local
+android/app/src/main/java/fish/nexa/ui/people/FriendsPage.kt:612	NxTextField	note	message
+android/app/src/main/java/fish/nexa/ui/people/MemberActions.kt:216	NxTextField	reason	staff
+android/app/src/main/java/fish/nexa/ui/pickers/ExpressionPicker.kt:342	NxTextField	query	local
+android/app/src/main/java/fish/nexa/ui/pickers/ExpressionPicker.kt:543	NxTextField	query	local
+android/app/src/main/java/fish/nexa/ui/pickers/Gifs.kt:121	NxTextField	query	local
+android/app/src/main/java/fish/nexa/ui/profile/ProfileCard.kt:658	BasicTextField	text	local
+android/app/src/main/java/fish/nexa/ui/profile/ProfileCard.kt:931	BasicTextField	text	message
+android/app/src/main/java/fish/nexa/ui/server/ChannelSettings.kt:265	NxTextField	name	server
+android/app/src/main/java/fish/nexa/ui/server/ChannelSettings.kt:381	NxTextField	tg.emoji	server
+android/app/src/main/java/fish/nexa/ui/server/ChannelSettings.kt:389	NxTextField	tg.name	server
+android/app/src/main/java/fish/nexa/ui/server/ColourPick.kt:168	NxTextField	hex	nontext
+android/app/src/main/java/fish/nexa/ui/server/CommunityPages.kt:212	NxTextField	tagText	server
+android/app/src/main/java/fish/nexa/ui/server/Frame.kt:700	BasicTextField	value = value	local
+android/app/src/main/java/fish/nexa/ui/server/IntegrationsPage.kt:293	NxTextField	name	app
+android/app/src/main/java/fish/nexa/ui/server/MembersPage.kt:148	NxTextField	q	local
+android/app/src/main/java/fish/nexa/ui/server/ModMembers.kt:653	NxTextField	reason	staff
+android/app/src/main/java/fish/nexa/ui/server/OverviewPage.kt:182	NxTextField	name	server
+android/app/src/main/java/fish/nexa/ui/server/Prompt.kt:40	NxTextField	values[f.key] ?: ""	primitive
+android/app/src/main/java/fish/nexa/ui/server/RolesPage.kt:472	NxTextField	name	server
+android/app/src/main/java/fish/nexa/ui/server/ServerPages.kt:437	NxTextField	typed	local
+android/app/src/main/java/fish/nexa/ui/server/ServerTagPage.kt:226	NxTextField	draft.text	server
+android/app/src/main/java/fish/nexa/ui/server/StickersPage.kt:382	NxTextField	name	expression
+android/app/src/main/java/fish/nexa/ui/server/StickersPage.kt:383	NxTextField	description	expression
+android/app/src/main/java/fish/nexa/ui/server/StickersPage.kt:415	NxTextField	s.name	expression
+android/app/src/main/java/fish/nexa/ui/server/StickersPage.kt:418	NxTextField	s.tags	expression
+android/app/src/main/java/fish/nexa/ui/settings/AboutMe.kt:107	BasicTextField	state	profile
+android/app/src/main/java/fish/nexa/ui/settings/AccountPages.kt:212	NxTextField	value	identity
+android/app/src/main/java/fish/nexa/ui/settings/AccountPages.kt:263	NxTextField	current	credential
+android/app/src/main/java/fish/nexa/ui/settings/AccountPages.kt:264	NxTextField	next	credential
+android/app/src/main/java/fish/nexa/ui/settings/AccountPages.kt:265	NxTextField	again	credential
+android/app/src/main/java/fish/nexa/ui/settings/AccountPages.kt:315	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/settings/AccountPages.kt:422	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/settings/AppDetail.kt:282	NxTextField	form.str("name", app.name)	app
+android/app/src/main/java/fish/nexa/ui/settings/AppDetail.kt:283	NxTextField	form.str("description", app.description)	app
+android/app/src/main/java/fish/nexa/ui/settings/AppDetail.kt:309	BasicTextField	tag	app
+android/app/src/main/java/fish/nexa/ui/settings/AppDetail.kt:323	NxTextField	form.str("interactions_url", app.interactionsUrl)	app
+android/app/src/main/java/fish/nexa/ui/settings/AppDetail.kt:329	NxTextField	form.str("terms_url", app.termsUrl)	app
+android/app/src/main/java/fish/nexa/ui/settings/AppDetail.kt:330	NxTextField	form.str("privacy_url", app.privacyUrl)	app
+android/app/src/main/java/fish/nexa/ui/settings/AppDetail.kt:333	NxTextField	form.str("event_webhooks_url", app.eventWebhooksUrl)	app
+android/app/src/main/java/fish/nexa/ui/settings/AppDetail.kt:369	NxTextField	(form.bot["username"] as? JsonPrimitive)?.contentOrNull ?: app.bot.username	app
+android/app/src/main/java/fish/nexa/ui/settings/AppDetail.kt:432	NxTextField	form.str("custom_install_url", app.customInstallUrl)	app
+android/app/src/main/java/fish/nexa/ui/settings/AppDetail.kt:474	NxTextField	u	app
+android/app/src/main/java/fish/nexa/ui/settings/ColourPicker.kt:192	NxTextField	text	nontext
+android/app/src/main/java/fish/nexa/ui/settings/DeveloperPortal.kt:302	NxTextField	name	app
+android/app/src/main/java/fish/nexa/ui/settings/HelpPages.kt:288	NxTextField	key	local
+android/app/src/main/java/fish/nexa/ui/settings/HelpPages.kt:361	NxTextField	who	local
+android/app/src/main/java/fish/nexa/ui/settings/LicensesPage.kt:97	NxTextField	q	local
+android/app/src/main/java/fish/nexa/ui/settings/PortalParts.kt:182	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/settings/PrivacyPages.kt:176	NxTextField	query	local
+android/app/src/main/java/fish/nexa/ui/settings/ProfilesPage.kt:676	BasicTextField	field	identity
+android/app/src/main/java/fish/nexa/ui/settings/ProfilesPage.kt:959	NxTextField	draft	profile
+android/app/src/main/java/fish/nexa/ui/settings/SecurityPage.kt:215	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/settings/SecurityPage.kt:242	NxTextField	code	credential
+android/app/src/main/java/fish/nexa/ui/settings/SecurityPage.kt:296	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/settings/SecurityPage.kt:329	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/settings/SecurityPage.kt:413	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/settings/SecurityPage.kt:414	NxTextField	name	local
+android/app/src/main/java/fish/nexa/ui/settings/SecurityPage.kt:441	NxTextField	name	local
+android/app/src/main/java/fish/nexa/ui/settings/SecurityPage.kt:558	NxTextField	pin	credential
+android/app/src/main/java/fish/nexa/ui/settings/SecurityPage.kt:562	NxTextField	again	credential
+android/app/src/main/java/fish/nexa/ui/settings/Settings.kt:438	BasicTextField	value = query	local
+android/app/src/main/java/fish/nexa/ui/settings/SoundsPage.kt:616	NxTextField	name	local
+android/app/src/main/java/fish/nexa/ui/settings/StickersPage.kt:279	NxTextField	form.name	expression
+android/app/src/main/java/fish/nexa/ui/settings/StickersPage.kt:280	NxTextField	form.description	expression
+android/app/src/main/java/fish/nexa/ui/settings/StickersPage.kt:462	NxTextField	name	expression
+android/app/src/main/java/fish/nexa/ui/settings/StickersPage.kt:463	NxTextField	tags	expression
+android/app/src/main/java/fish/nexa/ui/settings/StickersPage.kt:618	NxTextField	name	expression
+android/app/src/main/java/fish/nexa/ui/settings/StickersPage.kt:625	NxTextField	link	expression
+android/app/src/main/java/fish/nexa/ui/settings/StickersPage.kt:705	NxTextField	q	local
+android/app/src/main/java/fish/nexa/ui/settings/ThemeBuilder.kt:145	NxTextField	draft.name	theme
+android/app/src/main/java/fish/nexa/ui/settings/ThemeBuilder.kt:457	NxTextField	text	nontext
+android/app/src/main/java/fish/nexa/ui/settings/ThemeBuilder.kt:722	NxTextField	text	theme
+android/app/src/main/java/fish/nexa/ui/settings/TypingStyleEditor.kt:263	NxTextField	style.words ?: ""	typing
+android/app/src/main/java/fish/nexa/ui/settings/WidgetEditors.kt:255	BasicTextField	value	profile
+android/app/src/main/java/fish/nexa/ui/settings/WidgetEditors.kt:578	NxTextField	note	profile
+android/app/src/main/java/fish/nexa/ui/settings/WidgetEditors.kt:615	BasicTextField	draft	profile
+android/app/src/main/java/fish/nexa/ui/settings/WidgetEditors.kt:926	NxTextField	title	profile
+android/app/src/main/java/fish/nexa/ui/settings/WidgetEditors.kt:953	NxTextField	text	profile
+android/app/src/main/java/fish/nexa/ui/settings/WidgetEditors.kt:966	NxTextField	st.label	profile
+android/app/src/main/java/fish/nexa/ui/settings/WidgetEditors.kt:967	NxTextField	st.value	profile
+android/app/src/main/java/fish/nexa/ui/settings/WidgetEditors.kt:978	NxTextField	url	profile
+android/app/src/main/java/fish/nexa/ui/settings/WidgetEditors.kt:985	NxTextField	linkLabel	profile
+android/app/src/main/java/fish/nexa/ui/share/Share.kt:151	NxTextField	query	local
+android/app/src/main/java/fish/nexa/ui/shell/Accounts.kt:188	NxTextField	code	credential
+android/app/src/main/java/fish/nexa/ui/shell/Accounts.kt:201	NxTextField	username	credential
+android/app/src/main/java/fish/nexa/ui/shell/Accounts.kt:202	NxTextField	password	credential
+android/app/src/main/java/fish/nexa/ui/threads/Threads.kt:367	NxTextField	name	conversation
+android/app/src/main/java/fish/nexa/ui/voice/CallMenus.kt:614	NxTextField	ui.url	readonly

@@ -103,7 +103,7 @@ fun IncomingCallCard(channelId: String, from: String, onDecline: () -> Unit, onI
             Avatar(from, name, caller?.avatarId, 80.dp, modifier = Modifier.ring(CircleShape, c.statusOnline.copy(alpha = haloAlpha), halo.dp))
         }
         fish.nexa.ui.chat.PersonName(from, name, style = Nx.type.heading.copy(fontSize = Nx.type.sp(22f), fontWeight = FontWeight(690), lineHeight = Nx.type.sp(28f), textAlign = TextAlign.Center), color = c.textStrong, maxLines = 1)
-        Txt(sub, style = Nx.type.bodySmall, color = c.textMuted, align = TextAlign.Center)
+        Txt(sub, style = Nx.type.bodySmall, color = c.textMuted, align = TextAlign.Center, maxLines = 2)
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             RingAction(t("voice.incomingCall.decline"), Modifier.semantics { contentDescription = t("voice.incomingCall.decline") }, kind = "decline", onClick = onDecline)
             RingAction(t("voice.incomingCall.ignore"), Modifier.semantics { contentDescription = t("voice.incomingCall.ignoreHint") }, kind = "ignore", onClick = onIgnore)

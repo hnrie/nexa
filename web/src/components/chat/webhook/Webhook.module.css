@@ -170,3 +170,6 @@ a.title:hover { text-decoration: underline; }
 .author > :not(.authorIcon) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .title, a.title, .fieldName { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .description, .fieldValue, .text, .answerText { overflow: clip; }
+
+/* User-supplied compact metadata must not grow its surrounding controls. */
+.voterHead { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

@@ -1,0 +1,298 @@
+source	control	binding	disposition
+web/src/components/apps/AppFormModal.tsx:179	TextArea	(shared/spread props)	app
+web/src/components/apps/AppFormModal.tsx:179	TextInput	(shared/spread props)	app
+web/src/components/apps/AppFormModal.tsx:186	input	"checkbox"	nontext
+web/src/components/apps/AppFormModal.tsx:204	input	{radio ? "radio" : "checkbox"}	nontext
+web/src/components/apps/AppFormModal.tsx:295	input	"file"	nontext
+web/src/components/apps/PermissionPicker.tsx:29	input	"checkbox"	nontext
+web/src/components/apps/ReadingGlass.tsx:30	input	"radio"	nontext
+web/src/components/apps/ReadingGlass.tsx:37	input	"radio"	nontext
+web/src/components/apps/SelectBox.tsx:148	input	{query}	local
+web/src/components/bugs/ReportBugModal.tsx:302	TextInput	{subject}	staff
+web/src/components/bugs/ReportBugModal.tsx:340	TextArea	{description}	staff
+web/src/components/bugs/ReportBugModal.tsx:369	input	"file"	nontext
+web/src/components/chat/AudioPlayer.tsx:199	input	{muted ? 0 : volume}	nontext
+web/src/components/chat/EditMessage.tsx:106	textarea	{text}	message
+web/src/components/chat/LockedChannel.tsx:60	TextInput	{password}	credential
+web/src/components/chat/SubchatPanel.tsx:143	input	{name}	conversation
+web/src/components/chat/VideoPlayer.tsx:455	input	{muted ? 0 : volume}	nontext
+web/src/components/common/ColourInput.tsx:115	input	{text}	nontext
+web/src/components/common/ContextMenu.tsx:23	input	{value}	nontext
+web/src/components/common/FormattedText.tsx:28	TextArea	{value}	primitive
+web/src/components/common/IconPicker.tsx:51	input	"file"	nontext
+web/src/components/common/ImageCropModal.tsx:199	input	{zoom}	nontext
+web/src/components/common/ImageCropModal.tsx:204	input	"checkbox"	nontext
+web/src/components/common/SearchBox.tsx:56	input	{value}	local
+web/src/components/common/TextInput.tsx:77	input	{reveal && shown ? "text" : type}	nontext
+web/src/components/common/TextInput.tsx:92	textarea	(shared/spread props)	primitive
+web/src/components/common/Toggle.tsx:29	input	{label || ariaLabel}	nontext
+web/src/components/composer/CommandMode.tsx:532	input	""	app
+web/src/components/composer/CommandMode.tsx:548	input	{slot.text}	app
+web/src/components/composer/CommandMode.tsx:588	input	""	app
+web/src/components/composer/CommandMode.tsx:599	input	"file"	nontext
+web/src/components/composer/Composer.tsx:1035	input	"file"	nontext
+web/src/components/composer/Composer.tsx:1053	textarea	{text}	message
+web/src/components/composer/format/FormatEditor.tsx:692	input	{hex}	message
+web/src/components/composer/format/FormatEditor.tsx:731	input	{words}	message
+web/src/components/composer/format/FormatEditor.tsx:732	input	{url}	message
+web/src/components/composer/format/FormatEditor.tsx:755	input	{value}	message
+web/src/components/forum/NewPostDialog.tsx:111	TextInput	{title}	conversation
+web/src/components/forum/NewPostDialog.tsx:129	FormattedText	{text}	conversation
+web/src/components/forum/NewPostDialog.tsx:151	input	"file"	nontext
+web/src/components/legal/TermsGate.tsx:90	input	"checkbox"	nontext
+web/src/components/modals/AddAccountModal.tsx:88	TextInput	{code}	credential
+web/src/components/modals/AddAccountModal.tsx:108	TextInput	{username}	credential
+web/src/components/modals/AddAccountModal.tsx:111	TextInput	{password}	credential
+web/src/components/modals/ConfirmModal.tsx:40	input	"checkbox"	nontext
+web/src/components/modals/CreateCategoryModal.tsx:33	TextInput	{name}	server
+web/src/components/modals/CreateChannelModal.tsx:117	input	"radio"	nontext
+web/src/components/modals/CreateChannelModal.tsx:125	TextInput	{name}	server
+web/src/components/modals/CreateDMModal.tsx:91	TextInput	{q}	local
+web/src/components/modals/CreateDMModal.tsx:115	TextInput	{name}	conversation
+web/src/components/modals/CreateDMModal.tsx:145	input	"checkbox"	nontext
+web/src/components/modals/CreatePackModal.tsx:99	TextInput	{url}	expression
+web/src/components/modals/CreatePackModal.tsx:136	TextInput	{name}	expression
+web/src/components/modals/CreatePollModal.tsx:113	TextInput	{question}	poll
+web/src/components/modals/CreatePollModal.tsx:155	TextInput	{r.text}	poll
+web/src/components/modals/CreateServerModal.tsx:173	TextInput	{code}	local
+web/src/components/modals/CreateServerModal.tsx:206	TextInput	{templateUrl}	server
+web/src/components/modals/CreateServerModal.tsx:285	TextInput	{templateName}	server
+web/src/components/modals/CreateServerModal.tsx:311	TextInput	{name}	server
+web/src/components/modals/CustomStatusModal.tsx:86	TextInput	{text}	profile
+web/src/components/modals/EditGroupModal.tsx:90	TextInput	{name}	conversation
+web/src/components/modals/ForwardModal.tsx:88	TextArea	{comment}	message
+web/src/components/modals/ForwardModal.tsx:108	input	"radio"	nontext
+web/src/components/modals/GroupFriendAdder.tsx:66	TextInput	{q}	local
+web/src/components/modals/GroupInviteModal.tsx:118	TextInput	{link}	readonly
+web/src/components/modals/InviteModal.tsx:135	TextInput	{link}	readonly
+web/src/components/modals/PromptModal.tsx:74	TextInput	{values[f.key] ?? ""}	primitive
+web/src/components/modals/ServerNotificationsModal.tsx:35	input	"radio"	nontext
+web/src/components/modals/ServerProfileModal.tsx:74	TextInput	{nick}	identity
+web/src/components/modals/SubchatModal.tsx:88	TextInput	{name}	conversation
+web/src/components/modals/SubchatModal.tsx:103	TextInput	{password}	credential
+web/src/components/modals/SubchatModal.tsx:114	TextInput	{confirm}	credential
+web/src/components/moderation/AnnouncementsTab.tsx:118	TextInput	{title}	staff
+web/src/components/moderation/AnnouncementsTab.tsx:126	TextArea	{body}	staff
+web/src/components/moderation/BotsTab.tsx:93	input	{q}	local
+web/src/components/moderation/ExpressionsTab.tsx:235	input	{q}	local
+web/src/components/moderation/LogsTab.tsx:130	input	{q}	local
+web/src/components/moderation/ModerateEmojiModal.tsx:81	TextArea	{reason}	staff
+web/src/components/moderation/ModerateModal.tsx:123	TextInput	{amount}	nontext
+web/src/components/moderation/ModerateModal.tsx:384	input	"checkbox"	nontext
+web/src/components/moderation/ModerateModal.tsx:400	input	"checkbox"	nontext
+web/src/components/moderation/ModerateModal.tsx:408	input	"checkbox"	nontext
+web/src/components/moderation/ModerateModal.tsx:427	input	"checkbox"	nontext
+web/src/components/moderation/ModerateModal.tsx:477	TextInput	{confirm}	credential
+web/src/components/moderation/ModerateModal.tsx:486	TextArea	{reason}	staff
+web/src/components/moderation/ModeratePackModal.tsx:103	input	"checkbox"	nontext
+web/src/components/moderation/ModeratePackModal.tsx:112	input	"checkbox"	nontext
+web/src/components/moderation/ModeratePackModal.tsx:120	input	"checkbox"	nontext
+web/src/components/moderation/ModeratePackModal.tsx:139	TextArea	{reason}	staff
+web/src/components/moderation/ModerateServerModal.tsx:106	input	"checkbox"	nontext
+web/src/components/moderation/ModerateServerModal.tsx:122	TextArea	{reason}	staff
+web/src/components/moderation/PackPage.tsx:185	input	{s.name}	nontext
+web/src/components/moderation/RankModal.tsx:61	input	"radio"	nontext
+web/src/components/moderation/ServerPage.tsx:242	input	{`:${e.name}:`}	nontext
+web/src/components/moderation/ServersTab.tsx:149	input	{q}	local
+web/src/components/moderation/UserGrid.tsx:278	input	{q}	local
+web/src/components/moderation/UserGrid.tsx:447	input	{t("moderation.bulk.pick", { name: u.display_name })}	nontext
+web/src/components/nexa/ThreadChat.tsx:561	input	"file"	nontext
+web/src/components/nexa/ThreadChat.tsx:580	textarea	{text}	staff
+web/src/components/notes/NoteEditor.tsx:453	textarea	{title}	note
+web/src/components/notes/NoteEditor.tsx:482	input	"file"	nontext
+web/src/components/notes/ShareNoteModal.tsx:189	TextInput	{q}	local
+web/src/components/profile/BlockDialog.tsx:60	input	"checkbox"	nontext
+web/src/components/profile/BlockDialog.tsx:76	input	"checkbox"	nontext
+web/src/components/profile/ProfileCard.tsx:248	input	{text}	message
+web/src/components/profile/ProfileCard.tsx:833	textarea	{note}	local
+web/src/components/profile/Widgets.tsx:252	input	{muted ? 0 : volume}	nontext
+web/src/components/rail/FolderSettingsModal.tsx:65	TextInput	{name}	local
+web/src/components/rail/FolderSettingsModal.tsx:71	input	{t("organize.rail.accentColour")}	nontext
+web/src/components/rail/FolderSettingsModal.tsx:75	input	{t("server.roles.colourIndexOfCount", { index: i + 1, count: FOLDER_COLORS.length })}	nontext
+web/src/components/search/SearchSuggestions.tsx:212	input	{t("search.suggest.pickDate")}	local
+web/src/components/server/ChannelIconPicker.tsx:125	input	"file"	nontext
+web/src/components/server/ChannelSettingsModal.tsx:203	TextInput	{name}	server
+web/src/components/server/ChannelSettingsModal.tsx:213	FormattedText	{topic}	server
+web/src/components/server/ChannelSettingsModal.tsx:282	input	{limit}	nontext
+web/src/components/server/ChannelSettingsModal.tsx:302	TextInput	{tg.emoji}	server
+web/src/components/server/ChannelSettingsModal.tsx:303	TextInput	{tg.name}	server
+web/src/components/server/ChannelSettingsModal.tsx:305	input	"checkbox"	nontext
+web/src/components/server/ChannelSettingsModal.tsx:483	TextInput	{query}	local
+web/src/components/server/MemberActionModal.tsx:101	input	"checkbox"	nontext
+web/src/components/server/MemberActionModal.tsx:187	TextInput	{reason}	staff
+web/src/components/server/PackEditor.tsx:318	TextInput	{name}	expression
+web/src/components/server/PackEditor.tsx:322	TextArea	{description}	expression
+web/src/components/server/PackEditor.tsx:328	TextInput	{packUrl(pack.id)}	expression
+web/src/components/server/PackEditor.tsx:350	input	"file"	nontext
+web/src/components/server/PackEditor.tsx:354	TextInput	{p.name}	expression
+web/src/components/server/PackEditor.tsx:355	TextInput	{p.tags}	expression
+web/src/components/server/pages/BansPage.tsx:79	TextInput	{q}	local
+web/src/components/server/pages/DeleteServerPage.tsx:42	TextInput	{typed}	local
+web/src/components/server/pages/DiscoverySettingsPage.tsx:113	TextInput	{tagText}	server
+web/src/components/server/pages/EmojiPage.tsx:160	input	"file"	nontext
+web/src/components/server/pages/EmojiPage.tsx:166	TextInput	{q}	local
+web/src/components/server/pages/IntegrationsPage.tsx:253	TextInput	{name}	app
+web/src/components/server/pages/IntegrationsPage.tsx:281	input	"file"	nontext
+web/src/components/server/pages/MembersPage.tsx:116	TextInput	{q}	local
+web/src/components/server/pages/RolesPage.tsx:282	TextInput	{name}	server
+web/src/components/server/pages/RolesPage.tsx:298	input	{t("server.roles.default")}	nontext
+web/src/components/server/pages/RolesPage.tsx:300	input	{t("server.roles.colourIndexOfCount", { index: i + 1, count: SWATCHES.length })}	nontext
+web/src/components/server/pages/RolesPage.tsx:310	input	"radio"	nontext
+web/src/components/server/pages/RolesPage.tsx:339	input	"file"	nontext
+web/src/components/server/pages/RolesPage.tsx:391	TextInput	{filter}	local
+web/src/components/server/pages/RolesPage.tsx:441	TextInput	{q}	local
+web/src/components/server/pages/ServerOverviewPage.tsx:120	input	"file"	nontext
+web/src/components/server/pages/ServerOverviewPage.tsx:128	input	"file"	nontext
+web/src/components/server/pages/ServerOverviewPage.tsx:131	TextInput	{name}	server
+web/src/components/server/pages/ServerOverviewPage.tsx:134	FormattedText	{description}	server
+web/src/components/server/pages/ServerOverviewPage.tsx:144	input	"radio"	nontext
+web/src/components/server/pages/ServerOverviewPage.tsx:145	input	"radio"	nontext
+web/src/components/server/pages/ServerTagPage.tsx:130	TextInput	{draft.text}	server
+web/src/components/server/pages/ServerTagPage.tsx:158	input	"file"	nontext
+web/src/components/server/pages/ServerTagPage.tsx:182	input	"radio"	nontext
+web/src/components/server/pages/ServerTagPage.tsx:186	input	"radio"	nontext
+web/src/components/server/pages/automod/RuleEditor.tsx:82	input	"checkbox"	nontext
+web/src/components/server/pages/automod/RuleEditor.tsx:193	TextInput	{d.name}	server
+web/src/components/server/pages/automod/RuleEditor.tsx:210	TextArea	{d.wordsText}	server
+web/src/components/server/pages/automod/RuleEditor.tsx:213	TextArea	{d.regexText}	server
+web/src/components/server/pages/automod/RuleEditor.tsx:221	TextArea	{d.allowText}	server
+web/src/components/server/pages/automod/RuleEditor.tsx:245	input	"radio"	nontext
+web/src/components/server/pages/automod/RuleEditor.tsx:249	input	"radio"	nontext
+web/src/components/server/pages/automod/RuleEditor.tsx:255	TextArea	{d.domainsText}	server
+web/src/components/server/pages/automod/RuleEditor.tsx:259	TextArea	{d.allowText}	server
+web/src/components/server/pages/automod/RuleEditor.tsx:275	input	{d.config.percent ?? 70}	nontext
+web/src/components/server/pages/automod/RuleEditor.tsx:278	TextInput	{d.config.min_length ?? 10}	nontext
+web/src/components/server/pages/automod/RuleEditor.tsx:284	TextInput	{d.config.max ?? (kind === "mentions" ? 5 : 10)}	nontext
+web/src/components/server/pages/automod/RuleEditor.tsx:291	TextInput	{d.config.messages ?? 5}	nontext
+web/src/components/server/pages/automod/RuleEditor.tsx:294	TextInput	{d.config.seconds ?? 5}	nontext
+web/src/components/server/pages/automod/RuleEditor.tsx:300	TextArea	{d.extText}	server
+web/src/components/server/pages/automod/RuleEditor.tsx:310	TextArea	{sample}	local
+web/src/components/server/pages/automod/RuleEditor.tsx:336	TextInput	{action("block")?.message ?? ""}	server
+web/src/components/server/pages/members/ModMembers.tsx:338	input	{t("members.pick", { name: nameOf(m) })}	nontext
+web/src/components/server/pages/members/ModMembers.tsx:375	input	{t("members.pick", { name: nameOf(m) })}	nontext
+web/src/components/server/pages/members/ModMembers.tsx:488	TextInput	{reason}	staff
+web/src/components/settings/AboutMeEditor.tsx:73	textarea	{value}	primitive
+web/src/components/settings/AccountPage.tsx:137	TextInput	{value}	identity
+web/src/components/settings/AccountPage.tsx:146	TextInput	{value}	credential
+web/src/components/settings/AccountPage.tsx:147	TextInput	{pw}	credential
+web/src/components/settings/AccountPage.tsx:148	TextInput	{pw2}	credential
+web/src/components/settings/AccountPage.tsx:174	TextInput	{value}	credential
+web/src/components/settings/AdminPage.tsx:89	input	"radio"	nontext
+web/src/components/settings/AdminPage.tsx:108	TextInput	{key}	credential
+web/src/components/settings/AdminPage.tsx:199	TextInput	{who}	local
+web/src/components/settings/AppearancePage.tsx:137	input	{px}	nontext
+web/src/components/settings/ChatPage.tsx:24	input	"radio"	nontext
+web/src/components/settings/CustomCssPage.tsx:129	CodeEditor	{text ?? ""}	local
+web/src/components/settings/DeleteAccountDialog.tsx:125	TextInput	{password}	credential
+web/src/components/settings/LicensesPage.tsx:84	TextInput	{query}	local
+web/src/components/settings/NotificationsPage.tsx:72	input	"radio"	nontext
+web/src/components/settings/PasskeysSection.tsx:128	TextInput	{password}	credential
+web/src/components/settings/PasskeysSection.tsx:131	TextInput	{name}	local
+web/src/components/settings/PasskeysSection.tsx:143	TextInput	{name}	local
+web/src/components/settings/PrivacyPage.tsx:48	input	"radio"	nontext
+web/src/components/settings/ProfilePage.tsx:298	InlineText	{displayName}	identity
+web/src/components/settings/ProfilePage.tsx:301	InlineText	{pronouns}	identity
+web/src/components/settings/ProfilePage.tsx:303	InlineAbout	{about}	identity
+web/src/components/settings/ProfilePage.tsx:496	input	"file"	nontext
+web/src/components/settings/ProfilePage.tsx:497	input	"file"	nontext
+web/src/components/settings/SecurityPage.tsx:293	TextInput	{password}	credential
+web/src/components/settings/SecurityPage.tsx:307	TextInput	{code}	credential
+web/src/components/settings/SecurityPage.tsx:332	TextInput	{password}	credential
+web/src/components/settings/SecurityPage.tsx:349	TextInput	{password}	credential
+web/src/components/settings/SecurityPage.tsx:362	TextInput	{pin}	credential
+web/src/components/settings/SecurityPage.tsx:365	TextInput	{pin2}	credential
+web/src/components/settings/SecurityPage.tsx:403	input	"checkbox"	nontext
+web/src/components/settings/ServerProfileDesigner.tsx:315	InlineText	{nick}	identity
+web/src/components/settings/ServerProfileDesigner.tsx:318	InlineText	{pronouns}	identity
+web/src/components/settings/ServerProfileDesigner.tsx:320	InlineAbout	{about}	identity
+web/src/components/settings/ServerProfileDesigner.tsx:495	input	"file"	nontext
+web/src/components/settings/ServerProfileDesigner.tsx:496	input	"file"	nontext
+web/src/components/settings/SoundsPage.tsx:211	input	{sounds.volume}	nontext
+web/src/components/settings/SoundsPage.tsx:267	input	"file"	nontext
+web/src/components/settings/StickersPage.tsx:151	TextInput	{q}	local
+web/src/components/settings/TypingStyleEditor.tsx:117	input	"file"	nontext
+web/src/components/settings/TypingStyleEditor.tsx:192	TextInput	{style.words ?? ""}	typing
+web/src/components/settings/VoicePage.tsx:255	input	{settings.inputVolume}	nontext
+web/src/components/settings/VoicePage.tsx:258	input	{settings.outputVolume}	nontext
+web/src/components/settings/VoicePage.tsx:291	input	"radio"	nontext
+web/src/components/settings/VoicePage.tsx:295	input	"radio"	nontext
+web/src/components/settings/VoicePage.tsx:332	input	"radio"	nontext
+web/src/components/settings/VoicePage.tsx:399	input	{db}	nontext
+web/src/components/settings/WidgetsEditor.tsx:286	input	"file"	nontext
+web/src/components/settings/WidgetsEditor.tsx:301	TextInput	{q}	profile
+web/src/components/settings/WidgetsEditor.tsx:394	TextArea	{note}	profile
+web/src/components/settings/WidgetsEditor.tsx:445	input	{draft}	profile
+web/src/components/settings/WidgetsEditor.tsx:639	input	"file"	nontext
+web/src/components/settings/WidgetsEditor.tsx:654	TextInput	{q}	profile
+web/src/components/settings/WidgetsEditor.tsx:847	input	"file"	nontext
+web/src/components/settings/WidgetsEditor.tsx:860	TextInput	{title}	profile
+web/src/components/settings/WidgetsEditor.tsx:890	TextArea	{text}	profile
+web/src/components/settings/WidgetsEditor.tsx:900	TextInput	{st.label}	profile
+web/src/components/settings/WidgetsEditor.tsx:901	TextInput	{st.value}	profile
+web/src/components/settings/WidgetsEditor.tsx:917	TextInput	{url}	profile
+web/src/components/settings/WidgetsEditor.tsx:918	TextInput	{linkLabel}	profile
+web/src/components/settings/designerParts.tsx:44	input	{value}	primitive
+web/src/components/settings/designerParts.tsx:83	AboutMeEditor	{value}	primitive
+web/src/components/settings/designerParts.tsx:108	input	{shown}	primitive
+web/src/components/settings/look/AddCssLinkDialog.tsx:56	TextInput	{url}	local
+web/src/components/settings/look/AddCssLinkDialog.tsx:76	input	"checkbox"	nontext
+web/src/components/settings/look/AddPluginDialog.tsx:188	input	"checkbox"	nontext
+web/src/components/settings/look/AddPluginDialog.tsx:198	input	"radio"	nontext
+web/src/components/settings/look/AddPluginDialog.tsx:206	TextInput	{url}	local
+web/src/components/settings/look/AddPluginDialog.tsx:210	CodeEditor	{code}	credential
+web/src/components/settings/look/CodeEditor.tsx:18	textarea	{value}	primitive
+web/src/components/settings/look/ColourField.tsx:83	input	{text}	nontext
+web/src/components/settings/look/ColourField.tsx:118	input	{opacity}	nontext
+web/src/components/settings/look/ImportThemeDialog.tsx:62	TextArea	{text}	theme
+web/src/components/settings/look/ImportThemeDialog.tsx:76	input	"file"	nontext
+web/src/components/settings/look/PluginSettingsForm.tsx:18	TextInput	{text}	local
+web/src/components/settings/look/PluginUpdateDialog.tsx:80	input	"checkbox"	nontext
+web/src/components/settings/look/SimpleEditor.tsx:53	input	"radio"	nontext
+web/src/components/settings/look/ThemeBuilder.tsx:140	TextInput	{draft.name}	theme
+web/src/components/settings/portal/AppDetail.tsx:177	input	"file"	nontext
+web/src/components/settings/portal/AppDetail.tsx:231	TextInput	{v.name ?? app.name}	app
+web/src/components/settings/portal/AppDetail.tsx:234	TextArea	{v.description ?? app.description}	app
+web/src/components/settings/portal/AppDetail.tsx:246	input	{tag}	app
+web/src/components/settings/portal/AppDetail.tsx:266	TextInput	{v.interactions_url ?? app.interactions_url}	app
+web/src/components/settings/portal/AppDetail.tsx:274	TextInput	{v.terms_url ?? app.terms_url}	app
+web/src/components/settings/portal/AppDetail.tsx:277	TextInput	{v.privacy_url ?? app.privacy_url}	app
+web/src/components/settings/portal/AppDetail.tsx:283	TextInput	{v.event_webhooks_url ?? app.event_webhooks_url}	app
+web/src/components/settings/portal/AppDetail.tsx:288	input	"checkbox"	nontext
+web/src/components/settings/portal/AppDetail.tsx:292	input	"checkbox"	nontext
+web/src/components/settings/portal/AppDetail.tsx:343	TextInput	{draft.bot.username ?? bot.username}	app
+web/src/components/settings/portal/AppDetail.tsx:404	input	"checkbox"	nontext
+web/src/components/settings/portal/AppDetail.tsx:411	input	"checkbox"	nontext
+web/src/components/settings/portal/AppDetail.tsx:429	input	"checkbox"	nontext
+web/src/components/settings/portal/AppDetail.tsx:444	TextInput	{draft.app.custom_install_url ?? app.custom_install_url}	app
+web/src/components/settings/portal/AppDetail.tsx:488	TextInput	{u}	app
+web/src/components/settings/portal/AppDetail.tsx:512	input	"checkbox"	nontext
+web/src/components/settings/portal/DeveloperPortalPage.tsx:186	TextInput	{name}	app
+web/src/components/settings/portal/portalParts.tsx:96	TextInput	{password}	credential
+web/src/components/threads/CreateThreadModal.tsx:64	TextInput	{name}	conversation
+web/src/components/threads/CreateThreadModal.tsx:75	input	"radio"	nontext
+web/src/components/threads/CreateThreadModal.tsx:83	input	"radio"	nontext
+web/src/components/voice/GuestLinkModal.tsx:116	TextInput	{state?.url ?? ""}	readonly
+web/src/components/voice/ShareScreenModal.tsx:171	input	{plan.bitrate / 1_000_000}	nontext
+web/src/markdown/render.tsx:245	input	{node.checked ? t("render.taskDone") : t("render.taskOpen")}	nontext
+web/src/pages/AuthLayout.tsx:116	input	"checkbox"	nontext
+web/src/pages/AuthorizePage.tsx:177	input	"radio"	nontext
+web/src/pages/FriendsPage.tsx:164	input	{query}	local
+web/src/pages/FriendsPage.tsx:416	input	{value}	message
+web/src/pages/FriendsPage.tsx:431	TextArea	{note}	message
+web/src/pages/GuestCallPage.tsx:293	TextInput	{name}	identity
+web/src/pages/LockPage.tsx:53	input	{me?.username ?? ""}	credential
+web/src/pages/LockPage.tsx:55	TextInput	{password}	credential
+web/src/pages/LoginPage.tsx:161	TextInput	{code}	credential
+web/src/pages/LoginPage.tsx:192	TextInput	{username}	credential
+web/src/pages/LoginPage.tsx:198	TextInput	{password}	credential
+web/src/pages/PasscodePage.tsx:97	TextInput	{passcode}	credential
+web/src/pages/RecoverPage.tsx:96	TextInput	{username}	credential
+web/src/pages/RecoverPage.tsx:99	TextInput	{key}	credential
+web/src/pages/RecoverPage.tsx:102	TextInput	{password}	credential
+web/src/pages/RecoverPage.tsx:105	TextInput	{confirm}	credential
+web/src/pages/RegisterPage.tsx:137	TextInput	{username}	identity
+web/src/pages/RegisterPage.tsx:140	TextInput	{displayName}	identity
+web/src/pages/RegisterPage.tsx:147	TextInput	{password}	credential
+web/src/pages/RegisterPage.tsx:155	TextInput	{confirm}	credential
+web/src/pages/RegisterPage.tsx:160	TextInput	{inviteKey}	credential
+web/src/pages/RegisterPage.tsx:166	TextInput	{inviteKey}	credential

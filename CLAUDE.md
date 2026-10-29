@@ -1166,6 +1166,11 @@ the chat list never scrolls horizontally. Android bounds ink in its common text/
 renderers and uses matching title limits. Preserve its bounded personal-name effect halo.
 Keep removable labels in a shrinkable text child so their buttons stay visible.
 `docs/UI_TEXT_AUDIT.md` records the input-to-display inventory and the regression workflow.
+The field-level ledger is `docs/UI_TEXT_INPUTS.md`, with source snapshots in
+`docs/UI_TEXT_INPUTS.tsv` and `docs/UI_TEXT_INPUTS_ANDROID.tsv`; update these when adding
+shared text fields, dynamic prompts or imported/integration metadata. Emoji fallbacks
+must stay icon-sized, and compact labels need explicit line limits even with input
+length validation.
 The dev-only `web/tests/text-layout.html` fixture is checked with
 `cd web && npx tsc --noEmit -p tests` and `tools/text_layout_audit.py` against an explicit Vite
 scratch-server proxy. Android's debug-only `TextLayoutAuditActivity` accepts theme, payload

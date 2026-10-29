@@ -877,7 +877,7 @@ private fun CardWidget(w: Widgets.CardWidget) {
                     for (row in w.stats.chunked(cols)) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         for (st in row) Column(Modifier.weight(1f).clip(RoundedCornerShape(9.dp)).background(p.chip).topEdge(RoundedCornerShape(9.dp), c.edgeLight).padding(start = 10.dp, end = 10.dp, top = 7.dp, bottom = 8.dp)) {
                             Txt(st.label, style = Nx.type.hint.copy(fontWeight = FontWeight(600), lineHeight = Nx.type.sp(15f)), color = c.textMuted, maxLines = 2)
-                            Txt(st.value, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(19f)), color = c.textStrong, modifier = Modifier.padding(top = 2.dp))
+                            Txt(st.value, style = Nx.type.bodySmall.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(700), lineHeight = Nx.type.sp(19f)), color = c.textStrong, maxLines = 2, modifier = Modifier.padding(top = 2.dp))
                         }
                         repeat(cols - row.size) { Box(Modifier.weight(1f)) }
                     }

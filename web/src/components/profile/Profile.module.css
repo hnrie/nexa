@@ -410,3 +410,6 @@
   /* a phone's sheet is the popout: the card fills it (one in a message stays a card) */
   .card[data-variant="popout"]:not([data-embedded]) { width: 100%; max-height: none; overflow: visible; border-radius: 0; box-shadow: none; }
 }
+
+.listName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.listInitial { overflow: hidden; white-space: nowrap; }

@@ -365,3 +365,8 @@ button.track:focus-visible { outline-offset: -2px; }
 .favName, .widget h3.cardTitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .tag { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cardText { overflow: clip; }
+
+/* User-supplied compact metadata must not grow its surrounding controls. */
+.stat dt, .stat dd { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+
+.favNote { overflow: clip; }

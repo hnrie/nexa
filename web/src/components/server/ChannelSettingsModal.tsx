@@ -473,7 +473,7 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
               {candidateRoles.map((r) => (
                 <button key={r.id} className={s.pickerRow} onClick={unlessUnsaved(() => void add(r.id, "role"))}>
                   <span className={s.dot} style={{ background: r.color ? `#${r.color.toString(16).padStart(6, "0")}` : "var(--text-muted)" }} />
-                  {r.name}
+                  <span>{r.name}</span>
                 </button>
               ))}
             </div>

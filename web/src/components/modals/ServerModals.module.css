@@ -47,3 +47,9 @@
 .templateChan svg { color: var(--text-muted); flex: none; }
 .errorText { margin: 0; font-size: 13px; color: var(--danger); line-height: 1.4; }
 @media (max-width: 767px) { .row2 { grid-template-columns: 1fr; } }
+
+/* Imported template labels have the same bounds as the labels they create. */
+.templateTitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.rolePill, .templateChan { min-width: 0; max-width: 100%; }
+.rolePill > span:last-child, .templateChan > span, .templateCat { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.templateDesc { overflow-wrap: anywhere; overflow: clip; }

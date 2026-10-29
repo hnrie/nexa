@@ -385,3 +385,6 @@
 
 /* Keep shared user text inside its own layout slot. */
 .lobbyTitle, .ringName { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* User-supplied compact metadata must not grow its surrounding controls. */
+.ringSub { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

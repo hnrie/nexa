@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -152,7 +153,7 @@ private fun TypingWords(style: TypingStyle, name: String, textStyle: androidx.co
         add("a" to "\u0000$name\u0001")
         if (words != null) add("words" to words)
     }
-    BasicText(boldNames(t(key, *args.toTypedArray()), bold), style = textStyle, maxLines = if (wrap) Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
+    BasicText(boldNames(t(key, *args.toTypedArray()), bold), modifier = Modifier.clipToBounds(), style = textStyle, maxLines = if (wrap) 3 else 1, overflow = TextOverflow.Ellipsis)
 }
 
 private val EASE_IN_OUT = CubicBezierEasing(0.65f, 0f, 0.35f, 1f)

@@ -47,3 +47,6 @@
 .glass[data-everything] .note { color: var(--text-warning); }
 @media (prefers-reduced-motion: reduce) { .words, .glass { transition: none; } }
 @media (max-width: 767px) { .choices { grid-template-columns: 1fr; } }
+
+.state > span { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.note { overflow-wrap: anywhere; overflow: clip; }

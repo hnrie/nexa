@@ -190,3 +190,6 @@
 .acOption { display: inline-block; margin-inline-start: 8px; padding: 1px 6px; border-radius: 5px; background: var(--bg-hover); font-size: 12.5px; font-weight: 550; color: var(--text-muted); vertical-align: 1px; }
 /* the caret's place after the command and its slots: a command that takes nothing sends from here */
 .cmdTail { flex: 1 1 4px; min-width: 4px; height: 28px; padding: 0; border: 0; background: transparent; color: transparent; caret-color: var(--text); outline: none; }
+
+.slotName { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.slotGrow { min-width: 0; }

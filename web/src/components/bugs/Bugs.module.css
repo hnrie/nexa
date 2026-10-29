@@ -656,3 +656,8 @@
     transition: none;
   }
 }
+
+/* User-supplied compact metadata must not grow its surrounding controls. */
+.feedTitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+
+.facts dd { overflow: clip; }

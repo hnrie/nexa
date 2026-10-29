@@ -1038,3 +1038,5 @@
 .reportSubject { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .announcementTitle > svg { flex: none; }
 .announcementTitle > span { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+
+.personUser { display: inline-block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }

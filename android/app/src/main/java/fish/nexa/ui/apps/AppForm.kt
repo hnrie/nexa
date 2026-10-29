@@ -317,7 +317,7 @@ private fun ChoiceLine(on: Boolean, radio: Boolean, label: String, description: 
         }
         if (emoji != null) HookEmojiGlyph(emoji, 20)
         Column(Modifier.weight(1f)) {
-            Txt(label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(550)), color = if (on) c.textStrong else c.text)
+            Txt(label, style = Nx.type.body.copy(fontSize = Nx.type.sp(15f), fontWeight = FontWeight(550)), color = if (on) c.textStrong else c.text, maxLines = 2)
             if (!description.isNullOrEmpty()) Txt(description, style = Nx.type.hint, color = c.textMuted)
         }
     }

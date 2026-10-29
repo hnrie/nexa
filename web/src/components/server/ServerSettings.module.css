@@ -185,3 +185,8 @@
 .styleOpt input { accent-color: var(--brand); }
 .styleColors { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 10px; }
 .styleColor { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-muted); }
+
+.keyName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.preview { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.preview > span:nth-child(2), .pickerRow > span:not(.dot) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

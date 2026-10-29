@@ -1042,7 +1042,7 @@ export function ProfileCard({ userId, variant, onClose, preview, previewWidgets,
               return (
                 <button key={id} className={s.listItem} onClick={() => { onClose?.(); nav(`/channels/${id}`); }}>
                   {icon ? <img className={s.listIcon} src={icon} alt="" /> : <span className={s.listInitial}>{server.name.slice(0, 1).toUpperCase()}</span>}
-                  <span>{server.name}</span>
+                  <span className={s.listName}>{server.name}</span>
                 </button>
               );
             })}

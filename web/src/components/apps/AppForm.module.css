@@ -34,3 +34,6 @@
 
 /* Bound labels supplied by other people and apps. */
 .title, .choiceLabel { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+
+/* User-supplied compact metadata must not grow its surrounding controls. */
+.checkText > span:first-child { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

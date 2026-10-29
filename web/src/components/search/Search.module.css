@@ -199,3 +199,7 @@
   .rowAction { width: 44px; height: 44px; }
   .optClear { padding: 8px 4px; margin: -8px -4px; }
 }
+
+.stickerNote { min-width: 0; max-width: 100%; }
+.stickerNote > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.introTitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

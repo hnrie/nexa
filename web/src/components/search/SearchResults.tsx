@@ -188,7 +188,7 @@ export const MessageHit = memo(function MessageHit({ doc, needles, names, showWh
         {doc.st ? (
           <span className={s.stickerNote}>
             <StickerIcon size={14} aria-hidden="true" />
-            {doc.st.name ? t("chat.messageItem.stickerNamed", { name: doc.st.name }) : t("attachmentViews.sticker")}
+            <span>{doc.st.name ? t("chat.messageItem.stickerNamed", { name: doc.st.name }) : t("attachmentViews.sticker")}</span>
           </span>
         ) : null}
       </span>

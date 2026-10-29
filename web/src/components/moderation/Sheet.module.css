@@ -497,3 +497,6 @@
     min-height: 40px;
   }
 }
+
+.faceName, .nick { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.rowValue, .faceText { overflow: clip; }

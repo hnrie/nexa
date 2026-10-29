@@ -566,3 +566,9 @@ button.sysName:hover { text-decoration: underline; }
 /* Event links carry thread names, and names inside prose still need one line. */
 .sysName, .sysLink { display: inline-block; min-width: 0; max-width: 100%; max-height: 1lh; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; unicode-bidi: isolate; }
 .system > span:not(.sysIcon) { min-width: 0; max-width: 100%; }
+
+/* User-supplied compact metadata must not grow its surrounding controls. */
+.lockedTitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+
+.amChannel { min-width: 0; max-width: 100%; vertical-align: bottom; }
+.amChannel > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

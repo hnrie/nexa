@@ -119,3 +119,7 @@ code, pre, kbd { font-family: var(--font-mono); }
 /* Identity fragments in rows and translated prose. Even one glyph or combining
    sequence can paint beyond its line, so wrapping alone is not a boundary. */
 :where(.person-name) { box-sizing: content-box; display: inline-block; min-width: 0; max-width: 100%; max-height: 1lh; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; unicode-bidi: isolate; }
+
+/* Unsupported emoji are still icon-sized. A valid reaction can contain many
+   pictographs, and a platform glyph fallback must not size the surrounding row. */
+:where([data-emoji-fallback]) { display: inline-block; width: 1em; height: 1em; max-width: 100%; overflow: hidden; white-space: nowrap; vertical-align: bottom; }

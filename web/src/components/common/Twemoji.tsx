@@ -42,7 +42,7 @@ export function Twemoji({ text, className, title, fallbackClassName, boxClassNam
   const candidates = twemojiIndexSettled() ? twemojiCandidates(text).filter((u) => !failed.has(u) && (failures.get(u) ?? 0) < 2) : [];
   const src = candidates[0];
   const card = boxClassName ? "unicode" : undefined;
-  if (!src) return <span className={fallbackClassName ?? className} data-emoji-card={card}>{text}</span>;
+  if (!src) return <span className={fallbackClassName ?? className} data-emoji-fallback="" data-emoji-card={card}>{text}</span>;
   const img = (
     <img
       className={className}

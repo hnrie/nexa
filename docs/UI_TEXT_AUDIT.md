@@ -28,6 +28,9 @@ introduced. Existing input and decrypted-payload limits remain in force.
   layout boundary. These changes also protect previously saved values and text
   arriving from bots, links, encrypted payloads and older clients.
 
+The field-level [source ledger](UI_TEXT_INPUTS.md) includes the web and Android
+input catalogs, dynamic prompts, format/CRDT editors, imports and explicit exclusions.
+
 ## Input to display inventory
 
 The paths below identify the relevant entry points and shared renderers. A family
@@ -74,7 +77,9 @@ security review of every feature.
 build entry or application route. It renders actual `PersonName`, `InviteView`,
 `ServerCard`, `Markdown` and `RichEmbeds` components alongside representative markup
 using the actual chat, sidebar, forum, role, modal, note, profile and voice styles.
-All eleven personal name effects are exercised. The fixture has a separate
+All eleven personal name effects are exercised. The fixture also exercises emoji
+fallbacks, imported template labels, custom typing previews, profile statistics,
+picker headings, integration controls and compact metadata. The fixture has a separate
 TypeScript config checked with `cd web && npx tsc --noEmit -p tests`.
 
 With a scratch chatd on 5274, run Vite with an explicit proxy target:
@@ -101,6 +106,7 @@ Screenshots and JSON results stay outside the repository.
 
 `TextLayoutAuditActivity` is debug-only on Android. Launch it through adb with
 `--es theme dark|light|forest`, `--es payload normal|wide|unbroken|combining|breaks|rtl`
-and `--ei page 0|1`. It exercises common name, title, inline identity and markdown
-renderers. These component fixtures supplement actual app-screen checks; they do
+and `--ei page 0|1|2`. It exercises common name, title, inline identity and markdown
+renderers. Page 2 adds typing previews, checkbox labels and compact metadata.
+These component fixtures supplement actual app-screen checks; they do
 not replace navigating every future changed flow.

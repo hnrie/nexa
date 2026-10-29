@@ -81,3 +81,5 @@
 .qrTitle { margin: 8px 0 0; font-family: var(--font-display); font-size: 19px; font-weight: 700; color: var(--text-strong); }
 .qrText { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text-muted); }
 @media (prefers-reduced-motion: reduce) { .qrPlate[data-scanned] { animation: none; } }
+
+.title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
