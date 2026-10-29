@@ -137,7 +137,8 @@ object ChannelTree {
         val cats = mine.filter { it.isCategory }.sortedWith(order)
         val catIds = cats.map { it.id }.toSet()
         val loose = mine.filter { !it.isCategory && (it.parentId == null || it.parentId !in catIds) }.sortedWith(order)
-        return Tree(loose, cats.map { cat -> Category(cat, mine.filter { !it.isCategory && it.parentId == cat.id }.sortedWith(order)) })
+        val children = mine.filter { !it.isCategory }.groupBy { it.parentId }
+        return Tree(loose, cats.map { cat -> Category(cat, children[cat.id].orEmpty().sortedWith(order)) })
     }
 }
 

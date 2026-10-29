@@ -126,7 +126,9 @@ data class ServerState(
     val me: Member,
     val myPermissions: Long,
     val membersComplete: Boolean,
-)
+) {
+    val permissionRoles: List<PermRole> by lazy { Perms.roles(roles.values) }
+}
 
 class ServersStore(private val users: UsersStore, private val channels: ChannelsStore) {
     private val _byId = MutableStateFlow(persistentHashMapOf<String, ServerState>())
@@ -219,7 +221,7 @@ class ServersStore(private val users: UsersStore, private val channels: Channels
 
     fun serverPerms(st: ServerState, userId: String): Long {
         if (st.server.ownerId == userId || isInstanceAdmin(userId)) return P.ALL
-        return Perms.base(st.server.id, Perms.roles(st.roles.values), Perms.member(st.members[userId], userId), false)
+        return Perms.base(st.server.id, st.permissionRoles, Perms.member(st.members[userId], userId), false)
     }
 
     /** Threads this account is in, kept by the threads store, for private threads' permissions. */
@@ -230,12 +232,12 @@ class ServersStore(private val users: UsersStore, private val channels: Channels
         val isOwner = st.server.ownerId == userId || isInstanceAdmin(userId)
         // a thread answers to its channel
         if (ch != null && ch.isThread && ch.parentId != null) {
-            val parent = Perms.compute(st.server.id, Perms.roles(st.roles.values), Perms.member(st.members[userId], userId), isOwner, channels.get(ch.parentId)?.overwrites)
+            val parent = Perms.compute(st.server.id, st.permissionRoles, Perms.member(st.members[userId], userId), isOwner, channels.get(ch.parentId)?.overwrites)
             // only this account's own membership is known here; others' private threads read as closed
             val inIt = userId == st.me.userId && joinedThread(channelId)
             return Perms.thread(parent, ch.type == "private_thread", inIt)
         }
-        return Perms.compute(st.server.id, Perms.roles(st.roles.values), Perms.member(st.members[userId], userId), isOwner, ch?.overwrites)
+        return Perms.compute(st.server.id, st.permissionRoles, Perms.member(st.members[userId], userId), isOwner, ch?.overwrites)
     }
 
     fun canI(st: ServerState?, need: Long, channelId: String? = null): Boolean {
@@ -249,7 +251,7 @@ class ServersStore(private val users: UsersStore, private val channels: Channels
     fun memberHighest(st: ServerState, userId: String): Pair<Int, Boolean> {
         val isOwner = st.server.ownerId == userId
         if (!isOwner && isInstanceAdmin(userId)) return (1 shl 30) - 1 to false
-        return Perms.highestPosition(Perms.roles(st.roles.values), Perms.member(st.members[userId], userId)) to isOwner
+        return Perms.highestPosition(st.permissionRoles, Perms.member(st.members[userId], userId)) to isOwner
     }
 
     /** Roles top first. */

@@ -1,5 +1,6 @@
 package fish.nexa.ui.shell
 
+import fish.nexa.ui.collectEntryAsState
 import fish.nexa.data.StaffRanks
 import fish.nexa.ui.profile.copyBotIdItem
 import fish.nexa.data.NexaInbox
@@ -685,8 +686,9 @@ private fun ConversationRow(ch: Channel, selected: Boolean, parentSelected: Bool
 @Composable
 fun OwnerMarks(userId: String) {
     val c = Nx.colors
-    Nexa.users.byId.collectAsState().value
-    val flags = if (Nexa.users.me.collectAsState().value?.id == userId) Nexa.users.me.value?.flags else Nexa.users.get(userId)?.flags
+    val user by Nexa.users.byId.collectEntryAsState(userId)
+    val me by Nexa.users.me.collectAsState()
+    val flags = if (me?.id == userId) me?.flags else user?.flags
     val rank = StaffRanks.of(userId, flags ?: 0L) ?: return
     Icon(rank.icon, c.textBrand, size = 14.dp, modifier = Modifier.semantics { contentDescription = rank.label })
 }

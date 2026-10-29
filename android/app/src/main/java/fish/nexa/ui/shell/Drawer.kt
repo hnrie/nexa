@@ -1,5 +1,6 @@
 package fish.nexa.ui.shell
 
+import fish.nexa.ui.collectEntryAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -521,17 +522,17 @@ fun ConversationAvatar(ch: Channel, size: Dp, status: String? = null, showTyping
  */
 @Composable
 fun settingOn(key: String, default: Boolean = true): Boolean {
-    val doc by Nexa.settings.doc.collectAsState()
-    return (doc[key] as? JsonPrimitive)?.booleanOrNull ?: default
+    val value by Nexa.settings.doc.collectEntryAsState(key)
+    return (value as? JsonPrimitive)?.booleanOrNull ?: default
 }
 
 /** Who is typing in one channel, apart from this account (stores/typing.ts useTypingIn). */
 @Composable
 fun typersIn(channelId: String): List<String> {
-    val all by Nexa.typing.byChannel.collectAsState()
+    val typers by Nexa.typing.byChannel.collectEntryAsState(channelId)
     val me = Nexa.users.meId
     val now = System.currentTimeMillis()
-    return all[channelId]?.filter { (u, exp) -> exp > now && u != me }?.keys?.toList() ?: emptyList()
+    return typers?.filter { (u, exp) -> exp > now && u != me }?.keys?.toList() ?: emptyList()
 }
 
 /** The server menu (serverMenu.ts serverMenuItems), from the rail or the sidebar header. */

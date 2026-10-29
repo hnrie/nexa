@@ -1,5 +1,6 @@
 package fish.nexa.ui.chat
 
+import fish.nexa.ui.collectEntryAsState
 import fish.nexa.ui.profile.copyBotIdItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -141,7 +142,8 @@ private fun PersonRow(row: MemberRow.Person, list: String, ownerLabel: String, o
     val pressed by interaction.collectIsPressedAsState()
     val picking = Pick.picking(list)
     val picked = Pick.isPicked(list, row.userId)
-    val status = Nexa.presence.byId.collectAsState().value[row.userId]?.status ?: "offline"
+    val presence by Nexa.presence.byId.collectEntryAsState(row.userId)
+    val status = presence?.status ?: "offline"
     Row(
         Modifier
             .padding(vertical = 1.dp)
@@ -217,18 +219,22 @@ fun MemberList(serverId: String, channelId: String?) {
     LaunchedEffect(serverId, st.membersComplete, attempt) {
         if (st.membersComplete) return@LaunchedEffect
         try {
-            var after: String? = null
-            for (i in 0 until 20) {
-                val q = "limit=1000" + (after?.let { "&after=$it" } ?: "")
-                val res = Nexa.api.get("/servers/$serverId/members?$q") as JsonObject
-                val members = wireJson.decodeFromJsonElement(ListSerializer(Member.serializer()), res["members"] ?: JsonArray(emptyList()))
-                val people = wireJson.decodeFromJsonElement(ListSerializer(PublicUser.serializer()), res["users"] ?: JsonArray(emptyList()))
-                Nexa.users.upsert(people)
-                Nexa.servers.addMembers(serverId, members, members.size < 1000)
-                if (members.size < 1000) break
-                after = members.last().userId
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                var after: String? = null
+                for (i in 0 until 20) {
+                    val q = "limit=1000" + (after?.let { "&after=$it" } ?: "")
+                    val res = Nexa.api.get("/servers/$serverId/members?$q") as JsonObject
+                    val members = wireJson.decodeFromJsonElement(ListSerializer(Member.serializer()), res["members"] ?: JsonArray(emptyList()))
+                    val people = wireJson.decodeFromJsonElement(ListSerializer(PublicUser.serializer()), res["users"] ?: JsonArray(emptyList()))
+                    Nexa.users.upsert(people)
+                    Nexa.servers.addMembers(serverId, members, members.size < 1000)
+                    if (members.size < 1000) break
+                    after = members.last().userId
+                }
             }
             failed = false
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (_: Exception) {
             // tried again a little later, rather than left short for good
             failed = true
@@ -241,20 +247,18 @@ fun MemberList(serverId: String, channelId: String?) {
     }
 
     val overwrites = channelId?.let { channels[it]?.overwrites }
-    val visible = remember(st, overwrites) {
-        val roles = Perms.roles(st.roles.values)
-        val now = System.currentTimeMillis()
-        st.members.values.filter { m ->
-            val owner = st.server.ownerId == m.userId || Nexa.servers.isInstanceAdmin(m.userId)
-            channelId == null || P.has(Perms.compute(serverId, roles, Perms.member(m, m.userId, now), owner, overwrites), P.VIEW_CHANNEL)
-        }
-    }
     val you = t("callScreen.you")
     val unknown = t("names.unknownUser")
-    fun nameOf(m: Member) = m.nickname.ifBlank { null } ?: users[m.userId]?.let { Names.display(it) } ?: if (m.userId == meId) you else unknown
-    val sorted = remember(visible, users) {
-        val order = nameOrder()
-        visible.map { it to nameOf(it) }.sortedWith { a, b -> order.compare(a.second, b.second) }
+    val locale = I18n.locale
+    val meFlags = Nexa.users.me.collectAsState().value?.flags ?: 0L
+    val sorted by androidx.compose.runtime.key(serverId, channelId) {
+        androidx.compose.runtime.produceState<List<Pair<Member, String>>>(
+            emptyList(), st, users, overwrites, meId, meFlags, you, unknown, locale,
+        ) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                fish.nexa.data.MemberRoster.sorted(st, users, overwrites, channelId != null, meId, meFlags, you, unknown, locale)
+            }
+        }
     }
     val rows = remember(st, sorted, presence) {
         val hoisted = Nexa.servers.rolesByPosition(st).filter { it.hoist && it.id != serverId }

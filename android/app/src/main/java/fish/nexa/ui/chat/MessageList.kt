@@ -1,5 +1,6 @@
 package fish.nexa.ui.chat
 
+import fish.nexa.ui.collectEntryAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -265,17 +266,16 @@ private fun buildRows(
 fun MessageList(channel: Channel, modifier: Modifier = Modifier) {
     val c = Nx.colors
     val channelId = channel.id
-    val all by Nexa.messages.channels.collectAsState()
-    val state = all[channelId] ?: ChannelMessages()
-    val reads by Nexa.readStates.byChannel.collectAsState()
+    val entry by Nexa.messages.channels.collectEntryAsState(channelId)
+    val state = entry ?: remember(channelId) { ChannelMessages() }
+    val mark = Nexa.readStates.byChannel.collectEntryAsState(channelId).value
     // blocking someone changes which rows fold away
     val rels by Nexa.relationships.byId.collectAsState()
     val doc by Nexa.settings.doc.collectAsState()
-    val serverStates by Nexa.servers.byId.collectAsState()
+    val server by Nexa.servers.byId.collectEntryAsState(channel.serverId)
     val visible by Nexa.ui.visible.collectAsState()
     val me by Nexa.users.me.collectAsState()
     val meId = me?.id ?: ""
-    val server = channel.serverId?.let { serverStates[it] }
     val compact = remember(doc) { Nexa.settings.compact }
     val selecting = ChatUi.selecting == channelId
     val ctx = remember(channel, server, compact, selecting, meId) { ListCtx(channel, server, compact, selecting, meId) }
@@ -284,16 +284,14 @@ fun MessageList(channel: Channel, modifier: Modifier = Modifier) {
     val density = LocalDensity.current.density
 
     // where the unread part began when this conversation was opened; moved only by Mark Unread
-    var newAfter by remember(channelId) { mutableStateOf(reads[channelId]?.lastReadId.takeIf { Nexa.readStates.isUnread(channelId) }) }
-    val mark = reads[channelId]
+    var newAfter by remember(channelId) { mutableStateOf(mark?.lastReadId.takeIf { Nexa.readStates.isUnread(channelId) }) }
     LaunchedEffect(mark?.lastReadId, mark?.manual) {
         val id = mark?.lastReadId
         if (mark?.manual == true && id != null && (newAfter == null || Ids.compare(id, newAfter!!) < 0)) newAfter = id
     }
 
     val blockedShown = remember(channelId) { mutableStateMapOf<String, Boolean>() }
-    val notices by Nexa.misc.groupAddNotices.collectAsState()
-    val notice = notices[channelId]
+    val notice by Nexa.misc.groupAddNotices.collectEntryAsState(channelId)
     val rows = remember(state, meId, newAfter, blockedShown.toMap(), doc, rels, notice) {
         buildRows(state, meId, newAfter, blockedShown.filterValues { it }.keys, Nexa.settings.hideBlockedMessages, Nexa.settings.hideBlockedReplies, notice)
     }

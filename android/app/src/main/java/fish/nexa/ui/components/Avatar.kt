@@ -1,6 +1,5 @@
 package fish.nexa.ui.components
 
-import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -105,7 +104,6 @@ fun Avatar(
     typing: Boolean? = null,
     face: (@Composable () -> Unit)? = null,
 ) {
-    @Suppress("UNUSED_VARIABLE") val mediaAnimationPreferences = fish.nexa.Nexa.settings.doc.collectAsState().value
     val c = Nx.colors
     val density = LocalDensity.current
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -191,7 +189,7 @@ fun Avatar(
             }
             // the ring round the dot (or the pill) cut out of the picture, and a plain dot,
             // in a layer of their own: both are cut with Clear
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .graphicsLayer { compositingStrategy = if (statusColor != null) CompositingStrategy.Offscreen else CompositingStrategy.Auto }
             .drawWithContent {
                 drawContent()
                 if (statusColor != null) {
@@ -231,7 +229,7 @@ fun Avatar(
                 contentAlignment = Alignment.Center,
             ) {
                 BasicText(
-                    AvatarColor.initials(name),
+                    remember(name) { AvatarColor.initials(name) },
                     style = TextStyle(
                         fontFamily = Nx.type.display,
                         fontWeight = FontWeight(660),

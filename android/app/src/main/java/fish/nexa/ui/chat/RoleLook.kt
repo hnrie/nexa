@@ -1,5 +1,6 @@
 package fish.nexa.ui.chat
 
+import fish.nexa.ui.collectEntryAsState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -36,6 +37,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import fish.nexa.data.NameStyle
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.serialization.json.JsonElement
 import androidx.compose.ui.unit.Dp
 import coil3.compose.AsyncImage
@@ -48,7 +51,6 @@ import fish.nexa.ui.components.Txt
 import fish.nexa.ui.theme.Nx
 import fish.nexa.ui.theme.mixOklab
 import fish.nexa.ui.theme.rgbColor
-import java.util.WeakHashMap
 
 /** A role's picture beside names: one of its own, an emoji, or one of the server's emoji (lib/roleLook.ts). */
 sealed interface RoleIconInfo {
@@ -96,14 +98,9 @@ object RoleLooks {
         return (look ?: RoleLook(color = null)).copy(own = own)
     }
 
-    private val looks = WeakHashMap<ServerState, HashMap<String, RoleLook?>>()
-
-    /** How a member's name looks in a server, worked out once per state of it. */
-    @Synchronized
+    /** Visit only this member's roles. Hashing a ServerState here visits the entire roster. */
     fun of(st: ServerState?, userId: String): RoleLook? {
         if (st == null) return null
-        val byUser = looks.getOrPut(st) { HashMap() }
-        if (byUser.containsKey(userId)) return byUser[userId]
         val m = st.members[userId]
         var colored: Role? = null
         var iconed: Role? = null
@@ -121,7 +118,6 @@ object RoleLooks {
                 icon = iconed?.let { iconOf(it) },
             )
         }
-        byUser[userId] = look
         return look
     }
 }
@@ -189,18 +185,24 @@ fun PersonName(
         RoleName(text, null, style, color, modifier, maxLines)
         return
     }
-    val users by Nexa.users.byId.collectAsState()
+    val user by Nexa.users.byId.collectEntryAsState(userId)
     val me by Nexa.users.me.collectAsState()
-    val servers by Nexa.servers.byId.collectAsState()
+    val roleFlow = remember(serverId, userId) {
+        Nexa.servers.byId.map { states ->
+            if (userId != null && serverId != null) RoleLooks.of(states[serverId], userId) else null
+        }.distinctUntilChanged()
+    }
+    val role by androidx.compose.runtime.key(serverId, userId) {
+        roleFlow.collectAsState(initial = if (userId != null && serverId != null) RoleLooks.of(Nexa.servers.get(serverId), userId) else null)
+    }
     val own = if (!showNameStyle) null else when {
         userId != null && userId == me?.id -> me?.nameStyle
-        users.containsKey(userId) -> users[userId]?.nameStyle
+        user != null -> user?.nameStyle
         else -> nameStyle
     }
     LaunchedEffect(userId) {
         if (userId != null && userId != me?.id) Nexa.session.ensureUsers(listOf(userId))
     }
-    val role = if (userId != null && serverId != null) RoleLooks.of(servers[serverId], userId) else null
     RoleName(text, RoleLooks.withOwn(role, own), style, color, modifier, maxLines)
 }
 

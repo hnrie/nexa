@@ -42,7 +42,6 @@ import coil3.compose.AsyncImage
 import fish.nexa.Nexa
 import fish.nexa.data.P
 import fish.nexa.data.Perms
-import fish.nexa.data.threadsOf
 import fish.nexa.net.Channel
 import fish.nexa.media.Media
 import fish.nexa.media.TwemojiImage
@@ -110,8 +109,13 @@ fun ServerSidebar(serverId: String, channelId: String?) {
     // belong to: ones it started, wrote in or was brought into. Looking at a
     // thread or a forum post is not joining it, so it does not stand here
     // while it is open; its channel is shown as the place it is in instead.
+    val threadsByParent = remember(channels, joinedThreads) {
+        channels.values.filter { it.isThread && it.thread?.archived != true && it.id in joinedThreads }
+            .sortedWith { a, b -> fish.nexa.data.Ids.compare(b.lastMessageId ?: b.id, a.lastMessageId ?: a.id) }
+            .groupBy { it.parentId }
+    }
     fun threadsUnder(ch: Channel): List<Channel> =
-        if (!ch.holdsThreads) emptyList() else threadsOf(channels.values, ch.id).filter { th -> th.thread?.archived != true && th.id in joinedThreads }
+        if (!ch.holdsThreads) emptyList() else threadsByParent[ch.id].orEmpty()
     val open = channelId?.let { channels[it] }
     fun inside(ch: Channel) = open != null && open.parentId == ch.id && open.id !in joinedThreads && (open.type == "thread" || open.type == "private_thread")
     val st = servers[serverId] ?: return

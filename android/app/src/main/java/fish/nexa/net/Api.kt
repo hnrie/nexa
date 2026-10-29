@@ -132,7 +132,11 @@ class Api(val baseUrl: String) {
     ): T {
         val el = request(method, path, body, captcha, auth = auth)
         try {
-            return wireJson.decodeFromJsonElement(strategy, el)
+            return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                wireJson.decodeFromJsonElement(strategy, el)
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw ApiError(200, "bad_response", "The server's answer could not be read.")
         }

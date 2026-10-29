@@ -1674,6 +1674,21 @@ notes. CMake also fetches pinned Xiph RNNoise source and weights matching rnnois
   `get(...)` are plain reads, and a row that reads them can keep an old answer when its own
   arguments did not change. Read what a composable shows through `collectAsState()` (or
   `ui.shell.settingOn(key)` for a yes or no setting), in the composable that shows it.
+- Hot rows use `ui/StoreState.kt`'s `collectEntryAsState` for one user, presence, setting,
+  typing channel, read marker or message channel. Its distinct entry flow avoids redrawing every
+  visible row for unrelated gateway updates; changing the entry key starts with that entry's own
+  snapshot. Identity labels observe their resolved role look rather than every server snapshot.
+  `RoleLooks.of` visits only the member's assigned roles, with no cache keyed by `ServerState`,
+  whose structural hash walks the entire member roster. `ServerState.permissionRoles` parses
+  permission strings once per immutable server snapshot. Channel trees and sidebar threads group
+  children once instead of scanning all channels per parent. Avatars observe only their animation
+  switch, remember their grapheme initial and use an offscreen compositing surface only when a
+  presence dot needs its transparent cutout.
+- Typed REST response decoding (`net/Api`) and member-page decoding run off the UI thread and
+  preserve coroutine cancellation. `data/MemberRoster` filters channel permissions and sorts names
+  on a worker before `MemberList` draws them. Regression tests cover large-roster name lookups,
+  permission snapshot changes, member visibility and sorting, distinct store entries, response
+  decoding and channel-tree ordering.
 - The build's `copyWebAssets` task copies the web's locale files, sounds, emoji sprites,
   `whatsNew.ts`, the seasonal themes' pictures and the legal documents into the app; `assets/lucide.json`, `assets/emoji/` and
   `assets/licenses.json` come from `android/tools`.

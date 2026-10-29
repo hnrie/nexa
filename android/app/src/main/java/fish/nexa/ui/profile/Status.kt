@@ -1,5 +1,6 @@
 package fish.nexa.ui.profile
 
+import fish.nexa.ui.collectEntryAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
@@ -180,8 +181,7 @@ fun StatusEmojiImage(emoji: String, size: Dp, modifier: Modifier = Modifier) {
  */
 @Composable
 fun StatusLine(userId: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
-    val all by Nexa.presence.byId.collectAsState()
-    val p = all[userId]
+    val p by Nexa.presence.byId.collectEntryAsState(userId)
     val custom = Presences.customStatus(p)
     val acts = Presences.activitiesOf(p)
     val act = acts.firstOrNull()
