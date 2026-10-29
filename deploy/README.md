@@ -1,9 +1,18 @@
 # Deploying Nexa
 
 ```
-make build                     # web app + Go binary (prebuilt Node at /usr/local/lib/nodejs)
+make build                     # pull, deploy server, then build clients
 sudo bash deploy/install.sh    # the service (systemd on Linux, a LaunchDaemon on macOS) + tunnel ingress
 ```
+
+`make build` first runs `git pull --ff-only`, then compiles and installs the Go
+server. If `xyz.evilion.chat.service` exists in systemd, it restarts the service
+(using sudo when needed) and checks that it is active before building the web
+client, Android, and desktop in that order. Without that service, the restart
+step is skipped. Android and desktop keep their existing change/version checks.
+A failed pull, compile, or restart stops the build before clients are published.
+`make build TEST=1` also runs the Go and web test suites before deploying.
+`make server` still builds just the server without pulling or restarting.
 
 `install.sh` is idempotent. It creates `chatd.env` (from the example), `data/`
 and `logs/`, renders `deploy/xyz.evilion.chat.service.in` into
@@ -31,7 +40,7 @@ On Linux (systemd):
 journalctl -u xyz.evilion.chat -f                       # the log
 sudo systemctl restart xyz.evilion.chat                 # restart
 sudo systemctl stop xyz.evilion.chat                    # stop (start brings it back)
-make build && sudo systemctl restart xyz.evilion.chat   # update
+make build                                             # pull and update server, then clients
 bash backup.sh                                          # all of data/, keeping only the newest backup
 ```
 

@@ -3,18 +3,41 @@ NODE_BIN ?= /usr/local/lib/nodejs/current/bin
 VERSION ?= $(shell git describe --always --dirty 2>/dev/null || echo dev)
 export PATH := $(NODE_BIN):$(PATH)
 
-.PHONY: build web server android desktop-release test test-go test-web test-desktop desktop publish-desktop publish-android licenses run clean clean-deploy
+.PHONY: build build-current restart-service web server android desktop-release test test-go test-web test-desktop desktop publish-desktop publish-android licenses run clean clean-deploy
+
+# Re-read the Makefile after pulling so this build uses the fetched instructions.
+# Separate recursive makes enforce deployment order even with make -j.
+build:
+	git pull --ff-only
+	$(MAKE) build-current
 
 # A build runs the typechecker (inside the web build) but not the test
-# suites unless asked with `make build TEST=1`. The suites are timing
-# sensitive under load and slow machines trip them; `make test` is still the
-# way to run the whole thing on purpose.
+# suites unless asked with `make build TEST=1`. Run those before deploying.
+build-current:
 ifeq ($(TEST),1)
-BUILD_DEPS := test-web test-go web server android desktop-release
-else
-BUILD_DEPS := web server android desktop-release
+	$(MAKE) test-go test-web
 endif
-build: $(BUILD_DEPS)
+	$(MAKE) server
+	$(MAKE) restart-service
+	$(MAKE) web
+	$(MAKE) android
+	$(MAKE) desktop-release
+
+# Only systemd installations restart automatically. Missing services and hosts
+# without systemd skip this step; a failed restart stops the client builds.
+restart-service:
+	@if command -v systemctl >/dev/null 2>&1; then \
+		state=$$(systemctl show xyz.evilion.chat.service -p LoadState --value 2>/dev/null) || state=; \
+	else state=; fi; \
+	if [ -z "$$state" ] || [ "$$state" = not-found ]; then \
+		echo "  systemd service xyz.evilion.chat not found; skipping restart"; \
+	else \
+		if [ "$$(id -u)" = 0 ]; then \
+			systemctl restart xyz.evilion.chat.service; \
+		else \
+			sudo systemctl restart xyz.evilion.chat.service; \
+		fi && systemctl is-active --quiet xyz.evilion.chat.service; \
+	fi
 
 # The Android app, published into downloads/android, which chatd serves: the
 # app's updater offers it to every phone at once. Built only when something the
