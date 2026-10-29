@@ -1,0 +1,25 @@
+/** Dev-only call layout regression fixture, using the real shared web/desktop view. */
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
+import "@/styles/base.css";
+import { VoiceView } from "@/components/voice/VoiceView";
+import { useVoice } from "@/stores/voice";
+import { useAuth } from "@/stores/auth";
+import { useUsers } from "@/stores/users";
+import { useSettings } from "@/stores/settings";
+import type { Channel, MeUser, User, VoiceState } from "@/api/types";
+const channel = { id: "call", type: "dm", recipient_ids: ["alice", "bob"], server_id: null } as Channel;
+const people = ["alice", "bob"].map((id) => ({ id, username: id, display_name: id, avatar_id: null }) as User);
+useAuth.setState({ me: people[0] as MeUser });
+useUsers.setState({ byId: Object.fromEntries(people.map((p) => [p.id, p])) });
+useSettings.setState({ loaded: true });
+const states = people.map((p) => ({ channel_id: channel.id, user_id: p.id, call_since: Date.now() }) as VoiceState);
+const screen = document.createElement("canvas");
+screen.width = 1280; screen.height = 720;
+const ctx = screen.getContext("2d")!;
+ctx.fillStyle = "#49345e"; ctx.fillRect(0, 0, 1280, 720);
+ctx.fillStyle = "#eee"; ctx.font = "48px sans-serif"; ctx.fillText("Shared Screen", 60, 100);
+useVoice.setState({ mine: states[0], byChannel: { call: Object.fromEntries(states.map((p) => [p.user_id, p])) }, localScreen: screen.captureStream(), connection: "connected", peers: { bob: "connected" } });
+const embedded = new URLSearchParams(location.search).has("embedded");
+createRoot(document.getElementById("root")!).render(<MemoryRouter><div style={{ height: "100%", display: "flex", flexDirection: "column" }}><header style={{ height: 56, flex: "none", padding: 16 }}>Call Layout</header><div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}><VoiceView channel={channel} embedded={embedded} />{embedded && <div style={{ flex: 1, minHeight: 0 }}>Conversation</div>}</div></div></MemoryRouter>);

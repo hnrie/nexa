@@ -816,6 +816,13 @@ addresses, and refuses local-use translation, Teredo and IPv4-compatible ranges.
 
 ### Calls
 
+The web and desktop call view measures tile containers with fractional ResizeObserver content boxes
+and rounds down before fitting tiles. Rounded-up client dimensions can wrap a tile onto an extra
+row and clip the centred grid at fractional panel widths or browser zoom.
+`tools/call_layout_audit.py` checks the real view through the dev-only `web/tests/call-layout.html`
+fixture in Chromium and WebKit at desktop and phone sizes, including embedded calls and a
+negative control for the original clipping.
+
 Enhanced noise suppression uses Xiph RNNoise commit
 `70f1d256acd4b34a572f999a05c87bf00b67730d` on web and Android, with the same newer model.
 The web loads `@shiguredo/rnnoise-wasm` 2025.1.5 in `voice/denoise.worklet.ts`; native CMake fetches
@@ -1809,7 +1816,7 @@ notes. CMake also fetches pinned Xiph RNNoise source and weights matching rnnois
 ## Tools (`tools/`)
 
 - Testing: `check.sh`, `e2e.py`, `screenshot.py`, `text_layout_audit.py`, `seed.py`, `webhook_e2e.py`, `bot_e2e.py` with
-  `bots/`, `apps_ui.py`, `discord_e2e.py`,
+  `bots/`, `apps_ui.py`, `discord_e2e.py`, `call_layout_audit.py`,
   `sfu_call.py`, `sfu_guest.py`, `call_quality.py` and `share_quality.py` with `netsim/`, `ios_sim.py`
   with `ios/`, `app_size.py`, `desktop_idle.py` with `desktop_idle/`.
 - Fonts: `android/tools/name_fonts.py` (the name style fonts for Android, from the web's Fontsource files).

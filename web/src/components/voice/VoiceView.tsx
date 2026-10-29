@@ -171,10 +171,20 @@ function useBoxSize(ref: React.RefObject<HTMLElement | null>, active: boolean): 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el || !active) return;
-    const measure = () => setSize((cur) => (cur.w === el.clientWidth && cur.h === el.clientHeight ? cur : { w: el.clientWidth, h: el.clientHeight }));
-    measure();
+    // clientWidth/clientHeight round to the nearest pixel. At a fractional
+    // width that can give fitGrid more space than flexbox actually has, wrap
+    // a tile onto an extra row and clip both ends of the centred grid.
+    const measure = (width: number, height: number) => {
+      const w = Math.max(0, Math.floor(width));
+      const h = Math.max(0, Math.floor(height));
+      setSize((cur) => (cur.w === w && cur.h === h ? cur : { w, h }));
+    };
+    const box = el.getBoundingClientRect();
+    measure(Math.min(el.clientWidth, box.width), Math.min(el.clientHeight, box.height));
     if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(measure);
+    const ro = new ResizeObserver(([entry]) => {
+      if (entry) measure(entry.contentRect.width, entry.contentRect.height);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, [ref, active]);
