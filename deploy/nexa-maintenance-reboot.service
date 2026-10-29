@@ -1,0 +1,10 @@
+[Unit]
+Description=Scheduled host reboot, waiting for package updates
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/nexa/safe-maintenance-reboot.sh
+# If updates prevented the reboot, the timer tries again after 48 hours.
+# On a successful reboot the boot publisher replaces this with the new deadline.
+ExecStartPost=/usr/local/lib/nexa/maintenance-schedule.py next /var/lib/nexa-maintenance/schedule.json
+TimeoutStartSec=65min

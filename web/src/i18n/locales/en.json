@@ -7199,6 +7199,10 @@
   "chat.leaveSilently": "Leave without showing a leave message",
   "chat.systemMessage.changedName": "{actor} changed the group name.",
   "chat.systemMessage.changedIcon": "{actor} changed the group icon.",
+  "maintenance.countdown": "Server restarts in {time}",
+  "maintenance.downtime": "Expect 3-4 minutes of downtime.",
+  "maintenance.pending": "Server restart pending",
+  "maintenance.title": "Scheduled Maintenance",
   "whatsNew.r20261028.groupActivityTitle": "Group Chat Activity",
   "whatsNew.r20261028.groupActivityBody": "Group chats show name and icon changes. When leaving one group or several selected groups, you can choose to hide your leave message.",
   "whatsNew.r202610282.saveTitle": "Choose Where to Save",
@@ -7337,5 +7341,7 @@
   "reports.returnToReport": "Back to Report",
   "reports.reportTab": "Report",
   "reports.saved": "Review Saved",
-  "reports.historyTab": "History"
+  "reports.historyTab": "History",
+  "whatsNew.r20261029.maintenanceBody": "A countdown appears 2 hours 30 minutes before a scheduled server restart, so you can plan around a short interruption.",
+  "whatsNew.r20261029.maintenanceTitle": "Maintenance Notices"
 }

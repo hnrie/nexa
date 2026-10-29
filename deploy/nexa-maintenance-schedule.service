@@ -1,0 +1,8 @@
+[Unit]
+Description=Publish Nexa's optional host reboot deadline
+Before=nexa-maintenance-reboot.timer
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/lib/nexa/maintenance-schedule.py boot /var/lib/nexa-maintenance/schedule.json

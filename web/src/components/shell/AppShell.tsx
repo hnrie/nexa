@@ -9,6 +9,7 @@ import { TermsGate } from "@/components/legal/TermsGate";
 import { WhatsNew } from "@/components/shell/WhatsNewDialog";
 import { lazyPage } from "@/lib/lazyChunk";
 import { DownloadBanner } from "@/components/shell/DownloadBanner";
+import { MaintenanceBanner } from "./MaintenanceBanner";
 import { RpcBanner } from "@/components/shell/RpcBanner";
 import { isTypingField } from "@/lib/keyboardInset";
 import { rowSwipeActive } from "@/lib/swipeReply";
@@ -291,6 +292,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         ) : connection !== "open" && connection !== "idle" ? (
           <div className={s.connection} data-state={connection} role="status">{connectionNote ?? (connection === "connecting" ? t("shell.requireAuth.connecting") : t("shell.appShell.disconnectedReconnecting"))}</div>
         ) : null}
+        {!isDemo && <MaintenanceBanner />}
         {!isDemo && <UpdatePrompt />}
         <RpcBanner />
         <DiscordBanner />

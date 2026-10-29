@@ -7313,6 +7313,10 @@
   "chat.leaveSilently": "Sair sem mostrar uma mensagem de saída",
   "chat.systemMessage.changedName": "{actor} alterou o nome do grupo.",
   "chat.systemMessage.changedIcon": "{actor} alterou o ícone do grupo.",
+  "maintenance.countdown": "O servidor reinicia em {time}",
+  "maintenance.downtime": "Espere 3-4 minutos de indisponibilidade.",
+  "maintenance.pending": "Reinicialização do servidor pendente",
+  "maintenance.title": "Manutenção Programada",
   "whatsNew.r20261028.groupActivityTitle": "Atividade dos grupos",
   "whatsNew.r20261028.groupActivityBody": "Os grupos mostram alterações de nome e ícone. Ao sair de um ou vários grupos selecionados, você pode ocultar sua mensagem de saída.",
   "whatsNew.r202610282.saveTitle": "Escolha Onde Salvar",
@@ -7451,5 +7455,7 @@
   "reports.returnToReport": "Voltar à denúncia",
   "reports.reportTab": "Denúncia",
   "reports.saved": "Análise salva",
-  "reports.historyTab": "Histórico"
+  "reports.historyTab": "Histórico",
+  "whatsNew.r20261029.maintenanceBody": "Uma contagem regressiva aparece 2 horas e 30 minutos antes de uma reinicialização programada do servidor para você se preparar para uma breve interrupção.",
+  "whatsNew.r20261029.maintenanceTitle": "Avisos de Manutenção"
 }

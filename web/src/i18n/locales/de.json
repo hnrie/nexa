@@ -7199,6 +7199,10 @@
   "chat.leaveSilently": "Ohne Austrittsnachricht verlassen",
   "chat.systemMessage.changedName": "{actor} hat den Gruppennamen geändert.",
   "chat.systemMessage.changedIcon": "{actor} hat das Gruppenbild geändert.",
+  "maintenance.countdown": "Serverneustart in {time}",
+  "maintenance.downtime": "Rechne mit 3-4 Minuten Ausfallzeit.",
+  "maintenance.pending": "Serverneustart steht aus",
+  "maintenance.title": "Geplante Wartung",
   "whatsNew.r20261028.groupActivityTitle": "Aktivität in Gruppenchats",
   "whatsNew.r20261028.groupActivityBody": "Gruppenchats zeigen Änderungen am Namen und Bild an. Wenn du eine oder mehrere ausgewählte Gruppen verlässt, kannst du deine Austrittsnachricht ausblenden.",
   "whatsNew.r202610282.saveTitle": "Speicherort wählen",
@@ -7337,5 +7341,7 @@
   "reports.returnToReport": "Zurück zur Meldung",
   "reports.reportTab": "Meldung",
   "reports.saved": "Prüfung gespeichert",
-  "reports.historyTab": "Verlauf"
+  "reports.historyTab": "Verlauf",
+  "whatsNew.r20261029.maintenanceBody": "Ein Countdown erscheint 2 Stunden und 30 Minuten vor einem geplanten Serverneustart, damit du die kurze Unterbrechung einplanen kannst.",
+  "whatsNew.r20261029.maintenanceTitle": "Wartungshinweise"
 }

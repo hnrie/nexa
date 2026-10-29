@@ -8057,6 +8057,10 @@
   "chat.leaveSilently": "المغادرة دون إظهار رسالة مغادرة",
   "chat.systemMessage.changedName": "غيّر {actor} اسم المجموعة.",
   "chat.systemMessage.changedIcon": "غيّر {actor} أيقونة المجموعة.",
+  "maintenance.countdown": "إعادة تشغيل الخادم خلال {time}",
+  "maintenance.downtime": "توقّع انقطاع الخدمة لمدة 3-4 دقائق.",
+  "maintenance.pending": "إعادة تشغيل الخادم قيد الانتظار",
+  "maintenance.title": "صيانة مجدولة",
   "whatsNew.r20261028.groupActivityTitle": "نشاط الدردشة الجماعية",
   "whatsNew.r20261028.groupActivityBody": "تعرض الدردشات الجماعية تغييرات الاسم والأيقونة. عند مغادرة مجموعة واحدة أو عدة مجموعات محددة، يمكنك إخفاء رسالة المغادرة.",
   "whatsNew.r202610282.saveTitle": "اختر مكان الحفظ",
@@ -8195,5 +8199,7 @@
   "reports.returnToReport": "العودة إلى البلاغ",
   "reports.reportTab": "البلاغ",
   "reports.saved": "تم حفظ المراجعة",
-  "reports.historyTab": "السجل"
+  "reports.historyTab": "السجل",
+  "whatsNew.r20261029.maintenanceBody": "يظهر عد تنازلي قبل إعادة تشغيل الخادم المجدولة بساعتين و30 دقيقة، لتتمكن من الاستعداد لانقطاع قصير.",
+  "whatsNew.r20261029.maintenanceTitle": "إشعارات الصيانة"
 }

@@ -17,7 +17,9 @@ import (
 
 // Config is the complete runtime configuration of chatd.
 type Config struct {
-	Listen string
+	// MaintenanceFile is an optional host-written reboot deadline, never a reboot command.
+	MaintenanceFile string
+	Listen          string
 	// PublicURL is Nexa's own address: what its links, previews and the
 	// desktop app's updates name.
 	PublicURL string
@@ -164,6 +166,7 @@ func Load(getenv func(string) string) (Config, error) {
 			*dst = v
 		}
 	}
+	str("MAINTENANCE_FILE", &c.MaintenanceFile)
 	str("LISTEN", &c.Listen)
 	str("PUBLIC_URL", &c.PublicURL)
 	str("DATA_DIR", &c.DataDir)

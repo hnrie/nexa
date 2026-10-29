@@ -7312,6 +7312,10 @@
   "chat.leaveSilently": "Quitter sans afficher de message de départ",
   "chat.systemMessage.changedName": "{actor} a changé le nom du groupe.",
   "chat.systemMessage.changedIcon": "{actor} a changé l’icône du groupe.",
+  "maintenance.countdown": "Redémarrage du serveur dans {time}",
+  "maintenance.downtime": "Prévoyez 3-4 minutes d’indisponibilité.",
+  "maintenance.pending": "Redémarrage du serveur en attente",
+  "maintenance.title": "Maintenance Programmée",
   "whatsNew.r20261028.groupActivityTitle": "Activité des groupes",
   "whatsNew.r20261028.groupActivityBody": "Les groupes affichent les changements de nom et d’icône. Quand vous quittez un ou plusieurs groupes sélectionnés, vous pouvez masquer votre message de départ.",
   "whatsNew.r202610282.saveTitle": "Choisir où enregistrer",
@@ -7450,5 +7454,7 @@
   "reports.returnToReport": "Retour au signalement",
   "reports.reportTab": "Signalement",
   "reports.saved": "Examen enregistré",
-  "reports.historyTab": "Historique"
+  "reports.historyTab": "Historique",
+  "whatsNew.r20261029.maintenanceBody": "Un compte à rebours apparaît 2 heures et 30 minutes avant un redémarrage programmé du serveur pour vous permettre de prévoir une courte interruption.",
+  "whatsNew.r20261029.maintenanceTitle": "Avis de Maintenance"
 }

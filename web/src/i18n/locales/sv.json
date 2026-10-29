@@ -7199,6 +7199,10 @@
   "chat.leaveSilently": "Lämna utan att visa ett meddelande",
   "chat.systemMessage.changedName": "{actor} ändrade gruppens namn.",
   "chat.systemMessage.changedIcon": "{actor} ändrade gruppens ikon.",
+  "maintenance.countdown": "Servern startas om om {time}",
+  "maintenance.downtime": "Räkna med 3-4 minuters avbrott.",
+  "maintenance.pending": "Serverns omstart väntar",
+  "maintenance.title": "Planerat Underhåll",
   "whatsNew.r20261028.groupActivityTitle": "Aktivitet i gruppchattar",
   "whatsNew.r20261028.groupActivityBody": "Gruppchattar visar ändringar av namn och ikon. När du lämnar en grupp eller flera valda grupper kan du dölja ditt meddelande om att du lämnar.",
   "whatsNew.r202610282.saveTitle": "Välj var du vill spara",
@@ -7337,5 +7341,7 @@
   "reports.returnToReport": "Tillbaka till rapporten",
   "reports.reportTab": "Rapport",
   "reports.saved": "Granskning sparad",
-  "reports.historyTab": "Historik"
+  "reports.historyTab": "Historik",
+  "whatsNew.r20261029.maintenanceBody": "En nedräkning visas 2 timmar och 30 minuter före en planerad omstart av servern så att du kan planera för ett kort avbrott.",
+  "whatsNew.r20261029.maintenanceTitle": "Underhållsmeddelanden"
 }

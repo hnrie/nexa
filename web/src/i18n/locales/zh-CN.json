@@ -6962,6 +6962,10 @@
   "chat.leaveSilently": "退出时不显示退出消息",
   "chat.systemMessage.changedName": "{actor}更改了群组名称。",
   "chat.systemMessage.changedIcon": "{actor}更改了群组图标。",
+  "maintenance.countdown": "服务器将在 {time} 后重启",
+  "maintenance.downtime": "预计停机 3-4 分钟。",
+  "maintenance.pending": "等待服务器重启",
+  "maintenance.title": "计划维护",
   "whatsNew.r20261028.groupActivityTitle": "群组聊天动态",
   "whatsNew.r20261028.groupActivityBody": "群组聊天会显示名称和图标的更改。退出一个群组或多个选中的群组时，你可以选择隐藏退出消息。",
   "whatsNew.r202610282.saveTitle": "选择保存位置",
@@ -7100,5 +7104,7 @@
   "reports.returnToReport": "返回举报",
   "reports.reportTab": "举报",
   "reports.saved": "审核已保存",
-  "reports.historyTab": "历史"
+  "reports.historyTab": "历史",
+  "whatsNew.r20261029.maintenanceBody": "计划重启服务器前 2 小时 30 分钟会显示倒计时，方便你提前安排，避免短暂中断带来的影响。",
+  "whatsNew.r20261029.maintenanceTitle": "维护通知"
 }

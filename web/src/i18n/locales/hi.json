@@ -7199,6 +7199,10 @@
   "chat.leaveSilently": "ग्रुप छोड़ने का संदेश दिखाए बिना छोड़ें",
   "chat.systemMessage.changedName": "{actor} ने ग्रुप का नाम बदला।",
   "chat.systemMessage.changedIcon": "{actor} ने ग्रुप का आइकन बदला।",
+  "maintenance.countdown": "सर्वर {time} में फिर शुरू होगा",
+  "maintenance.downtime": "सेवा 3-4 मिनट तक अनुपलब्ध रहने की अपेक्षा करें।",
+  "maintenance.pending": "सर्वर का पुनरारंभ लंबित है",
+  "maintenance.title": "निर्धारित रखरखाव",
   "whatsNew.r20261028.groupActivityTitle": "ग्रुप चैट की गतिविधि",
   "whatsNew.r20261028.groupActivityBody": "ग्रुप चैट में नाम और आइकन के बदलाव दिखते हैं। एक ग्रुप या कई चुने हुए ग्रुप छोड़ते समय, आप अपना छोड़ने का संदेश छिपा सकते हैं।",
   "whatsNew.r202610282.saveTitle": "सहेजने की जगह चुनें",
@@ -7337,5 +7341,7 @@
   "reports.returnToReport": "रिपोर्ट पर वापस जाएँ",
   "reports.reportTab": "रिपोर्ट",
   "reports.saved": "समीक्षा सहेजी गई",
-  "reports.historyTab": "इतिहास"
+  "reports.historyTab": "इतिहास",
+  "whatsNew.r20261029.maintenanceBody": "निर्धारित सर्वर पुनरारंभ से 2 घंटे 30 मिनट पहले उलटी गिनती दिखाई देती है, ताकि आप थोड़ी देर के व्यवधान के लिए तैयारी कर सकें।",
+  "whatsNew.r20261029.maintenanceTitle": "रखरखाव सूचनाएँ"
 }

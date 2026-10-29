@@ -1096,6 +1096,29 @@ pages from Back history when returning to the report. Settings has Report Conten
 as a fallback for any content without its own menu. Reporting preserves the existing
 account, server and expression moderation flows rather than adding new staff privileges.
 
+### Optional host maintenance
+
+`MAINTENANCE_FILE` is empty by default. Only the nexa.fish deployment opts into the
+host-written `/var/lib/nexa-maintenance/schedule.json` deadline (`reboot_at`, Unix
+milliseconds). `api/maintenance.go` registers public `GET /api/v1/maintenance`, with
+server time, a 150-minute notice window and no-store caching. Missing or invalid
+files disable the notice. The app never executes reboot commands.
+
+`deploy/nexa-maintenance-*` and `maintenance-schedule.py` schedule the whole host
+48 hours after boot, starting a new interval after a manual reboot.
+`safe-maintenance-reboot.sh` waits up to an hour for package updates, then skips
+if still busy and schedules the next attempt 48 hours later. These are optional
+operator-installed units, replacing rather than accompanying any daily reboot timer.
+See `deploy/README.md` for installation and disabling. `tools/test_maintenance.py`
+checks the deadline arithmetic and dry-run update guards without reboot privileges.
+
+Web `shell/MaintenanceBanner.tsx` and Android `ui/shell/MaintenanceBanner.kt` poll
+the deadline every 30 seconds in the signed-in shell, show a non-dismissible
+countdown from 2 hours 30 minutes before it, and say to expect 3-4 minutes of
+downtime. They retain the notice through connection loss and show restart pending
+at zero until a refreshed schedule replaces or clears it. Local elapsed clocks
+keep countdowns independent of a mis-set device clock. The homepage demo skips it.
+
 ### Configuration
 
 Every setting is documented in `chatd.env.example`; `internal/config` loads them. Groups:
@@ -1109,7 +1132,7 @@ addresses (`LISTEN`, `PUBLIC_URL`, `ALT_URLS`, `MOVED_FROM`), storage (`DATA_DIR
 `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `TELEGRAM_BOT_TOKEN`, `DISCORD_CLIENT_ID`,
 `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`, `DISCORD_ACTIVITY_GUILD_ID`, `DISCORD_REDIRECT_URL`
 left empty, `DISCORD_API_URL` for the fake), payments (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_API_URL` for a fake), logging
-(`LOG_LEVEL`, `LOG_FILE`). A new setting goes
+(`LOG_LEVEL`, `LOG_FILE`), optional host maintenance (`MAINTENANCE_FILE`). A new setting goes
 in `config.go`, `chatd.env.example` and this list.
 
 ### Go tests

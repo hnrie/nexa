@@ -202,3 +202,38 @@ sent through one would never reach the people connected to the other.
 `REDIS_URL` only moves the rate limits into Redis, where they survive a
 restart; chatd warns at startup when `NODE_ID` is set, which is only ever
 needed by a second process.
+
+## Optional host maintenance notices
+
+Instances have no reboot schedule or banner by default. `MAINTENANCE_FILE` opts a
+chatd process into reading a host-written JSON file with `reboot_at` in Unix
+milliseconds. `GET /api/v1/maintenance` returns that deadline, server time and the
+150-minute warning window with `Cache-Control: no-store`. Missing or invalid files
+return no deadline. Web, desktop and Android show a non-dismissible countdown in
+the signed-in shell during that window, followed by a restart-pending notice if
+the host is delayed. A network failure keeps the last known notice; a successful
+response with no deadline clears it. Other instances are unaffected.
+
+The optional `nexa-maintenance-*` systemd templates reboot the **whole host**, not
+just chatd, 48 hours after boot. Manual reboots start a new 48-hour interval.
+They wait up to an hour for apt/dpkg activity to finish; if still busy, skip that
+reboot and try again 48 hours later. Do not enable these alongside another reboot
+timer. Installation requires root and intentionally does not start the reboot
+service directly:
+
+```sh
+sudo install -d /usr/local/lib/nexa
+sudo install -m 755 deploy/maintenance-schedule.py deploy/safe-maintenance-reboot.sh /usr/local/lib/nexa/
+sudo install -m 644 deploy/nexa-maintenance-schedule.service deploy/nexa-maintenance-reboot.service deploy/nexa-maintenance-reboot.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now nexa-maintenance-reboot.timer
+```
+
+Set `MAINTENANCE_FILE=/var/lib/nexa-maintenance/schedule.json` only in the intended
+instance's private `chatd.env` before deploying it. The file is public schedule
+metadata; chatd needs read access only. The boot publisher and the timer share the
+same monotonic boot clock. After a skipped reboot the service publishes the next
+48-hour deadline. To disable, stop and disable the timer and clear
+`MAINTENANCE_FILE`; remove the schedule file to clear notices immediately.
+`DRY_RUN=1 deploy/safe-maintenance-reboot.sh` exercises update checks without
+rebooting. No SSH credentials belong in these files.

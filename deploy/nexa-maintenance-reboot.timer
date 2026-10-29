@@ -1,0 +1,13 @@
+[Unit]
+Description=Reboot the host every 48 hours
+Requires=nexa-maintenance-schedule.service
+After=nexa-maintenance-schedule.service
+
+[Timer]
+OnBootSec=48h
+OnUnitInactiveSec=48h
+AccuracySec=1s
+Unit=nexa-maintenance-reboot.service
+
+[Install]
+WantedBy=timers.target

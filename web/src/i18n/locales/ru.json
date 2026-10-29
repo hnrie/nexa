@@ -7646,6 +7646,10 @@
   "chat.leaveSilently": "Выйти без сообщения о выходе",
   "chat.systemMessage.changedName": "{actor} изменил(а) название группы.",
   "chat.systemMessage.changedIcon": "{actor} изменил(а) значок группы.",
+  "maintenance.countdown": "Перезапуск сервера через {time}",
+  "maintenance.downtime": "Ожидайте 3-4 минуты недоступности.",
+  "maintenance.pending": "Ожидается перезапуск сервера",
+  "maintenance.title": "Плановое Обслуживание",
   "whatsNew.r20261028.groupActivityTitle": "События в групповых чатах",
   "whatsNew.r20261028.groupActivityBody": "В групповых чатах отображаются изменения названия и значка. При выходе из одной или нескольких выбранных групп можно скрыть сообщение о выходе.",
   "whatsNew.r202610282.saveTitle": "Выбор места сохранения",
@@ -7784,5 +7788,7 @@
   "reports.returnToReport": "Назад к жалобе",
   "reports.reportTab": "Жалоба",
   "reports.saved": "Проверка сохранена",
-  "reports.historyTab": "История"
+  "reports.historyTab": "История",
+  "whatsNew.r20261029.maintenanceBody": "Обратный отсчёт появляется за 2 часа 30 минут до планового перезапуска сервера, чтобы вы могли учесть короткий перерыв.",
+  "whatsNew.r20261029.maintenanceTitle": "Уведомления об Обслуживании"
 }

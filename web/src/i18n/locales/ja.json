@@ -6962,6 +6962,10 @@
   "chat.leaveSilently": "退出メッセージを表示せずに抜ける",
   "chat.systemMessage.changedName": "{actor}がグループ名を変更しました。",
   "chat.systemMessage.changedIcon": "{actor}がグループアイコンを変更しました。",
+  "maintenance.countdown": "サーバー再起動まで {time}",
+  "maintenance.downtime": "3-4分間のサービス停止を予定しています。",
+  "maintenance.pending": "サーバーの再起動を待機中",
+  "maintenance.title": "定期メンテナンス",
   "whatsNew.r20261028.groupActivityTitle": "グループチャットのアクティビティ",
   "whatsNew.r20261028.groupActivityBody": "グループ名とアイコンの変更がチャットに表示されます。1つのグループや選択した複数のグループを抜けるとき、退出メッセージを非表示にできます。",
   "whatsNew.r202610282.saveTitle": "保存先を選択",
@@ -7100,5 +7104,7 @@
   "reports.returnToReport": "報告に戻る",
   "reports.reportTab": "報告",
   "reports.saved": "審査を保存しました",
-  "reports.historyTab": "履歴"
+  "reports.historyTab": "履歴",
+  "whatsNew.r20261029.maintenanceBody": "サーバーの再起動予定時刻の2時間30分前からカウントダウンが表示され、短い中断に備えられます。",
+  "whatsNew.r20261029.maintenanceTitle": "メンテナンスのお知らせ"
 }

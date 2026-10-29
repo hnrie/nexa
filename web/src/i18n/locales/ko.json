@@ -6962,6 +6962,10 @@
   "chat.leaveSilently": "나가기 메시지를 표시하지 않고 나가기",
   "chat.systemMessage.changedName": "{actor}님이 그룹 이름을 변경했어요.",
   "chat.systemMessage.changedIcon": "{actor}님이 그룹 아이콘을 변경했어요.",
+  "maintenance.countdown": "서버 재시작까지 {time}",
+  "maintenance.downtime": "3-4분간 서비스가 중단될 예정입니다.",
+  "maintenance.pending": "서버 재시작 대기 중",
+  "maintenance.title": "예정된 유지 보수",
   "whatsNew.r20261028.groupActivityTitle": "그룹 채팅 활동",
   "whatsNew.r20261028.groupActivityBody": "그룹 이름과 아이콘 변경 사항이 채팅에 표시돼요. 하나의 그룹이나 선택한 여러 그룹에서 나갈 때 나가기 메시지를 숨길 수 있어요.",
   "whatsNew.r202610282.saveTitle": "저장 위치 선택",
@@ -7100,5 +7104,7 @@
   "reports.returnToReport": "신고로 돌아가기",
   "reports.reportTab": "신고",
   "reports.saved": "검토 저장됨",
-  "reports.historyTab": "기록"
+  "reports.historyTab": "기록",
+  "whatsNew.r20261029.maintenanceBody": "예정된 서버 재시작 2시간 30분 전부터 카운트다운이 표시되어 짧은 중단에 대비할 수 있습니다.",
+  "whatsNew.r20261029.maintenanceTitle": "유지 보수 알림"
 }

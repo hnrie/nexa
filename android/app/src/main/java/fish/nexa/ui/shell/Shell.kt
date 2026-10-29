@@ -220,6 +220,7 @@ fun MainShell() {
         // what is behind a dialog or sheet blurs, and a little behind an open drawer (AppShell.module.css)
         Column(Modifier.weight(1f).fillMaxHeight().blurredBy { maxOf(SCRIM_BLUR * Layers.dim, 2.dp * maxOf(drawer.value, members.value)) }.statusBarsPadding()) {
             ConnectionBanner()
+            MaintenanceBanner()
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (route) {
                     is Route.Friends -> FriendsPage()
