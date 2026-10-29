@@ -25,6 +25,13 @@ PAYLOADS = {
 
 CHECK = """() => {
   const failures = [];
+  for (const button of document.querySelectorAll('[data-full-label]')) {
+    const label = button.lastElementChild;
+    const range = document.createRange();
+    range.selectNodeContents(label);
+    const text = range.getBoundingClientRect(), box = label.getBoundingClientRect();
+    if (text.left < box.left - 1 || text.right > box.right + 1) failures.push(`clipped action: ${button.textContent}`);
+  }
   if (document.querySelectorAll("[data-boundary]").length < 15) failures.push("fixture did not render");
   for (const el of document.querySelectorAll('[data-emoji-slot]')) {
     if (el.getBoundingClientRect().width > 28) failures.push(`emoji slot expanded to ${el.getBoundingClientRect().width}`);
@@ -84,6 +91,10 @@ def main():
             unclamped = page.add_style_tag(content='[data-boundary^="invite"] [class*="_name_"] { -webkit-line-clamp: unset; }')
             assert any("height" in failure for failure in page.evaluate(CHECK)), "negative control did not detect unbounded titles"
             unclamped.evaluate("el => el.remove()")
+            if width == 1366:
+                squeezed = page.add_style_tag(content='[data-full-label] { flex-shrink: 1; }')
+                assert any("clipped action" in failure for failure in page.evaluate(CHECK)), "negative control did not detect clipped buttons"
+                squeezed.evaluate("el => el.remove()")
             page.close()
         browser.close()
     (args.out / "results.json").write_text(json.dumps({"results": results, "errors": errors}, indent=2))

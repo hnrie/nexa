@@ -1250,6 +1250,9 @@ blocks wrap and clip excess glyph ink. Code and tables scroll inside their own w
 the chat list never scrolls horizontally. Android bounds ink in its common text/name/markdown
 renderers and uses matching title limits. Preserve its bounded personal-name effect halo.
 Keep removable labels in a shrinkable text child so their buttons stay visible.
+Shared action buttons do not shrink in flex rows. Let adjacent text or inputs yield space,
+and wrap form rows when needed, so translated action labels stay readable. The text layout
+fixture covers account removal and the legal report row, including a button-clipping negative control.
 `docs/UI_TEXT_AUDIT.md` records the input-to-display inventory and the regression workflow.
 The field-level ledger is `docs/UI_TEXT_INPUTS.md`, with source snapshots in
 `docs/UI_TEXT_INPUTS.tsv` and `docs/UI_TEXT_INPUTS_ANDROID.tsv`; update these when adding

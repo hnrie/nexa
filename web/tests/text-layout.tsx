@@ -13,6 +13,9 @@ import { Markdown } from "@/markdown";
 import { RichEmbeds } from "@/components/chat/webhook/RichEmbeds";
 import { ServerCard } from "@/components/discovery/DiscoveryPage";
 import { Button } from "@/components/common/Button";
+import { TextInput } from "@/components/common/TextInput";
+import settings from "@/components/settings/Settings.module.css";
+import { t } from "@/i18n";
 import chat from "@/components/chat/Chat.module.css";
 import role from "@/components/server/RoleChips.module.css";
 import forum from "@/components/forum/Forum.module.css";
@@ -49,6 +52,14 @@ function Audit() {
   const target = { kind: "group" as const, id: null, name: text, description: body, icon: null, banner: null, online: null, members: 3 };
   const ctx = { users: { "1": { display_name: text, username: "alice" } }, channels: { "1": { name: text } }, roles: { "1": { name: text, color: 0 } }, emojiUrl: () => "" };
   return <MemoryRouter><main style={{ padding: 12, display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16, maxWidth: 1000, margin: "auto" }}>
+    <section data-boundary="account-removal" className={settings.dangerBox}>
+      <span className={settings.hint} style={{ margin: 0 }}>{t("settings.account.deletingYourAccountIsPermanentYour")}</span>
+      <Button data-action data-full-label variant="danger">{t("settings.account.deleteAccount")}</Button>
+    </section>
+    <section data-boundary="legal-report" className={settings.legalReportRow}>
+      <TextInput placeholder={t("settings.admin.legal.usernameOrAccountId")} />
+      <Button data-action data-full-label size="sm" disabled>{t("settings.admin.legal.compileReport")}</Button>
+    </section>
     <section data-boundary="chat" className={chat.chat} style={{ height: 560, background: "var(--bg-raised)" }}>
       <header className={chat.header}>
         <button className={chat.hGroup}><i style={{ flex: "none", width: 24 }}>◉</i><span data-lines="1" className={chat.hName} dir="auto">{text}</span></button>

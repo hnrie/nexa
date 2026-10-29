@@ -195,7 +195,7 @@ function LegalResponse() {
     <>
       <h3 className={st.h5}>{tr_("settings.admin.legal.lawEnforcementResponse")}</h3>
       <p className={st.hint}>{tr_("settings.admin.legal.compileWhatNexaHolds")}</p>
-      <div className={s.searchRow} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
+      <div className={st.legalReportRow}>
         <TextInput
           value={who}
           onChange={(e) => setWho(e.target.value)}

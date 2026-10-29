@@ -30,5 +30,6 @@
 .dots i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes pulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
 
-.btn { min-width: 0; max-width: 100%; }
+/* Rows give their spare width to text and inputs, never take it from actions. */
+.btn { flex-shrink: 0; min-width: 0; max-width: 100%; }
 .label { overflow: hidden; }
