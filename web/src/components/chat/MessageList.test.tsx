@@ -451,6 +451,57 @@ describe("MessageList keeping the reading position", () => {
     expect(firstVisible()).not.toBe("951");
   });
 
+  it("holds history during wheel momentum and releases it after scrollend settles", async () => {
+    asChrome();
+    seed(60);
+    show();
+    scrollTo(150);
+    scrollEnded();
+    fireEvent.wheel(scroller, { deltaY: -240 });
+    scrollTo(40);
+    inFlight.land(Array.from({ length: 50 }, (_, i) => String(951 + i)));
+    expect(rows()).toHaveLength(60);
+    const keeping = firstVisible();
+    const was = topOf(keeping);
+    // Model Chromium rebasing the reversed range to the newly loaded top
+    // when the held page is finally drawn, after its compositor gesture ends.
+    const measuredRect = HTMLElement.prototype.getBoundingClientRect;
+    let rebased = false;
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      if (!rebased && rows().length === 110) {
+        rebased = true;
+        scrollTop = -maxScroll();
+      }
+      return measuredRect.call(this);
+    };
+    scrollEnded();
+    expect(rows()).toHaveLength(60);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)); });
+    expect(rows()).toHaveLength(110);
+    expect(rebased).toBe(true);
+    expect(topOf(keeping)).toBe(was);
+    heights.set("960", ROW + 300);
+    relayout();
+    expect(topOf(keeping)).toBe(was);
+  });
+
+  it("releases wheel-held history after quiet when scrollend is missing", () => {
+    vi.useFakeTimers();
+    try {
+      asChrome();
+      seed(60);
+      show();
+      scrollTo(150);
+      fireEvent.wheel(scroller, { deltaY: -240 });
+      inFlight.land(Array.from({ length: 50 }, (_, i) => String(951 + i)));
+      expect(rows()).toHaveLength(60);
+      act(() => vi.advanceTimersByTime(1600));
+      expect(rows()).toHaveLength(110);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("lands a page that came under a touch that never moved the list as the finger lifts", () => {
     asChrome();
     seed(60);

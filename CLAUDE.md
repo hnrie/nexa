@@ -1239,6 +1239,17 @@ deploy, which `lib/appUpdate.ts` offers, using `version.json`) and `download-sw.
 switching pages goes through `startTransition`, which keeps the page on screen until the next one's
 file is here.
 
+### Message history scrolling
+
+`components/chat/MessageList.tsx` measures reading positions from the bottom of its reversed
+scroll container. In Chromium, incoming history waits until touch or wheel scrolling settles,
+including trackpad momentum. Wheel scrollend waits for a short rest before drawing queued
+rows, then restores the visible row in a layout effect if Chromium rebases its scroll range.
+The passive wheel listener also arms the quiet fallback when the
+loaded edge prevents a scroll event. `MessageList.test.tsx` covers both input paths, delayed
+image height changes and browsers that omit scrollend. Android uses stable row keys in its
+reversed native LazyColumn and does not use the browser gesture guard.
+
 ### Shared user text layout
 
 User text must fit its display slot independently of its character limit. Do not blacklist

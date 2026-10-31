@@ -57,8 +57,8 @@ type Row =
 const GROUP_MS = 7 * 60 * 1000;
 
 /**
- * Chrome and the browsers built on it, where a page landing above a touch
- * scroll moves this list under it (see `touching` in MessageList). Browsers
+ * Chrome and the browsers built on it, where a page landing during touch
+ * or wheel scrolling moves this list under it (see `touching` in MessageList). Browsers
  * on iPhones and iPads are WebKit whatever they call themselves, and say
  * CriOS rather than Chrome; touch scrolling there is left as it was.
  */
@@ -282,9 +282,9 @@ export function MessageList({ channel }: { channel: Channel }) {
   /** A page of older messages is on its way. Set here, not read from the last render, which lags a frame behind. */
   const olderBusy = useRef(false);
   /**
-   * A finger on the list or the list still moving from one (the fling after
-   * it), and the rows it was showing when the finger went down. Chrome, while
-   * a touch scroll or its fling is under way, holds the scroll position as a
+   * A finger or wheel on the list, or the list still moving from one (the fling after
+   * it), and the rows it was showing when the gesture began. Chrome, while
+   * a touch or wheel scroll or its fling is under way, holds the scroll position as a
    * distance from the top of the list rather than this list's own from the
    * bottom. A page of history landing above threw the reader to the top of
    * it, close enough to ask for the next page, which did the same, until the
@@ -296,6 +296,7 @@ export function MessageList({ channel }: { channel: Channel }) {
    * the top of what is loaded and the next page lands there.
    */
   const touching = useRef(false);
+  const releaseAnchor = useRef<Anchor | null>(null);
   const [held, setHeld] = useState<{ first: string; last: string } | null>(null);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [newBelow, setNewBelow] = useState(false);
@@ -556,6 +557,18 @@ export function MessageList({ channel }: { channel: Channel }) {
     return () => ro.disconnect();
   }, [channel.id, holdReading]);
 
+  // Chromium can rebase its reversed scroll range as a held page is drawn.
+  // Once the wheel is still it is safe to restore the actual visible row.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const anchor = releaseAnchor.current;
+    releaseAnchor.current = null;
+    if (el && anchor) {
+      restoreAnchor(el, anchor);
+      reading.current = readReading(el);
+    }
+  }, [held]);
+
   // Picking moves every row over for its check, which rewraps long messages
   // and would slide what is being read out of view. The row at the top is
   // noted before the change lands (a store subscription runs before React
@@ -699,7 +712,7 @@ export function MessageList({ channel }: { channel: Channel }) {
   const onScrollNow = useRef(onScroll);
   onScrollNow.current = onScroll;
 
-  // A finger down holds the rows that are there (see `touching`); they go once
+  // A touch or wheel gesture holds the rows that are there (see `touching`); they go once
   // the last finger is up and the list has stopped: at once if it never
   // moved, else at its scrollend, or when no scroll has come for a while where
   // that never fires. A finger that catches a fling keeps what is held.
@@ -709,6 +722,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     if (!el || !movesUnderTouch()) return;
     let fingers = false;
     let moving = false;
+    let wheel = false;
     let rest: ReturnType<typeof setTimeout> | null = null;
     const quietFor = "onscrollend" in window ? 1500 : 250;
     const wait = () => {
@@ -717,20 +731,35 @@ export function MessageList({ channel }: { channel: Channel }) {
     };
     const release = () => {
       wait();
+      if (wheel) releaseAnchor.current = readAnchor(el);
       touching.current = false;
+      wheel = false;
       setHeld(null);
     };
     const settle = () => {
       wait();
       rest = setTimeout(release, quietFor);
     };
-    const down = () => {
-      fingers = true;
-      wait();
+    const hold = () => {
       if (touching.current) return;
       touching.current = true;
       const now = useMessages.getState().channels[channel.id]?.ids ?? [];
       setHeld(now.length ? { first: now[0]!, last: now[now.length - 1]! } : null);
+    };
+    const down = () => {
+      fingers = true;
+      wait();
+      hold();
+    };
+    // Trackpad momentum uses wheel events, with no touchstart. Chromium
+    // preserves the top-relative position during that gesture too, so pages
+    // must wait just as they do under a finger. Arm the fallback even if the
+    // wheel hits the loaded edge and produces no scroll event.
+    const wheeled = (e: WheelEvent) => {
+      if (e.ctrlKey || e.deltaY === 0) return;
+      wheel = true;
+      hold();
+      if (!fingers) settle();
     };
     const up = (e: TouchEvent) => {
       if ((e.touches?.length ?? 0) > 0 || !fingers) return;
@@ -744,17 +773,25 @@ export function MessageList({ channel }: { channel: Channel }) {
     };
     const ended = () => {
       moving = false;
-      if (touching.current && !fingers) release();
+      if (!touching.current || fingers) return;
+      // A wheel scrollend can precede the compositor finishing its gesture.
+      // Let it rest before changing the scroll range; another wheel resets it.
+      if (wheel) {
+        wait();
+        rest = setTimeout(release, REST_MS);
+      } else release();
     };
     el.addEventListener("touchstart", down, { passive: true });
     el.addEventListener("touchend", up, { passive: true });
     el.addEventListener("touchcancel", up, { passive: true });
+    el.addEventListener("wheel", wheeled, { passive: true });
     el.addEventListener("scroll", scrolled, { passive: true });
     el.addEventListener("scrollend", ended);
     return () => {
       el.removeEventListener("touchstart", down);
       el.removeEventListener("touchend", up);
       el.removeEventListener("touchcancel", up);
+      el.removeEventListener("wheel", wheeled);
       el.removeEventListener("scroll", scrolled);
       el.removeEventListener("scrollend", ended);
       wait();
